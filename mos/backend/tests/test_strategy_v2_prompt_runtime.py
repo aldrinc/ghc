@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import hashlib
+from pathlib import Path
 
 import pytest
 
@@ -220,6 +222,163 @@ def test_offer_step05_response_schema_enforces_bounded_compact_contract() -> Non
             "kill_condition",
             "competitor_baseline",
         ]
+
+
+def test_voc_agent00b_response_schema_closes_configuration_objects() -> None:
+    schema = strategy_v2_activities._voc_agent00b_response_schema()
+    configuration_item = schema["properties"]["configurations"]["items"]
+
+    assert schema["required"] == ["platform_priorities", "configurations", "handoff_block"]
+    assert configuration_item["additionalProperties"] is False
+    assert configuration_item["required"] == ["config_id", "platform", "mode", "actor_id", "input"]
+    assert set(configuration_item["properties"]) == {"config_id", "platform", "mode", "actor_id", "input"}
+    assert "metadata" not in configuration_item["properties"]
+
+
+def _iter_strategy_v2_run_prompt_json_schemas():
+    source_path = Path(strategy_v2_activities.__file__)
+    source = source_path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    parents: dict[ast.AST, ast.AST] = {}
+
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+
+    def _enclosing_function(node: ast.AST) -> ast.FunctionDef | None:
+        current = parents.get(node)
+        while current is not None and not isinstance(current, ast.FunctionDef):
+            current = parents.get(current)
+        return current if isinstance(current, ast.FunctionDef) else None
+
+    def _build_local_scope(function_node: ast.FunctionDef | None, *, lineno: int) -> dict[str, object]:
+        if function_node is None:
+            return {}
+        local_scope: dict[str, object] = {}
+        for stmt in function_node.body:
+            stmt_lineno = getattr(stmt, "lineno", None)
+            if stmt_lineno is not None and stmt_lineno >= lineno:
+                break
+            target_name: str | None = None
+            value_node: ast.AST | None = None
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+                target_name = stmt.targets[0].id
+                value_node = stmt.value
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.value is not None:
+                target_name = stmt.target.id
+                value_node = stmt.value
+            if not target_name or value_node is None:
+                continue
+            expr = ast.get_source_segment(source, value_node)
+            if not expr:
+                continue
+            try:
+                local_scope[target_name] = eval(expr, strategy_v2_activities.__dict__, dict(local_scope))
+            except Exception:
+                continue
+        return local_scope
+
+    def _resolve_local_name(function_node: ast.FunctionDef | None, *, name: str, lineno: int) -> object:
+        if function_node is None:
+            raise NameError(name)
+        latest_lineno = -1
+        latest_value: ast.AST | None = None
+        for child in ast.walk(function_node):
+            child_lineno = getattr(child, "lineno", -1)
+            if child_lineno >= lineno:
+                continue
+            if isinstance(child, ast.Assign) and len(child.targets) == 1 and isinstance(child.targets[0], ast.Name):
+                if child.targets[0].id == name and child_lineno > latest_lineno:
+                    latest_lineno = child_lineno
+                    latest_value = child.value
+            elif isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name) and child.value is not None:
+                if child.target.id == name and child_lineno > latest_lineno:
+                    latest_lineno = child_lineno
+                    latest_value = child.value
+        if latest_value is None:
+            raise NameError(name)
+        expr = ast.get_source_segment(source, latest_value)
+        if not expr:
+            raise NameError(name)
+        return eval(expr, strategy_v2_activities.__dict__, {})
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "_run_prompt_json_object":
+            continue
+
+        schema_name: str | None = None
+        schema_expr: str | None = None
+        for kw in node.keywords:
+            if kw.arg == "schema_name" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                schema_name = kw.value.value
+            elif kw.arg == "schema":
+                schema_expr = ast.get_source_segment(source, kw.value)
+        if not schema_name or not schema_expr:
+            continue
+
+        function_node = _enclosing_function(node)
+        local_scope = _build_local_scope(function_node, lineno=node.lineno)
+        try:
+            schema = eval(schema_expr, strategy_v2_activities.__dict__, local_scope)
+        except NameError:
+            if not schema_expr.isidentifier():
+                raise
+            schema = _resolve_local_name(function_node, name=schema_expr, lineno=node.lineno)
+        yield node.lineno, schema_name, schema
+
+
+def _collect_openai_strict_schema_issues(node: object, *, path: str = "$") -> list[str]:
+    issues: list[str] = []
+    if isinstance(node, dict):
+        if node.get("type") == "object":
+            raw_properties = node.get("properties")
+            properties = raw_properties if isinstance(raw_properties, dict) else {}
+            if node.get("additionalProperties") is not False:
+                issues.append(f"{path}: additionalProperties must be false")
+            if properties:
+                required = node.get("required")
+                if not isinstance(required, list):
+                    issues.append(f"{path}: required must be a list")
+                else:
+                    missing = [key for key in properties if key not in required]
+                    extra = [key for key in required if key not in properties]
+                    if missing or extra:
+                        issues.append(f"{path}: required mismatch missing={missing} extra={extra}")
+            for key, child in properties.items():
+                issues.extend(_collect_openai_strict_schema_issues(child, path=f"{path}.properties.{key}"))
+
+        items = node.get("items")
+        if isinstance(items, (dict, list)):
+            issues.extend(_collect_openai_strict_schema_issues(items, path=f"{path}.items"))
+
+        for combiner_key in ("anyOf", "oneOf", "allOf"):
+            combiner = node.get(combiner_key)
+            if isinstance(combiner, list):
+                for idx, child in enumerate(combiner):
+                    issues.extend(_collect_openai_strict_schema_issues(child, path=f"{path}.{combiner_key}[{idx}]"))
+
+        negated = node.get("not")
+        if isinstance(negated, dict):
+            issues.extend(_collect_openai_strict_schema_issues(negated, path=f"{path}.not"))
+    elif isinstance(node, list):
+        for idx, child in enumerate(node):
+            issues.extend(_collect_openai_strict_schema_issues(child, path=f"{path}[{idx}]"))
+    return issues
+
+
+def test_strategy_v2_run_prompt_json_schemas_are_openai_strict() -> None:
+    failures: list[str] = []
+
+    for lineno, schema_name, schema in _iter_strategy_v2_run_prompt_json_schemas():
+        normalized = strategy_v2_activities._enforce_strict_openai_json_schema(schema)
+        issues = _collect_openai_strict_schema_issues(normalized)
+        if issues:
+            failures.append(f"{schema_name}@{lineno}")
+            failures.extend(f"  - {issue}" for issue in issues)
+
+    assert not failures, "\n".join(failures)
 
 
 def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.MonkeyPatch) -> None:

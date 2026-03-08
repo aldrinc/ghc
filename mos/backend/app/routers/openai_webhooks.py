@@ -4,7 +4,7 @@ from openai import InvalidWebhookSignatureError
 from app.config import settings
 from app.services.deep_research import DeepResearchJobService, build_openai_client
 
-router = APIRouter(prefix="/openai", tags=["openai"])
+router = APIRouter(prefix="/api/openai", tags=["openai"])
 
 
 @router.post("/webhook")

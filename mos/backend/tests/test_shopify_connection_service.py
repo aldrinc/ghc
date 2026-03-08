@@ -129,6 +129,46 @@ def test_status_multiple_installations_uses_selected_shop(monkeypatch):
     assert status["selectedShopDomain"] == "two.myshopify.com"
 
 
+def test_status_selected_shop_must_match_active_installation(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="active.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=True,
+                scopes=sorted(
+                    {
+                        "read_orders",
+                        "write_orders",
+                        "unauthenticated_read_product_listings",
+                        "read_products",
+                        "write_products",
+                        "read_discounts",
+                        "write_discounts",
+                    }
+                ),
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1",
+        selected_shop_domain="stale.myshopify.com",
+    )
+
+    assert status["state"] == "multiple_installations_conflict"
+    assert (
+        status["message"]
+        == "Selected default Shopify store (stale.myshopify.com) is not active for this workspace. "
+        "Choose one store explicitly."
+    )
+    assert status["shopDomain"] is None
+    assert status["selectedShopDomain"] == "stale.myshopify.com"
+
+
 def test_status_missing_scopes_returns_error(monkeypatch):
     monkeypatch.setattr(
         shopify_connection,
@@ -348,6 +388,47 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
         assert exc.detail == "productGid must be a Shopify product GID."
     else:
         raise AssertionError("Expected get_client_shopify_product to reject invalid product gid")
+
+
+def test_sync_client_shopify_catalog_collection_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
+        assert method == "POST"
+        assert path == "/v1/catalog/collection/sync"
+        assert json_body == {
+            "clientId": "client_1",
+            "productGids": [
+                "gid://shopify/Product/123",
+                "gid://shopify/Product/456",
+            ],
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "requestedProductCount": 2,
+            "addedProductCount": 1,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_catalog_collection(
+        client_id="client_1",
+        product_gids=[
+            "gid://shopify/Product/123",
+            "gid://shopify/Product/456",
+            "gid://shopify/Product/456",
+        ],
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "collectionId": "gid://shopify/Collection/1",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "requestedProductCount": 2,
+        "addedProductCount": 1,
+    }
 
 
 def test_create_client_shopify_product_parses_response(monkeypatch):

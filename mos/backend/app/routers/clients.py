@@ -1,6 +1,7 @@
 import base64
 import binascii
 import concurrent.futures
+from contextlib import nullcontext
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from html import escape
@@ -27,7 +28,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.base import SessionLocal
 from app.db.deps import get_session
-from app.db.models import ClientComplianceProfile, ClientUserPreference, Product
+from app.db.models import ClientComplianceProfile, ClientUserPreference, Funnel, FunnelPage, Product
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.client_compliance_profiles import (
     ClientComplianceProfilesRepository,
@@ -47,7 +48,7 @@ from app.db.repositories.shopify_theme_template_drafts import (
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.enums import ArtifactTypeEnum, AssetStatusEnum
+from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, FunnelStatusEnum
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.schemas.preferences import ActiveProductUpdateRequest
 from app.schemas.common import ClientCreate
@@ -102,6 +103,7 @@ from app.services.compliance import (
     get_policy_template,
     get_profile_url_field_for_page_key,
     markdown_to_shopify_html,
+    resolve_theme_contact_page_values,
     render_policy_template_markdown,
 )
 from app.services.funnels import (
@@ -109,7 +111,12 @@ from app.services.funnels import (
     create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
+from app.services.funnel_testimonials import (
+    generate_shopify_theme_review_card_payloads,
+    generate_shopify_theme_testimonial_image_asset,
+)
 from app.services.media_storage import MediaStorage
+from app.services.public_routing import require_product_route_slug
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     auto_provision_client_shopify_storefront_token,
@@ -126,6 +133,9 @@ from app.services.shopify_connection import (
     sync_client_shopify_theme_brand,
     upsert_client_shopify_policy_pages,
 )
+from app.services.shopify_collection_sync import (
+    sync_workspace_shopify_catalog_collection,
+)
 from app.services.shopify_theme_copy_agent import (
     generate_shopify_theme_component_copy,
 )
@@ -133,6 +143,8 @@ from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
 from app.services.product_types import canonical_product_type
+from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
+from app.testimonial_renderer.validate import TestimonialRenderError
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.temporal.client import get_temporal_client
@@ -196,44 +208,80 @@ _THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS: frozenset[str] = frozenset(
     for card_paths in _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS.values()
     for path in card_paths
 )
-_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
-_THEME_HEADER_NAV_DESKTOP_FILENAME = "snippets/header-nav-desktop.liquid"
-_THEME_HEADER_NAV_DRAWER_FILENAME = "snippets/header-nav-drawer.liquid"
 _THEME_RICH_TEXT_SECTION_FILENAME = "sections/rich-text.liquid"
-_THEME_HEADER_DRAWER_CATALOG_DETAILS_RE = re.compile(
-    r"<li>\s*<details\b[^>]*>.*?<summary[^>]*>\s*(?:Catalog|Shop)\s*</summary>.*?</details>\s*</li>",
-    re.IGNORECASE | re.DOTALL,
-)
-_THEME_HEADER_DRAWER_CATALOG_LINK_RE = re.compile(
-    r"<li>\s*<a\b[^>]*>\s*(?:Catalog|Shop)\s*</a>\s*</li>",
-    re.IGNORECASE | re.DOTALL,
-)
-_THEME_HEADER_DRAWER_COLLECTION_TEST_LINK_RE = re.compile(
-    r'href\s*=\s*(["\'])/collections/test\1',
+_THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
+_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
+_THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
+_THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
+_THEME_SHOPPABLE_VIDEO_SECTION_FILENAME = "sections/ss-shoppable-video.liquid"
+_THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
+_THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE = re.compile(
+    (
+        r'(<a\b(?=[^>]*\bclass="[^"]*(?:product-card__title|title)[^"]*")'
+        r'[^>]*\bhref=)"\{\{\s*product(?:_|\.)url\s*\}\}"'
+    ),
     re.IGNORECASE,
 )
-_THEME_COLLECTION_TEST_PATH_RE = re.compile(
-    r"/collections/test(?=(?:[/?#\"'\\]|$))",
+_THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
+    r'href="\{\{\s*product(?:_|\.)url\s*\}\}"',
     re.IGNORECASE,
 )
-_THEME_SHOPIFY_PRODUCT_LINK_RE = re.compile(
-    r'(?P<quote>["\'])shopify://products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+_THEME_SHOPPABLE_VIDEO_CART_JSON_LINE_RE = re.compile(
+    (
+        r"^(?P<indent>\s*)"
+        r"const\s+cart\{\{\s*forloop\.index\s*\}\}\s*="
+        r"\s*await\s+res\{\{\s*forloop\.index\s*\}\}\.json\(\);\s*$"
+    )
+)
+_THEME_SHOPPABLE_VIDEO_CART_UPDATE_PUBLISH_RE = re.compile(
+    (
+        r"theme\.pubsub\.publish\(\s*"
+        r"theme\.pubsub\.PUB_SUB_EVENTS\.cartUpdate\s*,\s*"
+        r"\{\s*cart:\s*cart\{\{\s*forloop\.index\s*\}\}\s*\}\s*"
+        r"\)\s*;"
+    )
+)
+_THEME_TRACK_ORDER_TITLE_RE = re.compile(
+    r"^\s*track\s+(?:your|my)\s+order\s*$",
     re.IGNORECASE,
 )
-_THEME_SHOPIFY_COLLECTION_LINK_RE = re.compile(
-    r'(?P<quote>["\'])shopify://collections(?:/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*))?(?P=quote)',
+_THEME_TRACK_ORDER_LINK_HREF_RE = re.compile(
+    r'href\s*=\s*["\']/pages/(?:track-order|track-your-order)["\']',
     re.IGNORECASE,
 )
-_THEME_RELATIVE_PRODUCT_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+_THEME_FOOTER_TABS_SECTION_FILENAMES: frozenset[str] = frozenset(
+    {"sections/ss-footer-4.liquid", "sections/a-ss-footer-4.liquid"}
+)
+_THEME_FOOTER_CONTACT_PAGE_PATH = "/pages/contact"
+_THEME_FOOTER_CONTACT_SUPPORT_LINK_HTML = (
+    f'<a href="{_THEME_FOOTER_CONTACT_PAGE_PATH}"><strong><u>Contact our support team</u></strong></a>'
+)
+_THEME_FOOTER_CONTACT_US_LINK_HTML = (
+    f'<a href="{_THEME_FOOTER_CONTACT_PAGE_PATH}"><strong><u>Contact us</u></strong></a>'
+)
+_THEME_FOOTER_REFUND_CONTACT_TEXT_RE = re.compile(
+    r"Contact\s+our\s+support\s+team",
     re.IGNORECASE,
 )
-_THEME_RELATIVE_PAGE_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/pages/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+_THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE = re.compile(
+    r"Our\s+team\s+is\s+here\s+to\s+help\.?",
     re.IGNORECASE,
 )
-_THEME_RELATIVE_COLLECTION_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/collections/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*)(?P=quote)',
+_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET = (
+    "  .footer-tab-text-{{ section.id }} a,\n"
+    "  .footer-tab-height-cal-{{ section.id }} a {\n"
+    "    text-decoration: underline !important;\n"
+    "    text-underline-offset: 2px;\n"
+    "    font-weight: 700;\n"
+    "    cursor: pointer;\n"
+    "  }\n\n"
+)
+_THEME_CONTACT_TEMPLATE_FILENAME_RE = re.compile(
+    r"^templates/page\.contact(?:-[a-z0-9]+)*\.json$",
+    re.IGNORECASE,
+)
+_THEME_CONTACT_EMAIL_VALUE_RE = re.compile(
+    r"^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$",
     re.IGNORECASE,
 )
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
@@ -249,7 +297,6 @@ _THEME_EXPORT_REQUIRED_COLLECTION_SECTIONS: tuple[str, ...] = (
     "main-collection-banner",
     "main-collection",
 )
-_THEME_SAFE_FALLBACK_PATH = "/"
 _THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR = "--color-page-bg-secondary"
 _THEME_SECONDARY_SECTION_BACKGROUND_FILENAMES: tuple[str, ...] = (
     "sections/ss-before-after-4.liquid",
@@ -279,11 +326,6 @@ _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
         "templates",
     }
 )
-_THEME_HEADER_DRAWER_SAFE_CATALOG_LINK = (
-    '<li><a class="drawer__menu-item block text-2xl font-bold '
-    f'leading-none tracking-tight" href="{_THEME_SAFE_FALLBACK_PATH}">Shop</a></li>'
-)
-_THEME_LIQUID_OUTPUT_TAG_RE = re.compile(r"(\{\{[-\s]*)(.*?)([-\s]*\}\})", re.DOTALL)
 _LOCAL_SHOPIFY_THEME_DEFAULT_SHOP_DOMAIN = "local.mos"
 _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_NAME = "mos-local-theme"
 _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_ROLE = "MAIN"
@@ -398,9 +440,17 @@ _THEME_SYNC_AI_IMAGE_MIN_SIZE_BY_ASPECT_RATIO = {
 _THEME_IMAGE_SLOT_CONFIG_PATH = (
     Path(__file__).resolve().parents[4] / "theme_image_slot_config.json"
 )
+_THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT = "default"
+_THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER = "testimonial_renderer"
+_THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD = "review_card"
 
 
-def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, str]]:
+def _load_theme_sync_slot_prompt_overrides() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+]:
     try:
         parsed = json.loads(_THEME_IMAGE_SLOT_CONFIG_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -430,6 +480,8 @@ def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, 
 
     aspect_ratio_overrides: dict[str, str] = {}
     render_hint_overrides: dict[str, str] = {}
+    generation_strategy_by_path: dict[str, str] = {}
+    testimonial_template_by_path: dict[str, str] = {}
     for raw_theme_name, raw_slots in raw_theme_map.items():
         if not isinstance(raw_theme_name, str) or not raw_theme_name.strip():
             raise RuntimeError(
@@ -504,12 +556,96 @@ def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, 
                     )
                 render_hint_overrides[slot_path] = normalized_render_hint
 
-    return aspect_ratio_overrides, render_hint_overrides
+            raw_generation_strategy = raw_slot.get("generationStrategy")
+            normalized_generation_strategy = _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT
+            if raw_generation_strategy is not None:
+                if (
+                    not isinstance(raw_generation_strategy, str)
+                    or not raw_generation_strategy.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "generationStrategy value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_generation_strategy = raw_generation_strategy.strip().lower()
+                if normalized_generation_strategy not in {
+                    _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT,
+                    _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER,
+                }:
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an unsupported "
+                        "generationStrategy value. "
+                        f"path={slot_path}, generationStrategy={normalized_generation_strategy}."
+                    )
+                existing_generation_strategy = generation_strategy_by_path.get(slot_path)
+                if (
+                    existing_generation_strategy is not None
+                    and existing_generation_strategy != normalized_generation_strategy
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "generationStrategy values. "
+                        f"path={slot_path}."
+                    )
+                if normalized_generation_strategy != _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT:
+                    generation_strategy_by_path[slot_path] = normalized_generation_strategy
+
+            raw_testimonial_template = raw_slot.get("testimonialTemplate")
+            if raw_testimonial_template is not None:
+                if (
+                    not isinstance(raw_testimonial_template, str)
+                    or not raw_testimonial_template.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "testimonialTemplate value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_testimonial_template = raw_testimonial_template.strip()
+                if (
+                    normalized_testimonial_template
+                    != _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an unsupported "
+                        "testimonialTemplate value. "
+                        f"path={slot_path}, testimonialTemplate={normalized_testimonial_template}."
+                    )
+                if (
+                    normalized_generation_strategy
+                    != _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config can only use testimonialTemplate "
+                        "when generationStrategy=testimonial_renderer. "
+                        f"path={slot_path}."
+                    )
+                existing_testimonial_template = testimonial_template_by_path.get(slot_path)
+                if (
+                    existing_testimonial_template is not None
+                    and existing_testimonial_template != normalized_testimonial_template
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "testimonialTemplate values. "
+                        f"path={slot_path}."
+                    )
+                testimonial_template_by_path[slot_path] = normalized_testimonial_template
+
+    return (
+        aspect_ratio_overrides,
+        render_hint_overrides,
+        generation_strategy_by_path,
+        testimonial_template_by_path,
+    )
 
 
 (
     _THEME_SYNC_SLOT_ASPECT_RATIO_OVERRIDE_BY_PATH,
     _THEME_SYNC_SLOT_IMAGE_RENDER_HINT_BY_PATH,
+    _THEME_SYNC_SLOT_GENERATION_STRATEGY_BY_PATH,
+    _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_BY_PATH,
 ) = _load_theme_sync_slot_prompt_overrides()
 _GEMINI_IMAGE_REFERENCES_ENABLED_TRUE_VALUES = {"1", "true", "yes", "on"}
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
@@ -547,82 +683,206 @@ def _has_explicit_gemini_hard_quota_signal(message: str) -> bool:
     )
 
 
-def _normalize_theme_export_header_drawer_content(*, content: str) -> str:
-    normalized = content
-    normalized = _THEME_HEADER_DRAWER_CATALOG_DETAILS_RE.sub(
-        _THEME_HEADER_DRAWER_SAFE_CATALOG_LINK,
-        normalized,
-    )
-
-    def _rewrite_catalog_link(match: re.Match[str]) -> str:
-        menu_item = match.group(0)
-        rewritten_menu_item = menu_item
-        if re.search(
-            r'href\s*=\s*["\']/collections/all["\']',
-            menu_item,
-            re.IGNORECASE,
-        ) is None:
-            rewritten_menu_item, replaced = re.subn(
-                r'href\s*=\s*["\'][^"\']*["\']',
-                'href="/collections/all"',
-                menu_item,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-            if replaced == 0:
-                rewritten_menu_item = re.sub(
-                    r"<a\b",
-                    '<a href="/collections/all"',
-                    menu_item,
-                    count=1,
-                    flags=re.IGNORECASE,
-                )
-        return re.sub(
-            r">(\s*)(?:Catalog|Shop)(\s*)<",
-            r">\1Shop\2<",
-            rewritten_menu_item,
-            count=1,
-            flags=re.IGNORECASE,
+def _resolve_theme_export_sales_page_path(
+    *,
+    client_id: str,
+    auth: AuthContext,
+    session: Session,
+) -> tuple[str, str | None]:
+    product = session.scalars(
+        select(Product)
+        .where(Product.org_id == auth.org_id, Product.client_id == client_id)
+        .order_by(Product.created_at.asc(), Product.id.asc())
+        .limit(1)
+    ).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Theme ZIP export requires at least one workspace product to resolve "
+                "Shopify theme links."
+            ),
         )
 
-    normalized = _THEME_HEADER_DRAWER_CATALOG_LINK_RE.sub(
-        _rewrite_catalog_link,
-        normalized,
+    try:
+        require_product_route_slug(product=product)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Theme ZIP export could not resolve a public product slug for the first "
+                f"workspace product: {exc}"
+            ),
+        ) from exc
+
+    def _find_latest_sales_page_for_product(
+        *,
+        product_id: str | None,
+    ) -> Any | None:
+        query = (
+            select(Product, Funnel.route_slug, FunnelPage.slug)
+            .join(Funnel, Funnel.product_id == Product.id)
+            .join(FunnelPage, FunnelPage.funnel_id == Funnel.id)
+            .where(
+                Funnel.org_id == auth.org_id,
+                Funnel.client_id == client_id,
+                Funnel.status.in_((FunnelStatusEnum.draft, FunnelStatusEnum.published)),
+                FunnelPage.template_id == "sales-pdp",
+            )
+            .order_by(
+                FunnelPage.created_at.desc(),
+                FunnelPage.id.desc(),
+                Funnel.created_at.desc(),
+                Funnel.id.desc(),
+                FunnelPage.ordering.desc(),
+            )
+            .limit(1)
+        )
+        if product_id is not None:
+            query = query.where(Funnel.product_id == product_id)
+        return session.execute(query).first()
+
+    def _build_sales_page_path(
+        *,
+        target_product: Product,
+        route_slug: Any,
+        page_slug: Any,
+    ) -> str | None:
+        target_funnel_slug = str(route_slug or "").strip()
+        target_page_slug = str(page_slug or "").strip()
+        if not target_funnel_slug or not target_page_slug:
+            return None
+        try:
+            target_product_slug = require_product_route_slug(product=target_product)
+        except ValueError:
+            return None
+        return f"/f/{target_product_slug}/{target_funnel_slug}/{target_page_slug}"
+
+    first_product_sales_page = _find_latest_sales_page_for_product(product_id=product.id)
+    if first_product_sales_page is not None:
+        first_product_record, first_route_slug, first_page_slug = first_product_sales_page
+        if isinstance(first_product_record, Product):
+            first_product_sales_page_path = _build_sales_page_path(
+                target_product=first_product_record,
+                route_slug=first_route_slug,
+                page_slug=first_page_slug,
+            )
+            if first_product_sales_page_path:
+                return first_product_sales_page_path, None
+
+    latest_workspace_sales_page = _find_latest_sales_page_for_product(product_id=None)
+    if latest_workspace_sales_page is not None:
+        workspace_product, workspace_route_slug, workspace_page_slug = (
+            latest_workspace_sales_page
+        )
+        if isinstance(workspace_product, Product):
+            workspace_sales_page_path = _build_sales_page_path(
+                target_product=workspace_product,
+                route_slug=workspace_route_slug,
+                page_slug=workspace_page_slug,
+            )
+            if workspace_sales_page_path:
+                return (
+                    workspace_sales_page_path,
+                    (
+                        "Theme ZIP downloaded, but sales page was not found for the first "
+                        f"workspace product '{product.title}'. Using latest available sales page "
+                        f"from workspace product '{workspace_product.title}'."
+                    ),
+                )
+
+    return (
+        "",
+        (
+            "Theme ZIP downloaded, but sales page was not found for the first "
+            f"workspace product '{product.title}'. Links were left blank."
+        ),
     )
-    normalized = _THEME_HEADER_DRAWER_COLLECTION_TEST_LINK_RE.sub(
-        'href="/collections/all"',
-        normalized,
-    )
-    return normalized
 
 
-def _normalize_theme_export_header_navigation_link_labels(
+def _normalize_theme_export_main_page_button_links(
     *,
     filename: str,
     content: str,
+    sales_page_path: str,
 ) -> str:
-    if filename not in {
-        _THEME_HEADER_NAV_DESKTOP_FILENAME,
-        _THEME_HEADER_NAV_DRAWER_FILENAME,
-    }:
+    if filename != _THEME_INDEX_TEMPLATE_FILENAME:
         return content
 
-    def _rewrite_liquid_output_tag(match: re.Match[str]) -> str:
-        prefix, expression, suffix = match.groups()
-        updated_expression = re.sub(
-            r"\blink\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
-            "link.title | replace: 'Catalog', 'Shop'",
-            expression,
-        )
-        return f"{prefix}{updated_expression}{suffix}"
+    try:
+        parsed_content = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Theme ZIP export could not parse templates/index.json while rewriting CTA links.",
+        ) from exc
 
-    normalized = _THEME_LIQUID_OUTPUT_TAG_RE.sub(_rewrite_liquid_output_tag, content)
-    normalized = re.sub(
-        r"\becho\s+link\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
-        "echo link.title | replace: 'Catalog', 'Shop'",
-        normalized,
+    rewritten_button_count = 0
+
+    def _rewrite_value(value: Any) -> Any:
+        nonlocal rewritten_button_count
+        if isinstance(value, dict):
+            updated: dict[str, Any] = {}
+            for key, nested_value in value.items():
+                if key in _THEME_MAIN_PAGE_BUTTON_LINK_KEYS and isinstance(nested_value, str):
+                    updated[key] = sales_page_path
+                    rewritten_button_count += 1
+                else:
+                    updated[key] = _rewrite_value(nested_value)
+            return updated
+        if isinstance(value, list):
+            return [_rewrite_value(item) for item in value]
+        return value
+
+    normalized_content = json.dumps(_rewrite_value(parsed_content), separators=(",", ":"))
+    if rewritten_button_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not find any homepage CTA button links to rewrite "
+                "in templates/index.json."
+            ),
+        )
+    return normalized_content
+
+
+def _normalize_theme_export_catalog_product_card_links(
+    *,
+    filename: str,
+    content: str,
+    sales_page_path: str,
+) -> str:
+    if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
+        return content
+
+    normalized_content, rewritten_title_count = _THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE.subn(
+        rf'\1"{sales_page_path}"',
+        content,
+        count=1,
     )
-    return normalized
+    if rewritten_title_count != 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not rewrite the catalog product title link "
+                "in snippets/product-card.liquid."
+            ),
+        )
+
+    normalized_content, rewritten_link_count = _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE.subn(
+        f'href="{sales_page_path}"',
+        normalized_content,
+        count=2,
+    )
+    if rewritten_link_count != 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not rewrite the expected catalog product links "
+                "in snippets/product-card.liquid."
+            ),
+        )
+    return normalized_content
 
 
 def _normalize_theme_export_rich_text_section_content(
@@ -660,6 +920,326 @@ def _normalize_theme_export_rich_text_section_content(
         flags=re.IGNORECASE,
     )
     return normalized
+
+
+def _normalize_theme_export_track_order_links(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    normalized = content
+    if filename == _THEME_HEADER_DRAWER_FILENAME:
+        normalized = _THEME_TRACK_ORDER_LINK_HREF_RE.sub(
+            'href="/pages/contact"',
+            normalized,
+        )
+
+    if filename != _THEME_FOOTER_GROUP_FILENAME:
+        return normalized
+
+    template_data = _parse_theme_export_template_json(
+        filename=filename,
+        content=normalized,
+    )
+    sections = template_data.get("sections")
+    if not isinstance(sections, dict):
+        return normalized
+
+    changed = False
+    for section in sections.values():
+        if not isinstance(section, dict):
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            continue
+        block_keys_to_remove: list[str] = []
+        for block_key, block in blocks.items():
+            if not isinstance(block, dict):
+                continue
+            settings = block.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            title = settings.get("title")
+            text = settings.get("text")
+            if isinstance(text, str) and text.strip():
+                if (
+                    _THEME_FOOTER_REFUND_CONTACT_TEXT_RE.search(text)
+                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text
+                ):
+                    updated_text = _THEME_FOOTER_REFUND_CONTACT_TEXT_RE.sub(
+                        _THEME_FOOTER_CONTACT_SUPPORT_LINK_HTML,
+                        text,
+                        count=1,
+                    )
+                    if updated_text != text:
+                        settings["text"] = updated_text
+                        changed = True
+                        text = updated_text
+
+                if (
+                    _THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE.search(text)
+                    and "Contact us" not in text
+                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text
+                ):
+                    updated_text = _THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE.sub(
+                        f"Our team is here to help. {_THEME_FOOTER_CONTACT_US_LINK_HTML}.",
+                        text,
+                        count=1,
+                    )
+                    if updated_text != text:
+                        settings["text"] = updated_text
+                        changed = True
+
+            if not isinstance(title, str) or not _THEME_TRACK_ORDER_TITLE_RE.match(
+                title.strip()
+            ):
+                continue
+            block_keys_to_remove.append(block_key)
+        for block_key in block_keys_to_remove:
+            blocks.pop(block_key, None)
+            changed = True
+
+    if not changed:
+        return normalized
+    return json.dumps(template_data, separators=(",", ":"))
+
+
+def _normalize_theme_export_shoppable_video_cart_counter_updates(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename != _THEME_SHOPPABLE_VIDEO_SECTION_FILENAME:
+        return content
+
+    lines = content.splitlines(keepends=True)
+    if not lines:
+        return content
+
+    changed = False
+    normalized_lines: list[str] = []
+    line_count = len(lines)
+    for index, line in enumerate(lines):
+        normalized_lines.append(line)
+        cart_line_match = _THEME_SHOPPABLE_VIDEO_CART_JSON_LINE_RE.match(
+            line.rstrip("\r\n")
+        )
+        if cart_line_match is None:
+            continue
+
+        next_line = lines[index + 1].strip() if index + 1 < line_count else ""
+        if _THEME_SHOPPABLE_VIDEO_CART_UPDATE_PUBLISH_RE.search(next_line):
+            continue
+
+        indent = cart_line_match.group("indent")
+        if line.endswith("\r\n"):
+            line_ending = "\r\n"
+        elif line.endswith("\n"):
+            line_ending = "\n"
+        elif line.endswith("\r"):
+            line_ending = "\r"
+        else:
+            line_ending = ""
+        normalized_lines.append(
+            indent
+            + "theme.pubsub.publish(theme.pubsub.PUB_SUB_EVENTS.cartUpdate, { cart: cart{{ forloop.index }} });"
+            + line_ending
+        )
+        changed = True
+
+    if not changed:
+        return content
+    return "".join(normalized_lines)
+
+
+def _normalize_theme_export_footer_tab_link_styling(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename not in _THEME_FOOTER_TABS_SECTION_FILENAMES:
+        return content
+    if ".footer-tab-text-{{ section.id }} a," in content:
+        return content
+
+    media_query_marker = "@media(min-width: 1024px) {"
+    if media_query_marker in content:
+        return content.replace(
+            media_query_marker,
+            f"{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}{media_query_marker}",
+            1,
+        )
+    return f"{content.rstrip()}\n\n{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}"
+
+
+def _build_theme_export_contact_multiline_html(*, text: str) -> str:
+    lines = [line.strip() for line in text.replace("\r", "\n").split("\n") if line.strip()]
+    if not lines:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received empty multiline text content.",
+        )
+    return f"<p>{'<br/>'.join(escape(line) for line in lines)}</p>"
+
+
+def _build_theme_export_contact_email_html(*, email: str) -> str:
+    normalized_email = email.strip()
+    if not normalized_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received an empty support email value.",
+        )
+    if not _THEME_CONTACT_EMAIL_VALUE_RE.match(normalized_email):
+        return _build_theme_export_contact_multiline_html(text=normalized_email)
+    escaped_email = escape(normalized_email)
+    return f'<p><a href="mailto:{escaped_email}">{escaped_email}</a></p>'
+
+
+def _build_theme_export_contact_phone_html(
+    *,
+    phone: str,
+    support_hours: str,
+) -> str:
+    normalized_phone = phone.strip()
+    normalized_hours = support_hours.strip()
+    if not normalized_phone:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received an empty support phone value.",
+        )
+    if not normalized_hours:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received empty support hours content.",
+        )
+
+    tel_value = re.sub(r"[^0-9+]", "", normalized_phone)
+    has_digits = any(char.isdigit() for char in tel_value)
+    escaped_phone = escape(normalized_phone)
+    escaped_hours = escape(normalized_hours)
+    if has_digits:
+        phone_line = f'<a href="tel:{escape(tel_value)}">{escaped_phone}</a>'
+    else:
+        phone_line = escaped_phone
+    return f"<p>{phone_line}<br/>{escaped_hours}</p>"
+
+
+def _normalize_theme_export_contact_page_template_content(
+    *,
+    filename: str,
+    content: str,
+    contact_page_values: dict[str, str] | None,
+) -> str:
+    if not _THEME_CONTACT_TEMPLATE_FILENAME_RE.match(filename):
+        return content
+    if not isinstance(contact_page_values, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because compliance "
+                "contact values were not provided."
+            ),
+        )
+
+    required_keys = (
+        "businessAddress",
+        "supportEmail",
+        "supportPhone",
+        "supportHours",
+    )
+    missing_or_invalid_keys: list[str] = []
+    normalized_contact_values: dict[str, str] = {}
+    for key in required_keys:
+        value = contact_page_values.get(key)
+        if not isinstance(value, str) or not value.strip():
+            missing_or_invalid_keys.append(key)
+            continue
+        normalized_contact_values[key] = value.strip()
+    if missing_or_invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because compliance "
+                "contact values are missing or invalid: "
+                + ", ".join(sorted(missing_or_invalid_keys))
+                + "."
+            ),
+        )
+
+    template_data = _parse_theme_export_template_json(
+        filename=filename,
+        content=content,
+    )
+    sections = template_data.get("sections")
+    if not isinstance(sections, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because "
+                f"{filename}.sections is missing or invalid."
+            ),
+        )
+
+    contact_html_by_heading = {
+        "address": _build_theme_export_contact_multiline_html(
+            text=normalized_contact_values["businessAddress"]
+        ),
+        "email": _build_theme_export_contact_email_html(
+            email=normalized_contact_values["supportEmail"]
+        ),
+        "phone": _build_theme_export_contact_phone_html(
+            phone=normalized_contact_values["supportPhone"],
+            support_hours=normalized_contact_values["supportHours"],
+        ),
+    }
+    rewritten_headings: set[str] = set()
+    for section in sections.values():
+        if not isinstance(section, dict):
+            continue
+        section_type = section.get("type")
+        if not isinstance(section_type, str) or section_type not in {
+            "contact-form",
+            "contact-with-map",
+        }:
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            continue
+        for block in blocks.values():
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") != "contact":
+                continue
+            settings = block.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            heading = settings.get("heading")
+            if not isinstance(heading, str) or not heading.strip():
+                continue
+            normalized_heading = heading.strip().lower()
+            if normalized_heading.startswith("address"):
+                settings["text"] = contact_html_by_heading["address"]
+                rewritten_headings.add("address")
+            elif normalized_heading.startswith("email"):
+                settings["text"] = contact_html_by_heading["email"]
+                rewritten_headings.add("email")
+            elif normalized_heading.startswith("phone"):
+                settings["text"] = contact_html_by_heading["phone"]
+                rewritten_headings.add("phone")
+
+    required_headings = {"address", "email", "phone"}
+    missing_headings = sorted(required_headings - rewritten_headings)
+    if missing_headings:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because "
+                f"{filename} is missing expected contact blocks: "
+                + ", ".join(missing_headings)
+                + "."
+            ),
+        )
+    return json.dumps(template_data, separators=(",", ":"))
 
 
 def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
@@ -888,6 +1468,15 @@ def _collect_local_theme_slots_from_json_value(
     seen_text_slot_paths: set[str],
 ) -> None:
     if isinstance(value, dict):
+        if (
+            value.get("disabled") is True
+            and (
+                path_tokens[:1] == ["sections"]
+                and len(path_tokens) in {2, 4}
+                and (len(path_tokens) == 2 or path_tokens[2] == "blocks")
+            )
+        ):
+            return
         for key, nested_value in value.items():
             next_tokens = [*path_tokens, key]
             if isinstance(nested_value, str) and "settings" in next_tokens:
@@ -1785,64 +2374,40 @@ def _normalize_theme_export_text_file_content(
     *,
     filename: str,
     content: str,
-) -> tuple[str, int]:
-    starting_collection_test_count = len(_THEME_COLLECTION_TEST_PATH_RE.findall(content))
+    sales_page_path: str,
+    contact_page_values: dict[str, str] | None = None,
+) -> str:
     normalized = content
-    if filename == _THEME_HEADER_DRAWER_FILENAME:
-        normalized = _normalize_theme_export_header_drawer_content(content=normalized)
-    normalized = _normalize_theme_export_header_navigation_link_labels(
+    normalized = _normalize_theme_export_main_page_button_links(
         filename=filename,
         content=normalized,
+        sales_page_path=sales_page_path,
     )
     normalized = _normalize_theme_export_rich_text_section_content(
         filename=filename,
         content=normalized,
     )
-    normalized = _normalize_theme_export_storefront_link_content(content=normalized)
-    normalized, _ = _THEME_COLLECTION_TEST_PATH_RE.subn(
-        _THEME_SAFE_FALLBACK_PATH,
-        normalized,
+    normalized = _normalize_theme_export_catalog_product_card_links(
+        filename=filename,
+        content=normalized,
+        sales_page_path=sales_page_path,
     )
-    ending_collection_test_count = len(_THEME_COLLECTION_TEST_PATH_RE.findall(normalized))
-    rewritten_collection_link_count = max(
-        0,
-        starting_collection_test_count - ending_collection_test_count,
+    normalized = _normalize_theme_export_track_order_links(
+        filename=filename,
+        content=normalized,
     )
-    return normalized, rewritten_collection_link_count
-
-
-def _normalize_theme_export_storefront_link_content(*, content: str) -> str:
-    normalized = _THEME_SHOPIFY_PRODUCT_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        content,
+    normalized = _normalize_theme_export_shoppable_video_cart_counter_updates(
+        filename=filename,
+        content=normalized,
     )
-    normalized = _THEME_RELATIVE_PRODUCT_PATH_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        normalized,
+    normalized = _normalize_theme_export_footer_tab_link_styling(
+        filename=filename,
+        content=normalized,
     )
-    normalized = _THEME_RELATIVE_PAGE_PATH_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        normalized,
-    )
-
-    def _rewrite_relative_collection_path_link(match: re.Match[str]) -> str:
-        return (
-            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
-        )
-
-    normalized = _THEME_RELATIVE_COLLECTION_PATH_LINK_RE.sub(
-        _rewrite_relative_collection_path_link,
-        normalized,
-    )
-
-    def _rewrite_shopify_collection_link(match: re.Match[str]) -> str:
-        return (
-            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
-        )
-
-    normalized = _THEME_SHOPIFY_COLLECTION_LINK_RE.sub(
-        _rewrite_shopify_collection_link,
-        normalized,
+    normalized = _normalize_theme_export_contact_page_template_content(
+        filename=filename,
+        content=normalized,
+        contact_page_values=contact_page_values,
     )
     return normalized
 
@@ -3259,6 +3824,20 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
     return context_by_path
 
 
+def _resolve_theme_sync_slot_generation_metadata(
+    slot_path: str,
+) -> tuple[str, str | None]:
+    normalized_slot_path = slot_path.strip()
+    generation_strategy = _THEME_SYNC_SLOT_GENERATION_STRATEGY_BY_PATH.get(
+        normalized_slot_path,
+        _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT,
+    )
+    testimonial_template = _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_BY_PATH.get(
+        normalized_slot_path
+    )
+    return generation_strategy, testimonial_template
+
+
 def _normalize_theme_slot_role(raw_role: Any) -> str:
     if not isinstance(raw_role, str):
         return "generic"
@@ -3406,6 +3985,7 @@ def _generate_theme_sync_ai_image_assets(
     org_id: str,
     client_id: str,
     product_id: str | None,
+    product: Product | None = None,
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
     general_prompt_context: str | None = None,
@@ -3434,6 +4014,38 @@ def _generate_theme_sync_ai_image_assets(
         ):
             continue
         normalized_slot_prompt_context_by_path[raw_path.strip()] = raw_context.strip()
+    testimonial_review_slot_paths: list[str] = []
+    for raw_slot in selected_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        raw_slot_path = raw_slot.get("path")
+        if not isinstance(raw_slot_path, str) or not raw_slot_path.strip():
+            continue
+        slot_path = raw_slot_path.strip()
+        generation_strategy, _ = _resolve_theme_sync_slot_generation_metadata(slot_path)
+        if (
+            generation_strategy
+            == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+        ):
+            testimonial_review_slot_paths.append(slot_path)
+    testimonial_render_payload_by_slot_path: dict[str, dict[str, Any]] = {}
+    if testimonial_review_slot_paths:
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Shopify testimonial image generation requires a product for "
+                    "review-card slots."
+                ),
+            )
+        testimonial_render_payload_by_slot_path, _ = (
+            generate_shopify_theme_review_card_payloads(
+                product=product,
+                slot_paths=testimonial_review_slot_paths,
+                general_prompt_context=general_prompt_context,
+                slot_prompt_context_by_path=normalized_slot_prompt_context_by_path,
+            )
+        )
     if reference_image_bytes is not None:
         if not reference_image_bytes:
             raise HTTPException(
@@ -3465,11 +4077,45 @@ def _generate_theme_sync_ai_image_assets(
         slot_path: str,
         slot_role: str,
         slot_recommended_aspect: str,
+        generation_strategy: str,
         aspect_ratio: str,
-        prompt: str,
+        prompt: str | None = None,
+        render_payload: dict[str, Any] | None = None,
+        testimonial_renderer: ThreadedTestimonialRenderer | None = None,
     ) -> dict[str, Any]:
         with SessionLocal() as slot_session:
             try:
+                if (
+                    generation_strategy
+                    == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+                ):
+                    if not isinstance(render_payload, dict) or not render_payload:
+                        raise RuntimeError(
+                            "Testimonial render payload is required for routed review slots."
+                        )
+                    generated_asset = generate_shopify_theme_testimonial_image_asset(
+                        session=slot_session,
+                        org_id=org_id,
+                        client_id=client_id,
+                        slot_path=slot_path,
+                        payload=render_payload,
+                        product_id=product_id,
+                        tags=["shopify_theme_sync", "component_image"],
+                        renderer=testimonial_renderer,
+                    )
+                    return {
+                        "slotPath": slot_path,
+                        "asset": generated_asset,
+                        "source": _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER,
+                        "rateLimited": False,
+                        "quotaExhausted": False,
+                        "error": None,
+                        "exception": None,
+                    }
+                if not isinstance(prompt, str) or not prompt.strip():
+                    raise RuntimeError(
+                        "AI image prompt is required for non-testimonial Shopify theme slots."
+                    )
                 generated_asset = create_funnel_image_asset(
                     session=slot_session,
                     org_id=org_id,
@@ -3496,6 +4142,17 @@ def _generate_theme_sync_ai_image_assets(
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": None,
+                    "exception": None,
+                }
+            except TestimonialRenderError as exc:
+                return {
+                    "slotPath": slot_path,
+                    "asset": None,
+                    "source": None,
+                    "rateLimited": False,
+                    "quotaExhausted": False,
+                    "error": str(exc),
+                    "exception": exc,
                 }
             except Exception as exc:  # noqa: BLE001
                 if _is_gemini_hard_quota_exhaustion_error(exc):
@@ -3506,6 +4163,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": True,
                         "quotaExhausted": True,
                         "error": str(exc),
+                        "exception": None,
                     }
                 if _is_gemini_quota_or_rate_limit_error(exc):
                     return {
@@ -3515,6 +4173,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": True,
                         "quotaExhausted": False,
                         "error": str(exc),
+                        "exception": None,
                     }
                 return {
                     "slotPath": slot_path,
@@ -3523,6 +4182,7 @@ def _generate_theme_sync_ai_image_assets(
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": str(exc),
+                    "exception": None,
                 }
 
     prepared_slots: list[dict[str, Any]] = []
@@ -3548,9 +4208,48 @@ def _generate_theme_sync_ai_image_assets(
             slot_recommended_aspect,
             slot_path=slot_path,
         )
+        generation_strategy, testimonial_template = (
+            _resolve_theme_sync_slot_generation_metadata(slot_path)
+        )
         role_aspect = (slot_role, slot_recommended_aspect)
         variant_count = variant_count_by_role_aspect.get(role_aspect, 0) + 1
         variant_count_by_role_aspect[role_aspect] = variant_count
+        prepared_slot = {
+            "slotPath": slot_path,
+            "slotKey": slot_key,
+            "slotRole": slot_role,
+            "recommendedAspect": slot_recommended_aspect,
+            "aspectRatio": aspect_ratio,
+            "generationStrategy": generation_strategy,
+        }
+        if (
+            generation_strategy
+            == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+        ):
+            if (
+                testimonial_template
+                != _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Routed testimonial review slots must declare "
+                        "testimonialTemplate=review_card. "
+                        f"slotPath={slot_path}."
+                    ),
+                )
+            render_payload = testimonial_render_payload_by_slot_path.get(slot_path)
+            if not isinstance(render_payload, dict) or not render_payload:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Shopify testimonial review payload generation did not return a "
+                        f"payload for slotPath={slot_path}."
+                    ),
+                )
+            prepared_slot["renderPayload"] = render_payload
+            prepared_slots.append(prepared_slot)
+            continue
         prompt = _build_theme_sync_slot_image_prompt(
             slot_role=slot_role,
             slot_key=slot_key,
@@ -3561,16 +4260,8 @@ def _generate_theme_sync_ai_image_assets(
             general_prompt_context=general_prompt_context,
             slot_prompt_context=normalized_slot_prompt_context_by_path.get(slot_path),
         )
-        prepared_slots.append(
-            {
-                "slotPath": slot_path,
-                "slotKey": slot_key,
-                "slotRole": slot_role,
-                "recommendedAspect": slot_recommended_aspect,
-                "aspectRatio": aspect_ratio,
-                "prompt": prompt,
-            }
-        )
+        prepared_slot["prompt"] = prompt
+        prepared_slots.append(prepared_slot)
 
     total_slots = len(prepared_slots)
     _emit_theme_sync_progress(
@@ -3606,83 +4297,28 @@ def _generate_theme_sync_ai_image_assets(
     completed_count = 0
     generated_count = 0
     skipped_count = 0
-    if max_workers == 1:
-        hard_quota_exhausted = False
-        hard_quota_slot_path: str | None = None
-        for slot in prepared_slots:
-            slot_path = slot["slotPath"]
-            try:
-                outcome = _generate_single_slot_asset(
-                    slot_path=slot_path,
-                    slot_role=slot["slotRole"],
-                    slot_recommended_aspect=slot["recommendedAspect"],
-                    aspect_ratio=slot["aspectRatio"],
-                    prompt=slot["prompt"],
-                )
-            except Exception as exc:  # noqa: BLE001
-                outcome = {
-                    "slotPath": slot_path,
-                    "asset": None,
-                    "source": None,
-                    "rateLimited": False,
-                    "quotaExhausted": False,
-                    "error": str(exc),
-                }
-            outcomes_by_path[slot_path] = outcome
-            completed_count += 1
-            if outcome.get("asset") is not None:
-                if outcome.get("source") != "unsplash":
-                    generated_count += 1
-            elif outcome.get("rateLimited"):
-                skipped_count += 1
-            _emit_theme_sync_progress(
-                {
-                    "stage": "image_generation",
-                    "message": "Generating component images for Shopify theme sync.",
-                    "totalImageSlots": total_slots,
-                    "completedImageSlots": completed_count,
-                    "generatedImageCount": generated_count,
-                    "skippedImageCount": skipped_count,
-                }
-            )
-            if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
-                hard_quota_exhausted = True
-                hard_quota_slot_path = slot_path
-                break
-
-        if hard_quota_exhausted and hard_quota_slot_path:
+    testimonial_renderer_context = (
+        ThreadedTestimonialRenderer()
+        if testimonial_review_slot_paths
+        else nullcontext(None)
+    )
+    with testimonial_renderer_context as testimonial_renderer:
+        if max_workers == 1:
+            hard_quota_exhausted = False
+            hard_quota_slot_path: str | None = None
             for slot in prepared_slots:
                 slot_path = slot["slotPath"]
-                if slot_path in outcomes_by_path:
-                    continue
-                outcomes_by_path[slot_path] = {
-                    "slotPath": slot_path,
-                    "asset": None,
-                    "source": None,
-                    "rateLimited": True,
-                    "quotaExhausted": False,
-                    "error": (
-                        "Skipped because hard Gemini quota exhaustion was detected "
-                        f"at slotPath={hard_quota_slot_path}."
-                    ),
-                }
-    else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
-            for slot in prepared_slots:
-                future = pool.submit(
-                    _generate_single_slot_asset,
-                    slot_path=slot["slotPath"],
-                    slot_role=slot["slotRole"],
-                    slot_recommended_aspect=slot["recommendedAspect"],
-                    aspect_ratio=slot["aspectRatio"],
-                    prompt=slot["prompt"],
-                )
-                futures[future] = slot["slotPath"]
-            for future in concurrent.futures.as_completed(futures):
-                slot_path = futures[future]
                 try:
-                    outcome = future.result()
+                    outcome = _generate_single_slot_asset(
+                        slot_path=slot_path,
+                        slot_role=slot["slotRole"],
+                        slot_recommended_aspect=slot["recommendedAspect"],
+                        generation_strategy=slot["generationStrategy"],
+                        aspect_ratio=slot["aspectRatio"],
+                        prompt=slot.get("prompt"),
+                        render_payload=slot.get("renderPayload"),
+                        testimonial_renderer=testimonial_renderer,
+                    )
                 except Exception as exc:  # noqa: BLE001
                     outcome = {
                         "slotPath": slot_path,
@@ -3691,6 +4327,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": False,
                         "quotaExhausted": False,
                         "error": str(exc),
+                        "exception": None,
                     }
                 outcomes_by_path[slot_path] = outcome
                 completed_count += 1
@@ -3709,12 +4346,83 @@ def _generate_theme_sync_ai_image_assets(
                         "skippedImageCount": skipped_count,
                     }
                 )
+                if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
+                    hard_quota_exhausted = True
+                    hard_quota_slot_path = slot_path
+                    break
+
+            if hard_quota_exhausted and hard_quota_slot_path:
+                for slot in prepared_slots:
+                    slot_path = slot["slotPath"]
+                    if slot_path in outcomes_by_path:
+                        continue
+                    outcomes_by_path[slot_path] = {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": True,
+                        "quotaExhausted": False,
+                        "error": (
+                            "Skipped because hard Gemini quota exhaustion was detected "
+                            f"at slotPath={hard_quota_slot_path}."
+                        ),
+                    }
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+                for slot in prepared_slots:
+                    future = pool.submit(
+                        _generate_single_slot_asset,
+                        slot_path=slot["slotPath"],
+                        slot_role=slot["slotRole"],
+                        slot_recommended_aspect=slot["recommendedAspect"],
+                        generation_strategy=slot["generationStrategy"],
+                        aspect_ratio=slot["aspectRatio"],
+                        prompt=slot.get("prompt"),
+                        render_payload=slot.get("renderPayload"),
+                        testimonial_renderer=testimonial_renderer,
+                    )
+                    futures[future] = slot["slotPath"]
+                for future in concurrent.futures.as_completed(futures):
+                    slot_path = futures[future]
+                    try:
+                        outcome = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        outcome = {
+                            "slotPath": slot_path,
+                            "asset": None,
+                            "source": None,
+                            "rateLimited": False,
+                            "quotaExhausted": False,
+                            "error": str(exc),
+                            "exception": None,
+                        }
+                    outcomes_by_path[slot_path] = outcome
+                    completed_count += 1
+                    if outcome.get("asset") is not None:
+                        if outcome.get("source") != "unsplash":
+                            generated_count += 1
+                    elif outcome.get("rateLimited"):
+                        skipped_count += 1
+                    _emit_theme_sync_progress(
+                        {
+                            "stage": "image_generation",
+                            "message": "Generating component images for Shopify theme sync.",
+                            "totalImageSlots": total_slots,
+                            "completedImageSlots": completed_count,
+                            "generatedImageCount": generated_count,
+                            "skippedImageCount": skipped_count,
+                        }
+                    )
 
     for slot in prepared_slots:
         slot_path = slot["slotPath"]
         outcome = outcomes_by_path.get(slot_path) or {}
         generated_asset = outcome.get("asset")
         if generated_asset is None:
+            special_exception = outcome.get("exception")
+            if isinstance(special_exception, TestimonialRenderError):
+                raise special_exception
             raw_slot_error = outcome.get("error")
             if isinstance(raw_slot_error, str) and raw_slot_error.strip():
                 slot_error_by_path[slot_path] = raw_slot_error.strip()
@@ -4201,6 +4909,7 @@ def _prepare_shopify_theme_template_build_data(
             org_id=auth.org_id,
             client_id=client_id,
             product_id=resolved_product_storage_id,
+            product=resolved_product,
             image_slots=planner_image_slots,
             text_slots=text_slots,
             reference_image_bytes=(
@@ -4572,8 +5281,21 @@ def _serialize_shopify_theme_template_draft_version(
     version: Any,
 ) -> ShopifyThemeTemplateDraftVersionResponse:
     payload_raw = version.payload if isinstance(version.payload, dict) else {}
+    payload_normalized = dict(payload_raw)
+    if "latestLogoUrl" in payload_normalized:
+        legacy_latest_logo_url = payload_normalized.pop("latestLogoUrl")
+        current_logo_url = payload_normalized.get("logoUrl")
+        if (
+            (
+                not isinstance(current_logo_url, str)
+                or not current_logo_url.strip()
+            )
+            and isinstance(legacy_latest_logo_url, str)
+            and legacy_latest_logo_url.strip()
+        ):
+            payload_normalized["logoUrl"] = legacy_latest_logo_url.strip()
     try:
-        data = ShopifyThemeTemplateDraftData(**payload_raw)
+        data = ShopifyThemeTemplateDraftData(**payload_normalized)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -5656,6 +6378,7 @@ def _generate_shopify_theme_template_draft_images(
                 org_id=auth.org_id,
                 client_id=client_id,
                 product_id=resolved_product_id,
+                product=resolved_product,
                 image_slots=image_slots_pending_generation,
                 text_slots=text_slots,
                 general_prompt_context=effective_general_context,
@@ -5681,6 +6404,8 @@ def _generate_shopify_theme_template_draft_images(
                     if isinstance(slot_path, str) and slot_path.strip()
                 }
             )
+        except TestimonialRenderError:
+            raise
         except Exception as exc:  # noqa: BLE001
             image_generation_error = _format_non_fatal_generation_error(
                 stage="Image generation",
@@ -6261,26 +6986,144 @@ def _compliance_profile_placeholder_values(
     return values
 
 
+_DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS: tuple[str, ...] = (
+    "privacy_policy",
+    "returns_refunds_policy",
+    "shipping_policy",
+    "terms_of_service",
+)
+
+
 def _select_compliance_page_keys_for_template_export(
     *, requirements: dict[str, Any]
 ) -> list[str]:
-    selected_by_ruleset: list[str] = []
-    for page in requirements["pages"]:
-        classification = page["classification"]
-        if classification == "required":
-            selected_by_ruleset.append(page["pageKey"])
+    classification_by_page_key = {
+        page["pageKey"]: page["classification"]
+        for page in requirements["pages"]
+    }
+    selected_default: list[str] = []
+    for page_key in _DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS:
+        if classification_by_page_key.get(page_key) == "not_applicable":
             continue
-        if classification == "strongly_recommended":
-            selected_by_ruleset.append(page["pageKey"])
-    if not selected_by_ruleset:
+        selected_default.append(page_key)
+    if not selected_default:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "No required or strongly recommended compliance pages are applicable for this workspace "
+                "No default compliance policy pages are applicable for this workspace "
                 "profile. Update the compliance profile business models first."
             ),
         )
-    return selected_by_ruleset
+    return selected_default
+
+
+def _extract_markdown_section_body(
+    *,
+    markdown: str,
+    section_title: str,
+) -> str:
+    section_pattern = re.compile(
+        rf"(?ms)^##\s+{re.escape(section_title)}\s*\n(?P<body>.*?)(?=^##\s+|\Z)"
+    )
+    match = section_pattern.search(markdown)
+    if not match:
+        raise ValueError(
+            f"Rendered contact_support policy markdown is missing section '{section_title}'."
+        )
+    body = match.group("body").strip()
+    if not body:
+        raise ValueError(
+            f"Rendered contact_support policy markdown has an empty section '{section_title}'."
+        )
+    return body
+
+
+def _extract_contact_support_template_values_from_markdown(
+    *,
+    markdown: str,
+) -> dict[str, str]:
+    channels_body = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Contact Channels",
+    )
+    support_hours = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Support Hours",
+    )
+    business_address = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Business Address",
+    )
+
+    email_match = re.search(r"(?im)^\s*-\s*Email:\s*(?P<value>.+?)\s*$", channels_body)
+    if not email_match:
+        raise ValueError(
+            "Rendered contact_support policy markdown is missing the Email line in Contact Channels."
+        )
+    support_email = email_match.group("value").strip()
+    if not support_email:
+        raise ValueError(
+            "Rendered contact_support policy markdown has an empty Email value in Contact Channels."
+        )
+
+    phone_match = re.search(r"(?im)^\s*-\s*Phone:\s*(?P<value>.+?)\s*$", channels_body)
+    if not phone_match:
+        raise ValueError(
+            "Rendered contact_support policy markdown is missing the Phone line in Contact Channels."
+        )
+    support_phone = phone_match.group("value").strip()
+    if not support_phone:
+        raise ValueError(
+            "Rendered contact_support policy markdown has an empty Phone value in Contact Channels."
+        )
+
+    return {
+        "supportEmail": support_email,
+        "supportPhone": support_phone,
+        "supportHours": support_hours,
+        "businessAddress": business_address,
+    }
+
+
+def _resolve_theme_export_contact_page_values(
+    *,
+    policy_sync_payload: dict[str, Any],
+) -> dict[str, str]:
+    raw_contact_values = policy_sync_payload.get("contactSupport")
+    if not isinstance(raw_contact_values, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because the "
+                "compliance sync payload is missing contactSupport values."
+            ),
+        )
+
+    required_keys = (
+        "businessAddress",
+        "supportEmail",
+        "supportPhone",
+        "supportHours",
+    )
+    missing_or_invalid_keys: list[str] = []
+    resolved_values: dict[str, str] = {}
+    for key in required_keys:
+        value = raw_contact_values.get(key)
+        if not isinstance(value, str) or not value.strip():
+            missing_or_invalid_keys.append(key)
+            continue
+        resolved_values[key] = value.strip()
+    if missing_or_invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because contactSupport "
+                "values from compliance sync are missing or invalid: "
+                + ", ".join(sorted(missing_or_invalid_keys))
+                + "."
+            ),
+        )
+    return resolved_values
 
 
 def _sync_compliance_policy_pages_for_template_export(
@@ -6331,6 +7174,14 @@ def _sync_compliance_policy_pages_for_template_export(
     website_url = _website_url_from_shop_domain(shop_domain=effective_shop_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url
+
+    try:
+        contact_support_values = resolve_theme_contact_page_values(
+            placeholder_values=placeholders,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     sync_pages_payload: list[dict[str, str]] = []
     rendered_pages_payload: list[dict[str, str]] = []
     for page_key in page_keys_to_sync:
@@ -6383,6 +7234,7 @@ def _sync_compliance_policy_pages_for_template_export(
             "pages": local_pages,
             "updatedProfileUrls": {},
             "renderedPages": rendered_pages_payload,
+            "contactSupport": contact_support_values,
         }
 
     sync_payload = upsert_client_shopify_policy_pages(
@@ -6432,6 +7284,7 @@ def _sync_compliance_policy_pages_for_template_export(
         "pages": synced_pages,
         "updatedProfileUrls": updated_profile_urls,
         "renderedPages": rendered_pages_payload,
+        "contactSupport": contact_support_values,
     }
 
 
@@ -6469,6 +7322,9 @@ def _build_shopify_theme_template_export_zip_response(
         auth=auth,
         session=session,
         sync_to_shopify=False,
+    )
+    contact_page_values = _resolve_theme_export_contact_page_values(
+        policy_sync_payload=policy_sync_payload
     )
 
     component_image_asset_map = _normalize_theme_template_component_image_asset_map(
@@ -6530,6 +7386,17 @@ def _build_shopify_theme_template_export_zip_response(
         if isinstance(draft_data.themeRole, str) and draft_data.themeRole.strip()
         else default_theme_role
     )
+    sales_page_path_resolution = _resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=auth,
+        session=session,
+    )
+    if isinstance(sales_page_path_resolution, tuple):
+        sales_page_path, sales_page_warning = sales_page_path_resolution
+    else:
+        # Backward-compatible path for tests that monkeypatch this helper with a raw string.
+        sales_page_path = str(sales_page_path_resolution or "")
+        sales_page_warning = None
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
@@ -6557,9 +7424,7 @@ def _build_shopify_theme_template_export_zip_response(
             )
         ),
     )
-    rewritten_collection_links_by_filename: dict[str, int] = {}
     normalized_text_files_by_filename: dict[str, str] = {}
-    unresolved_collection_link_filenames: set[str] = set()
     exported_archive_filenames: set[str] = set()
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
@@ -6592,18 +7457,12 @@ def _build_shopify_theme_template_export_zip_response(
                     ),
                 )
             if has_text_content:
-                normalized_content, rewritten_collection_link_count = (
-                    _normalize_theme_export_text_file_content(
-                        filename=filename,
-                        content=content,
-                    )
+                normalized_content = _normalize_theme_export_text_file_content(
+                    filename=filename,
+                    content=content,
+                    sales_page_path=sales_page_path,
+                    contact_page_values=contact_page_values,
                 )
-                if rewritten_collection_link_count > 0:
-                    rewritten_collection_links_by_filename[filename] = (
-                        rewritten_collection_link_count
-                    )
-                if _THEME_COLLECTION_TEST_PATH_RE.search(normalized_content):
-                    unresolved_collection_link_filenames.add(filename)
                 normalized_text_files_by_filename[filename] = normalized_content
                 zip_file.writestr(filename, normalized_content)
                 exported_archive_filenames.add(filename)
@@ -6631,17 +7490,6 @@ def _build_shopify_theme_template_export_zip_response(
             zip_file.writestr(filename, file_bytes)
             exported_archive_filenames.add(filename)
 
-        if unresolved_collection_link_filenames:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Theme ZIP export contains unresolved /collections/test links after "
-                    "normalization. Update theme navigation links before export. files="
-                    + ", ".join(sorted(unresolved_collection_link_filenames))
-                    + "."
-                ),
-            )
-
         _validate_required_theme_archive_files_in_export(
             exported_filenames=exported_archive_filenames
         )
@@ -6661,6 +7509,8 @@ def _build_shopify_theme_template_export_zip_response(
     filename_theme = _slugify_theme_export_token(str(exported["themeName"]))
     archive_filename = f"{filename_theme}.zip"
     headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    if sales_page_warning:
+        headers["X-Marketi-Theme-Export-Notice"] = sales_page_warning
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
@@ -7761,6 +8611,14 @@ def get_client_shopify_status(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=resolved_shop_domain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
@@ -7801,6 +8659,13 @@ def update_client_shopify_installation(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    if status_payload.get("state") == "ready":
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=payload.shopDomain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
@@ -7829,6 +8694,13 @@ def auto_provision_client_shopify_installation_storefront_token(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    if status_payload.get("state") == "ready":
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=payload.shopDomain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 

@@ -7268,6 +7268,44 @@ def _merge_voc_corpus_for_agent2(
     }
 
 
+def _voc_agent00b_response_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "platform_priorities": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"type": "string", "minLength": 1},
+            },
+            "configurations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "config_id": {"type": "string", "minLength": 1},
+                        "platform": {"type": "string", "minLength": 1},
+                        "mode": {"type": "string", "minLength": 1},
+                        "actor_id": {"type": "string", "minLength": 1},
+                        "input": _APIFY_EXEC_INPUT_SCHEMA,
+                        "metadata": {
+                            "anyOf": [
+                                {"type": "object", "additionalProperties": False},
+                                {"type": "null"},
+                            ]
+                        },
+                    },
+                    "required": ["config_id", "platform", "mode", "actor_id", "input", "metadata"],
+                },
+            },
+            "handoff_block": {"type": "string"},
+        },
+        "required": ["platform_priorities", "configurations", "handoff_block"],
+    }
+
+
 def _build_proof_candidates_from_voc(
     *,
     voc_rows: list[dict[str, Any]],
@@ -11668,41 +11706,7 @@ def run_strategy_v2_voc_agent0b_social_video_strategy_activity(params: dict[str,
                 f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
             ),
             schema_name="strategy_v2_voc_agent00b",
-            schema={
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "platform_priorities": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string", "minLength": 1},
-                    },
-                    "configurations": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {
-                                "config_id": {"type": "string", "minLength": 1},
-                                "platform": {"type": "string", "minLength": 1},
-                                "mode": {"type": "string", "minLength": 1},
-                                "actor_id": {"type": "string", "minLength": 1},
-                                "input": _APIFY_EXEC_INPUT_SCHEMA,
-                                "metadata": {
-                                    "anyOf": [
-                                        {"type": "object", "additionalProperties": False},
-                                        {"type": "null"},
-                                    ]
-                                },
-                            },
-                            "required": ["config_id", "platform", "mode", "actor_id", "input", "metadata"],
-                        },
-                    },
-                    "handoff_block": {"type": "string"},
-                },
-                "required": ["platform_priorities", "configurations", "handoff_block"],
-            },
+            schema=_voc_agent00b_response_schema(),
             use_reasoning=True,
             reasoning_effort="xhigh",
             use_web_search=True,
@@ -14108,41 +14112,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
                     ),
                     schema_name="strategy_v2_voc_agent00b",
-                    schema={
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "platform_priorities": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {"type": "string", "minLength": 1},
-                            },
-                        "configurations": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "config_id": {"type": "string", "minLength": 1},
-                                    "platform": {"type": "string", "minLength": 1},
-                                    "mode": {"type": "string", "minLength": 1},
-                                    "actor_id": {"type": "string", "minLength": 1},
-                                    "input": _APIFY_EXEC_INPUT_SCHEMA,
-                                    "metadata": {
-                                        "anyOf": [
-                                            {"type": "object", "additionalProperties": False},
-                                            {"type": "null"},
-                                        ]
-                                    },
-                                },
-                                "required": ["config_id", "platform", "mode", "actor_id", "input", "metadata"],
-                            },
-                        },
-                        "handoff_block": {"type": "string"},
-                    },
-                    "required": ["platform_priorities", "configurations", "handoff_block"],
-                },
+                    schema=_voc_agent00b_response_schema(),
                     use_reasoning=True,
                     reasoning_effort="xhigh",
                     use_web_search=True,

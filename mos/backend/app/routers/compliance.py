@@ -36,11 +36,20 @@ from app.services.compliance import (
     list_rulesets,
     normalize_business_models,
     render_policy_template_markdown,
+    render_theme_contact_page_body_html,
 )
 from app.services.shopify_connection import upsert_client_shopify_policy_pages
 
 
 router = APIRouter(tags=["compliance"])
+
+_DEFAULT_SYNC_PAGE_KEYS: tuple[str, ...] = (
+    "privacy_policy",
+    "returns_refunds_policy",
+    "shipping_policy",
+    "terms_of_service",
+    "contact_support",
+)
 
 
 def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
@@ -193,6 +202,7 @@ def _select_page_keys_for_sync(
     include_strongly_recommended: bool,
     requirements: dict,
 ) -> list[str]:
+    _ = include_strongly_recommended
     known_page_keys = set(list_policy_page_keys())
     classification_by_page_key = {
         page["pageKey"]: page["classification"]
@@ -236,20 +246,17 @@ def _select_page_keys_for_sync(
             )
         return selected
 
-    selected_by_ruleset: list[str] = []
-    for page in requirements["pages"]:
-        classification = page["classification"]
-        if classification == "required":
-            selected_by_ruleset.append(page["pageKey"])
+    selected_default: list[str] = []
+    for page_key in _DEFAULT_SYNC_PAGE_KEYS:
+        if classification_by_page_key.get(page_key) == "not_applicable":
             continue
-        if classification == "strongly_recommended" and include_strongly_recommended:
-            selected_by_ruleset.append(page["pageKey"])
-    if not selected_by_ruleset:
+        selected_default.append(page_key)
+    if not selected_default:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No required or strongly recommended compliance pages are applicable for this profile.",
+            detail="No default policy pages are applicable for this profile.",
         )
-    return selected_by_ruleset
+    return selected_default
 
 
 @router.get("/compliance/rulesets", response_model=list[ComplianceRulesetSummaryResponse])
@@ -444,11 +451,16 @@ def sync_client_compliance_policy_pages_to_shopify(
     for page_key in page_keys_to_sync:
         template = get_policy_template(page_key=page_key)
         try:
-            rendered_markdown = render_policy_template_markdown(
-                page_key=page_key,
-                placeholder_values=placeholders,
-            )
-            rendered_html = markdown_to_shopify_html(rendered_markdown)
+            if page_key == "contact_support":
+                rendered_html = render_theme_contact_page_body_html(
+                    placeholder_values=placeholders
+                )
+            else:
+                rendered_markdown = render_policy_template_markdown(
+                    page_key=page_key,
+                    placeholder_values=placeholders,
+                )
+                rendered_html = markdown_to_shopify_html(rendered_markdown)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

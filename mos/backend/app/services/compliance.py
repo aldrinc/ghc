@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from html import escape
+from pathlib import Path
 import re
 from typing import Any
 
@@ -41,6 +42,22 @@ _PAGE_ORDER = [
     "company_information",
     "subscription_terms_and_cancellation",
 ]
+
+_POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY = {
+    "privacy_policy": "privacy_policy.md",
+    "terms_of_service": "terms_of_service.md",
+    "returns_refunds_policy": "returns_refunds_policy.md",
+    "shipping_policy": "shipping_policy.md",
+    "company_information": "company_information.md",
+    "subscription_terms_and_cancellation": "subscription_terms_and_cancellation.md",
+}
+
+_THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY = {
+    "contact_support": (
+        "# Contact and Support\n\n"
+        "This page is theme-managed and should use the storefront contact-form template.\n"
+    )
+}
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 _STRONG_RE = re.compile(r"\*\*(.+?)\*\*")
@@ -496,42 +513,50 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Privacy Policy\n\n"
-            "This Privacy Policy explains how {{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\") collects, "
-            "uses, and shares personal information when you visit or make a purchase from {{website_url}}.\n\n"
-            "- Brand: {{brand_name}}\n"
-            "- Operator: {{legal_business_name}}\n"
-            "- Contact: {{support_email}}\n"
-            "- Address: {{company_address_text}}\n"
-            "- Effective date: {{effective_date}}\n\n"
-            "## Owner and Controller Identity\n"
-            "{{legal_business_name}} is the data controller responsible for personal information handled for "
-            "{{brand_name}}.\n\n"
-            "## Data We Collect\n"
-            "We may collect order, account, support, payment-confirmation, device, and browsing information, "
-            "including through cookies and similar technologies.\n\n"
+            "## Privacy Policy for {{brand_name}}\n\n"
+            "**Effective Date: {{effective_date}}**\n\n"
+            "{{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\", \"our\") is committed to safeguarding "
+            "the privacy of users who interact with {{website_url}}.\n\n"
+            "This Privacy Policy explains what information we collect, how we use it, and the measures we take "
+            "to protect it.\n\n"
+            "By accessing or using our services, you agree to this Privacy Policy.\n\n"
+            "## Information We Collect\n"
+            "1. **Personal Information**\n"
+            "We may collect personal information such as name, email address, shipping/billing details, and "
+            "contact information when you place an order, create an account, or contact support.\n\n"
+            "2. **Usage Information**\n"
+            "We collect information about interactions with our website, including pages viewed, time on page, "
+            "clicks, and conversion events.\n\n"
+            "3. **Device Information**\n"
+            "We may collect technical details about the device and browser used to access our services.\n\n"
             "{{privacy_data_collected}}\n\n"
-            "## How We Use Data\n"
-            "We use personal information to provide products/services, process transactions, fulfill orders, "
-            "communicate with customers, prevent fraud, and improve site and marketing performance.\n\n"
+            "## How We Use Your Information\n"
+            "1. **To Provide Services**\n"
+            "We use collected information to operate the store, process payments, fulfill orders, provide support, "
+            "and improve customer experience.\n\n"
+            "2. **Marketing and Communication**\n"
+            "Where permitted, we may use your contact details to send promotional communications and updates.\n\n"
+            "3. **Analytics and Improvement**\n"
+            "We use analytics to understand usage behavior and improve website and service performance.\n\n"
             "{{privacy_data_usage}}\n\n"
-            "## How We Share Data\n"
-            "We share data only as needed to operate the business (for example: commerce platform, payment processor, "
-            "shipping partners, analytics, and customer support providers) or when legally required.\n\n"
+            "## Sharing Your Information\n"
+            "We do not sell personal information. We may share data with service providers required to operate "
+            "the business and as required by law.\n\n"
             "{{privacy_data_sharing}}\n\n"
-            "## User Choices and Controls\n"
-            "Depending on location, users may have rights to access, correct, delete, or opt out of certain data "
-            "uses such as targeted advertising. Users can also manage cookie preferences and marketing "
-            "subscriptions where available.\n\n"
-            "{{privacy_user_choices}}\n\n"
-            "## Security and Retention\n"
-            "We apply reasonable technical and organizational safeguards and retain personal information only for as "
-            "long as needed for legitimate business and legal purposes.\n\n"
+            "## Security\n"
+            "We apply reasonable safeguards to protect personal information from unauthorized access, alteration, "
+            "disclosure, or destruction.\n\n"
             "{{privacy_security_retention}}\n\n"
-            "## Privacy Contact\n"
-            "For privacy questions or requests, contact {{support_email}}.\n\n"
-            "## Policy Updates and Effective Date\n"
+            "## Your Choices\n"
+            "You may request access, correction, or deletion of personal information where applicable, and you may "
+            "opt out of marketing communications.\n\n"
+            "{{privacy_user_choices}}\n\n"
+            "## Changes to This Privacy Policy\n"
+            "We may update this Privacy Policy at any time. Updated versions are posted on this page.\n\n"
             "{{privacy_update_notice}}\n\n"
-            "**Effective date:** {{effective_date}}\n"
+            "## Contact Us\n"
+            "If you have questions about this Privacy Policy, contact us at {{support_email}}.\n\n"
+            "Business address: {{company_address_text}}\n"
         ),
     },
     "terms_of_service": {
@@ -570,37 +595,67 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Terms of Service\n\n"
-            "These Terms of Service (\"Terms\") govern your access to and use of {{website_url}}, operated by "
-            "{{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\"). By visiting the site or purchasing a "
-            "product/service, you agree to these Terms.\n\n"
-            "## Business Identity\n"
-            "- Brand: {{brand_name}}\n"
-            "- Legal business name: {{legal_business_name}}\n"
-            "- Business address: {{company_address_text}}\n\n"
-            "## Offer Scope and Eligibility\n"
-            "{{terms_offer_scope}}\n\n"
+            "## Terms and Conditions {{brand_name}}\n"
+            "**Effective Date: {{effective_date}}**\n\n"
+            "These Terms and Conditions (\"Terms\") govern your use of {{website_url}} and the services provided "
+            "by {{brand_name}}, operated by {{legal_business_name}} and located at {{company_address_text}} "
+            "(\"we\", \"us\", \"our\").\n\n"
+            "By accessing or using our website and purchasing our products, you agree to be bound by these Terms.\n\n"
+            "Please read them carefully before placing an order.\n\n"
+            "## 1. Eligibility to Purchase\n"
+            "To place an order with {{brand_name}}, you must be at least 18 years old and have a valid payment "
+            "method accepted at checkout.\n\n"
             "{{terms_eligibility}}\n\n"
-            "## Pricing and Billing Terms\n"
-            "Prices, promotions, and availability can change without notice unless required by law. Payment "
-            "authorization is required before order fulfillment.\n\n"
+            "## 2. Product Information\n"
+            "We make every effort to ensure products shown on our website are accurately described. Slight "
+            "variations in color, size, or texture may occur due to screen settings and material characteristics.\n\n"
+            "All products are subject to availability, and we reserve the right to withdraw products at any time.\n\n"
+            "{{terms_offer_scope}}\n\n"
+            "## 3. Order Process & Contract\n"
+            "After placing an order, you will receive an email acknowledgment. This acknowledgment does not "
+            "constitute acceptance of your order.\n\n"
+            "Order acceptance occurs once payment is successfully processed and the order has been dispatched "
+            "(or access has been delivered for non-physical products).\n\n"
+            "We reserve the right to refuse or cancel any order for reasons including product availability, "
+            "pricing/content errors, suspected fraud, or other reasons at our discretion.\n\n"
+            "## 4. Pricing & Payment Terms\n"
+            "All prices are shown at checkout and may exclude taxes, duties, or shipping unless stated otherwise.\n\n"
+            "Accepted payment methods are shown at checkout and may vary by region.\n\n"
+            "Prices and product availability are subject to change without notice.\n\n"
             "{{terms_pricing_billing}}\n\n"
-            "## Fulfillment and Access Terms\n"
-            "We may limit, refuse, or cancel orders when necessary (for example suspected fraud, abuse, or inventory "
-            "constraints), and we may update or discontinue portions of the service.\n\n"
+            "## 5. Shipping & Delivery\n"
+            "Delivery timelines are estimates and can vary because of customs processing, carrier constraints, "
+            "weather, or other external factors outside our control.\n\n"
             "{{terms_fulfillment_access}}\n\n"
-            "## Refund and Cancellation Links\n"
-            "Review applicable refund, cancellation, shipping, and subscription policy pages before purchase.\n\n"
+            "## 6. Returns & Exchanges\n"
+            "Returns and exchanges are handled under our posted refund and returns terms.\n\n"
             "{{terms_refund_cancellation}}\n\n"
-            "## Limitations and Disclaimers\n"
-            "The service and content are provided on an \"as-is\" and \"as-available\" basis except where prohibited "
-            "by law.\n\n"
+            "## 7. Limitation of Liability\n"
+            "To the maximum extent permitted by applicable law, our total liability for any claim related to "
+            "products or services is limited to the amount you paid for the relevant order.\n\n"
+            "We are not liable for indirect, incidental, punitive, or consequential damages arising from use of "
+            "our products, services, or website.\n\n"
             "{{terms_disclaimers}}\n\n"
-            "## Support Contact\n"
-            "Contact: {{support_email}}\n\n"
-            "## Dispute Resolution and Governing Law\n"
-            "{{terms_dispute_resolution}}\n\n"
+            "## 8. Intellectual Property Rights\n"
+            "All website content, including text, graphics, logos, images, product names, and designs, is owned "
+            "by {{brand_name}} and/or its licensors.\n\n"
+            "You may not reproduce, duplicate, copy, sell, resell, or exploit any content without prior written "
+            "permission.\n\n"
+            "## 9. Privacy Policy\n"
+            "Your submission of personal information through our store is governed by our Privacy Policy.\n\n"
+            "## 10. Force Majeure\n"
+            "We are not liable for delays or failure to perform obligations due to causes beyond reasonable "
+            "control, including natural disasters, labor disputes, war, carrier outages, infrastructure failures, "
+            "or government action.\n\n"
+            "## 11. Governing Law and Jurisdiction\n"
             "{{terms_governing_law}}\n\n"
-            "**Effective date:** {{effective_date}}\n"
+            "{{terms_dispute_resolution}}\n\n"
+            "## 12. Changes to Terms\n"
+            "We reserve the right to update or modify these Terms at any time.\n\n"
+            "Changes take effect when posted on this page. Continued use of the website after updates constitutes "
+            "acceptance of the revised Terms.\n\n"
+            "## 13. Contact Information\n"
+            "For questions about these Terms, contact us at {{support_email}}.\n"
         ),
     },
     "returns_refunds_policy": {
@@ -635,30 +690,36 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Returns and Refunds Policy\n\n"
-            "This policy explains return, exchange, cancellation, and refund terms for purchases from {{brand_name}} "
-            "({{legal_business_name}}) on {{website_url}}.\n\n"
-            "## Eligibility\n"
-            "Returned items must satisfy the condition requirements in this section and may be denied if they do not "
-            "meet policy criteria.\n\n"
-            "{{refund_eligibility}}\n\n"
-            "## Return/Refund Window\n"
-            "Cancellation and return/refund requests must be submitted within the policy windows below.\n\n"
+            "We have a return window for eligible purchases. Return eligibility, timelines, and processing rules "
+            "are described below.\n\n"
+            "## Return Window\n"
             "{{refund_window_policy}}\n\n"
-            "## How to Request\n"
-            "Submit requests through the official support channel and include order-identifying details.\n\n"
+            "## Eligibility for Returns\n"
+            "To be eligible for a return, items must be in the same condition received, unused/unworn, with "
+            "original tags and packaging, and accompanied by proof of purchase.\n\n"
+            "{{refund_eligibility}}\n\n"
+            "## How to Start a Return\n"
+            "Contact support before sending any return.\n\n"
             "{{refund_request_steps}}\n\n"
-            "## Refund Method and Timing\n"
-            "Approved refunds are issued to the original payment method unless required otherwise by law.\n\n"
-            "{{refund_method_timing}}\n\n"
-            "## Fees and Deductions\n"
-            "Shipping charges, handling costs, or condition-based deductions may apply where disclosed.\n\n"
-            "{{refund_fees_deductions}}\n\n"
-            "## Exceptions\n"
-            "Certain purchases (for example final-sale, custom, or abuse-related orders) may be excluded except where "
-            "required by law.\n\n"
+            "## Damages and Issues\n"
+            "Please inspect your order upon delivery and contact us immediately if an item is defective, damaged, "
+            "or incorrect so we can evaluate and resolve the issue.\n\n"
+            "## Exceptions / Non-Returnable Items\n"
+            "Certain item categories may be non-returnable (for example, final-sale, personalized, perishable, "
+            "hygiene, hazardous, or gift-card products) where permitted by law.\n\n"
             "{{refund_exceptions}}\n\n"
-            "## Support Contact\n"
-            "For return authorization or refund support, contact {{support_email}}.\n\n"
+            "## Exchanges\n"
+            "The fastest way to get a different item is to return the original eligible item first, and place a "
+            "separate order for the replacement item after return approval.\n\n"
+            "## EU 14-Day Cooling-Off Period\n"
+            "Where required by law (including eligible EU orders), customers may cancel or return an order within "
+            "14 days of receipt without justification, provided eligibility conditions are met.\n\n"
+            "## Refunds\n"
+            "After we receive and inspect your return, we will notify you whether the refund is approved.\n\n"
+            "Approved refunds are sent to the original payment method.\n\n"
+            "{{refund_method_timing}}\n\n"
+            "{{refund_fees_deductions}}\n\n"
+            "If your refund has not posted within the disclosed time window, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -700,37 +761,44 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Shipping Policy\n\n"
-            "This policy describes shipping timelines, delivery expectations, and issue handling for orders placed "
-            "with {{brand_name}} on {{website_url}}.\n\n"
-            "## Shipping Regions\n"
-            "{{shipping_regions}}\n\n"
-            "## Processing Time\n"
-            "Orders are processed on business days and can be affected by weekends, holidays, or high-volume periods.\n\n"
+            "## Shipping Policy for {{brand_name}}\n\n"
+            "Welcome to {{brand_name}}'s Shipping Policy. This page outlines terms that apply to shipment and "
+            "delivery for orders placed through {{website_url}}.\n\n"
+            "By placing an order, you agree to these shipping terms.\n\n"
+            "## 1. Order Processing\n"
+            "Orders are typically processed on business days after purchase.\n\n"
             "{{shipping_processing_time}}\n\n"
-            "## Shipping Options and Costs\n"
-            "Available shipping methods and charges are shown at checkout before payment.\n\n"
-            "{{shipping_options_costs}}\n\n"
-            "## Delivery Estimates\n"
-            "Delivery windows begin after dispatch and are estimates, not guarantees.\n\n"
+            "## 2. Shipping Methods\n"
+            "Available shipping methods are shown at checkout, along with estimated delivery windows.\n\n"
             "{{shipping_delivery_estimates}}\n\n"
-            "## Tracking\n"
+            "## 3. Shipping Locations\n"
+            "We ship to approved destinations based on carrier availability and legal constraints.\n\n"
+            "{{shipping_regions}}\n\n"
+            "## 4. Shipping Costs\n"
+            "Shipping charges are calculated at checkout based on selected method and destination.\n\n"
+            "{{shipping_options_costs}}\n\n"
+            "## 5. Customs and Duties\n"
+            "For international shipments, customs fees, duties, or import taxes may apply and are generally the "
+            "recipient's responsibility unless stated otherwise.\n\n"
+            "{{shipping_customs_duties}}\n\n"
+            "## 6. Order Tracking\n"
             "Tracking details are provided after dispatch when available.\n\n"
             "{{shipping_tracking}}\n\n"
-            "## Address Changes\n"
-            "Address or cancellation requests are time-sensitive and may be unavailable after fulfillment starts.\n\n"
-            "{{shipping_address_changes}}\n\n"
-            "## Lost or Damaged Packages\n"
-            "Customers should report lost, delayed, or damaged shipments promptly so investigation or claim workflows "
-            "can begin.\n\n"
+            "## 7. Shipping Delays\n"
+            "Estimated delivery windows are not guaranteed. Delays can occur due to weather, customs, carrier "
+            "constraints, or other factors outside our control.\n\n"
+            "## 8. Lost or Stolen Packages\n"
+            "If a shipment is lost, delayed, damaged, or marked delivered but not received, contact support "
+            "promptly so we can assist with investigation and next steps.\n\n"
             "{{shipping_lost_damaged}}\n\n"
-            "## Customs and Duties\n"
-            "Customs processing, import duties, and local taxes for international shipments are governed by destination "
-            "country requirements.\n\n"
-            "{{shipping_customs_duties}}\n\n"
-            "## Return Address\n"
+            "## 9. Returns Due to Shipping Issues\n"
+            "If an order is returned due to address or delivery issues, we will contact you to arrange reshipment "
+            "where possible.\n\n"
+            "{{shipping_address_changes}}\n\n"
+            "Return shipments must be sent only to the authorized return address provided by support.\n\n"
             "{{shipping_return_address}}\n\n"
-            "## Shipping Support Contact\n"
-            "For shipping support, contact {{support_email}}.\n\n"
+            "## Contact Us\n"
+            "If you have questions about shipping, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -865,6 +933,58 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
     },
 }
 
+_template_keys = set(_POLICY_TEMPLATES)
+_file_map_keys = set(_POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY)
+_theme_managed_markdown_keys = set(_THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY)
+_covered_keys = _file_map_keys | _theme_managed_markdown_keys
+if _template_keys != _covered_keys:
+    missing_template_coverage = sorted(_template_keys - _covered_keys)
+    extra_template_coverage = sorted(_covered_keys - _template_keys)
+    raise RuntimeError(
+        "Compliance policy template coverage mismatch. "
+        f"missing={missing_template_coverage} extra={extra_template_coverage}"
+    )
+
+
+def _resolve_policy_templates_directory() -> Path:
+    service_file = Path(__file__).resolve()
+    for parent in service_file.parents:
+        candidate = parent / "docs" / "compliance" / "policy-templates"
+        if candidate.is_dir():
+            return candidate
+    raise RuntimeError(
+        "Unable to locate compliance policy template directory. "
+        "Expected 'docs/compliance/policy-templates' in this repository."
+    )
+
+
+_POLICY_TEMPLATES_DIRECTORY = _resolve_policy_templates_directory()
+
+
+def _load_policy_template_markdown(*, page_key: str) -> str:
+    theme_managed_template_markdown = _THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY.get(page_key)
+    if theme_managed_template_markdown is not None:
+        return theme_managed_template_markdown
+
+    filename = _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY.get(page_key)
+    if not filename:
+        raise KeyError(f"Unknown policy template key: {page_key}")
+
+    template_path = _POLICY_TEMPLATES_DIRECTORY / filename
+    try:
+        markdown = template_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(
+            f"Failed to read compliance policy template markdown for page '{page_key}' "
+            f"from '{template_path}'."
+        ) from exc
+
+    if not markdown.strip():
+        raise RuntimeError(
+            f"Compliance policy template markdown is empty for page '{page_key}' at '{template_path}'."
+        )
+    return markdown
+
 
 def list_rulesets() -> list[dict[str, Any]]:
     return [
@@ -905,15 +1025,16 @@ def normalize_business_models(values: list[str]) -> list[str]:
 def list_policy_templates() -> list[dict[str, Any]]:
     ordered: list[dict[str, Any]] = []
     for page_key in _PAGE_ORDER:
-        template = _POLICY_TEMPLATES[page_key]
-        ordered.append(deepcopy(template))
+        ordered.append(get_policy_template(page_key=page_key))
     return ordered
 
 
 def get_policy_template(*, page_key: str) -> dict[str, Any]:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
-    return deepcopy(_POLICY_TEMPLATES[page_key])
+    template = deepcopy(_POLICY_TEMPLATES[page_key])
+    template["templateMarkdown"] = _load_policy_template_markdown(page_key=page_key)
+    return template
 
 
 def list_policy_page_keys() -> list[str]:
@@ -929,6 +1050,8 @@ def get_profile_url_field_for_page_key(*, page_key: str) -> str:
 def get_policy_page_handle(*, page_key: str) -> str:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
+    if page_key == "contact_support":
+        return "contact"
     return page_key.replace("_", "-")
 
 
@@ -1060,6 +1183,59 @@ def render_policy_template_markdown(
             f"Unresolved placeholders remain for page '{page_key}': {unresolved_str}."
         )
     return rendered
+
+
+def resolve_theme_contact_page_values(
+    *,
+    placeholder_values: dict[str, str],
+) -> dict[str, str]:
+    mapping = {
+        "supportEmail": "support_email",
+        "supportPhone": "support_phone",
+        "supportHours": "support_hours_text",
+        "businessAddress": "company_address_text",
+    }
+    missing_placeholders: list[str] = []
+    resolved_values: dict[str, str] = {}
+
+    for response_key, placeholder_key in mapping.items():
+        raw_value = placeholder_values.get(placeholder_key)
+        if raw_value is None or not raw_value.strip():
+            raw_value = _DEFAULT_POLICY_PLACEHOLDER_VALUES.get(placeholder_key)
+        if raw_value is None or not raw_value.strip():
+            missing_placeholders.append(placeholder_key)
+            continue
+        resolved_values[response_key] = raw_value.strip()
+
+    if missing_placeholders:
+        missing = ", ".join(sorted(missing_placeholders))
+        raise ValueError(
+            "Missing placeholder values for theme-managed contact page: "
+            f"{missing}."
+        )
+
+    return resolved_values
+
+
+def render_theme_contact_page_body_html(
+    *,
+    placeholder_values: dict[str, str],
+) -> str:
+    contact_values = resolve_theme_contact_page_values(
+        placeholder_values=placeholder_values
+    )
+    escaped_email = escape(contact_values["supportEmail"])
+    escaped_phone = escape(contact_values["supportPhone"])
+    escaped_hours = escape(contact_values["supportHours"]).replace("\n", "<br/>")
+    escaped_address = escape(contact_values["businessAddress"]).replace("\n", "<br/>")
+
+    return (
+        "<h1>Contact and Support</h1>\n"
+        "<p>Use the contact form on this page to reach our support team.</p>\n"
+        f"<p><strong>Email:</strong> <a href=\"mailto:{escaped_email}\">{escaped_email}</a></p>\n"
+        f"<p><strong>Phone:</strong> {escaped_phone}<br/>{escaped_hours}</p>\n"
+        f"<p><strong>Business address:</strong><br/>{escaped_address}</p>"
+    )
 
 
 def _max_classification(current: str, candidate: str) -> str:

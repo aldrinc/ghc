@@ -1,3 +1,4 @@
+from app.services import compliance as compliance_service
 from app.services.compliance import RULESET_VERSION
 from app.routers import compliance as compliance_router
 
@@ -206,6 +207,15 @@ def test_list_policy_templates(api_client):
     assert "templateMarkdown" in privacy
 
 
+def test_get_policy_template_reads_markdown_from_disk(tmp_path, monkeypatch):
+    custom_markdown = "# Custom Privacy Policy\n\nCustom body.\n"
+    (tmp_path / "privacy_policy.md").write_text(custom_markdown, encoding="utf-8")
+    monkeypatch.setattr(compliance_service, "_POLICY_TEMPLATES_DIRECTORY", tmp_path)
+
+    template = compliance_service.get_policy_template(page_key="privacy_policy")
+    assert template["templateMarkdown"] == custom_markdown
+
+
 def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client, monkeypatch):
     client_id = _create_client(api_client)
     profile_payload = _sync_ready_profile_payload()
@@ -258,16 +268,8 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
                     "pageKey": "contact_support",
                     "pageId": "gid://shopify/Page/105",
                     "title": "Contact and Support",
-                    "handle": "contact-support",
-                    "url": "https://example.myshopify.com/pages/contact-support",
-                    "operation": "updated",
-                },
-                {
-                    "pageKey": "company_information",
-                    "pageId": "gid://shopify/Page/106",
-                    "title": "Company Information",
-                    "handle": "company-information",
-                    "url": "https://example.myshopify.com/pages/company-information",
+                    "handle": "contact",
+                    "url": "https://example.myshopify.com/pages/contact",
                     "operation": "updated",
                 },
             ],
@@ -283,7 +285,7 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
 
     body = sync_response.json()
     assert body["shopDomain"] == "example.myshopify.com"
-    assert len(body["pages"]) == 6
+    assert len(body["pages"]) == 5
     assert observed["client_id"] == client_id
     assert observed["shop_domain"] is None
     assert set(observed["page_keys"]) == {
@@ -292,10 +294,10 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
         "returns_refunds_policy",
         "shipping_policy",
         "contact_support",
-        "company_information",
     }
     page_map = {page["pageKey"]: page for page in observed["pages"]}  # type: ignore[index]
     assert "Compliance Workspace" in page_map["privacy_policy"]["bodyHtml"]
+    assert page_map["contact_support"]["handle"] == "contact"
 
     profile_response = api_client.get(f"/clients/{client_id}/compliance/profile")
     assert profile_response.status_code == 200
@@ -304,8 +306,7 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
     assert profile["termsOfServiceUrl"] == "https://example.myshopify.com/pages/terms-of-service"
     assert profile["returnsRefundsPolicyUrl"] == "https://example.myshopify.com/pages/returns-refunds-policy"
     assert profile["shippingPolicyUrl"] == "https://example.myshopify.com/pages/shipping-policy"
-    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact-support"
-    assert profile["companyInformationUrl"] == "https://example.myshopify.com/pages/company-information"
+    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact"
 
 
 def test_sync_compliance_policy_pages_requires_placeholder_values(api_client):
@@ -395,9 +396,9 @@ def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client
     assert "binding arbitration in the United States" in page_html_by_key["terms_of_service"]  # type: ignore[index]
     assert "within 90 days of delivery" in page_html_by_key["returns_refunds_policy"]  # type: ignore[index]
     assert "United States and Australia, with worldwide tracked shipping" in page_html_by_key["shipping_policy"]  # type: ignore[index]
-    assert "/pages/track-your-order" in page_html_by_key["contact_support"]  # type: ignore[index]
+    assert "Use the contact form on this page" in page_html_by_key["contact_support"]  # type: ignore[index]
+    assert "mailto:support@acme.test" in page_html_by_key["contact_support"]  # type: ignore[index]
     assert "24/7" in page_html_by_key["contact_support"]  # type: ignore[index]
-    assert "30 minutes" in page_html_by_key["contact_support"]  # type: ignore[index]
 
 
 def test_sync_compliance_policy_pages_requires_existing_profile(api_client):
@@ -451,8 +452,6 @@ def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeyp
         "terms_of_service",
         "returns_refunds_policy",
         "contact_support",
-        "company_information",
-        "subscription_terms_and_cancellation",
     }
     assert "shipping_policy" not in set(observed["page_keys"])
 
@@ -460,10 +459,6 @@ def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeyp
     assert profile_response.status_code == 200
     profile = profile_response.json()
     assert profile["shippingPolicyUrl"] is None
-    assert profile["subscriptionTermsAndCancellationUrl"] == (
-        "https://example.myshopify.com/pages/subscription-terms-and-cancellation"
-    )
-    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact-support"
     assert profile["returnsRefundsPolicyUrl"] == "https://example.myshopify.com/pages/returns-refunds-policy"
 
 
@@ -502,6 +497,4 @@ def test_sync_compliance_policy_pages_for_ecommerce_and_subscription_includes_al
         "returns_refunds_policy",
         "shipping_policy",
         "contact_support",
-        "company_information",
-        "subscription_terms_and_cancellation",
     }
