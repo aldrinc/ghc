@@ -374,7 +374,16 @@ class StrategyV2Workflow:
                 },
                 schedule_to_close_timeout=timedelta(minutes=60),
                 heartbeat_timeout=timedelta(minutes=20),
-                retry_policy=RetryPolicy(maximum_attempts=1),
+                retry_policy=RetryPolicy(
+                    maximum_attempts=2,
+                    initial_interval=timedelta(seconds=30),
+                    backoff_coefficient=2.0,
+                    maximum_interval=timedelta(minutes=5),
+                    non_retryable_error_types=[
+                        "StrategyV2MissingContextError",
+                        "StrategyV2SchemaValidationError",
+                    ],
+                ),
             )
             if not isinstance(foundational_result, dict):
                 raise RuntimeError("Strategy V2 foundational research activity returned an invalid payload.")

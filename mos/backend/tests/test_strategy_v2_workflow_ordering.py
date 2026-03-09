@@ -33,6 +33,12 @@ def test_strategy_v2_workflow_does_not_execute_precanon_child(monkeypatch) -> No
             assert payload["onboarding_payload_id"] == "payload-1"
             return {"stage0": _stage0_payload(), "stage0_artifact_id": "artifact-stage0"}
         if activity_name == "build_strategy_v2_foundational_research_activity":
+            assert _kwargs["heartbeat_timeout"] == timedelta(minutes=20)
+            assert _kwargs["retry_policy"].maximum_attempts == 2
+            assert _kwargs["retry_policy"].non_retryable_error_types == [
+                "StrategyV2MissingContextError",
+                "StrategyV2SchemaValidationError",
+            ]
             raise RuntimeError("stop_after_foundational_activity")
         if activity_name == "run_strategy_v2_voc_angle_pipeline_activity":
             assert payload["onboarding_payload_id"] == "payload-1"

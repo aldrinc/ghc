@@ -196,6 +196,41 @@ def test_generate_with_openai_retries_transient_response_server_error(monkeypatc
     assert llm._openai_client.responses.create_calls == 2  # type: ignore[union-attr]
 
 
+def test_generate_with_openai_resumes_existing_response_id(monkeypatch) -> None:
+    class _DummyResponses:
+        def __init__(self) -> None:
+            self.create_calls = 0
+            self.retrieve_calls: list[tuple[str, object | None]] = []
+
+        def create(self, **kwargs):  # noqa: ANN003
+            self.create_calls += 1
+            raise AssertionError("responses.create should not be called when resuming an existing response")
+
+        def retrieve(self, response_id: str, include=None):  # noqa: ANN001
+            self.retrieve_calls.append((response_id, include))
+            return SimpleNamespace(status="completed", output_text='{"ok": true}')
+
+    class _DummyOpenAIClient:
+        def __init__(self) -> None:
+            self.responses = _DummyResponses()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+
+    llm = LLMClient(default_model="gpt-5.2-2025-12-11")
+    llm._openai_client = _DummyOpenAIClient()  # type: ignore[assignment]
+
+    params = LLMGenerationParams(
+        model="gpt-5.2-2025-12-11",
+        use_reasoning=True,
+        existing_openai_response_id="resp_resume_123",
+    )
+    output = llm.generate_text("Return JSON", params=params)
+
+    assert output == '{"ok": true}'
+    assert llm._openai_client.responses.create_calls == 0  # type: ignore[union-attr]
+    assert llm._openai_client.responses.retrieve_calls == [("resp_resume_123", None)]  # type: ignore[union-attr]
+
+
 def test_generate_with_openai_does_not_retry_non_transient_response_failure(monkeypatch) -> None:
     class _DummyResponses:
         def __init__(self) -> None:

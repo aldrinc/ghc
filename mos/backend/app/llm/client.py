@@ -111,6 +111,7 @@ class LLMGenerationParams:
     openai_tool_choice: Optional[Any] = None
     openai_context_management: Optional[list[dict[str, Any]]] = None
     progress_callback: Optional[Callable[[dict[str, Any]], None]] = None
+    existing_openai_response_id: Optional[str] = None
 
 
 class LLMClient:
@@ -976,6 +977,30 @@ class LLMClient:
                 request_kwargs["text"] = {
                     "format": self._openai_text_format_from_response_format(response_format)
                 }
+
+            existing_response_id = (
+                params.existing_openai_response_id.strip()
+                if params and isinstance(params.existing_openai_response_id, str)
+                else ""
+            )
+            if existing_response_id:
+                logger.warning(
+                    "OpenAI responses request resumed "
+                    f"(model={model}, response_id={existing_response_id}, use_web_search={use_web_search}, "
+                    f"use_reasoning={use_reasoning})",
+                    extra={
+                        "model": model,
+                        "response_id": existing_response_id,
+                        "use_web_search": use_web_search,
+                        "use_reasoning": use_reasoning,
+                    },
+                )
+                return self._poll_openai_response(
+                    existing_response_id,
+                    include=include,
+                    poll_timeout_seconds=_POLL_TIMEOUT_SECONDS,
+                    progress_callback=params.progress_callback if params else None,
+                )
 
             max_attempts = max(1, _MAX_RETRIES)
             for attempt in range(1, max_attempts + 1):

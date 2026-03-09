@@ -167,6 +167,52 @@ def test_run_prompt_json_object_persists_claude_conversation_turns(monkeypatch: 
     assert conversation_messages[-1]["role"] == "assistant"
 
 
+def test_llm_generate_text_resumes_openai_response_from_matching_heartbeat(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _ActivityInfo:
+        heartbeat_details = [
+            {
+                "activity": "strategy_v2.run_voc_angle_pipeline",
+                "phase": "foundational",
+                "step_key": "01",
+                "model": "gpt-5.2-2025-12-11",
+                "response_id": "resp_resume_123",
+                "status": "in_progress",
+            }
+        ]
+
+    def _fake_generate_text(self, prompt: str, params):  # noqa: ANN001
+        captured["prompt"] = prompt
+        captured["response_id"] = params.existing_openai_response_id
+        if params.progress_callback is not None:
+            params.progress_callback({"status": "completed", "response_id": params.existing_openai_response_id})
+        return '{"ok": true}'
+
+    monkeypatch.setattr(strategy_v2_activities.activity, "info", lambda: _ActivityInfo())
+    monkeypatch.setattr(strategy_v2_activities.activity, "heartbeat", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities.LLMClient, "generate_text", _fake_generate_text)
+
+    progress_sink: dict[str, object] = {}
+    output = strategy_v2_activities._llm_generate_text(
+        prompt="Return JSON.",
+        model="gpt-5.2-2025-12-11",
+        use_reasoning=True,
+        heartbeat_context={
+            "activity": "strategy_v2.run_voc_angle_pipeline",
+            "phase": "foundational",
+            "step_key": "01",
+            "model": "gpt-5.2-2025-12-11",
+        },
+        progress_sink=progress_sink,
+    )
+
+    assert output == '{"ok": true}'
+    assert captured["response_id"] == "resp_resume_123"
+    assert progress_sink["response_id"] == "resp_resume_123"
+    assert progress_sink["status"] == "completed"
+
+
 def test_enforce_strict_openai_json_schema_preserves_explicit_object_constraints() -> None:
     schema = {
         "type": "object",

@@ -3870,6 +3870,10 @@ def _llm_generate_text(
 
         progress_callback = _progress_callback
 
+    resumed_response_id = _recover_openai_response_id_from_heartbeat(heartbeat_context=heartbeat_context)
+    if resumed_response_id and progress_callback is not None:
+        progress_callback({"status": "resuming", "response_id": resumed_response_id})
+
     llm = LLMClient(default_model=model)
     if model.lower().startswith("claude") and response_format is not None:
         json_schema_config = response_format.get("json_schema") if isinstance(response_format, dict) else None
@@ -3952,6 +3956,7 @@ def _llm_generate_text(
         openai_tool_choice=openai_tool_choice,
         openai_context_management=openai_context_management,
         progress_callback=progress_callback,
+        existing_openai_response_id=resumed_response_id,
     )
     output = llm.generate_text(prompt, params)
     cleaned = output.strip()
@@ -3959,8 +3964,36 @@ def _llm_generate_text(
         raise StrategyV2MissingContextError(
             f"LLM returned empty output for model '{model}'. "
             "Remediation: rerun the step after verifying model access and prompt input size."
-        )
+    )
     return cleaned
+
+
+def _recover_openai_response_id_from_heartbeat(
+    *,
+    heartbeat_context: Mapping[str, Any] | None,
+) -> str | None:
+    if not isinstance(heartbeat_context, Mapping) or not heartbeat_context:
+        return None
+    try:
+        heartbeat_details = list(activity.info().heartbeat_details or [])
+    except Exception:
+        return None
+    if not heartbeat_details:
+        return None
+    last_payload = heartbeat_details[-1]
+    if not isinstance(last_payload, Mapping):
+        return None
+    response_id = str(last_payload.get("response_id") or "").strip()
+    if not response_id:
+        return None
+    for key, expected in heartbeat_context.items():
+        if not isinstance(key, str):
+            continue
+        if expected is None or not isinstance(expected, (str, int, float, bool)):
+            continue
+        if last_payload.get(key) != expected:
+            return None
+    return response_id
 
 
 def _parse_json_response(*, raw_text: str, field_name: str) -> dict[str, Any]:
