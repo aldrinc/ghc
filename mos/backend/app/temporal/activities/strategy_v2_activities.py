@@ -975,111 +975,20 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
     if decision == "EXCLUDE" and include_in_mining_plan:
         raise ValueError("Agent 1 file_assessment EXCLUDE variant cannot include mining-plan selection.")
 
-    evidence_ref_item_schema = {"type": "string", "minLength": 1}
-
     if decision == "EXCLUDE":
-        properties: dict[str, Any] = {
+        properties = {
             "decision": {"type": "string", "enum": ["EXCLUDE"]},
             "exclude_reason": {"type": "string", "minLength": 1},
+            "observation_id": {"type": "null"},
             "include_in_mining_plan": {"type": "boolean", "enum": [False]},
-            "habitat_name": {"type": "null"},
-            "habitat_type": {"type": "null"},
-            "url_pattern": {"type": "null"},
-            "items_in_file": {"type": "null"},
-            "data_quality": {"type": "null"},
-            "observation_sheet": {"type": "null"},
-            "language_samples": {
-                "type": "array",
-                "maxItems": 0,
-                "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
-            },
-            "video_extension": {"type": "null"},
-            "competitive_overlap": {"type": "null"},
-            "trend_lifecycle": {"type": "null"},
-            "mining_gate": {"type": "null"},
-            "rank_score": {"type": "null"},
-            "estimated_yield": {"type": "null"},
-            "evidence_refs": {
-                "type": "array",
-                "maxItems": 0,
-                "items": evidence_ref_item_schema,
-            },
-            "priority_rank": {"type": "null"},
-            "target_voc_types": {
-                "type": "array",
-                "maxItems": 0,
-                "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
-            },
-            "sampling_strategy": {"type": "null"},
-            "platform_behavior_note": {"type": "null"},
-            "compliance_flags": {"type": "string", "maxLength": 0},
         }
-        return {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": properties,
-            "required": list(properties),
-        }
-
-    properties = {
-        "decision": {"type": "string", "enum": ["OBSERVE"]},
-        "exclude_reason": {"type": "string", "maxLength": 0},
-        "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
-        "habitat_name": {"type": "string", "minLength": 1},
-        "habitat_type": {"type": "string", "minLength": 1},
-        "url_pattern": {"type": "string", "minLength": 1},
-        "items_in_file": {"type": "integer", "minimum": 0},
-        "data_quality": deepcopy(_VOC_AGENT01_DATA_QUALITY_SCHEMA),
-        "observation_sheet": deepcopy(_VOC_AGENT01_OBSERVATION_SHEET_SCHEMA),
-        "language_samples": {
-            "type": "array",
-            "minItems": 1,
-            "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
-        },
-        "video_extension": {
-            "anyOf": [
-                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
-                {"type": "null"},
-            ]
-        },
-        "competitive_overlap": deepcopy(_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA),
-        "trend_lifecycle": deepcopy(_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA),
-        "mining_gate": deepcopy(_VOC_AGENT01_MINING_GATE_SCHEMA),
-        "rank_score": {"type": "integer"},
-        "estimated_yield": {"type": "integer", "minimum": 0},
-        "evidence_refs": {
-            "type": "array",
-            "minItems": 1,
-            "items": evidence_ref_item_schema,
-        },
-        "compliance_flags": {"type": "string"},
-    }
-    if include_in_mining_plan:
-        properties.update(
-            {
-                "priority_rank": {"type": "integer", "minimum": 1, "maximum": 12},
-                "target_voc_types": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
-                },
-                "sampling_strategy": {"type": "string", "minLength": 1},
-                "platform_behavior_note": {"type": "string", "minLength": 1},
-            }
-        )
     else:
-        properties.update(
-            {
-                "priority_rank": {"type": "null"},
-                "target_voc_types": {
-                    "type": "array",
-                    "maxItems": 0,
-                    "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
-                },
-                "sampling_strategy": {"type": "null"},
-                "platform_behavior_note": {"type": "null"},
-            }
-        )
+        properties = {
+            "decision": {"type": "string", "enum": ["OBSERVE"]},
+            "exclude_reason": {"type": "string", "maxLength": 0},
+            "observation_id": {"type": "string", "minLength": 1},
+            "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
+        }
     return {
         "type": "object",
         "additionalProperties": False,
@@ -1200,6 +1109,62 @@ _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
 }
 
 
+def _agent1_observation_detail_schema() -> dict[str, Any]:
+    properties = {
+        key: deepcopy(value)
+        for key, value in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["properties"].items()
+        if key != "source_file"
+    }
+    properties["observation_id"] = {"type": "string", "minLength": 1}
+    properties["priority_rank"] = {
+        "anyOf": [
+            {"type": "integer", "minimum": 1, "maximum": 12},
+            {"type": "null"},
+        ]
+    }
+    properties["target_voc_types"] = {
+        "type": "array",
+        "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+    }
+    properties["sampling_strategy"] = {
+        "anyOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"},
+        ]
+    }
+    properties["platform_behavior_note"] = {
+        "anyOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"},
+        ]
+    }
+    properties["compliance_flags"] = {"type": "string"}
+    required = [
+        field_name
+        for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["required"]
+        if field_name != "source_file"
+    ]
+    required.extend(
+        [
+            "observation_id",
+            "priority_rank",
+            "target_voc_types",
+            "sampling_strategy",
+            "platform_behavior_note",
+            "compliance_flags",
+        ]
+    )
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": required,
+    }
+
+
+_VOC_AGENT01_OBSERVATION_DETAIL_SCHEMA: dict[str, Any] = _agent1_observation_detail_schema()
+
+
 def _agent1_output_schema(*, source_files: Sequence[str]) -> dict[str, Any]:
     return {
         "type": "object",
@@ -1242,6 +1207,10 @@ def _agent1_output_schema(*, source_files: Sequence[str]) -> dict[str, Any]:
                 field_name="Agent 1 source_files",
                 value_schema=_VOC_AGENT01_FILE_ASSESSMENT_SCHEMA,
             ),
+            "observations": {
+                "type": "array",
+                "items": _VOC_AGENT01_OBSERVATION_DETAIL_SCHEMA,
+            },
             "gate_failures": {
                 "type": "array",
                 "items": {
@@ -1278,6 +1247,7 @@ def _agent1_output_schema(*, source_files: Sequence[str]) -> dict[str, Any]:
             "timestamp",
             "product_classification",
             "file_assessments",
+            "observations",
             "gate_failures",
             "disconfirmation_flags",
         ],
@@ -1435,7 +1405,7 @@ _VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
     ],
 }
 
-def _agent2_accepted_decision_schema() -> dict[str, Any]:
+def _agent2_accepted_observation_schema() -> dict[str, Any]:
     properties = deepcopy(_VOC_AGENT02_VOC_OBSERVATION_SCHEMA["properties"])
     for deterministic_field in (
         "voc_id",
@@ -1448,7 +1418,7 @@ def _agent2_accepted_decision_schema() -> dict[str, Any]:
         "evidence_ref",
     ):
         properties.pop(deterministic_field, None)
-    properties["decision"] = {"type": "string", "enum": ["ACCEPT"]}
+    properties["observation_id"] = {"type": "string", "minLength": 1}
     required = [
         field_name
         for field_name in _VOC_AGENT02_VOC_OBSERVATION_SCHEMA["required"]
@@ -1463,12 +1433,26 @@ def _agent2_accepted_decision_schema() -> dict[str, Any]:
             "evidence_ref",
         }
     ]
-    required.append("decision")
+    required.append("observation_id")
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": properties,
         "required": required,
+    }
+
+
+def _agent2_accepted_decision_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "decision": {"type": "string", "enum": ["ACCEPT"]},
+            "observation_id": {"type": "string", "minLength": 1},
+            "reason": {"type": "null"},
+            "note": {"type": "string", "maxLength": 0},
+        },
+        "required": ["decision", "observation_id", "reason", "note"],
     }
 
 
@@ -1478,13 +1462,14 @@ def _agent2_rejected_decision_schema() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {
             "decision": {"type": "string", "enum": ["REJECT"]},
+            "observation_id": {"type": "null"},
             "reason": {
                 "type": "string",
                 "enum": ["NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"],
             },
             "note": {"type": "string", "minLength": 1},
         },
-        "required": ["decision", "reason", "note"],
+        "required": ["decision", "observation_id", "reason", "note"],
     }
 
 
@@ -1509,6 +1494,10 @@ def _agent2_output_schema(*, evidence_ids: Sequence[str]) -> dict[str, Any]:
                 field_name="Agent 2 evidence_ids",
                 value_schema=_VOC_AGENT02_DECISION_SCHEMA,
             ),
+            "accepted_observations": {
+                "type": "array",
+                "items": _agent2_accepted_observation_schema(),
+            },
             "validation_errors": {"type": "array", "items": {"type": "string"}},
         },
         "required": [
@@ -1516,6 +1505,7 @@ def _agent2_output_schema(*, evidence_ids: Sequence[str]) -> dict[str, Any]:
             "input_count",
             "output_count",
             "decisions_by_evidence_id",
+            "accepted_observations",
             "validation_errors",
         ],
     }
@@ -8769,10 +8759,15 @@ def _render_agent1_runtime_instruction(
         "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
         "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
         "Return file_assessments as an object keyed by the exact source_file values from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows[].source_file.\n"
+        "Each file_assessments value is lightweight: decision, observation_id, exclude_reason, include_in_mining_plan.\n"
         "Do not emit source_file inside file_assessments values; runtime derives it from each object key.\n"
-        "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
-        "If decision=OBSERVE, habitat_name, habitat_type, url_pattern, items_in_file, data_quality, observation_sheet, "
-        "competitive_overlap, trend_lifecycle, mining_gate, rank_score, estimated_yield, and evidence_refs must all be populated.\n"
+        "Return observations as an array keyed logically by observation_id, with one observations entry for each OBSERVE decision.\n"
+        "Do not emit source_file inside observations rows; runtime derives it from the file_assessments object key that references each observation_id.\n"
+        "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments + observations.\n"
+        "Every OBSERVE file_assessments row must reference a unique non-empty observation_id.\n"
+        "Every observations row must include a unique non-empty observation_id.\n"
+        "If decision=OBSERVE, the referenced observations row must populate habitat_name, habitat_type, url_pattern, items_in_file, data_quality, observation_sheet, "
+        "competitive_overlap, trend_lifecycle, mining_gate, rank_score, estimated_yield, and evidence_refs.\n"
         "If decision=OBSERVE, copy url_pattern from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.default_url_pattern unless stronger evidence suggests a better locator.\n"
         "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
         "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
@@ -8783,18 +8778,16 @@ def _render_agent1_runtime_instruction(
         "Put the full human report into report_markdown string inside the JSON object.\n"
         "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
         "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
-        "Every OBSERVE row must include non-empty evidence_refs.\n"
-        "Every OBSERVE row must include mining_gate.status, mining_gate.failed_fields, and a non-empty mining_gate.reason.\n"
-        "If decision=EXCLUDE, set observation-only fields to null, set language_samples/evidence_refs/target_voc_types to empty arrays, "
-        "and set compliance_flags to an empty string.\n"
-        "If decision=EXCLUDE, provide a non-empty exclude_reason and set include_in_mining_plan=false.\n"
-        "If include_in_mining_plan=true, decision must be OBSERVE and priority_rank, target_voc_types, sampling_strategy, "
-        "platform_behavior_note, and evidence_refs must all be populated.\n"
-        "If include_in_mining_plan=false on an OBSERVE row, set priority_rank=null, target_voc_types=[], "
+        "Every observations row referenced by an OBSERVE decision must include non-empty evidence_refs.\n"
+        "Every observations row referenced by an OBSERVE decision must include mining_gate.status, mining_gate.failed_fields, and a non-empty mining_gate.reason.\n"
+        "If decision=EXCLUDE, set observation_id=null, provide a non-empty exclude_reason, and set include_in_mining_plan=false.\n"
+        "If include_in_mining_plan=true, the referenced observations row must populate priority_rank, target_voc_types, sampling_strategy, "
+        "platform_behavior_note, compliance_flags, and evidence_refs.\n"
+        "If include_in_mining_plan=false, the referenced observations row must set priority_rank=null, target_voc_types=[], "
         "sampling_strategy=null, platform_behavior_note=null, and compliance_flags=''.\n"
         "Construct mining selections from OBSERVE rows only; never mark an EXCLUDE row for mining.\n"
         "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
-        "Output complete file_assessments entries suitable for deterministic habitat scoring."
+        "Output complete file_assessments and observations entries suitable for deterministic habitat scoring."
     )
 
 
@@ -8814,6 +8807,11 @@ def _derive_agent1_outputs_from_file_assessments(
     if not isinstance(file_assessments_raw, Mapping):
         raise StrategyV2SchemaValidationError(
             "Agent 1 output must include file_assessments object for strict file-coverage validation."
+        )
+    observations_raw = agent01_output.get("observations")
+    if not isinstance(observations_raw, list):
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must include observations array for strict observation grounding."
         )
 
     observation_projection_required_fields = (
@@ -8853,6 +8851,19 @@ def _derive_agent1_outputs_from_file_assessments(
     excluded_source_files: list[str] = []
     mining_plan: list[dict[str, Any]] = []
     normalized_file_assessments: list[dict[str, Any]] = []
+    observations_by_id: dict[str, dict[str, Any]] = {}
+    for index, raw_row in enumerate(observations_raw):
+        row_name = f"Agent 1 observations[{index}]"
+        if not isinstance(raw_row, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        observation_id = str(raw_row.get("observation_id") or "").strip()
+        if not observation_id:
+            raise StrategyV2SchemaValidationError(f"{row_name}.observation_id must be non-empty.")
+        if observation_id in observations_by_id:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 1 observations must not contain duplicate observation_id values. Duplicate: '{observation_id}'."
+            )
+        observations_by_id[observation_id] = dict(raw_row)
     returned_source_files = {
         str(key or "").strip()
         for key in file_assessments_raw.keys()
@@ -8873,14 +8884,14 @@ def _derive_agent1_outputs_from_file_assessments(
             f"Missing source_file entries: {missing_source_files[:8]}."
         )
 
-    for index, source_file in enumerate(ordered_file_names):
+    used_observation_ids: set[str] = set()
+    for source_file in ordered_file_names:
         row_name = f"Agent 1 file_assessments[{source_file}]"
         row = file_assessments_raw.get(source_file)
         if not isinstance(row, Mapping):
             raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
         row_payload = dict(row)
         row_payload["source_file"] = source_file
-        normalized_file_assessments.append(deepcopy(row_payload))
 
         decision = str(row_payload.get("decision") or "").strip().upper()
         if decision not in {"OBSERVE", "EXCLUDE"}:
@@ -8893,6 +8904,9 @@ def _derive_agent1_outputs_from_file_assessments(
                 f"{row_name}.include_in_mining_plan must be boolean."
             )
         exclude_reason = str(row_payload.get("exclude_reason") or "").strip()
+        observation_id = str(row_payload.get("observation_id") or "").strip()
+        row_payload["observation_id"] = observation_id or None
+        normalized_file_assessments.append(deepcopy(row_payload))
 
         if decision == "EXCLUDE":
             if include_in_mining_plan:
@@ -8904,14 +8918,30 @@ def _derive_agent1_outputs_from_file_assessments(
                 raise StrategyV2SchemaValidationError(
                     f"{row_name}.exclude_reason must be non-empty when decision=EXCLUDE."
                 )
+            if observation_id:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.observation_id must be null/empty when decision=EXCLUDE."
+                )
             excluded_source_files.append(source_file)
             continue
 
-        observation_row = {
-            field_name: deepcopy(row_payload.get(field_name))
-            for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA.get("required", [])
-            if isinstance(field_name, str)
-        }
+        if not observation_id:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.observation_id must be non-empty when decision=OBSERVE."
+            )
+        if observation_id in used_observation_ids:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 1 observation_id '{observation_id}' is referenced by multiple file_assessments rows."
+            )
+        observation_raw = observations_by_id.get(observation_id)
+        if observation_raw is None:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.observation_id='{observation_id}' is missing a matching observations entry."
+            )
+        used_observation_ids.add(observation_id)
+
+        observation_row = deepcopy(observation_raw)
+        observation_row["source_file"] = source_file
         _require_row_fields(
             row=observation_row,
             required_fields=observation_projection_required_fields,
@@ -8920,10 +8950,31 @@ def _derive_agent1_outputs_from_file_assessments(
         observations.append(observation_row)
 
         if not include_in_mining_plan:
+            if observation_row.get("priority_rank") is not None:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.priority_rank must be null when include_in_mining_plan=false."
+                )
+            target_voc_types = observation_row.get("target_voc_types")
+            if not isinstance(target_voc_types, list) or target_voc_types:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.target_voc_types must be an empty array when include_in_mining_plan=false."
+                )
+            if observation_row.get("sampling_strategy") is not None:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.sampling_strategy must be null when include_in_mining_plan=false."
+                )
+            if observation_row.get("platform_behavior_note") is not None:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.platform_behavior_note must be null when include_in_mining_plan=false."
+                )
+            if str(observation_row.get("compliance_flags") or "").strip():
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.compliance_flags must be empty when include_in_mining_plan=false."
+                )
             continue
 
         mining_row = {
-            field_name: deepcopy(row_payload.get(field_name))
+            field_name: deepcopy(observation_row.get(field_name))
             for field_name in _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA.get("required", [])
             if isinstance(field_name, str)
         }
@@ -8932,7 +8983,7 @@ def _derive_agent1_outputs_from_file_assessments(
             required_fields=mining_projection_required_fields,
             row_name=f"{row_name}.mining_plan_projection",
         )
-        if "compliance_flags" not in row_payload or row_payload.get("compliance_flags") is None:
+        if "compliance_flags" not in observation_row or observation_row.get("compliance_flags") is None:
             raise StrategyV2SchemaValidationError(
                 f"{row_name}.compliance_flags must be present when include_in_mining_plan=true."
             )
@@ -8947,6 +8998,13 @@ def _derive_agent1_outputs_from_file_assessments(
                 f"{row_name}.evidence_refs must be a non-empty array when include_in_mining_plan=true."
             )
         mining_plan.append(mining_row)
+
+    unused_observation_ids = sorted(set(observations_by_id) - used_observation_ids)
+    if unused_observation_ids:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 observations contains observation_id values not referenced by file_assessments. "
+            f"Unused observation_id entries: {unused_observation_ids[:8]}."
+        )
 
     derived_output = dict(agent01_output)
     derived_output["file_assessments"] = normalized_file_assessments
@@ -9950,7 +10008,10 @@ def _run_agent2_extractor_prompt_only(
                 "Use AGENT2_INPUT_MANIFEST_JSON to read the canonical evidence_id list.\n"
                 "Return decisions_by_evidence_id as an object keyed by the exact evidence_id values from AGENT2_INPUT_MANIFEST_JSON.rows[].evidence_id.\n"
                 "Do not emit evidence_id inside decisions_by_evidence_id values; runtime derives it from each object key.\n"
-                "For each keyed decision: use decision=ACCEPT with a complete VOC payload, or decision=REJECT with reason and note.\n"
+                "For each keyed decision: use decision=ACCEPT with a unique observation_id, or decision=REJECT with reason and note.\n"
+                "Return accepted_observations as an array with one row per ACCEPT decision.\n"
+                "Do not emit evidence_id/source/source_type/source_url/source_author/source_date/evidence_ref/voc_id inside accepted_observations; runtime derives those deterministically.\n"
+                "Every ACCEPT decision must reference a unique observation_id that appears exactly once in accepted_observations.\n"
                 "Do not invent, mutate, alias, add, or drop evidence_id values beyond AGENT2_INPUT_MANIFEST_JSON.\n"
                 "Return one extraction object only."
             ),
@@ -10072,8 +10133,28 @@ def _validate_agent2_decision_partition(
             f"(missing_count={len(missing_decisions)}, sample_ids={sorted(missing_decisions)[:8]})."
         )
 
+    accepted_observations_raw = output.get("accepted_observations")
+    if not isinstance(accepted_observations_raw, list):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output must include accepted_observations array."
+        )
+    accepted_by_id: dict[str, dict[str, Any]] = {}
+    for index, raw_row in enumerate(accepted_observations_raw):
+        row_name = f"Agent 2 accepted_observations[{index}]"
+        if not isinstance(raw_row, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        observation_id = str(raw_row.get("observation_id") or "").strip()
+        if not observation_id:
+            raise StrategyV2SchemaValidationError(f"{row_name}.observation_id must be non-empty.")
+        if observation_id in accepted_by_id:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 accepted_observations must not contain duplicate observation_id values. Duplicate: '{observation_id}'."
+            )
+        accepted_by_id[observation_id] = dict(raw_row)
+
     all_voc_rows: list[dict[str, Any]] = []
     all_rejected_items: list[dict[str, Any]] = []
+    used_observation_ids: set[str] = set()
     for evidence_id in input_ordered_ids:
         source_row = input_rows_by_id.get(evidence_id)
         if source_row is None:
@@ -10087,7 +10168,22 @@ def _validate_agent2_decision_partition(
             )
         decision = str(row.get("decision") or "").strip().upper()
         if decision == "ACCEPT":
-            normalized_row = dict(row)
+            observation_id = str(row.get("observation_id") or "").strip()
+            if not observation_id:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 decisions_by_evidence_id['{evidence_id}'].observation_id must be non-empty when decision=ACCEPT."
+                )
+            if observation_id in used_observation_ids:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 observation_id '{observation_id}' is referenced by multiple evidence rows."
+                )
+            normalized_row = accepted_by_id.get(observation_id)
+            if normalized_row is None:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 decisions_by_evidence_id['{evidence_id}'].observation_id='{observation_id}' is missing a matching accepted_observations entry."
+                )
+            used_observation_ids.add(observation_id)
+            normalized_row = dict(normalized_row)
             normalized_row["evidence_id"] = evidence_id
             normalized_row["source_type"] = source_row["source_type"]
             normalized_row["source_url"] = source_row["source_url"]
@@ -10098,6 +10194,10 @@ def _validate_agent2_decision_partition(
             all_voc_rows.append(normalized_row)
             continue
         if decision == "REJECT":
+            if row.get("observation_id") not in {None, ""}:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 decisions_by_evidence_id['{evidence_id}'].observation_id must be null/empty when decision=REJECT."
+                )
             reason = str(row.get("reason") or "").strip().upper()
             if reason not in {"NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"}:
                 raise StrategyV2SchemaValidationError(
@@ -10125,6 +10225,13 @@ def _validate_agent2_decision_partition(
             continue
         raise StrategyV2SchemaValidationError(
             f"Agent 2 decisions_by_evidence_id['{evidence_id}'].decision must be ACCEPT or REJECT."
+        )
+
+    unused_observation_ids = sorted(set(accepted_by_id) - used_observation_ids)
+    if unused_observation_ids:
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 accepted_observations contains observation_id values not referenced by decisions_by_evidence_id. "
+            f"Unused observation_id entries: {unused_observation_ids[:8]}."
         )
 
     if not all_voc_rows:
@@ -13434,12 +13541,19 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
                 continue
             decisions_by_evidence_id[evidence_id] = {
                 "decision": "REJECT",
+                "observation_id": None,
                 "reason": "TOO_VAGUE",
                 "note": (
                     "Excluded from prompt extraction by deterministic compaction cap; "
                     "kept in audit trail."
                 ),
             }
+    accepted_observations_raw = agent02_output_raw.get("accepted_observations")
+    if not isinstance(accepted_observations_raw, list):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 extraction output must include accepted_observations array."
+        )
+    accepted_observations = [dict(row) for row in accepted_observations_raw if isinstance(row, Mapping)]
     accepted_count = sum(
         1
         for row in decisions_by_evidence_id.values()
@@ -13450,6 +13564,7 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         "input_count": len(evidence_rows),
         "output_count": accepted_count,
         "decisions_by_evidence_id": decisions_by_evidence_id,
+        "accepted_observations": accepted_observations,
         "validation_errors": (
             [row for row in agent02_output_raw.get("validation_errors", []) if isinstance(row, str)]
             if isinstance(agent02_output_raw.get("validation_errors"), list)

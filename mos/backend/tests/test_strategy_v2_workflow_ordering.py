@@ -165,6 +165,7 @@ def test_strategy_v2_workflow_stage2b_runs_as_checkpoint_activities(monkeypatch)
                     "input_count": 0,
                     "output_count": 0,
                     "decisions_by_evidence_id": {},
+                    "accepted_observations": [],
                     "validation_errors": [],
                 },
                 "agent02_input_manifest": {"input_count": 0, "rows": []},

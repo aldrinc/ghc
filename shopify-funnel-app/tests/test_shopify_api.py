@@ -3267,9 +3267,17 @@ def test_sync_theme_brand_updates_layout_and_css():
                 in css_content
             )
             assert "@media screen and (max-width: 749px) {" in css_content
-            assert ".slider--tablet .card-grid > * {" in css_content
-            assert "grid-auto-columns: minmax(0, 100%) !important;" in css_content
+            assert "[id*=\"main-collection\"] .card-grid," in css_content
+            assert ".collection .card-grid {" in css_content
+            assert "display: flex !important;" in css_content
+            assert "flex-wrap: nowrap !important;" in css_content
+            assert "overflow-y: visible !important;" in css_content
+            assert ".slider--tablet .card-grid > *," in css_content
+            assert "flex: 0 0 100% !important;" in css_content
+            assert "min-width: 100% !important;" in css_content
             assert "scroll-snap-type: x mandatory !important;" in css_content
+            assert ".slider--tablet .card-grid .card," in css_content
+            assert "overflow: visible !important;" in css_content
             assert (
                 "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
                 in css_content
@@ -5427,13 +5435,20 @@ def test_render_theme_brand_css_includes_mobile_collection_card_scroller_overrid
 
     assert "@media screen and (max-width: 749px) {" in css
     assert ".slider--tablet .card-grid {" in css
+    assert "[id*=\"main-collection\"] .card-grid," in css
+    assert ".collection .card-grid {" in css
     assert "--slider-item-width: minmax(0, 100%) !important;" in css
-    assert "grid-auto-flow: column !important;" in css
-    assert "grid-auto-columns: minmax(0, 100%) !important;" in css
+    assert "display: flex !important;" in css
+    assert "flex-wrap: nowrap !important;" in css
     assert "overflow-x: auto !important;" in css
+    assert "overflow-y: visible !important;" in css
     assert "scroll-snap-type: x mandatory !important;" in css
-    assert ".slider--tablet .card-grid > * {" in css
+    assert ".slider--tablet .card-grid > *," in css
+    assert "flex: 0 0 100% !important;" in css
+    assert "min-width: 100% !important;" in css
     assert "scroll-snap-align: start !important;" in css
+    assert ".slider--tablet .card-grid .card," in css
+    assert "overflow: visible !important;" in css
 
 
 def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():

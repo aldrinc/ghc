@@ -555,20 +555,36 @@ _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
         """@media screen and (max-width: 749px) {
   /* Keep mobile collection cards from crowding/overlapping by forcing
      a one-card-per-view horizontal scroller. */
-  .slider--tablet .card-grid {
+  .slider--tablet .card-grid,
+  [id*="main-collection"] .card-grid,
+  .collection .card-grid {
     --slider-item-width: minmax(0, 100%) !important;
-    grid-template-columns: none !important;
-    grid-auto-flow: column !important;
-    grid-auto-columns: minmax(0, 100%) !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
     overflow-x: auto !important;
+    overflow-y: visible !important;
     -webkit-overflow-scrolling: touch !important;
     overscroll-behavior-x: contain !important;
     scroll-snap-type: x mandatory !important;
   }
 
-  .slider--tablet .card-grid > * {
-    min-width: 0 !important;
+  .slider--tablet .card-grid > *,
+  [id*="main-collection"] .card-grid > *,
+  .collection .card-grid > * {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
     scroll-snap-align: start !important;
+  }
+
+  .slider--tablet .card-grid .card,
+  .slider--tablet .card-grid .product-card,
+  [id*="main-collection"] .card-grid .card,
+  [id*="main-collection"] .card-grid .product-card,
+  .collection .card-grid .card,
+  .collection .card-grid .product-card {
+    overflow: visible !important;
   }
 }""",
     ),

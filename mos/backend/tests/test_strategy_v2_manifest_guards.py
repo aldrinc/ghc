@@ -209,16 +209,30 @@ def _agent1_file_assessment(
     include_in_mining_plan: bool = False,
     priority_rank: int | None = None,
 ) -> dict[str, object]:
+    observation_id = f"obs-{source_file.replace('.', '-')}"
     return {
         "decision": decision,
         "exclude_reason": "Insufficient usable evidence in file." if decision == "EXCLUDE" else "",
+        "observation_id": None if decision == "EXCLUDE" else observation_id,
         "include_in_mining_plan": include_in_mining_plan,
-        "habitat_name": None if decision == "EXCLUDE" else f"Habitat for {source_file}",
-        "habitat_type": None if decision == "EXCLUDE" else "TEXT_COMMUNITY",
-        "url_pattern": None if decision == "EXCLUDE" else f"https://example.com/{source_file}",
-        "items_in_file": None if decision == "EXCLUDE" else 12,
-        "data_quality": None if decision == "EXCLUDE" else "CLEAN",
-        "observation_sheet": None if decision == "EXCLUDE" else {
+    }
+
+
+def _agent1_observation(
+    *,
+    source_file: str,
+    include_in_mining_plan: bool = False,
+    priority_rank: int | None = None,
+) -> dict[str, object]:
+    observation_id = f"obs-{source_file.replace('.', '-')}"
+    return {
+        "observation_id": observation_id,
+        "habitat_name": f"Habitat for {source_file}",
+        "habitat_type": "TEXT_COMMUNITY",
+        "url_pattern": f"https://example.com/{source_file}",
+        "items_in_file": 12,
+        "data_quality": "CLEAN",
+        "observation_sheet": {
             "threads_50_plus": "Y",
             "threads_200_plus": "N",
             "threads_1000_plus": "N",
@@ -258,7 +272,7 @@ def _agent1_file_assessment(
             "recommendation_threads": "Y",
             "reusability": "PATTERN_REUSABLE",
         },
-        "language_samples": [] if decision == "EXCLUDE" else [
+        "language_samples": [
             {
                 "sample_id": "S1",
                 "evidence_ref": f"{source_file}::item[0]",
@@ -270,23 +284,23 @@ def _agent1_file_assessment(
             }
         ],
         "video_extension": None,
-        "competitive_overlap": None if decision == "EXCLUDE" else {
+        "competitive_overlap": {
             "competitors_in_data": ["Competitor A"],
             "overlap_level": "LOW",
             "whitespace_opportunity": "Y",
         },
-        "trend_lifecycle": None if decision == "EXCLUDE" else {
+        "trend_lifecycle": {
             "trend_direction": "HIGHER",
             "lifecycle_stage": "GROWING",
         },
-        "mining_gate": None if decision == "EXCLUDE" else {
+        "mining_gate": {
             "status": "PASS",
             "failed_fields": [],
             "reason": "All mining requirements satisfied.",
         },
-        "rank_score": None if decision == "EXCLUDE" else 77,
-        "estimated_yield": None if decision == "EXCLUDE" else 22,
-        "evidence_refs": [] if decision == "EXCLUDE" else [f"{source_file}::item[0]"],
+        "rank_score": 77,
+        "estimated_yield": 22,
+        "evidence_refs": [f"{source_file}::item[0]"],
         "priority_rank": priority_rank,
         "target_voc_types": ["PAIN_LANGUAGE"] if include_in_mining_plan else [],
         "sampling_strategy": "Chronological high-signal scan." if include_in_mining_plan else None,
@@ -305,6 +319,7 @@ def test_validate_agent1_output_source_file_grounding_rejects_unknown_files() ->
                         decision="EXCLUDE",
                     )
                 },
+                "observations": [],
             },
             scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "allowed_file.json"}]},
         )
@@ -321,6 +336,7 @@ def test_validate_agent1_output_source_file_grounding_rejects_excluded_rows_mark
                         include_in_mining_plan=True,
                     )
                 },
+                "observations": [],
             },
             scraped_data_manifest={
                 "raw_scraped_data_files": [{"file_name": "mined_file.json"}]
@@ -339,6 +355,13 @@ def test_validate_agent1_output_source_file_grounding_requires_exact_union_cover
                         priority_rank=1,
                     )
                 },
+                "observations": [
+                    _agent1_observation(
+                        source_file="observed_file.json",
+                        include_in_mining_plan=True,
+                        priority_rank=1,
+                    )
+                ],
             },
             scraped_data_manifest={
                 "raw_scraped_data_files": [
@@ -363,6 +386,13 @@ def test_validate_agent1_output_source_file_grounding_accepts_exact_coverage_wit
                     decision="EXCLUDE",
                 ),
             },
+            "observations": [
+                _agent1_observation(
+                    source_file="observed_file.json",
+                    include_in_mining_plan=True,
+                    priority_rank=1,
+                )
+            ],
         },
         scraped_data_manifest={
             "raw_scraped_data_files": [

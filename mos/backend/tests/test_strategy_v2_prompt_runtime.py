@@ -259,20 +259,20 @@ def test_voc_agent01_file_assessment_schema_discriminates_observe_and_exclude_ro
         and variant["properties"]["include_in_mining_plan"]["enum"] == [True]
     )
 
-    assert exclude_variant["properties"]["url_pattern"]["type"] == "null"
-    assert exclude_variant["properties"]["rank_score"]["type"] == "null"
-    assert exclude_variant["properties"]["estimated_yield"]["type"] == "null"
+    assert exclude_variant["properties"]["observation_id"]["type"] == "null"
+    assert exclude_variant["properties"]["exclude_reason"]["type"] == "string"
 
-    assert observe_variant["properties"]["url_pattern"]["type"] == "string"
-    assert observe_variant["properties"]["rank_score"]["type"] == "integer"
-    assert observe_variant["properties"]["estimated_yield"]["type"] == "integer"
-    assert observe_variant["properties"]["priority_rank"]["type"] == "null"
-    assert observe_variant["properties"]["target_voc_types"]["maxItems"] == 0
+    assert observe_variant["properties"]["observation_id"]["type"] == "string"
+    assert observe_variant["properties"]["exclude_reason"]["maxLength"] == 0
 
-    assert mined_observe_variant["properties"]["priority_rank"]["type"] == "integer"
-    assert mined_observe_variant["properties"]["target_voc_types"]["minItems"] == 1
-    assert mined_observe_variant["properties"]["sampling_strategy"]["type"] == "string"
-    assert mined_observe_variant["properties"]["platform_behavior_note"]["type"] == "string"
+    assert mined_observe_variant["properties"]["observation_id"]["type"] == "string"
+    assert mined_observe_variant["properties"]["include_in_mining_plan"]["enum"] == [True]
+
+    observation_schema = strategy_v2_activities._VOC_AGENT01_OBSERVATION_DETAIL_SCHEMA
+    assert observation_schema["properties"]["observation_id"]["type"] == "string"
+    assert observation_schema["properties"]["url_pattern"]["type"] == "string"
+    assert observation_schema["properties"]["rank_score"]["type"] == "integer"
+    assert observation_schema["properties"]["estimated_yield"]["type"] == "integer"
 
 
 def _iter_strategy_v2_run_prompt_json_schemas():
@@ -497,6 +497,14 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
                 "decisions_by_evidence_id": {
                     "E1111111111111111": {
                         "decision": "ACCEPT",
+                        "observation_id": "obs-001",
+                        "reason": None,
+                        "note": "",
+                    }
+                },
+                "accepted_observations": [
+                    {
+                        "observation_id": "obs-001",
                         "quote": "I need safer guidance.",
                         "is_hook": "N",
                         "hook_format": "NONE",
@@ -541,7 +549,7 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
                         "solution_sophistication": "EXPERIENCED",
                         "compliance_risk": "GREEN",
                     }
-                },
+                ],
                 "validation_errors": [],
             },
             "{}",

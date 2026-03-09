@@ -562,15 +562,16 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "product_classification": {
                     "buyer_behavior": "CONSIDERED",
                     "purchase_emotion": "MIXED",
-                    "compliance_sensitivity": "MEDIUM",
-                    "price_sensitivity": "MID_TICKET_30_TO_100",
-                },
-                "file_assessments": _agent1_file_assessments_from_uploaded_manifest(),
-                "gate_failures": [],
-                "disconfirmation_flags": [
-                    "A small number of files could be noisy.",
-                    "Observed intent may cluster around adjacent problems.",
-                    "Platform mix may overweight text-based discussion.",
+                "compliance_sensitivity": "MEDIUM",
+                "price_sensitivity": "MID_TICKET_30_TO_100",
+            },
+            "file_assessments": _agent1_file_assessments_from_uploaded_manifest(),
+            "observations": _agent1_observations_from_uploaded_manifest(),
+            "gate_failures": [],
+            "disconfirmation_flags": [
+                "A small number of files could be noisy.",
+                "Observed intent may cluster around adjacent problems.",
+                "Platform mix may overweight text-based discussion.",
                 ],
             }
         elif context == "strategy_v2.agent2_output":
@@ -579,6 +580,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "input_count": len(_agent2_voc_observations_payload()),
                 "output_count": len(_agent2_voc_observations_payload()),
                 "decisions_by_evidence_id": _agent2_decisions_payload(),
+                "accepted_observations": _agent2_accepted_observations_payload(),
                 "validation_errors": [],
             }
         elif context == "strategy_v2.agent3_output":
@@ -1093,14 +1095,52 @@ def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any
         observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
         observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
         assessments[source_file] = _agent1_file_assessment_payload(
-                observation=observation,
-                include_in_mining_plan=index == 0,
-                priority_rank=1 if index == 0 else None,
+            observation=observation,
+            include_in_mining_plan=index == 0,
         )
 
     if not assessments:
         raise AssertionError("Agent 1 test stub could not derive any file assessments from the uploaded manifest.")
     return assessments
+
+
+def _agent1_observations_from_uploaded_manifest() -> list[dict[str, Any]]:
+    uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
+    agent1_payloads = uploaded_payloads.get("agent1-prompt-chain")
+    if not isinstance(agent1_payloads, dict):
+        raise AssertionError("Agent 1 test stub is missing uploaded logical payloads for agent1-prompt-chain.")
+
+    scraped_data_manifest = agent1_payloads.get("SCRAPED_DATA_FILES_JSON")
+    if not isinstance(scraped_data_manifest, dict):
+        raise AssertionError("Agent 1 test stub expected SCRAPED_DATA_FILES_JSON in uploaded logical payloads.")
+
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    raw_file_rows = [row for row in raw_files if isinstance(row, dict)] if isinstance(raw_files, list) else []
+    observations: list[dict[str, Any]] = []
+    for index, file_row in enumerate(raw_file_rows):
+        source_file = str(file_row.get("file_name") or "").strip()
+        if not source_file:
+            continue
+        habitat_name = str(file_row.get("habitat_name") or source_file).strip()
+        habitat_type = str(file_row.get("habitat_type") or "TEXT_COMMUNITY").strip() or "TEXT_COMMUNITY"
+        observation = _agent1_habitat_observation_payload(
+            habitat_name=habitat_name,
+            habitat_type=habitat_type,
+            source_file=source_file,
+        )
+        observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
+        observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
+        observations.append(
+            _agent1_observation_payload(
+                observation=observation,
+                include_in_mining_plan=index == 0,
+                priority_rank=1 if index == 0 else None,
+            )
+        )
+
+    if not observations:
+        raise AssertionError("Agent 1 test stub could not derive any observations from the uploaded manifest.")
+    return observations
 
 
 def _agent1_habitat_observation_payload(*, habitat_name: str, habitat_type: str, source_file: str) -> dict[str, Any]:
@@ -1188,12 +1228,23 @@ def _agent1_file_assessment_payload(
     *,
     observation: dict[str, Any],
     include_in_mining_plan: bool,
-    priority_rank: int | None = None,
 ) -> dict[str, Any]:
     return {
         "decision": "OBSERVE",
         "exclude_reason": "",
+        "observation_id": f"obs-{observation['source_file'].replace('.', '-')}",
         "include_in_mining_plan": include_in_mining_plan,
+    }
+
+
+def _agent1_observation_payload(
+    *,
+    observation: dict[str, Any],
+    include_in_mining_plan: bool,
+    priority_rank: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "observation_id": f"obs-{observation['source_file'].replace('.', '-')}",
         "habitat_name": observation["habitat_name"],
         "habitat_type": observation["habitat_type"],
         "url_pattern": observation["url_pattern"],
@@ -1226,55 +1277,69 @@ def _agent1_file_assessment_payload(
 
 def _agent2_decisions_payload() -> dict[str, dict[str, Any]]:
     decisions: dict[str, dict[str, Any]] = {}
-    for row in _agent2_voc_observations_payload():
+    for index, row in enumerate(_agent2_voc_observations_payload(), start=1):
         evidence_id = str(row["evidence_id"])
         decisions[evidence_id] = {
             "decision": "ACCEPT",
-            "quote": row["quote"],
-            "is_hook": row["is_hook"],
-            "hook_format": row["hook_format"],
-            "hook_word_count": row["hook_word_count"],
-            "video_virality_tier": row["video_virality_tier"],
-            "video_view_count": row["video_view_count"],
-            "competitor_saturation": row["competitor_saturation"],
-            "in_whitespace": row["in_whitespace"],
-            "specific_number": row["specific_number"],
-            "specific_product_brand": row["specific_product_brand"],
-            "specific_event_moment": row["specific_event_moment"],
-            "specific_body_symptom": row["specific_body_symptom"],
-            "before_after_comparison": row["before_after_comparison"],
-            "crisis_language": row["crisis_language"],
-            "profanity_extreme_punctuation": row["profanity_extreme_punctuation"],
-            "physical_sensation": row["physical_sensation"],
-            "identity_change_desire": row["identity_change_desire"],
-            "word_count": row["word_count"],
-            "clear_trigger_event": row["clear_trigger_event"],
-            "named_enemy": row["named_enemy"],
-            "shiftable_belief": row["shiftable_belief"],
-            "expectation_vs_reality": row["expectation_vs_reality"],
-            "headline_ready": row["headline_ready"],
-            "usable_content_pct": row["usable_content_pct"],
-            "personal_context": row["personal_context"],
-            "long_narrative": row["long_narrative"],
-            "engagement_received": row["engagement_received"],
-            "real_person_signals": row["real_person_signals"],
-            "moderated_community": row["moderated_community"],
-            "trigger_event": row["trigger_event"],
-            "pain_problem": row["pain_problem"],
-            "desired_outcome": row["desired_outcome"],
-            "failed_prior_solution": row["failed_prior_solution"],
-            "enemy_blame": row["enemy_blame"],
-            "identity_role": row["identity_role"],
-            "fear_risk": row["fear_risk"],
-            "emotional_valence": row["emotional_valence"],
-            "durable_psychology": row["durable_psychology"],
-            "market_specific": row["market_specific"],
-            "date_bracket": row["date_bracket"],
-            "buyer_stage": row["buyer_stage"],
-            "solution_sophistication": row["solution_sophistication"],
-            "compliance_risk": row["compliance_risk"],
+            "observation_id": f"obs-{index:03d}",
+            "reason": None,
+            "note": "",
         }
     return decisions
+
+
+def _agent2_accepted_observations_payload() -> list[dict[str, Any]]:
+    observations: list[dict[str, Any]] = []
+    for index, row in enumerate(_agent2_voc_observations_payload(), start=1):
+        observations.append(
+            {
+                "observation_id": f"obs-{index:03d}",
+                "quote": row["quote"],
+                "is_hook": row["is_hook"],
+                "hook_format": row["hook_format"],
+                "hook_word_count": row["hook_word_count"],
+                "video_virality_tier": row["video_virality_tier"],
+                "video_view_count": row["video_view_count"],
+                "competitor_saturation": row["competitor_saturation"],
+                "in_whitespace": row["in_whitespace"],
+                "specific_number": row["specific_number"],
+                "specific_product_brand": row["specific_product_brand"],
+                "specific_event_moment": row["specific_event_moment"],
+                "specific_body_symptom": row["specific_body_symptom"],
+                "before_after_comparison": row["before_after_comparison"],
+                "crisis_language": row["crisis_language"],
+                "profanity_extreme_punctuation": row["profanity_extreme_punctuation"],
+                "physical_sensation": row["physical_sensation"],
+                "identity_change_desire": row["identity_change_desire"],
+                "word_count": row["word_count"],
+                "clear_trigger_event": row["clear_trigger_event"],
+                "named_enemy": row["named_enemy"],
+                "shiftable_belief": row["shiftable_belief"],
+                "expectation_vs_reality": row["expectation_vs_reality"],
+                "headline_ready": row["headline_ready"],
+                "usable_content_pct": row["usable_content_pct"],
+                "personal_context": row["personal_context"],
+                "long_narrative": row["long_narrative"],
+                "engagement_received": row["engagement_received"],
+                "real_person_signals": row["real_person_signals"],
+                "moderated_community": row["moderated_community"],
+                "trigger_event": row["trigger_event"],
+                "pain_problem": row["pain_problem"],
+                "desired_outcome": row["desired_outcome"],
+                "failed_prior_solution": row["failed_prior_solution"],
+                "enemy_blame": row["enemy_blame"],
+                "identity_role": row["identity_role"],
+                "fear_risk": row["fear_risk"],
+                "emotional_valence": row["emotional_valence"],
+                "durable_psychology": row["durable_psychology"],
+                "market_specific": row["market_specific"],
+                "date_bracket": row["date_bracket"],
+                "buyer_stage": row["buyer_stage"],
+                "solution_sophistication": row["solution_sophistication"],
+                "compliance_risk": row["compliance_risk"],
+            }
+        )
+    return observations
 
 
 def _agent3_angle_observations_payload(min_count: int = 10) -> list[dict[str, Any]]:

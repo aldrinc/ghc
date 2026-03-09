@@ -1126,6 +1126,57 @@ def test_apply_local_theme_secondary_background_color_to_sections_rewrites_targe
     )
 
 
+def test_apply_local_theme_collection_banner_contrasting_text_color_uses_light_text_on_dark_overlay():
+    files_by_filename = {
+        "config/settings_data.json": {
+            "filename": "config/settings_data.json",
+            "content": json.dumps(
+                {
+                    "current": {
+                        "color_foreground": "#0f2618",
+                        "color_background": "#f8f7f5",
+                        "color_image_background": "#ffffff",
+                    }
+                }
+            ),
+        },
+        "templates/collection.json": {
+            "filename": "templates/collection.json",
+            "content": json.dumps(
+                {
+                    "sections": {
+                        "main-collection-banner": {
+                            "type": "main-collection-banner",
+                            "settings": {
+                                "show_image": True,
+                                "color_overlay": "#0f261808",
+                                "overlay_opacity": 50,
+                                "color_text": "#0f2618",
+                            },
+                        }
+                    }
+                }
+            ),
+        },
+    }
+
+    clients_router._apply_local_theme_collection_banner_contrasting_text_color(
+        files_by_filename=files_by_filename,
+        css_vars={
+            "--color-brand": "#0f2618",
+            "--color-text": "var(--color-brand)",
+            "--color-bg": "#ffffff",
+            "--hero-bg": "#e9fbff",
+        },
+    )
+
+    collection_template = json.loads(files_by_filename["templates/collection.json"]["content"])
+    assert (
+        collection_template["sections"]["main-collection-banner"]["settings"]["color_text"]
+        == "#ffffff"
+    )
+
+
 def test_local_theme_baseline_secondary_background_sections_expose_rewritable_bindings():
     baseline_zip_path = (
         Path(__file__).resolve().parents[3]
@@ -2525,6 +2576,12 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
             "settings"
         ]["button_link"]
         == ""
+    )
+    assert (
+        exported_collection_template["sections"]["main-collection-banner"]["settings"][
+            "color_text"
+        ]
+        == "#ffffff"
     )
     assert (
         exported_footer_group_template["sections"]["footer"]["type"] == "a-footer"

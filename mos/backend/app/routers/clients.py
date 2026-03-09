@@ -373,6 +373,18 @@ _LOCAL_SHOPIFY_THEME_CSS_IMPORT_URL_RE = re.compile(
     r"""@import\s+url\((?P<quote>["']?)(?P<url>[^"')]+)(?P=quote)\)\s*;""",
     re.IGNORECASE,
 )
+_LOCAL_SHOPIFY_THEME_HEX_COLOR_RE = re.compile(
+    r"^#(?P<hex>[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$",
+    re.IGNORECASE,
+)
+_LOCAL_SHOPIFY_THEME_RGB_COLOR_RE = re.compile(
+    r"^rgba?\((?P<channels>[^)]+)\)$",
+    re.IGNORECASE,
+)
+_LOCAL_SHOPIFY_THEME_CSS_VAR_RE = re.compile(
+    r"^var\(\s*(?P<name>--[a-z0-9\-_]+)\s*\)$",
+    re.IGNORECASE,
+)
 _ASSET_SHOPIFY_FILE_URLS_CACHE_KEY = "shopifyFileUrlsByShopDomain"
 _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
     "adapt",
@@ -1934,6 +1946,462 @@ def _merge_local_theme_export_css(
     return merged_content if merged_content.endswith("\n") else f"{merged_content}\n"
 
 
+def _resolve_local_theme_color_reference(
+    *,
+    raw_value: str,
+    css_vars: dict[str, str],
+    path: str,
+    seen_vars: set[str] | None = None,
+) -> str:
+    normalized_value = raw_value.strip()
+    match = _LOCAL_SHOPIFY_THEME_CSS_VAR_RE.fullmatch(normalized_value)
+    if not match:
+        return normalized_value
+
+    css_var_name = match.group("name").strip()
+    visited = set(seen_vars or ())
+    if css_var_name in visited:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Local Shopify theme export detected a circular CSS variable reference while "
+                f"resolving {path}: {css_var_name}."
+            ),
+        )
+    next_value = css_vars.get(css_var_name)
+    if not isinstance(next_value, str) or not next_value.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Local Shopify theme export requires CSS variable "
+                f"{css_var_name} to resolve {path}."
+            ),
+        )
+    visited.add(css_var_name)
+    return _resolve_local_theme_color_reference(
+        raw_value=next_value,
+        css_vars=css_vars,
+        path=path,
+        seen_vars=visited,
+    )
+
+
+def _parse_local_theme_color_value(
+    *,
+    raw_value: str,
+    css_vars: dict[str, str],
+    path: str,
+) -> tuple[int, int, int, float]:
+    resolved_value = _resolve_local_theme_color_reference(
+        raw_value=raw_value,
+        css_vars=css_vars,
+        path=path,
+    )
+    hex_match = _LOCAL_SHOPIFY_THEME_HEX_COLOR_RE.fullmatch(resolved_value)
+    if hex_match:
+        value = hex_match.group("hex")
+        if len(value) == 3:
+            value = "".join(ch * 2 for ch in value)
+            return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), 1.0
+        if len(value) == 4:
+            value = "".join(ch * 2 for ch in value)
+            return (
+                int(value[0:2], 16),
+                int(value[2:4], 16),
+                int(value[4:6], 16),
+                int(value[6:8], 16) / 255.0,
+            )
+        if len(value) == 6:
+            return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), 1.0
+        return (
+            int(value[0:2], 16),
+            int(value[2:4], 16),
+            int(value[4:6], 16),
+            int(value[6:8], 16) / 255.0,
+        )
+
+    rgb_match = _LOCAL_SHOPIFY_THEME_RGB_COLOR_RE.fullmatch(resolved_value)
+    if rgb_match:
+        raw_channels = [part.strip() for part in rgb_match.group("channels").split(",")]
+        if len(raw_channels) not in {3, 4}:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Local Shopify theme export received an invalid RGB color value for "
+                    f"{path}: {resolved_value!r}."
+                ),
+            )
+
+        def parse_rgb_channel(channel: str) -> int:
+            try:
+                numeric = float(channel)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Local Shopify theme export received an invalid RGB channel for "
+                        f"{path}: {resolved_value!r}."
+                    ),
+                ) from exc
+            if numeric < 0 or numeric > 255:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Local Shopify theme export requires RGB channels between 0 and 255 for "
+                        f"{path}: {resolved_value!r}."
+                    ),
+                )
+            return int(round(numeric))
+
+        def parse_alpha_channel(channel: str) -> float:
+            normalized = channel.strip()
+            if normalized.endswith("%"):
+                try:
+                    percentage = float(normalized[:-1].strip())
+                except ValueError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            "Local Shopify theme export received an invalid RGBA alpha value for "
+                            f"{path}: {resolved_value!r}."
+                        ),
+                    ) from exc
+                if percentage < 0 or percentage > 100:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            "Local Shopify theme export requires RGBA alpha percentages between 0 "
+                            f"and 100 for {path}: {resolved_value!r}."
+                        ),
+                    )
+                return percentage / 100.0
+            try:
+                alpha = float(normalized)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Local Shopify theme export received an invalid RGBA alpha value for "
+                        f"{path}: {resolved_value!r}."
+                    ),
+                ) from exc
+            if alpha < 0 or alpha > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Local Shopify theme export requires RGBA alpha between 0 and 1 for "
+                        f"{path}: {resolved_value!r}."
+                    ),
+                )
+            return alpha
+
+        red = parse_rgb_channel(raw_channels[0])
+        green = parse_rgb_channel(raw_channels[1])
+        blue = parse_rgb_channel(raw_channels[2])
+        alpha = parse_alpha_channel(raw_channels[3]) if len(raw_channels) == 4 else 1.0
+        return red, green, blue, alpha
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=(
+            "Local Shopify theme export requires a supported CSS color for "
+            f"{path}, received {resolved_value!r}."
+        ),
+    )
+
+
+def _blend_local_theme_color_over_background(
+    *,
+    fg: tuple[int, int, int, float],
+    bg: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    alpha = max(0.0, min(1.0, float(fg[3])))
+    if alpha >= 1.0:
+        return fg[0], fg[1], fg[2]
+    if alpha <= 0.0:
+        return bg
+    return (
+        int(round((fg[0] * alpha) + (bg[0] * (1.0 - alpha)))),
+        int(round((fg[1] * alpha) + (bg[1] * (1.0 - alpha)))),
+        int(round((fg[2] * alpha) + (bg[2] * (1.0 - alpha)))),
+    )
+
+
+def _relative_luminance_local_theme_rgb(*, r: int, g: int, b: int) -> float:
+    def to_linear(channel: int) -> float:
+        normalized = channel / 255.0
+        if normalized <= 0.04045:
+            return normalized / 12.92
+        return ((normalized + 0.055) / 1.055) ** 2.4
+
+    return (0.2126 * to_linear(r)) + (0.7152 * to_linear(g)) + (0.0722 * to_linear(b))
+
+
+def _contrast_ratio_local_theme_rgb(
+    *,
+    a: tuple[int, int, int],
+    b: tuple[int, int, int],
+) -> float:
+    luminance_a = _relative_luminance_local_theme_rgb(r=a[0], g=a[1], b=a[2])
+    luminance_b = _relative_luminance_local_theme_rgb(r=b[0], g=b[1], b=b[2])
+    lighter, darker = (
+        (luminance_a, luminance_b)
+        if luminance_a >= luminance_b
+        else (luminance_b, luminance_a)
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _coerce_local_theme_overlay_opacity(*, value: Any, path: str) -> float:
+    if isinstance(value, bool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Local Shopify theme export requires overlay_opacity to be numeric for "
+                f"{path}, received bool."
+            ),
+        )
+    if isinstance(value, (int, float)):
+        normalized = float(value)
+    elif isinstance(value, str) and value.strip():
+        try:
+            normalized = float(value.strip())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Local Shopify theme export requires overlay_opacity to be numeric for "
+                    f"{path}, received {value!r}."
+                ),
+            ) from exc
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Local Shopify theme export requires overlay_opacity to be numeric for "
+                f"{path}, received {value!r}."
+            ),
+        )
+    if normalized < 0 or normalized > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Local Shopify theme export requires overlay_opacity between 0 and 100 for "
+                f"{path}, received {normalized}."
+            ),
+        )
+    return normalized / 100.0
+
+
+def _load_local_theme_current_settings(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    settings_payload = _load_local_theme_json_file_from_export_files(
+        files_by_filename=files_by_filename,
+        filename=_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME,
+    )
+    current_settings = settings_payload.get("current")
+    if not isinstance(current_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings file is missing a valid current settings "
+                "object for collection banner color synchronization."
+            ),
+        )
+    return current_settings
+
+
+def _resolve_local_theme_color_candidate(
+    *,
+    css_vars: dict[str, str],
+    current_settings: dict[str, Any],
+    css_var_keys: tuple[str, ...],
+    settings_keys: tuple[str, ...],
+    path: str,
+) -> str:
+    for css_var_key in css_var_keys:
+        raw_value = css_vars.get(css_var_key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            return _resolve_local_theme_color_reference(
+                raw_value=raw_value,
+                css_vars=css_vars,
+                path=path,
+            )
+    for settings_key in settings_keys:
+        raw_value = current_settings.get(settings_key)
+        if isinstance(raw_value, str) and raw_value.strip():
+            return raw_value.strip()
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=(
+            "Local Shopify theme export could not resolve a concrete color value for "
+            f"{path}."
+        ),
+    )
+
+
+def _apply_local_theme_collection_banner_contrasting_text_color(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+    css_vars: dict[str, str],
+) -> None:
+    collection_template = _load_local_theme_json_file_from_export_files(
+        files_by_filename=files_by_filename,
+        filename="templates/collection.json",
+    )
+    sections = collection_template.get("sections")
+    if not isinstance(sections, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline collection template is missing a valid sections "
+                "object for banner color synchronization."
+            ),
+        )
+    banner_section = sections.get("main-collection-banner")
+    if not isinstance(banner_section, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline collection template is missing the "
+                "main-collection-banner section required for banner color synchronization."
+            ),
+        )
+    banner_settings = banner_section.get("settings")
+    if not isinstance(banner_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline collection banner is missing a valid settings "
+                "object for banner color synchronization."
+            ),
+        )
+
+    current_settings = _load_local_theme_current_settings(files_by_filename=files_by_filename)
+    settings_path = "templates/collection.json.sections.main-collection-banner.settings"
+
+    base_background_value = _resolve_local_theme_color_candidate(
+        css_vars=css_vars,
+        current_settings=current_settings,
+        css_var_keys=("--hero-bg", "--color-page-bg", "--color-bg"),
+        settings_keys=("color_background", "color_image_background"),
+        path=f"{settings_path}.background",
+    )
+    base_background_rgb = _blend_local_theme_color_over_background(
+        fg=_parse_local_theme_color_value(
+            raw_value=base_background_value,
+            css_vars=css_vars,
+            path=f"{settings_path}.background",
+        ),
+        bg=(255, 255, 255),
+    )
+
+    resolved_background_rgb = base_background_rgb
+    for background_key in (
+        "color_background",
+        "background_color",
+        "item_bg_color",
+        "body_bg_color",
+        "card_bg_color",
+    ):
+        raw_value = banner_settings.get(background_key)
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            continue
+        resolved_background_rgb = _blend_local_theme_color_over_background(
+            fg=_parse_local_theme_color_value(
+                raw_value=raw_value,
+                css_vars=css_vars,
+                path=f"{settings_path}.{background_key}",
+            ),
+            bg=base_background_rgb,
+        )
+        break
+
+    overlay_value = banner_settings.get("color_overlay")
+    contrast_background_rgb = resolved_background_rgb
+    if isinstance(overlay_value, str) and overlay_value.strip():
+        overlay_rgba = _parse_local_theme_color_value(
+            raw_value=overlay_value,
+            css_vars=css_vars,
+            path=f"{settings_path}.color_overlay",
+        )
+        overlay_alpha = overlay_rgba[3]
+        overlay_opacity = banner_settings.get("overlay_opacity")
+        if overlay_opacity is not None and (
+            not isinstance(overlay_opacity, str) or overlay_opacity.strip()
+        ):
+            overlay_alpha = _coerce_local_theme_overlay_opacity(
+                value=overlay_opacity,
+                path=f"{settings_path}.overlay_opacity",
+            )
+        resolved_background_rgb = _blend_local_theme_color_over_background(
+            fg=(overlay_rgba[0], overlay_rgba[1], overlay_rgba[2], overlay_alpha),
+            bg=resolved_background_rgb,
+        )
+        if banner_settings.get("show_image"):
+            # Collection banners frequently render text over photography. When an
+            # image is present, evaluating contrast against the overlay over a dark
+            # image backdrop better matches what users actually see than using the
+            # page background token alone.
+            contrast_background_rgb = _blend_local_theme_color_over_background(
+                fg=(overlay_rgba[0], overlay_rgba[1], overlay_rgba[2], overlay_alpha),
+                bg=(0, 0, 0),
+            )
+        else:
+            contrast_background_rgb = resolved_background_rgb
+
+    dark_value = _resolve_local_theme_color_candidate(
+        css_vars=css_vars,
+        current_settings=current_settings,
+        css_var_keys=("--color-text",),
+        settings_keys=("color_foreground",),
+        path=f"{settings_path}.color_text",
+    )
+    light_value = _resolve_local_theme_color_candidate(
+        css_vars=css_vars,
+        current_settings=current_settings,
+        css_var_keys=("--color-bg",),
+        settings_keys=("color_image_background", "color_background"),
+        path=f"{settings_path}.color_text",
+    )
+
+    dark_rgb = _blend_local_theme_color_over_background(
+        fg=_parse_local_theme_color_value(
+            raw_value=dark_value,
+            css_vars=css_vars,
+            path=f"{settings_path}.color_text.dark",
+        ),
+        bg=contrast_background_rgb,
+    )
+    light_rgb = _blend_local_theme_color_over_background(
+        fg=_parse_local_theme_color_value(
+            raw_value=light_value,
+            css_vars=css_vars,
+            path=f"{settings_path}.color_text.light",
+        ),
+        bg=contrast_background_rgb,
+    )
+
+    banner_settings["color_text"] = (
+        light_value
+        if _contrast_ratio_local_theme_rgb(a=light_rgb, b=contrast_background_rgb)
+        > _contrast_ratio_local_theme_rgb(a=dark_rgb, b=contrast_background_rgb)
+        else dark_value
+    )
+
+    file_entry = files_by_filename["templates/collection.json"]
+    file_entry["content"] = json.dumps(
+        collection_template,
+        indent=2,
+        sort_keys=True,
+    )
+    if not file_entry["content"].endswith("\n"):
+        file_entry["content"] = f"{file_entry['content']}\n"
+    file_entry.pop("contentBase64", None)
+
+
 def _require_local_theme_secondary_background_css_var(
     *,
     css_vars: dict[str, str],
@@ -2325,6 +2793,10 @@ def _build_local_shopify_theme_export_payload(
     _apply_theme_template_setting_values_to_local_files(
         files_by_filename=files_by_filename,
         values_by_setting_path=component_text_values,
+    )
+    _apply_local_theme_collection_banner_contrasting_text_color(
+        files_by_filename=files_by_filename,
+        css_vars=css_vars_with_defaults,
     )
     _apply_local_theme_rich_text_footer_color_styling(
         files_by_filename=files_by_filename,
