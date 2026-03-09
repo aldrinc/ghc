@@ -929,18 +929,56 @@ def _nullable_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
     return {"anyOf": [deepcopy(dict(schema)), {"type": "null"}]}
 
 
+def _ordered_unique_runtime_keys(*, values: Sequence[str], field_name: str) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = str(raw_value or "").strip()
+        if not value:
+            raise StrategyV2SchemaValidationError(f"{field_name} must not contain blank values.")
+        if value in seen:
+            raise StrategyV2SchemaValidationError(f"{field_name} must not contain duplicate value '{value}'.")
+        seen.add(value)
+        ordered.append(value)
+    if not ordered:
+        raise StrategyV2SchemaValidationError(f"{field_name} must include at least one value.")
+    return ordered
+
+
+def _build_exact_keyed_object_schema(
+    *,
+    keys: Sequence[str],
+    field_name: str,
+    value_schema: Mapping[str, Any] | None = None,
+    value_schema_builder: Callable[[str], Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    ordered_keys = _ordered_unique_runtime_keys(values=keys, field_name=field_name)
+    if (value_schema is None) == (value_schema_builder is None):
+        raise ValueError("Provide exactly one of value_schema or value_schema_builder.")
+    properties: dict[str, Any] = {}
+    for key in ordered_keys:
+        if value_schema_builder is not None:
+            properties[key] = deepcopy(dict(value_schema_builder(key)))
+        else:
+            properties[key] = deepcopy(dict(value_schema or {}))
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": ordered_keys,
+    }
+
+
 def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_plan: bool) -> dict[str, Any]:
     if decision not in {"OBSERVE", "EXCLUDE"}:
         raise ValueError(f"Unsupported Agent 1 file_assessment decision variant: {decision}")
     if decision == "EXCLUDE" and include_in_mining_plan:
         raise ValueError("Agent 1 file_assessment EXCLUDE variant cannot include mining-plan selection.")
 
-    source_file_schema = {"type": "string", "minLength": 1}
     evidence_ref_item_schema = {"type": "string", "minLength": 1}
 
     if decision == "EXCLUDE":
         properties: dict[str, Any] = {
-            "source_file": source_file_schema,
             "decision": {"type": "string", "enum": ["EXCLUDE"]},
             "exclude_reason": {"type": "string", "minLength": 1},
             "include_in_mining_plan": {"type": "boolean", "enum": [False]},
@@ -984,7 +1022,6 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
         }
 
     properties = {
-        "source_file": source_file_schema,
         "decision": {"type": "string", "enum": ["OBSERVE"]},
         "exclude_reason": {"type": "string", "maxLength": 0},
         "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
@@ -1161,87 +1198,90 @@ _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
         _agent1_file_assessment_variant_schema(decision="OBSERVE", include_in_mining_plan=True),
     ],
 }
-_VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "report_markdown": {"type": "string", "minLength": 1},
-        "agent_id": {"type": "string", "minLength": 1},
-        "agent_version": {"type": "string", "minLength": 1},
-        "timestamp": {"type": "string", "format": "date-time"},
-        "product_classification": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "buyer_behavior": {
-                    "type": "string",
-                    "enum": ["IMPULSE", "CONSIDERED", "HIGH_TRUST", "SUBSCRIPTION", "ONE_TIME"],
-                },
-                "purchase_emotion": {
-                    "type": "string",
-                    "enum": ["PRIMARILY_EMOTIONAL", "PRIMARILY_RATIONAL", "MIXED"],
-                },
-                "compliance_sensitivity": {
-                    "type": "string",
-                    "enum": ["LOW", "MEDIUM", "HIGH", "REGULATED"],
-                },
-                "price_sensitivity": {
-                    "type": "string",
-                    "enum": ["LOW_TICKET_UNDER_30", "MID_TICKET_30_TO_100", "HIGH_TICKET_OVER_100"],
-                },
-            },
-            "required": [
-                "buyer_behavior",
-                "purchase_emotion",
-                "compliance_sensitivity",
-                "price_sensitivity",
-            ],
-        },
-        "file_assessments": {
-            "type": "array",
-            "minItems": 1,
-            "items": _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA,
-        },
-        "gate_failures": {
-            "type": "array",
-            "items": {
+
+
+def _agent1_output_schema(*, source_files: Sequence[str]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "report_markdown": {"type": "string", "minLength": 1},
+            "agent_id": {"type": "string", "minLength": 1},
+            "agent_version": {"type": "string", "minLength": 1},
+            "timestamp": {"type": "string", "format": "date-time"},
+            "product_classification": {
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
-                    "habitat_name": {"type": "string", "minLength": 1},
-                    "gate_failed": {
+                    "buyer_behavior": {
                         "type": "string",
-                        "enum": [
-                            "publicly_accessible",
-                            "text_based_content",
-                            "target_language",
-                            "no_rate_limiting",
-                            "multiple",
-                        ],
+                        "enum": ["IMPULSE", "CONSIDERED", "HIGH_TRUST", "SUBSCRIPTION", "ONE_TIME"],
                     },
-                    "reason": {"type": "string", "minLength": 1},
+                    "purchase_emotion": {
+                        "type": "string",
+                        "enum": ["PRIMARILY_EMOTIONAL", "PRIMARILY_RATIONAL", "MIXED"],
+                    },
+                    "compliance_sensitivity": {
+                        "type": "string",
+                        "enum": ["LOW", "MEDIUM", "HIGH", "REGULATED"],
+                    },
+                    "price_sensitivity": {
+                        "type": "string",
+                        "enum": ["LOW_TICKET_UNDER_30", "MID_TICKET_30_TO_100", "HIGH_TICKET_OVER_100"],
+                    },
                 },
-                "required": ["habitat_name", "gate_failed", "reason"],
+                "required": [
+                    "buyer_behavior",
+                    "purchase_emotion",
+                    "compliance_sensitivity",
+                    "price_sensitivity",
+                ],
+            },
+            "file_assessments": _build_exact_keyed_object_schema(
+                keys=source_files,
+                field_name="Agent 1 source_files",
+                value_schema=_VOC_AGENT01_FILE_ASSESSMENT_SCHEMA,
+            ),
+            "gate_failures": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "habitat_name": {"type": "string", "minLength": 1},
+                        "gate_failed": {
+                            "type": "string",
+                            "enum": [
+                                "publicly_accessible",
+                                "text_based_content",
+                                "target_language",
+                                "no_rate_limiting",
+                                "multiple",
+                            ],
+                        },
+                        "reason": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["habitat_name", "gate_failed", "reason"],
+                },
+            },
+            "disconfirmation_flags": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {"type": "string", "minLength": 1},
             },
         },
-        "disconfirmation_flags": {
-            "type": "array",
-            "minItems": 3,
-            "maxItems": 3,
-            "items": {"type": "string", "minLength": 1},
-        },
-    },
-    "required": [
-        "report_markdown",
-        "agent_id",
-        "agent_version",
-        "timestamp",
-        "product_classification",
-        "file_assessments",
-        "gate_failures",
-        "disconfirmation_flags",
-    ],
-}
+        "required": [
+            "report_markdown",
+            "agent_id",
+            "agent_version",
+            "timestamp",
+            "product_classification",
+            "file_assessments",
+            "gate_failures",
+            "disconfirmation_flags",
+        ],
+    }
 _VOC_AGENT02_YN_SCHEMA: dict[str, Any] = {"type": "string", "enum": ["Y", "N"]}
 _VOC_AGENT02_EVIDENCE_ID_PATTERN = r"^E[0-9A-F]{16}$"
 _VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
@@ -1394,44 +1434,91 @@ _VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
         "compliance_risk",
     ],
 }
-_VOC_AGENT02_OUTPUT_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "mode": {"type": "string", "enum": ["DUAL", "FRESH"]},
-        "input_count": {"type": "integer", "minimum": 0},
-        "output_count": {"type": "integer", "minimum": 0},
-        "voc_observations": {
-            "type": "array",
-            "items": _VOC_AGENT02_VOC_OBSERVATION_SCHEMA,
-        },
-        "rejected_items": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "evidence_id": {"type": "string", "pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN},
-                    "reason": {
-                        "type": "string",
-                        "enum": ["NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"],
-                    },
-                    "note": {"type": "string"},
-                },
-                "required": ["evidence_id", "reason", "note"],
+
+def _agent2_accepted_decision_schema() -> dict[str, Any]:
+    properties = deepcopy(_VOC_AGENT02_VOC_OBSERVATION_SCHEMA["properties"])
+    for deterministic_field in (
+        "voc_id",
+        "evidence_id",
+        "source",
+        "source_type",
+        "source_url",
+        "source_author",
+        "source_date",
+        "evidence_ref",
+    ):
+        properties.pop(deterministic_field, None)
+    properties["decision"] = {"type": "string", "enum": ["ACCEPT"]}
+    required = [
+        field_name
+        for field_name in _VOC_AGENT02_VOC_OBSERVATION_SCHEMA["required"]
+        if field_name not in {
+            "voc_id",
+            "evidence_id",
+            "source",
+            "source_type",
+            "source_url",
+            "source_author",
+            "source_date",
+            "evidence_ref",
+        }
+    ]
+    required.append("decision")
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": required,
+    }
+
+
+def _agent2_rejected_decision_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "decision": {"type": "string", "enum": ["REJECT"]},
+            "reason": {
+                "type": "string",
+                "enum": ["NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"],
             },
+            "note": {"type": "string", "minLength": 1},
         },
-        "validation_errors": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": [
-        "mode",
-        "input_count",
-        "output_count",
-        "voc_observations",
-        "rejected_items",
-        "validation_errors",
-    ],
+        "required": ["decision", "reason", "note"],
+    }
+
+
+_VOC_AGENT02_DECISION_SCHEMA: dict[str, Any] = {
+    "anyOf": [
+        _agent2_accepted_decision_schema(),
+        _agent2_rejected_decision_schema(),
+    ]
 }
+
+
+def _agent2_output_schema(*, evidence_ids: Sequence[str]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "mode": {"type": "string", "enum": ["DUAL", "FRESH"]},
+            "input_count": {"type": "integer", "minimum": 0},
+            "output_count": {"type": "integer", "minimum": 0},
+            "decisions_by_evidence_id": _build_exact_keyed_object_schema(
+                keys=evidence_ids,
+                field_name="Agent 2 evidence_ids",
+                value_schema=_VOC_AGENT02_DECISION_SCHEMA,
+            ),
+            "validation_errors": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": [
+            "mode",
+            "input_count",
+            "output_count",
+            "decisions_by_evidence_id",
+            "validation_errors",
+        ],
+    }
 
 _OFFER_STEP01_PROMPT_PATTERN = "Offer Agent */prompts/step-01-avatar-brief.md"
 _OFFER_STEP02_PROMPT_PATTERN = "Offer Agent */prompts/step-02-market-calibration.md"
@@ -4308,7 +4395,23 @@ def _offer_step05_response_schema() -> dict[str, Any]:
     }
 
 
-def _offer_step04_response_schema() -> dict[str, Any]:
+def _offer_step04_bonus_module_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "copy": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": _STEP04_BONUS_COPY_MAX_CHARS,
+                "pattern": ".*\\S.*",
+            },
+        },
+        "required": ["copy"],
+    }
+
+
+def _offer_step04_response_schema(*, bonus_ids: Sequence[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -4424,23 +4527,11 @@ def _offer_step04_response_schema() -> dict[str, Any]:
                             "required": ["is_best_value", "rationale", "compared_variant_ids"],
                         },
                         "bonus_modules": {
-                            "type": "array",
-                            "minItems": 3,
-                            "maxItems": 3,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "bonus_id": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
-                                    "copy": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": _STEP04_BONUS_COPY_MAX_CHARS,
-                                        "pattern": ".*\\S.*",
-                                    },
-                                },
-                                "required": ["bonus_id", "copy"],
-                            },
+                            **_build_exact_keyed_object_schema(
+                                keys=bonus_ids,
+                                field_name="Offer Step 04 bonus_ids",
+                                value_schema=_offer_step04_bonus_module_schema(),
+                            ),
                         },
                         "objection_map": {
                             "type": "array",
@@ -8570,15 +8661,21 @@ def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict
     return observations
 
 
-def _build_agent1_runtime_file_inventory(scraped_data_manifest: Mapping[str, Any]) -> dict[str, Any]:
+def _ordered_scraped_data_file_names(scraped_data_manifest: Mapping[str, Any]) -> list[str]:
     raw_files = scraped_data_manifest.get("raw_scraped_data_files")
     file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
-    file_names: list[str] = []
-    for row in file_rows:
-        filename = str(row.get("file_name") or "").strip()
-        if not filename:
-            continue
-        file_names.append(filename)
+    return _ordered_unique_runtime_keys(
+        values=[
+            str(row.get("file_name") or "").strip()
+            for row in file_rows
+            if str(row.get("file_name") or "").strip()
+        ],
+        field_name="scraped_data_manifest.raw_scraped_data_files.file_name",
+    )
+
+
+def _build_agent1_runtime_file_inventory(scraped_data_manifest: Mapping[str, Any]) -> dict[str, Any]:
+    file_names = _ordered_scraped_data_file_names(scraped_data_manifest)
     return {
         "total_files": len(file_names),
         "file_names": file_names,
@@ -8667,11 +8764,12 @@ def _render_agent1_runtime_instruction(
         "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
         "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
         "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
-        "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON is canonical for file_assessments row count, ordering, and source_file values.\n"
+        "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON is canonical for the exact runtime source_file set and default row hints.\n"
         "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
         "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
         "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
-        "Return file_assessments with exactly one row per template row, preserving row order and source_file values exactly.\n"
+        "Return file_assessments as an object keyed by the exact source_file values from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows[].source_file.\n"
+        "Do not emit source_file inside file_assessments values; runtime derives it from each object key.\n"
         "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
         "If decision=OBSERVE, habitat_name, habitat_type, url_pattern, items_in_file, data_quality, observation_sheet, "
         "competitive_overlap, trend_lifecycle, mining_gate, rank_score, estimated_yield, and evidence_refs must all be populated.\n"
@@ -8705,22 +8803,17 @@ def _derive_agent1_outputs_from_file_assessments(
     agent01_output: Mapping[str, Any],
     scraped_data_manifest: Mapping[str, Any],
 ) -> dict[str, Any]:
-    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
-    raw_file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
-    allowed_file_names = {
-        str(row.get("file_name") or "").strip()
-        for row in raw_file_rows
-        if str(row.get("file_name") or "").strip()
-    }
-    if not allowed_file_names:
+    ordered_file_names = _ordered_scraped_data_file_names(scraped_data_manifest)
+    allowed_file_names = set(ordered_file_names)
+    if not ordered_file_names:
         raise StrategyV2SchemaValidationError(
             "scraped_data_manifest.raw_scraped_data_files must include at least one file_name for Agent 1 grounding."
         )
 
     file_assessments_raw = agent01_output.get("file_assessments")
-    if not isinstance(file_assessments_raw, list):
+    if not isinstance(file_assessments_raw, Mapping):
         raise StrategyV2SchemaValidationError(
-            "Agent 1 output must include file_assessments array for strict file-coverage validation."
+            "Agent 1 output must include file_assessments object for strict file-coverage validation."
         )
 
     observation_projection_required_fields = (
@@ -8759,38 +8852,47 @@ def _derive_agent1_outputs_from_file_assessments(
     observations: list[dict[str, Any]] = []
     excluded_source_files: list[str] = []
     mining_plan: list[dict[str, Any]] = []
-    seen_source_files: set[str] = set()
+    normalized_file_assessments: list[dict[str, Any]] = []
+    returned_source_files = {
+        str(key or "").strip()
+        for key in file_assessments_raw.keys()
+        if str(key or "").strip()
+    }
+    unknown_source_files = sorted(returned_source_files - allowed_file_names)
+    if unknown_source_files:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
+            f"Unknown source_file entries: {unknown_source_files[:8]}. "
+            "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
+        )
+    missing_source_files = sorted(allowed_file_names - returned_source_files)
+    if missing_source_files:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must provide exact source-file coverage: "
+            "(file_assessments.source_file) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
+            f"Missing source_file entries: {missing_source_files[:8]}."
+        )
 
-    for index, row in enumerate(file_assessments_raw):
-        row_name = f"Agent 1 file_assessments[{index}]"
+    for index, source_file in enumerate(ordered_file_names):
+        row_name = f"Agent 1 file_assessments[{source_file}]"
+        row = file_assessments_raw.get(source_file)
         if not isinstance(row, Mapping):
             raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
-        source_file = str(row.get("source_file") or "").strip()
-        if not source_file:
-            raise StrategyV2SchemaValidationError(f"{row_name}.source_file must be non-empty.")
-        if source_file in seen_source_files:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 1 file_assessments must not contain duplicate source_file values. Duplicate: '{source_file}'."
-            )
-        seen_source_files.add(source_file)
-        if source_file not in allowed_file_names:
-            raise StrategyV2SchemaValidationError(
-                "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
-                f"Unknown source_file entries: ['{source_file}']. "
-                "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
-            )
+        row_payload = dict(row)
+        row_payload["source_file"] = source_file
+        normalized_file_assessments.append(deepcopy(row_payload))
 
-        decision = str(row.get("decision") or "").strip().upper()
+        decision = str(row_payload.get("decision") or "").strip().upper()
         if decision not in {"OBSERVE", "EXCLUDE"}:
             raise StrategyV2SchemaValidationError(
                 f"{row_name}.decision must be OBSERVE or EXCLUDE."
             )
-        include_in_mining_plan = row.get("include_in_mining_plan")
+        include_in_mining_plan = row_payload.get("include_in_mining_plan")
         if not isinstance(include_in_mining_plan, bool):
             raise StrategyV2SchemaValidationError(
                 f"{row_name}.include_in_mining_plan must be boolean."
             )
-        exclude_reason = str(row.get("exclude_reason") or "").strip()
+        exclude_reason = str(row_payload.get("exclude_reason") or "").strip()
 
         if decision == "EXCLUDE":
             if include_in_mining_plan:
@@ -8806,7 +8908,7 @@ def _derive_agent1_outputs_from_file_assessments(
             continue
 
         observation_row = {
-            field_name: deepcopy(row.get(field_name))
+            field_name: deepcopy(row_payload.get(field_name))
             for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA.get("required", [])
             if isinstance(field_name, str)
         }
@@ -8821,7 +8923,7 @@ def _derive_agent1_outputs_from_file_assessments(
             continue
 
         mining_row = {
-            field_name: deepcopy(row.get(field_name))
+            field_name: deepcopy(row_payload.get(field_name))
             for field_name in _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA.get("required", [])
             if isinstance(field_name, str)
         }
@@ -8830,7 +8932,7 @@ def _derive_agent1_outputs_from_file_assessments(
             required_fields=mining_projection_required_fields,
             row_name=f"{row_name}.mining_plan_projection",
         )
-        if "compliance_flags" not in row or row.get("compliance_flags") is None:
+        if "compliance_flags" not in row_payload or row_payload.get("compliance_flags") is None:
             raise StrategyV2SchemaValidationError(
                 f"{row_name}.compliance_flags must be present when include_in_mining_plan=true."
             )
@@ -8846,18 +8948,8 @@ def _derive_agent1_outputs_from_file_assessments(
             )
         mining_plan.append(mining_row)
 
-    if seen_source_files != allowed_file_names:
-        missing = sorted(allowed_file_names - seen_source_files)
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output must provide exact source-file coverage: "
-            "(file_assessments.source_file) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
-            f"Missing source_file entries: {missing[:8]}."
-        )
-
     derived_output = dict(agent01_output)
-    derived_output["file_assessments"] = [
-        dict(row) for row in file_assessments_raw if isinstance(row, Mapping)
-    ]
+    derived_output["file_assessments"] = normalized_file_assessments
     derived_output["habitat_observations"] = observations
     derived_output["excluded_source_files"] = excluded_source_files
     derived_output["mining_plan"] = mining_plan
@@ -9365,6 +9457,27 @@ def _derive_voc_id_from_evidence_id(*, evidence_id: str) -> str:
     return f"R{normalized}"
 
 
+def _agent3_allowed_voc_ids(
+    *,
+    voc_observations: Sequence[Mapping[str, Any]] | None,
+    evidence_rows_for_prompt: Sequence[Mapping[str, Any]] | None,
+) -> list[str]:
+    candidate_ids: list[str] = []
+    if voc_observations:
+        candidate_ids.extend(
+            str(row.get("voc_id") or "").strip()
+            for row in voc_observations
+            if isinstance(row, Mapping) and str(row.get("voc_id") or "").strip()
+        )
+    if evidence_rows_for_prompt and not candidate_ids:
+        candidate_ids.extend(
+            _derive_voc_id_from_evidence_id(evidence_id=str(row.get("evidence_id") or "").strip())
+            for row in evidence_rows_for_prompt
+            if isinstance(row, Mapping) and str(row.get("evidence_id") or "").strip()
+        )
+    return _ordered_unique_runtime_keys(values=candidate_ids, field_name="Agent 3 runtime voc_ids")
+
+
 def _infer_voc_date_bracket(*, source_date: str) -> str:
     text = str(source_date or "").strip()
     if not text:
@@ -9835,13 +9948,14 @@ def _run_agent2_extractor_prompt_only(
                 "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before extracting VOC evidence rows.\n"
                 "Treat EVIDENCE_ROWS_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as the primary source of truth.\n"
                 "Use AGENT2_INPUT_MANIFEST_JSON to read the canonical evidence_id list.\n"
-                "For every input evidence_id, return exactly one decision: either accepted in voc_observations "
-                "or rejected in rejected_items.\n"
-                "Do not invent evidence_id values. Only echo evidence_id values from AGENT2_INPUT_MANIFEST_JSON.\n"
+                "Return decisions_by_evidence_id as an object keyed by the exact evidence_id values from AGENT2_INPUT_MANIFEST_JSON.rows[].evidence_id.\n"
+                "Do not emit evidence_id inside decisions_by_evidence_id values; runtime derives it from each object key.\n"
+                "For each keyed decision: use decision=ACCEPT with a complete VOC payload, or decision=REJECT with reason and note.\n"
+                "Do not invent, mutate, alias, add, or drop evidence_id values beyond AGENT2_INPUT_MANIFEST_JSON.\n"
                 "Return one extraction object only."
             ),
             schema_name="strategy_v2_voc_agent02_output",
-            schema=_VOC_AGENT02_OUTPUT_SCHEMA,
+            schema=_agent2_output_schema(evidence_ids=input_ordered_ids),
             use_reasoning=True,
             use_web_search=False,
             max_tokens=_AGENT2_MAX_TOKENS,
@@ -9904,20 +10018,12 @@ def _run_agent2_extractor_prompt_only(
                 "Agent 2 input_count mismatch "
                 f"(expected={len(evidence_rows)}, actual={output_input_count})."
             )
-        voc_rows = output.get("voc_observations")
-        if not isinstance(voc_rows, list):
-            raise StrategyV2SchemaValidationError("Agent 2 output must include voc_observations array.")
-        output_count = _coerce_output_int("output_count")
-        if output_count != len(voc_rows):
-            logging.getLogger(__name__).warning(
-                "Agent 2 output_count mismatch; using actual voc_observations length "
-                "(reported=%s, actual=%s).",
-                output_count,
-                len(voc_rows),
+        decisions_by_evidence_id = output.get("decisions_by_evidence_id")
+        if not isinstance(decisions_by_evidence_id, Mapping):
+            raise StrategyV2SchemaValidationError(
+                "Agent 2 output must include decisions_by_evidence_id object."
             )
-        rejected_rows = output.get("rejected_items")
-        if not isinstance(rejected_rows, list):
-            raise StrategyV2SchemaValidationError("Agent 2 output must include rejected_items array.")
+        _coerce_output_int("output_count")
 
         return {
             "mode": mode,
@@ -9941,131 +10047,102 @@ def _validate_agent2_decision_partition(
     input_rows_by_id: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     input_id_set = set(input_ordered_ids)
-    voc_rows = output.get("voc_observations")
-    if not isinstance(voc_rows, list):
-        raise StrategyV2SchemaValidationError("Agent 2 output must include voc_observations array.")
-    rejected_rows = output.get("rejected_items")
-    if not isinstance(rejected_rows, list):
-        raise StrategyV2SchemaValidationError("Agent 2 output must include rejected_items array.")
-
-    accepted_by_id: dict[str, dict[str, Any]] = {}
-    rejected_by_id: dict[str, dict[str, Any]] = {}
-    unknown_ids: set[str] = set()
-
-    for idx, row in enumerate(voc_rows):
-        if not isinstance(row, dict):
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 voc_observations[{idx}] must be an object."
-            )
-        evidence_id = _normalize_agent2_evidence_id(
-            row.get("evidence_id"),
-            field_name=f"Agent 2 voc_observations[{idx}].evidence_id",
+    decisions_by_evidence_id = output.get("decisions_by_evidence_id")
+    if not isinstance(decisions_by_evidence_id, Mapping):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output must include decisions_by_evidence_id object."
         )
-        source_row = input_rows_by_id.get(evidence_id)
-        if source_row is None:
-            unknown_ids.add(evidence_id)
-            continue
-        if evidence_id in accepted_by_id:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 voc_observations includes duplicate evidence_id={evidence_id}."
-            )
-        normalized_row = dict(row)
-        normalized_row["evidence_id"] = evidence_id
-        normalized_row["source_type"] = source_row["source_type"]
-        normalized_row["source_url"] = source_row["source_url"]
-        normalized_row["source_author"] = source_row["source_author"]
-        normalized_row["source_date"] = source_row["source_date"]
-        normalized_row["evidence_ref"] = source_row["evidence_ref"]
-        normalized_row["source"] = f"{source_row['source_type']}::{source_row['source_url']}"
-        accepted_by_id[evidence_id] = normalized_row
 
-    for idx, row in enumerate(rejected_rows):
-        if not isinstance(row, dict):
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 rejected_items[{idx}] must be an object."
-            )
-        evidence_id = _normalize_agent2_evidence_id(
-            row.get("evidence_id"),
-            field_name=f"Agent 2 rejected_items[{idx}].evidence_id",
-        )
-        source_row = input_rows_by_id.get(evidence_id)
-        if source_row is None:
-            unknown_ids.add(evidence_id)
-            continue
-        if evidence_id in rejected_by_id:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 rejected_items includes duplicate evidence_id={evidence_id}."
-            )
-        reason = str(row.get("reason") or "").strip().upper()
-        if reason not in {"NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"}:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 rejected_items[{idx}] has invalid reason={reason!r}."
-            )
-        note = str(row.get("note") or "").strip()
-        if not note:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 2 rejected_items[{idx}] requires a non-empty note."
-            )
-        rejected_by_id[evidence_id] = {
-            "evidence_id": evidence_id,
-            "reason": reason,
-            "note": note,
-            "source_type": source_row["source_type"],
-            "source_url": source_row["source_url"],
-            "source_author": source_row["source_author"],
-            "source_date": source_row["source_date"],
-            "evidence_ref": source_row["evidence_ref"],
-            "context": source_row["context"],
-            "verbatim_preview": source_row["verbatim"][:280],
-        }
-
+    returned_ids = {
+        str(key or "").strip()
+        for key in decisions_by_evidence_id.keys()
+        if str(key or "").strip()
+    }
+    unknown_ids = returned_ids - input_id_set
     if unknown_ids:
         sample_ids = sorted(unknown_ids)[:8]
         raise StrategyV2SchemaValidationError(
             "Agent 2 output contains evidence_id values not present in input evidence rows "
             f"(unknown_count={len(unknown_ids)}, sample_ids={sample_ids})."
         )
-
-    accepted_id_set = set(accepted_by_id.keys())
-    rejected_id_set = set(rejected_by_id.keys())
-    overlap_ids = accepted_id_set.intersection(rejected_id_set)
-    if overlap_ids:
-        raise StrategyV2SchemaValidationError(
-            "Agent 2 output cannot accept and reject the same evidence_id "
-            f"(overlap_count={len(overlap_ids)}, sample_ids={sorted(overlap_ids)[:8]})."
-        )
-
-    missing_decisions = input_id_set - accepted_id_set - rejected_id_set
+    missing_decisions = input_id_set - returned_ids
     if missing_decisions:
         raise StrategyV2SchemaValidationError(
             "Agent 2 output did not return decisions for all input evidence rows "
             f"(missing_count={len(missing_decisions)}, sample_ids={sorted(missing_decisions)[:8]})."
         )
 
-    if len(accepted_id_set) + len(rejected_id_set) != len(input_ordered_ids):
-        raise StrategyV2SchemaValidationError(
-            "Agent 2 decision partition count mismatch after validation "
-            f"(accepted={len(accepted_id_set)}, rejected={len(rejected_id_set)}, input={len(input_ordered_ids)})."
-        )
-
     all_voc_rows: list[dict[str, Any]] = []
     all_rejected_items: list[dict[str, Any]] = []
     for evidence_id in input_ordered_ids:
-        accepted_row = accepted_by_id.get(evidence_id)
-        if accepted_row is not None:
-            all_voc_rows.append(accepted_row)
+        source_row = input_rows_by_id.get(evidence_id)
+        if source_row is None:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 decision partition is missing indexed source row for evidence_id={evidence_id}."
+            )
+        row = decisions_by_evidence_id.get(evidence_id)
+        if not isinstance(row, Mapping):
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 decisions_by_evidence_id['{evidence_id}'] must be an object."
+            )
+        decision = str(row.get("decision") or "").strip().upper()
+        if decision == "ACCEPT":
+            normalized_row = dict(row)
+            normalized_row["evidence_id"] = evidence_id
+            normalized_row["source_type"] = source_row["source_type"]
+            normalized_row["source_url"] = source_row["source_url"]
+            normalized_row["source_author"] = source_row["source_author"]
+            normalized_row["source_date"] = source_row["source_date"]
+            normalized_row["evidence_ref"] = source_row["evidence_ref"]
+            normalized_row["source"] = f"{source_row['source_type']}::{source_row['source_url']}"
+            all_voc_rows.append(normalized_row)
             continue
-        rejected_row = rejected_by_id.get(evidence_id)
-        if rejected_row is not None:
-            all_rejected_items.append(rejected_row)
+        if decision == "REJECT":
+            reason = str(row.get("reason") or "").strip().upper()
+            if reason not in {"NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"}:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 decisions_by_evidence_id['{evidence_id}'] has invalid reason={reason!r}."
+                )
+            note = str(row.get("note") or "").strip()
+            if not note:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 decisions_by_evidence_id['{evidence_id}'] requires a non-empty note."
+                )
+            all_rejected_items.append(
+                {
+                    "evidence_id": evidence_id,
+                    "reason": reason,
+                    "note": note,
+                    "source_type": source_row["source_type"],
+                    "source_url": source_row["source_url"],
+                    "source_author": source_row["source_author"],
+                    "source_date": source_row["source_date"],
+                    "evidence_ref": source_row["evidence_ref"],
+                    "context": source_row["context"],
+                    "verbatim_preview": source_row["verbatim"][:280],
+                }
+            )
             continue
         raise StrategyV2SchemaValidationError(
-            f"Agent 2 decision partition missing evidence_id={evidence_id} after validation."
+            f"Agent 2 decisions_by_evidence_id['{evidence_id}'].decision must be ACCEPT or REJECT."
         )
 
     if not all_voc_rows:
         raise StrategyV2DecisionError(
             "Agent 2 extraction produced zero usable voc_observations after strict decision partition validation."
+        )
+
+    output_count = output.get("output_count")
+    if isinstance(output_count, bool):
+        raise StrategyV2SchemaValidationError("Agent 2 output_count must be an integer, received boolean.")
+    try:
+        reported_output_count = int(output_count)
+    except (TypeError, ValueError) as exc:
+        raise StrategyV2SchemaValidationError("Agent 2 output_count must be an integer.") from exc
+    if reported_output_count != len(all_voc_rows):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output_count mismatch after strict decision partition validation "
+            f"(reported={reported_output_count}, accepted={len(all_voc_rows)})."
         )
 
     for index, row in enumerate(all_voc_rows, start=1):
@@ -10564,16 +10641,30 @@ def _extract_agent3_candidate_rows(agent03_output: Mapping[str, Any]) -> list[di
     )
 
 
-def _agent3_prompt_output_schema(*, include_legacy_angle_candidates: bool) -> dict[str, Any]:
-    quote_item_schema: dict[str, Any] = {
+def _agent3_quote_item_schema(*, allowed_voc_ids: Sequence[str]) -> dict[str, Any]:
+    return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            "voc_id": {"type": "string", "maxLength": 64},
+            "voc_id": {
+                "type": "string",
+                "enum": _ordered_unique_runtime_keys(
+                    values=allowed_voc_ids,
+                    field_name="Agent 3 allowed voc_ids",
+                ),
+            },
             "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
         },
         "required": ["voc_id", "quote"],
     }
+
+
+def _agent3_prompt_output_schema(
+    *,
+    include_legacy_angle_candidates: bool,
+    allowed_voc_ids: Sequence[str],
+) -> dict[str, Any]:
+    quote_item_schema = _agent3_quote_item_schema(allowed_voc_ids=allowed_voc_ids)
     candidate_schema: dict[str, Any] = {
         "type": "object",
         "additionalProperties": False,
@@ -10761,7 +10852,13 @@ def _agent3_prompt_output_schema(*, include_legacy_angle_candidates: bool) -> di
                                     "type": "object",
                                     "additionalProperties": False,
                                     "properties": {
-                                        "voc_id": {"type": "string", "maxLength": 64},
+                                        "voc_id": {
+                                            "type": "string",
+                                            "enum": _ordered_unique_runtime_keys(
+                                                values=allowed_voc_ids,
+                                                field_name="Agent 3 allowed voc_ids",
+                                            ),
+                                        },
                                         "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
                                         "adjusted_score": {"type": "number"},
                                     },
@@ -13053,7 +13150,9 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
                 scraped_file_inventory=scraped_file_inventory,
             ),
             schema_name="strategy_v2_voc_agent01",
-            schema=_VOC_AGENT01_OUTPUT_SCHEMA,
+            schema=_agent1_output_schema(
+                source_files=_ordered_scraped_data_file_names(scraped_data_manifest),
+            ),
             use_reasoning=True,
             reasoning_effort="low",
             use_web_search=False,
@@ -13318,32 +13417,39 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         payload=prompt_extraction.get("output"),
         field_name="agent2_prompt_output",
     )
-    voc_rows_raw = agent02_output_raw.get("voc_observations")
-    if not isinstance(voc_rows_raw, list):
-        raise StrategyV2SchemaValidationError("Agent 2 extraction output must include voc_observations array.")
-    rejected_rows_raw = agent02_output_raw.get("rejected_items")
-    if not isinstance(rejected_rows_raw, list):
-        raise StrategyV2SchemaValidationError("Agent 2 extraction output must include rejected_items array.")
+    decisions_by_evidence_id_raw = agent02_output_raw.get("decisions_by_evidence_id")
+    if not isinstance(decisions_by_evidence_id_raw, Mapping):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 extraction output must include decisions_by_evidence_id object."
+        )
+    decisions_by_evidence_id = {
+        str(key): dict(value)
+        for key, value in decisions_by_evidence_id_raw.items()
+        if isinstance(key, str) and isinstance(value, Mapping)
+    }
     if excluded_prompt_rows:
-        compaction_rejections = [
-            {
-                "evidence_id": str(row.get("evidence_id") or "").strip().upper(),
+        for row in excluded_prompt_rows:
+            evidence_id = str(row.get("evidence_id") or "").strip().upper()
+            if not evidence_id:
+                continue
+            decisions_by_evidence_id[evidence_id] = {
+                "decision": "REJECT",
                 "reason": "TOO_VAGUE",
                 "note": (
                     "Excluded from prompt extraction by deterministic compaction cap; "
                     "kept in audit trail."
                 ),
             }
-            for row in excluded_prompt_rows
-            if str(row.get("evidence_id") or "").strip()
-        ]
-        rejected_rows_raw = [*rejected_rows_raw, *compaction_rejections]
+    accepted_count = sum(
+        1
+        for row in decisions_by_evidence_id.values()
+        if isinstance(row, Mapping) and str(row.get("decision") or "").strip().upper() == "ACCEPT"
+    )
     agent02_output = {
         "mode": str(prompt_extraction.get("mode") or agent2_mode),
         "input_count": len(evidence_rows),
-        "output_count": len(voc_rows_raw),
-        "voc_observations": voc_rows_raw,
-        "rejected_items": rejected_rows_raw,
+        "output_count": accepted_count,
+        "decisions_by_evidence_id": decisions_by_evidence_id,
         "validation_errors": (
             [row for row in agent02_output_raw.get("validation_errors", []) if isinstance(row, str)]
             if isinstance(agent02_output_raw.get("validation_errors"), list)
@@ -13352,8 +13458,8 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         "extraction_summary": {
             "input_count": len(evidence_rows),
             "prompt_input_count": int(prompt_extraction.get("input_count") or len(prompt_evidence_rows)),
-            "output_count": len(voc_rows_raw),
-            "rejected_count": len(rejected_rows_raw),
+            "output_count": accepted_count,
+            "rejected_count": max(0, len(decisions_by_evidence_id) - accepted_count),
             "compaction_excluded_count": len(excluded_prompt_rows),
         },
     }
@@ -13389,8 +13495,8 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
                 "mode": str(prompt_extraction.get("mode") or agent2_mode),
             },
             outputs_json={
-                "output_count": len(voc_rows_raw),
-                "rejected_count": len(rejected_rows_raw),
+                "output_count": accepted_count,
+                "rejected_count": max(0, len(decisions_by_evidence_id) - accepted_count),
                 "validation_error_count": len(agent02_output["validation_errors"]),
             },
         )
@@ -13405,7 +13511,7 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
             title="Strategy V2 VOC Extraction (Raw)",
             summary="Agent 2 prompt-chain VOC extraction completed; deterministic QA runs in v2-05.",
             payload={
-                "voc_observation_count": len(voc_rows_raw),
+                "voc_observation_count": accepted_count,
                 "prompt_corpus_count": len(existing_corpus),
                 "merged_corpus_count": len(merged_voc_artifact_rows),
                 "external_corpus_count": external_corpus_count,
@@ -13413,10 +13519,7 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
                 "mode": str(prompt_extraction.get("mode") or agent2_mode),
                 "agent02_output": agent02_output,
                 "input_manifest": agent02_input_manifest,
-                "rejected_items": rejected_rows_raw,
-                "rejected_item_count": len(
-                    [row for row in rejected_rows_raw if isinstance(row, dict)]
-                ),
+                "rejected_item_count": max(0, len(decisions_by_evidence_id) - accepted_count),
                 "evidence_row_count": len(evidence_rows),
                 "evidence_diagnostics": evidence_diagnostics,
                 "compaction_summary": compaction_summary,
@@ -13847,6 +13950,10 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         stage_label="agent3",
         logical_payloads=agent03_logical_payloads,
     )
+    agent03_allowed_voc_ids = _agent3_allowed_voc_ids(
+        voc_observations=voc_observations if isinstance(voc_observations, list) else None,
+        evidence_rows_for_prompt=evidence_rows_for_prompt if isinstance(evidence_rows_for_prompt, list) else None,
+    )
     try:
         runtime_voc_instruction = ""
         if voc_input_mode == "raw_evidence_fallback":
@@ -13876,6 +13983,7 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 "If any Agent 1 artifact is missing or empty, continue with available inputs and encode that limitation "
                 "via conservative evidence judgments.\n"
                 f"{runtime_voc_instruction}"
+                "For every top_quotes entry, use only voc_id values available in the uploaded Agent 2 / raw-evidence runtime inputs.\n"
                 "Output the JSON handoff block defined in the Agent 3 prompt.\n"
                 f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
                 f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
@@ -13883,7 +13991,10 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
             ),
             schema_name="strategy_v2_voc_agent03",
-            schema=_agent3_prompt_output_schema(include_legacy_angle_candidates=False),
+            schema=_agent3_prompt_output_schema(
+                include_legacy_angle_candidates=False,
+                allowed_voc_ids=agent03_allowed_voc_ids,
+            ),
             use_reasoning=True,
             use_web_search=False,
             openai_tools=_openai_python_tool_resources(
@@ -14693,7 +14804,9 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         scraped_file_inventory=scraped_file_inventory,
                     ),
                     schema_name="strategy_v2_voc_agent01",
-                    schema=_VOC_AGENT01_OUTPUT_SCHEMA,
+                    schema=_agent1_output_schema(
+                        source_files=_ordered_scraped_data_file_names(scraped_data_manifest),
+                    ),
                     use_reasoning=True,
                     reasoning_effort="low",
                     use_web_search=False,
@@ -14903,6 +15016,10 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     },
                 },
             )
+            agent03_allowed_voc_ids = _agent3_allowed_voc_ids(
+                voc_observations=voc_observations,
+                evidence_rows_for_prompt=None,
+            )
             try:
                 agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
                     asset=agent03_asset,
@@ -14913,6 +15030,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
                         "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
                         "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
+                        "For every top_quotes entry, use only voc_id values available in AGENT2_VOC_OBSERVATIONS_JSON.\n"
                         "Output the JSON handoff block defined in the Agent 3 prompt.\n"
                         f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
                         f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
@@ -14920,7 +15038,10 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
                     ),
                     schema_name="strategy_v2_voc_agent03",
-                    schema=_agent3_prompt_output_schema(include_legacy_angle_candidates=False),
+                    schema=_agent3_prompt_output_schema(
+                        include_legacy_angle_candidates=False,
+                        allowed_voc_ids=agent03_allowed_voc_ids,
+                    ),
                     use_reasoning=True,
                     use_web_search=True,
                     openai_tools=_openai_python_tool_resources(
@@ -16730,13 +16851,16 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     "## Runtime Output Contract\n"
                     f"Return JSON with `variants` array for ids {', '.join(_OFFER_VARIANT_IDS)}.\n"
                     "Use the V1 structure: product + discount + exactly 3 bonus modules.\n"
-                    "Bonus modules must reuse the exact bonus_id values from OFFER_DATA_READINESS_CONTEXT and keep copy short.\n"
+                    "Each variant must return bonus_modules as an object keyed by the exact bonus_id values from OFFER_DATA_READINESS_CONTEXT.\n"
+                    "Do not emit bonus_id inside bonus_modules values; runtime derives it from each object key.\n"
                     "Each variant must include structured pricing_metadata, savings_metadata, best_value_metadata, "
                     "objection_map, and dimension_scores.\n"
                     f"{product_type_offer_instruction}"
                 ),
                 schema_name="strategy_v2_offer_step04",
-                schema=_offer_step04_response_schema(),
+                schema=_offer_step04_response_schema(
+                    bonus_ids=[str(row["bonus_id"]) for row in bonus_items],
+                ),
                 use_reasoning=True,
                 use_web_search=False,
                 heartbeat_context={
@@ -16812,25 +16936,32 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     novelty_rows.append({"element_name": element_name, "classification": novelty_class})
 
                 bonus_modules_raw = variant.get("bonus_modules")
-                if not isinstance(bonus_modules_raw, list) or len(bonus_modules_raw) != len(bonus_items):
+                if not isinstance(bonus_modules_raw, Mapping):
                     raise StrategyV2SchemaValidationError(
-                        f"Variant '{variant_id}' must include exactly {len(bonus_items)} bonus_modules."
+                        f"Variant '{variant_id}' must include bonus_modules object keyed by readiness bonus ids."
                     )
                 bonus_copy_by_id: dict[str, str] = {}
-                for bonus_module_idx, bonus_module_raw in enumerate(bonus_modules_raw):
-                    bonus_module = _require_dict(
-                        payload=bonus_module_raw,
-                        field_name=f"variants[{idx}].bonus_modules[{bonus_module_idx}]",
+                returned_bonus_ids = {
+                    str(key or "").strip()
+                    for key in bonus_modules_raw.keys()
+                    if str(key or "").strip()
+                }
+                unknown_bonus_ids = sorted(returned_bonus_ids - expected_bonus_ids)
+                if unknown_bonus_ids:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' bonus_modules contains unknown bonus_id values: {unknown_bonus_ids}."
                     )
-                    bonus_id = str(bonus_module.get("bonus_id") or "").strip()
-                    if bonus_id not in bonus_by_id:
-                        raise StrategyV2SchemaValidationError(
-                            f"Variant '{variant_id}' bonus_modules contains unknown bonus_id '{bonus_id}'."
-                        )
-                    if bonus_id in bonus_copy_by_id:
-                        raise StrategyV2SchemaValidationError(
-                            f"Variant '{variant_id}' bonus_modules contains duplicate bonus_id '{bonus_id}'."
-                        )
+                missing_bonus_ids = sorted(expected_bonus_ids - returned_bonus_ids)
+                if missing_bonus_ids:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' bonus_modules must include exactly readiness bonus ids: "
+                        f"{sorted(expected_bonus_ids)}. Missing={missing_bonus_ids}."
+                    )
+                for bonus_id in [str(row["bonus_id"]) for row in bonus_items]:
+                    bonus_module = _require_dict(
+                        payload=bonus_modules_raw.get(bonus_id),
+                        field_name=f"variants[{idx}].bonus_modules['{bonus_id}']",
+                    )
                     bonus_copy = str(bonus_module.get("copy") or "").strip()
                     if not bonus_copy:
                         raise StrategyV2SchemaValidationError(
@@ -16842,11 +16973,6 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                             f"{_STEP04_BONUS_COPY_MAX_CHARS} chars."
                         )
                     bonus_copy_by_id[bonus_id] = bonus_copy
-                if set(bonus_copy_by_id.keys()) != expected_bonus_ids:
-                    raise StrategyV2SchemaValidationError(
-                        f"Variant '{variant_id}' bonus_modules must include exactly readiness bonus ids: "
-                        f"{sorted(expected_bonus_ids)}."
-                    )
 
                 pricing_metadata_raw = _require_dict(
                     payload=variant.get("pricing_metadata"),

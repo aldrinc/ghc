@@ -3266,6 +3266,10 @@ def test_sync_theme_brand_updates_layout_and_css():
                 "--slider-item-width: minmax(220px, 100%) !important;"
                 in css_content
             )
+            assert "@media screen and (max-width: 749px) {" in css_content
+            assert ".slider--tablet .card-grid > * {" in css_content
+            assert "grid-auto-columns: minmax(0, 100%) !important;" in css_content
+            assert "scroll-snap-type: x mandatory !important;" in css_content
             assert (
                 "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
                 in css_content
@@ -5408,6 +5412,28 @@ def test_render_theme_brand_css_includes_rounded_white_popup_background_override
     )
     assert "background-color: #ffffff !important;" in css
     assert "border-radius: 16px !important;" in css
+
+
+def test_render_theme_brand_css_includes_mobile_collection_card_scroller_overrides():
+    css = ShopifyApiClient._render_theme_brand_css(
+        theme_name="futrgroup2-0theme",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        data_theme="light",
+        css_vars={"--footer-bg": "#f4ede6"},
+        font_urls=[],
+    )
+
+    assert "@media screen and (max-width: 749px) {" in css
+    assert ".slider--tablet .card-grid {" in css
+    assert "--slider-item-width: minmax(0, 100%) !important;" in css
+    assert "grid-auto-flow: column !important;" in css
+    assert "grid-auto-columns: minmax(0, 100%) !important;" in css
+    assert "overflow-x: auto !important;" in css
+    assert "scroll-snap-type: x mandatory !important;" in css
+    assert ".slider--tablet .card-grid > * {" in css
+    assert "scroll-snap-align: start !important;" in css
 
 
 def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():

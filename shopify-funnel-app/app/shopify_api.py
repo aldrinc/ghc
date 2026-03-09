@@ -550,6 +550,29 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
         ),
     ),
 }
+_THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
+    "futrgroup2-0theme": (
+        """@media screen and (max-width: 749px) {
+  /* Keep mobile collection cards from crowding/overlapping by forcing
+     a one-card-per-view horizontal scroller. */
+  .slider--tablet .card-grid {
+    --slider-item-width: minmax(0, 100%) !important;
+    grid-template-columns: none !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(0, 100%) !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain !important;
+    scroll-snap-type: x mandatory !important;
+  }
+
+  .slider--tablet .card-grid > * {
+    min-width: 0 !important;
+    scroll-snap-align: start !important;
+  }
+}""",
+    ),
+}
 _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
     "futrgroup2-0theme": {
         "hero_background": "--hero-bg",
@@ -9227,6 +9250,14 @@ class ShopifyApiClient:
                 for prop, value in declarations:
                     lines.append(f"  {prop}: {value} !important;")
                 lines.append("}")
+
+        raw_css_blocks = _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME.get(
+            profile.theme_name, ()
+        )
+        if raw_css_blocks:
+            lines.append("")
+            lines.append("/* Managed theme mobile layout overrides. */")
+            lines.extend(raw_css_blocks)
 
         lines.append("")
         return "\n".join(lines)

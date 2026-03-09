@@ -285,6 +285,40 @@ def _iter_strategy_v2_run_prompt_json_schemas():
         for child in ast.iter_child_nodes(parent):
             parents[child] = parent
 
+    dynamic_eval_locals: dict[str, object] = {
+        "scraped_data_manifest": {
+            "raw_scraped_data_files": [
+                {"file_name": "file-a.json"},
+                {"file_name": "file-b.json"},
+            ]
+        },
+        "input_ordered_ids": ["E1111111111111111", "E2222222222222222"],
+        "bonus_items": [
+            {"bonus_id": "bonus-1"},
+            {"bonus_id": "bonus-2"},
+            {"bonus_id": "bonus-3"},
+        ],
+        "voc_observations": [
+            {"voc_id": "V001"},
+            {"voc_id": "V002"},
+            {"voc_id": "V003"},
+        ],
+        "agent03_allowed_voc_ids": ["V001", "V002", "V003"],
+        "evidence_rows_for_prompt": [
+            {"evidence_id": "E1111111111111111"},
+            {"evidence_id": "E2222222222222222"},
+            {"evidence_id": "E3333333333333333"},
+        ],
+    }
+
+    def _schema_eval_locals(local_scope: dict[str, object]) -> dict[str, object]:
+        merged = dict(local_scope)
+        for name, placeholder in dynamic_eval_locals.items():
+            current = merged.get(name)
+            if current in (None, [], {}, ()):
+                merged[name] = placeholder
+        return merged
+
     def _enclosing_function(node: ast.AST) -> ast.FunctionDef | None:
         current = parents.get(node)
         while current is not None and not isinstance(current, ast.FunctionDef):
@@ -313,7 +347,11 @@ def _iter_strategy_v2_run_prompt_json_schemas():
             if not expr:
                 continue
             try:
-                local_scope[target_name] = eval(expr, strategy_v2_activities.__dict__, dict(local_scope))
+                local_scope[target_name] = eval(
+                    expr,
+                    strategy_v2_activities.__dict__,
+                    _schema_eval_locals(dict(local_scope)),
+                )
             except Exception:
                 continue
         return local_scope
@@ -340,7 +378,7 @@ def _iter_strategy_v2_run_prompt_json_schemas():
         expr = ast.get_source_segment(source, latest_value)
         if not expr:
             raise NameError(name)
-        return eval(expr, strategy_v2_activities.__dict__, {})
+        return eval(expr, strategy_v2_activities.__dict__, _schema_eval_locals({}))
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -361,7 +399,11 @@ def _iter_strategy_v2_run_prompt_json_schemas():
         function_node = _enclosing_function(node)
         local_scope = _build_local_scope(function_node, lineno=node.lineno)
         try:
-            schema = eval(schema_expr, strategy_v2_activities.__dict__, local_scope)
+            schema = eval(
+                schema_expr,
+                strategy_v2_activities.__dict__,
+                _schema_eval_locals(local_scope),
+            )
         except NameError:
             if not schema_expr.isidentifier():
                 raise
@@ -451,20 +493,55 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
             {
                 "mode": "DUAL",
                 "input_count": 1,
-                "output_count": 2,
-                "voc_observations": [
-                    {
-                        "evidence_id": "E1111111111111111",
-                        "source_type": "REDDIT",
-                        "source_url": "https://example.com/post/1",
-                        "source_author": "user-1",
-                        "source_date": "2026-02-01",
-                        "evidence_ref": "row-1",
+                "output_count": 1,
+                "decisions_by_evidence_id": {
+                    "E1111111111111111": {
+                        "decision": "ACCEPT",
                         "quote": "I need safer guidance.",
-                        "source": "",
+                        "is_hook": "N",
+                        "hook_format": "NONE",
+                        "hook_word_count": 0,
+                        "video_virality_tier": "BASELINE",
+                        "video_view_count": 0,
+                        "competitor_saturation": [],
+                        "in_whitespace": "Y",
+                        "specific_number": "N",
+                        "specific_product_brand": "N",
+                        "specific_event_moment": "Y",
+                        "specific_body_symptom": "N",
+                        "before_after_comparison": "N",
+                        "crisis_language": "N",
+                        "profanity_extreme_punctuation": "N",
+                        "physical_sensation": "N",
+                        "identity_change_desire": "N",
+                        "word_count": 4,
+                        "clear_trigger_event": "Y",
+                        "named_enemy": "N",
+                        "shiftable_belief": "Y",
+                        "expectation_vs_reality": "N",
+                        "headline_ready": "N",
+                        "usable_content_pct": "OVER_75_PCT",
+                        "personal_context": "Y",
+                        "long_narrative": "N",
+                        "engagement_received": "N",
+                        "real_person_signals": "Y",
+                        "moderated_community": "Y",
+                        "trigger_event": "Routine failure",
+                        "pain_problem": "Needs safer guidance",
+                        "desired_outcome": "Clarity",
+                        "failed_prior_solution": "Generic advice",
+                        "enemy_blame": "Unsafe recommendations",
+                        "identity_role": "Caregiver",
+                        "fear_risk": "Making the wrong choice",
+                        "emotional_valence": "ANXIETY",
+                        "durable_psychology": "Y",
+                        "market_specific": "N",
+                        "date_bracket": "LAST_6MO",
+                        "buyer_stage": "problem aware",
+                        "solution_sophistication": "EXPERIENCED",
+                        "compliance_risk": "GREEN",
                     }
-                ],
-                "rejected_items": [],
+                },
                 "validation_errors": [],
             },
             "{}",
@@ -647,6 +724,44 @@ def test_json_schema_response_format_preserves_explicit_object_constraints() -> 
     assert freeform["additionalProperties"] is True
     assert freeform["properties"] == {}
     assert "required" not in freeform
+
+
+def test_agent1_output_schema_binds_exact_runtime_source_files() -> None:
+    schema = strategy_v2_activities._agent1_output_schema(
+        source_files=["file-a.json", "file-b.json"],
+    )
+    file_assessments = schema["properties"]["file_assessments"]
+    assert set(file_assessments["properties"].keys()) == {"file-a.json", "file-b.json"}
+    assert file_assessments["required"] == ["file-a.json", "file-b.json"]
+
+
+def test_agent2_output_schema_binds_exact_runtime_evidence_ids() -> None:
+    schema = strategy_v2_activities._agent2_output_schema(
+        evidence_ids=["E1111111111111111", "E2222222222222222"],
+    )
+    decisions = schema["properties"]["decisions_by_evidence_id"]
+    assert set(decisions["properties"].keys()) == {"E1111111111111111", "E2222222222222222"}
+    assert decisions["required"] == ["E1111111111111111", "E2222222222222222"]
+
+
+def test_offer_step04_schema_binds_exact_runtime_bonus_ids() -> None:
+    schema = strategy_v2_activities._offer_step04_response_schema(
+        bonus_ids=["bonus-1", "bonus-2", "bonus-3"],
+    )
+    bonus_modules = schema["properties"]["variants"]["items"]["properties"]["bonus_modules"]
+    assert set(bonus_modules["properties"].keys()) == {"bonus-1", "bonus-2", "bonus-3"}
+    assert bonus_modules["required"] == ["bonus-1", "bonus-2", "bonus-3"]
+
+
+def test_agent3_prompt_schema_restricts_quote_voc_ids_to_runtime_allowlist() -> None:
+    schema = strategy_v2_activities._agent3_prompt_output_schema(
+        include_legacy_angle_candidates=False,
+        allowed_voc_ids=["V001", "V002", "V003"],
+    )
+    quote_schema = (
+        schema["properties"]["purple_ocean_candidates"]["items"]["properties"]["evidence"]["properties"]["top_quotes"]["items"]
+    )
+    assert quote_schema["properties"]["voc_id"]["enum"] == ["V001", "V002", "V003"]
 
 
 def _build_stage2_with_price(price: str) -> ProductBriefStage2:

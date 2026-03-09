@@ -210,7 +210,6 @@ def _agent1_file_assessment(
     priority_rank: int | None = None,
 ) -> dict[str, object]:
     return {
-        "source_file": source_file,
         "decision": decision,
         "exclude_reason": "Insufficient usable evidence in file." if decision == "EXCLUDE" else "",
         "include_in_mining_plan": include_in_mining_plan,
@@ -300,9 +299,12 @@ def test_validate_agent1_output_source_file_grounding_rejects_unknown_files() ->
     with pytest.raises(StrategyV2SchemaValidationError, match="Unknown source_file entries"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "file_assessments": [
-                    _agent1_file_assessment(source_file="unexpected_file.json", decision="EXCLUDE")
-                ],
+                "file_assessments": {
+                    "unexpected_file.json": _agent1_file_assessment(
+                        source_file="unexpected_file.json",
+                        decision="EXCLUDE",
+                    )
+                },
             },
             scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "allowed_file.json"}]},
         )
@@ -312,13 +314,13 @@ def test_validate_agent1_output_source_file_grounding_rejects_excluded_rows_mark
     with pytest.raises(StrategyV2SchemaValidationError, match="cannot mark an EXCLUDE file_assessments row for mining"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "file_assessments": [
-                    _agent1_file_assessment(
+                "file_assessments": {
+                    "mined_file.json": _agent1_file_assessment(
                         source_file="mined_file.json",
                         decision="EXCLUDE",
                         include_in_mining_plan=True,
                     )
-                ],
+                },
             },
             scraped_data_manifest={
                 "raw_scraped_data_files": [{"file_name": "mined_file.json"}]
@@ -330,13 +332,13 @@ def test_validate_agent1_output_source_file_grounding_requires_exact_union_cover
     with pytest.raises(StrategyV2SchemaValidationError, match="exact source-file coverage"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "file_assessments": [
-                    _agent1_file_assessment(
+                "file_assessments": {
+                    "observed_file.json": _agent1_file_assessment(
                         source_file="observed_file.json",
                         include_in_mining_plan=True,
                         priority_rank=1,
                     )
-                ],
+                },
             },
             scraped_data_manifest={
                 "raw_scraped_data_files": [
@@ -350,14 +352,17 @@ def test_validate_agent1_output_source_file_grounding_requires_exact_union_cover
 def test_validate_agent1_output_source_file_grounding_accepts_exact_coverage_with_exclusions() -> None:
     derived = _derive_agent1_outputs_from_file_assessments(
         agent01_output={
-            "file_assessments": [
-                _agent1_file_assessment(
+            "file_assessments": {
+                "observed_file.json": _agent1_file_assessment(
                     source_file="observed_file.json",
                     include_in_mining_plan=True,
                     priority_rank=1,
                 ),
-                _agent1_file_assessment(source_file="excluded_file.json", decision="EXCLUDE"),
-            ],
+                "excluded_file.json": _agent1_file_assessment(
+                    source_file="excluded_file.json",
+                    decision="EXCLUDE",
+                ),
+            },
         },
         scraped_data_manifest={
             "raw_scraped_data_files": [

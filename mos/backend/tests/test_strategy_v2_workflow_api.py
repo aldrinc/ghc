@@ -167,11 +167,11 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "rationale": "Lowest commitment option for first-time buyers.",
                     "compared_variant_ids": ["share_and_save", "family_bundle"],
                 },
-                "bonus_modules": [
-                    {"bonus_id": "bonus-1", "copy": "Nightly startup checklist for first use."},
-                    {"bonus_id": "bonus-2", "copy": "Troubleshooting map for routine disruptions."},
-                    {"bonus_id": "bonus-3", "copy": "Quick reference card for daily consistency."},
-                ],
+                "bonus_modules": {
+                    "bonus-1": {"copy": "Nightly startup checklist for first use."},
+                    "bonus-2": {"copy": "Troubleshooting map for routine disruptions."},
+                    "bonus-3": {"copy": "Quick reference card for daily consistency."},
+                },
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -231,11 +231,11 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "rationale": "Best for two-device households balancing value and flexibility.",
                     "compared_variant_ids": ["single_device", "family_bundle"],
                 },
-                "bonus_modules": [
-                    {"bonus_id": "bonus-1", "copy": "Shared setup workflow for two users."},
-                    {"bonus_id": "bonus-2", "copy": "Sync checklist to keep routines aligned."},
-                    {"bonus_id": "bonus-3", "copy": "Partner accountability prompts for follow-through."},
-                ],
+                "bonus_modules": {
+                    "bonus-1": {"copy": "Shared setup workflow for two users."},
+                    "bonus-2": {"copy": "Sync checklist to keep routines aligned."},
+                    "bonus-3": {"copy": "Partner accountability prompts for follow-through."},
+                },
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -295,11 +295,11 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "rationale": "Highest total savings for family usage with the same core system.",
                     "compared_variant_ids": ["single_device", "share_and_save"],
                 },
-                "bonus_modules": [
-                    {"bonus_id": "bonus-1", "copy": "Family onboarding plan for multiple caregivers."},
-                    {"bonus_id": "bonus-2", "copy": "Shared escalation guide for off-pattern nights."},
-                    {"bonus_id": "bonus-3", "copy": "Printable family tracker for weekly review."},
-                ],
+                "bonus_modules": {
+                    "bonus-1": {"copy": "Family onboarding plan for multiple caregivers."},
+                    "bonus-2": {"copy": "Shared escalation guide for off-pattern nights."},
+                    "bonus-3": {"copy": "Printable family tracker for weekly review."},
+                },
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 7},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 7},
@@ -576,7 +576,10 @@ def _stub_prompt_chain_runtime(monkeypatch):
         elif context == "strategy_v2.agent2_output":
             payload = {
                 "mode": "DUAL",
-                "voc_observations": _agent2_voc_observations_payload(),
+                "input_count": len(_agent2_voc_observations_payload()),
+                "output_count": len(_agent2_voc_observations_payload()),
+                "decisions_by_evidence_id": _agent2_decisions_payload(),
+                "validation_errors": [],
             }
         elif context == "strategy_v2.agent3_output":
             payload = {
@@ -1060,7 +1063,7 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
     return rows
 
 
-def _agent1_file_assessments_from_uploaded_manifest() -> list[dict[str, Any]]:
+def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any]]:
     uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
     agent1_payloads = uploaded_payloads.get("agent1-prompt-chain")
     if not isinstance(agent1_payloads, dict):
@@ -1075,7 +1078,7 @@ def _agent1_file_assessments_from_uploaded_manifest() -> list[dict[str, Any]]:
     if not raw_file_rows:
         raise AssertionError("Agent 1 test stub expected raw_scraped_data_files to contain at least one file.")
 
-    assessments: list[dict[str, Any]] = []
+    assessments: dict[str, dict[str, Any]] = {}
     for index, file_row in enumerate(raw_file_rows):
         source_file = str(file_row.get("file_name") or "").strip()
         if not source_file:
@@ -1089,12 +1092,10 @@ def _agent1_file_assessments_from_uploaded_manifest() -> list[dict[str, Any]]:
         )
         observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
         observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
-        assessments.append(
-            _agent1_file_assessment_payload(
+        assessments[source_file] = _agent1_file_assessment_payload(
                 observation=observation,
                 include_in_mining_plan=index == 0,
                 priority_rank=1 if index == 0 else None,
-            )
         )
 
     if not assessments:
@@ -1190,7 +1191,6 @@ def _agent1_file_assessment_payload(
     priority_rank: int | None = None,
 ) -> dict[str, Any]:
     return {
-        "source_file": observation["source_file"],
         "decision": "OBSERVE",
         "exclude_reason": "",
         "include_in_mining_plan": include_in_mining_plan,
@@ -1222,6 +1222,59 @@ def _agent1_file_assessment_payload(
         ),
         "compliance_flags": "",
     }
+
+
+def _agent2_decisions_payload() -> dict[str, dict[str, Any]]:
+    decisions: dict[str, dict[str, Any]] = {}
+    for row in _agent2_voc_observations_payload():
+        evidence_id = str(row["evidence_id"])
+        decisions[evidence_id] = {
+            "decision": "ACCEPT",
+            "quote": row["quote"],
+            "is_hook": row["is_hook"],
+            "hook_format": row["hook_format"],
+            "hook_word_count": row["hook_word_count"],
+            "video_virality_tier": row["video_virality_tier"],
+            "video_view_count": row["video_view_count"],
+            "competitor_saturation": row["competitor_saturation"],
+            "in_whitespace": row["in_whitespace"],
+            "specific_number": row["specific_number"],
+            "specific_product_brand": row["specific_product_brand"],
+            "specific_event_moment": row["specific_event_moment"],
+            "specific_body_symptom": row["specific_body_symptom"],
+            "before_after_comparison": row["before_after_comparison"],
+            "crisis_language": row["crisis_language"],
+            "profanity_extreme_punctuation": row["profanity_extreme_punctuation"],
+            "physical_sensation": row["physical_sensation"],
+            "identity_change_desire": row["identity_change_desire"],
+            "word_count": row["word_count"],
+            "clear_trigger_event": row["clear_trigger_event"],
+            "named_enemy": row["named_enemy"],
+            "shiftable_belief": row["shiftable_belief"],
+            "expectation_vs_reality": row["expectation_vs_reality"],
+            "headline_ready": row["headline_ready"],
+            "usable_content_pct": row["usable_content_pct"],
+            "personal_context": row["personal_context"],
+            "long_narrative": row["long_narrative"],
+            "engagement_received": row["engagement_received"],
+            "real_person_signals": row["real_person_signals"],
+            "moderated_community": row["moderated_community"],
+            "trigger_event": row["trigger_event"],
+            "pain_problem": row["pain_problem"],
+            "desired_outcome": row["desired_outcome"],
+            "failed_prior_solution": row["failed_prior_solution"],
+            "enemy_blame": row["enemy_blame"],
+            "identity_role": row["identity_role"],
+            "fear_risk": row["fear_risk"],
+            "emotional_valence": row["emotional_valence"],
+            "durable_psychology": row["durable_psychology"],
+            "market_specific": row["market_specific"],
+            "date_bracket": row["date_bracket"],
+            "buyer_stage": row["buyer_stage"],
+            "solution_sophistication": row["solution_sophistication"],
+            "compliance_risk": row["compliance_risk"],
+        }
+    return decisions
 
 
 def _agent3_angle_observations_payload(min_count: int = 10) -> list[dict[str, Any]]:
