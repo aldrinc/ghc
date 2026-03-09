@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import colorsys
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -5835,6 +5836,489 @@ class ShopifyApiClient:
             )
         return resolved_value
 
+    @staticmethod
+    def _parse_theme_settings_css_color(
+        *,
+        value: str,
+        path: str,
+        context: str,
+    ) -> tuple[int, int, int, float]:
+        raw = value.strip()
+        if not raw:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires a concrete CSS color for path {path}, "
+                    "but received an empty string."
+                ),
+                status_code=422,
+            )
+
+        lowered = raw.lower()
+        if lowered == "transparent":
+            return 0, 0, 0, 0.0
+        if lowered == "white":
+            return 255, 255, 255, 1.0
+        if lowered == "black":
+            return 0, 0, 0, 1.0
+
+        if lowered.startswith("#"):
+            hex_body = lowered[1:]
+            if len(hex_body) in {3, 4}:
+                r = int(hex_body[0] * 2, 16)
+                g = int(hex_body[1] * 2, 16)
+                b = int(hex_body[2] * 2, 16)
+                alpha = int(hex_body[3] * 2, 16) / 255.0 if len(hex_body) == 4 else 1.0
+                return r, g, b, alpha
+            if len(hex_body) in {6, 8}:
+                r = int(hex_body[0:2], 16)
+                g = int(hex_body[2:4], 16)
+                b = int(hex_body[4:6], 16)
+                alpha = int(hex_body[6:8], 16) / 255.0 if len(hex_body) == 8 else 1.0
+                return r, g, b, alpha
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires a supported hex color for path {path}, "
+                    f"received {value!r}."
+                ),
+                status_code=422,
+            )
+
+        func_match = re.match(r"^(rgba?|hsla?)\((.*)\)$", lowered)
+        if not func_match:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires a supported CSS color for path {path}, "
+                    f"received {value!r}."
+                ),
+                status_code=422,
+            )
+
+        func = func_match.group(1)
+        inner = func_match.group(2).strip()
+        alpha: float = 1.0
+        if "/" in inner:
+            before, after = inner.split("/", 1)
+            inner = before.strip()
+            alpha_raw = after.strip()
+            alpha = (
+                float(alpha_raw[:-1].strip()) / 100.0
+                if alpha_raw.endswith("%")
+                else float(alpha_raw)
+            )
+
+        parts = inner.replace(",", " ").split()
+        if func in {"rgb", "rgba"}:
+            if len(parts) == 4 and "/" not in func_match.group(2):
+                alpha_raw = parts[3].strip()
+                alpha = (
+                    float(alpha_raw[:-1].strip()) / 100.0
+                    if alpha_raw.endswith("%")
+                    else float(alpha_raw)
+                )
+                parts = parts[:3]
+            if len(parts) != 3:
+                raise ShopifyApiError(
+                    message=(
+                        f"{context} requires a valid {func}() color for path {path}, "
+                        f"received {value!r}."
+                    ),
+                    status_code=422,
+                )
+
+            def parse_rgb_channel(part: str) -> int:
+                if part.endswith("%"):
+                    return max(0, min(255, int(round(float(part[:-1].strip()) * 255.0 / 100.0))))
+                return max(0, min(255, int(round(float(part)))))
+
+            r = parse_rgb_channel(parts[0].strip())
+            g = parse_rgb_channel(parts[1].strip())
+            b = parse_rgb_channel(parts[2].strip())
+            return r, g, b, max(0.0, min(1.0, alpha))
+
+        if len(parts) == 4 and "/" not in func_match.group(2):
+            alpha_raw = parts[3].strip()
+            alpha = (
+                float(alpha_raw[:-1].strip()) / 100.0
+                if alpha_raw.endswith("%")
+                else float(alpha_raw)
+            )
+            parts = parts[:3]
+        if len(parts) != 3:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires a valid {func}() color for path {path}, "
+                    f"received {value!r}."
+                ),
+                status_code=422,
+            )
+
+        hue_raw = parts[0].strip()
+        saturation_raw = parts[1].strip()
+        lightness_raw = parts[2].strip()
+        if hue_raw.endswith("deg"):
+            hue = float(hue_raw[:-3].strip())
+        else:
+            hue = float(hue_raw)
+        if not saturation_raw.endswith("%") or not lightness_raw.endswith("%"):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires percent saturation/lightness values for path {path}, "
+                    f"received {value!r}."
+                ),
+                status_code=422,
+            )
+        saturation = float(saturation_raw[:-1].strip()) / 100.0
+        lightness = float(lightness_raw[:-1].strip()) / 100.0
+        r_f, g_f, b_f = colorsys.hls_to_rgb(
+            (hue % 360.0) / 360.0,
+            lightness,
+            saturation,
+        )
+        return (
+            int(round(r_f * 255)),
+            int(round(g_f * 255)),
+            int(round(b_f * 255)),
+            max(0.0, min(1.0, alpha)),
+        )
+
+    @staticmethod
+    def _blend_theme_settings_color_over_background(
+        *,
+        fg: tuple[int, int, int, float],
+        bg: tuple[int, int, int],
+    ) -> tuple[int, int, int]:
+        alpha = max(0.0, min(1.0, float(fg[3])))
+        if alpha >= 1.0:
+            return fg[0], fg[1], fg[2]
+        if alpha <= 0.0:
+            return bg
+        return (
+            int(round((fg[0] * alpha) + (bg[0] * (1.0 - alpha)))),
+            int(round((fg[1] * alpha) + (bg[1] * (1.0 - alpha)))),
+            int(round((fg[2] * alpha) + (bg[2] * (1.0 - alpha)))),
+        )
+
+    @staticmethod
+    def _relative_luminance_srgb(*, r: int, g: int, b: int) -> float:
+        def to_linear(channel: int) -> float:
+            normalized = channel / 255.0
+            if normalized <= 0.04045:
+                return normalized / 12.92
+            return ((normalized + 0.055) / 1.055) ** 2.4
+
+        return (
+            (0.2126 * to_linear(r))
+            + (0.7152 * to_linear(g))
+            + (0.0722 * to_linear(b))
+        )
+
+    @classmethod
+    def _contrast_ratio_for_theme_settings_rgb(
+        cls,
+        *,
+        a: tuple[int, int, int],
+        b: tuple[int, int, int],
+    ) -> float:
+        luminance_a = cls._relative_luminance_srgb(r=a[0], g=a[1], b=a[2])
+        luminance_b = cls._relative_luminance_srgb(r=b[0], g=b[1], b=b[2])
+        lighter, darker = (
+            (luminance_a, luminance_b)
+            if luminance_a >= luminance_b
+            else (luminance_b, luminance_a)
+        )
+        return (lighter + 0.05) / (darker + 0.05)
+
+    @classmethod
+    def _resolve_theme_template_section_settings_context(
+        cls,
+        *,
+        template_filename: str,
+        template_data: dict[str, Any],
+        path: str,
+    ) -> tuple[str, dict[str, Any]] | None:
+        if not path.startswith(f"{template_filename}."):
+            return None
+        _, json_path = cls._split_theme_template_setting_path(setting_path=path)
+        path_segments = [segment for segment in json_path.split(".") if segment]
+        if len(path_segments) < 4 or path_segments[0] != "sections":
+            return None
+        section_id = path_segments[1]
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return None
+        section = sections.get(section_id)
+        if not isinstance(section, dict):
+            return None
+        section_settings = section.get("settings")
+        if not isinstance(section_settings, dict):
+            return None
+        return section_id, section_settings
+
+    @classmethod
+    def _resolve_theme_template_section_setting_color_value(
+        cls,
+        *,
+        template_filename: str,
+        section_id: str,
+        setting_key: str,
+        section_settings: dict[str, Any],
+        semantic_source_vars: dict[str, str],
+        effective_css_vars: dict[str, str],
+    ) -> str | None:
+        raw_value = section_settings.get(setting_key)
+        if not isinstance(raw_value, str):
+            return None
+        normalized_value = raw_value.strip()
+        if not normalized_value:
+            return None
+
+        setting_path = (
+            f"{template_filename}.sections.{section_id}.settings.{setting_key}"
+        )
+        semantic_key = cls._resolve_theme_settings_semantic_key(
+            semantic_source_vars=semantic_source_vars,
+            raw_key=setting_key,
+            raw_path=setting_path,
+        )
+        if semantic_key is not None:
+            source_var = semantic_source_vars[semantic_key]
+            return cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=setting_path,
+                context="Theme template section background mapping",
+            )
+
+        if not cls._is_theme_settings_color_like_value(value=normalized_value):
+            raise ShopifyApiError(
+                message=(
+                    "Theme template section background mapping requires a CSS color value "
+                    f"for path {setting_path}, received {raw_value!r}."
+                ),
+                status_code=422,
+            )
+        return normalized_value
+
+    @classmethod
+    def _coerce_theme_overlay_opacity(
+        cls,
+        *,
+        value: Any,
+        path: str,
+    ) -> float:
+        if isinstance(value, bool):
+            raise ShopifyApiError(
+                message=(
+                    "Theme template section background mapping requires overlay_opacity "
+                    f"for path {path} to be numeric, received bool."
+                ),
+                status_code=422,
+            )
+        if isinstance(value, (int, float)):
+            normalized = float(value)
+        elif isinstance(value, str) and value.strip():
+            try:
+                normalized = float(value.strip())
+            except ValueError as exc:
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template section background mapping requires overlay_opacity "
+                        f"for path {path} to be numeric, received {value!r}."
+                    ),
+                    status_code=422,
+                ) from exc
+        else:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template section background mapping requires overlay_opacity "
+                    f"for path {path} to be numeric, received {value!r}."
+                ),
+                status_code=422,
+            )
+        if normalized < 0.0 or normalized > 100.0:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template section background mapping requires overlay_opacity "
+                    f"for path {path} to be between 0 and 100, received {normalized}."
+                ),
+                status_code=422,
+            )
+        return normalized / 100.0
+
+    @classmethod
+    def _resolve_theme_template_base_background_rgb(
+        cls,
+        *,
+        effective_css_vars: dict[str, str],
+        path: str,
+    ) -> tuple[int, int, int]:
+        source_var_candidates = ("--hero-bg", "--color-page-bg", "--color-bg")
+        for source_var in source_var_candidates:
+            raw_value = effective_css_vars.get(source_var)
+            if not isinstance(raw_value, str) or not raw_value.strip():
+                continue
+            parsed_value = cls._parse_theme_settings_css_color(
+                value=raw_value,
+                path=path,
+                context="Theme template section background mapping",
+            )
+            return cls._blend_theme_settings_color_over_background(
+                fg=parsed_value,
+                bg=(255, 255, 255),
+            )
+        raise ShopifyApiError(
+            message=(
+                "Theme template section background mapping requires one of "
+                "--hero-bg, --color-page-bg, or --color-bg to be present for "
+                f"path {path}."
+            ),
+            status_code=422,
+        )
+
+    @classmethod
+    def _resolve_theme_template_section_background_rgb(
+        cls,
+        *,
+        template_filename: str,
+        template_data: dict[str, Any],
+        path: str,
+        semantic_source_vars: dict[str, str],
+        effective_css_vars: dict[str, str],
+    ) -> tuple[int, int, int] | None:
+        section_context = cls._resolve_theme_template_section_settings_context(
+            template_filename=template_filename,
+            template_data=template_data,
+            path=path,
+        )
+        if section_context is None:
+            return None
+        section_id, section_settings = section_context
+        section_settings_path = f"{template_filename}.sections.{section_id}.settings"
+        base_background_rgb = cls._resolve_theme_template_base_background_rgb(
+            effective_css_vars=effective_css_vars,
+            path=section_settings_path,
+        )
+
+        resolved_background_rgb: tuple[int, int, int] | None = None
+        for background_key in (
+            "color_background",
+            "background_color",
+            "item_bg_color",
+            "body_bg_color",
+            "card_bg_color",
+        ):
+            background_value = cls._resolve_theme_template_section_setting_color_value(
+                template_filename=template_filename,
+                section_id=section_id,
+                setting_key=background_key,
+                section_settings=section_settings,
+                semantic_source_vars=semantic_source_vars,
+                effective_css_vars=effective_css_vars,
+            )
+            if background_value is None:
+                continue
+            resolved_background_rgb = cls._blend_theme_settings_color_over_background(
+                fg=cls._parse_theme_settings_css_color(
+                    value=background_value,
+                    path=f"{section_settings_path}.{background_key}",
+                    context="Theme template section background mapping",
+                ),
+                bg=base_background_rgb,
+            )
+            break
+
+        overlay_value = cls._resolve_theme_template_section_setting_color_value(
+            template_filename=template_filename,
+            section_id=section_id,
+            setting_key="color_overlay",
+            section_settings=section_settings,
+            semantic_source_vars=semantic_source_vars,
+            effective_css_vars=effective_css_vars,
+        )
+        if overlay_value is None:
+            return resolved_background_rgb
+
+        overlay_path = f"{section_settings_path}.color_overlay"
+        overlay_color = cls._parse_theme_settings_css_color(
+            value=overlay_value,
+            path=overlay_path,
+            context="Theme template section background mapping",
+        )
+        overlay_opacity = section_settings.get("overlay_opacity")
+        overlay_alpha = overlay_color[3]
+        if overlay_opacity is not None and (
+            not isinstance(overlay_opacity, str) or overlay_opacity.strip()
+        ):
+            overlay_alpha = cls._coerce_theme_overlay_opacity(
+                value=overlay_opacity,
+                path=f"{section_settings_path}.overlay_opacity",
+            )
+        return cls._blend_theme_settings_color_over_background(
+            fg=(overlay_color[0], overlay_color[1], overlay_color[2], overlay_alpha),
+            bg=resolved_background_rgb or base_background_rgb,
+        )
+
+    @classmethod
+    def _resolve_theme_template_contrasting_text_color_value(
+        cls,
+        *,
+        template_filename: str,
+        template_data: dict[str, Any],
+        path: str,
+        semantic_source_vars: dict[str, str],
+        effective_css_vars: dict[str, str],
+    ) -> str | None:
+        background_rgb = cls._resolve_theme_template_section_background_rgb(
+            template_filename=template_filename,
+            template_data=template_data,
+            path=path,
+            semantic_source_vars=semantic_source_vars,
+            effective_css_vars=effective_css_vars,
+        )
+        if background_rgb is None:
+            return None
+
+        dark_value = cls._resolve_theme_settings_color_source_value(
+            effective_css_vars=effective_css_vars,
+            source_var="--color-text",
+            path=path,
+            context="Theme template contrasting text mapping",
+        )
+        light_value = cls._resolve_theme_settings_color_source_value(
+            effective_css_vars=effective_css_vars,
+            source_var="--color-bg",
+            path=path,
+            context="Theme template contrasting text mapping",
+        )
+        dark_rgb = cls._blend_theme_settings_color_over_background(
+            fg=cls._parse_theme_settings_css_color(
+                value=dark_value,
+                path=path,
+                context="Theme template contrasting text mapping",
+            ),
+            bg=background_rgb,
+        )
+        light_rgb = cls._blend_theme_settings_color_over_background(
+            fg=cls._parse_theme_settings_css_color(
+                value=light_value,
+                path=path,
+                context="Theme template contrasting text mapping",
+            ),
+            bg=background_rgb,
+        )
+
+        dark_contrast = cls._contrast_ratio_for_theme_settings_rgb(
+            a=dark_rgb,
+            b=background_rgb,
+        )
+        light_contrast = cls._contrast_ratio_for_theme_settings_rgb(
+            a=light_rgb,
+            b=background_rgb,
+        )
+        if light_contrast > dark_contrast:
+            return light_value
+        return dark_value
+
     @classmethod
     def _resolve_theme_settings_semantic_key(
         cls,
@@ -6672,13 +7156,23 @@ class ShopifyApiClient:
             if semantic_key is None:
                 unmapped_paths.append(path)
                 continue
-            source_var = semantic_source_vars[semantic_key]
-            expected_value = cls._resolve_theme_settings_color_source_value(
-                effective_css_vars=effective_css_vars,
-                source_var=source_var,
-                path=path,
-                context="Theme template settings mapping",
-            )
+            expected_value = None
+            if semantic_key in {"text", "foreground"}:
+                expected_value = cls._resolve_theme_template_contrasting_text_color_value(
+                    template_filename=template_filename,
+                    template_data=template_data,
+                    path=path,
+                    semantic_source_vars=semantic_source_vars,
+                    effective_css_vars=effective_css_vars,
+                )
+            if expected_value is None:
+                source_var = semantic_source_vars[semantic_key]
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme template settings mapping",
+                )
             existing_value = parent.get(key)
             if (
                 isinstance(existing_value, str)
@@ -6739,14 +7233,24 @@ class ShopifyApiClient:
             if semantic_key is None:
                 unmapped_paths.append(path)
                 continue
-            source_var = semantic_source_vars[semantic_key]
             try:
-                expected_value = cls._resolve_theme_settings_color_source_value(
-                    effective_css_vars=effective_css_vars,
-                    source_var=source_var,
-                    path=path,
-                    context="Theme template settings audit",
-                )
+                expected_value = None
+                if semantic_key in {"text", "foreground"}:
+                    expected_value = cls._resolve_theme_template_contrasting_text_color_value(
+                        template_filename=template_filename,
+                        template_data=template_data,
+                        path=path,
+                        semantic_source_vars=semantic_source_vars,
+                        effective_css_vars=effective_css_vars,
+                    )
+                if expected_value is None:
+                    source_var = semantic_source_vars[semantic_key]
+                    expected_value = cls._resolve_theme_settings_color_source_value(
+                        effective_css_vars=effective_css_vars,
+                        source_var=source_var,
+                        path=path,
+                        context="Theme template settings audit",
+                    )
             except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue

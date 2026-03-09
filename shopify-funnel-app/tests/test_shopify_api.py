@@ -6139,6 +6139,56 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
     )
 
 
+def test_sync_theme_template_color_settings_data_uses_light_text_for_dark_section_overlay():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--hero-bg"] = "#f5f5f5"
+    css_vars["--color-soft"] = "rgba(8, 12, 18, 0.92)"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "main-collection-banner": {
+                    "type": "main-collection-banner",
+                    "settings": {
+                        "color_overlay": "#ffffff",
+                        "overlay_opacity": 70,
+                        "color_text": "#111111",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = (
+        ShopifyApiClient._sync_theme_template_color_settings_data(
+            profile=profile,
+            template_filename="templates/collection.json",
+            template_content=template_content,
+            effective_css_vars=effective_css_vars,
+        )
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/collection.json",
+        template_content=next_template_content,
+    )
+
+    assert (
+        synced_template["sections"]["main-collection-banner"]["settings"]["color_text"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-bg"]
+    )
+    assert (
+        "templates/collection.json.sections.main-collection-banner.settings.color_text"
+        in report["updatedPaths"]
+    )
+    assert report["unmappedColorPaths"] == []
+
+
 def test_sync_theme_template_color_settings_data_resolves_var_color_tokens():
     profile = ShopifyApiClient._resolve_theme_brand_profile(
         theme_name="futrgroup2-0theme"
