@@ -235,6 +235,46 @@ def test_voc_agent00b_response_schema_closes_configuration_objects() -> None:
     assert "metadata" not in configuration_item["properties"]
 
 
+def test_voc_agent01_file_assessment_schema_discriminates_observe_and_exclude_rows() -> None:
+    schema = strategy_v2_activities._VOC_AGENT01_FILE_ASSESSMENT_SCHEMA
+    variants = schema["anyOf"]
+
+    assert len(variants) == 3
+
+    exclude_variant = next(
+        variant
+        for variant in variants
+        if variant["properties"]["decision"]["enum"] == ["EXCLUDE"]
+    )
+    observe_variant = next(
+        variant
+        for variant in variants
+        if variant["properties"]["decision"]["enum"] == ["OBSERVE"]
+        and variant["properties"]["include_in_mining_plan"]["enum"] == [False]
+    )
+    mined_observe_variant = next(
+        variant
+        for variant in variants
+        if variant["properties"]["decision"]["enum"] == ["OBSERVE"]
+        and variant["properties"]["include_in_mining_plan"]["enum"] == [True]
+    )
+
+    assert exclude_variant["properties"]["url_pattern"]["type"] == "null"
+    assert exclude_variant["properties"]["rank_score"]["type"] == "null"
+    assert exclude_variant["properties"]["estimated_yield"]["type"] == "null"
+
+    assert observe_variant["properties"]["url_pattern"]["type"] == "string"
+    assert observe_variant["properties"]["rank_score"]["type"] == "integer"
+    assert observe_variant["properties"]["estimated_yield"]["type"] == "integer"
+    assert observe_variant["properties"]["priority_rank"]["type"] == "null"
+    assert observe_variant["properties"]["target_voc_types"]["maxItems"] == 0
+
+    assert mined_observe_variant["properties"]["priority_rank"]["type"] == "integer"
+    assert mined_observe_variant["properties"]["target_voc_types"]["minItems"] == 1
+    assert mined_observe_variant["properties"]["sampling_strategy"]["type"] == "string"
+    assert mined_observe_variant["properties"]["platform_behavior_note"]["type"] == "string"
+
+
 def _iter_strategy_v2_run_prompt_json_schemas():
     source_path = Path(strategy_v2_activities.__file__)
     source = source_path.read_text(encoding="utf-8")

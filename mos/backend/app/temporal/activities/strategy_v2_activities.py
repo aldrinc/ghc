@@ -929,6 +929,128 @@ def _nullable_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
     return {"anyOf": [deepcopy(dict(schema)), {"type": "null"}]}
 
 
+def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_plan: bool) -> dict[str, Any]:
+    if decision not in {"OBSERVE", "EXCLUDE"}:
+        raise ValueError(f"Unsupported Agent 1 file_assessment decision variant: {decision}")
+    if decision == "EXCLUDE" and include_in_mining_plan:
+        raise ValueError("Agent 1 file_assessment EXCLUDE variant cannot include mining-plan selection.")
+
+    source_file_schema = {"type": "string", "minLength": 1}
+    evidence_ref_item_schema = {"type": "string", "minLength": 1}
+
+    if decision == "EXCLUDE":
+        properties: dict[str, Any] = {
+            "source_file": source_file_schema,
+            "decision": {"type": "string", "enum": ["EXCLUDE"]},
+            "exclude_reason": {"type": "string", "minLength": 1},
+            "include_in_mining_plan": {"type": "boolean", "enum": [False]},
+            "habitat_name": {"type": "null"},
+            "habitat_type": {"type": "null"},
+            "url_pattern": {"type": "null"},
+            "items_in_file": {"type": "null"},
+            "data_quality": {"type": "null"},
+            "observation_sheet": {"type": "null"},
+            "language_samples": {
+                "type": "array",
+                "maxItems": 0,
+                "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
+            },
+            "video_extension": {"type": "null"},
+            "competitive_overlap": {"type": "null"},
+            "trend_lifecycle": {"type": "null"},
+            "mining_gate": {"type": "null"},
+            "rank_score": {"type": "null"},
+            "estimated_yield": {"type": "null"},
+            "evidence_refs": {
+                "type": "array",
+                "maxItems": 0,
+                "items": evidence_ref_item_schema,
+            },
+            "priority_rank": {"type": "null"},
+            "target_voc_types": {
+                "type": "array",
+                "maxItems": 0,
+                "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+            },
+            "sampling_strategy": {"type": "null"},
+            "platform_behavior_note": {"type": "null"},
+            "compliance_flags": {"type": "string", "maxLength": 0},
+        }
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": properties,
+            "required": list(properties),
+        }
+
+    properties = {
+        "source_file": source_file_schema,
+        "decision": {"type": "string", "enum": ["OBSERVE"]},
+        "exclude_reason": {"type": "string", "maxLength": 0},
+        "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
+        "habitat_name": {"type": "string", "minLength": 1},
+        "habitat_type": {"type": "string", "minLength": 1},
+        "url_pattern": {"type": "string", "minLength": 1},
+        "items_in_file": {"type": "integer", "minimum": 0},
+        "data_quality": deepcopy(_VOC_AGENT01_DATA_QUALITY_SCHEMA),
+        "observation_sheet": deepcopy(_VOC_AGENT01_OBSERVATION_SHEET_SCHEMA),
+        "language_samples": {
+            "type": "array",
+            "minItems": 1,
+            "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
+        },
+        "video_extension": {
+            "anyOf": [
+                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
+                {"type": "null"},
+            ]
+        },
+        "competitive_overlap": deepcopy(_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA),
+        "trend_lifecycle": deepcopy(_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA),
+        "mining_gate": deepcopy(_VOC_AGENT01_MINING_GATE_SCHEMA),
+        "rank_score": {"type": "integer"},
+        "estimated_yield": {"type": "integer", "minimum": 0},
+        "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": evidence_ref_item_schema,
+        },
+        "compliance_flags": {"type": "string"},
+    }
+    if include_in_mining_plan:
+        properties.update(
+            {
+                "priority_rank": {"type": "integer", "minimum": 1, "maximum": 12},
+                "target_voc_types": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+                },
+                "sampling_strategy": {"type": "string", "minLength": 1},
+                "platform_behavior_note": {"type": "string", "minLength": 1},
+            }
+        )
+    else:
+        properties.update(
+            {
+                "priority_rank": {"type": "null"},
+                "target_voc_types": {
+                    "type": "array",
+                    "maxItems": 0,
+                    "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+                },
+                "sampling_strategy": {"type": "null"},
+                "platform_behavior_note": {"type": "null"},
+            }
+        )
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": list(properties),
+    }
+
+
 _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -1033,71 +1155,10 @@ _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA: dict[str, Any] = {
     ],
 }
 _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "source_file": {"type": "string", "minLength": 1},
-        "decision": {"type": "string", "enum": ["OBSERVE", "EXCLUDE"]},
-        "exclude_reason": {"type": "string"},
-        "include_in_mining_plan": {"type": "boolean"},
-        "habitat_name": _nullable_schema({"type": "string", "minLength": 1}),
-        "habitat_type": _nullable_schema({"type": "string", "minLength": 1}),
-        "url_pattern": _nullable_schema({"type": "string", "minLength": 1}),
-        "items_in_file": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
-        "data_quality": _nullable_schema(_VOC_AGENT01_DATA_QUALITY_SCHEMA),
-        "observation_sheet": _nullable_schema(_VOC_AGENT01_OBSERVATION_SHEET_SCHEMA),
-        "language_samples": {
-            "type": "array",
-            "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
-        },
-        "video_extension": {
-            "anyOf": [
-                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
-                {"type": "null"},
-            ]
-        },
-        "competitive_overlap": _nullable_schema(_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA),
-        "trend_lifecycle": _nullable_schema(_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA),
-        "mining_gate": _nullable_schema(_VOC_AGENT01_MINING_GATE_SCHEMA),
-        "rank_score": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
-        "estimated_yield": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
-        "evidence_refs": {
-            "type": "array",
-            "items": {"type": "string", "minLength": 1},
-        },
-        "priority_rank": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 12}, {"type": "null"}]},
-        "target_voc_types": {
-            "type": "array",
-            "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
-        },
-        "sampling_strategy": _nullable_schema({"type": "string", "minLength": 1}),
-        "platform_behavior_note": _nullable_schema({"type": "string", "minLength": 1}),
-        "compliance_flags": {"type": "string"},
-    },
-    "required": [
-        "source_file",
-        "decision",
-        "exclude_reason",
-        "include_in_mining_plan",
-        "habitat_name",
-        "habitat_type",
-        "url_pattern",
-        "items_in_file",
-        "data_quality",
-        "observation_sheet",
-        "language_samples",
-        "video_extension",
-        "competitive_overlap",
-        "trend_lifecycle",
-        "mining_gate",
-        "rank_score",
-        "estimated_yield",
-        "evidence_refs",
-        "priority_rank",
-        "target_voc_types",
-        "sampling_strategy",
-        "platform_behavior_note",
-        "compliance_flags",
+    "anyOf": [
+        _agent1_file_assessment_variant_schema(decision="EXCLUDE", include_in_mining_plan=False),
+        _agent1_file_assessment_variant_schema(decision="OBSERVE", include_in_mining_plan=False),
+        _agent1_file_assessment_variant_schema(decision="OBSERVE", include_in_mining_plan=True),
     ],
 }
 _VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
@@ -8553,6 +8614,43 @@ def _build_agent1_file_assessment_template(scraped_data_manifest: Mapping[str, A
         )
     return {
         "row_count": len(template_rows),
+        "observe_required_fields": [
+            "habitat_name",
+            "habitat_type",
+            "url_pattern",
+            "items_in_file",
+            "data_quality",
+            "observation_sheet",
+            "competitive_overlap",
+            "trend_lifecycle",
+            "mining_gate",
+            "rank_score",
+            "estimated_yield",
+            "evidence_refs",
+        ],
+        "exclude_required_null_fields": [
+            "habitat_name",
+            "habitat_type",
+            "url_pattern",
+            "items_in_file",
+            "data_quality",
+            "observation_sheet",
+            "competitive_overlap",
+            "trend_lifecycle",
+            "mining_gate",
+            "rank_score",
+            "estimated_yield",
+            "priority_rank",
+            "sampling_strategy",
+            "platform_behavior_note",
+        ],
+        "mining_required_fields_when_selected": [
+            "priority_rank",
+            "target_voc_types",
+            "sampling_strategy",
+            "platform_behavior_note",
+            "evidence_refs",
+        ],
         "rows": template_rows,
     }
 
@@ -8575,6 +8673,9 @@ def _render_agent1_runtime_instruction(
         "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
         "Return file_assessments with exactly one row per template row, preserving row order and source_file values exactly.\n"
         "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
+        "If decision=OBSERVE, habitat_name, habitat_type, url_pattern, items_in_file, data_quality, observation_sheet, "
+        "competitive_overlap, trend_lifecycle, mining_gate, rank_score, estimated_yield, and evidence_refs must all be populated.\n"
+        "If decision=OBSERVE, copy url_pattern from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.default_url_pattern unless stronger evidence suggests a better locator.\n"
         "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
         "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
         "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
@@ -8586,8 +8687,13 @@ def _render_agent1_runtime_instruction(
         "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
         "Every OBSERVE row must include non-empty evidence_refs.\n"
         "Every OBSERVE row must include mining_gate.status, mining_gate.failed_fields, and a non-empty mining_gate.reason.\n"
+        "If decision=EXCLUDE, set observation-only fields to null, set language_samples/evidence_refs/target_voc_types to empty arrays, "
+        "and set compliance_flags to an empty string.\n"
         "If decision=EXCLUDE, provide a non-empty exclude_reason and set include_in_mining_plan=false.\n"
-        "If include_in_mining_plan=true, decision must be OBSERVE and all mining-plan fields must be populated.\n"
+        "If include_in_mining_plan=true, decision must be OBSERVE and priority_rank, target_voc_types, sampling_strategy, "
+        "platform_behavior_note, and evidence_refs must all be populated.\n"
+        "If include_in_mining_plan=false on an OBSERVE row, set priority_rank=null, target_voc_types=[], "
+        "sampling_strategy=null, platform_behavior_note=null, and compliance_flags=''.\n"
         "Construct mining selections from OBSERVE rows only; never mark an EXCLUDE row for mining.\n"
         "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
         "Output complete file_assessments entries suitable for deterministic habitat scoring."
