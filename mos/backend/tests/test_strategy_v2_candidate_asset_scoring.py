@@ -53,6 +53,21 @@ def _stub_ingest_strategy_v2_asset_data(**_kwargs) -> dict[str, object]:
     }
 
 
+def _honest_herbalist_stage1_urls() -> list[str]:
+    return [
+        "https://ancientremedies.com",
+        "https://gaiaherbs.com",
+        "https://gaiaherbs.com/pages/meet-your-herb",
+        "https://consumerlab.com/join",
+        "https://learningherbs.com/herbmentor",
+        "https://theherbalacademy.com/about-us",
+        "https://mountainroseherbs.com/herbal-education",
+        "https://trchealthcare.com/product/natmed-pro",
+        "https://blog.herbsociety.org/research-education/other-research-education/chestnut-school-of-herbal-medicine-teaches-online",
+        "https://bbb.org/us/wa/shelton/profile/health-products/learningherbscom-llc-1296-22025340",
+    ]
+
+
 def test_build_url_candidates_dedupes_and_derives_platforms() -> None:
     candidates = build_url_candidates(
         [
@@ -90,6 +105,27 @@ def test_score_candidate_assets_applies_compliance_hard_gate() -> None:
     assert len(scored) == 1
     assert scored[0]["eligible"] is False
     assert "compliance_red" in scored[0]["hard_gate_flags"]
+
+
+def test_score_candidate_assets_rejects_directory_hosts_and_prefers_first_party_pages() -> None:
+    scored = score_candidate_assets(
+        build_url_candidates(
+            [
+                "https://gaiaherbs.com",
+                "https://blog.herbsociety.org/research-education/other-research-education/chestnut-school-of-herbal-medicine-teaches-online",
+                "https://bbb.org/us/wa/shelton/profile/health-products/learningherbscom-llc-1296-22025340",
+            ]
+        )
+    )
+
+    by_ref = {str(row["source_ref"]): row for row in scored}
+    assert by_ref["https://bbb.org/us/wa/shelton/profile/health-products/learningherbscom-llc-1296-22025340"]["eligible"] is False
+    assert "non_competitor_directory_source" in by_ref[
+        "https://bbb.org/us/wa/shelton/profile/health-products/learningherbscom-llc-1296-22025340"
+    ]["hard_gate_flags"]
+    assert by_ref["https://gaiaherbs.com"]["score_components"]["source_relevance_signal"] > by_ref[
+        "https://blog.herbsociety.org/research-education/other-research-education/chestnut-school-of-herbal-medicine-teaches-online"
+    ]["score_components"]["source_relevance_signal"]
 
 
 def test_select_top_candidates_enforces_diversity_caps() -> None:
@@ -209,18 +245,90 @@ def test_prepare_competitor_asset_candidates_success(monkeypatch: pytest.MonkeyP
     assert isinstance(summary.get("selected_candidate_ids"), list)
     selection_limits = summary.get("selection_limits")
     assert isinstance(selection_limits, dict)
-    assert selection_limits == {
-        "max_candidates": strategy_v2_activities._H2_MAX_CANDIDATE_ASSETS,
-        "max_per_competitor": strategy_v2_activities._H2_MAX_CANDIDATES_PER_COMPETITOR,
-        "max_per_platform": strategy_v2_activities._H2_MAX_CANDIDATES_PER_PLATFORM,
-    }
+    assert selection_limits.get("max_candidates") == strategy_v2_activities._H2_MAX_CANDIDATE_ASSETS
     operator_confirmation_policy = summary.get("operator_confirmation_policy")
     assert isinstance(operator_confirmation_policy, dict)
-    assert operator_confirmation_policy == {
-        "min_confirmed_assets": strategy_v2_activities._MIN_STAGE1_COMPETITORS,
-        "target_confirmed_assets": strategy_v2_activities._H2_TARGET_CONFIRMED_ASSETS,
-        "max_confirmed_assets": strategy_v2_activities._H2_MAX_CONFIRMED_ASSETS,
+    assert operator_confirmation_policy.get("target_confirmed_assets") == strategy_v2_activities._H2_TARGET_CONFIRMED_ASSETS
+
+
+def test_prepare_competitor_asset_candidates_prefers_scraped_caption_over_seed_stub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _stub_ingest(**_kwargs) -> dict[str, object]:
+        return {
+            "candidate_assets": [
+                {
+                    **build_url_candidates(["https://gaiaherbs.com/pages/herb-reference-guide"])[0],
+                    "headline_or_caption": "Herb Reference Guide",
+                    "compliance_risk": "GREEN",
+                }
+            ],
+            "social_video_observations": [],
+            "external_voc_corpus": [],
+            "proof_asset_candidates": [],
+            "raw_runs": [],
+            "summary": {
+                "strategy_config_run_count": 1,
+                "planned_actor_run_count": 1,
+            },
+        }
+
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest,
+    )
+    params = {
+        "stage1": _stage1_payload(
+            competitor_urls=[
+                "https://gaiaherbs.com/pages/herb-reference-guide",
+                "https://gaiaherbs.com/pages/meet-your-herb",
+                "https://ancientremedies.com",
+            ]
+        )
     }
+
+    result = prepare_strategy_v2_competitor_asset_candidates_activity(params)
+    by_ref = {str(row["source_ref"]): row for row in result["candidates"]}
+    assert by_ref["https://gaiaherbs.com/pages/herb-reference-guide"]["headline_or_caption"] == "Herb Reference Guide"
+
+
+def test_prepare_competitor_asset_candidates_relaxes_single_platform_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _stub_ingest(**_kwargs) -> dict[str, object]:
+        return {
+            "candidate_assets": build_url_candidates(_honest_herbalist_stage1_urls()),
+            "social_video_observations": [],
+            "external_voc_corpus": [],
+            "proof_asset_candidates": [],
+            "raw_runs": [],
+            "summary": {
+                "strategy_config_run_count": 2,
+                "planned_actor_run_count": 2,
+            },
+        }
+
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest,
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_H2_MAX_CANDIDATE_ASSETS", 12)
+    monkeypatch.setattr(strategy_v2_activities, "_H2_MAX_CANDIDATES_PER_PLATFORM", 6)
+
+    result = prepare_strategy_v2_competitor_asset_candidates_activity(
+        {"stage1": _stage1_payload(competitor_urls=_honest_herbalist_stage1_urls())}
+    )
+
+    summary = result["candidate_summary"]
+    assert summary["selected_candidate_count"] > 6
+    assert "https://gaiaherbs.com" in summary["selected_candidate_ids"]
+    assert "https://bbb.org/us/wa/shelton/profile/health-products/learningherbscom-llc-1296-22025340" not in summary[
+        "selected_candidate_ids"
+    ]
+    assert summary["selection_limits"]["max_per_platform"] == 12
+    assert summary["selection_limits"]["configured_max_per_platform"] == 6
 
 
 def test_competitor_asset_confirmation_decision_caps_confirmed_assets() -> None:

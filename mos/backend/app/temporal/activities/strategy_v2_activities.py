@@ -15366,6 +15366,31 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
         else []
     )
 
+    def _metric_count(row: Mapping[str, Any]) -> int:
+        metrics = row.get("metrics")
+        if not isinstance(metrics, dict):
+            return 0
+        return len([key for key, value in metrics.items() if value not in (None, "", 0)])
+
+    def _caption_preview(row: Mapping[str, Any]) -> str:
+        raw_text = str(row.get("headline_or_caption") or "").strip()
+        if not raw_text:
+            return ""
+        collapsed = re.sub(r"<[^>]+>", " ", raw_text)
+        collapsed = re.sub(r"\s+", " ", collapsed).strip()
+        return collapsed[:500]
+
+    def _candidate_merge_priority(row: Mapping[str, Any]) -> tuple[int, int, int, int, int]:
+        compliance = str(row.get("compliance_risk") or "").strip().upper()
+        caption = _caption_preview(row)
+        return (
+            _metric_count(row),
+            1 if caption else 0,
+            1 if str(row.get("raw_source_artifact_id") or "").strip() else 0,
+            1 if compliance not in {"", "YELLOW"} else 0,
+            len(caption),
+        )
+
     merged_candidates_by_ref: dict[str, dict[str, Any]] = {}
     for row in raw_candidates + apify_candidates:
         source_ref = str(row.get("source_ref") or "").strip()
@@ -15375,19 +15400,7 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
         if existing is None:
             merged_candidates_by_ref[source_ref] = row
             continue
-        existing_metrics = existing.get("metrics")
-        row_metrics = row.get("metrics")
-        existing_metric_count = (
-            len([key for key, value in existing_metrics.items() if value not in (None, "", 0)])
-            if isinstance(existing_metrics, dict)
-            else 0
-        )
-        row_metric_count = (
-            len([key for key, value in row_metrics.items() if value not in (None, "", 0)])
-            if isinstance(row_metrics, dict)
-            else 0
-        )
-        if row_metric_count > existing_metric_count:
+        if _candidate_merge_priority(row) > _candidate_merge_priority(existing):
             merged_candidates_by_ref[source_ref] = row
 
     if not merged_candidates_by_ref:
@@ -15398,11 +15411,22 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
     merged_candidates = list(merged_candidates_by_ref.values())
 
     scored_candidates = score_candidate_assets(merged_candidates)
+    eligible_platforms = {
+        str(row.get("platform") or "unknown")
+        for row in scored_candidates
+        if bool(row.get("eligible"))
+    }
+    effective_max_per_platform = (
+        _H2_MAX_CANDIDATE_ASSETS
+        if len(eligible_platforms) == 1
+        else _H2_MAX_CANDIDATES_PER_PLATFORM
+    )
+
     selected_candidates = select_top_candidates(
         scored_candidates,
         max_candidates=_H2_MAX_CANDIDATE_ASSETS,
         max_per_competitor=_H2_MAX_CANDIDATES_PER_COMPETITOR,
-        max_per_platform=_H2_MAX_CANDIDATES_PER_PLATFORM,
+        max_per_platform=effective_max_per_platform,
     )
     eligible_count = len([row for row in scored_candidates if bool(row.get("eligible"))])
 
@@ -15433,7 +15457,8 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
         "selection_limits": {
             "max_candidates": _H2_MAX_CANDIDATE_ASSETS,
             "max_per_competitor": _H2_MAX_CANDIDATES_PER_COMPETITOR,
-            "max_per_platform": _H2_MAX_CANDIDATES_PER_PLATFORM,
+            "max_per_platform": effective_max_per_platform,
+            "configured_max_per_platform": _H2_MAX_CANDIDATES_PER_PLATFORM,
         },
         "operator_confirmation_policy": {
             "min_confirmed_assets": _MIN_STAGE1_COMPETITORS,
@@ -15442,7 +15467,10 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
         },
         "selection_ordering": {
             "eligibility_rule": "hard_gate_flags must be empty",
-            "sort_rule": "candidate_asset_score desc, candidate_id asc",
+            "sort_rule": (
+                "candidate_asset_score desc, source_relevance_signal desc, "
+                "data_richness_signal desc, candidate_id asc"
+            ),
             "diversity_caps_applied": True,
         },
         "selected_by_platform": dict(selected_by_platform),

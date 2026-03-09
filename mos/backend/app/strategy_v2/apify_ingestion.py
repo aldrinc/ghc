@@ -771,6 +771,39 @@ def _classify_non_video_comment_source_type(*, platform: str, source_url: str) -
     return "FORUM"
 
 
+def _clean_candidate_caption_text(raw_text: str) -> str:
+    trimmed = raw_text.strip()
+    if not trimmed:
+        return ""
+    if "<html" in trimmed.lower() or "<body" in trimmed.lower():
+        return ""
+    collapsed = re.sub(r"<[^>]+>", " ", trimmed)
+    collapsed = re.sub(r"\s+", " ", collapsed).strip()
+    if not collapsed:
+        return ""
+    return collapsed[:500]
+
+
+def _extract_candidate_caption(raw: Mapping[str, Any]) -> str:
+    primary = _extract_string(
+        raw,
+        "headline",
+        "title",
+        "caption",
+        "description",
+    )
+    cleaned_primary = _clean_candidate_caption_text(primary)
+    if cleaned_primary:
+        return cleaned_primary
+    secondary = _extract_string(
+        raw,
+        "text",
+        "body",
+        "bodyText",
+    )
+    return _clean_candidate_caption_text(secondary)
+
+
 def _classify_external_voc_source_type(*, platform: str, source_url: str, source_role: str) -> str:
     if source_role == "HOOK":
         if platform not in _VIDEO_PLATFORMS:
@@ -1569,16 +1602,7 @@ def _normalize_candidate_assets(*, raw_runs: list[dict[str, Any]], seed_urls: li
 
                 platform = derive_platform_from_ref(source_ref)
                 asset_kind = _infer_asset_kind(platform=platform, raw=row, source_ref=source_ref)
-                caption = _extract_string(
-                    row,
-                    "headline",
-                    "title",
-                    "caption",
-                    "description",
-                    "text",
-                    "body",
-                    "bodyText",
-                )
+                caption = _extract_candidate_caption(row)
                 metrics = _extract_metrics(row)
                 candidate = CompetitorAssetCandidate(
                     candidate_id=source_ref,

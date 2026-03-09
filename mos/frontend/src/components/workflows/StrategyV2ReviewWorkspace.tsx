@@ -185,6 +185,15 @@ function normalizeStepKey(value: string): string {
   return value.trim().toUpperCase();
 }
 
+function asPositiveInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return Math.floor(value);
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
 function findResearchArtifactByStepKeys(
   artifacts: ResearchArtifactRef[],
   stepKeys: string[],
@@ -791,6 +800,20 @@ export function StrategyV2ReviewWorkspace({
     return out;
   }, [candidates]);
 
+  const competitorAssetPolicy = useMemo(() => {
+    if (pendingSignal !== "strategy_v2_confirm_competitor_assets") {
+      return { min: 3, max: 15, target: null as number | null };
+    }
+    const candidateSummary = isRecord(pendingPayload.candidate_summary) ? pendingPayload.candidate_summary : null;
+    const operatorPolicy = candidateSummary && isRecord(candidateSummary.operator_confirmation_policy)
+      ? candidateSummary.operator_confirmation_policy
+      : null;
+    const min = asPositiveInt(operatorPolicy?.min_confirmed_assets) ?? 3;
+    const max = asPositiveInt(operatorPolicy?.max_confirmed_assets) ?? 15;
+    const target = asPositiveInt(operatorPolicy?.target_confirmed_assets);
+    return { min, max, target };
+  }, [pendingPayload.candidate_summary, pendingSignal]);
+
   const validationMessages = useMemo(() => {
     if (!pendingSignal) return ["No pending Strategy V2 manual gate detected."];
 
@@ -800,8 +823,13 @@ export function StrategyV2ReviewWorkspace({
       if (!candidates.length) {
         messages.push("No competitor candidates were provided for this gate.");
       }
-      if (strategyConfirmedAssetRefs.length < 3 || strategyConfirmedAssetRefs.length > 15) {
-        messages.push("Select between 3 and 15 competitor assets.");
+      if (
+        strategyConfirmedAssetRefs.length < competitorAssetPolicy.min ||
+        strategyConfirmedAssetRefs.length > competitorAssetPolicy.max
+      ) {
+        messages.push(
+          `Select between ${competitorAssetPolicy.min} and ${competitorAssetPolicy.max} competitor assets.`,
+        );
       }
       const unknownConfirmedRefs = strategyConfirmedAssetRefs.filter((assetRef) => !candidateIdByAssetRef[assetRef]);
       if (unknownConfirmedRefs.length) {
@@ -851,6 +879,8 @@ export function StrategyV2ReviewWorkspace({
     strategyOperatorNote,
     candidates,
     strategyConfirmedAssetRefs,
+    competitorAssetPolicy.max,
+    competitorAssetPolicy.min,
     strategySelectedAngleId,
     selectedAngleCandidate?.raw,
     strategySelectedPairId,
@@ -1391,6 +1421,10 @@ export function StrategyV2ReviewWorkspace({
 
                 {pendingSignal === "strategy_v2_confirm_competitor_assets" ? (
                   <div className="space-y-2">
+                    <div className="text-[11px] text-content-muted">
+                      Confirm {competitorAssetPolicy.min}-{competitorAssetPolicy.max} assets
+                      {competitorAssetPolicy.target ? ` (target ${competitorAssetPolicy.target})` : ""}.
+                    </div>
                     {candidates.map((candidate) => {
                       const reviewed = reviewedSet.has(candidate.id);
                       const assetRef = String(candidate.assetRef || "").trim();
