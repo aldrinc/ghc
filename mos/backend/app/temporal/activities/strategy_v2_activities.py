@@ -11098,13 +11098,13 @@ def _map_offer_pipeline_input_with_price_resolution(
     max_iterations: int,
     score_threshold: float,
 ):
+    resolved_stage2 = stage2
     if str(stage2.price or "").strip().upper() == "TBD":
-        raise StrategyV2MissingContextError(
-            "Offer pipeline requires an explicit stage2.price value; fallback price scraping is disabled. "
-            "Remediation: populate explicit pricing before running v2-08 Offer pipeline."
-        )
+        stage2_payload = stage2.model_dump(mode="python")
+        stage2_payload["price"] = _resolve_price_from_reference_urls(urls=stage2.competitor_urls)
+        resolved_stage2 = ProductBriefStage2.model_validate(stage2_payload)
     return map_offer_pipeline_input(
-        stage2=stage2,
+        stage2=resolved_stage2,
         selected_angle_payload=selected_angle_payload,
         competitor_teardowns=competitor_teardowns,
         voc_research=voc_research,

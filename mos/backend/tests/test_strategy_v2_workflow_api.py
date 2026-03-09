@@ -3060,6 +3060,7 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3257,6 +3258,7 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3772,6 +3774,7 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3806,7 +3809,7 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
             "product_description": "Detailed product description",
             "product_customizable": True,
             "competitor_urls": ["https://competitor-a.example"],
-            "price": "$49",
+            "price": "TBD",
         },
     )
     db_session.add(onboarding_payload)
