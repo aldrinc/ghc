@@ -3349,6 +3349,7 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
             "product_description": "A practical handbook for natural remedy routines at home.",
             "product_customizable": True,
             "product_category": "Health & Wellness",
+            "price": "$49",
             "competitor_urls": ["https://offer.ancientremediesrevived.com/c3-nb"],
             "primary_benefits": ["Simple routines", "Reference tables", "Daily implementation tips"],
         },
