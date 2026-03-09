@@ -7,7 +7,7 @@ import json
 import re
 from typing import Any
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from app.services import funnel_ai
 from app.services.funnel_templates import get_funnel_template
@@ -30,6 +30,9 @@ _LITERAL_PRICE_RE = re.compile(r"\$\s*\d")
 _HERO_BENEFIT_COUNT = 4
 _HERO_BENEFIT_MAX_CHARS = 38
 _HERO_BENEFIT_MAX_WORDS = 6
+_MECHANISM_PARAGRAPH_MAX_CHARS = 180
+_MIN_FAQ_ITEMS = 8
+_VS_SPLIT_RE = re.compile(r"\s+vs\.?\s+", re.IGNORECASE)
 _HERO_BENEFIT_FORBIDDEN_PUNCTUATION_RE = re.compile(r"[,:;.!?()\[\]{}]")
 _HERO_BENEFIT_FORBIDDEN_ENDINGS = {
     "workflow",
@@ -155,9 +158,25 @@ class TemplateFitPackComparison(StrictContract):
     columns: TemplateFitPackComparisonColumns
     rows: list[TemplateFitPackComparisonRow] = Field(min_length=1, max_length=8)
 
+    @field_validator("badge")
+    @classmethod
+    def _validate_badge(cls, value: str) -> str:
+        cleaned = value.strip()
+        if cleaned.lower() != "us vs them":
+            raise ValueError("badge must be exactly 'US vs THEM'.")
+        return "US vs THEM"
+
+    @model_validator(mode="after")
+    def _normalize_title_orientation(self) -> "TemplateFitPackComparison":
+        self.title = _normalize_comparison_title(
+            raw_title=self.title,
+            columns=self.columns.model_dump(mode="python"),
+        )
+        return self
+
 
 class TemplateFitPackFaqItem(StrictContract):
-    question: str = Field(min_length=1)
+    question: str = Field(min_length=1, max_length=120)
     answer: str = Field(min_length=1, max_length=280)
 
     @field_validator("answer")
@@ -221,10 +240,31 @@ class TemplateFitPackProblem(StrictContract):
 
 class TemplateFitPackMechanism(StrictContract):
     title: str = Field(min_length=1)
-    paragraphs: list[str] = Field(min_length=1)
+    paragraphs: list[str] = Field(min_length=1, max_length=1)
     bullets: list[TemplateFitPackStoryBullet] = Field(min_length=5, max_length=5)
     callout: TemplateFitPackMechanismCallout
     comparison: TemplateFitPackComparison
+
+    @field_validator("paragraphs")
+    @classmethod
+    def _validate_paragraphs(cls, values: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for index, value in enumerate(values):
+            item = value.strip()
+            if not item:
+                raise ValueError(f"paragraphs[{index}] must be non-empty.")
+            if len(item) > _MECHANISM_PARAGRAPH_MAX_CHARS:
+                raise ValueError(
+                    f"paragraphs[{index}] exceeds {_MECHANISM_PARAGRAPH_MAX_CHARS} characters "
+                    f"(observed={len(item)})."
+                )
+            sentence_count = len([part for part in _SENTENCE_RE.split(item) if part.strip()])
+            if sentence_count > 2:
+                raise ValueError(
+                    f"paragraphs[{index}] exceeds 2 sentences (observed={sentence_count})."
+                )
+            cleaned.append(item)
+        return cleaned
 
 
 class TemplateFitPackSocialProof(StrictContract):
@@ -296,6 +336,17 @@ class TemplateFitPackGuarantee(StrictContract):
     why_body: str = Field(min_length=1, max_length=220)
     closing_line: str = Field(min_length=1, max_length=140)
 
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, value: str) -> str:
+        cleaned = _normalize_guarantee_title(value)
+        if "risk free guarantee" not in cleaned.lower():
+            raise ValueError(
+                "title must use 'Risk Free Guarantee' language. "
+                "Include the day count if relevant, for example '45-Day Risk Free Guarantee'."
+            )
+        return cleaned
+
     @field_validator("paragraphs")
     @classmethod
     def _validate_paragraphs(cls, values: list[str]) -> list[str]:
@@ -315,7 +366,7 @@ class TemplateFitPackGuarantee(StrictContract):
 
 class TemplateFitPackFaq(StrictContract):
     title: str = Field(min_length=1)
-    items: list[TemplateFitPackFaqItem] = Field(min_length=1)
+    items: list[TemplateFitPackFaqItem] = Field(min_length=_MIN_FAQ_ITEMS, max_length=12)
 
 
 class TemplateFitPack(StrictContract):
@@ -327,7 +378,7 @@ class TemplateFitPack(StrictContract):
     bonus: TemplateFitPackBonus
     guarantee: TemplateFitPackGuarantee
     faq: TemplateFitPackFaq
-    faq_pills: list[TemplateFitPackFaqPill] = Field(min_length=1, max_length=12)
+    faq_pills: list[TemplateFitPackFaqPill] = Field(min_length=_MIN_FAQ_ITEMS, max_length=12)
     marquee_items: list[str] = Field(min_length=1, max_length=12)
     cta_close: str = Field(min_length=1)
     urgency_message: str = Field(min_length=1, max_length=220)
@@ -741,6 +792,8 @@ def _looks_like_primary_solution_label(value: str) -> bool:
         "our ",
         "ours",
         "workflow",
+        "triage",
+        "structured",
         "handbook",
         "approach",
         "system",
@@ -759,6 +812,11 @@ def _looks_like_alternative_solution_label(value: str) -> bool:
         "typical",
         "other",
         "alternative",
+        "standard",
+        "generic",
+        "random",
+        "scattered",
+        "checking",
         "guide",
         "course",
         "old way",
@@ -794,6 +852,42 @@ def _resolve_comparison_pair(*, left_value: str, right_value: str) -> tuple[str,
         return left, right
     # Default orientation: left is baseline, right is improved/system side.
     return right, left
+
+
+def _normalize_comparison_title(*, raw_title: str, columns: dict[str, str]) -> str:
+    cleaned = raw_title.strip()
+    pup = _coerce_non_empty_text(columns.get("pup"))
+    disposable = _coerce_non_empty_text(columns.get("disposable"))
+    if not cleaned:
+        if pup and disposable:
+            return f"{pup} vs. {disposable}"
+        return ""
+
+    parts = _VS_SPLIT_RE.split(cleaned, maxsplit=1)
+    if len(parts) != 2:
+        return cleaned
+
+    normalized_left, normalized_right = _resolve_comparison_pair(
+        left_value=parts[0].strip(),
+        right_value=parts[1].strip(),
+    )
+    left = normalized_left or pup or parts[0].strip()
+    right = normalized_right or disposable or parts[1].strip()
+    if not left or not right:
+        return cleaned
+    return f"{left} vs. {right}"
+
+
+def _normalize_guarantee_title(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+    if re.search(r"workflow\s+fit", cleaned, re.IGNORECASE):
+        day_match = re.search(r"(\d+)\s*[- ]?\s*day", cleaned, re.IGNORECASE)
+        if day_match:
+            return f"{day_match.group(1)}-Day Risk Free Guarantee"
+        return "Risk Free Guarantee"
+    return cleaned
 
 
 def _coerce_comparison_columns(raw: Any) -> dict[str, str]:
@@ -1283,12 +1377,7 @@ def upgrade_strategy_v2_template_payload_fields(
         if not isinstance(comparison, dict):
             comparison = {}
             mechanism["comparison"] = comparison
-        comparison["badge"] = _first_non_empty(
-            [
-                _coerce_non_empty_text(comparison.get("badge")),
-                "SIDE-BY-SIDE COMPARISON",
-            ]
-        )
+        comparison["badge"] = "US vs THEM"
         comparison["title"] = _first_non_empty(
             [
                 _coerce_non_empty_text(comparison.get("title")),
@@ -1304,6 +1393,10 @@ def upgrade_strategy_v2_template_payload_fields(
         )
         comparison.pop("swipeHint", None)
         comparison["columns"] = _coerce_comparison_columns(comparison.get("columns"))
+        comparison["title"] = _normalize_comparison_title(
+            raw_title=_coerce_non_empty_text(comparison.get("title")),
+            columns=comparison["columns"],
+        )
         comparison_rows = _coerce_comparison_rows(comparison.get("rows"))
         if comparison_rows:
             comparison["rows"] = comparison_rows
@@ -1484,10 +1577,10 @@ def upgrade_strategy_v2_template_payload_fields(
             upgraded["guarantee"] = guarantee
         guarantee["title"] = _first_non_empty(
             [
-                _coerce_non_empty_text(guarantee.get("title")),
-                _coerce_non_empty_text(guarantee.get("heading")),
-                _coerce_non_empty_text(guarantee.get("headline")),
-                _coerce_non_empty_text(guarantee.get("badge_text")),
+                _normalize_guarantee_title(_coerce_non_empty_text(guarantee.get("title"))),
+                _normalize_guarantee_title(_coerce_non_empty_text(guarantee.get("heading"))),
+                _normalize_guarantee_title(_coerce_non_empty_text(guarantee.get("headline"))),
+                _normalize_guarantee_title(_coerce_non_empty_text(guarantee.get("badge_text"))),
             ]
         )
         guarantee_paragraphs = _coerce_non_empty_text_list(guarantee.get("paragraphs"))
@@ -1720,14 +1813,18 @@ def upgrade_strategy_v2_template_payload_fields(
         mechanism_paragraphs = [
             clipped
             for clipped in (
-                _clip_sentences(_coerce_non_empty_text(row), max_sentences=2, max_len=220)
+                _clip_sentences(
+                    _coerce_non_empty_text(row),
+                    max_sentences=2,
+                    max_len=_MECHANISM_PARAGRAPH_MAX_CHARS,
+                )
                 for row in (mechanism.get("paragraphs") if isinstance(mechanism.get("paragraphs"), list) else [])
             )
             if clipped
         ]
         if not mechanism_paragraphs:
             raise StrategyV2DecisionError("Legacy sales payload upgrade failed: mechanism.paragraphs is required.")
-        mechanism["paragraphs"] = mechanism_paragraphs[:2]
+        mechanism["paragraphs"] = mechanism_paragraphs[:1]
 
         social_proof["summary"] = _clip_sentences(
             _coerce_non_empty_text(social_proof.get("summary")),
@@ -1780,7 +1877,11 @@ def upgrade_strategy_v2_template_payload_fields(
                 normalized_faq_items.append({"question": question, "answer": answer})
         if not normalized_faq_items:
             raise StrategyV2DecisionError("Legacy sales payload upgrade failed: faq.items is required.")
-        faq["items"] = normalized_faq_items
+        if len(normalized_faq_items) < _MIN_FAQ_ITEMS:
+            raise StrategyV2DecisionError(
+                f"Legacy sales payload upgrade failed: faq.items must include at least {_MIN_FAQ_ITEMS} entries."
+            )
+        faq["items"] = normalized_faq_items[:12]
 
         normalized_faq_pills: list[dict[str, str]] = []
         for row in _coerce_faq_pills(upgraded.get("faq_pills")):
@@ -1795,7 +1896,11 @@ def upgrade_strategy_v2_template_payload_fields(
                 if _clip_text(item["question"], max_len=120)
                 and _clip_sentences(item["answer"], max_sentences=3, max_len=420)
             ]
-        upgraded["faq_pills"] = normalized_faq_pills
+        if len(normalized_faq_pills) < _MIN_FAQ_ITEMS:
+            raise StrategyV2DecisionError(
+                f"Legacy sales payload upgrade failed: faq_pills must include at least {_MIN_FAQ_ITEMS} entries."
+            )
+        upgraded["faq_pills"] = normalized_faq_pills[:12]
 
         normalized_marquee_items: list[str] = []
         seen_marquee_items: set[str] = set()
@@ -2725,6 +2830,11 @@ def build_strategy_v2_template_bridge_v1(
             "Template bridge could not parse FAQ Q/A items. "
             "Remediation: keep FAQ entries in `Q:` / `A:` format."
         )
+    if len(faq_items_raw) < _MIN_FAQ_ITEMS:
+        raise StrategyV2DecisionError(
+            f"Template bridge requires at least {_MIN_FAQ_ITEMS} FAQ items. "
+            "Remediation: include 8 or more Q:/A: entries in the FAQ section."
+        )
 
     cta_close_section = normalized_sections.get("cta_3_ps")
     cta_close_value = ""
@@ -2840,8 +2950,13 @@ def build_strategy_v2_template_bridge_v1(
                     "right_body": callout_right_body,
                 },
                 "comparison": {
-                    "badge": "SIDE-BY-SIDE COMPARISON",
-                    "title": _strip_markdown_inline(str(mechanism_section.get("title") or "Mechanism + Comparison")),
+                    "badge": "US vs THEM",
+                    "title": _normalize_comparison_title(
+                        raw_title=_strip_markdown_inline(
+                            str(mechanism_section.get("title") or "Mechanism + Comparison")
+                        ),
+                        columns=comparison_columns,
+                    ),
                     "swipe_hint": "Swipe right to see comparison ->",
                     "columns": comparison_columns,
                     "rows": comparison_rows,
@@ -2862,7 +2977,9 @@ def build_strategy_v2_template_bridge_v1(
                 "free_gifts_body": _first_non_empty(bonus_section.get("paragraphs") or []),
             },
                 "guarantee": {
-                    "title": _strip_markdown_inline(str(guarantee_section.get("title") or "Guarantee")),
+                    "title": _normalize_guarantee_title(
+                        _strip_markdown_inline(str(guarantee_section.get("title") or "Guarantee"))
+                    ),
                     "paragraphs": guarantee_paragraph_text,
                     "why_title": why_title,
                     "why_body": why_body,

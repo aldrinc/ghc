@@ -505,7 +505,7 @@ def _gemini_image_references_enabled() -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-_DEFAULT_FUNNEL_IMAGE_MODEL = "gemini-3-pro-image-preview"
+_DEFAULT_FUNNEL_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
 _GEMINI_IMAGE_GENERATION_RETRY_ATTEMPTS = 6
 _GEMINI_IMAGE_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 

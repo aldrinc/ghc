@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select
@@ -158,6 +159,15 @@ class MetaAdsRepository:
 
     def create_creative_spec(self, **fields) -> MetaCreativeSpec:
         record = MetaCreativeSpec(**fields)
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def update_creative_spec(self, record: MetaCreativeSpec, **fields) -> MetaCreativeSpec:
+        for key, value in fields.items():
+            setattr(record, key, value)
+        record.updated_at = datetime.now(timezone.utc)
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)

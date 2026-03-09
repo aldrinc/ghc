@@ -10,6 +10,13 @@ When this prompt is executed by `strategy_v2.run_copy_pipeline`, follow this out
 - `template_payload_json` must be a JSON-serialized object string (no markdown code fences).
 - `template_payload_json` top-level keys must be exactly: `hero`, `problem`, `mechanism`, `social_proof`, `whats_inside`, `bonus`, `guarantee`, `faq`, `faq_pills`, `marquee_items`, `urgency_message`, `cta_close`.
 - Do not emit alternative schema keys such as: `schema`, `template_id`, `product_name`, `product_subtitle`, `problem_recap`, `cta_primary`, `pricing`, `legal_disclaimer`.
+- `mechanism.paragraphs` must contain exactly 1 short intro paragraph before the bullets.
+- `mechanism.bullets` must contain exactly 5 bullets.
+- `mechanism.comparison.badge` must be exactly `US vs THEM`.
+- `mechanism.comparison.title` must put the product/system first: `<our approach> vs. <alternative>`.
+- `guarantee.title` must use `Risk Free Guarantee` language. If days are included, format it as `<X>-Day Risk Free Guarantee`.
+- Do not use `Workflow Fit Guarantee` phrasing.
+- `faq.items` and `faq_pills` must each contain at least 8 entries.
 
 ## Required Inputs
 
@@ -65,7 +72,7 @@ See `06_examples/honest_herbalist/sales_pages/Sales_Page_Comparison.docx` for a 
 |---------|------------|-------------|------|
 | 1. Hero Stack | B5 seed | 40-60w | Yes (first CTA) |
 | 2. Problem Recap | B1-B4 recap | 80-150w | No |
-| 3. Mechanism + Comparison | B5 (UMS) | 250-400w | No |
+| 3. Mechanism + Comparison | B5 (UMS) | 200-320w | No |
 | 4. Identity Bridge | B6 | 100-150w | No |
 | 5. Social Proof | B5-B6 reinforcement | 200-350w | No |
 | 6. CTA #1 | B7+B8 | 40-60w | YES (~38% of page) |
@@ -73,7 +80,7 @@ See `06_examples/honest_herbalist/sales_pages/Sales_Page_Comparison.docx` for a 
 | 8. Bonus Stack + Value | B7 | 150-200w | No |
 | 9. Guarantee | B8 | 80-120w | No |
 | 10. CTA #2 | B7+B8 | 40-60w | YES |
-| 11. FAQ | B5-B8 | 150-250w | No |
+| 11. FAQ | B5-B8 | 220-420w | No |
 | 12. CTA #3 + P.S. | B8 | 60-100w | YES |
 
 ## Key Calibration (Warm Presell Traffic)
@@ -116,3 +123,10 @@ For the 4 checkmark bullets under the purchase title:
 - Do not end bullets on feature labels such as workflow, guide, reference, checklist, worksheet, pages, notes, prompts, or scripts.
 - Do not use parentheses, arrows, colons, or explanatory clauses.
 - Preferred style: `Ask Better Questions`, `Spot Red Flags Fast`, `Check Interactions First`, `Feel Safer Starting`.
+
+## Sales Template Module Rules
+- Keep the problem and solution story copy tight. The solution/mechanism section gets 1 short intro paragraph, then moves into bullets/comparison.
+- Use `US vs THEM` as the comparison section badge.
+- Write comparison titles with the product/system first, then the alternative.
+- Write at least 8 FAQs with complete question/answer pairs.
+- Use `Risk Free Guarantee` naming for the guarantee title, with whatever day count is actually appropriate for the offer.

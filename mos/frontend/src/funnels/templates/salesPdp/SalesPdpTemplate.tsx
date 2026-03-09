@@ -214,6 +214,40 @@ function formatStepTitle(title: string, stepNumber: number | null) {
   return stepNumber ? `${stepNumber}. ${baseTitle}` : baseTitle
 }
 
+const COMPARISON_VS_RE = /\s+vs\.?\s+/i
+
+function looksLikePrimaryComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ["our ", "workflow", "triage", "structured", "system", "handbook", "approach"].some((token) =>
+    normalized.includes(token)
+  )
+}
+
+function looksLikeAlternativeComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ["typical", "standard", "generic", "other", "alternative", "old way", "scattered", "checking"].some(
+    (token) => normalized.includes(token)
+  )
+}
+
+function normalizeComparisonTitle(title: string, columns: ComparisonConfig["columns"]) {
+  const cleaned = title.trim()
+  if (!cleaned) return `${columns.pup} vs. ${columns.disposable}`
+  const parts = cleaned.split(COMPARISON_VS_RE)
+  if (parts.length !== 2) return cleaned
+  const [left, right] = parts.map((value) => value.trim())
+  const leftPrimary = looksLikePrimaryComparisonLabel(left)
+  const rightPrimary = looksLikePrimaryComparisonLabel(right)
+  const leftAlternative = looksLikeAlternativeComparisonLabel(left)
+  const rightAlternative = looksLikeAlternativeComparisonLabel(right)
+  if ((rightPrimary && !leftPrimary) || (leftAlternative && !rightAlternative)) {
+    return `${right} vs. ${left}`
+  }
+  return `${left} vs. ${right}`
+}
+
 function resolveUrgencyMonthLabels(now: Date = new Date()) {
   const currentYear = now.getUTCFullYear();
   const currentMonthIndex = now.getUTCMonth();
@@ -1702,6 +1736,7 @@ type SalesPdpComparisonProps = {
 
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
   const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
+  const comparisonTitle = normalizeComparisonTitle(resolvedConfig.title, resolvedConfig.columns)
   const comparisonGoodColor = 'var(--pdp-comparison-good, #16a34a)'
   const comparisonBadColor = 'var(--pdp-comparison-bad, #dc2626)'
   return (
@@ -1709,7 +1744,7 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
       <Container>
         <div style={{ textAlign: 'center' }}>
           <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
-          <h2 className={styles.sectionHeading}>{resolvedConfig.title}</h2>
+          <h2 className={styles.sectionHeading}>{comparisonTitle}</h2>
           <div className={styles.comparisonHint}>{resolvedConfig.swipeHint}</div>
         </div>
 

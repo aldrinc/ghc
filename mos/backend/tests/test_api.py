@@ -108,6 +108,20 @@ def test_health_options_allows_loopback_dev_origins():
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:5276"
 
 
+def test_health_options_allows_netbird_dev_origins():
+    with TestClient(app) as client:
+        resp = client.options(
+            "/health",
+            headers={
+                "Origin": "http://100.79.158.197:5275",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "http://100.79.158.197:5275"
+
+
 def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
     app.dependency_overrides.clear()
 

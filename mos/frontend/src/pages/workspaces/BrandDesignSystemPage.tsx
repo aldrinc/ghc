@@ -49,6 +49,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import type { DesignSystem } from "@/types/designSystems";
+import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 
@@ -1209,7 +1210,7 @@ export function BrandDesignSystemPage() {
     setSelectedLogoPublicId(previewBrand.logoAssetPublicId || "");
   }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveOptionalApiBaseUrl();
   const publicAssetBaseUrl = apiBaseUrl?.replace(/\/$/, "");
   const productById = useMemo(
     () => new Map(workspaceProducts.map((product) => [product.id, product])),

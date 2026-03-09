@@ -287,6 +287,8 @@ def test_copy_input_packet_and_runtime_blocks_build_successfully() -> None:
     assert "problem_recap" in sales_page_runtime
     assert "cta_primary" in sales_page_runtime
     assert "`whats_inside.benefits` must be exactly 4 short, outcome-led purchase-module bullets." in sales_page_runtime
+    assert "`mechanism.comparison.badge` must be exactly `US vs THEM`." in sales_page_runtime
+    assert "`faq.items` must contain at least 8 entries." in sales_page_runtime
 
 
 def test_copy_repair_directives_add_cta_budget_fix_when_cta_count_fails() -> None:

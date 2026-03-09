@@ -1805,18 +1805,19 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                 "paragraphs": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 1,
                     "items": {"type": "string", "minLength": 1},
                 },
                 "bullets": {
                     "type": "array",
-                    "minItems": 4,
-                    "maxItems": 6,
+                    "minItems": 5,
+                    "maxItems": 5,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "title": {"type": "string", "minLength": 1, "maxLength": 90},
-                            "body": {"type": "string", "minLength": 1, "maxLength": 240},
+                            "title": {"type": "string", "minLength": 1, "maxLength": 56},
+                            "body": {"type": "string", "minLength": 1, "maxLength": 160},
                         },
                         "required": ["title", "body"],
                     },
@@ -1836,7 +1837,7 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "badge": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "badge": {"type": "string", "const": "US vs THEM"},
                         "title": {"type": "string", "minLength": 1, "maxLength": 160},
                         "swipe_hint": {"type": "string", "minLength": 1, "maxLength": 120},
                         "columns": {
@@ -1886,9 +1887,9 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "benefits": {
                     "type": "array",
-                    "minItems": 1,
-                    "maxItems": 6,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 140},
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 38},
                 },
                 "offer_helper_text": {"type": "string", "minLength": 1},
             },
@@ -1926,13 +1927,14 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                 "title": {"type": "string", "minLength": 1},
                 "items": {
                     "type": "array",
-                    "minItems": 1,
+                    "minItems": 8,
+                    "maxItems": 12,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "question": {"type": "string", "minLength": 1},
-                            "answer": {"type": "string", "minLength": 1},
+                            "question": {"type": "string", "minLength": 1, "maxLength": 120},
+                            "answer": {"type": "string", "minLength": 1, "maxLength": 280},
                         },
                         "required": ["question", "answer"],
                     },
@@ -1942,14 +1944,14 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
         },
         "faq_pills": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 8,
             "maxItems": 12,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
-                    "label": {"type": "string", "minLength": 1},
-                    "answer": {"type": "string", "minLength": 1},
+                    "label": {"type": "string", "minLength": 1, "maxLength": 120},
+                    "answer": {"type": "string", "minLength": 1, "maxLength": 420},
                 },
                 "required": ["label", "answer"],
             },
@@ -2005,12 +2007,16 @@ _SALES_TEMPLATE_LIMITS_INSTRUCTION = (
     "- whats_inside.benefits must not use parentheses, colons, arrows, commas, or explanatory clauses\n"
     "- whats_inside.offer_helper_text <= 180 chars and max 2 sentences\n"
     "- problem.paragraphs: 1-2 items, each <= 320 chars\n"
-    "- mechanism.paragraphs: 1-2 items, each <= 220 chars\n"
+    "- mechanism.paragraphs: exactly 1 item <= 180 chars\n"
     "- mechanism.bullets: exactly 5 items; title <= 56 chars; body <= 160 chars\n"
+    "- mechanism.comparison.badge must be exactly `US vs THEM`\n"
+    "- mechanism.comparison.title must put your solution first: `<your approach> vs. <alternative>`\n"
     "- guarantee.paragraphs: exactly 1 item <= 260 chars\n"
+    "- guarantee.title must use `Risk Free Guarantee` language; if a timeframe is present, format it like `<X>-Day Risk Free Guarantee`\n"
+    "- never use `Workflow Fit Guarantee` phrasing\n"
     "- guarantee.why_body <= 220 chars; closing_line <= 140 chars\n"
-    "- faq.items[].question <= 120 chars; answer <= 280 chars (max 3 sentences)\n"
-    "- faq_pills[].label <= 120 chars; answer <= 420 chars (max 3 sentences)\n"
+    "- faq.items must include at least 8 entries; question <= 120 chars; answer <= 280 chars (max 3 sentences)\n"
+    "- faq_pills must include at least 8 entries; label <= 120 chars; answer <= 420 chars (max 3 sentences)\n"
     "- marquee_items[] each <= 24 chars, 1-3 words\n"
     "- urgency_message <= 220 chars\n"
 )
@@ -12184,7 +12190,6 @@ def _model_prompt_input_token_budget(*, model: str, max_tokens: int | None) -> i
         return max(budget, 1)
     return None
 
-
 def _map_offer_pipeline_input_with_price_resolution(
     *,
     stage2: ProductBriefStage2,
@@ -19792,6 +19797,7 @@ def _is_non_retryable_sales_payload_failure(error_message: str) -> bool:
         )
     return (
         "sales template payload json parse failed" in lowered
+        or "template_payload_validation:" in lowered
         or "invalid template_payload object" in lowered
         or "legacy sales payload upgrade failed" in lowered
     )

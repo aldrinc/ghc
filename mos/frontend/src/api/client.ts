@@ -1,7 +1,8 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useMemo } from "react";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 export type ApiError = {

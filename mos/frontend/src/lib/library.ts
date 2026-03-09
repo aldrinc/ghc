@@ -1,5 +1,6 @@
 import type { CompanySwipeAsset } from "@/types/swipes";
 import type { LibraryItem, MediaAsset } from "@/types/library";
+import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 
 function randomId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -13,8 +14,7 @@ export function unixSecondsToIso(sec?: number | null) {
   return new Date(sec * 1000).toISOString();
 }
 
-const apiBaseUrl =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || undefined;
+const apiBaseUrl = resolveOptionalApiBaseUrl();
 
 function toAbsoluteUrl(url?: string | null): string | undefined {
   if (!url) return undefined;

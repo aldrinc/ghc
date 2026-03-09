@@ -551,7 +551,7 @@
   --story-title-weight: 700;
   --story-title-letter-spacing: -0.02em;
   --story-media-frame-max-width: 520px;
-  --story-media-frame-aspect: 4 / 5;
+  --story-media-frame-aspect: 1 / 1;
   --story-media-frame-padding: 12px;
   --story-media-border: 1px solid var(--pdp-brand-12);
 

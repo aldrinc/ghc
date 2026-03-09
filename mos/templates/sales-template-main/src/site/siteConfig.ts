@@ -322,8 +322,8 @@ export const siteConfig: SiteConfig = {
 
     comparison: {
       id: 'comparison',
-      badge: 'VOTED #1 PEE PAD BY DOGS TODAY',
-      title: 'PuppyPad Vs. Disposable Pee Pads',
+      badge: 'US vs THEM',
+      title: 'PuppyPad vs. Disposable Pee Pads',
       swipeHint: 'Swipe Right To See Comparison →',
       columns: {
         pup: 'THE PUPPYPAD',
@@ -389,8 +389,8 @@ export const siteConfig: SiteConfig = {
 
     guarantee: {
       id: 'guarantee',
-      badge: 'NO RISK PROMISE',
-      title: 'Try PuppyPad Risk-Free for 90 Days',
+      badge: 'RISK FREE GUARANTEE',
+      title: '90-Day Risk Free Guarantee',
       paragraphs: [
         'Use PuppyPad for a full 90 days. Wash it. Test it. Let your dog use it hundreds of times.',
         "If you don't see immediate results - if your dog doesn't naturally use it, if it doesn't eliminate accidents, if you're not completely thrilled - we'll refund you.",

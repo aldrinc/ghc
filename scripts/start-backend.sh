@@ -15,5 +15,5 @@ fi
 echo "[backend] Installing/updating dependencies from pyproject.toml..."
 .venv/bin/pip install -e .
 
-echo "[backend] Starting uvicorn on http://localhost:8008"
-exec .venv/bin/uvicorn app.main:app --port 8008 --reload
+echo "[backend] Starting uvicorn on http://0.0.0.0:8008"
+exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8008 --reload

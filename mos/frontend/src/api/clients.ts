@@ -3,8 +3,9 @@ import { useAuth } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
 import type { Client } from "@/types/common";
 import { toast } from "@/components/ui/toast";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 export type ShopifyConnectionState =

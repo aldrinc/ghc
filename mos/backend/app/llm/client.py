@@ -11,7 +11,6 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
 try:
     import google.generativeai as genai
     _GENAI_IMPORT_ERROR: Exception | None = None
@@ -19,6 +18,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     genai = None
     _GENAI_IMPORT_ERROR = exc
 
+from app.env_loader import load_backend_env_files
 from app.observability import (
     get_openai_client_class,
     start_langfuse_generation,
@@ -27,10 +27,7 @@ from app.observability import (
 
 # Ensure API keys in .env are loaded even if app.config hasn't been imported yet.
 _backend_root = Path(__file__).resolve().parents[2]
-_repo_root = _backend_root.parent.parent
-load_dotenv(_repo_root / ".env", override=False)
-# Keep process-level env authoritative so explicit runtime overrides are not silently replaced.
-load_dotenv(_backend_root / ".env", override=False)
+load_backend_env_files(_backend_root)
 
 
 class LLMClientConfigError(Exception):

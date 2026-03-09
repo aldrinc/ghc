@@ -14,6 +14,23 @@ from app.strategy_v2.template_bridge import (
 )
 
 
+def _faq_items() -> list[dict[str, str]]:
+    return [
+        {"question": "Is this medical advice?", "answer": "No, educational guidance only."},
+        {"question": "Is this digital?", "answer": "Yes, instant access after purchase."},
+        {"question": "How fast can I start?", "answer": "Most readers can start the same day."},
+        {"question": "Does it work with multiple meds?", "answer": "Yes, it is built for medication-aware checks."},
+        {"question": "Do I need prior experience?", "answer": "No, the guidance is written for beginners."},
+        {"question": "Can I print it?", "answer": "Yes, you can print the worksheets and reference pages."},
+        {"question": "Is there a refund policy?", "answer": "Yes, the guarantee terms explain the refund window."},
+        {"question": "What support does it include?", "answer": "It includes practical prompts and clear next steps."},
+    ]
+
+
+def _faq_pills() -> list[dict[str, str]]:
+    return [{"label": item["question"], "answer": item["answer"]} for item in _faq_items()]
+
+
 def _sales_markdown() -> str:
     return """
 # Headline
@@ -58,7 +75,7 @@ Everything is organized for quick lookup.
 ## Bonus Stack + Value: Included extras
 You also get a compact quick-start reference page.
 
-## Guarantee: 30-day confidence promise
+## Guarantee: 30-Day Risk Free Guarantee
 Try it for 30 days and request a refund if it is not a fit.
 Why this guarantee exists
 Because this is designed for practical, repeatable use.
@@ -73,6 +90,24 @@ A: No. It is an educational reference with safety guardrails.
 
 Q: Is this digital?
 A: Yes, it is delivered digitally for instant access.
+
+Q: How fast can I start?
+A: Most readers can start the same day.
+
+Q: Does it work with multiple meds?
+A: Yes, it is built for medication-aware checks.
+
+Q: Do I need prior experience?
+A: No, the guidance is written for beginners.
+
+Q: Can I print it?
+A: Yes, you can print the worksheets and reference pages.
+
+Q: Is there a refund policy?
+A: Yes, the guarantee terms explain the refund window.
+
+Q: What support does it include?
+A: It includes practical prompts and clear next steps.
 
 ## CTA #3 + P.S.: Final step
 Use this reference before your next remedy decision.
@@ -109,7 +144,7 @@ def _valid_sales_payload() -> dict[str, object]:
                 "right_body": "Verifiable, structured, and practical.",
             },
             "comparison": {
-                "badge": "SIDE-BY-SIDE COMPARISON",
+                "badge": "US vs THEM",
                 "title": "Safety-first handbook vs marketplace books",
                 "swipe_hint": "Swipe right to see comparison ->",
                 "columns": {"pup": "SAFETY-FIRST HANDBOOK", "disposable": "MARKETPLACE BOOKS"},
@@ -147,7 +182,7 @@ def _valid_sales_payload() -> dict[str, object]:
             "free_gifts_body": "A concise one-page reference.",
         },
         "guarantee": {
-            "title": "Try it with confidence",
+            "title": "30-Day Risk Free Guarantee",
             "paragraphs": ["If it is not a fit, request a refund."],
             "why_title": "Why this guarantee exists",
             "why_body": "It is built for practical repeatable use.",
@@ -155,12 +190,9 @@ def _valid_sales_payload() -> dict[str, object]:
         },
         "faq": {
             "title": "Common questions",
-            "items": [{"question": "Is this medical advice?", "answer": "No, educational guidance only."}],
+            "items": _faq_items(),
         },
-        "faq_pills": [
-            {"label": "Is this medical advice?", "answer": "No, educational guidance only."},
-            {"label": "Is this digital?", "answer": "Yes, instant access after purchase."},
-        ],
+        "faq_pills": _faq_pills(),
         "marquee_items": [
             "Medication-aware",
             "Safety-first",
@@ -269,12 +301,12 @@ def test_upgrade_sales_payload_normalizes_common_legacy_keys() -> None:
             "items": [{"title": "Bonus A"}, {"title": "Bonus B"}],
         },
         "guarantee": {
-            "heading": "Legacy Guarantee Heading",
+            "heading": "45-Day Risk Free Guarantee",
             "body": "Try it and request a refund if needed.",
         },
         "faq": {
             "heading": "Legacy FAQ Heading",
-            "items": [{"q": "Is this digital?", "a": "Yes."}],
+            "items": _faq_items(),
         },
         "cta_close": {"cta_label": "Start now"},
         "problem_recap": {"heading": "Should be removed"},
@@ -294,7 +326,7 @@ def test_upgrade_sales_payload_normalizes_common_legacy_keys() -> None:
     assert validated["hero"]["purchase_title"] == "Legacy Hero Headline"
     assert validated["problem"]["title"] == "Legacy Problem Heading"
     assert validated["mechanism"]["comparison"]["columns"]["pup"] == "Our way"
-    assert validated["faq_pills"][0]["label"] == "Is this digital?"
+    assert validated["faq_pills"][0]["label"] == "Is this medical advice?"
     assert "schema" not in upgraded
     assert "template_id" not in upgraded
 
@@ -364,13 +396,13 @@ def test_upgrade_sales_payload_normalizes_problem_recap_and_comparison_variants(
             "total_value_statement": "Total bonus value included.",
         },
         "guarantee": {
-            "headline": "60-day guarantee",
+            "headline": "60-Day Risk Free Guarantee",
             "body": "Request a refund within 60 days.",
             "badge_text": "Money-back",
         },
         "faq": {
             "headline": "FAQ",
-            "items": [{"q": "Is this digital?", "a": "Yes."}],
+            "items": _faq_items(),
         },
         "cta_close": {"cta_label": "Get access now"},
         "marquee_items": [
@@ -451,11 +483,8 @@ def test_upgrade_sales_payload_derives_faq_items_and_cta_close_from_legacy_keys(
             "headline": "Inside",
         },
         "bonus": {"headline": "Bonus", "free_gifts_body": "Included extras."},
-        "guarantee": {"headline": "Guarantee", "body": "Refund within 60 days."},
-        "faq_pills": [
-            {"label": "Is this digital?", "answer": "Yes."},
-            {"label": "Is this medical advice?", "answer": "No."},
-        ],
+        "guarantee": {"headline": "30-Day Risk Free Guarantee", "body": "Refund within 60 days."},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Fast", "Practical", "Structured", "Safety-first"],
         "urgency_message": "Selling out quickly.",
         "cta_primary": {"label": "Start now"},
@@ -470,9 +499,9 @@ def test_upgrade_sales_payload_derives_faq_items_and_cta_close_from_legacy_keys(
         payload_fields=upgraded,
     )
 
-    assert validated["faq"]["items"][0]["question"] == "Is this digital?"
-    assert validated["faq"]["items"][0]["answer"] == "Yes."
-    assert validated["faq_pills"][1]["label"] == "Is this medical advice?"
+    assert validated["faq"]["items"][0]["question"] == "Is this medical advice?"
+    assert validated["faq"]["items"][0]["answer"] == "No, educational guidance only."
+    assert validated["faq_pills"][1]["label"] == "Is this digital?"
     assert validated["cta_close"] == "Start now"
 
 
@@ -537,13 +566,13 @@ def test_upgrade_sales_payload_handles_two_column_rows_and_strips_known_drift_ke
             "free_gifts_body": "Four support tools included.",
         },
         "guarantee": {
-            "headline": "60-day guarantee",
+            "headline": "60-Day Risk Free Guarantee",
             "body": "Request a refund if not a fit.",
             "cta_label": "Start now",
             "cta_url": "https://example.com/order",
         },
-        "faq": {"headline": "FAQ", "items": [{"q": "Is this digital?", "a": "Yes."}]},
-        "faq_pills": [{"label": "Is this digital?", "answer": "Yes."}],
+        "faq": {"headline": "FAQ", "items": _faq_items()},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Safety-first", "Practical", "Medication-aware", "Actionable"],
         "urgency_message": "Selling out faster than expected.",
         "cta_close": {"cta_label": "Get access now"},
@@ -613,11 +642,8 @@ def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
             "headline": "Inside",
         },
         "bonus": {"headline": "Bonus", "free_gifts_body": "Included extras."},
-        "guarantee": {"headline": "Guarantee", "body": "Refund within 60 days."},
-        "faq_pills": [
-            {"label": "Is this digital?", "answer": "Yes."},
-            {"label": "Is this medical advice?", "answer": "No."},
-        ],
+        "guarantee": {"headline": "30-Day Risk Free Guarantee", "body": "Refund within 60 days."},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Fast", "Practical", "Structured", "Safety-first"],
         "urgency_message": "Selling out quickly.",
         "cta_primary": {"label": "Start now"},
@@ -943,6 +969,27 @@ def test_sales_template_payload_rejects_hardcoded_cta_price() -> None:
     payload["hero"] = hero
 
     with pytest.raises(StrategyV2DecisionError, match="hero.primary_cta_label"):
+        validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
+
+
+def test_sales_template_payload_requires_risk_free_guarantee_language() -> None:
+    payload = _valid_sales_payload()
+    guarantee = dict(payload["guarantee"])
+    guarantee["title"] = "30-Day Confidence Guarantee"
+    payload["guarantee"] = guarantee
+
+    with pytest.raises(StrategyV2DecisionError, match="Risk Free Guarantee"):
+        validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
+
+
+def test_sales_template_payload_requires_at_least_eight_faqs() -> None:
+    payload = _valid_sales_payload()
+    faq = dict(payload["faq"])
+    faq["items"] = faq["items"][:2]
+    payload["faq"] = faq
+    payload["faq_pills"] = payload["faq_pills"][:2]
+
+    with pytest.raises(StrategyV2DecisionError, match="faq.items"):
         validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
 
 

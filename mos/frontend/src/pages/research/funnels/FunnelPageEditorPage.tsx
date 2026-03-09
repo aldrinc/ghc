@@ -15,6 +15,7 @@ import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -91,7 +92,7 @@ export function FunnelPageEditorPage() {
     return buildPublicFunnelPath({ productSlug: runtimeProductSlug, funnelSlug: runtimeFunnelSlug, slug, bundleMode: false });
   }, [metaSlug, pageDetail?.page.slug, runtimeFunnelSlug, runtimeProductSlug]);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+  const apiBaseUrl = resolveRequiredApiBaseUrl();
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
   const designSystemTokens = pageDetail?.designSystemTokens ?? null;
   const aiPlugin = useMemo(

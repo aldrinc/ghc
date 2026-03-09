@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import { toast } from "@/components/ui/toast";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import type {
   Product,
   ProductAsset,
@@ -52,7 +53,7 @@ type ShopifyVariantSyncResponse = {
   variants: ShopifyCatalogVariant[];
 };
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 async function readUploadError(resp: Response): Promise<string> {
