@@ -2,7 +2,7 @@ name: Self Deploy
 
 on:
   push:
-    branches: ["shopify-fixes"]
+    branches: ["main"]
   workflow_dispatch:
 
 concurrency:
@@ -33,4 +33,3 @@ jobs:
             --header "Content-Type: application/json" \
             --header "X-API-Key: ${CLOUDHAND_API_KEY}" \
             --data '{"plan_path": "/opt/apps/cloudhand-deploy/cloudhand/plan-2026-02-05T00-23-54Z.json"}' 
-
