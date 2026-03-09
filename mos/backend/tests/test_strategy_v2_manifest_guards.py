@@ -9,6 +9,7 @@ from app.temporal.activities.strategy_v2_activities import (
     StrategyV2MissingContextError,
     StrategyV2SchemaValidationError,
     _build_scraped_data_manifest,
+    _derive_agent1_outputs_from_file_assessments,
     _extract_manifest_date_range,
     _normalize_scraped_item_for_manifest,
     _validate_agent1_output_source_file_grounding,
@@ -201,31 +202,126 @@ def test_build_scraped_data_manifest_keeps_google_organic_results_as_text_signal
     assert first_item["source_url"] == "https://example.com/checklist"
 
 
+def _agent1_file_assessment(
+    *,
+    source_file: str,
+    decision: str = "OBSERVE",
+    include_in_mining_plan: bool = False,
+    priority_rank: int | None = None,
+) -> dict[str, object]:
+    return {
+        "source_file": source_file,
+        "decision": decision,
+        "exclude_reason": "Insufficient usable evidence in file." if decision == "EXCLUDE" else "",
+        "include_in_mining_plan": include_in_mining_plan,
+        "habitat_name": None if decision == "EXCLUDE" else f"Habitat for {source_file}",
+        "habitat_type": None if decision == "EXCLUDE" else "TEXT_COMMUNITY",
+        "url_pattern": None if decision == "EXCLUDE" else f"https://example.com/{source_file}",
+        "items_in_file": None if decision == "EXCLUDE" else 12,
+        "data_quality": None if decision == "EXCLUDE" else "CLEAN",
+        "observation_sheet": None if decision == "EXCLUDE" else {
+            "threads_50_plus": "Y",
+            "threads_200_plus": "N",
+            "threads_1000_plus": "N",
+            "posts_last_3mo": "Y",
+            "posts_last_6mo": "Y",
+            "posts_last_12mo": "Y",
+            "recency_ratio": "MAJORITY_RECENT",
+            "exact_category": "Y",
+            "purchasing_comparing": "Y",
+            "personal_usage": "Y",
+            "adjacent_only": "N",
+            "first_person_narratives": "Y",
+            "trigger_events": "Y",
+            "fear_frustration_shame": "Y",
+            "specific_dollar_or_time": "Y",
+            "long_detailed_posts": "Y",
+            "comparison_discussions": "Y",
+            "price_value_mentions": "Y",
+            "post_purchase_experience": "Y",
+            "relevance_pct": "OVER_50_PCT",
+            "dominated_by_offtopic": "N",
+            "competitor_brands_mentioned": "Y",
+            "competitor_brand_count": "1-3",
+            "competitor_ads_present": "N",
+            "trend_direction": "HIGHER",
+            "seasonal_patterns": "N",
+            "seasonal_description": "N/A",
+            "habitat_age": "3_TO_7YR",
+            "membership_trend": "GROWING",
+            "post_frequency_trend": "INCREASING",
+            "publicly_accessible": "Y",
+            "text_based_content": "Y",
+            "target_language": "Y",
+            "no_rate_limiting": "Y",
+            "purchase_intent_density": "SOME",
+            "discusses_spending": "Y",
+            "recommendation_threads": "Y",
+            "reusability": "PATTERN_REUSABLE",
+        },
+        "language_samples": [] if decision == "EXCLUDE" else [
+            {
+                "sample_id": "S1",
+                "evidence_ref": f"{source_file}::item[0]",
+                "word_count": 120,
+                "has_trigger_event": "Y",
+                "has_failed_solution": "Y",
+                "has_identity_language": "Y",
+                "has_specific_outcome": "Y",
+            }
+        ],
+        "video_extension": None,
+        "competitive_overlap": None if decision == "EXCLUDE" else {
+            "competitors_in_data": ["Competitor A"],
+            "overlap_level": "LOW",
+            "whitespace_opportunity": "Y",
+        },
+        "trend_lifecycle": None if decision == "EXCLUDE" else {
+            "trend_direction": "HIGHER",
+            "lifecycle_stage": "GROWING",
+        },
+        "mining_gate": None if decision == "EXCLUDE" else {
+            "status": "PASS",
+            "failed_fields": [],
+            "reason": "All mining requirements satisfied.",
+        },
+        "rank_score": None if decision == "EXCLUDE" else 77,
+        "estimated_yield": None if decision == "EXCLUDE" else 22,
+        "evidence_refs": [] if decision == "EXCLUDE" else [f"{source_file}::item[0]"],
+        "priority_rank": priority_rank,
+        "target_voc_types": ["PAIN_LANGUAGE"] if include_in_mining_plan else [],
+        "sampling_strategy": "Chronological high-signal scan." if include_in_mining_plan else None,
+        "platform_behavior_note": "Narrative posts with detailed symptom context." if include_in_mining_plan else None,
+        "compliance_flags": "",
+    }
+
+
 def test_validate_agent1_output_source_file_grounding_rejects_unknown_files() -> None:
     with pytest.raises(StrategyV2SchemaValidationError, match="Unknown source_file entries"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "habitat_observations": [{"source_file": "unexpected_file.json"}],
-                "mining_plan": [{"source_file": "allowed_file.json"}],
-                "excluded_source_files": [],
+                "file_assessments": [
+                    _agent1_file_assessment(source_file="unexpected_file.json", decision="EXCLUDE")
+                ],
             },
             scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "allowed_file.json"}]},
         )
 
 
-def test_validate_agent1_output_source_file_grounding_requires_mining_subset_of_observations() -> None:
-    with pytest.raises(StrategyV2SchemaValidationError, match="mining_plan must be a subset"):
+def test_validate_agent1_output_source_file_grounding_rejects_excluded_rows_marked_for_mining() -> None:
+    with pytest.raises(StrategyV2SchemaValidationError, match="cannot mark an EXCLUDE file_assessments row for mining"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "habitat_observations": [{"source_file": "observed_file.json"}],
-                "mining_plan": [{"source_file": "mined_file.json"}],
-                "excluded_source_files": ["mined_file.json"],
+                "file_assessments": [
+                    _agent1_file_assessment(
+                        source_file="mined_file.json",
+                        decision="EXCLUDE",
+                        include_in_mining_plan=True,
+                    )
+                ],
             },
             scraped_data_manifest={
-                "raw_scraped_data_files": [
-                    {"file_name": "observed_file.json"},
-                    {"file_name": "mined_file.json"},
-                ]
+                "raw_scraped_data_files": [{"file_name": "mined_file.json"}]
             },
         )
 
@@ -234,9 +330,13 @@ def test_validate_agent1_output_source_file_grounding_requires_exact_union_cover
     with pytest.raises(StrategyV2SchemaValidationError, match="exact source-file coverage"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
-                "habitat_observations": [{"source_file": "observed_file.json"}],
-                "mining_plan": [{"source_file": "observed_file.json"}],
-                "excluded_source_files": [],
+                "file_assessments": [
+                    _agent1_file_assessment(
+                        source_file="observed_file.json",
+                        include_in_mining_plan=True,
+                        priority_rank=1,
+                    )
+                ],
             },
             scraped_data_manifest={
                 "raw_scraped_data_files": [
@@ -248,11 +348,16 @@ def test_validate_agent1_output_source_file_grounding_requires_exact_union_cover
 
 
 def test_validate_agent1_output_source_file_grounding_accepts_exact_coverage_with_exclusions() -> None:
-    _validate_agent1_output_source_file_grounding(
+    derived = _derive_agent1_outputs_from_file_assessments(
         agent01_output={
-            "habitat_observations": [{"source_file": "observed_file.json"}],
-            "mining_plan": [{"source_file": "observed_file.json"}],
-            "excluded_source_files": ["excluded_file.json"],
+            "file_assessments": [
+                _agent1_file_assessment(
+                    source_file="observed_file.json",
+                    include_in_mining_plan=True,
+                    priority_rank=1,
+                ),
+                _agent1_file_assessment(source_file="excluded_file.json", decision="EXCLUDE"),
+            ],
         },
         scraped_data_manifest={
             "raw_scraped_data_files": [
@@ -261,3 +366,6 @@ def test_validate_agent1_output_source_file_grounding_accepts_exact_coverage_wit
             ]
         },
     )
+    assert [row["source_file"] for row in derived["habitat_observations"]] == ["observed_file.json"]
+    assert derived["excluded_source_files"] == ["excluded_file.json"]
+    assert [row["source_file"] for row in derived["mining_plan"]] == ["observed_file.json"]

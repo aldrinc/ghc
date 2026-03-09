@@ -25,15 +25,27 @@ def _stub_activity_heartbeat(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _stub_prompt_file_uploads(monkeypatch):
+    uploaded_logical_payloads: dict[str, dict[str, Any]] = {}
+
+    def _fake_upload_openai_prompt_json_files(*, stage_label: str, logical_payloads: dict[str, Any], **_kwargs):
+        uploaded_logical_payloads[stage_label] = dict(logical_payloads)
+        return ({str(name): f"file-{stage_label}-{name}" for name in logical_payloads}, [])
+
     monkeypatch.setattr(
         strategy_v2_activities,
         "_upload_openai_prompt_json_files",
-        lambda **_kwargs: ({}, []),
+        _fake_upload_openai_prompt_json_files,
     )
     monkeypatch.setattr(
         strategy_v2_activities,
         "_cleanup_openai_prompt_files",
         lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS",
+        uploaded_logical_payloads,
+        raising=False,
     )
 
 
@@ -543,50 +555,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
             }
         elif context == "strategy_v2.agent1_output":
             payload = {
-                "habitat_observations": [
-                    _agent1_habitat_observation_payload(
-                        habitat_name="reddit.com/r/sleep",
-                        habitat_type="TEXT_COMMUNITY",
-                        source_file="reddit_sleep.json",
-                    ),
-                    _agent1_habitat_observation_payload(
-                        habitat_name="forum.sleephelp.com",
-                        habitat_type="FORUM",
-                        source_file="forum_sleephelp.json",
-                    ),
-                ],
-                "excluded_source_files": [],
-                "mining_plan": [
-                    {
-                        "habitat_name": "reddit.com/r/sleep",
-                        "habitat_type": "TEXT_COMMUNITY",
-                        "source_file": "reddit_sleep.json",
-                        "priority_rank": 1,
-                        "rank_score": 12,
-                        "target_voc_types": ["PAIN_LANGUAGE"],
-                        "estimated_yield": 20,
-                        "sampling_strategy": "Process chronologically across high-detail items first.",
-                        "platform_behavior_note": "Long-form narratives with high detail density.",
-                        "compliance_flags": "",
-                        "observation_sheet": _agent1_habitat_observation_payload(
-                            habitat_name="reddit.com/r/sleep",
-                            habitat_type="TEXT_COMMUNITY",
-                            source_file="reddit_sleep.json",
-                        )["observation_sheet"],
-                        "language_samples": [],
-                        "video_extension": None,
-                        "competitive_overlap": _agent1_habitat_observation_payload(
-                            habitat_name="reddit.com/r/sleep",
-                            habitat_type="TEXT_COMMUNITY",
-                            source_file="reddit_sleep.json",
-                        )["competitive_overlap"],
-                        "trend_lifecycle": _agent1_habitat_observation_payload(
-                            habitat_name="reddit.com/r/sleep",
-                            habitat_type="TEXT_COMMUNITY",
-                            source_file="reddit_sleep.json",
-                        )["trend_lifecycle"],
-                        "evidence_refs": ["/apify_output/raw_scraped_data/reddit_sleep.json::item[0]"],
-                    }
+                "report_markdown": "## Agent 1\nValidated runtime file coverage.",
+                "agent_id": "agent1-test",
+                "agent_version": "test.v1",
+                "timestamp": "2026-03-08T23:00:00Z",
+                "product_classification": {
+                    "buyer_behavior": "CONSIDERED",
+                    "purchase_emotion": "MIXED",
+                    "compliance_sensitivity": "MEDIUM",
+                    "price_sensitivity": "MID_TICKET_30_TO_100",
+                },
+                "file_assessments": _agent1_file_assessments_from_uploaded_manifest(),
+                "gate_failures": [],
+                "disconfirmation_flags": [
+                    "A small number of files could be noisy.",
+                    "Observed intent may cluster around adjacent problems.",
+                    "Platform mix may overweight text-based discussion.",
                 ],
             }
         elif context == "strategy_v2.agent2_output":
@@ -1076,6 +1060,48 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
     return rows
 
 
+def _agent1_file_assessments_from_uploaded_manifest() -> list[dict[str, Any]]:
+    uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
+    agent1_payloads = uploaded_payloads.get("agent1-prompt-chain")
+    if not isinstance(agent1_payloads, dict):
+        raise AssertionError("Agent 1 test stub is missing uploaded logical payloads for agent1-prompt-chain.")
+
+    scraped_data_manifest = agent1_payloads.get("SCRAPED_DATA_FILES_JSON")
+    if not isinstance(scraped_data_manifest, dict):
+        raise AssertionError("Agent 1 test stub expected SCRAPED_DATA_FILES_JSON in uploaded logical payloads.")
+
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    raw_file_rows = [row for row in raw_files if isinstance(row, dict)] if isinstance(raw_files, list) else []
+    if not raw_file_rows:
+        raise AssertionError("Agent 1 test stub expected raw_scraped_data_files to contain at least one file.")
+
+    assessments: list[dict[str, Any]] = []
+    for index, file_row in enumerate(raw_file_rows):
+        source_file = str(file_row.get("file_name") or "").strip()
+        if not source_file:
+            continue
+        habitat_name = str(file_row.get("habitat_name") or source_file).strip()
+        habitat_type = str(file_row.get("habitat_type") or "TEXT_COMMUNITY").strip() or "TEXT_COMMUNITY"
+        observation = _agent1_habitat_observation_payload(
+            habitat_name=habitat_name,
+            habitat_type=habitat_type,
+            source_file=source_file,
+        )
+        observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
+        observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
+        assessments.append(
+            _agent1_file_assessment_payload(
+                observation=observation,
+                include_in_mining_plan=index == 0,
+                priority_rank=1 if index == 0 else None,
+            )
+        )
+
+    if not assessments:
+        raise AssertionError("Agent 1 test stub could not derive any file assessments from the uploaded manifest.")
+    return assessments
+
+
 def _agent1_habitat_observation_payload(*, habitat_name: str, habitat_type: str, source_file: str) -> dict[str, Any]:
     observation_sheet = {
         "threads_50_plus": "Y",
@@ -1154,6 +1180,47 @@ def _agent1_habitat_observation_payload(*, habitat_name: str, habitat_type: str,
         "rank_score": 81,
         "estimated_yield": 28,
         "evidence_refs": [f"{source_file}::item[0]"],
+    }
+
+
+def _agent1_file_assessment_payload(
+    *,
+    observation: dict[str, Any],
+    include_in_mining_plan: bool,
+    priority_rank: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "source_file": observation["source_file"],
+        "decision": "OBSERVE",
+        "exclude_reason": "",
+        "include_in_mining_plan": include_in_mining_plan,
+        "habitat_name": observation["habitat_name"],
+        "habitat_type": observation["habitat_type"],
+        "url_pattern": observation["url_pattern"],
+        "items_in_file": observation["items_in_file"],
+        "data_quality": observation["data_quality"],
+        "observation_sheet": observation["observation_sheet"],
+        "language_samples": observation["language_samples"],
+        "video_extension": observation["video_extension"],
+        "competitive_overlap": observation["competitive_overlap"],
+        "trend_lifecycle": observation["trend_lifecycle"],
+        "mining_gate": observation["mining_gate"],
+        "rank_score": observation["rank_score"],
+        "estimated_yield": observation["estimated_yield"],
+        "evidence_refs": observation["evidence_refs"],
+        "priority_rank": priority_rank,
+        "target_voc_types": ["PAIN_LANGUAGE"] if include_in_mining_plan else [],
+        "sampling_strategy": (
+            "Process chronologically across high-detail items first."
+            if include_in_mining_plan
+            else None
+        ),
+        "platform_behavior_note": (
+            "Long-form narratives with high detail density."
+            if include_in_mining_plan
+            else None
+        ),
+        "compliance_flags": "",
     }
 
 

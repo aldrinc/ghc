@@ -905,6 +905,30 @@ _VOC_AGENT01_MINING_GATE_SCHEMA: dict[str, Any] = {
     },
     "required": ["status", "failed_fields", "reason"],
 }
+_VOC_AGENT01_DATA_QUALITY_SCHEMA: dict[str, Any] = {
+    "type": "string",
+    "enum": ["CLEAN", "MINOR_ISSUES", "MAJOR_ISSUES", "UNUSABLE"],
+}
+_VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA: dict[str, Any] = {
+    "type": "string",
+    "enum": [
+        "PAIN_LANGUAGE",
+        "TRIGGER_EVENTS",
+        "FAILED_SOLUTIONS",
+        "BUYER_COMPARISONS",
+        "DESIRED_OUTCOMES",
+        "IDENTITY_LANGUAGE",
+        "OBJECTIONS",
+        "PROOF_DEMANDS",
+        "POST_PURCHASE",
+    ],
+}
+
+
+def _nullable_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    return {"anyOf": [deepcopy(dict(schema)), {"type": "null"}]}
+
+
 _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -914,10 +938,7 @@ _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA: dict[str, Any] = {
         "url_pattern": {"type": "string", "minLength": 1},
         "source_file": {"type": "string", "minLength": 1},
         "items_in_file": {"type": "integer", "minimum": 0},
-        "data_quality": {
-            "type": "string",
-            "enum": ["CLEAN", "MINOR_ISSUES", "MAJOR_ISSUES", "UNUSABLE"],
-        },
+        "data_quality": _VOC_AGENT01_DATA_QUALITY_SCHEMA,
         "observation_sheet": _VOC_AGENT01_OBSERVATION_SHEET_SCHEMA,
         "language_samples": {
             "type": "array",
@@ -970,20 +991,7 @@ _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA: dict[str, Any] = {
         "target_voc_types": {
             "type": "array",
             "minItems": 1,
-            "items": {
-                "type": "string",
-                "enum": [
-                    "PAIN_LANGUAGE",
-                    "TRIGGER_EVENTS",
-                    "FAILED_SOLUTIONS",
-                    "BUYER_COMPARISONS",
-                    "DESIRED_OUTCOMES",
-                    "IDENTITY_LANGUAGE",
-                    "OBJECTIONS",
-                    "PROOF_DEMANDS",
-                    "POST_PURCHASE",
-                ],
-            },
+            "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
         },
         "estimated_yield": {"type": "integer", "minimum": 0},
         "sampling_strategy": {"type": "string", "minLength": 1},
@@ -1024,6 +1032,74 @@ _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA: dict[str, Any] = {
         "evidence_refs",
     ],
 }
+_VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "source_file": {"type": "string", "minLength": 1},
+        "decision": {"type": "string", "enum": ["OBSERVE", "EXCLUDE"]},
+        "exclude_reason": {"type": "string"},
+        "include_in_mining_plan": {"type": "boolean"},
+        "habitat_name": _nullable_schema({"type": "string", "minLength": 1}),
+        "habitat_type": _nullable_schema({"type": "string", "minLength": 1}),
+        "url_pattern": _nullable_schema({"type": "string", "minLength": 1}),
+        "items_in_file": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "data_quality": _nullable_schema(_VOC_AGENT01_DATA_QUALITY_SCHEMA),
+        "observation_sheet": _nullable_schema(_VOC_AGENT01_OBSERVATION_SHEET_SCHEMA),
+        "language_samples": {
+            "type": "array",
+            "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
+        },
+        "video_extension": {
+            "anyOf": [
+                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
+                {"type": "null"},
+            ]
+        },
+        "competitive_overlap": _nullable_schema(_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA),
+        "trend_lifecycle": _nullable_schema(_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA),
+        "mining_gate": _nullable_schema(_VOC_AGENT01_MINING_GATE_SCHEMA),
+        "rank_score": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+        "estimated_yield": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+        },
+        "priority_rank": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 12}, {"type": "null"}]},
+        "target_voc_types": {
+            "type": "array",
+            "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+        },
+        "sampling_strategy": _nullable_schema({"type": "string", "minLength": 1}),
+        "platform_behavior_note": _nullable_schema({"type": "string", "minLength": 1}),
+        "compliance_flags": {"type": "string"},
+    },
+    "required": [
+        "source_file",
+        "decision",
+        "exclude_reason",
+        "include_in_mining_plan",
+        "habitat_name",
+        "habitat_type",
+        "url_pattern",
+        "items_in_file",
+        "data_quality",
+        "observation_sheet",
+        "language_samples",
+        "video_extension",
+        "competitive_overlap",
+        "trend_lifecycle",
+        "mining_gate",
+        "rank_score",
+        "estimated_yield",
+        "evidence_refs",
+        "priority_rank",
+        "target_voc_types",
+        "sampling_strategy",
+        "platform_behavior_note",
+        "compliance_flags",
+    ],
+}
 _VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -1060,20 +1136,10 @@ _VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
                 "price_sensitivity",
             ],
         },
-        "excluded_source_files": {
-            "type": "array",
-            "items": {"type": "string", "minLength": 1},
-        },
-        "habitat_observations": {
+        "file_assessments": {
             "type": "array",
             "minItems": 1,
-            "items": _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA,
-        },
-        "mining_plan": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 12,
-            "items": _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA,
+            "items": _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA,
         },
         "gate_failures": {
             "type": "array",
@@ -1110,9 +1176,7 @@ _VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
         "agent_version",
         "timestamp",
         "product_classification",
-        "excluded_source_files",
-        "habitat_observations",
-        "mining_plan",
+        "file_assessments",
         "gate_failures",
         "disconfirmation_flags",
     ],
@@ -8460,11 +8524,81 @@ def _build_agent1_runtime_file_inventory(scraped_data_manifest: Mapping[str, Any
     }
 
 
-def _validate_agent1_output_source_file_grounding(
+def _build_agent1_file_assessment_template(scraped_data_manifest: Mapping[str, Any]) -> dict[str, Any]:
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
+    template_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(file_rows):
+        source_file = str(row.get("file_name") or "").strip()
+        if not source_file:
+            continue
+        items_in_file_raw = row.get("item_count")
+        items_in_file = (
+            int(items_in_file_raw)
+            if isinstance(items_in_file_raw, int) and not isinstance(items_in_file_raw, bool)
+            else 0
+        )
+        template_rows.append(
+            {
+                "source_file": source_file,
+                "default_habitat_name": str(row.get("habitat_name") or source_file or f"Habitat {index + 1}").strip(),
+                "default_habitat_type": str(
+                    row.get("habitat_type") or row.get("source_platform") or "CANNOT_DETERMINE"
+                ).strip(),
+                "default_url_pattern": str(
+                    row.get("virtual_path") or row.get("source_url") or row.get("dataset_id") or source_file
+                ).strip(),
+                "items_in_file": items_in_file,
+            }
+        )
+    return {
+        "row_count": len(template_rows),
+        "rows": template_rows,
+    }
+
+
+def _render_agent1_runtime_instruction(
+    *,
+    agent01_file_id_map: Mapping[str, str],
+    scraped_file_inventory: Mapping[str, Any],
+) -> str:
+    return (
+        "## Runtime Input Block\n"
+        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent01_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+        f"SCRAPED_FILE_INVENTORY_JSON:\n{_dump_prompt_json_required(scraped_file_inventory, max_chars=16000, field_name='SCRAPED_FILE_INVENTORY_JSON')}\n\n"
+        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+        "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
+        "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
+        "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON is canonical for file_assessments row count, ordering, and source_file values.\n"
+        "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
+        "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
+        "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
+        "Return file_assessments with exactly one row per template row, preserving row order and source_file values exactly.\n"
+        "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
+        "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
+        "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
+        "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
+        "If text_based_content is not Y because text evidence is missing, set target_language=CANNOT_DETERMINE "
+        "and do not list target_language as an independent mining gate failure.\n"
+        "Because runtime enforces strict JSON response_format, return a single JSON object only.\n"
+        "Put the full human report into report_markdown string inside the JSON object.\n"
+        "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
+        "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
+        "Every OBSERVE row must include non-empty evidence_refs.\n"
+        "Every OBSERVE row must include mining_gate.status, mining_gate.failed_fields, and a non-empty mining_gate.reason.\n"
+        "If decision=EXCLUDE, provide a non-empty exclude_reason and set include_in_mining_plan=false.\n"
+        "If include_in_mining_plan=true, decision must be OBSERVE and all mining-plan fields must be populated.\n"
+        "Construct mining selections from OBSERVE rows only; never mark an EXCLUDE row for mining.\n"
+        "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
+        "Output complete file_assessments entries suitable for deterministic habitat scoring."
+    )
+
+
+def _derive_agent1_outputs_from_file_assessments(
     *,
     agent01_output: Mapping[str, Any],
     scraped_data_manifest: Mapping[str, Any],
-) -> None:
+) -> dict[str, Any]:
     raw_files = scraped_data_manifest.get("raw_scraped_data_files")
     raw_file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
     allowed_file_names = {
@@ -8477,69 +8611,162 @@ def _validate_agent1_output_source_file_grounding(
             "scraped_data_manifest.raw_scraped_data_files must include at least one file_name for Agent 1 grounding."
         )
 
-    def _collect_source_files(rows: Any) -> set[str]:
-        source_files: set[str] = set()
-        if not isinstance(rows, list):
-            return source_files
-        for row in rows:
-            if not isinstance(row, Mapping):
-                continue
-            source_file = str(row.get("source_file") or "").strip()
-            if not source_file:
-                continue
-            source_files.add(source_file)
-        return source_files
-
-    observed_source_files = _collect_source_files(agent01_output.get("habitat_observations"))
-    mining_plan_source_files = _collect_source_files(agent01_output.get("mining_plan"))
-    excluded_source_files_raw = agent01_output.get("excluded_source_files")
-    if not isinstance(excluded_source_files_raw, list):
+    file_assessments_raw = agent01_output.get("file_assessments")
+    if not isinstance(file_assessments_raw, list):
         raise StrategyV2SchemaValidationError(
-            "Agent 1 output must include excluded_source_files array for strict file-coverage validation."
+            "Agent 1 output must include file_assessments array for strict file-coverage validation."
         )
-    excluded_source_files_values = [
-        str(value).strip()
-        for value in excluded_source_files_raw
-        if isinstance(value, str) and str(value).strip()
-    ]
-    if len(excluded_source_files_values) != len(set(excluded_source_files_values)):
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output excluded_source_files must not contain duplicate filenames."
-        )
-    excluded_source_files = set(excluded_source_files_values)
 
-    unknown = sorted(
-        (observed_source_files | mining_plan_source_files | excluded_source_files) - allowed_file_names
+    observation_projection_required_fields = (
+        "habitat_name",
+        "habitat_type",
+        "url_pattern",
+        "source_file",
+        "items_in_file",
+        "data_quality",
+        "observation_sheet",
+        "language_samples",
+        "competitive_overlap",
+        "trend_lifecycle",
+        "mining_gate",
+        "rank_score",
+        "estimated_yield",
+        "evidence_refs",
     )
-    if unknown:
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
-            f"Unknown source_file entries: {unknown[:8]}. "
-            "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
-        )
+    mining_projection_required_fields = (
+        "habitat_name",
+        "habitat_type",
+        "source_file",
+        "priority_rank",
+        "rank_score",
+        "target_voc_types",
+        "estimated_yield",
+        "sampling_strategy",
+        "platform_behavior_note",
+        "observation_sheet",
+        "language_samples",
+        "competitive_overlap",
+        "trend_lifecycle",
+        "evidence_refs",
+    )
 
-    mining_not_observed = sorted(mining_plan_source_files - observed_source_files)
-    if mining_not_observed:
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output mining_plan must be a subset of habitat_observations by source_file. "
-            f"source_file entries present in mining_plan but missing from habitat_observations: {mining_not_observed[:8]}."
-        )
+    observations: list[dict[str, Any]] = []
+    excluded_source_files: list[str] = []
+    mining_plan: list[dict[str, Any]] = []
+    seen_source_files: set[str] = set()
 
-    overlap = sorted(observed_source_files & excluded_source_files)
-    if overlap:
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output cannot list the same source_file in both habitat_observations and excluded_source_files. "
-            f"Overlapping source_file entries: {overlap[:8]}."
-        )
+    for index, row in enumerate(file_assessments_raw):
+        row_name = f"Agent 1 file_assessments[{index}]"
+        if not isinstance(row, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        source_file = str(row.get("source_file") or "").strip()
+        if not source_file:
+            raise StrategyV2SchemaValidationError(f"{row_name}.source_file must be non-empty.")
+        if source_file in seen_source_files:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 1 file_assessments must not contain duplicate source_file values. Duplicate: '{source_file}'."
+            )
+        seen_source_files.add(source_file)
+        if source_file not in allowed_file_names:
+            raise StrategyV2SchemaValidationError(
+                "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
+                f"Unknown source_file entries: ['{source_file}']. "
+                "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
+            )
 
-    coverage_union = observed_source_files | excluded_source_files
-    if coverage_union != allowed_file_names:
-        missing = sorted(allowed_file_names - coverage_union)
+        decision = str(row.get("decision") or "").strip().upper()
+        if decision not in {"OBSERVE", "EXCLUDE"}:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.decision must be OBSERVE or EXCLUDE."
+            )
+        include_in_mining_plan = row.get("include_in_mining_plan")
+        if not isinstance(include_in_mining_plan, bool):
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.include_in_mining_plan must be boolean."
+            )
+        exclude_reason = str(row.get("exclude_reason") or "").strip()
+
+        if decision == "EXCLUDE":
+            if include_in_mining_plan:
+                raise StrategyV2SchemaValidationError(
+                    "Agent 1 output cannot mark an EXCLUDE file_assessments row for mining. "
+                    f"Invalid source_file entry: '{source_file}'."
+                )
+            if not exclude_reason:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name}.exclude_reason must be non-empty when decision=EXCLUDE."
+                )
+            excluded_source_files.append(source_file)
+            continue
+
+        observation_row = {
+            field_name: deepcopy(row.get(field_name))
+            for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA.get("required", [])
+            if isinstance(field_name, str)
+        }
+        _require_row_fields(
+            row=observation_row,
+            required_fields=observation_projection_required_fields,
+            row_name=f"{row_name}.observation_projection",
+        )
+        observations.append(observation_row)
+
+        if not include_in_mining_plan:
+            continue
+
+        mining_row = {
+            field_name: deepcopy(row.get(field_name))
+            for field_name in _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA.get("required", [])
+            if isinstance(field_name, str)
+        }
+        _require_row_fields(
+            row=mining_row,
+            required_fields=mining_projection_required_fields,
+            row_name=f"{row_name}.mining_plan_projection",
+        )
+        if "compliance_flags" not in row or row.get("compliance_flags") is None:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.compliance_flags must be present when include_in_mining_plan=true."
+            )
+        target_voc_types = mining_row.get("target_voc_types")
+        if not isinstance(target_voc_types, list) or not target_voc_types:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.target_voc_types must be a non-empty array when include_in_mining_plan=true."
+            )
+        evidence_refs = mining_row.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not evidence_refs:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.evidence_refs must be a non-empty array when include_in_mining_plan=true."
+            )
+        mining_plan.append(mining_row)
+
+    if seen_source_files != allowed_file_names:
+        missing = sorted(allowed_file_names - seen_source_files)
         raise StrategyV2SchemaValidationError(
             "Agent 1 output must provide exact source-file coverage: "
-            "(habitat_observations.source_file U excluded_source_files) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
+            "(file_assessments.source_file) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
             f"Missing source_file entries: {missing[:8]}."
         )
+
+    derived_output = dict(agent01_output)
+    derived_output["file_assessments"] = [
+        dict(row) for row in file_assessments_raw if isinstance(row, Mapping)
+    ]
+    derived_output["habitat_observations"] = observations
+    derived_output["excluded_source_files"] = excluded_source_files
+    derived_output["mining_plan"] = mining_plan
+    return derived_output
+
+
+def _validate_agent1_output_source_file_grounding(
+    *,
+    agent01_output: Mapping[str, Any],
+    scraped_data_manifest: Mapping[str, Any],
+) -> None:
+    _derive_agent1_outputs_from_file_assessments(
+        agent01_output=agent01_output,
+        scraped_data_manifest=scraped_data_manifest,
+    )
 
 
 def _normalize_voc_source_type(raw_value: object) -> str:
@@ -12682,6 +12909,7 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
         context="VOC Agent 1 habitat qualifier",
     )
     scraped_file_inventory = _build_agent1_runtime_file_inventory(scraped_data_manifest)
+    agent01_file_assessment_template = _build_agent1_file_assessment_template(scraped_data_manifest)
     agent01_file_id_map, agent01_uploaded_file_ids = _upload_openai_prompt_json_files(
         model=settings.STRATEGY_V2_VOC_MODEL,
         workflow_run_id=workflow_run_id,
@@ -12696,6 +12924,7 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
             "COMPETITOR_ANALYSIS_JSON": competitor_analysis,
             "HANDOFF_AUDIT_JSON": handoff_audit,
             "SCORING_AUDIT_JSON": scoring_audit,
+            "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON": agent01_file_assessment_template,
             "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
                 "step_contents": {
                     step_key: str(foundational_step_contents.get(step_key) or "")
@@ -12713,34 +12942,9 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
             asset=agent01_asset,
             context="strategy_v2.agent1_output",
             model=settings.STRATEGY_V2_VOC_MODEL,
-            runtime_instruction=(
-                "## Runtime Input Block\n"
-                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent01_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
-                f"SCRAPED_FILE_INVENTORY_JSON:\n{_dump_prompt_json_required(scraped_file_inventory, max_chars=16000, field_name='SCRAPED_FILE_INVENTORY_JSON')}\n\n"
-                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
-                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
-                "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
-                "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
-                "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
-                "Never invent, mutate, or alias filenames that are not explicitly listed at runtime.\n"
-                "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
-                "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
-                "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
-                "If text_based_content is not Y because text evidence is missing, set target_language=CANNOT_DETERMINE "
-                "and do not list target_language as an independent mining gate failure.\n"
-                "Because runtime enforces strict JSON response_format, return a single JSON object only.\n"
-                "Put the full human report into report_markdown string inside the JSON object.\n"
-                "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
-                "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
-                "Every habitat_observations entry and mining_plan entry must include a non-empty evidence_refs array.\n"
-                "Every habitat_observations[*].mining_gate object must include status, failed_fields, and a non-empty reason.\n"
-                "Include excluded_source_files as filenames intentionally excluded from habitat_observations.\n"
-                "Ensure (habitat_observations.source_file U excluded_source_files) exactly matches SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
-                "Ensure every mining_plan.source_file appears in habitat_observations.source_file (mining_plan subset rule).\n"
-                "Construct mining_plan by selecting rows from habitat_observations only; never introduce a new source_file in mining_plan.\n"
-                "Never include any excluded_source_files entry inside mining_plan.\n"
-                "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
-                "Output complete habitat_observations and mining_plan entries suitable for deterministic habitat scoring."
+            runtime_instruction=_render_agent1_runtime_instruction(
+                agent01_file_id_map=agent01_file_id_map,
+                scraped_file_inventory=scraped_file_inventory,
             ),
             schema_name="strategy_v2_voc_agent01",
             schema=_VOC_AGENT01_OUTPUT_SCHEMA,
@@ -12786,13 +12990,13 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
             "and complete product/avatar context before rerunning v2-04."
         ),
     )
-    raw_habitat_observations = agent01_output.get("habitat_observations")
-    if not isinstance(raw_habitat_observations, list):
-        raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
-    _validate_agent1_output_source_file_grounding(
+    agent01_output = _derive_agent1_outputs_from_file_assessments(
         agent01_output=agent01_output,
         scraped_data_manifest=scraped_data_manifest,
     )
+    raw_habitat_observations = agent01_output.get("habitat_observations")
+    if not isinstance(raw_habitat_observations, list):
+        raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
     habitat_observations = _normalize_habitat_observations(
         [row for row in raw_habitat_observations if isinstance(row, dict)]
     )
@@ -14345,6 +14549,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 context="VOC Agent 1 habitat qualifier",
             )
             scraped_file_inventory = _build_agent1_runtime_file_inventory(scraped_data_manifest)
+            agent01_file_assessment_template = _build_agent1_file_assessment_template(scraped_data_manifest)
             agent01_file_id_map, agent01_uploaded_file_ids = _upload_openai_prompt_json_files(
                 model=settings.STRATEGY_V2_VOC_MODEL,
                 workflow_run_id=workflow_run_id,
@@ -14359,6 +14564,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "COMPETITOR_ANALYSIS_JSON": competitor_analysis,
                     "HANDOFF_AUDIT_JSON": handoff_audit,
                     "SCORING_AUDIT_JSON": scoring_audit,
+                    "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON": agent01_file_assessment_template,
                     "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
                         "step_contents": {
                             step_key: str(foundational_step_contents.get(step_key) or "")
@@ -14376,34 +14582,9 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     asset=agent01_asset,
                     context="strategy_v2.agent1_output",
                     model=settings.STRATEGY_V2_VOC_MODEL,
-                    runtime_instruction=(
-                        "## Runtime Input Block\n"
-                        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent01_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
-                        f"SCRAPED_FILE_INVENTORY_JSON:\n{_dump_prompt_json_required(scraped_file_inventory, max_chars=16000, field_name='SCRAPED_FILE_INVENTORY_JSON')}\n\n"
-                        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
-                        "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
-                        "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
-                        "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
-                        "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
-                        "Never invent, mutate, or alias filenames that are not explicitly listed at runtime.\n"
-                        "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
-                        "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
-                        "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
-                        "If text_based_content is not Y because text evidence is missing, set target_language=CANNOT_DETERMINE "
-                        "and do not list target_language as an independent mining gate failure.\n"
-                        "Because runtime enforces strict JSON response_format, return a single JSON object only.\n"
-                        "Put the full human report into report_markdown string inside the JSON object.\n"
-                        "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
-                        "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
-                        "Every habitat_observations entry and mining_plan entry must include a non-empty evidence_refs array.\n"
-                        "Every habitat_observations[*].mining_gate object must include status, failed_fields, and a non-empty reason.\n"
-                        "Include excluded_source_files as filenames intentionally excluded from habitat_observations.\n"
-                        "Ensure (habitat_observations.source_file U excluded_source_files) exactly matches SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
-                        "Ensure every mining_plan.source_file appears in habitat_observations.source_file (mining_plan subset rule).\n"
-                        "Construct mining_plan by selecting rows from habitat_observations only; never introduce a new source_file in mining_plan.\n"
-                        "Never include any excluded_source_files entry inside mining_plan.\n"
-                        "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
-                        "Output complete habitat_observations and mining_plan entries suitable for deterministic habitat scoring."
+                    runtime_instruction=_render_agent1_runtime_instruction(
+                        agent01_file_id_map=agent01_file_id_map,
+                        scraped_file_inventory=scraped_file_inventory,
                     ),
                     schema_name="strategy_v2_voc_agent01",
                     schema=_VOC_AGENT01_OUTPUT_SCHEMA,
@@ -14436,13 +14617,13 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "and complete product/avatar context before rerunning v2-04."
                 ),
             )
-            raw_habitat_observations = agent01_output.get("habitat_observations")
-            if not isinstance(raw_habitat_observations, list):
-                raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
-            _validate_agent1_output_source_file_grounding(
+            agent01_output = _derive_agent1_outputs_from_file_assessments(
                 agent01_output=agent01_output,
                 scraped_data_manifest=scraped_data_manifest,
             )
+            raw_habitat_observations = agent01_output.get("habitat_observations")
+            if not isinstance(raw_habitat_observations, list):
+                raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
             habitat_observations = _normalize_habitat_observations(
                 [row for row in raw_habitat_observations if isinstance(row, dict)]
             )
