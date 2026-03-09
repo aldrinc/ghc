@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DialogRoot,
   DialogTrigger,
@@ -23,6 +24,8 @@ import {
 } from "@/api/compliance";
 import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api/products";
 import { toast } from "@/components/ui/toast";
+import { useProductContext } from "@/contexts/ProductContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { Client } from "@/types/common";
 
 type WizardStep = {
@@ -162,6 +165,9 @@ export function OnboardingWizard({
   onCompleted,
   variant = "modal",
 }: OnboardingWizardProps) {
+  const navigate = useNavigate();
+  const { selectWorkspace } = useWorkspace();
+  const { selectProduct } = useProductContext();
   const isPage = variant === "page";
   const [open, setOpen] = useState(isPage);
   const [stepIndex, setStepIndex] = useState(0);
@@ -241,6 +247,38 @@ export function OnboardingWizard({
     setIsProductEditorOpen(false);
     setEditingProductIndex(null);
     setProductDraft(emptyProductDraft);
+  };
+
+  const completeOnboarding = ({
+    clientId: completedClientId,
+    clientName: completedClientName,
+    productId,
+    productName,
+  }: {
+    clientId: string;
+    clientName?: string;
+    productId: string;
+    productName?: string;
+  }) => {
+    if (onCompleted) {
+      onCompleted({
+        clientId: completedClientId,
+        clientName: completedClientName,
+        productId,
+        productName,
+      });
+      return;
+    }
+    selectWorkspace(completedClientId, { name: completedClientName });
+    selectProduct(
+      productId,
+      {
+        title: productName,
+        client_id: completedClientId,
+      },
+      { clientId: completedClientId }
+    );
+    navigate("/workspaces/overview");
   };
 
   useEffect(() => {
@@ -402,28 +440,37 @@ export function OnboardingWizard({
         toast.error("Onboarding started but no product ID was returned.");
         return;
       }
-
-      const uploadedAssets = await uploadProductAssetsById.mutateAsync({
-        productId,
-        files: [firstProduct.primary_image_file],
-      });
-      const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
-      if (!primaryImageAsset?.id) {
-        throw new Error("Product image upload did not return an image asset.");
-      }
-      await setProductPrimaryAssetById.mutateAsync({
-        productId,
-        primaryAssetId: primaryImageAsset.id,
-      });
-
-      resetWizard();
-      setOpen(false);
-      onCompleted?.({
+      const completionPayload = {
         clientId: ensuredClientId,
         clientName: state.client_name.trim() || clientName,
         productId,
         productName: (response as any)?.product_name || firstProduct.product_name.trim(),
-      });
+      };
+      const primaryImageFile = firstProduct.primary_image_file;
+      if (primaryImageFile) {
+        void (async () => {
+          try {
+            const uploadedAssets = await uploadProductAssetsById.mutateAsync({
+              productId,
+              files: [primaryImageFile],
+            });
+            const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
+            if (!primaryImageAsset?.id) {
+              throw new Error("Product image upload did not return an image asset.");
+            }
+            await setProductPrimaryAssetById.mutateAsync({
+              productId,
+              primaryAssetId: primaryImageAsset.id,
+            });
+          } catch (error) {
+            console.error("Post-onboarding product image setup failed", error);
+          }
+        })();
+      }
+
+      resetWizard();
+      setOpen(false);
+      completeOnboarding(completionPayload);
     } catch (err) {
       // errors are surfaced via mutation onError handlers
     }
