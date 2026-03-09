@@ -3924,6 +3924,8 @@ SEGMENT_HINT: parents
         }
     )
     selected_angle = voc_angle_result["ranked_angle_candidates"][0]["angle"]
+    selected_angle["hook_starters"] = None
+    voc_angle_result["ranked_angle_candidates"][0]["angle"]["hook_starters"] = None
 
     stage2_result = strategy_v2_activities.apply_strategy_v2_angle_selection_activity(
         {

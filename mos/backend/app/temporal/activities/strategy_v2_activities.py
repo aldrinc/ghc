@@ -15707,8 +15707,19 @@ def apply_strategy_v2_angle_selection_activity(params: dict[str, Any]) -> dict[s
     workflow_run_id = str(params["workflow_run_id"])
 
     stage1 = ProductBriefStage1.model_validate(_require_dict(payload=params["stage1"], field_name="stage1"))
+    decision_payload = _require_dict(payload=params["angle_selection_decision"], field_name="angle_selection_decision")
+    decision_selected_angle = _require_dict(
+        payload=decision_payload.get("selected_angle"),
+        field_name="angle_selection_decision.selected_angle",
+    )
+    if decision_selected_angle.get("hook_starters") is None:
+        decision_payload = dict(decision_payload)
+        decision_payload["selected_angle"] = {
+            **decision_selected_angle,
+            "hook_starters": [],
+        }
     decision = AngleSelectionDecision.model_validate(
-        _require_dict(payload=params["angle_selection_decision"], field_name="angle_selection_decision")
+        decision_payload
     )
     ranked_candidates_raw = params.get("ranked_angle_candidates")
     if not isinstance(ranked_candidates_raw, list) or not ranked_candidates_raw:
@@ -15721,6 +15732,11 @@ def apply_strategy_v2_angle_selection_activity(params: dict[str, Any]) -> dict[s
     for index, row in enumerate(ranked_candidates_raw):
         row_payload = _require_dict(payload=row, field_name=f"ranked_angle_candidates[{index}]")
         angle_payload = _require_dict(payload=row_payload.get("angle"), field_name=f"ranked_angle_candidates[{index}].angle")
+        if angle_payload.get("hook_starters") is None:
+            angle_payload = {
+                **angle_payload,
+                "hook_starters": [],
+            }
         candidate = SelectedAngleContract.model_validate(angle_payload)
         candidate_lookup[candidate.angle_id] = candidate
         candidate_row_lookup[candidate.angle_id] = row_payload
