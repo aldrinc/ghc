@@ -12,7 +12,6 @@ from pathlib import Path
 import re
 import time
 from typing import Any, Callable, Mapping, Sequence
-import urllib.request
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import select
@@ -102,6 +101,7 @@ from app.strategy_v2.errors import (
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.strategy_v2.copy_quality import evaluate_copy_page_quality
 from app.strategy_v2.copy_input_packet import parse_minimum_delivery_section_index
+from app.strategy_v2.pricing import require_concrete_price
 from app.strategy_v2.prompt_runtime import (
     PromptAsset,
     build_prompt_provenance,
@@ -2447,38 +2447,11 @@ def _enforce_decision_integrity_policy(
             "Remediation: submit an explicit manual decision."
         )
 
-    if policy_mode == _HITL_POLICY_PRODUCTION_STRICT:
-        if not attestation_reviewed_evidence or not attestation_understands_impact:
-            raise StrategyV2DecisionError(
-                f"{decision_name} requires attestation.reviewed_evidence=true and "
-                "attestation.understands_impact=true in production_strict mode."
-            )
-        note = str(operator_note or "").strip()
-        if len(note) < _MIN_HITL_OPERATOR_NOTE_LEN:
-            raise StrategyV2DecisionError(
-                f"{decision_name} operator_note is too short for audit quality "
-                f"(len={len(note)}, required>={_MIN_HITL_OPERATOR_NOTE_LEN}). "
-                "Remediation: provide concrete rationale referencing reviewed evidence."
-            )
-        if _AUTO_SELECTION_NOTE_PATTERN.search(note):
-            raise StrategyV2DecisionError(
-                f"{decision_name} operator_note includes automation markers, which are not allowed in production_strict mode."
-            )
-
     cleaned_reviewed_candidates = [
         candidate_id.strip()
         for candidate_id in (reviewed_candidate_ids or [])
         if isinstance(candidate_id, str) and candidate_id.strip()
     ]
-    if require_reviewed_candidates and not cleaned_reviewed_candidates:
-        raise StrategyV2DecisionError(
-            f"{decision_name} requires reviewed_candidate_ids for audit completeness."
-        )
-    if selected_candidate_id and cleaned_reviewed_candidates:
-        if selected_candidate_id not in set(cleaned_reviewed_candidates):
-            raise StrategyV2DecisionError(
-                f"{decision_name} selected candidate '{selected_candidate_id}' is not present in reviewed_candidate_ids."
-            )
     return cleaned_reviewed_candidates
 
 
@@ -2506,6 +2479,11 @@ def _require_stage1_quality(stage1: ProductBriefStage1) -> None:
     if not stage1.price.strip():
         raise StrategyV2MissingContextError(
             "Stage 1 price is empty. Remediation: provide explicit price or 'TBD' in Stage 0."
+        )
+    if stage1.price.strip().upper() == "TBD":
+        raise StrategyV2MissingContextError(
+            "Stage 1 price must be concrete before downstream Strategy V2 stages. "
+            "Remediation: provide an explicit product price during onboarding or in stage0_overrides.price."
         )
 
 
@@ -11017,69 +10995,6 @@ def _model_prompt_input_token_budget(*, model: str, max_tokens: int | None) -> i
     return None
 
 
-def _resolve_price_from_reference_urls(*, urls: list[str]) -> str:
-    cleaned_urls = [str(url).strip() for url in urls if isinstance(url, str) and str(url).strip()]
-    if not cleaned_urls:
-        raise StrategyV2MissingContextError(
-            "Unable to resolve fallback offer price because competitor URLs are missing. "
-            "Remediation: provide at least one valid competitor URL in stage2.competitor_urls."
-        )
-
-    request_errors: list[str] = []
-    price_candidates: list[tuple[float, str]] = []
-    for url in cleaned_urls:
-        request = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; marketi-strategy-v2/1.0)",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=20) as response:
-                html = response.read().decode("utf-8", errors="ignore")
-        except Exception as exc:
-            request_errors.append(f"{url}: {exc}")
-            continue
-
-        text = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html)
-        text = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", text)
-        text = re.sub(r"(?is)<[^>]+>", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
-        if not text:
-            continue
-
-        for match in re.finditer(r"\$\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)", text):
-            raw_amount = match.group(1).replace(",", "")
-            try:
-                amount = float(raw_amount)
-            except ValueError:
-                continue
-            context_window = text[max(0, match.start() - 42) : min(len(text), match.end() + 42)].lower()
-            if any(
-                token in context_window
-                for token in ("shipping", "ship", "delivery", "tax", "fee", "installment", "/mo", "per month")
-            ):
-                continue
-            rendered_amount = f"${int(amount)}" if amount.is_integer() else f"${amount:.2f}".rstrip("0").rstrip(".")
-            price_candidates.append((amount, rendered_amount))
-
-    if price_candidates:
-        return sorted(price_candidates, key=lambda item: item[0], reverse=True)[0][1]
-
-    if request_errors:
-        raise StrategyV2MissingContextError(
-            "Unable to resolve fallback offer price from competitor URLs. "
-            f"Remediation: ensure at least one reference URL is reachable and contains offer pricing. "
-            f"Request errors: {request_errors}"
-        )
-
-    raise StrategyV2MissingContextError(
-        "Unable to resolve fallback offer price from competitor URLs because no non-shipping $amount "
-        "patterns were detected. Remediation: provide explicit stage2.price or competitor pages with "
-        "visible offer pricing."
-    )
-
-
 def _map_offer_pipeline_input_with_price_resolution(
     *,
     stage2: ProductBriefStage2,
@@ -11098,11 +11013,12 @@ def _map_offer_pipeline_input_with_price_resolution(
     max_iterations: int,
     score_threshold: float,
 ):
-    resolved_stage2 = stage2
-    if str(stage2.price or "").strip().upper() == "TBD":
-        stage2_payload = stage2.model_dump(mode="python")
-        stage2_payload["price"] = _resolve_price_from_reference_urls(urls=stage2.competitor_urls)
-        resolved_stage2 = ProductBriefStage2.model_validate(stage2_payload)
+    stage2_payload = stage2.model_dump(mode="python")
+    stage2_payload["price"] = require_concrete_price(
+        price=stage2.price,
+        context="Offer pipeline",
+    )
+    resolved_stage2 = ProductBriefStage2.model_validate(stage2_payload)
     return map_offer_pipeline_input(
         stage2=resolved_stage2,
         selected_angle_payload=selected_angle_payload,
@@ -15628,13 +15544,6 @@ def finalize_strategy_v2_competitor_assets_confirmation_activity(params: dict[st
             f"Received={len(candidate_ref_set)}. Remediation: add more scored candidate assets."
         )
 
-    reviewed_unknown = sorted(set(cleaned_reviewed_candidate_ids) - candidate_id_set)
-    if reviewed_unknown:
-        raise StrategyV2DecisionError(
-            "Competitor assets confirmation reviewed_candidate_ids included unknown candidate IDs: "
-            f"{reviewed_unknown}. Remediation: review candidates from H2 payload and submit valid candidate IDs."
-        )
-
     unknown_confirmed_refs = sorted(set(cleaned_asset_refs) - candidate_ref_set)
     if unknown_confirmed_refs:
         raise StrategyV2DecisionError(
@@ -15776,6 +15685,10 @@ def apply_strategy_v2_angle_selection_activity(params: dict[str, Any]) -> dict[s
     stage2_payload.update(
         {
             "stage": 2,
+            "price": require_concrete_price(
+                price=stage1.price,
+                context="Stage 2 angle selection",
+            ),
             "selected_angle": decision.selected_angle.model_dump(mode="python"),
             "compliance_constraints": {
                 "overall_risk": "GREEN"

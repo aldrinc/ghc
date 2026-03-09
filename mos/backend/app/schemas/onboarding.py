@@ -2,11 +2,15 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.strategy_v2.errors import StrategyV2MissingContextError
+from app.strategy_v2.pricing import require_concrete_price
+
 
 class OnboardingStartRequest(BaseModel):
     business_type: Literal["new", "existing"] = "new"
     brand_story: str = Field(..., min_length=10)
     product_name: str = Field(..., min_length=1)
+    price: str = Field(..., min_length=1)
     product_type: str = Field(..., min_length=1)
     product_customizable: bool
     business_model: str = Field(..., min_length=1)
@@ -48,3 +52,11 @@ class OnboardingStartRequest(BaseModel):
         if not cleaned:
             raise ValueError("Must include at least one non-empty value.")
         return cleaned
+
+    @field_validator("price", mode="after")
+    @classmethod
+    def _validate_price(cls, value: str) -> str:
+        try:
+            return require_concrete_price(price=value, context="Onboarding")
+        except StrategyV2MissingContextError as exc:
+            raise ValueError(str(exc)) from exc

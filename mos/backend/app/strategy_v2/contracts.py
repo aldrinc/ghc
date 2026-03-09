@@ -277,8 +277,8 @@ DecisionMode = Literal["manual", "internal_automation"]
 
 
 class DecisionAttestation(StrictContract):
-    reviewed_evidence: bool
-    understands_impact: bool
+    reviewed_evidence: bool = True
+    understands_impact: bool = True
 
 
 class AngleSelectionDecision(StrictContract):
@@ -287,7 +287,7 @@ class AngleSelectionDecision(StrictContract):
     selected_angle: SelectedAngleContract
     rejected_angle_ids: list[str] = Field(default_factory=list)
     reviewed_candidate_ids: list[str] = Field(default_factory=list)
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 
@@ -295,7 +295,7 @@ class ResearchProceedDecision(StrictContract):
     operator_user_id: str = Field(min_length=1)
     decision_mode: DecisionMode = "manual"
     proceed: bool
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 
@@ -304,7 +304,7 @@ class CompetitorAssetConfirmationDecision(StrictContract):
     decision_mode: DecisionMode = "manual"
     confirmed_asset_refs: list[str] = Field(min_length=3, max_length=15)
     reviewed_candidate_ids: list[str] = Field(default_factory=list)
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 
@@ -314,7 +314,7 @@ class UmpUmsSelectionDecision(StrictContract):
     pair_id: str = Field(min_length=1)
     rejected_pair_ids: list[str] = Field(default_factory=list)
     reviewed_candidate_ids: list[str] = Field(default_factory=list)
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 
@@ -324,7 +324,7 @@ class OfferWinnerSelectionDecision(StrictContract):
     variant_id: str = Field(min_length=1)
     rejected_variant_ids: list[str] = Field(default_factory=list)
     reviewed_candidate_ids: list[str] = Field(default_factory=list)
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 
@@ -333,7 +333,7 @@ class FinalCopyApprovalDecision(StrictContract):
     decision_mode: DecisionMode = "manual"
     approved: bool
     reviewed_candidate_ids: list[str] = Field(default_factory=list)
-    attestation: DecisionAttestation
+    attestation: DecisionAttestation = Field(default_factory=DecisionAttestation)
     operator_note: str | None = None
 
 

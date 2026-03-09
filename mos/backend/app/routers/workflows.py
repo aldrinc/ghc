@@ -430,22 +430,13 @@ def _prepare_strategy_v2_decision_payload(*, body: dict[str, Any], auth: AuthCon
     payload["decision_mode"] = decision_mode
 
     attestation = payload.get("attestation")
-    if not isinstance(attestation, dict):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "attestation is required and must include reviewed_evidence and understands_impact booleans."
-            ),
-        )
-    reviewed_evidence = attestation.get("reviewed_evidence")
-    understands_impact = attestation.get("understands_impact")
-    if not isinstance(reviewed_evidence, bool) or not isinstance(understands_impact, bool):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "attestation.reviewed_evidence and attestation.understands_impact must both be booleans."
-            ),
-        )
+    reviewed_evidence = True
+    understands_impact = True
+    if isinstance(attestation, dict):
+        if isinstance(attestation.get("reviewed_evidence"), bool):
+            reviewed_evidence = attestation["reviewed_evidence"]
+        if isinstance(attestation.get("understands_impact"), bool):
+            understands_impact = attestation["understands_impact"]
     payload["attestation"] = {
         "reviewed_evidence": reviewed_evidence,
         "understands_impact": understands_impact,

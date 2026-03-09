@@ -95,17 +95,10 @@ class StrategyV2Workflow:
         return isinstance(value, list) and any(isinstance(item, str) and item.strip() for item in value)
 
     @staticmethod
-    def _has_required_attestation(payload: Any) -> bool:
+    def _has_valid_decision_payload(payload: Any) -> bool:
         if not isinstance(payload, dict):
             return False
-        if str(payload.get("decision_mode") or "").strip().lower() not in {"manual", "internal_automation"}:
-            return False
-        attestation = payload.get("attestation")
-        return (
-            isinstance(attestation, dict)
-            and isinstance(attestation.get("reviewed_evidence"), bool)
-            and isinstance(attestation.get("understands_impact"), bool)
-        )
+        return str(payload.get("decision_mode") or "manual").strip().lower() in {"manual", "internal_automation"}
 
     @staticmethod
     def _normalize_angle_gate_candidates(rows: Any) -> list[Dict[str, Any]]:
@@ -161,48 +154,43 @@ class StrategyV2Workflow:
         if signal_type == "strategy_v2_proceed_research":
             payload = self._research_proceed_decision
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and isinstance(payload.get("proceed"), bool)
             )
         if signal_type == "strategy_v2_confirm_competitor_assets":
             payload = self._competitor_asset_confirmation_decision
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and self._is_valid_str_list(payload.get("confirmed_asset_refs"))
-                and self._is_valid_str_list(payload.get("reviewed_candidate_ids"))
             )
         if signal_type == "strategy_v2_select_angle":
             payload = self._angle_selection_decision
             selected_angle = payload.get("selected_angle") if isinstance(payload, dict) else None
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and isinstance(selected_angle, dict)
                 and isinstance(selected_angle.get("angle_id"), str)
                 and bool(selected_angle.get("angle_id").strip())
-                and self._is_valid_str_list(payload.get("reviewed_candidate_ids"))
             )
         if signal_type == "strategy_v2_select_ump_ums":
             payload = self._ump_ums_selection_decision
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and isinstance(payload.get("pair_id"), str)
                 and bool(str(payload.get("pair_id")).strip())
-                and self._is_valid_str_list(payload.get("reviewed_candidate_ids"))
             )
         if signal_type == "strategy_v2_select_offer_winner":
             payload = self._offer_winner_decision
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and isinstance(payload.get("variant_id"), str)
                 and bool(str(payload.get("variant_id")).strip())
-                and self._is_valid_str_list(payload.get("reviewed_candidate_ids"))
             )
         if signal_type == "strategy_v2_approve_final_copy":
             payload = self._final_approval_decision
             return (
-                self._has_required_attestation(payload)
+                self._has_valid_decision_payload(payload)
                 and isinstance(payload.get("approved"), bool)
-                and self._is_valid_str_list(payload.get("reviewed_candidate_ids"))
             )
         return False
 

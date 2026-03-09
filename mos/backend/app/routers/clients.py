@@ -45,7 +45,7 @@ from app.db.repositories.jobs import (
 from app.db.repositories.shopify_theme_template_drafts import (
     ShopifyThemeTemplateDraftsRepository,
 )
-from app.db.repositories.products import ProductOffersRepository, ProductsRepository
+from app.db.repositories.products import ProductOffersRepository, ProductsRepository, ProductVariantsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, FunnelStatusEnum
@@ -147,6 +147,7 @@ from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
+from app.strategy_v2.pricing import parse_price_to_cents_and_currency
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.client_onboarding import (
     ClientOnboardingInput,
@@ -10318,6 +10319,7 @@ async def start_client_onboarding(
     clients_repo = ClientsRepository(session)
     products_repo = ProductsRepository(session)
     offers_repo = ProductOffersRepository(session)
+    variants_repo = ProductVariantsRepository(session)
 
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
@@ -10369,6 +10371,17 @@ async def start_client_onboarding(
         client_id=client_id,
         product_id=str(product.id),
         **offer_fields,
+    )
+    price_cents, currency = parse_price_to_cents_and_currency(
+        price_text=payload.price,
+        context="Onboarding",
+    )
+    variants_repo.create(
+        product_id=str(product.id),
+        offer_id=str(default_offer.id),
+        title=product.title,
+        price=price_cents,
+        currency=currency,
     )
 
     payload_data = payload.model_dump()

@@ -74,7 +74,6 @@ const GATE_SEQUENCE: StrategyV2PendingSignal[] = [
   "strategy_v2_approve_final_copy",
 ];
 
-const OPERATOR_NOTE_MIN_LENGTH = 20;
 const FOUNDATIONAL_DOC_SPECS = [
   {
     stepSuffix: "01",
@@ -296,8 +295,6 @@ export function StrategyV2ReviewWorkspace({
   const [fileStateById, setFileStateById] = useState<Record<string, FileRuntimeState>>({});
   const [artifactDataCache, setArtifactDataCache] = useState<Record<string, Record<string, unknown>>>({});
 
-  const [strategyReviewedEvidence, setStrategyReviewedEvidence] = useState(true);
-  const [strategyUnderstandsImpact, setStrategyUnderstandsImpact] = useState(true);
   const [strategyOperatorNote, setStrategyOperatorNote] = useState("");
 
   const [reviewedCandidateIds, setReviewedCandidateIds] = useState<string[]>([]);
@@ -315,8 +312,6 @@ export function StrategyV2ReviewWorkspace({
   }, [candidateIds, pendingPayload.copy_artifact_id, pendingSignal]);
 
   useEffect(() => {
-    setStrategyReviewedEvidence(true);
-    setStrategyUnderstandsImpact(true);
     setStrategyOperatorNote("");
     setReviewedCandidateIds([]);
     setStrategyConfirmedAssetRefs([]);
@@ -576,20 +571,6 @@ export function StrategyV2ReviewWorkspace({
 
   const requiredFilesOnly = useMemo(() => requiredFiles.filter((file) => file.required), [requiredFiles]);
 
-  const missingRequiredFiles = useMemo(
-    () => requiredFilesOnly.filter((file) => Boolean(file.missingReason)),
-    [requiredFilesOnly],
-  );
-
-  const unreviewedRequiredFiles = useMemo(
-    () =>
-      requiredFilesOnly.filter((file) => {
-        if (file.missingReason) return false;
-        return !getFileRuntime(file.id).reviewed;
-      }),
-    [requiredFilesOnly, fileStateById],
-  );
-
   const fetchArtifactData = async (artifactId: string): Promise<Record<string, unknown>> => {
     const cached = artifactDataCache[artifactId];
     if (cached) return cached;
@@ -815,27 +796,6 @@ export function StrategyV2ReviewWorkspace({
 
     const messages: string[] = [];
 
-    if (missingRequiredFiles.length) {
-      messages.push(
-        `Missing required file(s): ${missingRequiredFiles.map((file) => file.title).join(", ")}.`,
-      );
-    }
-    if (unreviewedRequiredFiles.length) {
-      messages.push(
-        `Review required file(s): ${unreviewedRequiredFiles.map((file) => file.title).join(", ")}.`,
-      );
-    }
-
-    if (!strategyReviewedEvidence) {
-      messages.push("Attestation is required: reviewed evidence.");
-    }
-    if (!strategyUnderstandsImpact) {
-      messages.push("Attestation is required: understands impact.");
-    }
-    if (strategyOperatorNote.trim().length < OPERATOR_NOTE_MIN_LENGTH) {
-      messages.push(`Operator note must be at least ${OPERATOR_NOTE_MIN_LENGTH} characters.`);
-    }
-
     if (pendingSignal === "strategy_v2_confirm_competitor_assets") {
       if (!candidates.length) {
         messages.push("No competitor candidates were provided for this gate.");
@@ -847,17 +807,6 @@ export function StrategyV2ReviewWorkspace({
       if (unknownConfirmedRefs.length) {
         messages.push("One or more confirmed assets do not map to provided candidate source refs.");
       }
-      const unreviewedSelections = strategyConfirmedAssetRefs.filter((assetRef) => {
-        const candidateId = candidateIdByAssetRef[assetRef];
-        if (!candidateId) return true;
-        return !reviewedSet.has(candidateId);
-      });
-      if (unreviewedSelections.length) {
-        messages.push("Each confirmed asset must be reviewed before submission.");
-      }
-      if (!reviewedCandidateIds.length) {
-        messages.push("Review at least one competitor candidate dossier.");
-      }
     }
 
     if (pendingSignal === "strategy_v2_select_angle") {
@@ -866,9 +815,6 @@ export function StrategyV2ReviewWorkspace({
       }
       if (!strategySelectedAngleId) {
         messages.push("Select one angle.");
-      }
-      if (strategySelectedAngleId && !reviewedSet.has(strategySelectedAngleId)) {
-        messages.push("Selected angle must be reviewed before submission.");
       }
       if (!selectedAngleCandidate?.raw) {
         messages.push("Selected angle payload is missing.");
@@ -882,9 +828,6 @@ export function StrategyV2ReviewWorkspace({
       if (!strategySelectedPairId) {
         messages.push("Select one UMP/UMS pair.");
       }
-      if (strategySelectedPairId && !reviewedSet.has(strategySelectedPairId)) {
-        messages.push("Selected pair must be reviewed before submission.");
-      }
     }
 
     if (pendingSignal === "strategy_v2_select_offer_winner") {
@@ -894,32 +837,20 @@ export function StrategyV2ReviewWorkspace({
       if (!strategySelectedVariantId) {
         messages.push("Select one winning variant.");
       }
-      if (strategySelectedVariantId && !reviewedSet.has(strategySelectedVariantId)) {
-        messages.push("Selected variant must be reviewed before submission.");
-      }
     }
 
     if (pendingSignal === "strategy_v2_approve_final_copy") {
       if (!candidateIds.length) {
         messages.push("Copy candidate id is missing for final approval.");
       }
-      if (!reviewedCandidateIds.length) {
-        messages.push("Review final copy files before approval submission.");
-      }
     }
 
     return messages;
   }, [
     pendingSignal,
-    missingRequiredFiles,
-    unreviewedRequiredFiles,
-    strategyReviewedEvidence,
-    strategyUnderstandsImpact,
     strategyOperatorNote,
     candidates,
     strategyConfirmedAssetRefs,
-    reviewedSet,
-    reviewedCandidateIds.length,
     strategySelectedAngleId,
     selectedAngleCandidate?.raw,
     strategySelectedPairId,
@@ -938,11 +869,14 @@ export function StrategyV2ReviewWorkspace({
     const baseDecision: Record<string, unknown> = {
       decision_mode: "manual",
       attestation: {
-        reviewed_evidence: strategyReviewedEvidence,
-        understands_impact: strategyUnderstandsImpact,
+        reviewed_evidence: true,
+        understands_impact: true,
       },
-      operator_note: strategyOperatorNote.trim(),
     };
+    const operatorNote = strategyOperatorNote.trim();
+    if (operatorNote) {
+      baseDecision.operator_note = operatorNote;
+    }
 
     const reviewedIds = Array.from(new Set(reviewedCandidateIds));
 
@@ -1123,8 +1057,8 @@ export function StrategyV2ReviewWorkspace({
   return (
     <div className="mt-3 space-y-4">
       {pendingSignal ? (
-        <Callout variant="warning" title={`Review required: ${strategyV2SignalLabel(pendingSignal)}`}>
-          Complete required file review in the center panel, then decide and submit.
+        <Callout variant="warning" title={`Decision needed: ${strategyV2SignalLabel(pendingSignal)}`}>
+          Review the available files if helpful, then send the decision.
         </Callout>
       ) : (
         <Callout variant="neutral" title="No pending Strategy V2 gate">
@@ -1620,35 +1554,15 @@ export function StrategyV2ReviewWorkspace({
               </div>
 
               <div className="ds-card ds-card--md space-y-3">
-                <div className="text-sm font-semibold text-content">Attest and submit</div>
-                <label className="flex items-center gap-2 text-xs text-content">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                    checked={strategyReviewedEvidence}
-                    onChange={() => setStrategyReviewedEvidence((value) => !value)}
-                  />
-                  <span>I reviewed the evidence required for this decision.</span>
-                </label>
-                <label className="flex items-center gap-2 text-xs text-content">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                    checked={strategyUnderstandsImpact}
-                    onChange={() => setStrategyUnderstandsImpact((value) => !value)}
-                  />
-                  <span>I understand the impact of this decision.</span>
-                </label>
+                <div className="text-sm font-semibold text-content">Submit decision</div>
 
                 <div>
-                  <div className="text-xs text-content-muted mb-1">
-                    Operator note (minimum {OPERATOR_NOTE_MIN_LENGTH} characters)
-                  </div>
+                  <div className="text-xs text-content-muted mb-1">Operator note (optional)</div>
                   <Textarea
                     rows={4}
                     value={strategyOperatorNote}
                     onChange={(event) => setStrategyOperatorNote(event.target.value)}
-                    placeholder="Explain what you reviewed and why this decision is correct."
+                    placeholder="Optional context for this decision."
                   />
                 </div>
 
@@ -1659,14 +1573,14 @@ export function StrategyV2ReviewWorkspace({
                 ) : null}
 
                 {validationMessages.length ? (
-                  <Callout variant="danger" title="Submission blocked until the following are resolved">
+                  <Callout variant="danger" title="Missing required decision inputs">
                     {validationMessages.map((message) => (
                       <div key={message}>• {message}</div>
                     ))}
                   </Callout>
                 ) : (
                   <Callout variant="success" title="Ready to submit">
-                    All required files are reviewed and decision payload validation checks pass.
+                    The selected decision payload is ready. File review is available, but it no longer blocks sending.
                   </Callout>
                 )}
 

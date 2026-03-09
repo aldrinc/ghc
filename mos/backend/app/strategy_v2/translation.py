@@ -20,6 +20,7 @@ from app.strategy_v2.contracts import (
     validate_stage1,
 )
 from app.strategy_v2.errors import StrategyV2MissingContextError
+from app.strategy_v2.pricing import parse_price_to_cents_and_currency, require_concrete_price
 
 
 _MARKET_MATURITY_VALUES = ("Introduction", "Growth", "Maturity", "Decline")
@@ -103,26 +104,10 @@ def _require_string_list(
 
 
 def _parse_price_to_cents_and_currency(price_text: str) -> tuple[int, str]:
-    normalized = price_text.strip()
-    if not normalized:
-        raise StrategyV2MissingContextError(
-            "Missing required field 'price'. Remediation: provide explicit stage2.price before Offer pipeline mapping."
-        )
-
-    currency = "USD"
-    if normalized.upper().startswith("USD"):
-        normalized = normalized[3:].strip()
-    if normalized.startswith("$"):
-        normalized = normalized[1:].strip()
-
-    number_match = re.search(r"\d+(?:\.\d{1,2})?", normalized)
-    if number_match is None:
-        raise StrategyV2MissingContextError(
-            "Unable to parse numeric price for Offer pipeline input mapping. "
-            "Remediation: provide stage2.price in a parseable format like '$49' or '49.99'."
-        )
-    amount = float(number_match.group(0))
-    return int(round(amount * 100)), currency
+    return parse_price_to_cents_and_currency(
+        price_text=price_text,
+        context="Offer pipeline input mapping",
+    )
 
 
 def _extract_step_content(
@@ -450,6 +435,8 @@ def translate_stage0(
         resolved_price = str(payload.get("price")).strip()
     else:
         resolved_price = "TBD"
+    if resolved_price.upper() != "TBD":
+        resolved_price = require_concrete_price(price=resolved_price, context="Stage 0 translation")
 
     competitor_urls: list[str] = []
     raw_urls = override_urls if isinstance(override_urls, list) else payload.get("competitor_urls")
@@ -555,7 +542,10 @@ def translate_stage1(
         "stage": 1,
         "product_name": stage0.product_name,
         "description": stage0.description,
-        "price": stage0.price,
+        "price": require_concrete_price(
+            price=stage0.price,
+            context="Stage 1 translation",
+        ),
         "competitor_urls": merged_competitor_urls,
         "product_customizable": stage0.product_customizable,
         "category_niche": category_niche,

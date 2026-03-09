@@ -268,6 +268,18 @@ def test_translate_stage1_merges_competitor_urls_from_step1_content() -> None:
     ]
 
 
+def test_translate_stage1_requires_concrete_price() -> None:
+    stage0 = translate_stage0(
+        product_name="Honest Herbalist Handbook",
+        product_description="Digital herbal safety guide.",
+        onboarding_payload={"competitor_urls": ["https://seed.example/one"]},
+        stage0_overrides={"product_customizable": True},
+    )
+
+    with pytest.raises(StrategyV2MissingContextError, match="Stage 1 translation requires a concrete price"):
+        translate_stage1(stage0=stage0, precanon_research=_precanon_research_fixture())
+
+
 def test_translate_stage1_accepts_primary_challenge_label_for_bottleneck() -> None:
     stage0 = translate_stage0(
         product_name="Honest Herbalist Handbook",

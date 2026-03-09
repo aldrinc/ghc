@@ -1749,7 +1749,7 @@ def test_start_strategy_v2_and_send_all_hitl_signals(api_client, fake_temporal):
     assert "strategy_v2_approve_final_copy" in signal_names
 
 
-def test_strategy_v2_proceed_research_requires_attestation(api_client, fake_temporal):
+def test_strategy_v2_proceed_research_accepts_missing_attestation(api_client, fake_temporal):
     client_id, product_id = _create_client_and_product(
         api_client=api_client,
         suffix="AttestationRequired",
@@ -1776,15 +1776,18 @@ def test_strategy_v2_proceed_research_requires_attestation(api_client, fake_temp
         f"/workflows/{run_id}/signals/strategy-v2/proceed-research",
         json={
             "proceed": True,
-            "decision_mode": "manual",
-            "operator_note": "Reviewed evidence and prepared to proceed without attestation payload.",
         },
     )
-    assert response.status_code == 400
-    assert "attestation is required" in response.json()["detail"]
+    assert response.status_code == 200
 
     signal_names = [name for name, _args in fake_temporal.signals]
-    assert "strategy_v2_proceed_research" not in signal_names
+    assert "strategy_v2_proceed_research" in signal_names
+    proceed_signal_args = next(args for name, args in fake_temporal.signals if name == "strategy_v2_proceed_research")
+    proceed_payload = proceed_signal_args[0]
+    assert proceed_payload["attestation"] == {
+        "reviewed_evidence": True,
+        "understands_impact": True,
+    }
 
 
 def test_workflow_research_artifact_endpoint_supports_artifact_scheme(
@@ -3060,7 +3063,6 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
-    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3258,7 +3260,6 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
-    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3774,7 +3775,6 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         },
     )
     monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
-    monkeypatch.setattr(strategy_v2_activities, "_resolve_price_from_reference_urls", lambda *, urls: "$49")
     monkeypatch.setattr(
         strategy_v2_activities,
         "score_voc_items",
@@ -3809,7 +3809,7 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
             "product_description": "Detailed product description",
             "product_customizable": True,
             "competitor_urls": ["https://competitor-a.example"],
-            "price": "TBD",
+            "price": "$49",
         },
     )
     db_session.add(onboarding_payload)

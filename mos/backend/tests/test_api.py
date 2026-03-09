@@ -150,6 +150,7 @@ def test_onboarding_requires_strategy_v2_enabled(api_client):
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "price": "$49",
             "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
@@ -183,6 +184,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "price": "$49",
             "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
@@ -209,6 +211,10 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
     assert product_payload["title"] == "Test Product"
     assert product_payload["product_type"] == "book"
     assert isinstance(product_payload.get("variants"), list)
+    assert len(product_payload["variants"]) == 1
+    assert product_payload["variants"][0]["offer_id"] == default_offer_id
+    assert product_payload["variants"][0]["price"] == 4900
+    assert product_payload["variants"][0]["currency"] == "USD"
 
     short_product_id = product_id.split("-", 1)[0]
     product_detail_short = api_client.get(f"/products/{short_product_id}")

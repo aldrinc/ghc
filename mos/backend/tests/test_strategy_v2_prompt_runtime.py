@@ -830,36 +830,7 @@ def _build_stage2_with_price(price: str) -> ProductBriefStage2:
         }
     )
 
-
-def test_resolve_price_from_reference_urls_prefers_offer_price_over_shipping(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _FakeResponse:
-        def __init__(self, html: str) -> None:
-            self._html = html
-
-        def __enter__(self) -> "_FakeResponse":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def read(self) -> bytes:
-            return self._html.encode("utf-8")
-
-    def _fake_urlopen(_request, timeout: int = 0) -> _FakeResponse:
-        assert timeout == 20
-        return _FakeResponse(
-            "<html><body>"
-            "<p>Shipping is only $9.99 today</p>"
-            "<p>Secure your copy now only $37</p>"
-            "</body></html>"
-        )
-
-    monkeypatch.setattr(strategy_v2_activities.urllib.request, "urlopen", _fake_urlopen)
-    price = strategy_v2_activities._resolve_price_from_reference_urls(urls=["https://offer.example"])
-    assert price == "$37"
-
-
-def test_map_offer_pipeline_input_with_price_resolution_fails_when_price_is_tbd(
+def test_map_offer_pipeline_input_with_price_resolution_requires_concrete_price(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -872,10 +843,7 @@ def test_map_offer_pipeline_input_with_price_resolution_fails_when_price_is_tbd(
     monkeypatch.setattr(strategy_v2_activities, "map_offer_pipeline_input", _fake_map_offer_pipeline_input)
 
     stage2 = _build_stage2_with_price("TBD")
-    with pytest.raises(
-        StrategyV2MissingContextError,
-        match="fallback price scraping is disabled",
-    ):
+    with pytest.raises(StrategyV2MissingContextError, match="Offer pipeline requires a concrete price"):
         strategy_v2_activities._map_offer_pipeline_input_with_price_resolution(
             stage2=stage2,
             selected_angle_payload=stage2.selected_angle.model_dump(mode="python"),

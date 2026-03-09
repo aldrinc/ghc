@@ -54,6 +54,7 @@ const complianceBusinessModelOptions: Array<{ label: string; value: ComplianceBu
 type ProductDraft = {
   product_name: string;
   product_description: string;
+  price: string;
   product_type: string;
   product_category: string;
   primary_benefits: string;
@@ -68,6 +69,7 @@ type ProductDraft = {
 const emptyProductDraft: ProductDraft = {
   product_name: "",
   product_description: "",
+  price: "",
   product_type: "",
   product_category: "",
   primary_benefits: "",
@@ -208,6 +210,7 @@ export function OnboardingWizard({
       return (
         Boolean(state.products[0]?.product_name?.trim()) &&
         Boolean(state.products[0]?.product_description?.trim()) &&
+        Boolean(state.products[0]?.price?.trim()) &&
         Boolean(state.products[0]?.product_type?.trim()) &&
         Boolean(state.products[0]?.primary_image_file)
       );
@@ -274,6 +277,10 @@ export function OnboardingWizard({
       toast.error("Product description is required.");
       return;
     }
+    if (!firstProduct?.price?.trim()) {
+      toast.error("Product price is required.");
+      return;
+    }
     if (!firstProduct?.product_type?.trim()) {
       toast.error("Product type is required.");
       return;
@@ -317,6 +324,7 @@ export function OnboardingWizard({
       business_type: state.business_type,
       brand_story: state.brand_story.trim(),
       product_name: firstProduct.product_name.trim(),
+      price: firstProduct.price.trim(),
       product_customizable: state.product_customizable,
       business_model: state.business_model.trim(),
       funnel_position: state.funnel_position.trim(),
@@ -457,6 +465,10 @@ export function OnboardingWizard({
       toast.error("Product description is required.");
       return;
     }
+    if (!productDraft.price.trim()) {
+      toast.error("Product price is required.");
+      return;
+    }
     if (!productDraft.product_type.trim()) {
       toast.error("Product type is required.");
       return;
@@ -473,6 +485,7 @@ export function OnboardingWizard({
       ...productDraft,
       product_name: productDraft.product_name.trim(),
       product_description: productDraft.product_description.trim(),
+      price: productDraft.price.trim(),
       product_type: productDraft.product_type.trim(),
     };
     setState((s) => {
@@ -593,6 +606,9 @@ export function OnboardingWizard({
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-content">{product.product_name}</div>
                       <div className="mt-1 text-xs text-content-muted">
+                        Price: {product.price || "Missing"}
+                      </div>
+                      <div className="mt-1 text-xs text-content-muted">
                         Type: {product.product_type || "Missing"}
                       </div>
                       <div className="mt-1 text-xs text-content-muted">
@@ -691,6 +707,19 @@ export function OnboardingWizard({
                     render={(props) => (
                       <Textarea {...props} rows={3} placeholder="Sleep support tincture with calming herbs." />
                     )}
+                  />
+                  <FieldError />
+                </FieldRoot>
+
+                <FieldRoot name="price">
+                  <FieldLabel>Price</FieldLabel>
+                  <FieldDescription>Required. Used for Strategy V2 and the default offer price point.</FieldDescription>
+                  <Input
+                    value={productDraft.price}
+                    onChange={(e) => setProductDraft((draft) => ({ ...draft, price: e.target.value }))}
+                    placeholder="$49"
+                    required
+                    disabled={isSubmitting}
                   />
                   <FieldError />
                 </FieldRoot>
@@ -967,6 +996,9 @@ export function OnboardingWizard({
                 </p>
                 <p>
                   <strong>Description:</strong> {state.products[0].product_description || "Missing"}
+                </p>
+                <p>
+                  <strong>Price:</strong> {state.products[0].price || "Missing"}
                 </p>
                 <p>
                   <strong>Product type:</strong> {state.products[0].product_type || "Missing"}
