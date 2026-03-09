@@ -3256,6 +3256,16 @@ def test_sync_theme_brand_updates_layout_and_css():
                 in css_content
             )
             assert '[class*="cart-drawer"]' not in css_content
+            assert ".slider--tablet .card-grid {" in css_content
+            assert (
+                "--slider-item-width: minmax(160px, calc((100% - var(--card-grid-gap)) / 2)) !important;"
+                in css_content
+            )
+            assert ".slider--tablet .mobile\\:card-grid--1 {" in css_content
+            assert (
+                "--slider-item-width: minmax(220px, 100%) !important;"
+                in css_content
+            )
             assert (
                 "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
                 in css_content

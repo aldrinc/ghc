@@ -496,6 +496,21 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             ),
         ),
         (
+            ".slider--tablet .card-grid",
+            (
+                (
+                    "--slider-item-width",
+                    "minmax(160px, calc((100% - var(--card-grid-gap)) / 2))",
+                ),
+            ),
+        ),
+        (
+            ".slider--tablet .mobile\\:card-grid--1",
+            (
+                ("--slider-item-width", "minmax(220px, 100%)"),
+            ),
+        ),
+        (
             "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button, header .header__buttons .cart-drawer-button:hover, #shopify-section-header .header__buttons .cart-drawer-button:hover, header .header__buttons .cart-drawer-button:focus-visible, #shopify-section-header .header__buttons .cart-drawer-button:focus-visible",
             (
                 ("background-color", "transparent"),
