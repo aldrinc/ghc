@@ -122,6 +122,51 @@ def test_normalize_habitat_observations_preserves_unknown_video_numeric_fields_a
     assert normalized[0]["viral_video_count"] is None
 
 
+def test_normalize_habitat_observations_allows_nullable_video_numeric_fields_as_json_null() -> None:
+    row = {
+        "habitat_name": "social video habitat",
+        "habitat_type": "Social_Video",
+        "url_pattern": "https://www.tiktok.com/@brand",
+        "source_file": "social_video_habitat.json",
+        "items_in_file": 200,
+        "data_quality": "CLEAN",
+        "observation_sheet": _build_observation_sheet(),
+        "language_samples": [],
+        "video_extension": {
+            "video_count_scraped": 200,
+            "median_view_count": None,
+            "viral_videos_found": "CANNOT_DETERMINE",
+            "viral_video_count": None,
+            "comment_sections_active": "CANNOT_DETERMINE",
+            "comment_avg_length": "SHORT",
+            "hook_formats_identifiable": "Y",
+            "creator_diversity": "SINGLE",
+            "contains_testimonial_language": "N",
+            "contains_objection_language": "Y",
+            "contains_purchase_intent": "Y",
+        },
+        "competitive_overlap": _build_schema_object(_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA),
+        "trend_lifecycle": _build_schema_object(_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA),
+        "mining_gate": {
+            "status": "PASS",
+            "failed_fields": [],
+            "reason": "Hard gate passed with available social-video evidence.",
+        },
+        "rank_score": 14,
+        "estimated_yield": 0,
+        "evidence_refs": ["/apify_output/raw_scraped_data/social_video/test.json::item[0]"],
+    }
+
+    normalized = _normalize_habitat_observations([row])
+
+    assert len(normalized) == 1
+    assert normalized[0]["video_count_scraped"] == 200
+    assert normalized[0]["median_view_count"] is None
+    assert normalized[0]["viral_video_count"] is None
+    assert normalized[0]["comment_avg_length"] == "SHORT"
+    assert normalized[0]["creator_diversity"] == "SINGLE"
+
+
 def test_normalize_agent00_handoff_output_includes_target_id_and_config_id() -> None:
     raw_output = {
         "product_classification": {

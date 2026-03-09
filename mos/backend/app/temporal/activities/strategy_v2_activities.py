@@ -8546,11 +8546,16 @@ def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict
         if isinstance(video_extension, dict):
             required_video_fields = _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA.get("required", [])
             if isinstance(required_video_fields, list):
-                _require_row_fields(
-                    row=video_extension,
-                    required_fields=tuple(str(field) for field in required_video_fields if isinstance(field, str)),
-                    row_name=f"{row_name}.video_extension",
-                )
+                missing_video_fields = [
+                    str(field_name)
+                    for field_name in required_video_fields
+                    if isinstance(field_name, str) and field_name not in video_extension
+                ]
+                if missing_video_fields:
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension is missing required fields: {missing_video_fields}. "
+                        "Remediation: emit complete observation sheet fields from the upstream agent output."
+                    )
         data_quality = str(row.get("data_quality") or "").strip().upper()
         if data_quality not in {"CLEAN", "MINOR_ISSUES", "MAJOR_ISSUES", "UNUSABLE"}:
             raise StrategyV2SchemaValidationError(
@@ -8632,6 +8637,15 @@ def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict
                     )
                 return normalized
 
+            def _required_video_enum(field_name: str, *, allowed: tuple[str, ...]) -> str:
+                value = str(video_extension.get(field_name) or "").strip().upper()
+                if value not in allowed:
+                    allowed_values = ", ".join(allowed)
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension field '{field_name}' must be one of {allowed_values}."
+                    )
+                return value
+
             def _optional_video_metric_int(field_name: str) -> int | None:
                 value = video_extension.get(field_name)
                 if value is None:
@@ -8661,9 +8675,15 @@ def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict
             observations[-1]["viral_videos_found"] = _required_video_yes_no("viral_videos_found")
             observations[-1]["viral_video_count"] = _optional_video_metric_int("viral_video_count")
             observations[-1]["comment_sections_active"] = _required_video_yes_no("comment_sections_active")
-            observations[-1]["comment_avg_length"] = str(video_extension.get("comment_avg_length") or "").strip()
+            observations[-1]["comment_avg_length"] = _required_video_enum(
+                "comment_avg_length",
+                allowed=("SHORT", "MEDIUM", "LONG"),
+            )
             observations[-1]["hook_formats_identifiable"] = _required_video_yes_no("hook_formats_identifiable")
-            observations[-1]["creator_diversity"] = str(video_extension.get("creator_diversity") or "").strip()
+            observations[-1]["creator_diversity"] = _required_video_enum(
+                "creator_diversity",
+                allowed=("SINGLE", "FEW", "MANY"),
+            )
             observations[-1]["contains_testimonial_language"] = _required_video_yes_no("contains_testimonial_language")
             observations[-1]["contains_objection_language"] = _required_video_yes_no("contains_objection_language")
             observations[-1]["contains_purchase_intent"] = _required_video_yes_no("contains_purchase_intent")
