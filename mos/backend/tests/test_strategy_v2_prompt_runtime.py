@@ -315,10 +315,32 @@ def test_voc_agent01_file_assessment_schema_discriminates_observe_and_exclude_ro
     assert mined_observe_variant["properties"]["include_in_mining_plan"]["enum"] == [True]
 
     observation_schema = strategy_v2_activities._VOC_AGENT01_OBSERVATION_DETAIL_SCHEMA
-    assert observation_schema["properties"]["observation_id"]["type"] == "string"
-    assert observation_schema["properties"]["url_pattern"]["type"] == "string"
-    assert observation_schema["properties"]["rank_score"]["type"] == "integer"
-    assert observation_schema["properties"]["estimated_yield"]["type"] == "integer"
+    observation_variants = observation_schema["anyOf"]
+    assert len(observation_variants) == 2
+
+    non_mined_observation_variant = next(
+        variant
+        for variant in observation_variants
+        if variant["properties"]["include_in_mining_plan"]["enum"] == [False]
+    )
+    mined_observation_variant = next(
+        variant
+        for variant in observation_variants
+        if variant["properties"]["include_in_mining_plan"]["enum"] == [True]
+    )
+
+    assert non_mined_observation_variant["properties"]["target_voc_types"]["maxItems"] == 0
+    assert non_mined_observation_variant["properties"]["sampling_strategy"]["type"] == "null"
+    assert non_mined_observation_variant["properties"]["platform_behavior_note"]["type"] == "null"
+    assert non_mined_observation_variant["properties"]["priority_rank"]["type"] == "null"
+
+    assert mined_observation_variant["properties"]["observation_id"]["type"] == "string"
+    assert mined_observation_variant["properties"]["url_pattern"]["type"] == "string"
+    assert mined_observation_variant["properties"]["rank_score"]["type"] == "integer"
+    assert mined_observation_variant["properties"]["estimated_yield"]["type"] == "integer"
+    assert mined_observation_variant["properties"]["target_voc_types"]["minItems"] == 1
+    assert mined_observation_variant["properties"]["sampling_strategy"]["minLength"] == 1
+    assert mined_observation_variant["properties"]["platform_behavior_note"]["minLength"] == 1
 
 
 def _iter_strategy_v2_run_prompt_json_schemas():

@@ -301,6 +301,7 @@ def _agent1_observation(
         "rank_score": 77,
         "estimated_yield": 22,
         "evidence_refs": [f"{source_file}::item[0]"],
+        "include_in_mining_plan": include_in_mining_plan,
         "priority_rank": priority_rank,
         "target_voc_types": ["PAIN_LANGUAGE"] if include_in_mining_plan else [],
         "sampling_strategy": "Chronological high-signal scan." if include_in_mining_plan else None,
@@ -404,3 +405,54 @@ def test_validate_agent1_output_source_file_grounding_accepts_exact_coverage_wit
     assert [row["source_file"] for row in derived["habitat_observations"]] == ["observed_file.json"]
     assert derived["excluded_source_files"] == ["excluded_file.json"]
     assert [row["source_file"] for row in derived["mining_plan"]] == ["observed_file.json"]
+
+
+def test_validate_agent1_output_source_file_grounding_rejects_mined_rows_without_target_voc_types() -> None:
+    observation = _agent1_observation(
+        source_file="observed_file.json",
+        include_in_mining_plan=True,
+        priority_rank=1,
+    )
+    observation["target_voc_types"] = []
+
+    with pytest.raises(
+        StrategyV2SchemaValidationError,
+        match="target_voc_types must be a non-empty array when include_in_mining_plan=true",
+    ):
+        _validate_agent1_output_source_file_grounding(
+            agent01_output={
+                "file_assessments": {
+                    "observed_file.json": _agent1_file_assessment(
+                        source_file="observed_file.json",
+                        include_in_mining_plan=True,
+                    )
+                },
+                "observations": [observation],
+            },
+            scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "observed_file.json"}]},
+        )
+
+
+def test_validate_agent1_output_source_file_grounding_rejects_include_in_mining_plan_mismatch() -> None:
+    observation = _agent1_observation(
+        source_file="observed_file.json",
+        include_in_mining_plan=False,
+        priority_rank=None,
+    )
+
+    with pytest.raises(
+        StrategyV2SchemaValidationError,
+        match="observation_projection.include_in_mining_plan must match file_assessments.include_in_mining_plan",
+    ):
+        _validate_agent1_output_source_file_grounding(
+            agent01_output={
+                "file_assessments": {
+                    "observed_file.json": _agent1_file_assessment(
+                        source_file="observed_file.json",
+                        include_in_mining_plan=True,
+                    )
+                },
+                "observations": [observation],
+            },
+            scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "observed_file.json"}]},
+        )

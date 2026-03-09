@@ -997,6 +997,62 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
     }
 
 
+def _agent1_observation_detail_variant_schema(*, include_in_mining_plan: bool) -> dict[str, Any]:
+    properties = {
+        key: deepcopy(value)
+        for key, value in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["properties"].items()
+        if key != "source_file"
+    }
+    properties["observation_id"] = {"type": "string", "minLength": 1}
+    properties["include_in_mining_plan"] = {
+        "type": "boolean",
+        "enum": [include_in_mining_plan],
+    }
+    if include_in_mining_plan:
+        properties["priority_rank"] = {"type": "integer", "minimum": 1, "maximum": 12}
+        properties["target_voc_types"] = {
+            "type": "array",
+            "minItems": 1,
+            "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+        }
+        properties["sampling_strategy"] = {"type": "string", "minLength": 1}
+        properties["platform_behavior_note"] = {"type": "string", "minLength": 1}
+        properties["compliance_flags"] = {"type": "string"}
+    else:
+        properties["priority_rank"] = {"type": "null"}
+        properties["target_voc_types"] = {
+            "type": "array",
+            "maxItems": 0,
+            "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
+        }
+        properties["sampling_strategy"] = {"type": "null"}
+        properties["platform_behavior_note"] = {"type": "null"}
+        properties["compliance_flags"] = {"type": "string", "maxLength": 0}
+
+    required = [
+        field_name
+        for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["required"]
+        if field_name != "source_file"
+    ]
+    required.extend(
+        [
+            "observation_id",
+            "include_in_mining_plan",
+            "priority_rank",
+            "target_voc_types",
+            "sampling_strategy",
+            "platform_behavior_note",
+            "compliance_flags",
+        ]
+    )
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": required,
+    }
+
+
 _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -1110,55 +1166,11 @@ _VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
 
 
 def _agent1_observation_detail_schema() -> dict[str, Any]:
-    properties = {
-        key: deepcopy(value)
-        for key, value in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["properties"].items()
-        if key != "source_file"
-    }
-    properties["observation_id"] = {"type": "string", "minLength": 1}
-    properties["priority_rank"] = {
-        "anyOf": [
-            {"type": "integer", "minimum": 1, "maximum": 12},
-            {"type": "null"},
-        ]
-    }
-    properties["target_voc_types"] = {
-        "type": "array",
-        "items": _VOC_AGENT01_TARGET_VOC_TYPE_SCHEMA,
-    }
-    properties["sampling_strategy"] = {
-        "anyOf": [
-            {"type": "string", "minLength": 1},
-            {"type": "null"},
-        ]
-    }
-    properties["platform_behavior_note"] = {
-        "anyOf": [
-            {"type": "string", "minLength": 1},
-            {"type": "null"},
-        ]
-    }
-    properties["compliance_flags"] = {"type": "string"}
-    required = [
-        field_name
-        for field_name in _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA["required"]
-        if field_name != "source_file"
-    ]
-    required.extend(
-        [
-            "observation_id",
-            "priority_rank",
-            "target_voc_types",
-            "sampling_strategy",
-            "platform_behavior_note",
-            "compliance_flags",
-        ]
-    )
     return {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": properties,
-        "required": required,
+        "anyOf": [
+            _agent1_observation_detail_variant_schema(include_in_mining_plan=False),
+            _agent1_observation_detail_variant_schema(include_in_mining_plan=True),
+        ]
     }
 
 
@@ -8777,6 +8789,7 @@ def _render_agent1_runtime_instruction(
         "Do not emit separate habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments + observations.\n"
         "Every OBSERVE file_assessments row must reference a unique non-empty observation_id.\n"
         "Every observations row must include a unique non-empty observation_id.\n"
+        "Every observations row must repeat include_in_mining_plan and it must exactly match the linked file_assessments row.\n"
         "If decision=OBSERVE, the referenced observations row must populate habitat_name, habitat_type, url_pattern, items_in_file, data_quality, observation_sheet, "
         "competitive_overlap, trend_lifecycle, mining_gate, rank_score, estimated_yield, and evidence_refs.\n"
         "If decision=OBSERVE, copy url_pattern from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.default_url_pattern unless stronger evidence suggests a better locator.\n"
@@ -8953,6 +8966,15 @@ def _derive_agent1_outputs_from_file_assessments(
 
         observation_row = deepcopy(observation_raw)
         observation_row["source_file"] = source_file
+        observation_include_in_mining_plan = observation_row.get("include_in_mining_plan")
+        if not isinstance(observation_include_in_mining_plan, bool):
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.observation_projection.include_in_mining_plan must be boolean."
+            )
+        if observation_include_in_mining_plan != include_in_mining_plan:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.observation_projection.include_in_mining_plan must match file_assessments.include_in_mining_plan."
+            )
         _require_row_fields(
             row=observation_row,
             required_fields=observation_projection_required_fields,

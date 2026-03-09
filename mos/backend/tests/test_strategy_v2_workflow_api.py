@@ -1245,6 +1245,7 @@ def _agent1_observation_payload(
 ) -> dict[str, Any]:
     return {
         "observation_id": f"obs-{observation['source_file'].replace('.', '-')}",
+        "include_in_mining_plan": include_in_mining_plan,
         "habitat_name": observation["habitat_name"],
         "habitat_type": observation["habitat_type"],
         "url_pattern": observation["url_pattern"],
