@@ -316,6 +316,31 @@ _THEME_SECONDARY_COUNTDOWN_SHAPE_FILL_RE = re.compile(
     r'fill="\{\{\s*background_color\s*\}\}"',
     re.IGNORECASE,
 )
+_LOCAL_THEME_COLLECTION_BANNER_SECTION_FILENAME = "sections/main-collection-banner.liquid"
+_LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_SNIPPET = (
+    "    {%- if desktop_image != blank %}\n"
+    "      {%- render 'section-variables', section: section -%}\n"
+    "      {%- if section.settings.image_height == 'adapt' %}\n"
+)
+_LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_REPLACEMENT = (
+    "    {%- render 'section-variables', section: section -%}\n"
+    "    {%- if desktop_image != blank %}\n"
+    "      {%- if section.settings.image_height == 'adapt' %}\n"
+)
+_LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_SNIPPET = (
+    'class="banner__box md:text-{{ section.settings.text_alignment }} '
+    'text-{{ section.settings.text_alignment_mobile }}"'
+)
+_LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT = (
+    'class="banner__box main-collection-banner__content md:text-{{ '
+    'section.settings.text_alignment }} text-{{ section.settings.text_alignment_mobile }}"'
+)
+_LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET = (
+    "\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__content {\n"
+    "    color: rgb(var(--color-foreground));\n"
+    "  }\n"
+)
 _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
     {
         "assets",
@@ -2407,6 +2432,73 @@ def _apply_local_theme_collection_banner_contrasting_text_color(
     file_entry.pop("contentBase64", None)
 
 
+def _apply_local_theme_collection_banner_text_styling(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+) -> None:
+    file_entry = files_by_filename.get(_LOCAL_THEME_COLLECTION_BANNER_SECTION_FILENAME)
+    section_content = file_entry.get("content") if isinstance(file_entry, dict) else None
+    if not isinstance(section_content, str) or not section_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline is missing or has invalid collection banner "
+                "section content required for text color synchronization."
+            ),
+        )
+
+    updated_content = section_content
+    if _LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_REPLACEMENT not in updated_content:
+        if _LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_SNIPPET not in updated_content:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline collection banner does not expose the "
+                    "expected section color variable binding required for text color "
+                    "synchronization."
+                ),
+            )
+        updated_content = updated_content.replace(
+            _LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_SNIPPET,
+            _LOCAL_THEME_COLLECTION_BANNER_SECTION_VARIABLES_REPLACEMENT,
+            1,
+        )
+
+    if _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT not in updated_content:
+        if _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_SNIPPET not in updated_content:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline collection banner does not expose the "
+                    "expected banner content wrapper required for text color "
+                    "synchronization."
+                ),
+            )
+        updated_content = updated_content.replace(
+            _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_SNIPPET,
+            _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT,
+            1,
+        )
+
+    if _LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET not in updated_content:
+        if "</style>" not in updated_content:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline collection banner is missing the style "
+                    "block required for text color synchronization."
+                ),
+            )
+        updated_content = updated_content.replace(
+            "</style>",
+            f"{_LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET}</style>",
+            1,
+        )
+
+    file_entry["content"] = updated_content
+    file_entry.pop("contentBase64", None)
+
+
 def _require_local_theme_secondary_background_css_var(
     *,
     css_vars: dict[str, str],
@@ -2798,6 +2890,9 @@ def _build_local_shopify_theme_export_payload(
     _apply_theme_template_setting_values_to_local_files(
         files_by_filename=files_by_filename,
         values_by_setting_path=component_text_values,
+    )
+    _apply_local_theme_collection_banner_text_styling(
+        files_by_filename=files_by_filename,
     )
     _apply_local_theme_collection_banner_contrasting_text_color(
         files_by_filename=files_by_filename,
