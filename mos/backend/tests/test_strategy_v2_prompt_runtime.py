@@ -305,42 +305,32 @@ def test_voc_agent01_file_assessment_schema_discriminates_observe_and_exclude_ro
         and variant["properties"]["include_in_mining_plan"]["enum"] == [True]
     )
 
-    assert exclude_variant["properties"]["observation_id"]["type"] == "null"
+    assert exclude_variant["properties"]["observation_projection"]["type"] == "null"
     assert exclude_variant["properties"]["exclude_reason"]["type"] == "string"
 
-    assert observe_variant["properties"]["observation_id"]["type"] == "string"
+    observe_projection = observe_variant["properties"]["observation_projection"]
+    mined_projection = mined_observe_variant["properties"]["observation_projection"]
+
+    assert observe_projection["type"] == "object"
     assert observe_variant["properties"]["exclude_reason"]["maxLength"] == 0
+    assert "priority_rank" in observe_projection["required"]
+    assert observe_projection["properties"]["priority_rank"]["type"] == "null"
+    assert "include_in_mining_plan" not in observe_projection["properties"]
+    assert "observation_id" not in observe_projection["properties"]
 
-    assert mined_observe_variant["properties"]["observation_id"]["type"] == "string"
     assert mined_observe_variant["properties"]["include_in_mining_plan"]["enum"] == [True]
+    assert mined_projection["properties"]["priority_rank"]["type"] == "integer"
+    assert mined_projection["properties"]["target_voc_types"]["minItems"] == 1
 
-    observation_schema = strategy_v2_activities._VOC_AGENT01_OBSERVATION_DETAIL_SCHEMA
-    observation_variants = observation_schema["anyOf"]
-    assert len(observation_variants) == 2
+    assert observe_projection["properties"]["target_voc_types"]["maxItems"] == 0
+    assert observe_projection["properties"]["sampling_strategy"]["type"] == "null"
+    assert observe_projection["properties"]["platform_behavior_note"]["type"] == "null"
 
-    non_mined_observation_variant = next(
-        variant
-        for variant in observation_variants
-        if variant["properties"]["include_in_mining_plan"]["enum"] == [False]
-    )
-    mined_observation_variant = next(
-        variant
-        for variant in observation_variants
-        if variant["properties"]["include_in_mining_plan"]["enum"] == [True]
-    )
-
-    assert non_mined_observation_variant["properties"]["target_voc_types"]["maxItems"] == 0
-    assert non_mined_observation_variant["properties"]["sampling_strategy"]["type"] == "null"
-    assert non_mined_observation_variant["properties"]["platform_behavior_note"]["type"] == "null"
-    assert non_mined_observation_variant["properties"]["priority_rank"]["type"] == "null"
-
-    assert mined_observation_variant["properties"]["observation_id"]["type"] == "string"
-    assert mined_observation_variant["properties"]["url_pattern"]["type"] == "string"
-    assert mined_observation_variant["properties"]["rank_score"]["type"] == "integer"
-    assert mined_observation_variant["properties"]["estimated_yield"]["type"] == "integer"
-    assert mined_observation_variant["properties"]["target_voc_types"]["minItems"] == 1
-    assert mined_observation_variant["properties"]["sampling_strategy"]["minLength"] == 1
-    assert mined_observation_variant["properties"]["platform_behavior_note"]["minLength"] == 1
+    assert mined_projection["properties"]["url_pattern"]["type"] == "string"
+    assert mined_projection["properties"]["rank_score"]["type"] == "integer"
+    assert mined_projection["properties"]["estimated_yield"]["type"] == "integer"
+    assert mined_projection["properties"]["sampling_strategy"]["minLength"] == 1
+    assert mined_projection["properties"]["platform_behavior_note"]["minLength"] == 1
 
 
 def _iter_strategy_v2_run_prompt_json_schemas():
@@ -809,6 +799,9 @@ def test_agent1_output_schema_binds_exact_runtime_source_files() -> None:
     file_assessments = schema["properties"]["file_assessments"]
     assert set(file_assessments["properties"].keys()) == {"file-a.json", "file-b.json"}
     assert file_assessments["required"] == ["file-a.json", "file-b.json"]
+    assert "observations" not in schema["properties"]
+    for variant in file_assessments["properties"]["file-a.json"]["anyOf"]:
+        assert "observation_projection" in variant["required"]
 
 
 def test_agent2_output_schema_binds_exact_runtime_evidence_ids() -> None:

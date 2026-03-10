@@ -566,7 +566,6 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "price_sensitivity": "MID_TICKET_30_TO_100",
             },
             "file_assessments": _agent1_file_assessments_from_uploaded_manifest(),
-            "observations": _agent1_observations_from_uploaded_manifest(),
             "gate_failures": [],
             "disconfirmation_flags": [
                 "A small number of files could be noisy.",
@@ -1104,45 +1103,6 @@ def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any
     return assessments
 
 
-def _agent1_observations_from_uploaded_manifest() -> list[dict[str, Any]]:
-    uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
-    agent1_payloads = uploaded_payloads.get("agent1-prompt-chain")
-    if not isinstance(agent1_payloads, dict):
-        raise AssertionError("Agent 1 test stub is missing uploaded logical payloads for agent1-prompt-chain.")
-
-    scraped_data_manifest = agent1_payloads.get("SCRAPED_DATA_FILES_JSON")
-    if not isinstance(scraped_data_manifest, dict):
-        raise AssertionError("Agent 1 test stub expected SCRAPED_DATA_FILES_JSON in uploaded logical payloads.")
-
-    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
-    raw_file_rows = [row for row in raw_files if isinstance(row, dict)] if isinstance(raw_files, list) else []
-    observations: list[dict[str, Any]] = []
-    for index, file_row in enumerate(raw_file_rows):
-        source_file = str(file_row.get("file_name") or "").strip()
-        if not source_file:
-            continue
-        habitat_name = str(file_row.get("habitat_name") or source_file).strip()
-        habitat_type = str(file_row.get("habitat_type") or "TEXT_COMMUNITY").strip() or "TEXT_COMMUNITY"
-        observation = _agent1_habitat_observation_payload(
-            habitat_name=habitat_name,
-            habitat_type=habitat_type,
-            source_file=source_file,
-        )
-        observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
-        observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
-        observations.append(
-            _agent1_observation_payload(
-                observation=observation,
-                include_in_mining_plan=index == 0,
-                priority_rank=1 if index == 0 else None,
-            )
-        )
-
-    if not observations:
-        raise AssertionError("Agent 1 test stub could not derive any observations from the uploaded manifest.")
-    return observations
-
-
 def _agent1_habitat_observation_payload(*, habitat_name: str, habitat_type: str, source_file: str) -> dict[str, Any]:
     observation_sheet = {
         "threads_50_plus": "Y",
@@ -1232,20 +1192,22 @@ def _agent1_file_assessment_payload(
     return {
         "decision": "OBSERVE",
         "exclude_reason": "",
-        "observation_id": f"obs-{observation['source_file'].replace('.', '-')}",
         "include_in_mining_plan": include_in_mining_plan,
+        "observation_projection": _agent1_observation_projection_payload(
+            observation=observation,
+            include_in_mining_plan=include_in_mining_plan,
+            priority_rank=1 if include_in_mining_plan else None,
+        ),
     }
 
 
-def _agent1_observation_payload(
+def _agent1_observation_projection_payload(
     *,
     observation: dict[str, Any],
     include_in_mining_plan: bool,
     priority_rank: int | None = None,
 ) -> dict[str, Any]:
     return {
-        "observation_id": f"obs-{observation['source_file'].replace('.', '-')}",
-        "include_in_mining_plan": include_in_mining_plan,
         "habitat_name": observation["habitat_name"],
         "habitat_type": observation["habitat_type"],
         "url_pattern": observation["url_pattern"],
