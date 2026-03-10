@@ -282,7 +282,7 @@ def test_voc_agent00b_response_schema_closes_configuration_objects() -> None:
 
 
 def test_voc_agent01_file_assessment_schema_discriminates_observe_and_exclude_rows() -> None:
-    schema = strategy_v2_activities._VOC_AGENT01_FILE_ASSESSMENT_SCHEMA
+    schema = strategy_v2_activities._VOC_AGENT01_FILE_ASSESSMENT_ROW_SCHEMA
     variants = schema["anyOf"]
 
     assert len(variants) == 3
@@ -797,10 +797,11 @@ def test_agent1_output_schema_binds_exact_runtime_source_files() -> None:
         source_files=["file-a.json", "file-b.json"],
     )
     file_assessments = schema["properties"]["file_assessments"]
-    assert set(file_assessments["properties"].keys()) == {"file-a.json", "file-b.json"}
-    assert file_assessments["required"] == ["file-a.json", "file-b.json"]
+    assert file_assessments["type"] == "array"
+    assert file_assessments["minItems"] == 2
+    assert file_assessments["maxItems"] == 2
     assert "observations" not in schema["properties"]
-    for variant in file_assessments["properties"]["file-a.json"]["anyOf"]:
+    for variant in file_assessments["items"]["anyOf"]:
         assert "observation_projection" in variant["required"]
 
 

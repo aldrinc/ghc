@@ -977,6 +977,7 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
 
     if decision == "EXCLUDE":
         properties = {
+            "source_file": {"type": "string", "minLength": 1},
             "decision": {"type": "string", "enum": ["EXCLUDE"]},
             "exclude_reason": {"type": "string", "minLength": 1},
             "include_in_mining_plan": {"type": "boolean", "enum": [False]},
@@ -984,6 +985,7 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
         }
     else:
         properties = {
+            "source_file": {"type": "string", "minLength": 1},
             "decision": {"type": "string", "enum": ["OBSERVE"]},
             "exclude_reason": {"type": "string", "maxLength": 0},
             "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
@@ -1151,7 +1153,7 @@ _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA: dict[str, Any] = {
         "evidence_refs",
     ],
 }
-_VOC_AGENT01_FILE_ASSESSMENT_SCHEMA: dict[str, Any] = {
+_VOC_AGENT01_FILE_ASSESSMENT_ROW_SCHEMA: dict[str, Any] = {
     "anyOf": [
         _agent1_file_assessment_variant_schema(decision="EXCLUDE", include_in_mining_plan=False),
         _agent1_file_assessment_variant_schema(decision="OBSERVE", include_in_mining_plan=False),
@@ -1197,11 +1199,12 @@ def _agent1_output_schema(*, source_files: Sequence[str]) -> dict[str, Any]:
                     "price_sensitivity",
                 ],
             },
-            "file_assessments": _build_exact_keyed_object_schema(
-                keys=source_files,
-                field_name="Agent 1 source_files",
-                value_schema=_VOC_AGENT01_FILE_ASSESSMENT_SCHEMA,
-            ),
+            "file_assessments": {
+                "type": "array",
+                "minItems": len(source_files),
+                "maxItems": len(source_files),
+                "items": _VOC_AGENT01_FILE_ASSESSMENT_ROW_SCHEMA,
+            },
             "gate_failures": {
                 "type": "array",
                 "items": {
@@ -8807,9 +8810,8 @@ def _render_agent1_runtime_instruction(
         "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
         "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
         "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
-        "Return file_assessments as an object keyed by the exact source_file values from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows[].source_file.\n"
-        "Each file_assessments value must include decision, exclude_reason, include_in_mining_plan, and observation_projection.\n"
-        "Do not emit source_file inside file_assessments values; runtime derives it from each object key.\n"
+        "Return file_assessments as an array with one row per runtime source_file from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows[].source_file.\n"
+        "Each file_assessments row must include source_file, decision, exclude_reason, include_in_mining_plan, and observation_projection.\n"
         "Do not emit separate observations, habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
         "Runtime assigns stable observation_id values for OBSERVE rows; do not invent observation_id fields anywhere in the output.\n"
         "If decision=OBSERVE, observation_projection must be a populated object and must not include source_file, observation_id, or include_in_mining_plan.\n"
@@ -8851,9 +8853,9 @@ def _derive_agent1_outputs_from_file_assessments(
         )
 
     file_assessments_raw = agent01_output.get("file_assessments")
-    if not isinstance(file_assessments_raw, Mapping):
+    if not isinstance(file_assessments_raw, list):
         raise StrategyV2SchemaValidationError(
-            "Agent 1 output must include file_assessments object for strict file-coverage validation."
+            "Agent 1 output must include file_assessments array for strict file-coverage validation."
         )
 
     observation_projection_required_fields = (
@@ -8893,11 +8895,20 @@ def _derive_agent1_outputs_from_file_assessments(
     excluded_source_files: list[str] = []
     mining_plan: list[dict[str, Any]] = []
     normalized_file_assessments: list[dict[str, Any]] = []
-    returned_source_files = {
-        str(key or "").strip()
-        for key in file_assessments_raw.keys()
-        if str(key or "").strip()
-    }
+    file_assessments_by_source_file: dict[str, dict[str, Any]] = {}
+    for index, raw_row in enumerate(file_assessments_raw):
+        row_name = f"Agent 1 file_assessments[{index}]"
+        if not isinstance(raw_row, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        source_file = str(raw_row.get("source_file") or "").strip()
+        if not source_file:
+            raise StrategyV2SchemaValidationError(f"{row_name}.source_file must be non-empty.")
+        if source_file in file_assessments_by_source_file:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 1 file_assessments contains duplicate source_file entries. Duplicate: '{source_file}'."
+            )
+        file_assessments_by_source_file[source_file] = dict(raw_row)
+    returned_source_files = set(file_assessments_by_source_file)
     unknown_source_files = sorted(returned_source_files - allowed_file_names)
     if unknown_source_files:
         raise StrategyV2SchemaValidationError(
@@ -8916,9 +8927,9 @@ def _derive_agent1_outputs_from_file_assessments(
     observe_index = 0
     for source_file in ordered_file_names:
         row_name = f"Agent 1 file_assessments[{source_file}]"
-        row = file_assessments_raw.get(source_file)
-        if not isinstance(row, Mapping):
-            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        row = file_assessments_by_source_file.get(source_file)
+        if row is None:
+            raise StrategyV2SchemaValidationError(f"{row_name} must be present.")
         row_payload = dict(row)
         row_payload["source_file"] = source_file
 

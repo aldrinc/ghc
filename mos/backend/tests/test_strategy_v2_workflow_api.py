@@ -1064,7 +1064,7 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
     return rows
 
 
-def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any]]:
+def _agent1_file_assessments_from_uploaded_manifest() -> list[dict[str, Any]]:
     uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
     agent1_payloads = uploaded_payloads.get("agent1-prompt-chain")
     if not isinstance(agent1_payloads, dict):
@@ -1079,7 +1079,7 @@ def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any
     if not raw_file_rows:
         raise AssertionError("Agent 1 test stub expected raw_scraped_data_files to contain at least one file.")
 
-    assessments: dict[str, dict[str, Any]] = {}
+    assessments: list[dict[str, Any]] = []
     for index, file_row in enumerate(raw_file_rows):
         source_file = str(file_row.get("file_name") or "").strip()
         if not source_file:
@@ -1093,9 +1093,11 @@ def _agent1_file_assessments_from_uploaded_manifest() -> dict[str, dict[str, Any
         )
         observation["url_pattern"] = str(file_row.get("virtual_path") or habitat_name).strip() or habitat_name
         observation["items_in_file"] = int(file_row.get("item_count") or observation["items_in_file"])
-        assessments[source_file] = _agent1_file_assessment_payload(
-            observation=observation,
-            include_in_mining_plan=index == 0,
+        assessments.append(
+            _agent1_file_assessment_payload(
+                observation=observation,
+                include_in_mining_plan=index == 0,
+            )
         )
 
     if not assessments:
@@ -1190,6 +1192,7 @@ def _agent1_file_assessment_payload(
     include_in_mining_plan: bool,
 ) -> dict[str, Any]:
     return {
+        "source_file": observation["source_file"],
         "decision": "OBSERVE",
         "exclude_reason": "",
         "include_in_mining_plan": include_in_mining_plan,
