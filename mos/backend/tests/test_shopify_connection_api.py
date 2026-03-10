@@ -1391,13 +1391,16 @@ def test_build_theme_sync_slot_image_prompt_applies_feature_icon_constraints():
 
     assert "Create a clean ecommerce feature icon" in prompt
     assert "Icon-style requirements:" in prompt
+    assert "occupying roughly 70-80% of the canvas" in prompt
+    assert "Do not place the icon inside a badge, card, tile, frame, or inset square." in prompt
     assert "Background policy:" in prompt
     assert "always use a flat solid background" in prompt
-    assert "--color-page-bg value provided in context" in prompt
+    assert "exact --color-page-bg hex value provided in context" in prompt
+    assert "exact --color-cta-shell hex value provided in context" in prompt
     assert "Feature context: We deliver worldwide Get your package anywhere!." in prompt
 
 
-def test_build_theme_sync_default_general_prompt_context_includes_page_background_token():
+def test_build_theme_sync_default_general_prompt_context_includes_theme_color_tokens():
     context = clients_router._build_theme_sync_default_general_prompt_context(
         draft_data=SimpleNamespace(
             workspaceName="Workspace A",
@@ -1407,6 +1410,7 @@ def test_build_theme_sync_default_general_prompt_context_includes_page_backgroun
             cssVars={
                 "--color-brand": "#123456",
                 "--color-cta": "#abcdef",
+                "--color-cta-shell": "#f4efe7",
                 "--color-page-bg": "#f8f7f5",
             },
         ),
@@ -1419,7 +1423,8 @@ def test_build_theme_sync_default_general_prompt_context_includes_page_backgroun
         brand_description="Brand description",
     )
 
-    assert "Page background token (--color-page-bg): #f8f7f5." in context
+    assert "Exact CTA shell hex (--color-cta-shell): #f4efe7." in context
+    assert "Exact page background hex (--color-page-bg): #f8f7f5." in context
 
 
 def test_split_theme_text_slots_for_copy_generation_excludes_feature_highlights():

@@ -405,7 +405,7 @@ _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
 }
 _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH = 180
 _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH = 2000
-_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH = 600
+_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH = 900
 _THEME_IMAGE_PROMPT_BRAND_DESCRIPTION_MAX_LENGTH = 480
 _THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY = "brandDescription"
 _THEME_COPY_GUIDELINE_MAX_LENGTH = 180
@@ -424,13 +424,17 @@ _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME = {
     "generic": "Lifestyle composition aligned to the product and brand positioning.",
 }
 _THEME_SYNC_AI_FEATURE_ICON_ROLE_GUIDANCE = (
-    "Create a clean ecommerce feature icon that directly symbolizes the feature claim."
+    "Create a clean ecommerce feature icon that directly symbolizes the feature claim and fills most of the frame."
 )
 _THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS = (
     "Icon-style requirements: single symbolic icon, simple centered composition, clear silhouette, "
     "minimal background detail, no text, no letters, no numbers, no people, no product photography. "
-    "Background policy: always use a flat solid background that exactly matches the --color-page-bg value "
-    "provided in context."
+    "Scale policy: make the icon large and legible, occupying roughly 70-80% of the canvas with tight outer padding. "
+    "Do not place the icon inside a badge, card, tile, frame, or inset square. "
+    "Background policy: hard requirement: always use a flat solid background with the exact --color-page-bg hex value "
+    "provided in context; no gradients, shadows, borders, or off-tone background variations. "
+    "Icon color policy: hard requirement: all icon strokes, fills, and shapes must use the exact "
+    "--color-cta-shell hex value provided in context; do not introduce other accent colors."
 )
 _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "landscape": "16:9",
@@ -4230,10 +4234,15 @@ def _build_theme_sync_default_general_prompt_context(
     color_cta = draft_data.cssVars.get("--color-cta")
     if isinstance(color_cta, str) and color_cta.strip():
         context_segments.append(f"CTA color: {color_cta.strip()}.")
+    color_cta_shell = draft_data.cssVars.get("--color-cta-shell")
+    if isinstance(color_cta_shell, str) and color_cta_shell.strip():
+        context_segments.append(
+            f"Exact CTA shell hex (--color-cta-shell): {color_cta_shell.strip()}."
+        )
     color_page_bg = draft_data.cssVars.get("--color-page-bg")
     if isinstance(color_page_bg, str) and color_page_bg.strip():
         context_segments.append(
-            f"Page background token (--color-page-bg): {color_page_bg.strip()}."
+            f"Exact page background hex (--color-page-bg): {color_page_bg.strip()}."
         )
 
     combined_context = " ".join(context_segments).strip()
@@ -4287,10 +4296,7 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
         ]
         if is_feature_icon_slot:
             context_segments.append("Creative format: icon-style feature illustration.")
-            context_segments.append(_THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS)
         slot_render_hint = _THEME_SYNC_SLOT_IMAGE_RENDER_HINT_BY_PATH.get(slot_path)
-        if slot_render_hint:
-            context_segments.append(f"Rendering guidance: {slot_render_hint}")
         text_fragments = _build_theme_sync_slot_text_fragments(
             slot_path=slot_path,
             text_values_by_path=text_values_by_path,
@@ -4306,6 +4312,10 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
                     )
                 else:
                     context_segments.append(f"Related copy context: {related_text}.")
+        if is_feature_icon_slot:
+            context_segments.append(_THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS)
+        if slot_render_hint:
+            context_segments.append(f"Rendering guidance: {slot_render_hint}")
         context_text = " ".join(context_segments).strip()
         if len(context_text) > _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH:
             context_text = context_text[:_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH].rstrip()
