@@ -840,6 +840,25 @@ def test_agent3_prompt_schema_restricts_quote_voc_ids_to_runtime_allowlist() -> 
     assert quote_schema["properties"]["voc_id"]["enum"] == ["V001", "V002", "V003"]
 
 
+def test_agent3_runtime_payload_preflight_rejects_oversized_payload() -> None:
+    with pytest.raises(StrategyV2MissingContextError, match="runtime payload exceeded"):
+        strategy_v2_activities._validate_agent3_runtime_payloads(
+            {
+                "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                    "document_mode": "summary_compact",
+                    "steps": [{"step_key": "01", "summary": "x" * 1000}],
+                },
+                "AGENT2_VOC_OBSERVATIONS_JSON": [
+                    {
+                        "voc_id": "V001",
+                        "quote": "x"
+                        * (strategy_v2_activities._AGENT3_RUNTIME_SINGLE_PAYLOAD_MAX_CHARS + 500),
+                    }
+                ],
+            }
+        )
+
+
 def _build_stage2_with_price(price: str) -> ProductBriefStage2:
     return ProductBriefStage2.model_validate(
         {

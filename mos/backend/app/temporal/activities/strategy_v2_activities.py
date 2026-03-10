@@ -2248,6 +2248,34 @@ _AGENT3_TOP_QUOTES_PER_CANDIDATE = 5
 _AGENT3_HOOK_STARTERS_PER_CANDIDATE = 3
 _AGENT3_MAX_TEXT_CHARS = 280
 _AGENT3_MAX_QUOTE_CHARS = 320
+_AGENT3_FOUNDATIONAL_SUMMARY_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT3_FOUNDATIONAL_SUMMARY_MAX_CHARS", "1800")
+)
+_AGENT3_FOUNDATIONAL_EXCERPT_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT3_FOUNDATIONAL_EXCERPT_MAX_CHARS", "900")
+)
+_AGENT3_PRODUCT_BRIEF_MAX_COMPETITOR_URLS = int(
+    os.getenv("STRATEGY_V2_AGENT3_PRODUCT_BRIEF_MAX_COMPETITOR_URLS", "12")
+)
+_AGENT3_COMPETITOR_MAP_MAX_COMPETITORS = int(
+    os.getenv("STRATEGY_V2_AGENT3_COMPETITOR_MAP_MAX_COMPETITORS", "12")
+)
+_AGENT3_COMPETITOR_MAP_MAX_ASSETS_PER_COMPETITOR = int(
+    os.getenv("STRATEGY_V2_AGENT3_COMPETITOR_MAP_MAX_ASSETS_PER_COMPETITOR", "3")
+)
+_AGENT3_HABITAT_MAX_ROWS = int(os.getenv("STRATEGY_V2_AGENT3_HABITAT_MAX_ROWS", "12"))
+_AGENT3_MINING_PLAN_MAX_ROWS = int(os.getenv("STRATEGY_V2_AGENT3_MINING_PLAN_MAX_ROWS", "10"))
+_AGENT3_VOC_MAX_ROWS = int(os.getenv("STRATEGY_V2_AGENT3_VOC_MAX_ROWS", "60"))
+_AGENT3_RAW_EVIDENCE_MAX_ROWS = int(os.getenv("STRATEGY_V2_AGENT3_RAW_EVIDENCE_MAX_ROWS", "60"))
+_AGENT3_VOC_MAX_RATIO_PER_SOURCE = float(
+    os.getenv("STRATEGY_V2_AGENT3_VOC_MAX_RATIO_PER_SOURCE", "0.4")
+)
+_AGENT3_RUNTIME_TOTAL_PAYLOAD_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT3_RUNTIME_TOTAL_PAYLOAD_MAX_CHARS", "180000")
+)
+_AGENT3_RUNTIME_SINGLE_PAYLOAD_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT3_RUNTIME_SINGLE_PAYLOAD_MAX_CHARS", "60000")
+)
 _AGENT1_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT1_MAX_TOKENS", "128000"))
 _AGENT2_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT2_MAX_TOKENS", "128000"))
 _AGENT3_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT3_MAX_TOKENS", "64000"))
@@ -10395,6 +10423,766 @@ def _run_agent2_extractor(
     }
 
 
+def _compact_agent3_text(value: object, *, max_chars: int) -> str:
+    if max_chars < 1:
+        raise StrategyV2SchemaValidationError("Agent 3 text compaction max_chars must be >= 1.")
+    text = str(value or "")
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if len(normalized) <= max_chars:
+        return normalized
+    truncated = normalized[:max_chars].rstrip()
+    last_space = truncated.rfind(" ")
+    if last_space >= max_chars // 2:
+        truncated = truncated[:last_space]
+    return truncated.rstrip(" ,;:-")
+
+
+def _compact_agent3_string_list(
+    values: object,
+    *,
+    max_items: int,
+    max_chars: int,
+) -> list[str]:
+    if max_items < 1:
+        raise StrategyV2SchemaValidationError("Agent 3 compact string-list max_items must be >= 1.")
+    if not isinstance(values, list):
+        return []
+    compacted: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = _compact_agent3_text(raw_value, max_chars=max_chars)
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        compacted.append(value)
+        if len(compacted) >= max_items:
+            break
+    return compacted
+
+
+def _compact_agent3_product_brief(stage1_data: Mapping[str, Any]) -> dict[str, Any]:
+    primary_segment = stage1_data.get("primary_segment")
+    compact_primary_segment = (
+        {
+            "name": _compact_agent3_text(primary_segment.get("name"), max_chars=120),
+            "size_estimate": _compact_agent3_text(primary_segment.get("size_estimate"), max_chars=80),
+            "key_differentiator": _compact_agent3_text(
+                primary_segment.get("key_differentiator"),
+                max_chars=180,
+            ),
+        }
+        if isinstance(primary_segment, Mapping)
+        else {}
+    )
+    return {
+        "product_name": _compact_agent3_text(stage1_data.get("product_name"), max_chars=160),
+        "description": _compact_agent3_text(stage1_data.get("description"), max_chars=400),
+        "price": _compact_agent3_text(stage1_data.get("price"), max_chars=40),
+        "category_niche": _compact_agent3_text(stage1_data.get("category_niche"), max_chars=140),
+        "market_maturity_stage": _compact_agent3_text(
+            stage1_data.get("market_maturity_stage"),
+            max_chars=80,
+        ),
+        "primary_segment": compact_primary_segment,
+        "bottleneck": _compact_agent3_text(stage1_data.get("bottleneck"), max_chars=180),
+        "positioning_gaps": _compact_agent3_string_list(
+            stage1_data.get("positioning_gaps"),
+            max_items=8,
+            max_chars=180,
+        ),
+        "primary_icps": _compact_agent3_string_list(
+            stage1_data.get("primary_icps"),
+            max_items=8,
+            max_chars=120,
+        ),
+        "competitor_urls": _compact_agent3_string_list(
+            stage1_data.get("competitor_urls"),
+            max_items=_AGENT3_PRODUCT_BRIEF_MAX_COMPETITOR_URLS,
+            max_chars=240,
+        ),
+    }
+
+
+def _compact_agent3_avatar_brief_payload(avatar_brief_payload: Mapping[str, Any]) -> dict[str, Any]:
+    demographics = avatar_brief_payload.get("demographics")
+    compact_demographics = (
+        {
+            "age_range": _compact_agent3_text(demographics.get("age_range"), max_chars=60),
+            "gender_skew": _compact_agent3_text(demographics.get("gender_skew"), max_chars=80),
+        }
+        if isinstance(demographics, Mapping)
+        else {}
+    )
+    return {
+        "demographics": compact_demographics,
+        "platform_habits": _compact_agent3_string_list(
+            avatar_brief_payload.get("platform_habits"),
+            max_items=6,
+            max_chars=140,
+        ),
+        "content_consumption_patterns": _compact_agent3_string_list(
+            avatar_brief_payload.get("content_consumption_patterns"),
+            max_items=6,
+            max_chars=180,
+        ),
+        "psychographics_summary": _compact_agent3_text(
+            avatar_brief_payload.get("psychographics_summary"),
+            max_chars=1000,
+        ),
+    }
+
+
+def _compact_agent3_foundational_docs(
+    *,
+    foundational_step_contents: Mapping[str, Any],
+    foundational_step_summaries: Mapping[str, Any],
+) -> dict[str, Any]:
+    steps: list[dict[str, Any]] = []
+    for step_key in _FOUNDATIONAL_STEP_KEYS:
+        summary_text = _compact_agent3_text(
+            foundational_step_summaries.get(step_key)
+            or foundational_step_contents.get(step_key),
+            max_chars=_AGENT3_FOUNDATIONAL_SUMMARY_MAX_CHARS,
+        )
+        content_excerpt = ""
+        if not summary_text:
+            content_excerpt = _compact_agent3_text(
+                foundational_step_contents.get(step_key),
+                max_chars=_AGENT3_FOUNDATIONAL_EXCERPT_MAX_CHARS,
+            )
+        steps.append(
+            {
+                "step_key": step_key,
+                "summary": summary_text,
+                "content_excerpt": content_excerpt,
+            }
+        )
+    return {
+        "document_mode": "summary_compact",
+        "steps": steps,
+    }
+
+
+def _compact_agent3_competitor_angle_map(
+    competitor_angle_map: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    compacted: list[dict[str, Any]] = []
+    input_competitor_count = 0
+    input_asset_count = 0
+    for raw_row in competitor_angle_map:
+        if not isinstance(raw_row, Mapping):
+            continue
+        input_competitor_count += 1
+        assets_raw = raw_row.get("assets")
+        assets = [row for row in assets_raw if isinstance(row, Mapping)] if isinstance(assets_raw, list) else []
+        input_asset_count += len(assets)
+        compact_assets: list[dict[str, Any]] = []
+        for asset_row in assets[:_AGENT3_COMPETITOR_MAP_MAX_ASSETS_PER_COMPETITOR]:
+            compact_assets.append(
+                {
+                    "asset_id": _compact_agent3_text(asset_row.get("asset_id"), max_chars=80),
+                    "primary_angle": _compact_agent3_text(asset_row.get("primary_angle"), max_chars=220),
+                    "core_claim": _compact_agent3_text(asset_row.get("core_claim"), max_chars=220),
+                    "implied_mechanism": _compact_agent3_text(
+                        asset_row.get("implied_mechanism"),
+                        max_chars=220,
+                    ),
+                    "target_segment_description": _compact_agent3_text(
+                        asset_row.get("target_segment_description"),
+                        max_chars=220,
+                    ),
+                    "hook_type": _compact_agent3_text(asset_row.get("hook_type"), max_chars=120),
+                }
+            )
+        compacted.append(
+            {
+                "competitor_name": _compact_agent3_text(raw_row.get("competitor_name"), max_chars=140),
+                "asset_count": len(assets),
+                "assets": compact_assets,
+            }
+        )
+        if len(compacted) >= _AGENT3_COMPETITOR_MAP_MAX_COMPETITORS:
+            break
+    diagnostics = {
+        "input_competitor_count": input_competitor_count,
+        "selected_competitor_count": len(compacted),
+        "input_asset_count": input_asset_count,
+        "selected_asset_count": sum(len(row.get("assets") or []) for row in compacted),
+    }
+    return compacted, diagnostics
+
+
+def _compact_agent3_saturated_angles(
+    saturated_angles: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    compacted: list[dict[str, str]] = []
+    for raw_row in saturated_angles:
+        if not isinstance(raw_row, Mapping):
+            continue
+        compacted.append(
+            {
+                "angle": _compact_agent3_text(raw_row.get("angle"), max_chars=200),
+                "driver": _compact_agent3_text(raw_row.get("driver"), max_chars=180),
+                "status": _compact_agent3_text(raw_row.get("status"), max_chars=32),
+                "competitor_count": _compact_agent3_text(
+                    raw_row.get("competitor_count"),
+                    max_chars=24,
+                ),
+            }
+        )
+    return compacted
+
+
+def _compact_agent3_habitat_scored(habitat_scored: Mapping[str, Any]) -> dict[str, Any]:
+    summary = habitat_scored.get("summary")
+    habitats_raw = habitat_scored.get("habitats")
+    habitats = [row for row in habitats_raw if isinstance(row, Mapping)] if isinstance(habitats_raw, list) else []
+    ranked_rows = sorted(
+        [dict(row) for row in habitats],
+        key=lambda row: (
+            int(row.get("rank") or 9999),
+            -float(row.get("final_score") or 0.0),
+        ),
+    )
+    compacted_habitats: list[dict[str, Any]] = []
+    for row in ranked_rows[:_AGENT3_HABITAT_MAX_ROWS]:
+        compacted_habitats.append(
+            {
+                "rank": int(row.get("rank") or 0),
+                "habitat_name": _compact_agent3_text(row.get("habitat_name"), max_chars=140),
+                "habitat_type": _compact_agent3_text(row.get("habitat_type"), max_chars=80),
+                "final_score": float(row.get("final_score") or 0.0),
+                "confidence_range": list(row.get("confidence_range"))
+                if isinstance(row.get("confidence_range"), (list, tuple))
+                else row.get("confidence_range"),
+                "mining_gate_applied": bool(row.get("mining_gate_applied")),
+                "lifecycle_stage": _compact_agent3_text(row.get("lifecycle_stage"), max_chars=60),
+            }
+        )
+    return {
+        "summary": dict(summary) if isinstance(summary, Mapping) else {},
+        "habitats": compacted_habitats,
+    }
+
+
+def _compact_agent3_habitat_observations(
+    observations: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    ordered_rows = sorted(
+        [dict(row) for row in observations if isinstance(row, Mapping)],
+        key=lambda row: (
+            0 if bool(row.get("include_in_mining_plan")) else 1,
+            int(row.get("priority_rank") or 9999),
+            -int(row.get("rank_score") or 0),
+            str(row.get("source_file") or ""),
+        ),
+    )
+    compacted: list[dict[str, Any]] = []
+    for row in ordered_rows[:_AGENT3_HABITAT_MAX_ROWS]:
+        mining_gate = row.get("mining_gate")
+        video_extension = row.get("video_extension")
+        evidence_refs = row.get("evidence_refs")
+        compacted.append(
+            {
+                "source_file": _compact_agent3_text(row.get("source_file"), max_chars=160),
+                "habitat_name": _compact_agent3_text(row.get("habitat_name"), max_chars=140),
+                "habitat_type": _compact_agent3_text(row.get("habitat_type"), max_chars=80),
+                "url_pattern": _compact_agent3_text(row.get("url_pattern"), max_chars=220),
+                "data_quality": _compact_agent3_text(row.get("data_quality"), max_chars=32),
+                "include_in_mining_plan": bool(row.get("include_in_mining_plan")),
+                "priority_rank": row.get("priority_rank"),
+                "rank_score": int(row.get("rank_score") or 0),
+                "estimated_yield": int(row.get("estimated_yield") or 0),
+                "mining_gate": (
+                    {
+                        "status": _compact_agent3_text(mining_gate.get("status"), max_chars=32),
+                        "failed_fields": _compact_agent3_string_list(
+                            mining_gate.get("failed_fields"),
+                            max_items=8,
+                            max_chars=80,
+                        ),
+                        "reason": _compact_agent3_text(mining_gate.get("reason"), max_chars=220),
+                    }
+                    if isinstance(mining_gate, Mapping)
+                    else {}
+                ),
+                "video_extension": (
+                    {
+                        "viral_videos_found": video_extension.get("viral_videos_found"),
+                        "comment_sections_active": video_extension.get("comment_sections_active"),
+                        "contains_purchase_intent": video_extension.get("contains_purchase_intent"),
+                        "creator_diversity": _compact_agent3_text(
+                            video_extension.get("creator_diversity"),
+                            max_chars=24,
+                        ),
+                    }
+                    if isinstance(video_extension, Mapping)
+                    else None
+                ),
+                "evidence_refs_preview": _compact_agent3_string_list(
+                    evidence_refs,
+                    max_items=4,
+                    max_chars=180,
+                ),
+            }
+        )
+    diagnostics = {
+        "input_count": len(ordered_rows),
+        "selected_count": len(compacted),
+        "omitted_count": max(len(ordered_rows) - len(compacted), 0),
+    }
+    return compacted, diagnostics
+
+
+def _compact_agent3_mining_plan(
+    mining_plan: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    ordered_rows = sorted(
+        [dict(row) for row in mining_plan if isinstance(row, Mapping)],
+        key=lambda row: (
+            int(row.get("priority_rank") or 9999),
+            -int(row.get("rank_score") or 0),
+            str(row.get("source_file") or ""),
+        ),
+    )
+    compacted: list[dict[str, Any]] = []
+    for row in ordered_rows[:_AGENT3_MINING_PLAN_MAX_ROWS]:
+        compacted.append(
+            {
+                "source_file": _compact_agent3_text(row.get("source_file"), max_chars=160),
+                "habitat_name": _compact_agent3_text(row.get("habitat_name"), max_chars=140),
+                "habitat_type": _compact_agent3_text(row.get("habitat_type"), max_chars=80),
+                "priority_rank": int(row.get("priority_rank") or 0),
+                "rank_score": int(row.get("rank_score") or 0),
+                "estimated_yield": int(row.get("estimated_yield") or 0),
+                "target_voc_types": _compact_agent3_string_list(
+                    row.get("target_voc_types"),
+                    max_items=6,
+                    max_chars=64,
+                ),
+                "sampling_strategy": _compact_agent3_text(
+                    row.get("sampling_strategy"),
+                    max_chars=220,
+                ),
+                "platform_behavior_note": _compact_agent3_text(
+                    row.get("platform_behavior_note"),
+                    max_chars=220,
+                ),
+                "compliance_flags": _compact_agent3_text(
+                    row.get("compliance_flags"),
+                    max_chars=120,
+                ),
+                "evidence_refs_preview": _compact_agent3_string_list(
+                    row.get("evidence_refs"),
+                    max_items=4,
+                    max_chars=180,
+                ),
+            }
+        )
+    diagnostics = {
+        "input_count": len(ordered_rows),
+        "selected_count": len(compacted),
+        "omitted_count": max(len(ordered_rows) - len(compacted), 0),
+    }
+    return compacted, diagnostics
+
+
+def _agent3_voc_score_lookup(voc_scored: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    items_raw = voc_scored.get("items")
+    items = [row for row in items_raw if isinstance(row, Mapping)] if isinstance(items_raw, list) else []
+    lookup: dict[str, dict[str, Any]] = {}
+    for row in items:
+        voc_id = str(row.get("voc_id") or "").strip()
+        if not voc_id:
+            continue
+        lookup[voc_id] = dict(row)
+    return lookup
+
+
+def _compact_agent3_voc_inputs(
+    *,
+    voc_observations: Sequence[Mapping[str, Any]],
+    voc_scored: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[str], dict[str, Any]]:
+    score_lookup = _agent3_voc_score_lookup(voc_scored)
+    ordered_rows = [dict(row) for row in voc_observations if isinstance(row, Mapping)]
+    ranked_rows = sorted(
+        ordered_rows,
+        key=lambda row: (
+            float(score_lookup.get(str(row.get("voc_id") or "").strip(), {}).get("adjusted_score") or 0.0),
+            _score_voc_row_for_prompt(dict(row))[0],
+        ),
+        reverse=True,
+    )
+    source_cap = max(1, int(_AGENT3_VOC_MAX_ROWS * _AGENT3_VOC_MAX_RATIO_PER_SOURCE))
+    selected: list[dict[str, Any]] = []
+    selected_keys: set[str] = set()
+    per_source: dict[str, int] = {}
+    for row in ranked_rows:
+        source_bucket = _voc_row_source_bucket(row)
+        if per_source.get(source_bucket, 0) >= source_cap:
+            continue
+        dedupe_key = f"{str(row.get('source_url') or '')}::{str(row.get('quote') or '')[:160]}"
+        if dedupe_key in selected_keys:
+            continue
+        selected.append(row)
+        selected_keys.add(dedupe_key)
+        per_source[source_bucket] = per_source.get(source_bucket, 0) + 1
+        if len(selected) >= _AGENT3_VOC_MAX_ROWS:
+            break
+    if len(selected) < min(_AGENT3_VOC_MAX_ROWS, len(ranked_rows)):
+        for row in ranked_rows:
+            dedupe_key = f"{str(row.get('source_url') or '')}::{str(row.get('quote') or '')[:160]}"
+            if dedupe_key in selected_keys:
+                continue
+            selected.append(row)
+            selected_keys.add(dedupe_key)
+            if len(selected) >= _AGENT3_VOC_MAX_ROWS:
+                break
+
+    compacted_observations: list[dict[str, Any]] = []
+    allowed_voc_ids: list[str] = []
+    compacted_scores: list[dict[str, Any]] = []
+    for row in selected:
+        voc_id = str(row.get("voc_id") or "").strip()
+        if not voc_id:
+            continue
+        score_row = score_lookup.get(voc_id, {})
+        allowed_voc_ids.append(voc_id)
+        compacted_observations.append(
+            {
+                "voc_id": voc_id,
+                "source_type": _compact_agent3_text(row.get("source_type"), max_chars=32),
+                "source_url": _compact_agent3_text(row.get("source_url"), max_chars=240),
+                "source_author": _compact_agent3_text(row.get("source_author"), max_chars=80),
+                "source_date": _compact_agent3_text(row.get("source_date"), max_chars=48),
+                "evidence_ref": _compact_agent3_text(row.get("evidence_ref"), max_chars=180),
+                "quote": str(row.get("quote") or "").strip()[:_AGENT3_MAX_QUOTE_CHARS],
+                "trigger_event": _compact_agent3_text(row.get("trigger_event"), max_chars=180),
+                "pain_problem": _compact_agent3_text(row.get("pain_problem"), max_chars=180),
+                "desired_outcome": _compact_agent3_text(row.get("desired_outcome"), max_chars=180),
+                "failed_prior_solution": _compact_agent3_text(
+                    row.get("failed_prior_solution"),
+                    max_chars=180,
+                ),
+                "enemy_blame": _compact_agent3_text(row.get("enemy_blame"), max_chars=180),
+                "identity_role": _compact_agent3_text(row.get("identity_role"), max_chars=140),
+                "fear_risk": _compact_agent3_text(row.get("fear_risk"), max_chars=180),
+                "emotional_valence": _compact_agent3_text(
+                    row.get("emotional_valence"),
+                    max_chars=48,
+                ),
+                "buyer_stage": _compact_agent3_text(row.get("buyer_stage"), max_chars=48),
+                "solution_sophistication": _compact_agent3_text(
+                    row.get("solution_sophistication"),
+                    max_chars=48,
+                ),
+                "compliance_risk": _compact_agent3_text(row.get("compliance_risk"), max_chars=32),
+                "specific_number": row.get("specific_number"),
+                "specific_event_moment": row.get("specific_event_moment"),
+                "before_after_comparison": row.get("before_after_comparison"),
+                "crisis_language": row.get("crisis_language"),
+                "headline_ready": row.get("headline_ready"),
+                "personal_context": row.get("personal_context"),
+                "long_narrative": row.get("long_narrative"),
+            }
+        )
+        compacted_scores.append(
+            {
+                "voc_id": voc_id,
+                "adjusted_score": float(score_row.get("adjusted_score") or 0.0),
+                "confidence_range": list(score_row.get("confidence_range"))
+                if isinstance(score_row.get("confidence_range"), (list, tuple))
+                else score_row.get("confidence_range"),
+                "aspiration_gap": int(score_row.get("aspiration_gap") or 0),
+                "freshness_modifier": float(score_row.get("freshness_modifier") or 0.0),
+                "zero_evidence_gate": bool(score_row.get("zero_evidence_gate")),
+                "classifications": dict(score_row.get("classifications"))
+                if isinstance(score_row.get("classifications"), Mapping)
+                else {},
+            }
+        )
+
+    diagnostics = {
+        "input_count": len(ordered_rows),
+        "selected_count": len(compacted_observations),
+        "omitted_count": max(len(ordered_rows) - len(compacted_observations), 0),
+        "source_type_distribution_selected": _agent2_source_type_distribution(compacted_observations),
+    }
+    compacted_voc_scored = {
+        "selection_mode": "top_diverse_compact",
+        "items": compacted_scores,
+        "corpus_health": dict(voc_scored.get("corpus_health"))
+        if isinstance(voc_scored.get("corpus_health"), Mapping)
+        else {},
+    }
+    return compacted_observations, compacted_voc_scored, allowed_voc_ids, diagnostics
+
+
+def _compact_agent3_raw_evidence_inputs(
+    *,
+    evidence_rows_for_prompt: Sequence[Mapping[str, Any]],
+    evidence_manifest_rows: Sequence[Mapping[str, Any]],
+    evidence_diagnostics: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], list[str]]:
+    selected_rows, excluded_rows, compaction_summary = _compact_agent2_evidence_rows(
+        evidence_rows=evidence_rows_for_prompt,
+        max_rows=_AGENT3_RAW_EVIDENCE_MAX_ROWS,
+    )
+    compacted_rows: list[dict[str, Any]] = []
+    allowed_voc_ids: list[str] = []
+    for row in selected_rows:
+        evidence_id = _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name="Agent 3 compact raw evidence row.evidence_id",
+        )
+        compacted_rows.append(
+            {
+                "evidence_id": evidence_id,
+                "source_type": _compact_agent3_text(row.get("source_type"), max_chars=32),
+                "source_url": _compact_agent3_text(row.get("source_url"), max_chars=240),
+                "author": _compact_agent3_text(row.get("author"), max_chars=80),
+                "date": _compact_agent3_text(row.get("date"), max_chars=48),
+                "context": _compact_agent3_text(row.get("context"), max_chars=220),
+                "verbatim": str(row.get("verbatim") or "").strip()[:900],
+                "evidence_ref": _compact_agent3_text(row.get("evidence_ref"), max_chars=180),
+            }
+        )
+        allowed_voc_ids.append(_derive_voc_id_from_evidence_id(evidence_id=evidence_id))
+
+    manifest_by_id = {
+        _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name="Agent 3 raw evidence manifest row.evidence_id",
+        ): dict(row)
+        for row in evidence_manifest_rows
+        if isinstance(row, Mapping)
+    }
+    compacted_manifest: list[dict[str, Any]] = []
+    for row in compacted_rows:
+        manifest_row = manifest_by_id.get(str(row.get("evidence_id") or "").strip())
+        if not isinstance(manifest_row, Mapping):
+            continue
+        compacted_manifest.append(
+            {
+                "input_index": int(manifest_row.get("input_index") or 0),
+                "evidence_id": _compact_agent3_text(manifest_row.get("evidence_id"), max_chars=32),
+                "source_type": _compact_agent3_text(manifest_row.get("source_type"), max_chars=32),
+                "source_url": _compact_agent3_text(manifest_row.get("source_url"), max_chars=240),
+                "source_author": _compact_agent3_text(manifest_row.get("source_author"), max_chars=80),
+                "source_date": _compact_agent3_text(manifest_row.get("source_date"), max_chars=48),
+                "evidence_ref": _compact_agent3_text(manifest_row.get("evidence_ref"), max_chars=180),
+                "context_preview": _compact_agent3_text(
+                    manifest_row.get("context_preview"),
+                    max_chars=180,
+                ),
+                "verbatim_preview": _compact_agent3_text(
+                    manifest_row.get("verbatim_preview"),
+                    max_chars=220,
+                ),
+                "verbatim_sha256": _compact_agent3_text(
+                    manifest_row.get("verbatim_sha256"),
+                    max_chars=80,
+                ),
+            }
+        )
+
+    diagnostics = {
+        "selection": compaction_summary,
+        "input_diagnostics": dict(evidence_diagnostics),
+        "excluded_count": len(excluded_rows),
+    }
+    return compacted_rows, compacted_manifest, diagnostics, allowed_voc_ids
+
+
+def _estimate_agent3_payload_counts(payload: Any) -> dict[str, int]:
+    counts = {"lists": 0, "dicts": 0, "scalars": 0}
+    stack = [payload]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Mapping):
+            counts["dicts"] += 1
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            counts["lists"] += 1
+            stack.extend(current)
+        else:
+            counts["scalars"] += 1
+    return counts
+
+
+def _validate_agent3_runtime_payloads(
+    logical_payloads: Mapping[str, Any],
+) -> dict[str, Any]:
+    payload_sizes: dict[str, dict[str, Any]] = {}
+    total_chars = 0
+    oversized_payloads: list[str] = []
+    for logical_name, payload in logical_payloads.items():
+        serialized = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+        char_count = len(serialized)
+        total_chars += char_count
+        payload_sizes[str(logical_name)] = {
+            "char_count": char_count,
+            **_estimate_agent3_payload_counts(payload),
+        }
+        if char_count > _AGENT3_RUNTIME_SINGLE_PAYLOAD_MAX_CHARS:
+            oversized_payloads.append(f"{logical_name}={char_count}")
+    diagnostics = {
+        "payloads": payload_sizes,
+        "total_chars": total_chars,
+        "single_payload_limit_chars": _AGENT3_RUNTIME_SINGLE_PAYLOAD_MAX_CHARS,
+        "total_payload_limit_chars": _AGENT3_RUNTIME_TOTAL_PAYLOAD_MAX_CHARS,
+        "oversized_payloads": oversized_payloads,
+    }
+    if oversized_payloads or total_chars > _AGENT3_RUNTIME_TOTAL_PAYLOAD_MAX_CHARS:
+        raise StrategyV2MissingContextError(
+            "Agent 3 runtime payload exceeded the bounded prompt package envelope "
+            f"(total_chars={total_chars}, oversized_payloads={oversized_payloads}). "
+            "Remediation: reduce duplicated Agent 3 context inputs before rerunning v2-06."
+        )
+    return diagnostics
+
+
+def _build_agent3_runtime_logical_payloads(
+    *,
+    stage1_data: Mapping[str, Any],
+    avatar_brief_payload: Mapping[str, Any],
+    foundational_step_contents: Mapping[str, Any],
+    foundational_step_summaries: Mapping[str, Any],
+    competitor_analysis: Mapping[str, Any],
+    habitat_scored: Mapping[str, Any],
+    agent1_habitat_observations: Sequence[Mapping[str, Any]],
+    agent1_mining_plan: Sequence[Mapping[str, Any]],
+    voc_input_mode: str,
+    voc_observations: Sequence[Mapping[str, Any]],
+    voc_scored: Mapping[str, Any],
+    evidence_rows_for_prompt: Sequence[Mapping[str, Any]],
+    evidence_manifest_rows: Sequence[Mapping[str, Any]],
+    evidence_diagnostics: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[str], dict[str, Any]]:
+    competitor_angle_map = build_competitor_angle_map(competitor_analysis)
+    compact_competitor_angle_map, competitor_map_diagnostics = _compact_agent3_competitor_angle_map(
+        competitor_angle_map
+    )
+    saturated_angles = _compact_agent3_saturated_angles(
+        extract_saturated_angles(competitor_analysis, limit=9)
+    )
+    compact_habitat_scored = _compact_agent3_habitat_scored(habitat_scored)
+    compact_habitat_observations, habitat_diagnostics = _compact_agent3_habitat_observations(
+        agent1_habitat_observations
+    )
+    compact_mining_plan, mining_diagnostics = _compact_agent3_mining_plan(agent1_mining_plan)
+
+    logical_payloads: dict[str, Any] = {
+        "COMPETITOR_ANGLE_MAP_JSON": compact_competitor_angle_map,
+        "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
+        "PRODUCT_BRIEF_JSON": _compact_agent3_product_brief(stage1_data),
+        "HABITAT_SCORED_JSON": compact_habitat_scored,
+        "AGENT1_HABITAT_OBSERVATIONS_JSON": compact_habitat_observations,
+        "AGENT1_MINING_PLAN_JSON": compact_mining_plan,
+        "AVATAR_BRIEF_SUMMARY_JSON": _compact_agent3_avatar_brief_payload(avatar_brief_payload),
+        "FOUNDATIONAL_RESEARCH_DOCS_JSON": _compact_agent3_foundational_docs(
+            foundational_step_contents=foundational_step_contents,
+            foundational_step_summaries=foundational_step_summaries,
+        ),
+    }
+
+    diagnostics: dict[str, Any] = {
+        "competitor_map": competitor_map_diagnostics,
+        "habitat_observations": habitat_diagnostics,
+        "mining_plan": mining_diagnostics,
+        "voc_input_mode": voc_input_mode,
+        "foundational_mode": "summary_compact",
+    }
+    allowed_voc_ids: list[str] = []
+
+    if voc_input_mode in {"agent2_full", "agent2_observations_only"}:
+        compact_voc_observations, compact_voc_scored, allowed_voc_ids, voc_diagnostics = (
+            _compact_agent3_voc_inputs(
+                voc_observations=voc_observations,
+                voc_scored=voc_scored,
+            )
+        )
+        logical_payloads["AGENT2_VOC_OBSERVATIONS_JSON"] = compact_voc_observations
+        logical_payloads["AGENT2_HANDOFF_VOC_SCORED_JSON"] = compact_voc_scored
+        diagnostics["voc"] = voc_diagnostics
+    else:
+        compact_evidence_rows, compact_manifest_rows, raw_evidence_diagnostics, allowed_voc_ids = (
+            _compact_agent3_raw_evidence_inputs(
+                evidence_rows_for_prompt=evidence_rows_for_prompt,
+                evidence_manifest_rows=evidence_manifest_rows,
+                evidence_diagnostics=evidence_diagnostics,
+            )
+        )
+        logical_payloads["VOC_EVIDENCE_ROWS_JSON"] = compact_evidence_rows
+        logical_payloads["AGENT2_INPUT_MANIFEST_JSON"] = {
+            "input_count": len(compact_manifest_rows),
+            "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+            "rows": compact_manifest_rows,
+        }
+        logical_payloads["VOC_EVIDENCE_LAYOUT_JSON"] = {
+            "description": (
+                "Rows contain deterministic evidence_id keyed VOC evidence for Agent 3 raw-evidence fallback."
+            ),
+            "required_fields": [
+                "evidence_id",
+                "source_type",
+                "source_url",
+                "author",
+                "date",
+                "context",
+                "verbatim",
+                "evidence_ref",
+            ],
+            "counts": {
+                "evidence_rows": len(compact_evidence_rows),
+                "manifest_rows": len(compact_manifest_rows),
+            },
+            "evidence_diagnostics": raw_evidence_diagnostics,
+        }
+        diagnostics["voc"] = raw_evidence_diagnostics
+
+    diagnostics["payload_sizes"] = _validate_agent3_runtime_payloads(logical_payloads)
+    return logical_payloads, allowed_voc_ids, diagnostics
+
+
+def _render_agent3_runtime_instruction(
+    *,
+    agent03_file_id_map: Mapping[str, str],
+    voc_input_mode: str,
+) -> str:
+    runtime_voc_instruction = ""
+    if voc_input_mode == "raw_evidence_fallback":
+        runtime_voc_instruction = (
+            "Agent 2 VOC outputs were not provided for this run.\n"
+            "Use VOC_EVIDENCE_ROWS_JSON + AGENT2_INPUT_MANIFEST_JSON as the canonical VOC source.\n"
+            "Preserve evidence_id traceability and derive deterministic VOC IDs from evidence_id where needed.\n"
+        )
+    elif voc_input_mode == "agent2_observations_only":
+        runtime_voc_instruction = (
+            "AGENT2_VOC_OBSERVATIONS_JSON was provided without a native Agent 2 score payload.\n"
+            "Use the provided scored handoff JSON generated from deterministic scoring for ranking support.\n"
+        )
+    return (
+        "## Runtime Input Block\n"
+        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+        "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before beginning any analysis.\n"
+        "FOUNDATIONAL_RESEARCH_DOCS_JSON is intentionally summary_compact for v2-06; use it as high-level context, not as a raw transcript.\n"
+        "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
+        "Operate in artifact-only mode for this run and do not invoke web search.\n"
+        "AGENT1_HABITAT_OBSERVATIONS_JSON, AGENT1_MINING_PLAN_JSON, and HABITAT_SCORED_JSON are compact scoring handoffs for prioritization.\n"
+        "If any Agent 1 artifact is missing or empty, continue with available inputs and encode that limitation via conservative evidence judgments.\n"
+        f"{runtime_voc_instruction}"
+        "For every top_quotes entry, use only voc_id values available in the uploaded Agent 2 / raw-evidence runtime inputs.\n"
+        "Output the JSON handoff block defined in the Agent 3 prompt.\n"
+        f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
+        f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
+        "Do not generate hook_starters unless explicitly requested by the prompt.\n"
+        f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
+    )
+
+
 def _derive_angle_observation_seed_from_candidate(candidate: Mapping[str, Any] | None) -> dict[str, Any]:
     if not isinstance(candidate, Mapping):
         return {}
@@ -11951,6 +12739,7 @@ def run_strategy_v2_voc_agent0_habitat_strategy_activity(params: dict[str, Any])
 
     stage1 = shared_context["stage1"]
     stage1_data = shared_context["stage1_data"]
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
     foundational_step_contents = shared_context["foundational_step_contents"]
     foundational_step_summaries = shared_context["foundational_step_summaries"]
     competitor_analysis = shared_context["competitor_analysis"]
@@ -13891,6 +14680,7 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
     )
 
     stage1_data = shared_context["stage1_data"]
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
     competitor_analysis = _require_dict(
         payload=params.get("competitor_analysis"),
         field_name="competitor_analysis",
@@ -13985,116 +14775,59 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         )
         voc_scored = score_voc_items(voc_observations)
 
-    competitor_angle_map = build_competitor_angle_map(competitor_analysis)
-    saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
+    agent03_logical_payloads, agent03_allowed_voc_ids, agent03_payload_diagnostics = (
+        _build_agent3_runtime_logical_payloads(
+            stage1_data=stage1_data,
+            avatar_brief_payload=avatar_brief_payload,
+            foundational_step_contents=foundational_step_contents,
+            foundational_step_summaries=foundational_step_summaries,
+            competitor_analysis=competitor_analysis,
+            habitat_scored=habitat_scored,
+            agent1_habitat_observations=agent1_habitat_observations,
+            agent1_mining_plan=agent1_mining_plan,
+            voc_input_mode=voc_input_mode,
+            voc_observations=voc_observations,
+            voc_scored=voc_scored,
+            evidence_rows_for_prompt=evidence_rows_for_prompt,
+            evidence_manifest_rows=evidence_manifest_rows,
+            evidence_diagnostics=evidence_diagnostics,
+        )
+    )
+    saturated_angles_raw = agent03_logical_payloads.get("KNOWN_SATURATED_ANGLES_JSON")
+    saturated_angles = (
+        [row for row in saturated_angles_raw if isinstance(row, Mapping)]
+        if isinstance(saturated_angles_raw, list)
+        else []
+    )
     saturated_count = max(1, min(9, len(saturated_angles)))
     activity.heartbeat(
         {
             "activity": "strategy_v2.run_voc_agent3_synthesis",
             "phase": "agent3_prompt",
             "status": "started",
+            "runtime_payload_total_chars": int(
+                agent03_payload_diagnostics.get("payload_sizes", {}).get("total_chars") or 0
+            ),
         }
     )
     agent03_asset = resolve_prompt_asset(
         pattern=_VOC_AGENT03_PROMPT_PATTERN,
         context="VOC Agent 3 shadow angle clusterer",
     )
-    agent03_logical_payloads: dict[str, Any] = {
-        "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
-        "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
-        "PRODUCT_BRIEF_JSON": stage1_data,
-        "HABITAT_SCORED_JSON": habitat_scored,
-        "AGENT1_HABITAT_OBSERVATIONS_JSON": agent1_habitat_observations,
-        "AGENT1_MINING_PLAN_JSON": agent1_mining_plan,
-        "AVATAR_BRIEF_SUMMARY_JSON": {
-            "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
-        },
-        "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
-            "step_contents": {
-                step_key: str(foundational_step_contents.get(step_key) or "")
-                for step_key in _FOUNDATIONAL_STEP_KEYS
-            },
-            "step_summaries": {
-                step_key: str(foundational_step_summaries.get(step_key) or "")
-                for step_key in _FOUNDATIONAL_STEP_KEYS
-            },
-        },
-    }
-    if voc_input_mode in {"agent2_full", "agent2_observations_only"}:
-        agent03_logical_payloads["AGENT2_VOC_OBSERVATIONS_JSON"] = voc_observations
-        agent03_logical_payloads["AGENT2_HANDOFF_VOC_SCORED_JSON"] = voc_scored
-    else:
-        agent03_logical_payloads["VOC_EVIDENCE_ROWS_JSON"] = evidence_rows_for_prompt
-        agent03_logical_payloads["AGENT2_INPUT_MANIFEST_JSON"] = {
-            "input_count": len(evidence_manifest_rows),
-            "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
-            "rows": evidence_manifest_rows,
-        }
-        agent03_logical_payloads["VOC_EVIDENCE_LAYOUT_JSON"] = {
-            "description": (
-                "Rows contain deterministic evidence_id keyed VOC evidence for Agent 3 raw-evidence fallback."
-            ),
-            "required_fields": [
-                "evidence_id",
-                "source_type",
-                "source_url",
-                "author",
-                "date",
-                "context",
-                "verbatim",
-                "evidence_ref",
-            ],
-            "counts": {
-                "evidence_rows": len(evidence_rows_for_prompt),
-                "manifest_rows": len(evidence_manifest_rows),
-            },
-            "evidence_diagnostics": evidence_diagnostics,
-        }
     agent03_file_id_map, agent03_uploaded_file_ids = _upload_openai_prompt_json_files(
         model=settings.STRATEGY_V2_VOC_MODEL,
         workflow_run_id=workflow_run_id,
         stage_label="agent3",
         logical_payloads=agent03_logical_payloads,
     )
-    agent03_allowed_voc_ids = _agent3_allowed_voc_ids(
-        voc_observations=voc_observations if isinstance(voc_observations, list) else None,
-        evidence_rows_for_prompt=evidence_rows_for_prompt if isinstance(evidence_rows_for_prompt, list) else None,
-    )
     try:
-        runtime_voc_instruction = ""
-        if voc_input_mode == "raw_evidence_fallback":
-            runtime_voc_instruction = (
-                "Agent 2 VOC outputs were not provided for this run.\n"
-                "Use VOC_EVIDENCE_ROWS_JSON + AGENT2_INPUT_MANIFEST_JSON as the canonical VOC source.\n"
-                "Preserve evidence_id traceability and derive deterministic VOC IDs from evidence_id where needed.\n"
-            )
-        elif voc_input_mode == "agent2_observations_only":
-            runtime_voc_instruction = (
-                "AGENT2_VOC_OBSERVATIONS_JSON was provided without a native Agent 2 score payload.\n"
-                "Use the provided scored handoff JSON generated from deterministic scoring for ranking support.\n"
-            )
         agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
             asset=agent03_asset,
             context="strategy_v2.agent3_output",
             model=settings.STRATEGY_V2_VOC_MODEL,
-            runtime_instruction=(
-                "## Runtime Input Block\n"
-                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
-                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
-                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before beginning any analysis.\n"
-                "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
-                "Operate in artifact-only mode for this run and do not invoke web search.\n"
-                "If HABITAT_SCORED_JSON, AGENT1_HABITAT_OBSERVATIONS_JSON, or AGENT1_MINING_PLAN_JSON are present, "
-                "use them to prioritize habitat weighting, source diversity checks, and contradiction sampling.\n"
-                "If any Agent 1 artifact is missing or empty, continue with available inputs and encode that limitation "
-                "via conservative evidence judgments.\n"
-                f"{runtime_voc_instruction}"
-                "For every top_quotes entry, use only voc_id values available in the uploaded Agent 2 / raw-evidence runtime inputs.\n"
-                "Output the JSON handoff block defined in the Agent 3 prompt.\n"
-                f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
-                f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
-                "Do not generate hook_starters unless explicitly requested by the prompt.\n"
-                f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
+            runtime_instruction=_render_agent3_runtime_instruction(
+                agent03_file_id_map=agent03_file_id_map,
+                voc_input_mode=voc_input_mode,
             ),
             schema_name="strategy_v2_voc_agent03",
             schema=_agent3_prompt_output_schema(
@@ -14113,6 +14846,9 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 "activity": "strategy_v2.run_voc_agent3_synthesis",
                 "phase": "agent3_prompt",
                 "model": settings.STRATEGY_V2_VOC_MODEL,
+                "runtime_payload_total_chars": int(
+                    agent03_payload_diagnostics.get("payload_sizes", {}).get("total_chars") or 0
+                ),
             },
         )
     finally:
@@ -14190,6 +14926,7 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 if isinstance(voc_scored.get("items"), list)
                 else 0,
                 "raw_evidence_row_count": len(evidence_rows_for_prompt),
+                "runtime_payload_diagnostics": agent03_payload_diagnostics,
             },
             outputs_json={
                 "ranked_candidates": ranked_candidates,
@@ -14219,6 +14956,7 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 "competitor_analysis": competitor_analysis,
                 "voc_scored_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
                 "evidence_diagnostics": evidence_diagnostics,
+                "runtime_payload_diagnostics": agent03_payload_diagnostics,
                 "prompt_provenance": agent03_provenance,
                 "raw_output": agent03_raw[:30000],
             },
@@ -15091,7 +15829,32 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 agent_run_id=voc_agent_run_id,
             )
 
-            competitor_angle_map = build_competitor_angle_map(competitor_analysis)
+            agent03_logical_payloads, agent03_allowed_voc_ids, agent03_payload_diagnostics = (
+                _build_agent3_runtime_logical_payloads(
+                    stage1_data=stage1_data,
+                    avatar_brief_payload=avatar_brief_payload,
+                    foundational_step_contents=foundational_step_contents,
+                    foundational_step_summaries=foundational_step_summaries,
+                    competitor_analysis=competitor_analysis,
+                    habitat_scored=habitat_scored,
+                    agent1_habitat_observations=habitat_observations,
+                    agent1_mining_plan=agent01_output.get("mining_plan")
+                    if isinstance(agent01_output.get("mining_plan"), list)
+                    else [],
+                    voc_input_mode=voc_input_mode,
+                    voc_observations=voc_observations,
+                    voc_scored=voc_scored,
+                    evidence_rows_for_prompt=evidence_rows,
+                    evidence_manifest_rows=[],
+                    evidence_diagnostics=evidence_diagnostics,
+                )
+            )
+            saturated_angles_raw = agent03_logical_payloads.get("KNOWN_SATURATED_ANGLES_JSON")
+            saturated_angles = (
+                [row for row in saturated_angles_raw if isinstance(row, Mapping)]
+                if isinstance(saturated_angles_raw, list)
+                else []
+            )
             saturated_count = max(1, min(9, len(saturated_angles)))
             agent03_asset = resolve_prompt_asset(
                 pattern=_VOC_AGENT03_PROMPT_PATTERN,
@@ -15101,47 +15864,16 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 model=settings.STRATEGY_V2_VOC_MODEL,
                 workflow_run_id=workflow_run_id,
                 stage_label="agent3-prompt-chain",
-                logical_payloads={
-                    "AGENT2_HANDOFF_VOC_SCORED_JSON": voc_scored,
-                    "AGENT2_VOC_OBSERVATIONS_JSON": voc_observations,
-                    "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
-                    "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
-                    "PRODUCT_BRIEF_JSON": stage1_data,
-                    "AVATAR_BRIEF_SUMMARY_JSON": {
-                        "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
-                    },
-                    "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
-                        "step_contents": {
-                            step_key: str(foundational_step_contents.get(step_key) or "")
-                            for step_key in _FOUNDATIONAL_STEP_KEYS
-                        },
-                        "step_summaries": {
-                            step_key: str(foundational_step_summaries.get(step_key) or "")
-                            for step_key in _FOUNDATIONAL_STEP_KEYS
-                        },
-                    },
-                },
-            )
-            agent03_allowed_voc_ids = _agent3_allowed_voc_ids(
-                voc_observations=voc_observations,
-                evidence_rows_for_prompt=None,
+                logical_payloads=agent03_logical_payloads,
             )
             try:
                 agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
                     asset=agent03_asset,
                     context="strategy_v2.agent3_output",
                     model=settings.STRATEGY_V2_VOC_MODEL,
-                    runtime_instruction=(
-                        "## Runtime Input Block\n"
-                        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
-                        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
-                        "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
-                        "For every top_quotes entry, use only voc_id values available in AGENT2_VOC_OBSERVATIONS_JSON.\n"
-                        "Output the JSON handoff block defined in the Agent 3 prompt.\n"
-                        f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
-                        f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
-                        "Do not generate hook_starters unless explicitly requested by the prompt.\n"
-                        f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
+                    runtime_instruction=_render_agent3_runtime_instruction(
+                        agent03_file_id_map=agent03_file_id_map,
+                        voc_input_mode=voc_input_mode,
                     ),
                     schema_name="strategy_v2_voc_agent03",
                     schema=_agent3_prompt_output_schema(
@@ -15149,7 +15881,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         allowed_voc_ids=agent03_allowed_voc_ids,
                     ),
                     use_reasoning=True,
-                    use_web_search=True,
+                    use_web_search=False,
                     openai_tools=_openai_python_tool_resources(
                         settings.STRATEGY_V2_VOC_MODEL,
                         file_ids=list(agent03_file_id_map.values()),
@@ -15160,6 +15892,9 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         "activity": "strategy_v2.run_voc_angle_pipeline",
                         "phase": "agent3_prompt",
                         "model": settings.STRATEGY_V2_VOC_MODEL,
+                        "runtime_payload_total_chars": int(
+                            agent03_payload_diagnostics.get("payload_sizes", {}).get("total_chars") or 0
+                        ),
                     },
                 )
             finally:
@@ -15240,6 +15975,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     if isinstance(voc_scored.get("items"), list)
                     else 0,
                     "raw_evidence_row_count": len(evidence_rows),
+                    "runtime_payload_diagnostics": agent03_payload_diagnostics,
                 },
                 outputs_json={
                     "ranked_candidates": ranked_candidates,
@@ -15269,6 +16005,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "competitor_analysis": competitor_analysis,
                     "voc_scored_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
                     "evidence_diagnostics": evidence_diagnostics,
+                    "runtime_payload_diagnostics": agent03_payload_diagnostics,
                     "prompt_provenance": agent03_provenance,
                     "raw_output": agent03_raw[:30000],
                 },

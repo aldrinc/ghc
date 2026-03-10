@@ -2593,6 +2593,174 @@ def test_strategy_v2_checkpoint_c5_scores_voc_observations_when_voc_scored_missi
         )
 
 
+def test_strategy_v2_agent3_uploads_compact_runtime_payloads(monkeypatch):
+    shared_context = _stage2b_shared_context_stub()
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: shared_context)
+    monkeypatch.setattr(strategy_v2_activities, "_require_step_payload_artifact_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ensure_foundational_step_payload_artifact_ids",
+        lambda **kwargs: dict(kwargs["existing_step_payload_artifact_ids"]),
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _stop_after_upload(**kwargs):
+        captured["use_web_search"] = kwargs.get("use_web_search")
+        captured["runtime_instruction"] = kwargs.get("runtime_instruction")
+        raise AssertionError("stop_after_agent3_upload")
+
+    monkeypatch.setattr(strategy_v2_activities, "_run_prompt_json_object", _stop_after_upload)
+
+    habitat_one = _agent1_habitat_observation_payload(
+        habitat_name="r/herbalism",
+        habitat_type="TEXT_COMMUNITY",
+        source_file="habitat-1.json",
+    )
+    habitat_one["include_in_mining_plan"] = True
+    habitat_one["priority_rank"] = 1
+    habitat_two = _agent1_habitat_observation_payload(
+        habitat_name="forum.sleephelp.com",
+        habitat_type="FORUM",
+        source_file="habitat-2.json",
+    )
+    habitat_two["include_in_mining_plan"] = False
+    habitat_two["priority_rank"] = None
+    mining_plan = [
+        {
+            "source_file": habitat_one["source_file"],
+            "habitat_name": habitat_one["habitat_name"],
+            "habitat_type": habitat_one["habitat_type"],
+            "priority_rank": 1,
+            "rank_score": habitat_one["rank_score"],
+            "estimated_yield": habitat_one["estimated_yield"],
+            "target_voc_types": ["PAIN_LANGUAGE", "FAILED_SOLUTIONS"],
+            "sampling_strategy": "Process long-form narratives first.",
+            "platform_behavior_note": "High-detail buyer complaint threads.",
+            "compliance_flags": "",
+            "evidence_refs": habitat_one["evidence_refs"],
+        }
+    ]
+    habitat_scored = {
+        "summary": {"total_habitats": 2},
+        "habitats": [
+            {
+                "rank": 1,
+                "habitat_name": habitat_one["habitat_name"],
+                "habitat_type": habitat_one["habitat_type"],
+                "final_score": 82.4,
+                "confidence_range": [73.0, 89.0],
+                "mining_gate_applied": False,
+                "lifecycle_stage": "GROWING",
+            },
+            {
+                "rank": 2,
+                "habitat_name": habitat_two["habitat_name"],
+                "habitat_type": habitat_two["habitat_type"],
+                "final_score": 71.1,
+                "confidence_range": [62.0, 79.0],
+                "mining_gate_applied": False,
+                "lifecycle_stage": "MATURE",
+            },
+        ],
+    }
+
+    voc_rows: list[dict[str, Any]] = []
+    voc_scored_items: list[dict[str, Any]] = []
+    total_rows = strategy_v2_activities._AGENT3_VOC_MAX_ROWS + 20
+    for index in range(total_rows):
+        template = _agent2_voc_observations_payload()[index % len(_agent2_voc_observations_payload())]
+        row = dict(template)
+        row["voc_id"] = f"V{index + 1:03d}"
+        row["evidence_id"] = f"E{index + 1:016X}"
+        row["quote"] = f"{template['quote']} variant {index}"
+        row["source_url"] = f"https://community{index % 9}.example/thread/{index}"
+        row["source"] = row["source_url"]
+        row["source_type"] = "REDDIT" if index % 2 == 0 else "FORUM"
+        row["source_author"] = f"user_{index:03d}"
+        voc_rows.append(row)
+        voc_scored_items.append(
+            {
+                "voc_id": row["voc_id"],
+                "adjusted_score": float(90 - (index % 17)),
+                "confidence_range": [61.0, 92.0],
+                "aspiration_gap": 4,
+                "freshness_modifier": 1.0,
+                "zero_evidence_gate": False,
+                "classifications": {
+                    "buyer_stage": row["buyer_stage"],
+                    "solution_sophistication": row["solution_sophistication"],
+                    "compliance_risk": row["compliance_risk"],
+                },
+            }
+        )
+
+    with pytest.raises(AssertionError, match="stop_after_agent3_upload"):
+        strategy_v2_activities.run_strategy_v2_voc_agent3_synthesis_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": shared_context["confirmed_competitor_assets"],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-04": "artifact-v2-04",
+                },
+                "competitor_analysis": {
+                    "asset_observation_sheets": [
+                        {
+                            "asset_id": f"asset-{idx}",
+                            "competitor_name": f"Competitor {idx % 5}",
+                            "primary_angle": "Safer nightly routine",
+                            "core_claim": "Predictable relief without guesswork",
+                            "implied_mechanism": "Structured timing and contraindication guidance",
+                            "target_segment_description": "High-risk readers",
+                            "hook_type": "problem crystallization",
+                        }
+                        for idx in range(18)
+                    ],
+                    "saturation_map": [
+                        {
+                            "angle": f"Angle {idx}",
+                            "driver": "safety",
+                            "status": "SATURATED" if idx < 4 else "CONTESTED",
+                            "competitor_count": str(idx + 1),
+                        }
+                        for idx in range(8)
+                    ],
+                    "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.2},
+                },
+                "agent01_output": {
+                    "habitat_observations": [habitat_one, habitat_two],
+                    "mining_plan": mining_plan,
+                },
+                "habitat_scored": habitat_scored,
+                "voc_observations": voc_rows,
+                "voc_scored": {
+                    "items": voc_scored_items,
+                    "corpus_health": {"total_items": len(voc_rows)},
+                },
+            }
+        )
+
+    uploaded_payloads = getattr(strategy_v2_activities, "_TEST_STUB_PROMPT_LOGICAL_PAYLOADS", {})
+    agent3_payloads = uploaded_payloads.get("agent3")
+    assert isinstance(agent3_payloads, dict)
+    assert agent3_payloads["FOUNDATIONAL_RESEARCH_DOCS_JSON"]["document_mode"] == "summary_compact"
+    assert "step_contents" not in agent3_payloads["FOUNDATIONAL_RESEARCH_DOCS_JSON"]
+    assert len(agent3_payloads["AGENT2_VOC_OBSERVATIONS_JSON"]) == strategy_v2_activities._AGENT3_VOC_MAX_ROWS
+    assert agent3_payloads["AGENT2_HANDOFF_VOC_SCORED_JSON"]["selection_mode"] == "top_diverse_compact"
+    assert captured["use_web_search"] is False
+    assert "summary_compact" in str(captured["runtime_instruction"])
+
+
 def test_normalize_strategy_v2_artifact_refs_promotes_nested_step_payload_ids():
     normalized = _normalize_strategy_v2_artifact_refs(
         {

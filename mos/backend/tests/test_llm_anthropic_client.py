@@ -59,6 +59,7 @@ def test_anthropic_generation_surfaces_underlying_exception(monkeypatch) -> None
 def test_llm_client_default_model_falls_back_to_claude(monkeypatch) -> None:
     monkeypatch.delenv("LLM_DEFAULT_MODEL", raising=False)
     monkeypatch.delenv("CLAUDE_DEFAULT_MODEL", raising=False)
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *args, **kwargs: False)
 
     importlib.reload(llm_client_module)
     try:
