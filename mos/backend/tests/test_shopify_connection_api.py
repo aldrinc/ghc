@@ -1177,6 +1177,39 @@ def test_apply_local_theme_collection_banner_contrasting_text_color_uses_light_t
     )
 
 
+def test_apply_local_theme_collection_banner_text_styling_keeps_banner_text_on_computed_foreground():
+    baseline_zip_path = (
+        Path(__file__).resolve().parents[3]
+        / clients_router._LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH
+    )
+
+    with zipfile.ZipFile(baseline_zip_path) as archive:
+        section_content = archive.read("sections/main-collection-banner.liquid").decode("utf-8")
+
+    files_by_filename = {
+        "sections/main-collection-banner.liquid": {
+            "filename": "sections/main-collection-banner.liquid",
+            "content": section_content,
+        }
+    }
+
+    clients_router._apply_local_theme_collection_banner_text_styling(
+        files_by_filename=files_by_filename,
+    )
+
+    updated_content = files_by_filename["sections/main-collection-banner.liquid"]["content"]
+    render_index = updated_content.index("{%- render 'section-variables', section: section -%}")
+    image_guard_index = updated_content.index("{%- if desktop_image != blank %}")
+    assert render_index < image_guard_index
+    assert (
+        'class="banner__box main-collection-banner__content md:text-{{ '
+        'section.settings.text_alignment }} text-{{ '
+        'section.settings.text_alignment_mobile }}"'
+    ) in updated_content
+    assert "#shopify-section-{{ section.id }} .main-collection-banner__content {" in updated_content
+    assert "color: rgb(var(--color-foreground));" in updated_content
+
+
 def test_local_theme_baseline_secondary_background_sections_expose_rewritable_bindings():
     baseline_zip_path = (
         Path(__file__).resolve().parents[3]
@@ -1391,13 +1424,16 @@ def test_build_theme_sync_slot_image_prompt_applies_feature_icon_constraints():
 
     assert "Create a clean ecommerce feature icon" in prompt
     assert "Icon-style requirements:" in prompt
+    assert "occupying roughly 70-80% of the canvas" in prompt
+    assert "Do not place the icon inside a badge, card, tile, frame, or inset square." in prompt
     assert "Background policy:" in prompt
     assert "always use a flat solid background" in prompt
-    assert "--color-page-bg value provided in context" in prompt
+    assert "exact --color-page-bg hex value provided in context" in prompt
+    assert "exact --color-cta-shell hex value provided in context" in prompt
     assert "Feature context: We deliver worldwide Get your package anywhere!." in prompt
 
 
-def test_build_theme_sync_default_general_prompt_context_includes_page_background_token():
+def test_build_theme_sync_default_general_prompt_context_includes_theme_color_tokens():
     context = clients_router._build_theme_sync_default_general_prompt_context(
         draft_data=SimpleNamespace(
             workspaceName="Workspace A",
@@ -1407,6 +1443,7 @@ def test_build_theme_sync_default_general_prompt_context_includes_page_backgroun
             cssVars={
                 "--color-brand": "#123456",
                 "--color-cta": "#abcdef",
+                "--color-cta-shell": "#f4efe7",
                 "--color-page-bg": "#f8f7f5",
             },
         ),
@@ -1419,7 +1456,8 @@ def test_build_theme_sync_default_general_prompt_context_includes_page_backgroun
         brand_description="Brand description",
     )
 
-    assert "Page background token (--color-page-bg): #f8f7f5." in context
+    assert "Exact CTA shell hex (--color-cta-shell): #f4efe7." in context
+    assert "Exact page background hex (--color-page-bg): #f8f7f5." in context
 
 
 def test_split_theme_text_slots_for_copy_generation_excludes_feature_highlights():
