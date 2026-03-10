@@ -380,6 +380,8 @@ _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES: tuple[str, ...] = (
     "sections/footer-group.json",
     "sections/overlay-group.json",
 )
+_LOCAL_SHOPIFY_THEME_LAYOUT_FILENAME = "layout/theme.liquid"
+_LOCAL_SHOPIFY_THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
 _LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME = "config/settings_data.json"
 _LOCAL_SHOPIFY_THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
 _LOCAL_SHOPIFY_THEME_RICH_TEXT_SECTION_ID = "rich_text_U6caVk"
@@ -411,7 +413,15 @@ _LOCAL_SHOPIFY_THEME_CSS_VAR_RE = re.compile(
     r"^var\(\s*(?P<name>--[a-z0-9\-_]+)\s*\)$",
     re.IGNORECASE,
 )
+_LOCAL_SHOPIFY_THEME_BRAND_LOGO_CSS_VAR_RE = re.compile(
+    r'(?m)^(\s*--mos-brand-logo-url\s*:\s*")(?P<url>(?:[^"\\]|\\.)*)(";\s*)$'
+)
+_LOCAL_SHOPIFY_THEME_BRAND_LOGO_META_RE = re.compile(
+    r'(<meta\s+name="mos-brand-logo-url"\s+content=")(?P<url>[^"]*)("\s*/?>)',
+    re.IGNORECASE,
+)
 _ASSET_SHOPIFY_FILE_URLS_CACHE_KEY = "shopifyFileUrlsByShopDomain"
+_THEME_TEMPLATE_BRAND_LOGO_UPLOAD_SETTING_PATH = "__brand_logo__"
 _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
     "adapt",
     "auto",
@@ -2631,6 +2641,126 @@ def _apply_local_theme_export_default_navigation_size(
     settings_file_entry.pop("contentBase64", None)
 
 
+def _escape_local_theme_css_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _resolve_local_theme_footer_logo_setting_paths(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+) -> list[str]:
+    footer_group_data = _load_local_theme_json_file_from_export_files(
+        files_by_filename=files_by_filename,
+        filename=_LOCAL_SHOPIFY_THEME_FOOTER_GROUP_FILENAME,
+    )
+    sections = footer_group_data.get("sections")
+    if not isinstance(sections, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline footer-group file is missing a valid sections "
+                "object for brand logo synchronization."
+            ),
+        )
+
+    footer_logo_setting_paths: list[str] = []
+    for section_key, section_payload in sections.items():
+        if not isinstance(section_key, str) or not section_key.strip():
+            continue
+        if not isinstance(section_payload, dict):
+            continue
+        settings_payload = section_payload.get("settings")
+        if not isinstance(settings_payload, dict) or "logo" not in settings_payload:
+            continue
+        footer_logo_setting_paths.append(
+            f"{_LOCAL_SHOPIFY_THEME_FOOTER_GROUP_FILENAME}.sections.{section_key.strip()}.settings.logo"
+        )
+
+    if not footer_logo_setting_paths:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline footer-group file does not expose a footer logo "
+                "setting path for brand logo synchronization."
+            ),
+        )
+    return sorted(footer_logo_setting_paths)
+
+
+def _apply_local_theme_brand_logo_references(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+    layout_filename: str,
+    css_filename: str,
+    logo_url: str,
+) -> None:
+    logo_setting_paths = {
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo": logo_url,
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo_mobile": logo_url,
+    }
+    for footer_logo_setting_path in _resolve_local_theme_footer_logo_setting_paths(
+        files_by_filename=files_by_filename
+    ):
+        logo_setting_paths[footer_logo_setting_path] = logo_url
+    _apply_theme_template_setting_values_to_local_files(
+        files_by_filename=files_by_filename,
+        values_by_setting_path=logo_setting_paths,
+    )
+
+    css_file_entry = files_by_filename.get(css_filename)
+    css_content = css_file_entry.get("content") if isinstance(css_file_entry, dict) else None
+    if not isinstance(css_content, str) or not css_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline workspace-brand CSS asset is missing or invalid "
+                "for brand logo synchronization."
+            ),
+        )
+    escaped_logo_url = _escape_local_theme_css_string(logo_url)
+    updated_css_content, replaced_css_logo_count = _LOCAL_SHOPIFY_THEME_BRAND_LOGO_CSS_VAR_RE.subn(
+        lambda match: f'{match.group(1)}{escaped_logo_url}{match.group(3)}',
+        css_content,
+    )
+    if replaced_css_logo_count < 1:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline workspace-brand CSS asset does not expose "
+                "--mos-brand-logo-url for brand logo synchronization."
+            ),
+        )
+    css_file_entry["content"] = updated_css_content
+    css_file_entry.pop("contentBase64", None)
+
+    layout_file_entry = files_by_filename.get(layout_filename)
+    layout_content = (
+        layout_file_entry.get("content") if isinstance(layout_file_entry, dict) else None
+    )
+    if not isinstance(layout_content, str) or not layout_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline layout file is missing or invalid for brand "
+                "logo synchronization."
+            ),
+        )
+    updated_layout_content, replaced_layout_logo_count = _LOCAL_SHOPIFY_THEME_BRAND_LOGO_META_RE.subn(
+        lambda match: f'{match.group(1)}{escape(logo_url, quote=True)}{match.group(3)}',
+        layout_content,
+    )
+    if replaced_layout_logo_count < 1:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline layout file does not expose the "
+                "mos-brand-logo-url meta tag for brand logo synchronization."
+            ),
+        )
+    layout_file_entry["content"] = updated_layout_content
+    layout_file_entry.pop("contentBase64", None)
+
+
 def _apply_local_theme_rich_text_footer_color_styling(
     *,
     files_by_filename: dict[str, dict[str, str]],
@@ -2825,7 +2955,7 @@ def _build_local_shopify_theme_export_payload(
     theme_role: str,
 ) -> dict[str, Any]:
     ordered_filenames, files_by_filename = _load_local_shopify_theme_baseline_files()
-    layout_filename = "layout/theme.liquid"
+    layout_filename = _LOCAL_SHOPIFY_THEME_LAYOUT_FILENAME
     layout_file_entry = files_by_filename.get(layout_filename)
     if not isinstance(layout_file_entry, dict):
         raise HTTPException(
@@ -2851,7 +2981,7 @@ def _build_local_shopify_theme_export_payload(
                 f"referenced by layout/theme.liquid. filename={css_filename}."
             ),
         )
-    settings_filename = "config/settings_data.json"
+    settings_filename = _LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME
     settings_file_entry = files_by_filename.get(settings_filename)
     if not isinstance(settings_file_entry, dict):
         raise HTTPException(
@@ -2881,6 +3011,12 @@ def _build_local_shopify_theme_export_payload(
     css_file_entry.pop("contentBase64", None)
     _apply_local_theme_export_default_navigation_size(
         settings_file_entry=settings_file_entry,
+    )
+    _apply_local_theme_brand_logo_references(
+        files_by_filename=files_by_filename,
+        layout_filename=layout_filename,
+        css_filename=css_filename,
+        logo_url=logo_url,
     )
 
     _apply_theme_template_setting_values_to_local_files(
@@ -6233,6 +6369,79 @@ def _resolve_template_export_component_image_urls_from_asset_map_with_cache(
     return resolved_component_image_urls
 
 
+def _resolve_theme_template_logo_url_to_shopify_file_with_cache(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    shop_domain: str,
+    logo_public_id: str,
+    current_logo_url: str,
+) -> str:
+    logo_asset = AssetsRepository(session).get_by_public_id(
+        org_id=org_id,
+        public_id=logo_public_id,
+        client_id=client_id,
+    )
+    if not logo_asset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Stored theme template draft references a brand logo asset that does not exist "
+                f"for this workspace. assetPublicId={logo_public_id}."
+            ),
+        )
+
+    cached_shopify_file_url = _read_asset_cached_shopify_file_url(
+        asset=logo_asset,
+        shop_domain=shop_domain,
+    )
+    if cached_shopify_file_url is not None:
+        return cached_shopify_file_url
+
+    normalized_current_logo_url = current_logo_url.strip()
+    if normalized_current_logo_url.startswith("shopify://"):
+        _write_asset_cached_shopify_file_url(
+            asset=logo_asset,
+            shop_domain=shop_domain,
+            shopify_file_url=normalized_current_logo_url,
+        )
+        session.add(logo_asset)
+        session.commit()
+        return normalized_current_logo_url
+
+    public_asset_base_url = _require_public_asset_base_url()
+    resolved_logo_urls = _resolve_template_export_component_image_urls_to_shopify_files(
+        client_id=client_id,
+        shop_domain=shop_domain,
+        component_image_urls={
+            _THEME_TEMPLATE_BRAND_LOGO_UPLOAD_SETTING_PATH: (
+                f"{public_asset_base_url}/public/assets/{logo_public_id}"
+            )
+        },
+    )
+    resolved_logo_url = resolved_logo_urls.get(_THEME_TEMPLATE_BRAND_LOGO_UPLOAD_SETTING_PATH)
+    if not isinstance(resolved_logo_url, str) or not resolved_logo_url.strip().startswith(
+        "shopify://"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify image URL resolver did not return a Shopify file URL for the "
+                "workspace brand logo during template image generation."
+            ),
+        )
+    normalized_resolved_logo_url = resolved_logo_url.strip()
+    _write_asset_cached_shopify_file_url(
+        asset=logo_asset,
+        shop_domain=shop_domain,
+        shopify_file_url=normalized_resolved_logo_url,
+    )
+    session.add(logo_asset)
+    session.commit()
+    return normalized_resolved_logo_url
+
+
 def _resolve_latest_template_publish_logo(
     *,
     session: Session,
@@ -6254,6 +6463,39 @@ def _resolve_latest_template_publish_logo(
         design_system_id=design_system_id,
     )
     return logo_public_id, logo_url
+
+
+def _resolve_uploaded_template_logo_url_for_export(
+    *,
+    draft_data: ShopifyThemeTemplateDraftData,
+    latest_logo_asset_public_id: str,
+    latest_logo_url: str,
+) -> str:
+    draft_logo_url = (
+        draft_data.logoUrl.strip()
+        if isinstance(draft_data.logoUrl, str) and draft_data.logoUrl.strip()
+        else ""
+    )
+    if not draft_logo_url.startswith("shopify://"):
+        return latest_logo_url
+
+    draft_logo_asset_public_id = (
+        draft_data.logoAssetPublicId.strip()
+        if isinstance(draft_data.logoAssetPublicId, str)
+        and draft_data.logoAssetPublicId.strip()
+        else ""
+    )
+    if draft_logo_asset_public_id != latest_logo_asset_public_id.strip():
+        return latest_logo_url
+
+    metadata = draft_data.metadata if isinstance(draft_data.metadata, dict) else {}
+    uploaded_shop_domain = metadata.get("logoUploadedShopDomain")
+    if not isinstance(uploaded_shop_domain, str) or not uploaded_shop_domain.strip():
+        return latest_logo_url
+
+    if uploaded_shop_domain.strip().lower() != draft_data.shopDomain.strip().lower():
+        return latest_logo_url
+    return draft_logo_url
 
 
 def _resolve_latest_template_publish_design_system_snapshot(
@@ -6754,6 +6996,51 @@ def _generate_shopify_theme_template_draft_images(
     )
     next_component_text_values.update(managed_feature_component_text_values)
     latest_metadata = dict(latest_data.metadata or {})
+    resolved_logo_url = (
+        latest_data.logoUrl.strip()
+        if isinstance(latest_data.logoUrl, str) and latest_data.logoUrl.strip()
+        else ""
+    )
+    if not resolved_logo_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored Shopify theme template draft version is missing logoUrl.",
+        )
+    logo_public_id = (
+        latest_data.logoAssetPublicId.strip()
+        if isinstance(latest_data.logoAssetPublicId, str)
+        and latest_data.logoAssetPublicId.strip()
+        else ""
+    )
+    if not logo_public_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stored Shopify theme template draft version is missing logoAssetPublicId.",
+        )
+    resolved_logo_url = _resolve_theme_template_logo_url_to_shopify_file_with_cache(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        shop_domain=latest_data.shopDomain,
+        logo_public_id=logo_public_id,
+        current_logo_url=resolved_logo_url,
+    )
+    current_logo_uploaded_shop_domain = latest_metadata.get("logoUploadedShopDomain")
+    if isinstance(current_logo_uploaded_shop_domain, str) and current_logo_uploaded_shop_domain.strip():
+        normalized_current_logo_uploaded_shop_domain = (
+            current_logo_uploaded_shop_domain.strip().lower()
+        )
+    else:
+        normalized_current_logo_uploaded_shop_domain = None
+    resolved_logo_uploaded_shop_domain = (
+        latest_data.shopDomain.strip().lower()
+        if resolved_logo_url.startswith("shopify://")
+        else None
+    )
+    logo_url_changed = resolved_logo_url != latest_data.logoUrl.strip()
+    logo_upload_state_changed = (
+        resolved_logo_uploaded_shop_domain != normalized_current_logo_uploaded_shop_domain
+    )
     latest_feature_highlights_payload = (
         latest_data.featureHighlights.model_dump(mode="json", exclude_none=True)
         if latest_data.featureHighlights is not None
@@ -6828,6 +7115,8 @@ def _generate_shopify_theme_template_draft_images(
             component_image_urls_changed
             or component_text_values_changed
             or feature_highlights_changed
+            or logo_url_changed
+            or logo_upload_state_changed
         ):
             merged_metadata = dict(latest_metadata)
             merged_metadata.update(
@@ -6837,8 +7126,15 @@ def _generate_shopify_theme_template_draft_images(
                     "componentTextValueCount": len(normalized_component_text_values),
                 }
             )
+            if resolved_logo_uploaded_shop_domain is not None:
+                merged_metadata["logoUploadedShopDomain"] = (
+                    resolved_logo_uploaded_shop_domain
+                )
+            else:
+                merged_metadata.pop("logoUploadedShopDomain", None)
             next_data = latest_data.model_copy(
                 update={
+                    "logoUrl": resolved_logo_url,
                     "componentImageAssetMap": normalized_component_image_asset_map,
                     "componentImageUrls": normalized_component_image_urls,
                     "componentTextValues": normalized_component_text_values,
@@ -7311,6 +7607,8 @@ def _generate_shopify_theme_template_draft_images(
         and not component_text_values_changed
         and not feature_highlights_changed
         and not component_image_urls_changed
+        and not logo_url_changed
+        and not logo_upload_state_changed
     ):
         serialized_draft = _serialize_shopify_theme_template_draft(
             draft=draft,
@@ -7362,6 +7660,10 @@ def _generate_shopify_theme_template_draft_images(
             "componentTextValueCount": len(normalized_component_text_values),
         }
     )
+    if resolved_logo_uploaded_shop_domain is not None:
+        merged_metadata["logoUploadedShopDomain"] = resolved_logo_uploaded_shop_domain
+    else:
+        merged_metadata.pop("logoUploadedShopDomain", None)
     if should_generate_images:
         merged_metadata["imageGenerationGeneratedAt"] = datetime.now(timezone.utc).isoformat()
     if generated_component_text_values:
@@ -7380,6 +7682,7 @@ def _generate_shopify_theme_template_draft_images(
     next_data = latest_data.model_copy(
         update={
             "productId": resolved_product_id,
+            "logoUrl": resolved_logo_url,
             "componentImageAssetMap": normalized_component_image_asset_map,
             "componentImageUrls": normalized_component_image_urls,
             "componentTextValues": normalized_component_text_values,
@@ -8029,11 +8332,16 @@ def _build_shopify_theme_template_export_zip_response(
         # Backward-compatible path for tests that monkeypatch this helper with a raw string.
         sales_page_path = str(sales_page_path_resolution or "")
         sales_page_warning = None
+    resolved_export_logo_url = _resolve_uploaded_template_logo_url_for_export(
+        draft_data=draft_data,
+        latest_logo_asset_public_id=_latest_logo_asset_public_id,
+        latest_logo_url=latest_logo_url,
+    )
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
         brand_name=latest_brand_name,
-        logo_url=latest_logo_url,
+        logo_url=resolved_export_logo_url,
         css_vars=latest_css_vars,
         font_urls=latest_font_urls,
         data_theme=latest_data_theme,
@@ -9291,12 +9599,13 @@ def update_client_shopify_installation(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
-    if status_payload.get("state") == "ready":
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
         sync_workspace_shopify_catalog_collection(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
-            shop_domain=payload.shopDomain,
+            shop_domain=resolved_shop_domain,
         )
     return ShopifyConnectionStatusResponse(**status_payload)
 
@@ -9326,12 +9635,13 @@ def auto_provision_client_shopify_installation_storefront_token(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
-    if status_payload.get("state") == "ready":
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
         sync_workspace_shopify_catalog_collection(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
-            shop_domain=payload.shopDomain,
+            shop_domain=resolved_shop_domain,
         )
     return ShopifyConnectionStatusResponse(**status_payload)
 

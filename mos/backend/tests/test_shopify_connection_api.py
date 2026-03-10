@@ -36,6 +36,31 @@ def _create_client(api_client, *, name: str = "Shopify Workspace") -> str:
     return response.json()["id"]
 
 
+def _create_workspace_image_asset(
+    db_session,
+    *,
+    client: Client,
+    public_id: UUID | None = None,
+    ai_metadata: dict[str, object] | None = None,
+) -> str:
+    asset_public_id = public_id or uuid4()
+    db_session.add(
+        Asset(
+            org_id=client.org_id,
+            client_id=client.id,
+            source_type=AssetSourceEnum.generated,
+            channel_id="meta",
+            format="image",
+            content={"label": "workspace image"},
+            public_id=asset_public_id,
+            asset_kind="image",
+            ai_metadata=ai_metadata or {},
+        )
+    )
+    db_session.flush()
+    return str(asset_public_id)
+
+
 def _set_theme_export_sales_page_path(
     monkeypatch,
     *,
@@ -2853,6 +2878,160 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     )
 
 
+def test_export_shopify_theme_template_zip_uses_uploaded_logo_url(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    _set_theme_export_sales_page_path(monkeypatch)
+
+    uploaded_logo_url = "shopify://shop_images/generated-logo.png"
+    logo_public_id = str(uuid4())
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="uploaded-logo-theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="agent_image_generation_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Acme",
+                "logoAssetPublicId": logo_public_id,
+                "logoUrl": uploaded_logo_url,
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "uploaded-logo-theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": None,
+                "componentImageAssetMap": {},
+                "componentImageUrls": {},
+                "componentTextValues": {},
+                "imageSlots": [],
+                "textSlots": [],
+                "metadata": {"logoUploadedShopDomain": "example.myshopify.com"},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+        sync_to_shopify: bool = True,
+    ):
+        assert sync_to_shopify is False
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [],
+            "updatedProfileUrls": {},
+            "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
+        }
+
+    def fake_resolve_latest_snapshot(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        design_system_id: str,
+    ):
+        assert design_system_id == "design-system-1"
+        return (
+            "Latest Brand Name",
+            logo_public_id,
+            "https://assets.example.com/public/assets/latest-logo",
+            {
+                "--color-brand": "#654321",
+                "--color-page-bg-secondary": "#f4efe7",
+            },
+            [],
+            "dark",
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_latest_template_publish_design_system_snapshot",
+        fake_resolve_latest_snapshot,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+
+    settings_payload = json.loads(
+        archive.read("config/settings_data.json").decode("utf-8")
+    )
+    assert settings_payload["current"]["logo"] == uploaded_logo_url
+    assert settings_payload["current"]["logo_mobile"] == uploaded_logo_url
+
+    footer_group_payload = json.loads(
+        archive.read("sections/footer-group.json").decode("utf-8")
+    )
+    footer_logo_values = [
+        section_payload["settings"]["logo"]
+        for section_payload in footer_group_payload["sections"].values()
+        if isinstance(section_payload, dict)
+        and isinstance(section_payload.get("settings"), dict)
+        and "logo" in section_payload["settings"]
+    ]
+    assert footer_logo_values
+    assert footer_logo_values == [uploaded_logo_url]
+
+    exported_layout = archive.read("layout/theme.liquid").decode("utf-8")
+    assert (
+        f'<meta name="mos-brand-logo-url" content="{uploaded_logo_url}">'
+        in exported_layout
+    )
+    workspace_css_filename = clients_router._resolve_local_theme_workspace_css_filename(
+        layout_content=exported_layout
+    )
+    exported_workspace_css = archive.read(workspace_css_filename).decode("utf-8")
+    assert f'--mos-brand-logo-url: "{uploaded_logo_url}";' in exported_workspace_css
+
+
 def test_export_shopify_theme_template_zip_requires_stored_component_image_urls(
     api_client, db_session, monkeypatch
 ):
@@ -2964,6 +3143,7 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
     mapped_slot_path = (
         "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
     )
+    logo_public_id = _create_workspace_image_asset(db_session, client=client)
     draft = ShopifyThemeTemplateDraft(
         org_id=client.org_id,
         client_id=client.id,
@@ -2993,8 +3173,8 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
                 "designSystemId": "design-system-1",
                 "designSystemName": "Acme DS",
                 "brandName": "Acme",
-                "logoAssetPublicId": str(uuid4()),
-                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "logoAssetPublicId": logo_public_id,
+                "logoUrl": "shopify://shop_images/logo-1.png",
                 "themeId": "gid://shopify/OnlineStoreTheme/123",
                 "themeName": "backfill-image-urls-theme",
                 "themeRole": "MAIN",
@@ -3015,7 +3195,7 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
                     }
                 ],
                 "textSlots": [],
-                "metadata": {},
+                "metadata": {"logoUploadedShopDomain": "example.myshopify.com"},
             },
             created_by_user_external_id="test-user",
             created_at=datetime.now(timezone.utc),
@@ -3067,6 +3247,135 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
         "component_image_asset_map": {
             mapped_slot_path: response.version.data.componentImageAssetMap[mapped_slot_path]
         },
+    }
+
+
+def test_generate_shopify_theme_template_draft_images_uploads_brand_logo_to_shopify(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    logo_public_id = _create_workspace_image_asset(db_session, client=client)
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="logo-upload-theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="build_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Acme",
+                "logoAssetPublicId": logo_public_id,
+                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "logo-upload-theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": None,
+                "componentImageAssetMap": {},
+                "componentImageUrls": {},
+                "componentTextValues": {},
+                "imageSlots": [],
+                "textSlots": [
+                    {
+                        "path": "templates/index.json.sections.hero.settings.heading",
+                        "key": "heading",
+                        "currentValue": "Existing heading",
+                    }
+                ],
+                "metadata": {},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    def fake_resolve_logo_url_to_shopify_files(
+        *,
+        client_id: str,
+        shop_domain: str,
+        component_image_urls: dict[str, str],
+    ) -> dict[str, str]:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["component_image_urls"] = dict(component_image_urls)
+        return {
+            clients_router._THEME_TEMPLATE_BRAND_LOGO_UPLOAD_SETTING_PATH: (
+                "shopify://shop_images/generated-logo.png"
+            )
+        }
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_template_export_component_image_urls_to_shopify_files",
+        fake_resolve_logo_url_to_shopify_files,
+    )
+
+    response = clients_router._generate_shopify_theme_template_draft_images(
+        client_id=client_id,
+        payload=ShopifyThemeTemplateGenerateImagesRequest(draftId=str(draft.id)),
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+        generate_text=False,
+    )
+
+    assert response.generatedImageCount == 0
+    assert response.generatedTextCount == 0
+    assert response.version.versionNumber == 2
+    assert response.version.data.logoUrl == "shopify://shop_images/generated-logo.png"
+    assert (
+        response.version.data.metadata["logoUploadedShopDomain"]
+        == "example.myshopify.com"
+    )
+    assert observed == {
+        "client_id": client_id,
+        "shop_domain": "example.myshopify.com",
+        "component_image_urls": {
+            clients_router._THEME_TEMPLATE_BRAND_LOGO_UPLOAD_SETTING_PATH: (
+                f"https://assets.example.com/public/assets/{logo_public_id}"
+            )
+        },
+    }
+
+    refreshed_logo_asset = db_session.scalar(
+        select(Asset).where(Asset.public_id == UUID(logo_public_id))
+    )
+    assert refreshed_logo_asset is not None
+    assert refreshed_logo_asset.ai_metadata == {
+        "shopifyFileUrlsByShopDomain": {
+            "example.myshopify.com": "shopify://shop_images/generated-logo.png"
+        }
     }
 
 
@@ -3122,8 +3431,10 @@ def test_generate_shopify_theme_template_draft_images_routes_review_slots_to_tes
                 "designSystemId": "design-system-1",
                 "designSystemName": "Acme DS",
                 "brandName": "Acme",
-                "logoAssetPublicId": str(uuid4()),
-                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "logoAssetPublicId": _create_workspace_image_asset(
+                    db_session, client=client
+                ),
+                "logoUrl": "shopify://shop_images/logo-1.png",
                 "themeId": "gid://shopify/OnlineStoreTheme/123",
                 "themeName": "review-routing-theme",
                 "themeRole": "MAIN",
@@ -3151,7 +3462,7 @@ def test_generate_shopify_theme_template_draft_images_routes_review_slots_to_tes
                     },
                 ],
                 "textSlots": [],
-                "metadata": {},
+                "metadata": {"logoUploadedShopDomain": "example.myshopify.com"},
             },
             created_by_user_external_id="test-user",
             created_at=datetime.now(timezone.utc),

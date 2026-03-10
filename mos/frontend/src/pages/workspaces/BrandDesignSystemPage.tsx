@@ -2232,7 +2232,7 @@ export function BrandDesignSystemPage() {
           ) : (
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
               <Input
-                placeholder="example-shop.myshopify.com"
+                placeholder="example-shop.myshopify.com or yourstore.com"
                 value={shopifyShopDomainDraft}
                 onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
                 disabled={isShopifyConnectionMutating}
