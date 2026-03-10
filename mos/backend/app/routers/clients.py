@@ -335,10 +335,20 @@ _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT = (
     'class="banner__box main-collection-banner__content md:text-{{ '
     'section.settings.text_alignment }} text-{{ section.settings.text_alignment_mobile }}"'
 )
+_LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET = 'class="breadcrumb"'
+_LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT = (
+    'class="breadcrumb main-collection-banner__breadcrumb"'
+)
 _LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET = (
     "\n"
-    "  #shopify-section-{{ section.id }} .main-collection-banner__content {\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__content,\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__content :is(a, li, .icon, .banner__title, .split-words, .single-word) {\n"
     "    color: rgb(var(--color-foreground));\n"
+    "  }\n"
+    "\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__breadcrumb {\n"
+    "    font-family: var(--font-heading-family);\n"
+    "    font-style: var(--font-heading-style);\n"
     "  }\n"
 )
 _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
@@ -2487,6 +2497,21 @@ def _apply_local_theme_collection_banner_text_styling(
         updated_content = updated_content.replace(
             _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_SNIPPET,
             _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT,
+            1,
+        )
+
+    if _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT not in updated_content:
+        if _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET not in updated_content:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline collection banner does not expose the "
+                    "expected breadcrumb wrapper required for text color synchronization."
+                ),
+            )
+        updated_content = updated_content.replace(
+            _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET,
+            _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT,
             1,
         )
 

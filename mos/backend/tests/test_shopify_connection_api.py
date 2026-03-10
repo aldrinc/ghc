@@ -1231,8 +1231,32 @@ def test_apply_local_theme_collection_banner_text_styling_keeps_banner_text_on_c
         'section.settings.text_alignment }} text-{{ '
         'section.settings.text_alignment_mobile }}"'
     ) in updated_content
-    assert "#shopify-section-{{ section.id }} .main-collection-banner__content {" in updated_content
+    assert 'class="breadcrumb main-collection-banner__breadcrumb"' in updated_content
+    assert "#shopify-section-{{ section.id }} .main-collection-banner__content," in updated_content
     assert "color: rgb(var(--color-foreground));" in updated_content
+    assert "font-family: var(--font-heading-family);" in updated_content
+
+
+def test_local_theme_baseline_collection_banner_has_dynamic_text_styling_bindings():
+    baseline_zip_path = (
+        Path(__file__).resolve().parents[3]
+        / clients_router._LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH
+    )
+
+    with zipfile.ZipFile(baseline_zip_path) as archive:
+        section_content = archive.read("sections/main-collection-banner.liquid").decode("utf-8")
+
+    render_index = section_content.index("{%- render 'section-variables', section: section -%}")
+    image_guard_index = section_content.index("{%- if desktop_image != blank %}")
+    assert render_index < image_guard_index
+    assert (
+        'class="banner__box main-collection-banner__content md:text-{{ '
+        'section.settings.text_alignment }} text-{{ '
+        'section.settings.text_alignment_mobile }}"'
+    ) in section_content
+    assert 'class="breadcrumb main-collection-banner__breadcrumb"' in section_content
+    assert "#shopify-section-{{ section.id }} .main-collection-banner__content," in section_content
+    assert "font-family: var(--font-heading-family);" in section_content
 
 
 def test_local_theme_baseline_secondary_background_sections_expose_rewritable_bindings():
