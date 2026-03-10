@@ -977,7 +977,6 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
 
     if decision == "EXCLUDE":
         properties = {
-            "source_file": {"type": "string", "minLength": 1},
             "decision": {"type": "string", "enum": ["EXCLUDE"]},
             "exclude_reason": {"type": "string", "minLength": 1},
             "include_in_mining_plan": {"type": "boolean", "enum": [False]},
@@ -985,7 +984,6 @@ def _agent1_file_assessment_variant_schema(*, decision: str, include_in_mining_p
         }
     else:
         properties = {
-            "source_file": {"type": "string", "minLength": 1},
             "decision": {"type": "string", "enum": ["OBSERVE"]},
             "exclude_reason": {"type": "string", "maxLength": 0},
             "include_in_mining_plan": {"type": "boolean", "enum": [include_in_mining_plan]},
@@ -8808,10 +8806,10 @@ def _render_agent1_runtime_instruction(
         "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
         "AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON is canonical for the exact runtime source_file set and default row hints.\n"
         "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
-        "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
-        "Never invent, mutate, alias, add, or drop filenames that are not explicitly listed at runtime.\n"
-        "Return file_assessments as an array with one row per runtime source_file from AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows[].source_file.\n"
-        "Each file_assessments row must include source_file, decision, exclude_reason, include_in_mining_plan, and observation_projection.\n"
+        "Return file_assessments as an array with exactly one row per AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows entry, preserving that exact order.\n"
+        "Do not reorder, omit, or duplicate rows relative to AGENT1_FILE_ASSESSMENT_TEMPLATE_JSON.rows.\n"
+        "Each file_assessments row must include only decision, exclude_reason, include_in_mining_plan, and observation_projection.\n"
+        "Do not emit source_file inside file_assessments rows; runtime binds each row to the corresponding template row by position.\n"
         "Do not emit separate observations, habitat_observations, excluded_source_files, or mining_plan arrays; runtime derives them from file_assessments.\n"
         "Runtime assigns stable observation_id values for OBSERVE rows; do not invent observation_id fields anywhere in the output.\n"
         "If decision=OBSERVE, observation_projection must be a populated object and must not include source_file, observation_id, or include_in_mining_plan.\n"
@@ -8846,7 +8844,6 @@ def _derive_agent1_outputs_from_file_assessments(
     scraped_data_manifest: Mapping[str, Any],
 ) -> dict[str, Any]:
     ordered_file_names = _ordered_scraped_data_file_names(scraped_data_manifest)
-    allowed_file_names = set(ordered_file_names)
     if not ordered_file_names:
         raise StrategyV2SchemaValidationError(
             "scraped_data_manifest.raw_scraped_data_files must include at least one file_name for Agent 1 grounding."
@@ -8856,6 +8853,12 @@ def _derive_agent1_outputs_from_file_assessments(
     if not isinstance(file_assessments_raw, list):
         raise StrategyV2SchemaValidationError(
             "Agent 1 output must include file_assessments array for strict file-coverage validation."
+        )
+    if len(file_assessments_raw) != len(ordered_file_names):
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must provide exact source-file coverage: "
+            "len(file_assessments) must equal SCRAPED_DATA_FILES_JSON.raw_scraped_data_files length. "
+            f"Expected {len(ordered_file_names)} file_assessments rows but received {len(file_assessments_raw)}."
         )
 
     observation_projection_required_fields = (
@@ -8895,42 +8898,18 @@ def _derive_agent1_outputs_from_file_assessments(
     excluded_source_files: list[str] = []
     mining_plan: list[dict[str, Any]] = []
     normalized_file_assessments: list[dict[str, Any]] = []
-    file_assessments_by_source_file: dict[str, dict[str, Any]] = {}
-    for index, raw_row in enumerate(file_assessments_raw):
-        row_name = f"Agent 1 file_assessments[{index}]"
-        if not isinstance(raw_row, Mapping):
-            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
-        source_file = str(raw_row.get("source_file") or "").strip()
-        if not source_file:
-            raise StrategyV2SchemaValidationError(f"{row_name}.source_file must be non-empty.")
-        if source_file in file_assessments_by_source_file:
-            raise StrategyV2SchemaValidationError(
-                f"Agent 1 file_assessments contains duplicate source_file entries. Duplicate: '{source_file}'."
-            )
-        file_assessments_by_source_file[source_file] = dict(raw_row)
-    returned_source_files = set(file_assessments_by_source_file)
-    unknown_source_files = sorted(returned_source_files - allowed_file_names)
-    if unknown_source_files:
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
-            f"Unknown source_file entries: {unknown_source_files[:8]}. "
-            "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
-        )
-    missing_source_files = sorted(allowed_file_names - returned_source_files)
-    if missing_source_files:
-        raise StrategyV2SchemaValidationError(
-            "Agent 1 output must provide exact source-file coverage: "
-            "(file_assessments.source_file) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
-            f"Missing source_file entries: {missing_source_files[:8]}."
-        )
 
     observe_index = 0
-    for source_file in ordered_file_names:
-        row_name = f"Agent 1 file_assessments[{source_file}]"
-        row = file_assessments_by_source_file.get(source_file)
-        if row is None:
-            raise StrategyV2SchemaValidationError(f"{row_name} must be present.")
-        row_payload = dict(row)
+    for index, source_file in enumerate(ordered_file_names):
+        row_name = f"Agent 1 file_assessments[{index}]"
+        raw_row = file_assessments_raw[index]
+        if not isinstance(raw_row, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name} must be an object.")
+        row_payload = dict(raw_row)
+        if "source_file" in row_payload:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.source_file must not be provided; runtime binds source_file by manifest order."
+            )
         row_payload["source_file"] = source_file
 
         decision = str(row_payload.get("decision") or "").strip().upper()

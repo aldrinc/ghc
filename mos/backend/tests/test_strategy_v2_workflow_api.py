@@ -1192,7 +1192,6 @@ def _agent1_file_assessment_payload(
     include_in_mining_plan: bool,
 ) -> dict[str, Any]:
     return {
-        "source_file": observation["source_file"],
         "decision": "OBSERVE",
         "exclude_reason": "",
         "include_in_mining_plan": include_in_mining_plan,

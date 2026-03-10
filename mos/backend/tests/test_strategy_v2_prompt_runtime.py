@@ -803,6 +803,7 @@ def test_agent1_output_schema_binds_exact_runtime_source_files() -> None:
     assert "observations" not in schema["properties"]
     for variant in file_assessments["items"]["anyOf"]:
         assert "observation_projection" in variant["required"]
+        assert "source_file" not in variant["properties"]
 
 
 def test_agent2_output_schema_binds_exact_runtime_evidence_ids() -> None:

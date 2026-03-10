@@ -219,7 +219,6 @@ def _agent1_file_assessment(
         else None
     )
     return {
-        "source_file": source_file,
         "decision": decision,
         "exclude_reason": "Insufficient usable evidence in file." if decision == "EXCLUDE" else "",
         "include_in_mining_plan": include_in_mining_plan,
@@ -336,15 +335,18 @@ def _agent1_observation_projection(
     return projection
 
 
-def test_validate_agent1_output_source_file_grounding_rejects_unknown_files() -> None:
-    with pytest.raises(StrategyV2SchemaValidationError, match="Unknown source_file entries"):
+def test_validate_agent1_output_source_file_grounding_rejects_stale_source_file_fields() -> None:
+    with pytest.raises(StrategyV2SchemaValidationError, match="source_file must not be provided"):
         _validate_agent1_output_source_file_grounding(
             agent01_output={
                 "file_assessments": [
-                    _agent1_file_assessment(
-                        source_file="unexpected_file.json",
-                        decision="EXCLUDE",
-                    )
+                    {
+                        **_agent1_file_assessment(
+                            source_file="allowed_file.json",
+                            decision="EXCLUDE",
+                        ),
+                        "source_file": "allowed_file.json",
+                    }
                 ]
             },
             scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "allowed_file.json"}]},
@@ -482,7 +484,6 @@ def test_validate_agent1_output_source_file_grounding_rejects_missing_observatio
                 "file_assessments": [
                     {
                         "decision": "OBSERVE",
-                        "source_file": "observed_file.json",
                         "exclude_reason": "",
                         "include_in_mining_plan": False,
                         "observation_projection": None,
@@ -491,3 +492,33 @@ def test_validate_agent1_output_source_file_grounding_rejects_missing_observatio
             },
             scraped_data_manifest={"raw_scraped_data_files": [{"file_name": "observed_file.json"}]},
         )
+
+
+def test_validate_agent1_output_source_file_grounding_binds_rows_by_manifest_order() -> None:
+    derived = _derive_agent1_outputs_from_file_assessments(
+        agent01_output={
+            "file_assessments": [
+                _agent1_file_assessment(
+                    source_file="second_file.json",
+                    include_in_mining_plan=False,
+                ),
+                _agent1_file_assessment(
+                    source_file="first_file.json",
+                    include_in_mining_plan=True,
+                    priority_rank=1,
+                ),
+            ]
+        },
+        scraped_data_manifest={
+            "raw_scraped_data_files": [
+                {"file_name": "first_file.json"},
+                {"file_name": "second_file.json"},
+            ]
+        },
+    )
+
+    assert [row["source_file"] for row in derived["habitat_observations"]] == [
+        "first_file.json",
+        "second_file.json",
+    ]
+    assert [row["source_file"] for row in derived["mining_plan"]] == ["second_file.json"]
