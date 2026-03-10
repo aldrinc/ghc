@@ -5,7 +5,7 @@ import binascii
 from dataclasses import dataclass
 import re
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 from fastapi import HTTPException, status
@@ -13,9 +13,15 @@ from fastapi import HTTPException, status
 from app.config import settings
 
 _SHOP_DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
+_STOREFRONT_DOMAIN_RE = re.compile(
+    r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
+)
 _SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 _SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
 _SHOPIFY_THEME_GID_PREFIX = "gid://shopify/OnlineStoreTheme/"
+_SHOP_DOMAIN_RESOLUTION_REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+_SHOP_DOMAIN_RESOLUTION_MAX_REDIRECTS = 5
+_SHOP_DOMAIN_RESOLUTION_TIMEOUT_SECONDS = 10.0
 _REQUIRED_SHOPIFY_SCOPES = {
     "read_orders",
     "write_orders",
@@ -30,6 +36,8 @@ _IMPLIED_SHOPIFY_SCOPES: dict[str, set[str]] = {
     "write_products": {"read_products"},
     "write_discounts": {"read_discounts"},
 }
+
+
 @dataclass(frozen=True)
 class ShopifyInstallation:
     shop_domain: str
@@ -81,6 +89,109 @@ def _error_detail_from_response(response: httpx.Response) -> str:
         if isinstance(detail, str):
             return detail
     return str(body)
+
+
+def _shop_domain_input_error(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=detail,
+    )
+
+
+def _normalize_storefront_url(raw_value: str) -> tuple[str, str]:
+    if not isinstance(raw_value, str):
+        raise _shop_domain_input_error("shopDomain must be a string.")
+
+    raw = raw_value.strip()
+    if not raw:
+        raise _shop_domain_input_error("shopDomain cannot be empty.")
+    if any(char.isspace() for char in raw):
+        raise _shop_domain_input_error(
+            "shopDomain must not contain whitespace characters."
+        )
+
+    candidate = raw if "://" in raw else f"https://{raw}"
+    parsed = urlsplit(candidate)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise _shop_domain_input_error(
+            "shopDomain must be a *.myshopify.com domain or an http(s) storefront URL."
+        )
+
+    if parsed.username or parsed.password or parsed.port is not None:
+        raise _shop_domain_input_error(
+            "shopDomain must not include credentials or a port."
+        )
+
+    host = (parsed.hostname or "").strip().lower().rstrip(".")
+    if not host:
+        raise _shop_domain_input_error(
+            "shopDomain must be a valid *.myshopify.com domain or custom storefront domain."
+        )
+    if not (
+        _SHOP_DOMAIN_RE.fullmatch(host) or _STOREFRONT_DOMAIN_RE.fullmatch(host)
+    ):
+        raise _shop_domain_input_error(
+            "shopDomain must be a valid *.myshopify.com domain or custom storefront domain."
+        )
+
+    normalized_url = urlunsplit((scheme, host, parsed.path or "/", parsed.query, ""))
+    return host, normalized_url
+
+
+def _resolve_redirected_shop_domain(*, source_host: str, start_url: str) -> str:
+    timeout = httpx.Timeout(
+        timeout=_SHOP_DOMAIN_RESOLUTION_TIMEOUT_SECONDS,
+        connect=min(_SHOP_DOMAIN_RESOLUTION_TIMEOUT_SECONDS, 5.0),
+    )
+
+    current_url = start_url
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+            for _ in range(_SHOP_DOMAIN_RESOLUTION_MAX_REDIRECTS + 1):
+                response = client.get(
+                    current_url,
+                    headers={"User-Agent": "mOS Shopify domain resolver"},
+                )
+                resolved_host, _ = _normalize_storefront_url(str(response.url))
+                if _SHOP_DOMAIN_RE.fullmatch(resolved_host):
+                    return resolved_host
+
+                if response.status_code not in _SHOP_DOMAIN_RESOLUTION_REDIRECT_STATUSES:
+                    break
+
+                location = response.headers.get("location")
+                if not isinstance(location, str) or not location.strip():
+                    break
+
+                next_url = urljoin(current_url, location.strip())
+                next_host, normalized_next_url = _normalize_storefront_url(next_url)
+                if _SHOP_DOMAIN_RE.fullmatch(next_host):
+                    return next_host
+                current_url = normalized_next_url
+    except HTTPException:
+        raise
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=(
+                "Timed out while resolving Shopify storefront domain. "
+                f"Enter the store *.myshopify.com domain directly if this keeps happening. sourceHost={source_host}"
+            ),
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Failed to resolve Shopify storefront domain. "
+                f"Enter the store *.myshopify.com domain directly if the custom domain is not redirecting correctly. sourceHost={source_host}"
+            ),
+        ) from exc
+
+    raise _shop_domain_input_error(
+        "Custom storefront domain did not resolve to a Shopify *.myshopify.com domain. "
+        f"Enter the store *.myshopify.com domain directly or use a storefront domain that redirects to it. sourceHost={source_host}"
+    )
 
 
 def _bridge_request(
@@ -146,13 +257,10 @@ def _bridge_request(
 
 
 def normalize_shop_domain(value: str) -> str:
-    cleaned = value.strip().lower()
-    if not cleaned or not _SHOP_DOMAIN_RE.fullmatch(cleaned):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="shopDomain must be a valid *.myshopify.com domain.",
-        )
-    return cleaned
+    host, normalized_url = _normalize_storefront_url(value)
+    if _SHOP_DOMAIN_RE.fullmatch(host):
+        return host
+    return _resolve_redirected_shop_domain(source_host=host, start_url=normalized_url)
 
 
 def _normalize_currency_code(value: str) -> str:

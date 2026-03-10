@@ -9599,12 +9599,13 @@ def update_client_shopify_installation(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
-    if status_payload.get("state") == "ready":
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
         sync_workspace_shopify_catalog_collection(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
-            shop_domain=payload.shopDomain,
+            shop_domain=resolved_shop_domain,
         )
     return ShopifyConnectionStatusResponse(**status_payload)
 
@@ -9634,12 +9635,13 @@ def auto_provision_client_shopify_installation_storefront_token(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
-    if status_payload.get("state") == "ready":
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
         sync_workspace_shopify_catalog_collection(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
-            shop_domain=payload.shopDomain,
+            shop_domain=resolved_shop_domain,
         )
     return ShopifyConnectionStatusResponse(**status_payload)
 

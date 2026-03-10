@@ -7,6 +7,74 @@ from app.services.shopify_connection import ShopifyInstallation
 from fastapi import HTTPException
 
 
+def test_normalize_shop_domain_accepts_myshopify_domain():
+    assert (
+        shopify_connection.normalize_shop_domain(" Example-Store.myshopify.com ")
+        == "example-store.myshopify.com"
+    )
+
+
+def test_build_client_shopify_install_url_resolves_custom_storefront_domain(monkeypatch):
+    real_client = httpx.Client
+    observed_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_urls.append(str(request.url))
+        return httpx.Response(
+            302,
+            headers={"location": "https://honest-herbalist.myshopify.com/"},
+            request=request,
+        )
+
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        shopify_connection.httpx,
+        "Client",
+        lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
+    )
+    monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
+    monkeypatch.setattr(
+        shopify_connection,
+        "_require_checkout_service_config",
+        lambda: ("https://bridge.example.com", "internal-token"),
+    )
+
+    install_url = shopify_connection.build_client_shopify_install_url(
+        client_id="client_1",
+        shop_domain="thehonestherbalist.com",
+    )
+
+    assert observed_urls == ["https://thehonestherbalist.com/"]
+    assert (
+        install_url
+        == "https://bridge.example.com/auth/install?shop=honest-herbalist.myshopify.com&client_id=client_1"
+    )
+
+
+def test_normalize_shop_domain_rejects_custom_domain_without_myshopify_redirect(monkeypatch):
+    real_client = httpx.Client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="ok", request=request)
+
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        shopify_connection.httpx,
+        "Client",
+        lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
+    )
+
+    try:
+        shopify_connection.normalize_shop_domain("thehonestherbalist.com")
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "did not resolve" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected normalize_shop_domain to reject a custom domain without a Shopify redirect"
+        )
+
+
 def test_status_not_connected(monkeypatch):
     monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
 
