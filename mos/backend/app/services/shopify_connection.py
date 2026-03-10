@@ -22,6 +22,16 @@ _SHOPIFY_THEME_GID_PREFIX = "gid://shopify/OnlineStoreTheme/"
 _SHOP_DOMAIN_RESOLUTION_REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 _SHOP_DOMAIN_RESOLUTION_MAX_REDIRECTS = 5
 _SHOP_DOMAIN_RESOLUTION_TIMEOUT_SECONDS = 10.0
+_SHOPIFY_STOREFRONT_HTML_SHOP_PATTERNS = (
+    re.compile(
+        r"""Shopify\.shop\s*=\s*["'](?P<shop>[a-z0-9][a-z0-9-]*\.myshopify\.com)["']""",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"""["']myshopifyDomain["']\s*:\s*["'](?P<shop>[a-z0-9][a-z0-9-]*\.myshopify\.com)["']""",
+        re.IGNORECASE,
+    ),
+)
 _REQUIRED_SHOPIFY_SCOPES = {
     "read_orders",
     "write_orders",
@@ -139,6 +149,23 @@ def _normalize_storefront_url(raw_value: str) -> tuple[str, str]:
     return host, normalized_url
 
 
+def _extract_shopify_shop_domain_from_storefront_response(
+    response: httpx.Response,
+) -> str | None:
+    response_text = response.text if isinstance(response.text, str) else ""
+    if not response_text:
+        return None
+
+    for pattern in _SHOPIFY_STOREFRONT_HTML_SHOP_PATTERNS:
+        match = pattern.search(response_text)
+        if not match:
+            continue
+        shop_domain = str(match.group("shop")).strip().lower()
+        if _SHOP_DOMAIN_RE.fullmatch(shop_domain):
+            return shop_domain
+    return None
+
+
 def _resolve_redirected_shop_domain(*, source_host: str, start_url: str) -> str:
     timeout = httpx.Timeout(
         timeout=_SHOP_DOMAIN_RESOLUTION_TIMEOUT_SECONDS,
@@ -156,6 +183,12 @@ def _resolve_redirected_shop_domain(*, source_host: str, start_url: str) -> str:
                 resolved_host, _ = _normalize_storefront_url(str(response.url))
                 if _SHOP_DOMAIN_RE.fullmatch(resolved_host):
                     return resolved_host
+
+                storefront_shop_domain = (
+                    _extract_shopify_shop_domain_from_storefront_response(response)
+                )
+                if storefront_shop_domain is not None:
+                    return storefront_shop_domain
 
                 if response.status_code not in _SHOP_DOMAIN_RESOLUTION_REDIRECT_STATUSES:
                     break
