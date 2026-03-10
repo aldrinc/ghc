@@ -238,6 +238,23 @@ def test_funnel_proxy_requires_port_when_server_names_are_empty():
         deployer._configure_funnel_publication_proxy(app)
 
 
+def test_generic_nginx_config_allows_large_upload_bodies():
+    app = _git_app(name="api-service")
+    app.service_config.server_names = ["api.example.com"]
+    app.service_config.ports = [8008]
+    deployer, uploaded, commands = _stub_deployer()
+    deployer._ensure_nginx = lambda: None
+
+    deployer._configure_nginx(app)
+
+    conf = uploaded["/etc/nginx/sites-available/api-service"]
+    assert "listen 80;" in conf
+    assert "server_name api.example.com;" in conf
+    assert "client_max_body_size 250m;" in conf
+    assert "proxy_pass http://127.0.0.1:8008;" in conf
+    assert "systemctl reload nginx" in commands
+
+
 def test_remove_workload_cleans_service_nginx_and_app_dir():
     app = _git_app(name="honest-herbalist")
     deployer, _uploaded, commands = _stub_deployer()

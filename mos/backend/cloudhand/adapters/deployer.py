@@ -26,6 +26,8 @@ from ..models import (
 _NGINX_PROXY_CONNECT_TIMEOUT = "60s"
 _NGINX_PROXY_SEND_TIMEOUT = "3600s"
 _NGINX_PROXY_READ_TIMEOUT = "3600s"
+# Leave headroom above the 200 MiB backend product-asset limit for multipart framing.
+_NGINX_APP_CLIENT_MAX_BODY_SIZE = "250m"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 _ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpHero", "SalesPdpTemplate"}
@@ -1183,6 +1185,7 @@ WantedBy=multi-user.target
         conf = f"""server {{
     listen 80;
     server_name {server_name_line};
+    client_max_body_size {_NGINX_APP_CLIENT_MAX_BODY_SIZE};
     proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
     proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
     proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
