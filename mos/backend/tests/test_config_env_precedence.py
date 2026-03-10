@@ -4,8 +4,8 @@ import app.config as config_module
 
 
 def test_strategy_v2_copy_defaults_remain_claude():
-    assert config_module.Settings.model_fields["STRATEGY_V2_COPY_MODEL"].default == "claude-sonnet-4-6"
-    assert config_module.Settings.model_fields["STRATEGY_V2_COPY_QA_MODEL"].default == "claude-sonnet-4-6"
+    assert config_module.Settings.model_fields["STRATEGY_V2_COPY_MODEL"].default == "claude-opus-4-6"
+    assert config_module.Settings.model_fields["STRATEGY_V2_COPY_QA_MODEL"].default == "claude-opus-4-6"
 
 
 def test_process_env_overrides_backend_dotenv(monkeypatch):

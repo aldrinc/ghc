@@ -113,6 +113,21 @@ def _resolve_image_url(value: Any, base_dir: Optional[Path], field: str) -> str:
     return resolved_path.as_uri()
 
 
+def _resolve_prompt_file(value: Any, base_dir: Optional[Path], field: str, max_length: int) -> str:
+    prompt_path = _assert_string(value, field, 400)
+    resolved_base = base_dir or Path.cwd()
+    candidate = Path(prompt_path)
+    resolved_path = candidate if candidate.is_absolute() else (resolved_base / candidate)
+    resolved_path = resolved_path.resolve()
+    if not resolved_path.exists():
+        raise TestimonialRenderError(f"{field} file does not exist: {resolved_path}")
+    try:
+        raw_prompt = resolved_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise TestimonialRenderError(f"Unable to read {field} file: {resolved_path}") from exc
+    return _assert_string(raw_prompt, field, max_length)
+
+
 def _assert_nano_reference_image_url(resolved_url: str, field: str) -> None:
     trimmed = _assert_string(resolved_url, field)
     if trimmed.startswith("data:"):
@@ -475,6 +490,7 @@ def _validate_pdp_background(background: Any, base_dir: Optional[Path]) -> dict[
         "imageUrl",
         "alt",
         "prompt",
+        "promptFile",
         "promptVars",
         "referenceImages",
         "referenceFirst",
@@ -490,6 +506,10 @@ def _validate_pdp_background(background: Any, base_dir: Optional[Path]) -> dict[
         image_url = _resolve_image_url(background.get("imageUrl"), base_dir, "background.imageUrl")
     alt = _assert_optional_string(background.get("alt"), "background.alt", 200)
     prompt = _assert_optional_string(background.get("prompt"), "background.prompt", 6000)
+    if prompt is not None and background.get("promptFile") is not None:
+        raise TestimonialRenderError("Provide either background.prompt or background.promptFile, not both.")
+    if background.get("promptFile") is not None:
+        prompt = _resolve_prompt_file(background.get("promptFile"), base_dir, "background.promptFile", 6000)
     prompt_vars = (
         _validate_pdp_prompt_vars(background.get("promptVars"))
         if background.get("promptVars") is not None
@@ -578,6 +598,28 @@ def _validate_pdp_comment(comment: Any, *, base_dir: Optional[Path], prefix: str
         "avatarUrl": avatar_url,
         "verified": verified,
     }
+
+
+def _validate_pdp_comments(
+    *,
+    comment: Any,
+    comments: Any,
+    base_dir: Optional[Path],
+) -> list[dict[str, Any]]:
+    if comments is not None:
+        if not isinstance(comments, list) or len(comments) == 0:
+            raise TestimonialRenderError("comments must be a non-empty array.")
+        if len(comments) > 2:
+            raise TestimonialRenderError("comments must contain at most 2 items for pdp_ugc_standard.")
+        return [
+            _validate_pdp_comment(entry, base_dir=base_dir, prefix=f"comments[{idx}]")
+            for idx, entry in enumerate(comments)
+        ]
+
+    if comment is None:
+        raise TestimonialRenderError("comment is required.")
+
+    return [_validate_pdp_comment(comment, base_dir=base_dir, prefix="comment")]
 
 
 def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[str, Any]:
@@ -676,6 +718,20 @@ def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[s
         output["rating"] = _validate_pdp_rating(payload.get("rating"))
         output["cta"] = _validate_pdp_cta(payload.get("cta"))
         output["background"] = _validate_pdp_background(payload.get("background"), base_dir)
+
+        if template == "pdp_ugc_standard":
+            comments = _validate_pdp_comments(
+                comment=payload.get("comment"),
+                comments=payload.get("comments"),
+                base_dir=base_dir,
+            )
+            output["comment"] = comments[0]
+            output["comments"] = comments
+            return output
+
+        if payload.get("comments") is not None:
+            raise TestimonialRenderError(f"comments is not supported for template {template}.")
+
         output["comment"] = _validate_pdp_comment(payload.get("comment"), base_dir=base_dir, prefix="comment")
         if template == "pdp_qa_ugc" and not output["comment"].get("questionText"):
             raise TestimonialRenderError("comment.questionText is required for template pdp_qa_ugc.")

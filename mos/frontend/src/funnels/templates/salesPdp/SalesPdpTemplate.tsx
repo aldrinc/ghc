@@ -29,7 +29,10 @@ import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
-import { withDesignSystemBrandLogo } from "@/funnels/templates/shared/designSystemBrandLogo";
+import {
+  resolveDesignSystemBrandLogoVariant,
+  withDesignSystemBrandLogo,
+} from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
 
@@ -554,7 +557,7 @@ function Gallery({
   return (
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
-        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchPriority="high" />
+        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchpriority="high" />
       </div>
 
       <div className={styles.galleryControls}>
@@ -1737,8 +1740,6 @@ type SalesPdpComparisonProps = {
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
   const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
   const comparisonTitle = normalizeComparisonTitle(resolvedConfig.title, resolvedConfig.columns)
-  const comparisonGoodColor = 'var(--pdp-comparison-good, #16a34a)'
-  const comparisonBadColor = 'var(--pdp-comparison-bad, #dc2626)'
   return (
     <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
       <Container>
@@ -1763,11 +1764,7 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   <td className={styles.tableLabel}>{r.label}</td>
                   <td>
                     <div className={styles.cell}>
-                      <span
-                        className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`}
-                        aria-hidden="true"
-                        style={{ color: comparisonGoodColor, borderColor: comparisonGoodColor }}
-                      >
+                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`} aria-hidden="true">
                         <IconCheck size={12} />
                       </span>
                       {r.pup}
@@ -1775,11 +1772,7 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   </td>
                   <td>
                     <div className={styles.cell}>
-                      <span
-                        className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`}
-                        aria-hidden="true"
-                        style={{ color: comparisonBadColor, borderColor: comparisonBadColor }}
-                      >
+                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`} aria-hidden="true">
                         <IconClose size={12} />
                       </span>
                       {r.disposable}
@@ -2016,9 +2009,10 @@ type SalesPdpFooterProps = {
 export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
   const designSystemTokens = useDesignSystemTokens()
   const resolvedConfig = parseJson<FooterConfig>(configJson) ?? config ?? salesPdpDefaults.config.footer
+  const logoVariant = resolveDesignSystemBrandLogoVariant(resolvedConfig.logoVariant, "onDark")
   const resolvedLogo = useMemo(
-    () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo),
-    [designSystemTokens, resolvedConfig.logo]
+    () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo, logoVariant),
+    [designSystemTokens, logoVariant, resolvedConfig.logo]
   )
   const links = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
   const paymentIcons = Array.isArray(resolvedConfig.paymentIcons) ? resolvedConfig.paymentIcons : []

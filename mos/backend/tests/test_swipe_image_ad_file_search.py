@@ -110,6 +110,26 @@ def _fake_file_search_context(**_kwargs):
     return (["fileSearchStores/context-store"], [], [], [])
 
 
+def _fake_swipe_copy_pack_parsed(*, angle: str) -> dict[str, object]:
+    return {
+        "selectedVariation": "Variation 1",
+        "formattedVariationsMarkdown": (
+            "```markdown\n"
+            "Variation 1\n"
+            "Meta Primary Text: Nights keep breaking down for the same hidden reason.\n"
+            "Meta Headline: Fix the routine bottleneck\n"
+            "Meta Description: Learn what actually changes the pattern\n"
+            "Meta CTA: Learn More\n"
+            "```\n"
+        ),
+        "metaPrimaryText": f"{angle} with a compliant curiosity-led hook.",
+        "metaHeadline": "Fix the routine bottleneck",
+        "metaDescription": "Learn what actually changes the pattern",
+        "metaCta": "Learn More",
+        "claimsGuardrails": ["Do not promise medical outcomes."],
+    }
+
+
 def test_resolve_gemini_store_names_uses_existing_files(api_client, db_session, auth_context, monkeypatch):
     monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
     client_id, product_id, campaign_id = _create_campaign_with_product(
@@ -201,6 +221,12 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             captured["model"] = model
             captured["contents"] = contents
             captured["config"] = config
+            if len(contents) >= 2 and contents[1] == "Ad Image or Video asset:":
+                return SimpleNamespace(
+                    parsed=_fake_swipe_copy_pack_parsed(angle="Clinical proof and fast results"),
+                    text="",
+                    usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+                )
             return SimpleNamespace(
                 text="```text\nDense generation-ready prompt.\n```",
                 usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
@@ -268,14 +294,21 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
         swipe_activity,
         "_extract_brief",
         lambda **_kwargs: (
-            {
-                "creativeConcept": "Concept",
-                "requirements": [{"channel": "meta", "format": "image", "angle": "Clinical proof and fast results"}],
-                "constraints": [],
-                "toneGuidelines": [],
-                "visualGuidelines": [],
-            },
-            "brief-artifact-id",
+                {
+                    "creativeConcept": "Concept",
+                    "requirements": [
+                        {
+                            "channel": "meta",
+                            "format": "image",
+                            "angle": "Clinical proof and fast results",
+                            "funnelStage": "bottom-of-funnel",
+                        }
+                    ],
+                    "constraints": [],
+                    "toneGuidelines": [],
+                    "visualGuidelines": [],
+                },
+                "brief-artifact-id",
         ),
     )
     monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
@@ -288,6 +321,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             "canon": {"constraints": {"legal": ["No medical claims"]}},
             "design_system_tokens": {},
         },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
     )
     monkeypatch.setattr(
         swipe_activity,
@@ -396,6 +434,12 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
             captured["model"] = model
             captured["contents"] = contents
             captured["config"] = config
+            if len(contents) >= 2 and contents[1] == "Ad Image or Video asset:":
+                return SimpleNamespace(
+                    parsed=_fake_swipe_copy_pack_parsed(angle="Clinical proof"),
+                    text="",
+                    usage_metadata=SimpleNamespace(prompt_token_count=11, candidates_token_count=22),
+                )
             return SimpleNamespace(
                 text="```text\nDense generation-ready prompt.\n```",
                 usage_metadata=SimpleNamespace(prompt_token_count=11, candidates_token_count=22),
@@ -454,14 +498,21 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
         swipe_activity,
         "_extract_brief",
         lambda **_kwargs: (
-            {
-                "creativeConcept": "Concept",
-                "requirements": [{"channel": "meta", "format": "image", "angle": "Clinical proof"}],
-                "constraints": [],
-                "toneGuidelines": [],
-                "visualGuidelines": [],
-            },
-            "brief-artifact-id",
+                {
+                    "creativeConcept": "Concept",
+                    "requirements": [
+                        {
+                            "channel": "meta",
+                            "format": "image",
+                            "angle": "Clinical proof",
+                            "funnelStage": "bottom-of-funnel",
+                        }
+                    ],
+                    "constraints": [],
+                    "toneGuidelines": [],
+                    "visualGuidelines": [],
+                },
+                "brief-artifact-id",
         ),
     )
     monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
@@ -474,6 +525,11 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
             "canon": {"constraints": {"legal": []}},
             "design_system_tokens": {},
         },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
     )
     monkeypatch.setattr(
         swipe_activity,
@@ -533,6 +589,12 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
     class _FakeModels:
         def generate_content(self, *, model, contents, config):
             captured["contents"] = contents
+            if len(contents) >= 2 and contents[1] == "Ad Image or Video asset:":
+                return SimpleNamespace(
+                    parsed=_fake_swipe_copy_pack_parsed(angle="Clinical proof"),
+                    text="",
+                    usage_metadata=SimpleNamespace(prompt_token_count=11, candidates_token_count=22),
+                )
             return SimpleNamespace(
                 text="```text\nDense generation-ready prompt.\n```",
                 usage_metadata=SimpleNamespace(prompt_token_count=11, candidates_token_count=22),
@@ -591,14 +653,21 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
         swipe_activity,
         "_extract_brief",
         lambda **_kwargs: (
-            {
-                "creativeConcept": "Concept",
-                "requirements": [{"channel": "meta", "format": "image", "angle": "Clinical proof"}],
-                "constraints": [],
-                "toneGuidelines": [],
-                "visualGuidelines": [],
-            },
-            "brief-artifact-id",
+                {
+                    "creativeConcept": "Concept",
+                    "requirements": [
+                        {
+                            "channel": "meta",
+                            "format": "image",
+                            "angle": "Clinical proof",
+                            "funnelStage": "bottom-of-funnel",
+                        }
+                    ],
+                    "constraints": [],
+                    "toneGuidelines": [],
+                    "visualGuidelines": [],
+                },
+                "brief-artifact-id",
         ),
     )
     monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
@@ -611,6 +680,11 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
             "canon": {"constraints": {"legal": []}},
             "design_system_tokens": {},
         },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
     )
     monkeypatch.setattr(
         swipe_activity,

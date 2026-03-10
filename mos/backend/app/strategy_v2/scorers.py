@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stdout
 import io
 import importlib.util
+import logging
 import os
 import re
 import tempfile
@@ -19,6 +20,7 @@ from app.observability import get_openai_client_class
 from app.strategy_v2.errors import StrategyV2ScorerError
 
 
+logger = logging.getLogger(__name__)
 _MODULE_CACHE: dict[str, ModuleType] = {}
 _MODULE_CACHE_LOCK = Lock()
 _HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS = max(
@@ -258,6 +260,17 @@ def _extract_request_id_from_headers(headers: object) -> str | None:
 def _call_headline_qa_llm(prompt, api_key, model="claude-sonnet-4-20250514", messages=None):
     provider, resolved_model, base_url, _api_key_env = _resolve_headline_qa_model(model)
     message_payload = messages if messages is not None else [{"role": "user", "content": prompt}]
+    started_at = time.monotonic()
+
+    logger.info(
+        "headline_qa_llm_started",
+        extra={
+            "provider": provider,
+            "model": resolved_model,
+            "message_count": len(message_payload),
+            "prompt_chars": len(prompt or ""),
+        },
+    )
 
     try:
         if provider == "anthropic":
@@ -306,6 +319,18 @@ def _call_headline_qa_llm(prompt, api_key, model="claude-sonnet-4-20250514", mes
             output_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
             stop_reason = getattr(response, "stop_reason", None)
             cleaned_text = text.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+            logger.info(
+                "headline_qa_llm_completed",
+                extra={
+                    "provider": provider,
+                    "model": resolved_model,
+                    "request_id": request_id,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "stop_reason": stop_reason,
+                    "elapsed_seconds": round(time.monotonic() - started_at, 3),
+                },
+            )
             print(
                 "  INFO: LLM call completed: "
                 f"request_id={request_id or 'missing'} input_tokens={input_tokens} output_tokens={output_tokens} "
@@ -348,6 +373,18 @@ def _call_headline_qa_llm(prompt, api_key, model="claude-sonnet-4-20250514", mes
         choices = getattr(completion, "choices", None)
         finish_reason = getattr(choices[0], "finish_reason", None) if isinstance(choices, list) and choices else None
         cleaned_text = text.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+        logger.info(
+            "headline_qa_llm_completed",
+            extra={
+                "provider": provider,
+                "model": resolved_model,
+                "request_id": request_id,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "stop_reason": finish_reason,
+                "elapsed_seconds": round(time.monotonic() - started_at, 3),
+            },
+        )
         print(
             "  INFO: LLM call completed: "
             f"request_id={request_id or 'missing'} input_tokens={input_tokens} output_tokens={output_tokens} "
@@ -370,6 +407,16 @@ def _call_headline_qa_llm(prompt, api_key, model="claude-sonnet-4-20250514", mes
         if request_id:
             extra_parts.append(f"request_id={request_id}")
         suffix = f" ({', '.join(extra_parts)})" if extra_parts else ""
+        logger.exception(
+            "headline_qa_llm_failed",
+            extra={
+                "provider": provider,
+                "model": resolved_model,
+                "status_code": status_code,
+                "request_id": request_id,
+                "elapsed_seconds": round(time.monotonic() - started_at, 3),
+            },
+        )
         print(f"  WARNING: LLM call failed: {exc}{suffix}")
         return None
 

@@ -28,6 +28,11 @@ import {
 } from "@/api/products";
 import { toast } from "@/components/ui/toast";
 import type { ProductAsset, ProductOffer, ProductVariant } from "@/types/products";
+import {
+  SUPPORTED_PRODUCT_ASSET_ACCEPT,
+  SUPPORTED_PRODUCT_ASSET_LABEL,
+  areSupportedProductAssetFiles,
+} from "@/lib/productAssetUpload";
 
 function formatBytes(value?: number | null): string | null {
   if (value === null || value === undefined) return null;
@@ -394,6 +399,11 @@ export function ProductDetailPage() {
     const files = Array.from(event.target.files || []);
     if (!files.length) {
       toast.error("No files selected.");
+      event.target.value = "";
+      return;
+    }
+    if (!areSupportedProductAssetFiles(files)) {
+      toast.error(`Unsupported file type. Upload only ${SUPPORTED_PRODUCT_ASSET_LABEL}.`);
       event.target.value = "";
       return;
     }
@@ -922,7 +932,7 @@ export function ProductDetailPage() {
                     className="hidden"
                     type="file"
                     multiple
-                    accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    accept={SUPPORTED_PRODUCT_ASSET_ACCEPT}
                     onChange={handleAssetUpload}
                   />
                   <Button

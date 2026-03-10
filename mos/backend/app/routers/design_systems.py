@@ -27,6 +27,10 @@ _DESIGN_SYSTEM_LOGO_ALLOWED_MIME_TYPES = {
     "image/webp",
     "image/gif",
 }
+_DESIGN_SYSTEM_LOGO_VARIANT_TO_TOKEN_KEY = {
+    "default": "logoAssetPublicId",
+    "onDark": "logoOnDarkAssetPublicId",
+}
 
 
 def _ensure_client_belongs(session: Session, *, org_id: str, client_id: str):
@@ -66,11 +70,25 @@ def _resolve_logo_content_type_or_400(file: UploadFile) -> str:
     return content_type
 
 
+def _resolve_logo_variant_or_400(raw_variant: str | None) -> str:
+    cleaned = (raw_variant or "default").strip()
+    if not cleaned:
+        cleaned = "default"
+    if cleaned not in _DESIGN_SYSTEM_LOGO_VARIANT_TO_TOKEN_KEY:
+        allowed = ", ".join(sorted(_DESIGN_SYSTEM_LOGO_VARIANT_TO_TOKEN_KEY))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported logo variant ({cleaned}). Allowed variants: {allowed}.",
+        )
+    return cleaned
+
+
 def _apply_logo_to_tokens_or_422(
     *,
     tokens: object,
     logo_public_id: str,
     default_logo_alt: str,
+    variant: str,
 ) -> dict[str, object]:
     if not isinstance(tokens, dict):
         raise HTTPException(
@@ -88,7 +106,8 @@ def _apply_logo_to_tokens_or_422(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.brand must be a JSON object.",
         )
-    brand_obj["logoAssetPublicId"] = logo_public_id
+    token_key = _DESIGN_SYSTEM_LOGO_VARIANT_TO_TOKEN_KEY[variant]
+    brand_obj[token_key] = logo_public_id
     logo_alt = brand_obj.get("logoAlt")
     if not isinstance(logo_alt, str) or not logo_alt.strip():
         brand_obj["logoAlt"] = default_logo_alt
@@ -187,10 +206,12 @@ def update_design_system(
 @router.post("/{design_system_id}/logo", status_code=status.HTTP_201_CREATED)
 async def upload_design_system_logo(
     design_system_id: str,
+    variant: str = "default",
     file: UploadFile = File(...),
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    resolved_variant = _resolve_logo_variant_or_400(variant)
     repo = DesignSystemsRepository(session)
     design_system = repo.get(org_id=auth.org_id, design_system_id=design_system_id)
     if not design_system:
@@ -222,8 +243,16 @@ async def upload_design_system_logo(
             content_bytes=content,
             filename=file.filename,
             content_type=content_type,
-            tags=["brand_logo", "design_system"],
-            alt=f"{design_system.name} logo",
+            tags=(
+                ["brand_logo", "design_system"]
+                if resolved_variant == "default"
+                else ["brand_logo", "design_system", "brand_logo_on_dark"]
+            ),
+            alt=(
+                f"{design_system.name} logo"
+                if resolved_variant == "default"
+                else f"{design_system.name} logo for dark surfaces"
+            ),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -232,6 +261,7 @@ async def upload_design_system_logo(
         tokens=design_system.tokens,
         logo_public_id=str(asset.public_id),
         default_logo_alt=str(design_system.name),
+        variant=resolved_variant,
     )
     updated = repo.update(
         org_id=auth.org_id,
@@ -244,6 +274,7 @@ async def upload_design_system_logo(
         "assetId": str(asset.id),
         "publicId": str(asset.public_id),
         "url": f"/public/assets/{asset.public_id}",
+        "variant": resolved_variant,
         "designSystem": jsonable_encoder(updated),
     }
 

@@ -638,6 +638,7 @@
         "src": "/assets/puppypad-logo.svg",
         "alt": "Brand logo"
       },
+      "logoVariant": "onDark",
       "copyright": "© 2025 PuppyPad",
       "links": [],
       "paymentIcons": []

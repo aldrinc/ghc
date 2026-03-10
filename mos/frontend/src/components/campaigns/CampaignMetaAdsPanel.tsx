@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useMetaApi } from "@/api/meta";
+import { CampaignPaidAdsQaCard } from "@/components/campaigns/CampaignPaidAdsQaCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
@@ -85,6 +86,133 @@ function getGenerationGroup(item: MetaPipelineAsset): {
     kind: "asset",
     label: `Asset ${shortId(item.asset.id, 5)}`,
   };
+}
+
+function readHostname(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.replace(/^www\./i, "");
+  } catch {
+    return null;
+  }
+}
+
+type CopyFieldProps = {
+  label: string;
+  value?: string | null;
+  multiline?: boolean;
+};
+
+function CopyField({ label, value, multiline = false }: CopyFieldProps) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">{label}</div>
+      <div
+        className={[
+          "rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-content",
+          multiline ? "whitespace-pre-wrap leading-6" : "",
+        ].join(" ")}
+      >
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+type MetaFeedPreviewProps = {
+  assetUrl: string | null;
+  assetAlt: string;
+  primaryText?: string | null;
+  headline?: string | null;
+  description?: string | null;
+  cta?: string | null;
+  destinationUrl?: string | null;
+  specReady: boolean;
+  specSourceLabel: string;
+};
+
+function MetaFeedPreview({
+  assetUrl,
+  assetAlt,
+  primaryText,
+  headline,
+  description,
+  cta,
+  destinationUrl,
+  specReady,
+  specSourceLabel,
+}: MetaFeedPreviewProps) {
+  const hostname = readHostname(destinationUrl);
+
+  return (
+    <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white text-slate-900 shadow-sm">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Meta Feed Preview</div>
+            <div className="text-xs text-slate-500">Sample layout using the prepared creative spec</div>
+          </div>
+          <span
+            className={[
+              "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              specReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+            ].join(" ")}
+          >
+            {specSourceLabel}
+          </span>
+        </div>
+      </div>
+
+      {specReady ? (
+        <>
+          <div className="space-y-3 px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
+                B
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-900">Brand Page</div>
+                <div className="text-xs text-slate-500">Sponsored</div>
+              </div>
+            </div>
+            <div className="whitespace-pre-wrap text-[13px] leading-5 text-slate-800">
+              {primaryText || "Primary text missing from prepared spec."}
+            </div>
+          </div>
+
+          <div className="border-y border-slate-200 bg-slate-50">
+            {assetUrl ? (
+              <img src={assetUrl} alt={assetAlt} className="h-[320px] w-full object-contain" loading="lazy" />
+            ) : (
+              <div className="flex h-[320px] items-center justify-center px-4 text-sm text-slate-500">
+                Generated remix preview missing.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 px-4 py-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">{hostname || "destination url missing"}</div>
+              <div className="mt-1 text-[15px] font-semibold leading-5 text-slate-900">
+                {headline || "Headline missing from prepared spec."}
+              </div>
+              {description ? <div className="mt-1 text-sm leading-5 text-slate-600">{description}</div> : null}
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-xs text-slate-500">Call to action</div>
+              <div className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+                {cta || "Learn More"}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex min-h-[520px] items-center justify-center px-6 py-10 text-center text-sm leading-6 text-slate-500">
+          Prepare Meta review to render the exact upload preview for this asset.
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsPanelProps) {
@@ -428,6 +556,8 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         </div>
       </div>
 
+      <CampaignPaidAdsQaCard campaign={campaign} />
+
       <div className="border border-border bg-transparent">
         <div className="border-b border-border px-4 py-3">
           <div className="text-base font-semibold text-content">Draft Meta-ready creatives</div>
@@ -479,6 +609,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                     const metaUploadHeadline = readString(item.creative_spec?.headline);
                     const metaUploadDescription = readString(item.creative_spec?.description);
                     const metaUploadCta = readString(item.creative_spec?.call_to_action_type);
+                    const metaDestinationUrl = readString(item.creative_spec?.destination_url);
                     const swipeCandidatePrimaryText = readString(swipeCopyPack?.metaPrimaryText);
                     const swipeCandidateHeadline = readString(swipeCopyPack?.metaHeadline);
                     const swipeCandidateDescription = readString(swipeCopyPack?.metaDescription);
@@ -487,178 +618,221 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                     const previewVariation = readString(swipeCopyPack?.selectedVariation);
                     const metaSpecPreparedFromSwipeCopy = creativeSpecSource === "campaign_meta_review_setup_swipe_copy";
                     const hasLegacyMetaSpec = Boolean(item.creative_spec?.id) && !metaSpecPreparedFromSwipeCopy;
+                    const metaPreviewStatusLabel = item.creative_spec?.id
+                      ? metaSpecPreparedFromSwipeCopy
+                        ? "Prepared Meta spec"
+                        : "Legacy Meta spec"
+                      : "Spec missing";
                     return (
-                      <div
-                        key={item.asset.id}
-                        className="grid gap-4 rounded-lg border border-border bg-surface p-4 xl:grid-cols-[minmax(0,240px)_minmax(0,240px)_minmax(0,1fr)]"
-                      >
-                        <div className="space-y-2">
-                          <div className="text-xs uppercase tracking-wide text-content-muted">Source swipe</div>
-                          <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
-                            {sourceUrl ? (
-                              <img src={sourceUrl} alt={sourceLabel} className="h-[220px] w-full object-contain" loading="lazy" />
-                            ) : (
-                              <div className="flex h-[220px] items-center justify-center text-sm text-content-muted">No source preview</div>
-                            )}
-                          </div>
-                          <div className="text-sm text-content">{sourceLabel}</div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {sourceMediaType ? <Badge tone="neutral">{sourceMediaType}</Badge> : null}
-                            <Badge tone="neutral">{generationGroup.label}</Badge>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="text-xs uppercase tracking-wide text-content-muted">Generated remix</div>
-                          <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
-                            {assetUrl ? (
-                              <img
-                                src={assetUrl}
-                                alt={item.asset.asset_kind || "Creative asset"}
-                                className="h-[220px] w-full object-contain"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="flex h-[220px] items-center justify-center text-sm text-content-muted">No preview</div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={item.creative_spec?.id ? "success" : "accent"}>
-                              {item.creative_spec?.id ? "Creative spec ready" : "Spec missing"}
-                            </Badge>
-                            {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Prepared from swipe copy</Badge> : null}
-                            {hasLegacyMetaSpec ? <Badge tone="danger">Legacy Meta spec</Badge> : null}
-                            {!item.creative_spec?.id && swipeCopyPack ? <Badge tone="accent">Swipe copy ready</Badge> : null}
-                            <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
-                            {batchId ? <Badge tone="neutral">Batch {shortId(batchId, 5)}</Badge> : null}
-                          </div>
-                        </div>
-
-                        <div className="min-w-0 space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
+                      <div key={item.asset.id} className="space-y-4 rounded-xl border border-border bg-surface p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
                             <div className="text-sm font-semibold text-content">{item.creative_spec?.name || item.asset.public_id}</div>
-                            <Badge tone="neutral">Req {readNumber(item.asset.ai_metadata?.requirementIndex) ?? "—"}</Badge>
-                            {previewVariation ? <Badge tone="neutral">{previewVariation}</Badge> : null}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone="neutral">Req {readNumber(item.asset.ai_metadata?.requirementIndex) ?? "—"}</Badge>
+                              {previewVariation ? <Badge tone="neutral">{previewVariation}</Badge> : null}
+                              <Badge tone={item.creative_spec?.id ? "success" : "accent"}>
+                                {item.creative_spec?.id ? "Meta spec ready" : "Meta spec missing"}
+                              </Badge>
+                              {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Prepared from swipe copy</Badge> : null}
+                              {hasLegacyMetaSpec ? <Badge tone="danger">Legacy Meta spec</Badge> : null}
+                              {!item.creative_spec?.id && swipeCopyPack ? <Badge tone="accent">Swipe copy ready</Badge> : null}
+                              <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
+                              <Badge tone="neutral">{generationGroup.label}</Badge>
+                              {batchId ? <Badge tone="neutral">Batch {shortId(batchId, 5)}</Badge> : null}
+                            </div>
                           </div>
 
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-lg border border-border bg-surface p-3">
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Asset provenance</div>
-                              <div className="mt-2 space-y-1 text-sm text-content">
-                                <div><span className="text-content-muted">Asset ID:</span> <span className="font-mono">{item.asset.id}</span></div>
-                                <div><span className="text-content-muted">Created:</span> {formatDate(item.asset.created_at)}</div>
-                                <div><span className="text-content-muted">Angle:</span> {item.experiment?.name || item.experiment?.id || "—"}</div>
-                                {destinationPage ? <div><span className="text-content-muted">Destination:</span> {destinationPage}</div> : null}
-                                {angleUsed ? <div><span className="text-content-muted">Stage 1 angle:</span> {angleUsed}</div> : null}
-                              </div>
-                            </div>
+                          <div className="flex flex-wrap gap-2">
+                            {preSalesUrl ? (
+                              <a href={preSalesUrl} target="_blank" rel="noreferrer">
+                                <Button variant="secondary" size="xs">Open pre-sales</Button>
+                              </a>
+                            ) : null}
+                            {salesUrl ? (
+                              <a href={salesUrl} target="_blank" rel="noreferrer">
+                                <Button variant="secondary" size="xs">Open sales</Button>
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
 
-                            <div className="rounded-lg border border-border bg-surface p-3">
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Meta upload copy</div>
-                              {item.creative_spec?.id ? (
-                                <div className="mt-2 space-y-2 text-sm text-content">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Prepared from swipe copy</Badge> : null}
-                                    {hasLegacyMetaSpec ? <Badge tone="danger">Legacy spec source</Badge> : null}
-                                  </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Primary text</div>
-                                    <div>{metaUploadPrimaryText || "—"}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Headline</div>
-                                    <div>{metaUploadHeadline || "—"}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Description</div>
-                                    <div>{metaUploadDescription || "—"}</div>
-                                  </div>
-                                  {metaUploadCta ? (
-                                    <div>
-                                      <div className="text-xs uppercase tracking-wide text-content-muted">CTA</div>
-                                      <div>{metaUploadCta}</div>
-                                    </div>
-                                  ) : null}
-                                </div>
+                        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,0.82fr)_minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.1fr)]">
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">1 Source Swipe</div>
+                                <div className="text-xs text-content-muted">Original swipe selected as the visual reference.</div>
+                              </div>
+                              {sourceMediaType ? <Badge tone="neutral">{sourceMediaType}</Badge> : null}
+                            </div>
+                            <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface-2">
+                              {sourceUrl ? (
+                                <img src={sourceUrl} alt={sourceLabel} className="h-[260px] w-full object-contain" loading="lazy" />
                               ) : (
-                                <div className="mt-2 space-y-2 text-sm text-content-muted">
-                                  <div>No Meta creative spec has been prepared yet.</div>
-                                  {swipeCopyPack ? <div>Stage 1 swipe copy exists below, but it is not upload-ready until you run Prepare Meta review.</div> : null}
+                                <div className="flex h-[260px] items-center justify-center px-4 text-sm text-content-muted">
+                                  Source swipe preview missing.
                                 </div>
                               )}
                             </div>
+                            <div className="mt-3 space-y-2">
+                              <div className="text-sm font-semibold text-content">{sourceLabel}</div>
+                              <div className="text-xs leading-5 text-content-muted">
+                                This is the swipe the system grounded the remix on before preparing any Meta creative spec.
+                              </div>
+                            </div>
                           </div>
 
-                          {swipeCopyPack ? (
-                            <div className="rounded-lg border border-border bg-surface p-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="text-xs uppercase tracking-wide text-content-muted">Swipe Stage 1 copy source</div>
-                                {previewVariation ? <Badge tone="neutral">{previewVariation}</Badge> : null}
-                                {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Selected for Meta</Badge> : <Badge tone="accent">Candidate only</Badge>}
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">2 Generated Remix</div>
+                                <div className="text-xs text-content-muted">Rendered creative asset that pairs with the chosen copy.</div>
                               </div>
-                              <div className="mt-2 grid gap-3 md:grid-cols-2">
-                                <div className="space-y-2 text-sm text-content">
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Primary text</div>
-                                    <div>{swipeCandidatePrimaryText || "—"}</div>
+                              <Badge tone="neutral">{item.asset.asset_kind || "asset"}</Badge>
+                            </div>
+                            <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface-2">
+                              {assetUrl ? (
+                                <img
+                                  src={assetUrl}
+                                  alt={item.asset.asset_kind || "Creative asset"}
+                                  className="h-[260px] w-full object-contain"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex h-[260px] items-center justify-center px-4 text-sm text-content-muted">
+                                  Generated remix preview missing.
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {item.creative_spec?.id ? <Badge tone="success">Ready for Meta review</Badge> : null}
+                              {!item.creative_spec?.id ? <Badge tone="accent">Waiting for Meta prep</Badge> : null}
+                              {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Copy linked</Badge> : null}
+                              {hasLegacyMetaSpec ? <Badge tone="danger">Legacy copy source</Badge> : null}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">3 Meta Upload Copy</div>
+                                <div className="text-xs text-content-muted">This is the exact copy that would go into Meta for this ad.</div>
+                              </div>
+                              <Badge tone={item.creative_spec?.id ? "success" : "accent"}>{metaPreviewStatusLabel}</Badge>
+                            </div>
+
+                            {item.creative_spec?.id ? (
+                              <div className="mt-3 space-y-3">
+                                <CopyField label="Primary Text" value={metaUploadPrimaryText} multiline />
+                                <CopyField label="Headline" value={metaUploadHeadline} />
+                                <CopyField label="Description" value={metaUploadDescription} />
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <CopyField label="CTA Button" value={metaUploadCta} />
+                                  <CopyField label="Destination URL" value={metaDestinationUrl} />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-3 rounded-lg border border-dashed border-border bg-surface-2 px-4 py-4 text-sm leading-6 text-content-muted">
+                                No upload-ready Meta creative spec exists yet.
+                                {swipeCopyPack ? " Stage 1 swipe copy is available below, but it is not the current upload source." : ""}
+                              </div>
+                            )}
+                          </div>
+
+                          <MetaFeedPreview
+                            assetUrl={assetUrl}
+                            assetAlt={item.asset.asset_kind || "Creative asset"}
+                            primaryText={metaUploadPrimaryText}
+                            headline={metaUploadHeadline}
+                            description={metaUploadDescription}
+                            cta={metaUploadCta}
+                            destinationUrl={metaDestinationUrl}
+                            specReady={Boolean(item.creative_spec?.id)}
+                            specSourceLabel={metaSpecPreparedFromSwipeCopy ? "Prepared from swipe copy" : metaPreviewStatusLabel}
+                          />
+                        </div>
+
+                        <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.1fr)_minmax(0,0.82fr)]">
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Creative Lineage</div>
+                            <div className="mt-3 space-y-2 text-sm text-content">
+                              <div><span className="text-content-muted">Asset ID:</span> <span className="font-mono">{item.asset.id}</span></div>
+                              <div><span className="text-content-muted">Created:</span> {formatDate(item.asset.created_at)}</div>
+                              <div><span className="text-content-muted">Angle:</span> {item.experiment?.name || item.experiment?.id || "—"}</div>
+                              {destinationPage ? <div><span className="text-content-muted">Destination:</span> {destinationPage}</div> : null}
+                              {angleUsed ? <div><span className="text-content-muted">Stage 1 angle:</span> {angleUsed}</div> : null}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Swipe Stage 1 Copy Source</div>
+                              {previewVariation ? <Badge tone="neutral">{previewVariation}</Badge> : null}
+                              {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Selected for Meta</Badge> : <Badge tone="accent">Candidate only</Badge>}
+                            </div>
+                            {swipeCopyPack ? (
+                              <div className="mt-3 space-y-3">
+                                <div className="grid gap-3 lg:grid-cols-2">
+                                  <CopyField label="Swipe Primary Text" value={swipeCandidatePrimaryText} multiline />
+                                  <div className="space-y-3">
+                                    <CopyField label="Swipe Headline" value={swipeCandidateHeadline} />
+                                    <CopyField label="Swipe Description" value={swipeCandidateDescription} />
+                                    <CopyField label="Swipe CTA" value={swipeCandidateCta} />
                                   </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Headline</div>
-                                    <div>{swipeCandidateHeadline || "—"}</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-wide text-content-muted">Description</div>
-                                    <div>{swipeCandidateDescription || "—"}</div>
-                                  </div>
-                                  {swipeCandidateCta ? (
-                                    <div>
-                                      <div className="text-xs uppercase tracking-wide text-content-muted">CTA</div>
-                                      <div>{swipeCandidateCta}</div>
-                                    </div>
-                                  ) : null}
                                 </div>
                                 {previewMarkdown ? (
-                                  <pre className="max-h-[320px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-content">
-                                    {previewMarkdown}
-                                  </pre>
+                                  <details className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+                                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
+                                      View full Stage 1 pack
+                                    </summary>
+                                    <pre className="mt-3 max-h-[240px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-content">
+                                      {previewMarkdown}
+                                    </pre>
+                                  </details>
                                 ) : null}
                               </div>
-                            </div>
-                          ) : null}
+                            ) : (
+                              <div className="mt-3 text-sm text-content-muted">No Stage 1 swipe copy pack is stored on this asset.</div>
+                            )}
+                          </div>
 
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-lg border border-border bg-surface p-3">
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Ad set specs</div>
-                              {(item.adset_specs || []).length ? (
-                                <div className="mt-2 space-y-2">
-                                  {(item.adset_specs || []).map((spec) => (
-                                    <div key={spec.id} className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
-                                      <div className="font-semibold text-content">{spec.name || spec.id}</div>
-                                      <div className="text-content-muted">Status: {spec.status || "draft"}</div>
-                                    </div>
-                                  ))}
+                          <div className="rounded-xl border border-border bg-surface p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Meta Wiring</div>
+                            <div className="mt-3 space-y-3">
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Ad set specs</div>
+                                {(item.adset_specs || []).length ? (
+                                  <div className="mt-2 space-y-2">
+                                    {(item.adset_specs || []).map((spec) => (
+                                      <div key={spec.id} className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
+                                        <div className="font-semibold text-content">{spec.name || spec.id}</div>
+                                        <div className="text-content-muted">Status: {spec.status || "draft"}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="mt-2 text-sm text-content-muted">No internal Meta ad set spec yet.</div>
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Funnel review</div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {preSalesUrl ? (
+                                    <a href={preSalesUrl} target="_blank" rel="noreferrer">
+                                      <Button variant="secondary" size="xs">Open pre-sales</Button>
+                                    </a>
+                                  ) : null}
+                                  {salesUrl ? (
+                                    <a href={salesUrl} target="_blank" rel="noreferrer">
+                                      <Button variant="secondary" size="xs">Open sales</Button>
+                                    </a>
+                                  ) : null}
+                                  {!preSalesUrl && !salesUrl ? (
+                                    <div className="text-sm text-content-muted">No funnel review links on this creative spec yet.</div>
+                                  ) : null}
                                 </div>
-                              ) : (
-                                <div className="mt-2 text-sm text-content-muted">No internal Meta ad set spec yet.</div>
-                              )}
-                            </div>
-
-                            <div className="rounded-lg border border-border bg-surface p-3">
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Funnel review</div>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {preSalesUrl ? (
-                                  <a href={preSalesUrl} target="_blank" rel="noreferrer">
-                                    <Button variant="secondary" size="xs">Open pre-sales</Button>
-                                  </a>
-                                ) : null}
-                                {salesUrl ? (
-                                  <a href={salesUrl} target="_blank" rel="noreferrer">
-                                    <Button variant="secondary" size="xs">Open sales</Button>
-                                  </a>
-                                ) : null}
-                                {!preSalesUrl && !salesUrl ? (
-                                  <div className="text-sm text-content-muted">No funnel review links on this creative spec yet.</div>
-                                ) : null}
                               </div>
                             </div>
                           </div>

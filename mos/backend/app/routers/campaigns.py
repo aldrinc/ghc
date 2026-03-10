@@ -179,6 +179,22 @@ def _resolve_funnel_review_paths(
     return by_funnel_id
 
 
+def _resolve_meta_review_destination_url(
+    *,
+    destination_page: str,
+    review_paths: dict[str, str],
+) -> str | None:
+    cleaned = destination_page.strip()
+    if not cleaned:
+        return None
+    if cleaned.startswith("/") or cleaned.startswith("http://") or cleaned.startswith("https://"):
+        return cleaned
+    candidate = review_paths.get(cleaned)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate.strip()
+    return None
+
+
 def _validate_planning_prereqs(
     *,
     org_id: str,
@@ -1014,6 +1030,10 @@ def setup_campaign_meta_review(
                 "headline": swipe_copy_pack.meta_headline,
                 "description": swipe_copy_pack.meta_description,
                 "call_to_action_type": swipe_copy_pack.meta_cta,
+                "destination_url": _resolve_meta_review_destination_url(
+                    destination_page=destination_page,
+                    review_paths=review_paths,
+                ),
                 "page_id": settings.META_PAGE_ID,
                 "instagram_actor_id": settings.META_INSTAGRAM_ACTOR_ID,
                 "status": "draft",

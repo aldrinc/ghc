@@ -379,7 +379,39 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "image": {
                         "alt": "Caregiver reviewing a nightly routine checklist",
                     },
-                }
+                },
+                {
+                    "number": 2,
+                    "title": "Advice overload creates more second-guessing",
+                    "body": "Too many disconnected tips make it harder to stay consistent under pressure.",
+                    "image": {
+                        "alt": "Open tabs and notes scattered across a kitchen table",
+                    },
+                },
+                {
+                    "number": 3,
+                    "title": "Sequence errors look like motivation problems",
+                    "body": "The real issue is often order of operations, not effort or commitment.",
+                    "image": {
+                        "alt": "Parent checking a clock beside a bedtime routine chart",
+                    },
+                },
+                {
+                    "number": 4,
+                    "title": "Small misses cascade into full routine resets",
+                    "body": "Without a recovery branch, one disruption turns into an entire lost evening.",
+                    "image": {
+                        "alt": "Bedtime supplies laid out beside a crossed-out checklist",
+                    },
+                },
+                {
+                    "number": 5,
+                    "title": "A repeatable system lowers stress fast",
+                    "body": "Clear checkpoints and mechanism-fit steps make the whole routine easier to repeat.",
+                    "image": {
+                        "alt": "Calmer evening routine with a printed nightly plan on the counter",
+                    },
+                },
             ],
             "marquee": [
                 "Mechanism-first",
@@ -3866,6 +3898,95 @@ def test_build_offer_variants_requires_nonempty_revision_notes(
                 },
             }
         )
+def test_offer_data_readiness_allows_zero_prelinked_bonuses(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    monkeypatch.setattr(strategy_v2_activities, "session_scope", _session_scope_override)
+
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="OfferReadiness",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    default_offer = ProductOffer(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        name="Default Offer",
+        business_model="one-time",
+    )
+    db_session.add(default_offer)
+    db_session.flush()
+    db_session.add(
+        ProductVariant(
+            product_id=product_uuid,
+            offer_id=default_offer.id,
+            title="Default Offer",
+            price=4900,
+            currency="USD",
+        )
+    )
+    onboarding_payload = OnboardingPayload(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        data={
+            "product_name": "Offer Readiness Product",
+            "product_type": "digital",
+            "price": "$49",
+            "default_offer_id": str(default_offer.id),
+        },
+    )
+    db_session.add(onboarding_payload)
+    db_session.commit()
+    db_session.refresh(onboarding_payload)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-offer-readiness-workflow",
+        temporal_run_id="strategy-v2-offer-readiness-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    readiness = strategy_v2_activities.validate_strategy_v2_offer_data_readiness_activity(
+        {
+            "org_id": auth_context.org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": None,
+            "workflow_run_id": str(workflow_run.id),
+            "onboarding_payload_id": str(onboarding_payload.id),
+            "offer_pipeline_output": {
+                "offer_input": {
+                    "product_brief": {
+                        "price_cents": 4900,
+                        "currency": "USD",
+                    }
+                }
+            },
+        }
+    )
+
+    assert readiness["status"] == "ready"
+    assert readiness["context"]["offer_id"] == str(default_offer.id)
+    assert readiness["context"]["bonus_items"] == []
 
 
 def test_offer_data_readiness_allows_zero_prelinked_bonuses(
@@ -4367,7 +4488,7 @@ SEGMENT_HINT: parents
         .filter(
             Product.id.in_([link.bonus_product_id for link in synced_bonus_links]),
             Product.org_id == org_uuid,
-            Product.client_id == client_id,
+            Product.client_id == client_uuid,
         )
         .all()
     )

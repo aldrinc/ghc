@@ -32,6 +32,14 @@ from app.schemas.compliance import (
     ComplianceRulesetResponse,
     ComplianceRulesetSummaryResponse,
 )
+from app.schemas.paid_ads_qa import (
+    PaidAdsPlatformProfileResponse,
+    PaidAdsPlatformProfileUpsertRequest,
+    PaidAdsQaRunRequest,
+    PaidAdsQaRunResponse,
+    PaidAdsRulesetResponse as PaidAdsRulesetResponseModel,
+    PaidAdsRulesetSummaryResponse as PaidAdsRulesetSummaryResponseModel,
+)
 
 __all__ = [
     "ClientCanon",
@@ -65,4 +73,10 @@ __all__ = [
     "CompliancePolicyTemplateResponse",
     "ComplianceRulesetSummaryResponse",
     "ComplianceRulesetResponse",
+    "PaidAdsPlatformProfileUpsertRequest",
+    "PaidAdsPlatformProfileResponse",
+    "PaidAdsQaRunRequest",
+    "PaidAdsQaRunResponse",
+    "PaidAdsRulesetSummaryResponseModel",
+    "PaidAdsRulesetResponseModel",
 ]

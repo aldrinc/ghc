@@ -1269,8 +1269,15 @@ def _resolve_destination_type(
     funnel_id: str | None,
     funnel_stage: str | None,
 ) -> str:
+    normalized_stage = (funnel_stage or "").strip().lower()
     if not isinstance(funnel_id, str) or not funnel_id.strip():
-        raise ValueError("funnel_id is required to resolve swipe copy destination type.")
+        if normalized_stage in {"top-of-funnel", "top", "tof", "middle-of-funnel", "middle", "mid", "mof"}:
+            return "Presales Listicle Page"
+        if normalized_stage in {"bottom-of-funnel", "bottom", "bof"}:
+            return "Sales Page"
+        raise ValueError(
+            "funnel_id is required to resolve swipe copy destination type when funnelStage is missing or unsupported."
+        )
 
     pages = session.scalars(
         select(FunnelPage).where(FunnelPage.funnel_id == funnel_id.strip())
@@ -1286,7 +1293,6 @@ def _resolve_destination_type(
             f"(funnel_id={funnel_id})."
         )
 
-    normalized_stage = (funnel_stage or "").strip().lower()
     if normalized_stage in {"bottom-of-funnel", "bottom", "bof"}:
         if "sales-pdp" in template_ids:
             return "Sales Page"

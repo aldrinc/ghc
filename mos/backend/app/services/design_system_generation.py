@@ -307,6 +307,7 @@ def _response_schema() -> dict[str, Any]:
                 "properties": {
                     "name": {"type": "string"},
                     "logoAssetPublicId": {"type": "string"},
+                    "logoOnDarkAssetPublicId": {"type": "string"},
                     "logoAlt": {"type": "string"},
                 },
                 "required": ["name", "logoAssetPublicId"],
@@ -407,6 +408,7 @@ def _claude_response_schema() -> dict[str, Any]:
                 "properties": {
                     "name": {"type": "string"},
                     "logoAssetPublicId": {"type": "string"},
+                    "logoOnDarkAssetPublicId": {"type": "string"},
                     "logoAlt": {"type": "string"},
                 },
                 "required": ["name", "logoAssetPublicId"],
@@ -488,6 +490,13 @@ def _validate_tokens(tokens: Any, *, required_css_vars: list[str]) -> dict[str, 
     if not isinstance(logo_public_id, str) or not logo_public_id.strip():
         raise DesignSystemGenerationError(
             "Design system tokens.brand.logoAssetPublicId must be a non-empty string."
+        )
+    logo_on_dark_public_id = brand.get("logoOnDarkAssetPublicId")
+    if logo_on_dark_public_id is not None and (
+        not isinstance(logo_on_dark_public_id, str) or not logo_on_dark_public_id.strip()
+    ):
+        raise DesignSystemGenerationError(
+            "Design system tokens.brand.logoOnDarkAssetPublicId must be a non-empty string when provided."
         )
 
     return tokens

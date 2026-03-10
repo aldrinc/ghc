@@ -514,7 +514,7 @@ class PreSalesReviewSlideFitPack(StrictContract):
 
 class PreSalesListicleFitPack(StrictContract):
     hero: PreSalesHeroFitPack
-    reasons: list[PreSalesReasonFitPack] = Field(min_length=1)
+    reasons: list[PreSalesReasonFitPack] = Field(min_length=5)
     marquee: list[str] = Field(min_length=1)
     pitch: PreSalesPitchFitPack
     reviews: list[PreSalesReviewSlideFitPack] = Field(default_factory=list)
@@ -952,6 +952,7 @@ def _coerce_comparison_rows(raw: Any) -> list[dict[str, str]]:
             )
             left_value = _first_non_empty(
                 [
+                    _coerce_non_empty_text(item.get("them")),
                     _coerce_non_empty_text(item.get("left")),
                     _coerce_non_empty_text(item.get("col1")),
                     _coerce_non_empty_text(item.get("disposable")),
@@ -960,6 +961,7 @@ def _coerce_comparison_rows(raw: Any) -> list[dict[str, str]]:
             )
             right_value = _first_non_empty(
                 [
+                    _coerce_non_empty_text(item.get("us")),
                     _coerce_non_empty_text(item.get("right")),
                     _coerce_non_empty_text(item.get("col2")),
                     _coerce_non_empty_text(item.get("pup")),

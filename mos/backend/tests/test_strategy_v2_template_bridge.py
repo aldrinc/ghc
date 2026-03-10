@@ -115,6 +115,41 @@ Use this reference before your next remedy decision.
 """
 
 
+def _valid_pre_sales_reasons() -> list[dict[str, object]]:
+    return [
+        {
+            "number": 1,
+            "title": "Conflicting advice is common",
+            "body": "A structured checklist helps you evaluate signals quickly. It keeps next steps clear.",
+            "image": {"alt": "Reader reviewing a medication-aware herbal checklist"},
+        },
+        {
+            "number": 2,
+            "title": "Red flags are easy to miss",
+            "body": "Simple stop signs reduce rushed decisions. They make follow-up questions more precise.",
+            "image": {"alt": "Highlighted stop-sign notes on a herbal screening worksheet"},
+        },
+        {
+            "number": 3,
+            "title": "Prep changes the appointment",
+            "body": "Better notes shorten the back-and-forth. Families leave with clearer answers.",
+            "image": {"alt": "Parent organizing questions before a practitioner visit"},
+        },
+        {
+            "number": 4,
+            "title": "One reference beats scattered tabs",
+            "body": "A single workflow keeps safety checks in one place. It reduces second-guessing mid-decision.",
+            "image": {"alt": "Open handbook beside a neat stack of notes"},
+        },
+        {
+            "number": 5,
+            "title": "Confidence comes from clear boundaries",
+            "body": "Knowing when to pause lowers avoidable risk. That makes the next action easier to choose.",
+            "image": {"alt": "Checklist with clear do-now and pause-now sections"},
+        },
+    ]
+
+
 def _valid_sales_payload() -> dict[str, object]:
     return {
         "hero": {
@@ -598,6 +633,90 @@ def test_upgrade_sales_payload_handles_two_column_rows_and_strips_known_drift_ke
     assert "cta_url" not in upgraded["guarantee"]
 
 
+def test_upgrade_sales_payload_handles_feature_us_them_comparison_rows() -> None:
+    legacy_payload = {
+        "hero": {
+            "headline": "Interaction triage workflow",
+            "primary_cta_label": "Get access",
+            "primary_cta_subbullets": ["Fast setup", "No subscription"],
+        },
+        "problem": {
+            "headline": "Why this matters",
+            "body": "Most shoppers are left to guess at herb-drug interactions.",
+        },
+        "mechanism": {
+            "headline": "How this works",
+            "subheadline": "Use a structured screen before trying anything.",
+            "bullets": [
+                {"title": "Step 1", "body": "List the herb and medication."},
+                {"title": "Step 2", "body": "Check red flags."},
+                {"title": "Step 3", "body": "Cross-check sources."},
+                {"title": "Step 4", "body": "Prepare clinician questions."},
+                {"title": "Step 5", "body": "Review final contraindications."},
+            ],
+            "callout": {
+                "left_title": "Typical guide",
+                "left_body": "Generic and vague",
+                "right_title": "Workflow",
+                "right_body": "Specific and actionable",
+            },
+            "comparison": {
+                "badge": "US vs THEM",
+                "title": "Interaction Triage Workflow vs. Random Google Searches",
+                "swipe_hint": "Swipe to compare",
+                "columns": ["Honest Herbalist Handbook", "Typical Herbal Guides"],
+                "rows": [
+                    {
+                        "feature": "Herb-drug interaction screening",
+                        "us": "Built-in triage checklist for every herb",
+                        "them": "Rarely mentioned or buried in fine print",
+                    }
+                ],
+            },
+        },
+        "social_proof": {
+            "headline": "What readers say",
+            "testimonials": [{"quote": "This gave me a clear process."}],
+        },
+        "whats_inside": {
+            "benefits": [
+                "Start Faster",
+                "Stay On Track",
+                "Ask Better Questions",
+                "Feel More Certain",
+            ],
+            "headline": "Everything included",
+        },
+        "bonus": {
+            "headline": "Bonus stack",
+            "free_gifts_body": "Four support tools included.",
+        },
+        "guarantee": {
+            "headline": "30-Day Risk Free Guarantee",
+            "body": "Request a refund if not a fit.",
+        },
+        "faq": {"headline": "FAQ", "items": _faq_items()},
+        "faq_pills": _faq_pills(),
+        "marquee_items": ["Safety-first", "Practical", "Medication-aware", "Actionable"],
+        "urgency_message": "Selling out faster than expected.",
+        "cta_close": {"cta_label": "Get access now"},
+    }
+
+    upgraded = upgrade_strategy_v2_template_payload_fields(
+        template_id="sales-pdp",
+        payload_fields=legacy_payload,
+    )
+    validated = validate_strategy_v2_template_payload_fields(
+        template_id="sales-pdp",
+        payload_fields=upgraded,
+    )
+
+    row = validated["mechanism"]["comparison"]["rows"][0]
+    assert row["label"] == "Herb-drug interaction screening"
+    assert row["pup"] == "Built-in triage checklist for every herb"
+    assert row["disposable"] == "Rarely mentioned or buried in fine print"
+
+
 def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
     long_body = "A" * 400
     legacy_payload = {
@@ -663,6 +782,18 @@ def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
 
 
 def test_upgrade_presales_payload_clamps_legacy_fields_to_contract_caps() -> None:
+    reasons = _valid_pre_sales_reasons()
+    reasons[0] = {
+        "number": 1,
+        "title": "Why long-form safety explanations need to be constrained for template payloads",
+        "body": (
+            "Sentence one explains the issue in detail. "
+            "Sentence two adds practical context. "
+            "Sentence three reinforces the action. "
+            "Sentence four should be trimmed."
+        ),
+        "image": {"alt": "Checklist visual"},
+    }
     legacy_payload = {
         "hero": {
             "title": "Safety-first herbal screening process " * 4,
@@ -679,19 +810,7 @@ def test_upgrade_presales_payload_clamps_legacy_fields_to_contract_caps() -> Non
                 }
             ],
         },
-        "reasons": [
-            {
-                "number": 1,
-                "title": "Why long-form safety explanations need to be constrained for template payloads",
-                "body": (
-                    "Sentence one explains the issue in detail. "
-                    "Sentence two adds practical context. "
-                    "Sentence three reinforces the action. "
-                    "Sentence four should be trimmed."
-                ),
-                "image": {"alt": "Checklist visual"},
-            }
-        ],
+        "reasons": reasons,
         "marquee": [
             "Interaction Triage Workflow For Parents",
             "Contraindication Flag Checker With Extra Words",
@@ -821,6 +940,7 @@ def test_template_payload_patch_operations_apply_to_sales_template() -> None:
 
 
 def test_template_payload_patch_operations_apply_to_presales_template() -> None:
+    reasons = _valid_pre_sales_reasons()
     fields = validate_strategy_v2_template_payload_fields(
         template_id="pre-sales-listicle",
         payload_fields={
@@ -842,16 +962,7 @@ def test_template_payload_patch_operations_apply_to_presales_template() -> None:
                     },
                 ],
             },
-            "reasons": [
-                {
-                    "number": 1,
-                    "title": "Conflicting advice is common",
-                    "body": "A structured checklist helps you evaluate signals quickly.",
-                    "image": {
-                        "alt": "Reader reviewing a medication-aware herbal checklist",
-                    },
-                }
-            ],
+            "reasons": reasons,
             "marquee": ["Safety first", "Clear decisions"],
             "pitch": {
                 "title": "Use the handbook for faster, safer choices",
@@ -920,14 +1031,7 @@ def test_validate_presales_payload_normalizes_social_proof_badges() -> None:
                     }
                 ],
             },
-            "reasons": [
-                {
-                    "number": 1,
-                    "title": "Conflicting advice is common",
-                    "body": "A structured checklist helps you evaluate signals quickly.",
-                    "image": {"alt": "Checklist visual"},
-                }
-            ],
+            "reasons": _valid_pre_sales_reasons(),
             "marquee": ["Safety first"],
             "pitch": {
                 "title": "Use the handbook for faster, safer choices",
@@ -951,6 +1055,37 @@ def test_validate_presales_payload_normalizes_social_proof_badges() -> None:
     assert fields["hero"]["badges"][2]["label"] == "Risk Free Trial"
     assert fields["review_wall"]["title"].startswith("Over ")
     assert fields["review_wall"]["title"].endswith("5 Star Reviews")
+
+
+def test_presales_template_payload_requires_at_least_five_reasons() -> None:
+    payload = {
+        "hero": {
+            "title": "What if your remedy process felt clear and safe?",
+            "subtitle": "A practical checklist before your next decision.",
+            "badges": [
+                {
+                    "label": "Original badge",
+                    "icon": {"alt": "Original icon", "prompt": "icon of something else"},
+                }
+            ],
+        },
+        "reasons": _valid_pre_sales_reasons()[:4],
+        "marquee": ["Safety first"],
+        "pitch": {
+            "title": "Use the handbook for faster, safer choices",
+            "bullets": ["Simple steps", "Clear boundaries", "Faster prep", "Better questions"],
+            "cta_label": "Learn more",
+            "image": {"alt": "Pitch visual"},
+        },
+        "review_wall": {
+            "title": "Trusted by practical families",
+            "button_label": "Open full reviews",
+        },
+        "floating_cta": {"label": "Learn more"},
+    }
+
+    with pytest.raises(StrategyV2DecisionError, match="reasons"):
+        validate_strategy_v2_template_payload_fields(template_id="pre-sales-listicle", payload_fields=payload)
 
 
 def test_sales_template_payload_requires_exactly_two_cta_subbullets() -> None:

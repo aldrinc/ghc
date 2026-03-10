@@ -25,16 +25,6 @@ async function loadBootstrapModule(
   | { bootstrapAdminApp: () => void }
   | { bootstrapRuntimeApp: () => void }
 > {
-  if (import.meta.env.DEV) {
-    const sourcePath =
-      kind === "runtime" ? "/src/runtimeBootstrap.tsx" : "/src/adminBootstrap.tsx";
-    const cacheBust = `mos_bootstrap=${Date.now().toString(36)}`;
-    return import(
-      /* @vite-ignore */
-      `${sourcePath}?${cacheBust}`
-    );
-  }
-
   if (kind === "runtime") {
     return import("./runtimeBootstrap");
   }

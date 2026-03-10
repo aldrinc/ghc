@@ -14,6 +14,9 @@ When this prompt is executed by `strategy_v2.run_copy_pipeline`, follow this out
 - `mechanism.bullets` must contain exactly 5 bullets.
 - `mechanism.comparison.badge` must be exactly `US vs THEM`.
 - `mechanism.comparison.title` must put the product/system first: `<our approach> vs. <alternative>`.
+- `mechanism.comparison.columns` must be an object with exactly two keys: `pup` and `disposable`.
+- `mechanism.comparison.rows` must be an array of objects that use exactly `label`, `pup`, and `disposable`.
+- Do not use legacy comparison row keys like `feature`, `us`, `them`, `left`, `right`, `col1`, `col2`, or `values`.
 - `guarantee.title` must use `Risk Free Guarantee` language. If days are included, format it as `<X>-Day Risk Free Guarantee`.
 - Do not use `Workflow Fit Guarantee` phrasing.
 - `faq.items` and `faq_pills` must each contain at least 8 entries.

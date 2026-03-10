@@ -786,6 +786,7 @@ def test_llm_generate_text_uses_claude_structured_output_when_schema_requested(m
         output_schema: dict[str, object],
         max_tokens: int,
         temperature: float,
+        progress_callback=None,
     ) -> dict[str, object]:
         captured["model"] = model
         captured["system"] = system
@@ -853,6 +854,7 @@ def test_llm_generate_text_uses_explicit_claude_messages_when_provided(monkeypat
         temperature: float,
         user_content: list[dict[str, object]] | None = None,
         messages: list[dict[str, object]] | None = None,
+        progress_callback=None,
     ) -> dict[str, object]:
         captured["model"] = model
         captured["system"] = system

@@ -551,10 +551,6 @@ function TopicChips({
 }
 
 function ReviewRow({ review }: { review: Review }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = review.body.length > 240;
-  const shown = expanded || !isLong ? review.body : `${review.body.slice(0, 240)}…`;
-
   return (
     <div className="flex gap-4 py-8">
       <Avatar name={review.author.name} url={review.author.avatarUrl} />
@@ -581,18 +577,7 @@ function ReviewRow({ review }: { review: Review }) {
           <div className="text-sm font-semibold text-content">{review.title}</div>
         </div>
 
-        <div className="mt-4 text-sm leading-6 text-content">
-          {shown}
-          {isLong && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="ml-2 font-semibold text-content underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {expanded ? "Show less" : "Read more"}
-            </button>
-          )}
-        </div>
+        <div className="mt-4 text-sm leading-6 text-content">{review.body}</div>
 
         {review.media?.length ? (
           <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible md:pb-0">

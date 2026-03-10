@@ -30,6 +30,61 @@ def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str,
     return client_id, product_id, campaign_resp.json()["id"]
 
 
+def _build_swipe_copy_pack(
+    *,
+    requirement_index: int,
+    angle: str,
+    hook: str,
+    primary_text: str,
+    headline: str,
+    description: str,
+    cta: str = "Learn More",
+    destination_type: str = "pre-sales",
+) -> dict[str, object]:
+    return {
+        "platform": "Meta",
+        "requirementIndex": requirement_index,
+        "channel": "facebook",
+        "format": "image_ad",
+        "funnelStage": "top-of-funnel",
+        "angle": angle,
+        "hook": hook,
+        "destinationType": destination_type,
+        "selectedVariation": "Variation 1",
+        "formattedVariationsMarkdown": (
+            "```markdown\n"
+            f"Primary Text: {primary_text}\n"
+            f"Headline: {headline}\n"
+            f"Description: {description}\n"
+            f"CTA: {cta}\n"
+            "```"
+        ),
+        "metaPrimaryText": primary_text,
+        "metaHeadline": headline,
+        "metaDescription": description,
+        "metaCta": cta,
+        "claimsGuardrails": ["Do not invent unsupported claims."],
+    }
+
+
+def _build_swipe_copy_inputs(
+    *,
+    source_label: str,
+    source_url: str,
+    angle_used: str,
+    destination_page: str = "pre-sales",
+) -> dict[str, object]:
+    return {
+        "adImageOrVideo": {
+            "sourceLabel": source_label,
+            "sourceUrl": source_url,
+            "assetType": "image",
+        },
+        "angleUsed": angle_used,
+        "destinationPage": destination_page,
+    }
+
+
 def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     api_client,
     db_session,
@@ -160,8 +215,20 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
             "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
             "adCopyPackId": "copy-pack-001",
             "creativeGenerationBatchId": "batch-xyz",
-            "swipeSourceLabel": "10.png",
-            "swipeSourceUrl": "https://example.com/swipes/10.png",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Structure over guesswork.",
+                hook="A clearer way to check interactions before you start.",
+                primary_text="Parents need a repeatable herb-drug interaction workflow before they try anything.",
+                headline="A safer way to screen interactions",
+                description="Built from the Honest Herbalist workflow.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="10.png",
+                source_url="https://example.com/swipes/10.png",
+                angle_used="Structure over guesswork.",
+                destination_page="pre-sales",
+            ),
         },
     )
     db_session.add(asset)
@@ -191,15 +258,16 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     )
     assert row["creative_spec"]["headline"] == "A safer way to screen interactions"
     assert row["creative_spec"]["description"] == "Built from the Honest Herbalist workflow."
+    assert row["creative_spec"]["call_to_action_type"] == "Learn More"
+    assert row["creative_spec"]["destination_url"].endswith("/pre-sales")
     assert row["creative_spec"]["metadata_json"]["assetBriefId"] == brief_id
-    assert row["creative_spec"]["metadata_json"]["adCopyPackArtifactId"] == str(ad_copy_pack_artifact.id)
-    assert row["creative_spec"]["metadata_json"]["adCopyPackId"] == "copy-pack-001"
     assert row["creative_spec"]["metadata_json"]["generationBatchId"] == "batch-xyz"
     assert row["creative_spec"]["metadata_json"]["swipeSourceLabel"] == "10.png"
     assert row["creative_spec"]["metadata_json"]["swipeSourceMediaUrl"] == "https://example.com/swipes/10.png"
-    assert row["creative_spec"]["metadata_json"]["copyPack"]["metaPrimaryText"] == (
+    assert row["creative_spec"]["metadata_json"]["swipeCopyPack"]["metaPrimaryText"] == (
         "Parents need a repeatable herb-drug interaction workflow before they try anything."
     )
+    assert row["creative_spec"]["metadata_json"]["swipeCopyInputs"]["destinationPage"] == "pre-sales"
     assert row["creative_spec"]["metadata_json"]["reviewPaths"]["pre-sales"].endswith("/pre-sales")
     assert row["creative_spec"]["metadata_json"]["reviewPaths"]["sales"].endswith("/sales")
     assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
@@ -355,8 +423,20 @@ def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exis
             "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
             "adCopyPackId": "copy-pack-latest",
             "creativeGenerationBatchId": "batch-latest",
-            "swipeSourceLabel": "10.png",
-            "swipeSourceUrl": "https://example.com/swipes/10.png",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Batch-aware review setup.",
+                hook="Use the latest assets only.",
+                primary_text="Primary text from the latest batch.",
+                headline="Latest batch headline",
+                description="Latest batch description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="10.png",
+                source_url="https://example.com/swipes/10.png",
+                angle_used="Batch-aware review setup.",
+                destination_page="pre-sales",
+            ),
         },
         created_at=datetime.now(timezone.utc),
     )
@@ -505,8 +585,20 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
             "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
             "adCopyPackId": "copy-pack-batch-scope",
             "creativeGenerationBatchId": "batch-older",
-            "swipeSourceLabel": "10.png",
-            "swipeSourceUrl": "https://example.com/swipes/10.png",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Batch-scoped review setup.",
+                hook="Respect the selected creative batch.",
+                primary_text="Primary text from the older batch.",
+                headline="Older batch headline",
+                description="Older batch description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="10.png",
+                source_url="https://example.com/swipes/10.png",
+                angle_used="Batch-scoped review setup.",
+                destination_page="pre-sales",
+            ),
         },
         created_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
@@ -536,8 +628,20 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
             "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
             "adCopyPackId": "copy-pack-batch-scope",
             "creativeGenerationBatchId": "batch-selected",
-            "swipeSourceLabel": "11.png",
-            "swipeSourceUrl": "https://example.com/swipes/11.png",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Batch-scoped review setup.",
+                hook="Respect the selected creative batch.",
+                primary_text="Primary text from the selected batch.",
+                headline="Selected batch headline",
+                description="Selected batch description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="11.png",
+                source_url="https://example.com/swipes/11.png",
+                angle_used="Batch-scoped review setup.",
+                destination_page="pre-sales",
+            ),
         },
         created_at=datetime.now(timezone.utc),
     )

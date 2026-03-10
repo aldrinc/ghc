@@ -40,6 +40,7 @@ from app.routers import (
     meta_ads,
     shopify_webhooks,
     deploy,
+    paid_ads_qa,
 )
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ def create_app() -> FastAPI:
     app.include_router(teardowns.router)
     app.include_router(ads.router)
     app.include_router(meta_ads.router)
+    app.include_router(paid_ads_qa.router)
     app.include_router(shopify_webhooks.router)
     app.include_router(workflows.router)
     app.include_router(deep_research.router)
