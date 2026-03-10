@@ -3271,12 +3271,131 @@ def test_generate_shopify_theme_template_draft_images_routes_review_slots_to_tes
     assert response.imageModelBySlotPath[generic_slot_path] == "gemini-2.5-flash-image"
 
 
-def test_generate_theme_sync_ai_image_assets_raises_for_inprocess_testimonial_renderer_errors(
+def test_generate_theme_sync_ai_image_assets_continues_after_testimonial_renderer_slot_errors(
     monkeypatch,
 ):
     review_slot_path = (
         "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
     )
+    generic_slot_path = "templates/collection.json.sections.main-collection-banner.settings.image"
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_review_card_payloads",
+        lambda **kwargs: (
+            {
+                review_slot_path: {
+                    "template": "review_card",
+                    "name": "Taylor",
+                    "verified": True,
+                    "rating": 5,
+                    "review": "It feels supportive and easy to wear after long workdays.",
+                    "avatarPrompt": "Candid portrait of a satisfied customer indoors.",
+                    "heroImagePrompt": "Lifestyle product-use photo at home.",
+                    "imageModel": "gemini-2.5-flash-image",
+                }
+            },
+            "claude-sonnet-4-5",
+        ),
+    )
+
+    renderer_sentinel = object()
+
+    class FakeThreadedTestimonialRenderer:
+        def __enter__(self):
+            return renderer_sentinel
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(
+        clients_router,
+        "ThreadedTestimonialRenderer",
+        FakeThreadedTestimonialRenderer,
+    )
+
+    generic_asset = SimpleNamespace(
+        public_id=str(uuid4()),
+        ai_metadata={
+            "model": "gemini-2.5-flash-image",
+            "source": "ai",
+            "promptTokenCount": 17,
+        },
+        file_source="ai",
+        width=1600,
+        height=900,
+    )
+    observed: dict[str, object] = {}
+
+    def fake_create_funnel_image_asset(**kwargs):
+        observed["generic_slot_path"] = kwargs["usage_context"]["slotPath"]
+        return generic_asset
+
+    monkeypatch.setattr(
+        clients_router,
+        "create_funnel_image_asset",
+        fake_create_funnel_image_asset,
+    )
+
+    def fake_generate_shopify_theme_testimonial_image_asset(**kwargs):
+        observed["testimonial_renderer"] = kwargs["renderer"]
+        raise RendererError("Timed out waiting for testimonial renderer output.")
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_testimonial_image_asset",
+        fake_generate_shopify_theme_testimonial_image_asset,
+    )
+
+    (
+        generated_assets,
+        rate_limited_slot_paths,
+        generated_asset_by_slot_path,
+        quota_exhausted_slot_paths,
+        slot_error_by_path,
+    ) = clients_router._generate_theme_sync_ai_image_assets(
+        session=None,
+        org_id="org-1",
+        client_id="client-1",
+        product_id="product-1",
+        product=SimpleNamespace(id="product-1", title="Acme Wrap"),
+        image_slots=[
+            {
+                "path": review_slot_path,
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": generic_slot_path,
+                "key": "image",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+            },
+        ],
+        max_concurrency=1,
+    )
+
+    assert generated_assets == [generic_asset]
+    assert rate_limited_slot_paths == []
+    assert generated_asset_by_slot_path == {generic_slot_path: generic_asset}
+    assert quota_exhausted_slot_paths == []
+    assert slot_error_by_path == {
+        review_slot_path: "Timed out waiting for testimonial renderer output."
+    }
+    assert observed == {
+        "generic_slot_path": generic_slot_path,
+        "testimonial_renderer": renderer_sentinel,
+    }
+
+
+def test_generate_theme_sync_ai_image_assets_continues_after_testimonial_renderer_startup_errors(
+    monkeypatch,
+):
+    review_slot_path = (
+        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
+    )
+    generic_slot_path = "templates/collection.json.sections.main-collection-banner.settings.image"
 
     monkeypatch.setattr(
         clients_router,
@@ -3311,26 +3430,60 @@ def test_generate_theme_sync_ai_image_assets_raises_for_inprocess_testimonial_re
         FailingThreadedTestimonialRenderer,
     )
 
-    with pytest.raises(
-        RendererError,
-        match="Failed to launch chromium",
-    ):
-        clients_router._generate_theme_sync_ai_image_assets(
-            session=None,
-            org_id="org-1",
-            client_id="client-1",
-            product_id="product-1",
-            product=SimpleNamespace(id="product-1", title="Acme Wrap"),
-            image_slots=[
-                {
-                    "path": review_slot_path,
-                    "key": "image",
-                    "role": "supporting",
-                    "recommendedAspect": "square",
-                }
-            ],
-            max_concurrency=1,
-        )
+    generic_asset = SimpleNamespace(
+        public_id=str(uuid4()),
+        ai_metadata={
+            "model": "gemini-2.5-flash-image",
+            "source": "ai",
+            "promptTokenCount": 17,
+        },
+        file_source="ai",
+        width=1600,
+        height=900,
+    )
+
+    monkeypatch.setattr(
+        clients_router,
+        "create_funnel_image_asset",
+        lambda **kwargs: generic_asset,
+    )
+
+    (
+        generated_assets,
+        rate_limited_slot_paths,
+        generated_asset_by_slot_path,
+        quota_exhausted_slot_paths,
+        slot_error_by_path,
+    ) = clients_router._generate_theme_sync_ai_image_assets(
+        session=None,
+        org_id="org-1",
+        client_id="client-1",
+        product_id="product-1",
+        product=SimpleNamespace(id="product-1", title="Acme Wrap"),
+        image_slots=[
+            {
+                "path": review_slot_path,
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": generic_slot_path,
+                "key": "image",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+            },
+        ],
+        max_concurrency=1,
+    )
+
+    assert generated_assets == [generic_asset]
+    assert rate_limited_slot_paths == []
+    assert generated_asset_by_slot_path == {generic_slot_path: generic_asset}
+    assert quota_exhausted_slot_paths == []
+    assert slot_error_by_path == {
+        review_slot_path: "Failed to launch chromium for testimonial rendering."
+    }
 
 
 def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
