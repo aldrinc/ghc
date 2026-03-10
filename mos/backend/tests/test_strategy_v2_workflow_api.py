@@ -8,7 +8,17 @@ from uuid import UUID
 import pytest
 
 from app.db.enums import ArtifactTypeEnum, WorkflowKindEnum
-from app.db.models import Artifact, Campaign, OnboardingPayload, ProductOffer, ResearchArtifact, WorkflowRun
+from app.db.models import (
+    Artifact,
+    Campaign,
+    OnboardingPayload,
+    Product,
+    ProductOffer,
+    ProductOfferBonus,
+    ProductVariant,
+    ResearchArtifact,
+    WorkflowRun,
+)
 from app.routers.workflows import _normalize_strategy_v2_artifact_refs
 from app.strategy_v2.errors import (
     StrategyV2DecisionError,
@@ -122,6 +132,28 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 },
             ]
         }
+
+    def _generated_bonus_items_payload() -> list[dict[str, Any]]:
+        return [
+            {
+                "bonus_slot": "bonus-1",
+                "title": "Herb Interaction Quickstart",
+                "product_type": "digital",
+                "description": "A compact decision guide for checking herb-to-herb overlap before trying a new routine.",
+            },
+            {
+                "bonus_slot": "bonus-2",
+                "title": "Contraindication Red Flag Checklist",
+                "product_type": "digital",
+                "description": "A printable checklist for spotting medication, surgery, and anesthesia conflicts fast.",
+            },
+            {
+                "bonus_slot": "bonus-3",
+                "title": "Symptom Pattern Tracker",
+                "product_type": "digital",
+                "description": "A weekly worksheet for logging triggers, reactions, and timing patterns in one place.",
+            },
+        ]
 
     def _offer_variants_payload() -> list[dict[str, Any]]:
         return [
@@ -688,7 +720,10 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ]
             }
         elif context == "strategy_v2.offer.step04":
-            payload = {"variants": _offer_variants_payload()}
+            payload = {
+                "bonus_items": _generated_bonus_items_payload(),
+                "variants": _offer_variants_payload(),
+            }
         elif context == "strategy_v2.offer.step05":
             payload = {
                 "evaluation": _step05_evaluation_payload(),
@@ -3776,6 +3811,89 @@ def test_build_offer_variants_requires_nonempty_revision_notes(
         )
 
 
+def test_offer_data_readiness_allows_zero_prelinked_bonuses(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    monkeypatch.setattr(strategy_v2_activities, "session_scope", _session_scope_override)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_persist_step_payload",
+        lambda **_kwargs: "artifact-ready-1",
+    )
+
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="OfferReadiness",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    default_offer = ProductOffer(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        name="Default Offer",
+        business_model="one-time",
+    )
+    db_session.add(default_offer)
+    db_session.flush()
+    db_session.add(
+        ProductVariant(
+            product_id=product_uuid,
+            offer_id=default_offer.id,
+            title="Default Offer",
+            price=4900,
+            currency="USD",
+        )
+    )
+    onboarding_payload = OnboardingPayload(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        data={
+            "product_name": "Offer Readiness Product",
+            "product_type": "digital",
+            "price": "$49",
+            "default_offer_id": str(default_offer.id),
+        },
+    )
+    db_session.add(onboarding_payload)
+    db_session.commit()
+    db_session.refresh(onboarding_payload)
+
+    readiness = strategy_v2_activities.validate_strategy_v2_offer_data_readiness_activity(
+        {
+            "org_id": auth_context.org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": None,
+            "workflow_run_id": "00000000-0000-0000-0000-00000000a001",
+            "onboarding_payload_id": str(onboarding_payload.id),
+            "offer_pipeline_output": {
+                "offer_input": {
+                    "product_brief": {
+                        "price_cents": 4900,
+                        "currency": "USD",
+                    }
+                }
+            },
+        }
+    )
+
+    assert readiness["status"] == "ready"
+    assert readiness["context"]["offer_id"] == str(default_offer.id)
+    assert readiness["context"]["bonus_items"] == []
+
+
 def test_strategy_v2_activity_integration_stage0_to_final_copy(
     api_client,
     db_session,
@@ -4124,29 +4242,7 @@ SEGMENT_HINT: parents
                     "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
                     "offer_id": "offer-1",
                     "offer_name": "Offer Variant Bundle",
-                    "bonus_items": [
-                        {
-                            "bonus_id": "bonus-1",
-                            "linked_product_id": "bonus-prod-1",
-                            "title": "Bonus 1",
-                            "product_type": "digital",
-                            "position": 1,
-                        },
-                        {
-                            "bonus_id": "bonus-2",
-                            "linked_product_id": "bonus-prod-2",
-                            "title": "Bonus 2",
-                            "product_type": "digital",
-                            "position": 2,
-                        },
-                        {
-                            "bonus_id": "bonus-3",
-                            "linked_product_id": "bonus-prod-3",
-                            "title": "Bonus 3",
-                            "product_type": "digital",
-                            "position": 3,
-                        },
-                    ],
+                    "bonus_items": [],
                     "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
                     "savings_metadata": {
                         "savings_amount_cents": 3000,
@@ -4157,12 +4253,8 @@ SEGMENT_HINT: parents
                         "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
                         "offer_id": "offer-1",
                         "offer_name": "Offer Variant Bundle",
-                        "bonuses": [
-                            {"bonus_id": "bonus-1", "linked_product_id": "bonus-prod-1", "title": "Bonus 1"},
-                            {"bonus_id": "bonus-2", "linked_product_id": "bonus-prod-2", "title": "Bonus 2"},
-                            {"bonus_id": "bonus-3", "linked_product_id": "bonus-prod-3", "title": "Bonus 3"},
-                        ],
-                        "bonus_count": 3,
+                        "bonuses": [],
+                        "bonus_count": 0,
                     },
                 },
             },
@@ -4216,6 +4308,61 @@ SEGMENT_HINT: parents
     assert synced_offer.options_schema.get("strategyV2Offer", {}).get("variant_id") == stage3_result["stage3"][
         "variant_selected"
     ]
+    persisted_bonus_stack = stage3_result["stage3"]["bonus_stack"]
+    assert len(persisted_bonus_stack) == 3
+    assert all(row.get("bonus_id") for row in persisted_bonus_stack)
+    assert all(row.get("linked_product_id") for row in persisted_bonus_stack)
+    synced_bonus_links = (
+        db_session.query(ProductOfferBonus)
+        .filter(ProductOfferBonus.offer_id == synced_offer.id)
+        .order_by(ProductOfferBonus.position.asc(), ProductOfferBonus.created_at.asc())
+        .all()
+    )
+    assert len(synced_bonus_links) == 3
+    persisted_bonus_products = (
+        db_session.query(Product)
+        .filter(
+            Product.id.in_([link.bonus_product_id for link in synced_bonus_links]),
+            Product.org_id == org_uuid,
+            Product.client_id == client_id,
+        )
+        .all()
+    )
+    assert len(persisted_bonus_products) == 3
+    repeated_stage3_result = strategy_v2_activities.finalize_strategy_v2_offer_winner_activity(
+        {
+            "org_id": auth_context.org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": None,
+            "workflow_run_id": workflow_run_id,
+            "stage2": stage2_result["stage2"],
+            "offer_pipeline_output": offer_pipeline_output,
+            "offer_variants_output": offer_variants_output,
+            "offer_winner_decision": {
+                "operator_user_id": "operator-1",
+                "variant_id": variant_id,
+                "rejected_variant_ids": [],
+                "reviewed_candidate_ids": [variant_id],
+                **_manual_hitl_fields(
+                    operator_note="Selected winner variant after reviewing scored variants and rationale.",
+                ),
+            },
+            "brand_voice_notes": "Direct, concrete, no hype.",
+            "compliance_notes": "Avoid medical cure claims.",
+        }
+    )
+    repeat_bonus_links = (
+        db_session.query(ProductOfferBonus)
+        .filter(ProductOfferBonus.offer_id == synced_offer.id)
+        .order_by(ProductOfferBonus.position.asc(), ProductOfferBonus.created_at.asc())
+        .all()
+    )
+    assert len(repeat_bonus_links) == 3
+    assert sorted(str(link.bonus_product_id) for link in repeat_bonus_links) == sorted(
+        str(link.bonus_product_id) for link in synced_bonus_links
+    )
+    assert all(row.get("linked_product_id") for row in repeated_stage3_result["stage3"]["bonus_stack"])
     copy_result = strategy_v2_activities.run_strategy_v2_copy_pipeline_activity(
         {
             "org_id": auth_context.org_id,

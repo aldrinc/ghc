@@ -2205,10 +2205,12 @@ _STEP05_REVISION_NOTES_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_REVIS
 _STEP05_KILL_CONDITION_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_KILL_CONDITION_MAX_CHARS", "800"))
 _STEP04_CORE_PROMISE_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_CORE_PROMISE_MAX_CHARS", "140"))
 _STEP04_BONUS_TITLE_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_BONUS_TITLE_MAX_CHARS", "70"))
+_STEP04_BONUS_DESCRIPTION_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_BONUS_DESCRIPTION_MAX_CHARS", "220"))
 _STEP04_BONUS_COPY_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_BONUS_COPY_MAX_CHARS", "140"))
 _STEP04_BEST_VALUE_REASON_MAX_CHARS = int(
     os.getenv("STRATEGY_V2_OFFER_STEP04_BEST_VALUE_REASON_MAX_CHARS", "120")
 )
+_OFFER_GENERATED_BONUS_SLOTS = ("bonus-1", "bonus-2", "bonus-3")
 _OFFER_ORCHESTRATOR_REQUIRED_STEP_PROMPTS = (
     "step-01-avatar-brief.md",
     "step-02-market-calibration.md",
@@ -4431,11 +4433,46 @@ def _offer_step04_bonus_module_schema() -> dict[str, Any]:
     }
 
 
-def _offer_step04_response_schema(*, bonus_ids: Sequence[str]) -> dict[str, Any]:
+def _offer_step04_bonus_item_schema(*, bonus_slots: Sequence[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
+            "bonus_slot": {"type": "string", "enum": list(bonus_slots)},
+            "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": _STEP04_BONUS_TITLE_MAX_CHARS,
+                "pattern": ".*\\S.*",
+            },
+            "product_type": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": ".*\\S.*",
+            },
+            "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": _STEP04_BONUS_DESCRIPTION_MAX_CHARS,
+                "pattern": ".*\\S.*",
+            },
+        },
+        "required": ["bonus_slot", "title", "product_type", "description"],
+    }
+
+
+def _offer_step04_response_schema(*, bonus_slots: Sequence[str]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "bonus_items": {
+                "type": "array",
+                "minItems": len(bonus_slots),
+                "maxItems": len(bonus_slots),
+                "items": _offer_step04_bonus_item_schema(bonus_slots=bonus_slots),
+            },
             "variants": {
                 "type": "array",
                 "minItems": len(_OFFER_VARIANT_IDS),
@@ -4548,8 +4585,8 @@ def _offer_step04_response_schema(*, bonus_ids: Sequence[str]) -> dict[str, Any]
                         },
                         "bonus_modules": {
                             **_build_exact_keyed_object_schema(
-                                keys=bonus_ids,
-                                field_name="Offer Step 04 bonus_ids",
+                                keys=bonus_slots,
+                                field_name="Offer Step 04 bonus_slots",
                                 value_schema=_offer_step04_bonus_module_schema(),
                             ),
                         },
@@ -4651,7 +4688,7 @@ def _offer_step04_response_schema(*, bonus_ids: Sequence[str]) -> dict[str, Any]
                 },
             }
         },
-        "required": ["variants"],
+        "required": ["bonus_items", "variants"],
     }
 
 
@@ -5940,10 +5977,6 @@ def _resolve_offer_bundle_context(
             }
         )
     bonus_items = sorted(bonus_items, key=lambda row: int(row.get("position") or 0))
-    if len(bonus_items) != 3:
-        raise StrategyV2MissingContextError(
-            "Offer data readiness requires exactly 3 linked offer bonuses for V1."
-        )
 
     core_product_context = {
         "product_id": str(product.id),
@@ -6016,7 +6049,7 @@ def validate_strategy_v2_offer_data_readiness_activity(params: dict[str, Any]) -
         except StrategyV2MissingContextError as exc:
             inconsistent_fields.append(str(exc))
             remediation_steps.append(
-                "Provide product_type, a default offer, one price point, and exactly 3 linked bonuses for Offer Agent V1."
+                "Provide product_type, a default offer, and one price point before running Offer Agent V1."
             )
 
         offer_input = offer_pipeline_output.get("offer_input")
@@ -6054,9 +6087,9 @@ def validate_strategy_v2_offer_data_readiness_activity(params: dict[str, Any]) -
             step_key=V2_STEP_OFFER_DATA_READINESS,
             title="Strategy V2 Offer Data Readiness",
             summary=(
-                "Offer data readiness checks passed for V1 discount+3-bonus format."
+                "Offer generation prerequisites are ready for V1 discount+3-bonus format."
                 if status == "ready"
-                else "Offer data readiness blocked with required remediation."
+                else "Offer generation prerequisites are blocked with required remediation."
             ),
             payload=payload,
             model_name="deterministic_validator",
@@ -6202,6 +6235,332 @@ def _normalize_scored_variants_for_offer_sync(
     return [normalized_by_id[variant_id] for variant_id in _OFFER_VARIANT_IDS]
 
 
+def _normalize_offer_step04_bonus_items(
+    *,
+    raw_bonus_items: object,
+    bonus_slots: Sequence[str],
+) -> list[dict[str, Any]]:
+    if not isinstance(raw_bonus_items, list) or len(raw_bonus_items) != len(bonus_slots):
+        raise StrategyV2SchemaValidationError(
+            f"Offer Step 04 output must include exactly {len(bonus_slots)} bonus_items."
+        )
+    normalized_by_slot: dict[str, dict[str, Any]] = {}
+    for idx, raw_bonus_item in enumerate(raw_bonus_items):
+        bonus_item = _require_dict(payload=raw_bonus_item, field_name=f"bonus_items[{idx}]")
+        bonus_slot = str(bonus_item.get("bonus_slot") or "").strip().lower()
+        if bonus_slot not in bonus_slots:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 bonus_items[{idx}] has invalid bonus_slot '{bonus_slot}'. "
+                f"Expected one of {list(bonus_slots)}."
+            )
+        if bonus_slot in normalized_by_slot:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 returned duplicate bonus_slot '{bonus_slot}'."
+            )
+        title = str(bonus_item.get("title") or "").strip()
+        if not title:
+            raise StrategyV2SchemaValidationError(f"Offer Step 04 bonus_item '{bonus_slot}' title is required.")
+        if len(title) > _STEP04_BONUS_TITLE_MAX_CHARS:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 bonus_item '{bonus_slot}' title exceeds {_STEP04_BONUS_TITLE_MAX_CHARS} chars."
+            )
+        raw_product_type = str(bonus_item.get("product_type") or "").strip()
+        product_type = canonical_product_type(raw_product_type)
+        if not product_type:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 bonus_item '{bonus_slot}' product_type is required."
+            )
+        description = str(bonus_item.get("description") or "").strip()
+        if not description:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 bonus_item '{bonus_slot}' description is required."
+            )
+        if len(description) > _STEP04_BONUS_DESCRIPTION_MAX_CHARS:
+            raise StrategyV2SchemaValidationError(
+                f"Offer Step 04 bonus_item '{bonus_slot}' description exceeds "
+                f"{_STEP04_BONUS_DESCRIPTION_MAX_CHARS} chars."
+            )
+        normalized_by_slot[bonus_slot] = {
+            "bonus_slot": bonus_slot,
+            "title": title,
+            "product_type": product_type,
+            "description": description,
+        }
+    missing_slots = [slot for slot in bonus_slots if slot not in normalized_by_slot]
+    if missing_slots:
+        raise StrategyV2SchemaValidationError(
+            f"Offer Step 04 bonus_items missing required bonus_slot values: {missing_slots}."
+        )
+    return [
+        {
+            **normalized_by_slot[bonus_slot],
+            "position": index + 1,
+        }
+        for index, bonus_slot in enumerate(bonus_slots)
+    ]
+
+
+def _normalize_generated_bonus_stack_for_persistence(
+    *,
+    bonus_stack: object,
+    field_name: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(bonus_stack, list) or len(bonus_stack) != len(_OFFER_GENERATED_BONUS_SLOTS):
+        raise StrategyV2MissingContextError(
+            "Strategy V2 bonus persistence requires exactly 3 generated bonus items."
+        )
+    normalized_by_slot: dict[str, dict[str, Any]] = {}
+    for idx, raw_bonus in enumerate(bonus_stack):
+        bonus_item = _require_dict(payload=raw_bonus, field_name=f"{field_name}[{idx}]")
+        bonus_slot = str(bonus_item.get("bonus_slot") or "").strip().lower()
+        if bonus_slot not in _OFFER_GENERATED_BONUS_SLOTS:
+            raise StrategyV2MissingContextError(
+                f"{field_name}[{idx}] has invalid bonus_slot '{bonus_slot}'."
+            )
+        if bonus_slot in normalized_by_slot:
+            raise StrategyV2MissingContextError(
+                f"{field_name} contains duplicate bonus_slot '{bonus_slot}'."
+            )
+        title = str(bonus_item.get("title") or "").strip()
+        description = str(bonus_item.get("description") or "").strip()
+        copy = str(bonus_item.get("copy") or "").strip()
+        product_type = canonical_product_type(str(bonus_item.get("product_type") or "").strip())
+        if not title or not description or not copy or not product_type:
+            raise StrategyV2MissingContextError(
+                f"{field_name}[{idx}] requires title, description, copy, and product_type."
+            )
+        normalized_by_slot[bonus_slot] = {
+            "bonus_slot": bonus_slot,
+            "title": title,
+            "description": description,
+            "copy": copy,
+            "product_type": product_type,
+        }
+    return [
+        {
+            **normalized_by_slot[bonus_slot],
+            "position": index + 1,
+        }
+        for index, bonus_slot in enumerate(_OFFER_GENERATED_BONUS_SLOTS)
+    ]
+
+
+def _build_offer_bundle_contents(
+    *,
+    core_product_id: str,
+    core_product_title: str,
+    product_type: str,
+    offer_id: str,
+    offer_name: str,
+    bonus_stack: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "core_product": {
+            "product_id": core_product_id,
+            "title": core_product_title,
+            "product_type": product_type,
+        },
+        "offer_id": offer_id,
+        "offer_name": offer_name,
+        "bonuses": [
+            {
+                "bonus_slot": str(bonus_row.get("bonus_slot") or ""),
+                "bonus_id": str(bonus_row.get("bonus_id") or ""),
+                "linked_product_id": (
+                    str(bonus_row.get("linked_product_id") or "")
+                    if bonus_row.get("linked_product_id") is not None
+                    else None
+                ),
+                "title": str(bonus_row.get("title") or ""),
+                "product_type": str(bonus_row.get("product_type") or ""),
+                "description": str(bonus_row.get("description") or ""),
+                "copy": str(bonus_row.get("copy") or ""),
+                "position": int(bonus_row.get("position") or 0),
+            }
+            for bonus_row in bonus_stack
+        ],
+        "bonus_count": len(bonus_stack),
+    }
+
+
+def _apply_persisted_bonus_identity_to_variant(
+    *,
+    variant_payload: Mapping[str, Any],
+    persisted_bonus_stack: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    if not isinstance(variant_payload, Mapping):
+        raise StrategyV2MissingContextError("Expected variant payload to be an object during bonus persistence.")
+    provisional_bonus_stack = _normalize_generated_bonus_stack_for_persistence(
+        bonus_stack=variant_payload.get("bonus_stack"),
+        field_name="selected_variant.bonus_stack",
+    )
+    provisional_copy_by_slot = {
+        str(row["bonus_slot"]): str(row["copy"])
+        for row in provisional_bonus_stack
+    }
+    normalized_variant = dict(variant_payload)
+    normalized_bonus_stack: list[dict[str, Any]] = []
+    for persisted_bonus in persisted_bonus_stack:
+        bonus_slot = str(persisted_bonus.get("bonus_slot") or "").strip().lower()
+        normalized_bonus_stack.append(
+            {
+                "bonus_slot": bonus_slot,
+                "bonus_id": str(persisted_bonus.get("bonus_id") or ""),
+                "linked_product_id": str(persisted_bonus.get("linked_product_id") or ""),
+                "title": str(persisted_bonus.get("title") or ""),
+                "product_type": str(persisted_bonus.get("product_type") or ""),
+                "description": str(persisted_bonus.get("description") or ""),
+                "copy": provisional_copy_by_slot.get(bonus_slot, ""),
+                "position": int(persisted_bonus.get("position") or 0),
+            }
+        )
+    normalized_variant["bonus_stack"] = normalized_bonus_stack
+    bundle_contents = variant_payload.get("bundle_contents")
+    if isinstance(bundle_contents, Mapping):
+        normalized_variant["bundle_contents"] = _build_offer_bundle_contents(
+            core_product_id=str(
+                _require_dict(payload=bundle_contents.get("core_product"), field_name="bundle_contents.core_product").get(
+                    "product_id"
+                )
+                or ""
+            ),
+            core_product_title=str(
+                _require_dict(payload=bundle_contents.get("core_product"), field_name="bundle_contents.core_product").get(
+                    "title"
+                )
+                or ""
+            ),
+            product_type=str(
+                _require_dict(payload=bundle_contents.get("core_product"), field_name="bundle_contents.core_product").get(
+                    "product_type"
+                )
+                or ""
+            ),
+            offer_id=str(bundle_contents.get("offer_id") or ""),
+            offer_name=str(bundle_contents.get("offer_name") or ""),
+            bonus_stack=normalized_bonus_stack,
+        )
+    return normalized_variant
+
+
+def _persist_generated_strategy_v2_bonus_stack(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    target_offer,
+    generated_bonus_stack: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    products_repo = ProductsRepository(session)
+    bonuses_repo = ProductOfferBonusesRepository(session)
+    existing_links = bonuses_repo.list_by_offer(offer_id=str(target_offer.id))
+    previous_strategy_v2_offer = (
+        target_offer.options_schema.get("strategyV2Offer")
+        if isinstance(target_offer.options_schema, dict)
+        else None
+    )
+    previous_bonus_stack_raw = (
+        previous_strategy_v2_offer.get("bonus_stack")
+        if isinstance(previous_strategy_v2_offer, Mapping)
+        else None
+    )
+    previous_bonus_identity_by_slot: dict[str, dict[str, Any]] = {}
+    if isinstance(previous_bonus_stack_raw, list):
+        for idx, raw_bonus in enumerate(previous_bonus_stack_raw):
+            if not isinstance(raw_bonus, Mapping):
+                raise StrategyV2MissingContextError(
+                    f"Existing strategy_v2 bonus metadata row {idx} is not an object."
+                )
+            bonus_slot = str(raw_bonus.get("bonus_slot") or "").strip().lower()
+            linked_product_id = str(raw_bonus.get("linked_product_id") or "").strip()
+            if not bonus_slot or not linked_product_id:
+                raise StrategyV2MissingContextError(
+                    "Existing strategy_v2 bonus metadata is missing bonus_slot or linked_product_id."
+                )
+            previous_bonus_identity_by_slot[bonus_slot] = {
+                "bonus_slot": bonus_slot,
+                "linked_product_id": linked_product_id,
+            }
+    if existing_links and not previous_bonus_identity_by_slot:
+        raise StrategyV2MissingContextError(
+            "Selected offer already has linked bonuses, but they are not owned by strategy_v2 metadata. "
+            "Remediation: clear manual bonus links before rerunning Strategy V2."
+        )
+    existing_link_by_product_id = {str(link.bonus_product_id): link for link in existing_links}
+    persisted_bonus_stack: list[dict[str, Any]] = []
+    for bonus_item in generated_bonus_stack:
+        bonus_slot = str(bonus_item.get("bonus_slot") or "").strip().lower()
+        position = int(bonus_item.get("position") or 0)
+        title = str(bonus_item.get("title") or "").strip()
+        description = str(bonus_item.get("description") or "").strip()
+        product_type = canonical_product_type(str(bonus_item.get("product_type") or "").strip())
+        copy = str(bonus_item.get("copy") or "").strip()
+        if not bonus_slot or not title or not description or not product_type or not copy:
+            raise StrategyV2MissingContextError(
+                "Generated bonus persistence requires bonus_slot, title, description, product_type, and copy."
+            )
+        existing_identity = previous_bonus_identity_by_slot.get(bonus_slot)
+        if existing_identity is not None:
+            linked_product = products_repo.get(
+                org_id=org_id,
+                product_id=str(existing_identity["linked_product_id"]),
+            )
+            if linked_product is None:
+                raise StrategyV2MissingContextError(
+                    f"Existing strategy_v2 bonus product for slot '{bonus_slot}' no longer exists."
+                )
+            linked_product = products_repo.update(
+                org_id=org_id,
+                product_id=str(linked_product.id),
+                title=title,
+                description=description,
+                product_type=product_type,
+            )
+            if linked_product is None:
+                raise StrategyV2MissingContextError(
+                    f"Failed to update strategy_v2 bonus product for slot '{bonus_slot}'."
+                )
+        else:
+            linked_product = products_repo.create(
+                org_id=org_id,
+                client_id=client_id,
+                title=title,
+                description=description,
+                product_type=product_type,
+            )
+        if str(linked_product.id) == product_id:
+            raise StrategyV2MissingContextError(
+                f"Generated bonus slot '{bonus_slot}' resolved to the core product, which is invalid."
+            )
+        existing_link = existing_link_by_product_id.get(str(linked_product.id))
+        if existing_link is None:
+            existing_link = bonuses_repo.create(
+                org_id=org_id,
+                client_id=client_id,
+                offer_id=str(target_offer.id),
+                bonus_product_id=str(linked_product.id),
+                position=position,
+            )
+        else:
+            existing_link.position = position
+            session.commit()
+            session.refresh(existing_link)
+        persisted_bonus_stack.append(
+            {
+                "bonus_slot": bonus_slot,
+                "bonus_id": str(existing_link.id),
+                "linked_product_id": str(linked_product.id),
+                "title": title,
+                "product_type": product_type,
+                "description": description,
+                "copy": copy,
+                "position": position,
+            }
+        )
+    return persisted_bonus_stack
+
+
 def _sync_product_offer_from_strategy_output(
     *,
     session,
@@ -6272,55 +6631,11 @@ def _sync_product_offer_from_strategy_output(
         scored_variants=scored_variants,
         product_type=str(stage3_data.get("product_type") or ""),
     )
-    strategy_v2_offer_payload = {
-        "source": "strategy_v2",
-        "variant_id": str(stage3_data.get("variant_selected") or ""),
-        "offer_format": str(stage3_data.get("offer_format") or "DISCOUNT_PLUS_3_BONUSES_V1"),
-        "product_type": str(stage3_data.get("product_type") or ""),
-        "ump": str(stage3_data.get("ump") or ""),
-        "ums": str(stage3_data.get("ums") or ""),
-        "core_promise": offer_name,
-        "value_stack_summary": differentiation_bullets,
-        "pricing_rationale": pricing_rationale or None,
-        "pricing_metadata": (
-            dict(stage3_data.get("pricing_metadata"))
-            if isinstance(stage3_data.get("pricing_metadata"), dict)
-            else None
-        ),
-        "savings_metadata": (
-            dict(stage3_data.get("savings_metadata"))
-            if isinstance(stage3_data.get("savings_metadata"), dict)
-            else None
-        ),
-        "best_value_metadata": (
-            dict(stage3_data.get("best_value_metadata"))
-            if isinstance(stage3_data.get("best_value_metadata"), dict)
-            else None
-        ),
-        "bundle_contents": (
-            dict(stage3_data.get("bundle_contents"))
-            if isinstance(stage3_data.get("bundle_contents"), dict)
-            else None
-        ),
-        "bonus_stack": (
-            [row for row in stage3_data.get("bonus_stack") if isinstance(row, dict)]
-            if isinstance(stage3_data.get("bonus_stack"), list)
-            else []
-        ),
-        "guarantee_type": guarantee_text,
-        "composite_score": stage3_data.get("composite_score"),
-        "variants": normalized_scored_variants,
-        "selected_variant": dict(selected_variant),
-        "selected_variant_score": dict(selected_variant_score),
-        "decision": dict(decision_payload),
-    }
-
     base_options_schema = (
         dict(target_offer.options_schema)
         if target_offer is not None and isinstance(target_offer.options_schema, dict)
         else {}
     )
-    base_options_schema["strategyV2Offer"] = strategy_v2_offer_payload
 
     if target_offer is None:
         target_offer = offers_repo.create(
@@ -6428,7 +6743,78 @@ def _sync_product_offer_from_strategy_output(
             continue
         variants_repo.delete(variant_id=row_id)
 
-    return _serialize_product_offer_for_strategy(target_offer)
+    generated_bonus_stack = _normalize_generated_bonus_stack_for_persistence(
+        bonus_stack=stage3_data.get("bonus_stack"),
+        field_name="stage3.bonus_stack",
+    )
+    persisted_bonus_stack = _persist_generated_strategy_v2_bonus_stack(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        target_offer=target_offer,
+        generated_bonus_stack=generated_bonus_stack,
+    )
+    persisted_bundle_contents = _build_offer_bundle_contents(
+        core_product_id=product_id,
+        core_product_title=str(stage3_data.get("product_name") or ""),
+        product_type=str(stage3_data.get("product_type") or ""),
+        offer_id=str(target_offer.id),
+        offer_name=str(target_offer.name or ""),
+        bonus_stack=persisted_bonus_stack,
+    )
+    persisted_selected_variant = _apply_persisted_bonus_identity_to_variant(
+        variant_payload=selected_variant,
+        persisted_bonus_stack=persisted_bonus_stack,
+    )
+    strategy_v2_offer_payload = {
+        "source": "strategy_v2",
+        "variant_id": str(stage3_data.get("variant_selected") or ""),
+        "offer_format": str(stage3_data.get("offer_format") or "DISCOUNT_PLUS_3_BONUSES_V1"),
+        "product_type": str(stage3_data.get("product_type") or ""),
+        "ump": str(stage3_data.get("ump") or ""),
+        "ums": str(stage3_data.get("ums") or ""),
+        "core_promise": offer_name,
+        "value_stack_summary": differentiation_bullets,
+        "pricing_rationale": pricing_rationale or None,
+        "pricing_metadata": (
+            dict(stage3_data.get("pricing_metadata"))
+            if isinstance(stage3_data.get("pricing_metadata"), dict)
+            else None
+        ),
+        "savings_metadata": (
+            dict(stage3_data.get("savings_metadata"))
+            if isinstance(stage3_data.get("savings_metadata"), dict)
+            else None
+        ),
+        "best_value_metadata": (
+            dict(stage3_data.get("best_value_metadata"))
+            if isinstance(stage3_data.get("best_value_metadata"), dict)
+            else None
+        ),
+        "bundle_contents": persisted_bundle_contents,
+        "bonus_stack": persisted_bonus_stack,
+        "guarantee_type": guarantee_text,
+        "composite_score": stage3_data.get("composite_score"),
+        "variants": normalized_scored_variants,
+        "selected_variant": persisted_selected_variant,
+        "selected_variant_score": dict(selected_variant_score),
+        "decision": dict(decision_payload),
+    }
+    base_options_schema["strategyV2Offer"] = strategy_v2_offer_payload
+    target_offer = offers_repo.update(
+        offer_id=str(target_offer.id),
+        options_schema=base_options_schema,
+    )
+    if target_offer is None:
+        raise StrategyV2MissingContextError("Failed to persist strategy_v2 offer metadata after bonus sync.")
+
+    return {
+        "offer": _serialize_product_offer_for_strategy(target_offer),
+        "bonus_stack": persisted_bonus_stack,
+        "bundle_contents": persisted_bundle_contents,
+        "selected_variant": persisted_selected_variant,
+    }
 
 
 def _is_scrapeable_source_ref(source_ref: str) -> tuple[bool, str | None]:
@@ -17486,40 +17872,7 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
         payload=readiness_context.get("savings_metadata"),
         field_name="offer_data_readiness.context.savings_metadata",
     )
-    bonus_items_raw = readiness_context.get("bonus_items")
-    if not isinstance(bonus_items_raw, list) or len(bonus_items_raw) != 3:
-        raise StrategyV2SchemaValidationError(
-            "offer_data_readiness.context.bonus_items must contain exactly 3 bonus definitions."
-        )
-    bonus_items: list[dict[str, Any]] = []
-    for bonus_idx, raw_bonus in enumerate(bonus_items_raw):
-        bonus_item = _require_dict(
-            payload=raw_bonus,
-            field_name=f"offer_data_readiness.context.bonus_items[{bonus_idx}]",
-        )
-        bonus_id = str(bonus_item.get("bonus_id") or "").strip()
-        linked_product_id = str(bonus_item.get("linked_product_id") or "").strip()
-        title = str(bonus_item.get("title") or "").strip()
-        if not bonus_id or not linked_product_id or not title:
-            raise StrategyV2SchemaValidationError(
-                "offer_data_readiness.context.bonus_items requires bonus_id, linked_product_id, and title."
-            )
-        bonus_items.append(
-            {
-                "bonus_id": bonus_id,
-                "linked_product_id": linked_product_id,
-                "title": title,
-                "product_type": str(bonus_item.get("product_type") or "").strip().lower() or "other",
-                "position": int(bonus_item.get("position") or 0),
-            }
-        )
-    bonus_items = sorted(bonus_items, key=lambda row: int(row.get("position") or 0))
-    expected_bonus_ids = {str(row["bonus_id"]) for row in bonus_items}
-    if len(expected_bonus_ids) != 3:
-        raise StrategyV2SchemaValidationError(
-            "offer_data_readiness.context.bonus_items must include 3 unique bonus_id values."
-        )
-    bonus_by_id = {str(row["bonus_id"]): row for row in bonus_items}
+    bonus_slots = list(_OFFER_GENERATED_BONUS_SLOTS)
     product_type_offer_instruction = ""
     if canonical_product_type(product_type) == "book":
         product_type_offer_instruction = (
@@ -17674,18 +18027,19 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     f"STEP_02_OUTPUT:\n{step_02_output[:12000]}\n\n"
                     f"OFFER_DATA_READINESS_CONTEXT:\n{_dump_prompt_json(readiness_context, max_chars=12000)}\n\n"
                     "## Runtime Output Contract\n"
-                    f"Return JSON with `variants` array for ids {', '.join(_OFFER_VARIANT_IDS)}.\n"
-                    "Use the V1 structure: product + discount + exactly 3 bonus modules.\n"
-                    "Each variant must return bonus_modules as an object keyed by the exact bonus_id values from OFFER_DATA_READINESS_CONTEXT.\n"
-                    "Do not emit bonus_id inside bonus_modules values; runtime derives it from each object key.\n"
+                    f"Return JSON with `bonus_items` for slots {', '.join(bonus_slots)} "
+                    f"and `variants` for ids {', '.join(_OFFER_VARIANT_IDS)}.\n"
+                    "Use the V1 structure: product + discount + exactly 3 generated bonus items.\n"
+                    "Define the three persistent bonus records in `bonus_items` first. "
+                    "Each bonus_item must include bonus_slot, title, product_type, and description.\n"
+                    "Each variant must return bonus_modules as an object keyed by those same bonus_slot values.\n"
+                    "Do not emit bonus_id inside bonus_modules values; runtime persists bonus records after selection.\n"
                     "Each variant must include structured pricing_metadata, savings_metadata, best_value_metadata, "
                     "objection_map, and dimension_scores.\n"
                     f"{product_type_offer_instruction}"
                 ),
                 schema_name="strategy_v2_offer_step04",
-                schema=_offer_step04_response_schema(
-                    bonus_ids=[str(row["bonus_id"]) for row in bonus_items],
-                ),
+                schema=_offer_step04_response_schema(bonus_slots=bonus_slots),
                 use_reasoning=True,
                 use_web_search=False,
                 heartbeat_context={
@@ -17696,6 +18050,10 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 },
             )
 
+            bonus_items = _normalize_offer_step04_bonus_items(
+                raw_bonus_items=step04_parsed.get("bonus_items"),
+                bonus_slots=bonus_slots,
+            )
             raw_variants = step04_parsed.get("variants")
             if not isinstance(raw_variants, list):
                 raise StrategyV2SchemaValidationError("Offer Step 04 output is missing variants array.")
@@ -17763,41 +18121,42 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 bonus_modules_raw = variant.get("bonus_modules")
                 if not isinstance(bonus_modules_raw, Mapping):
                     raise StrategyV2SchemaValidationError(
-                        f"Variant '{variant_id}' must include bonus_modules object keyed by readiness bonus ids."
+                        f"Variant '{variant_id}' must include bonus_modules object keyed by generated bonus slots."
                     )
-                bonus_copy_by_id: dict[str, str] = {}
-                returned_bonus_ids = {
+                bonus_copy_by_slot: dict[str, str] = {}
+                returned_bonus_slots = {
                     str(key or "").strip()
                     for key in bonus_modules_raw.keys()
                     if str(key or "").strip()
                 }
-                unknown_bonus_ids = sorted(returned_bonus_ids - expected_bonus_ids)
-                if unknown_bonus_ids:
+                expected_bonus_slots = {str(row["bonus_slot"]) for row in bonus_items}
+                unknown_bonus_slots = sorted(returned_bonus_slots - expected_bonus_slots)
+                if unknown_bonus_slots:
                     raise StrategyV2SchemaValidationError(
-                        f"Variant '{variant_id}' bonus_modules contains unknown bonus_id values: {unknown_bonus_ids}."
+                        f"Variant '{variant_id}' bonus_modules contains unknown bonus_slot values: {unknown_bonus_slots}."
                     )
-                missing_bonus_ids = sorted(expected_bonus_ids - returned_bonus_ids)
-                if missing_bonus_ids:
+                missing_bonus_slots = sorted(expected_bonus_slots - returned_bonus_slots)
+                if missing_bonus_slots:
                     raise StrategyV2SchemaValidationError(
-                        f"Variant '{variant_id}' bonus_modules must include exactly readiness bonus ids: "
-                        f"{sorted(expected_bonus_ids)}. Missing={missing_bonus_ids}."
+                        f"Variant '{variant_id}' bonus_modules must include exactly generated bonus slots: "
+                        f"{sorted(expected_bonus_slots)}. Missing={missing_bonus_slots}."
                     )
-                for bonus_id in [str(row["bonus_id"]) for row in bonus_items]:
+                for bonus_slot in bonus_slots:
                     bonus_module = _require_dict(
-                        payload=bonus_modules_raw.get(bonus_id),
-                        field_name=f"variants[{idx}].bonus_modules['{bonus_id}']",
+                        payload=bonus_modules_raw.get(bonus_slot),
+                        field_name=f"variants[{idx}].bonus_modules['{bonus_slot}']",
                     )
                     bonus_copy = str(bonus_module.get("copy") or "").strip()
                     if not bonus_copy:
                         raise StrategyV2SchemaValidationError(
-                            f"Variant '{variant_id}' bonus_modules bonus_id '{bonus_id}' copy is required."
+                            f"Variant '{variant_id}' bonus_modules bonus_slot '{bonus_slot}' copy is required."
                         )
                     if len(bonus_copy) > _STEP04_BONUS_COPY_MAX_CHARS:
                         raise StrategyV2SchemaValidationError(
-                            f"Variant '{variant_id}' bonus copy for bonus_id '{bonus_id}' exceeds "
+                            f"Variant '{variant_id}' bonus copy for bonus_slot '{bonus_slot}' exceeds "
                             f"{_STEP04_BONUS_COPY_MAX_CHARS} chars."
                         )
-                    bonus_copy_by_id[bonus_id] = bonus_copy
+                    bonus_copy_by_slot[bonus_slot] = bonus_copy
 
                 pricing_metadata_raw = _require_dict(
                     payload=variant.get("pricing_metadata"),
@@ -17987,34 +18346,39 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     "best_value_metadata": best_value_metadata,
                     "bonus_stack": [
                         {
-                            "bonus_id": str(bonus_row.get("bonus_id") or ""),
-                            "linked_product_id": str(bonus_row.get("linked_product_id") or ""),
+                            "bonus_slot": str(bonus_row.get("bonus_slot") or ""),
+                            "bonus_id": str(bonus_row.get("bonus_slot") or ""),
+                            "linked_product_id": None,
                             "title": str(bonus_row.get("title") or ""),
                             "product_type": str(bonus_row.get("product_type") or ""),
-                            "copy": str(bonus_copy_by_id.get(str(bonus_row.get("bonus_id") or "")) or ""),
+                            "description": str(bonus_row.get("description") or ""),
+                            "copy": str(bonus_copy_by_slot.get(str(bonus_row.get("bonus_slot") or "")) or ""),
+                            "position": int(bonus_row.get("position") or 0),
                         }
                         for bonus_row in bonus_items
                     ],
-                    "bundle_contents": {
-                        "core_product": {
-                            "product_id": core_product_id,
-                            "title": core_product_title,
-                            "product_type": product_type,
-                        },
-                        "offer_id": str(readiness_context.get("offer_id") or ""),
-                        "offer_name": str(readiness_context.get("offer_name") or ""),
-                        "bonuses": [
+                    "bundle_contents": _build_offer_bundle_contents(
+                        core_product_id=core_product_id,
+                        core_product_title=core_product_title,
+                        product_type=product_type,
+                        offer_id=str(readiness_context.get("offer_id") or ""),
+                        offer_name=str(readiness_context.get("offer_name") or ""),
+                        bonus_stack=[
                             {
-                                "bonus_id": str(bonus_row.get("bonus_id") or ""),
-                                "linked_product_id": str(bonus_row.get("linked_product_id") or ""),
+                                "bonus_slot": str(bonus_row.get("bonus_slot") or ""),
+                                "bonus_id": str(bonus_row.get("bonus_slot") or ""),
+                                "linked_product_id": None,
                                 "title": str(bonus_row.get("title") or ""),
                                 "product_type": str(bonus_row.get("product_type") or ""),
-                                "copy": str(bonus_copy_by_id.get(str(bonus_row.get("bonus_id") or "")) or ""),
+                                "description": str(bonus_row.get("description") or ""),
+                                "copy": str(
+                                    bonus_copy_by_slot.get(str(bonus_row.get("bonus_slot") or "")) or ""
+                                ),
+                                "position": int(bonus_row.get("position") or 0),
                             }
                             for bonus_row in bonus_items
                         ],
-                        "bonus_count": len(bonus_items),
-                    },
+                    ),
                 }
             missing_ids = [variant_id for variant_id in _OFFER_VARIANT_IDS if variant_id not in by_id]
             if missing_ids:
@@ -18404,21 +18768,13 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             else None
         ),
     )
-    copy_context = build_copy_context_files(
-        stage3=stage3,
-        awareness_angle_matrix=awareness_matrix,
-        brand_voice_notes=brand_voice_notes,
-        compliance_notes=compliance_notes,
-        voc_quotes=quotes,
-    )
-    copy_context_data = copy_context.model_dump(mode="python")
     decision_payload = {
         **decision.model_dump(mode="python"),
         "reviewed_candidate_ids": cleaned_reviewed_candidate_ids,
     }
 
     with session_scope() as session:
-        synced_product_offer = _sync_product_offer_from_strategy_output(
+        sync_result = _sync_product_offer_from_strategy_output(
             session=session,
             org_id=org_id,
             client_id=client_id,
@@ -18431,6 +18787,29 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             selected_variant_score=selected_variant_score,
             decision_payload=decision_payload,
         )
+        synced_product_offer = _require_dict(payload=sync_result.get("offer"), field_name="sync_result.offer")
+        stage3_payload["bonus_stack"] = [
+            row for row in sync_result.get("bonus_stack", []) if isinstance(row, dict)
+        ]
+        stage3_payload["bundle_contents"] = (
+            dict(sync_result.get("bundle_contents"))
+            if isinstance(sync_result.get("bundle_contents"), Mapping)
+            else None
+        )
+        stage3 = validate_stage3(stage3_payload)
+        stage3_data = stage3.model_dump(mode="python")
+        selected_variant = _require_dict(
+            payload=sync_result.get("selected_variant"),
+            field_name="sync_result.selected_variant",
+        )
+        copy_context = build_copy_context_files(
+            stage3=stage3,
+            awareness_angle_matrix=awareness_matrix,
+            brand_voice_notes=brand_voice_notes,
+            compliance_notes=compliance_notes,
+            voc_quotes=quotes,
+        )
+        copy_context_data = copy_context.model_dump(mode="python")
         artifacts_repo = ArtifactsRepository(session)
         stage3_artifact = artifacts_repo.insert(
             org_id=org_id,

@@ -352,9 +352,9 @@ def _iter_strategy_v2_run_prompt_json_schemas():
         },
         "input_ordered_ids": ["E1111111111111111", "E2222222222222222"],
         "bonus_items": [
-            {"bonus_id": "bonus-1"},
-            {"bonus_id": "bonus-2"},
-            {"bonus_id": "bonus-3"},
+            {"bonus_slot": "bonus-1"},
+            {"bonus_slot": "bonus-2"},
+            {"bonus_slot": "bonus-3"},
         ],
         "voc_observations": [
             {"voc_id": "V001"},
@@ -815,10 +815,12 @@ def test_agent2_output_schema_binds_exact_runtime_evidence_ids() -> None:
     assert decisions["required"] == ["E1111111111111111", "E2222222222222222"]
 
 
-def test_offer_step04_schema_binds_exact_runtime_bonus_ids() -> None:
+def test_offer_step04_schema_binds_exact_generated_bonus_slots() -> None:
     schema = strategy_v2_activities._offer_step04_response_schema(
-        bonus_ids=["bonus-1", "bonus-2", "bonus-3"],
+        bonus_slots=["bonus-1", "bonus-2", "bonus-3"],
     )
+    bonus_items = schema["properties"]["bonus_items"]["items"]
+    assert bonus_items["properties"]["bonus_slot"]["enum"] == ["bonus-1", "bonus-2", "bonus-3"]
     bonus_modules = schema["properties"]["variants"]["items"]["properties"]["bonus_modules"]
     assert set(bonus_modules["properties"].keys()) == {"bonus-1", "bonus-2", "bonus-3"}
     assert bonus_modules["required"] == ["bonus-1", "bonus-2", "bonus-3"]
