@@ -12,6 +12,7 @@ import {
   useListClientShopifyProducts,
 } from "@/api/clients";
 import {
+  type ShopifyProductSyncResponse,
   useAddOfferBonus,
   useCreateProductOffer,
   useCreateShopifyProductForProduct,
@@ -185,6 +186,7 @@ export function ProductDetailPage() {
   const [shopifyPushSummary, setShopifyPushSummary] = useState<{
     shopDomain: string;
     productGid: string;
+    status: string;
     createdCount: number;
     updatedCount: number;
     deletedCount: number;
@@ -464,8 +466,8 @@ export function ProductDetailPage() {
       return;
     }
     const nextVariantPrice = Number(createShopifyVariantPriceDraft);
-    if (Number.isNaN(nextVariantPrice) || nextVariantPrice <= 0) {
-      toast.error("Shopify variant price must be greater than 0.");
+    if (Number.isNaN(nextVariantPrice) || nextVariantPrice < 0) {
+      toast.error("Shopify variant price must be 0 or greater.");
       return;
     }
     const nextCurrency = createShopifyCurrencyDraft.trim().toUpperCase();
@@ -481,7 +483,7 @@ export function ProductDetailPage() {
       vendor: productDetail.vendor || undefined,
       productType: productDetail.product_type || undefined,
       tags: productDetail.tags || [],
-      status: "DRAFT",
+      status: productDetail.published_at ? "ACTIVE" : "DRAFT",
       variants: [
         {
           title: nextVariantTitle,
@@ -534,28 +536,33 @@ export function ProductDetailPage() {
       toast.error("Shopify must be connected and ready before syncing.");
       return;
     }
-    if (!hasMappedShopifyProduct) {
-      toast.error("Save a Shopify product GID before syncing.");
-      return;
-    }
     const response = await syncShopifyProduct.mutateAsync({
       shopDomain: shopifyStatus?.shopDomain || undefined,
     });
-    const variantTitles = (response.variants || [])
-      .map((variant) => String(variant.title || "").trim())
-      .filter((title) => Boolean(title));
-    setShopifyPushSummary({
-      shopDomain: response.shopDomain,
-      productGid: response.productGid,
-      createdCount: response.createdCount,
-      updatedCount: response.updatedCount,
-      deletedCount: response.deletedCount,
-      offerCount: response.offerCount,
-      variantTitles,
-      variantCount: response.variants.length,
-      metafieldNamespace: response.metafieldNamespace,
-      metafieldKey: response.metafieldKey,
-    });
+    applyShopifyPushSummary(response);
+  };
+
+  const handleSetProductStatus = async (nextStatus: "ACTIVE" | "DRAFT") => {
+    if (!productDetail) return;
+    const currentStatus = productDetail.published_at ? "ACTIVE" : "DRAFT";
+    if (currentStatus === nextStatus) return;
+
+    const nextPublishedAt = nextStatus === "ACTIVE" ? productDetail.published_at || new Date().toISOString() : null;
+    await updateProduct.mutateAsync({ publishedAt: nextPublishedAt });
+
+    if (!isShopifyReady) {
+      toast.error("mOS status updated, but Shopify connection is not ready so Shopify was not updated.");
+      return;
+    }
+
+    try {
+      const response = await syncShopifyProduct.mutateAsync({
+        shopDomain: shopifyStatus?.shopDomain || undefined,
+      });
+      applyShopifyPushSummary(response);
+    } catch {
+      toast.error("mOS status updated, but Shopify sync failed. Review the sync error and retry.");
+    }
   };
 
   const handleSearchShopifyProducts = async () => {
@@ -727,6 +734,32 @@ export function ProductDetailPage() {
   const isDeletingVariant = deleteVariant.isPending;
   const isShopifyReady = shopifyStatus?.state === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
+  const productIsActive = Boolean(productDetail?.published_at);
+  const productStatusLabel = productIsActive ? "Active" : "Draft";
+  const isUpdatingProductStatus = updateProduct.isPending || syncShopifyProduct.isPending;
+
+  const applyShopifyPushSummary = (response: ShopifyProductSyncResponse) => {
+    const syncedProductGid = String(response.productGid || "").trim();
+    if (syncedProductGid) {
+      setShopifyProductGidDraft(syncedProductGid);
+    }
+    const variantTitles = (response.variants || [])
+      .map((variant) => String(variant.title || "").trim())
+      .filter((title) => Boolean(title));
+    setShopifyPushSummary({
+      shopDomain: response.shopDomain,
+      productGid: response.productGid,
+      status: response.status,
+      createdCount: response.createdCount,
+      updatedCount: response.updatedCount,
+      deletedCount: response.deletedCount,
+      offerCount: response.offerCount,
+      variantTitles,
+      variantCount: response.variants.length,
+      metafieldNamespace: response.metafieldNamespace,
+      metafieldKey: response.metafieldKey,
+    });
+  };
 
   if (!workspace) {
     return (
@@ -781,6 +814,33 @@ export function ProductDetailPage() {
                   {productDetail.product_type || "No product type"}
                 </div>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border border-border bg-surface px-2 py-1 font-semibold text-content">
+                  mOS {productStatusLabel}
+                </span>
+                <span className="text-content-muted">
+                  {productDetail.published_at
+                    ? `Activated ${formatTimestamp(productDetail.published_at) || productDetail.published_at}`
+                    : "Not active yet"}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => void handleSetProductStatus("ACTIVE")}
+                  disabled={isUpdatingProductStatus || productIsActive}
+                >
+                  {isUpdatingProductStatus && !productIsActive ? "Updating…" : "Make active"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleSetProductStatus("DRAFT")}
+                  disabled={isUpdatingProductStatus || !productIsActive}
+                >
+                  {isUpdatingProductStatus && productIsActive ? "Updating…" : "Make draft"}
+                </Button>
+              </div>
               <div className="mt-3 grid gap-3 text-xs text-content-muted sm:grid-cols-2">
                 <div>
                   <div className="font-semibold text-content">Benefits</div>
@@ -797,7 +857,8 @@ export function ProductDetailPage() {
               <div>
                 <div className="text-xs font-semibold uppercase text-content-muted">Shopify Product Mapping</div>
                 <div className="text-xs text-content-muted">
-                  Required for bonus products and Shopify offer verification.
+                  Used for offer baskets, bonus products, and Shopify product sync. Missing mappings can be created from
+                  mOS during attach and sync flows.
                 </div>
               </div>
               {!isShopifyReady ? (
@@ -880,6 +941,7 @@ export function ProductDetailPage() {
                   <div className="text-xs text-content-muted">
                     Store: {shopifyPushSummary.shopDomain} · Product: {shopifyPushSummary.productGid}
                   </div>
+                  <div className="text-xs text-content-muted">Shopify status: {shopifyPushSummary.status}</div>
                   <div className="text-xs text-content-muted">
                     Synced {shopifyPushSummary.variantCount} variant
                     {shopifyPushSummary.variantCount === 1 ? "" : "s"} and {shopifyPushSummary.offerCount} offer
@@ -897,24 +959,29 @@ export function ProductDetailPage() {
                   ) : null}
                 </div>
               ) : null}
-              {isShopifyReady && hasMappedShopifyProduct ? (
+              {isShopifyReady ? (
                 <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <div className="text-xs text-content-muted">
-                    Shopify product is already mapped for this product. mOS will push product fields, variants, and
-                    offer basket metadata onto that Shopify product.
+                    {hasMappedShopifyProduct
+                      ? "Shopify product is already mapped for this product. mOS will push product fields, variants, and offer basket metadata onto that Shopify product."
+                      : "No Shopify product is mapped yet. mOS will create the Shopify product first, then push product fields, variants, and offer basket metadata."}
                   </div>
                   <Button
                     size="sm"
                     onClick={() => void handleSyncShopifyProduct()}
                     disabled={syncShopifyProduct.isPending}
                   >
-                    {syncShopifyProduct.isPending ? "Syncing…" : "Sync mOS to Shopify"}
+                    {syncShopifyProduct.isPending
+                      ? "Syncing…"
+                      : hasMappedShopifyProduct
+                        ? "Sync mOS to Shopify"
+                        : "Create + Sync mOS to Shopify"}
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={() => void handleSyncShopifyVariants()}
-                    disabled={syncShopifyVariants.isPending}
+                    disabled={!hasMappedShopifyProduct || syncShopifyVariants.isPending}
                   >
                     {syncShopifyVariants.isPending ? "Syncing…" : "Pull variants from Shopify"}
                   </Button>
@@ -1150,7 +1217,7 @@ export function ProductDetailPage() {
                                   <div className="min-w-0">
                                     <div className="text-xs font-semibold text-content">{bonus.bonus_product.title}</div>
                                     <div className="text-[11px] text-content-muted">
-                                      {bonus.bonus_product.shopify_product_gid || "Missing Shopify product GID"}
+                                      {bonus.bonus_product.shopify_product_gid || "Will create in Shopify on next sync"}
                                     </div>
                                   </div>
                                   <Button
@@ -1182,9 +1249,9 @@ export function ProductDetailPage() {
                           >
                             <option value="">Select bonus product</option>
                             {addableBonuses.map((candidate) => (
-                              <option key={candidate.id} value={candidate.id} disabled={!candidate.shopifyProductGid}>
+                              <option key={candidate.id} value={candidate.id}>
                                 {candidate.title}
-                                {candidate.shopifyProductGid ? "" : " (missing Shopify GID)"}
+                                {candidate.shopifyProductGid ? "" : " (will create in Shopify on add)"}
                               </option>
                             ))}
                           </select>
@@ -1219,19 +1286,26 @@ export function ProductDetailPage() {
               <div className="mt-4 space-y-3">
                 {productDetail.variants.length ? (
                   productDetail.variants.map((variant) => {
-                    const isShopifyMapped =
-                      variant.provider === "shopify" &&
+                    const hasShopifyVariantGid =
                       typeof variant.external_price_id === "string" &&
                       variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
                     const syncTimestamp = formatTimestamp(variant.shopify_last_synced_at);
                     const syncError = variant.shopify_last_sync_error?.trim() || null;
-                    const syncStatus = !isShopifyMapped
-                      ? "Not Shopify"
-                      : syncError
-                        ? "Error"
-                        : syncTimestamp
-                          ? "Synced"
-                          : "Pending";
+                    const hasShopifySyncRecord = Boolean(syncTimestamp || syncError);
+                    const shopifyMappingStatus = hasShopifyVariantGid
+                      ? "Variant GID mapped"
+                      : hasShopifySyncRecord
+                        ? "Managed by product sync"
+                        : variant.provider === "shopify"
+                          ? "Missing valid Shopify variant GID"
+                          : "Not mapped";
+                    const syncStatus = syncError
+                      ? "Error"
+                      : syncTimestamp
+                        ? "Synced"
+                        : hasShopifyVariantGid || variant.provider === "shopify"
+                          ? "Pending"
+                          : "Not synced";
 
                     return (
                       <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
@@ -1266,11 +1340,7 @@ export function ProductDetailPage() {
                         <div className="grid gap-2 text-xs text-content-muted">
                           <div>
                             <span className="font-semibold text-content">Shopify mapping:</span>{" "}
-                            {isShopifyMapped
-                              ? "Ready"
-                              : variant.provider === "shopify"
-                                ? "Missing valid Shopify variant GID"
-                                : "Not Shopify"}
+                            {shopifyMappingStatus}
                           </div>
                           <div>
                             <span className="font-semibold text-content">Sync status:</span> {syncStatus}

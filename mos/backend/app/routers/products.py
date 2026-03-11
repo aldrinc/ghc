@@ -448,6 +448,55 @@ def _build_shopify_source_of_truth_payload(
     }
 
 
+def _build_shopify_create_variants_payload(*, variants: list[ProductVariant]) -> list[dict[str, object]]:
+    return [
+        {
+            "title": variant.title,
+            "priceCents": variant.price,
+            "currency": str(variant.currency or "").strip().upper(),
+        }
+        for variant in variants
+    ]
+
+
+def _product_shopify_status_text(product: Product) -> str:
+    return "ACTIVE" if product.published_at is not None else "DRAFT"
+
+
+def _ensure_product_has_shopify_product_gid(
+    *,
+    session: Session,
+    product: Product,
+    resolved_shop_domain: str,
+    variants: list[ProductVariant] | None = None,
+) -> tuple[str, bool]:
+    existing_product_gid = str(product.shopify_product_gid or "").strip()
+    if existing_product_gid:
+        return existing_product_gid, False
+
+    resolved_variants = variants
+    if resolved_variants is None:
+        variants_repo = ProductVariantsRepository(session)
+        resolved_variants = variants_repo.list_by_product(product_id=str(product.id))
+    _validate_product_variants_for_shopify_sync(variants=resolved_variants)
+
+    created = create_client_shopify_product(
+        client_id=str(product.client_id),
+        title=product.title,
+        description=product.description or "",
+        handle=product.handle,
+        vendor=product.vendor,
+        product_type=product.product_type,
+        tags=list(product.tags or []),
+        status_text=_product_shopify_status_text(product),
+        variants=_build_shopify_create_variants_payload(variants=resolved_variants),
+        shop_domain=resolved_shop_domain,
+    )
+    product.shopify_product_gid = created["productGid"]
+    session.add(product)
+    return created["productGid"], True
+
+
 def _get_client_user_pref(
     *,
     session: Session,
@@ -709,7 +758,7 @@ def create_shopify_product_for_product(
         vendor=payload.vendor,
         product_type=payload.productType,
         tags=payload.tags,
-        status_text=payload.status,
+        status_text=_product_shopify_status_text(product),
         variants=[variant.model_dump() for variant in payload.variants],
         shop_domain=payload.shopDomain,
     )
@@ -939,11 +988,6 @@ def sync_shopify_product_for_product(
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if not product.shopify_product_gid:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Product is not mapped to Shopify. Save a Shopify product GID first.",
-        )
 
     selected_shop_domain_pref = _get_client_user_pref(
         session=session,
@@ -985,14 +1029,29 @@ def sync_shopify_product_for_product(
     )
     for offer, bonuses in offers_with_bonuses:
         for _bonus, bonus_product in bonuses:
-            if not bonus_product.shopify_product_gid:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f'Offer "{offer.name}" includes bonus product "{bonus_product.title}" '
-                        "without a Shopify product GID."
-                    ),
+            try:
+                _ensure_product_has_shopify_product_gid(
+                    session=session,
+                    product=bonus_product,
+                    resolved_shop_domain=resolved_shop_domain,
                 )
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+                raise HTTPException(
+                    status_code=exc.status_code,
+                    detail=(
+                        f'Offer "{offer.name}" bonus product "{bonus_product.title}" could not be prepared for Shopify sync: '
+                        f"{detail}"
+                    ),
+                ) from exc
+
+    status_text = _product_shopify_status_text(product)
+    _ensure_product_has_shopify_product_gid(
+        session=session,
+        product=product,
+        resolved_shop_domain=resolved_shop_domain,
+        variants=variants,
+    )
 
     source_of_truth_payload = _build_shopify_source_of_truth_payload(
         product=product,
@@ -1033,7 +1092,7 @@ def sync_shopify_product_for_product(
             vendor=product.vendor,
             product_type=product.product_type,
             tags=list(product.tags or []),
-            status_text="ACTIVE" if product.published_at is not None else "DRAFT",
+            status_text=status_text,
             variants=sync_variants_payload,
             source_of_truth_payload=source_of_truth_payload,
             shop_domain=resolved_shop_domain,
@@ -1256,11 +1315,6 @@ def add_offer_bonus(
             status_code=status.HTTP_409_CONFLICT,
             detail="Bonus product must differ from the offer primary product.",
         )
-    if not bonus_product.shopify_product_gid:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Bonus product must include a Shopify product GID.",
-        )
 
     bonuses_repo = ProductOfferBonusesRepository(session)
     existing = session.scalars(
@@ -1275,10 +1329,54 @@ def add_offer_bonus(
             detail="Bonus product is already linked to this offer.",
         )
 
-    verify_shopify_product_exists(
-        client_id=str(offer.client_id),
-        product_gid=bonus_product.shopify_product_gid,
-    )
+    bonus_product_gid = str(bonus_product.shopify_product_gid or "").strip()
+    if bonus_product_gid:
+        verify_shopify_product_exists(
+            client_id=str(offer.client_id),
+            product_gid=bonus_product_gid,
+        )
+    else:
+        selected_shop_domain_pref = _get_client_user_pref(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(offer.client_id),
+            user_external_id=auth.user_id,
+        )
+        selected_shop_domain = (
+            selected_shop_domain_pref.selected_shop_domain.strip().lower()
+            if selected_shop_domain_pref
+            and isinstance(selected_shop_domain_pref.selected_shop_domain, str)
+            and selected_shop_domain_pref.selected_shop_domain.strip()
+            else None
+        )
+        status_payload = get_client_shopify_connection_status(
+            client_id=str(offer.client_id),
+            selected_shop_domain=selected_shop_domain,
+        )
+        if status_payload["state"] != "ready":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Shopify connection is not ready: {status_payload['message']}",
+            )
+        resolved_shop_domain = status_payload.get("shopDomain")
+        if not isinstance(resolved_shop_domain, str) or not resolved_shop_domain.strip():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify connection is ready but no shopDomain was resolved.",
+            )
+
+        try:
+            bonus_product_gid, _bonus_product_created = _ensure_product_has_shopify_product_gid(
+                session=session,
+                product=bonus_product,
+                resolved_shop_domain=resolved_shop_domain,
+            )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail=f'Bonus product "{bonus_product.title}" could not be prepared for Shopify: {detail}',
+            ) from exc
 
     max_position = session.scalar(
         select(func.max(ProductOfferBonus.position)).where(ProductOfferBonus.offer_id == offer.id)
@@ -1432,7 +1530,7 @@ def update_product(
         fields["tags"] = payload.tags
     if payload.templateSuffix is not None:
         fields["template_suffix"] = payload.templateSuffix
-    if payload.publishedAt is not None:
+    if "publishedAt" in fields_set:
         fields["published_at"] = payload.publishedAt
     if "shopifyProductGid" in fields_set:
         if payload.shopifyProductGid is None:
