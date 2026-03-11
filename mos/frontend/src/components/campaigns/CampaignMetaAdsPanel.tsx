@@ -145,17 +145,17 @@ function MetaFeedPreview({
   const hostname = readHostname(destinationUrl);
 
   return (
-    <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white text-slate-900 shadow-sm">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="overflow-hidden rounded-[22px] border border-border bg-surface text-content shadow-sm">
+      <div className="border-b border-divider bg-surface-2 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Meta Feed Preview</div>
-            <div className="text-xs text-slate-500">Sample layout using the prepared creative spec</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Meta Feed Preview</div>
+            <div className="text-xs text-content-muted">Sample layout using the prepared creative spec</div>
           </div>
           <span
             className={[
-              "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold",
-              specReady ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+              "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+              specReady ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning",
             ].join(" ")}
           >
             {specSourceLabel}
@@ -167,24 +167,24 @@ function MetaFeedPreview({
         <>
           <div className="space-y-3 px-4 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-semibold text-content">
                 B
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900">Brand Page</div>
-                <div className="text-xs text-slate-500">Sponsored</div>
+                <div className="truncate text-sm font-semibold text-content">Brand Page</div>
+                <div className="text-xs text-content-muted">Sponsored</div>
               </div>
             </div>
-            <div className="whitespace-pre-wrap text-[13px] leading-5 text-slate-800">
+            <div className="whitespace-pre-wrap text-[13px] leading-5 text-content">
               {primaryText || "Primary text missing from prepared spec."}
             </div>
           </div>
 
-          <div className="border-y border-slate-200 bg-slate-50">
+          <div className="border-y border-divider bg-surface-2">
             {assetUrl ? (
               <img src={assetUrl} alt={assetAlt} className="h-[320px] w-full object-contain" loading="lazy" />
             ) : (
-              <div className="flex h-[320px] items-center justify-center px-4 text-sm text-slate-500">
+              <div className="flex h-[320px] items-center justify-center px-4 text-sm text-content-muted">
                 Generated remix preview missing.
               </div>
             )}
@@ -192,22 +192,22 @@ function MetaFeedPreview({
 
           <div className="space-y-3 px-4 py-4">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">{hostname || "destination url missing"}</div>
-              <div className="mt-1 text-[15px] font-semibold leading-5 text-slate-900">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-content-muted">{hostname || "destination url missing"}</div>
+              <div className="mt-1 text-[15px] font-semibold leading-5 text-content">
                 {headline || "Headline missing from prepared spec."}
               </div>
-              {description ? <div className="mt-1 text-sm leading-5 text-slate-600">{description}</div> : null}
+              {description ? <div className="mt-1 text-sm leading-5 text-content-muted">{description}</div> : null}
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">Call to action</div>
-              <div className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2">
+              <div className="text-xs text-content-muted">Call to action</div>
+              <div className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
                 {cta || "Learn More"}
               </div>
             </div>
           </div>
         </>
       ) : (
-        <div className="flex min-h-[520px] items-center justify-center px-6 py-10 text-center text-sm leading-6 text-slate-500">
+        <div className="flex min-h-[520px] items-center justify-center px-6 py-10 text-center text-sm leading-6 text-content-muted">
           Prepare Meta review to render the exact upload preview for this asset.
         </div>
       )}
