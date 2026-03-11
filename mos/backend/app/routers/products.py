@@ -88,6 +88,13 @@ _SHOPIFY_UNSYNCED_VARIANT_FIELDS = {
 }
 
 
+def _normalize_variant_provider(provider: str | None) -> str | None:
+    if provider is None:
+        return None
+    cleaned = str(provider).strip().lower()
+    return cleaned or None
+
+
 def _resolve_product_asset_content_type(file: UploadFile) -> str:
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     if not content_type and file.filename:
@@ -165,7 +172,8 @@ def _validate_shopify_variant_gid(external_price_id: str) -> str:
 
 
 def _validate_variant_provider_mapping(*, provider: str | None, external_price_id: str | None) -> None:
-    if provider == "shopify":
+    normalized_provider = _normalize_variant_provider(provider)
+    if normalized_provider == "shopify":
         if external_price_id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -183,7 +191,7 @@ def _validate_variant_provider_mapping(*, provider: str | None, external_price_i
 
 def _is_shopify_managed_variant(variant: ProductVariant) -> bool:
     return (
-        variant.provider == "shopify"
+        _normalize_variant_provider(variant.provider) == "shopify"
         and isinstance(variant.external_price_id, str)
         and variant.external_price_id.strip().startswith(_SHOPIFY_VARIANT_GID_PREFIX)
     )
@@ -293,7 +301,7 @@ def _validate_product_variants_for_shopify_sync(*, variants: list[ProductVariant
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f'Variant "{title}" must have a valid 3-letter currency code before Shopify sync.',
             )
-        if variant.provider == "shopify" and variant.external_price_id is not None:
+        if _normalize_variant_provider(variant.provider) == "shopify" and variant.external_price_id is not None:
             external_price_id = str(variant.external_price_id).strip()
             if external_price_id and not external_price_id.startswith(_SHOPIFY_VARIANT_GID_PREFIX):
                 raise HTTPException(
@@ -788,7 +796,7 @@ def create_shopify_product_for_product(
         for value in session.scalars(
             select(ProductVariant.title).where(
                 ProductVariant.product_id == product.id,
-                ProductVariant.provider == "shopify",
+                func.lower(func.trim(ProductVariant.provider)) == "shopify",
             )
         ).all()
         if isinstance(value, str) and value.strip()
@@ -1112,7 +1120,10 @@ def sync_shopify_product_for_product(
     for variant in variants:
         variant.shopify_last_synced_at = synced_at
         variant.shopify_last_sync_error = None
-        if variant.provider == "shopify" and not _is_shopify_managed_variant(variant):
+        normalized_provider = _normalize_variant_provider(variant.provider)
+        if normalized_provider == "shopify" and variant.provider != normalized_provider:
+            variant.provider = normalized_provider
+        if normalized_provider == "shopify" and not _is_shopify_managed_variant(variant):
             matched_variant = response_variants_by_title.get(str(variant.title or "").strip().lower())
             if matched_variant is not None:
                 variant.external_price_id = matched_variant["variantGid"]
@@ -1618,12 +1629,13 @@ def create_variant(
                 detail="offerId must belong to the selected product.",
             )
 
-    if payload.provider and payload.provider not in _SUPPORTED_PRICE_PROVIDERS:
+    normalized_provider = _normalize_variant_provider(payload.provider)
+    if normalized_provider and normalized_provider not in _SUPPORTED_PRICE_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
-    if payload.externalPriceId and not payload.provider:
+    if payload.externalPriceId and not normalized_provider:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
     _validate_variant_provider_mapping(
-        provider=payload.provider,
+        provider=normalized_provider,
         external_price_id=payload.externalPriceId,
     )
 
@@ -1637,7 +1649,7 @@ def create_variant(
     if payload.compareAtPrice is not None:
         fields["compare_at_price"] = payload.compareAtPrice
     if payload.provider is not None:
-        fields["provider"] = payload.provider
+        fields["provider"] = normalized_provider
     if payload.externalPriceId is not None:
         fields["external_price_id"] = payload.externalPriceId.strip()
     if payload.optionValues is not None:
@@ -1704,11 +1716,13 @@ def update_variant(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
 
     fields_set = payload.model_fields_set
-    if payload.provider and payload.provider not in _SUPPORTED_PRICE_PROVIDERS:
+    normalized_payload_provider = _normalize_variant_provider(payload.provider) if "provider" in fields_set else None
+    current_provider = _normalize_variant_provider(variant.provider)
+    if normalized_payload_provider and normalized_payload_provider not in _SUPPORTED_PRICE_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
-    if "externalPriceId" in fields_set and payload.externalPriceId and not payload.provider and not variant.provider:
+    if "externalPriceId" in fields_set and payload.externalPriceId and not normalized_payload_provider and not current_provider:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
-    effective_provider = payload.provider if "provider" in fields_set else variant.provider
+    effective_provider = normalized_payload_provider if "provider" in fields_set else current_provider
     effective_external_price_id = payload.externalPriceId if "externalPriceId" in fields_set else variant.external_price_id
     _validate_variant_provider_mapping(
         provider=effective_provider,
@@ -1821,7 +1835,7 @@ def update_variant(
     if "compareAtPrice" in fields_set:
         fields["compare_at_price"] = payload.compareAtPrice
     if "provider" in fields_set:
-        fields["provider"] = payload.provider
+        fields["provider"] = normalized_payload_provider
     if "externalPriceId" in fields_set:
         fields["external_price_id"] = payload.externalPriceId.strip() if payload.externalPriceId is not None else None
     if "optionValues" in fields_set:
