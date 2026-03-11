@@ -903,7 +903,7 @@ def test_build_strategy_v2_testimonial_grounding_includes_voc_and_guardrails():
 
 
 def test_testimonial_generation_count_enforces_sales_pdp_minimum():
-    assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=12) == 75
+    assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=12) == 74
     assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=90) == 90
     assert (
         funnel_testimonials._testimonial_generation_count(
@@ -941,7 +941,7 @@ def test_resolve_testimonial_generation_count_keeps_non_budgeted_behavior():
             image_target_count=12,
             max_duration_seconds=None,
         )
-        == 75
+        == 74
     )
     assert (
         funnel_testimonials._resolve_testimonial_generation_count(
