@@ -4204,7 +4204,9 @@ def _load_product_context(
         )
         return None, None, context
     product = session.scalars(
-        select(Product).where(
+        select(Product)
+        .execution_options(populate_existing=True)
+        .where(
             Product.org_id == org_id,
             Product.client_id == client_id,
             Product.id == funnel.product_id,
@@ -4272,7 +4274,9 @@ def _load_product_context(
     primary_asset: Asset | None = None
     if product.primary_asset_id:
         primary_asset = session.scalars(
-            select(Asset).where(
+            select(Asset)
+            .execution_options(populate_existing=True)
+            .where(
                 Asset.org_id == org_id,
                 Asset.client_id == client_id,
                 Asset.id == product.primary_asset_id,

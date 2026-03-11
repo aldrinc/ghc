@@ -2,10 +2,11 @@ import json
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 
-from app.db.enums import AssetSourceEnum, AssetStatusEnum
-from app.db.models import Asset
-from app.services import funnel_testimonials
+from app.db.enums import AssetSourceEnum, AssetStatusEnum, FunnelStatusEnum
+from app.db.models import Asset, Funnel, Product
+from app.services import funnel_ai, funnel_testimonials
 
 
 def _sample_testimonial(
@@ -693,6 +694,84 @@ def test_resolve_sales_pdp_background_reference_assets_uses_original_source_firs
         str(source_asset.public_id),
         str(rendered_asset.public_id),
     ]
+
+
+def test_product_context_and_testimonial_primary_image_refresh_stale_product_state(db_session, seed_data):
+    client = seed_data["client"]
+
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="Handbook",
+        description="Printed handbook",
+        product_type="book",
+        primary_asset_id=None,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        campaign_id=seed_data["campaign"].id,
+        product_id=product.id,
+        name="Launch",
+        route_slug="launch",
+        status=FunnelStatusEnum.draft,
+    )
+    db_session.add(funnel)
+    db_session.flush()
+
+    stale_product, _, _ = funnel_ai._load_product_context(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        funnel=funnel,
+    )
+    assert stale_product is not None
+    assert stale_product.primary_asset_id is None
+
+    asset = Asset(
+        org_id=client.org_id,
+        client_id=client.id,
+        source_type=AssetSourceEnum.upload,
+        status=AssetStatusEnum.approved,
+        public_id=uuid4(),
+        asset_kind="image",
+        channel_id="funnel",
+        format="image",
+        content={},
+        file_source="upload",
+        file_status="ready",
+        product_id=product.id,
+        storage_key="dev/orig/test-product-primary.png",
+        content_type="image/png",
+    )
+    db_session.add(asset)
+    db_session.flush()
+
+    db_session.execute(
+        sa.text("update products set primary_asset_id = :asset_id where id = :product_id"),
+        {"asset_id": str(asset.id), "product_id": str(product.id)},
+    )
+    db_session.flush()
+
+    refreshed_product, _, _ = funnel_ai._load_product_context(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        funnel=funnel,
+    )
+    assert refreshed_product is not None
+    assert str(refreshed_product.primary_asset_id) == str(asset.id)
+
+    resolved_asset = funnel_testimonials._resolve_product_primary_image(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        product=stale_product,
+    )
+    assert str(resolved_asset.id) == str(asset.id)
 
 
 def test_social_comment_without_attachment_indices_empty_for_small_totals():

@@ -1461,12 +1461,26 @@ def _resolve_product_primary_image(
     client_id: str,
     product: Product,
 ) -> Asset:
+    refreshed_product = session.scalars(
+        select(Product)
+        .execution_options(populate_existing=True)
+        .where(
+            Product.org_id == org_id,
+            Product.client_id == client_id,
+            Product.id == product.id,
+        )
+    ).first()
+    if refreshed_product is not None:
+        product = refreshed_product
+
     if not product.primary_asset_id:
         raise TestimonialGenerationError(
             "Product primary image is required to render testimonial hero images."
         )
     asset = session.scalars(
-        select(Asset).where(
+        select(Asset)
+        .execution_options(populate_existing=True)
+        .where(
             Asset.org_id == org_id,
             Asset.client_id == client_id,
             Asset.id == product.primary_asset_id,
