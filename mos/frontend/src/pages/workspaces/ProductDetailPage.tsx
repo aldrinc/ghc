@@ -20,6 +20,7 @@ import {
   useProduct,
   useProductAssets,
   useRemoveOfferBonus,
+  useSyncShopifyProductForProduct,
   useSyncShopifyVariantsForProduct,
   useUpdateProduct,
   useUpdateProductOffer,
@@ -141,6 +142,7 @@ export function ProductDetailPage() {
   const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
   const updateProduct = useUpdateProduct(productId || "");
   const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
+  const syncShopifyProduct = useSyncShopifyProductForProduct(productId || "");
   const syncShopifyVariants = useSyncShopifyVariantsForProduct(productId || "");
   const createOffer = useCreateProductOffer(productId || "");
   const [offerFormMode, setOfferFormMode] = useState<"create" | "edit">("create");
@@ -180,6 +182,18 @@ export function ProductDetailPage() {
     variantTitles: string[];
     variantCount: number;
   } | null>(null);
+  const [shopifyPushSummary, setShopifyPushSummary] = useState<{
+    shopDomain: string;
+    productGid: string;
+    createdCount: number;
+    updatedCount: number;
+    deletedCount: number;
+    offerCount: number;
+    variantTitles: string[];
+    variantCount: number;
+    metafieldNamespace: string;
+    metafieldKey: string;
+  } | null>(null);
   const [offerName, setOfferName] = useState("");
   const [offerBusinessModel, setOfferBusinessModel] = useState("one_time");
   const [offerDescription, setOfferDescription] = useState("");
@@ -212,6 +226,7 @@ export function ProductDetailPage() {
 
   useEffect(() => {
     setShopifyImportSummary(null);
+    setShopifyPushSummary(null);
   }, [productId]);
 
   const resetVariantForm = () => {
@@ -511,6 +526,35 @@ export function ProductDetailPage() {
       productGid: response.productGid,
       variantTitles: importedVariantTitles,
       variantCount: response.totalFetched,
+    });
+  };
+
+  const handleSyncShopifyProduct = async () => {
+    if (!isShopifyReady) {
+      toast.error("Shopify must be connected and ready before syncing.");
+      return;
+    }
+    if (!hasMappedShopifyProduct) {
+      toast.error("Save a Shopify product GID before syncing.");
+      return;
+    }
+    const response = await syncShopifyProduct.mutateAsync({
+      shopDomain: shopifyStatus?.shopDomain || undefined,
+    });
+    const variantTitles = (response.variants || [])
+      .map((variant) => String(variant.title || "").trim())
+      .filter((title) => Boolean(title));
+    setShopifyPushSummary({
+      shopDomain: response.shopDomain,
+      productGid: response.productGid,
+      createdCount: response.createdCount,
+      updatedCount: response.updatedCount,
+      deletedCount: response.deletedCount,
+      offerCount: response.offerCount,
+      variantTitles,
+      variantCount: response.variants.length,
+      metafieldNamespace: response.metafieldNamespace,
+      metafieldKey: response.metafieldKey,
     });
   };
 
@@ -830,12 +874,42 @@ export function ProductDetailPage() {
                   </div>
                 </div>
               ) : null}
-              {isShopifyReady && hasMappedShopifyProduct ? (
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+              {shopifyPushSummary ? (
+                <div className="rounded-md border border-border bg-surface p-3 space-y-1">
+                  <div className="text-xs font-semibold uppercase text-content-muted">Latest Shopify Push Sync</div>
                   <div className="text-xs text-content-muted">
-                    Shopify product is already mapped for this product. Clear mapping if you need to create a new Shopify
-                    product.
+                    Store: {shopifyPushSummary.shopDomain} · Product: {shopifyPushSummary.productGid}
                   </div>
+                  <div className="text-xs text-content-muted">
+                    Synced {shopifyPushSummary.variantCount} variant
+                    {shopifyPushSummary.variantCount === 1 ? "" : "s"} and {shopifyPushSummary.offerCount} offer
+                    {shopifyPushSummary.offerCount === 1 ? "" : "s"}.
+                  </div>
+                  <div className="text-xs text-content-muted">
+                    {shopifyPushSummary.createdCount} created · {shopifyPushSummary.updatedCount} updated ·{" "}
+                    {shopifyPushSummary.deletedCount} deleted
+                  </div>
+                  <div className="text-xs text-content-muted">
+                    Bundle payload written to `{shopifyPushSummary.metafieldNamespace}.{shopifyPushSummary.metafieldKey}`.
+                  </div>
+                  {shopifyPushSummary.variantTitles.length ? (
+                    <div className="text-xs text-content-muted">{shopifyPushSummary.variantTitles.join(", ")}</div>
+                  ) : null}
+                </div>
+              ) : null}
+              {isShopifyReady && hasMappedShopifyProduct ? (
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <div className="text-xs text-content-muted">
+                    Shopify product is already mapped for this product. mOS will push product fields, variants, and
+                    offer basket metadata onto that Shopify product.
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => void handleSyncShopifyProduct()}
+                    disabled={syncShopifyProduct.isPending}
+                  >
+                    {syncShopifyProduct.isPending ? "Syncing…" : "Sync mOS to Shopify"}
+                  </Button>
                   <Button
                     size="sm"
                     variant="secondary"

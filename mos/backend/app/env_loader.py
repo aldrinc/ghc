@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dotenv import load_dotenv
+import dotenv
 
 
 def iter_backend_env_files(backend_root: Path) -> tuple[Path, Path, Path]:
@@ -18,5 +18,5 @@ def load_backend_env_files(backend_root: Path) -> tuple[Path, Path, Path]:
     env_files = iter_backend_env_files(backend_root)
     for path in env_files:
         if path.exists():
-            load_dotenv(path, override=False)
+            dotenv.load_dotenv(path, override=False)
     return env_files

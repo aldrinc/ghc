@@ -126,6 +126,12 @@ class ShopifyProductCreateResponse(BaseModel):
     variants: list[ShopifyCreatedVariant] = Field(default_factory=list)
 
 
+class ShopifySyncProductRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+
+
 class ShopifyThemeBrandSyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -574,4 +580,21 @@ class ShopifyProductVariantSyncResponse(BaseModel):
     createdCount: int = Field(..., ge=0)
     updatedCount: int = Field(..., ge=0)
     totalFetched: int = Field(..., ge=0)
+    variants: list[ShopifyCatalogVariant] = Field(default_factory=list)
+
+
+class ShopifyProductSyncResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    productGid: str
+    title: str
+    handle: str
+    status: str
+    createdCount: int = Field(..., ge=0)
+    updatedCount: int = Field(..., ge=0)
+    deletedCount: int = Field(..., ge=0)
+    offerCount: int = Field(..., ge=0)
+    metafieldNamespace: str
+    metafieldKey: str
     variants: list[ShopifyCatalogVariant] = Field(default_factory=list)

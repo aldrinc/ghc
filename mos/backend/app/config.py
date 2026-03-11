@@ -39,6 +39,10 @@ _LOCAL_DEV_CORS_ORIGINS = {
 }
 
 
+def _default_backend_cors_origins() -> list[str]:
+    return sorted(_LOCAL_DEV_CORS_ORIGINS)
+
+
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION: bool = False
@@ -80,7 +84,7 @@ class Settings(BaseSettings):
     STRATEGY_V2_VOC_PROMPT_EXTERNAL_ROWS: int = 40
     STRATEGY_V2_VOC_SOURCE_DIVERSITY_MAX_RATIO: float = 0.25
 
-    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode]
+    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(default_factory=_default_backend_cors_origins)
 
     OPENAI_API_KEY: str | None = None
     BASETEN_API_KEY: str | None = None

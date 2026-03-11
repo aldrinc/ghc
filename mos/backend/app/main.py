@@ -44,6 +44,7 @@ from app.routers import (
 )
 
 logger = logging.getLogger(__name__)
+_DEV_ENVIRONMENTS = {"development", "local", "test"}
 _LOOPBACK_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?$"
 _DEV_LAN_CORS_ORIGIN_REGEX = (
     r"^https?://(?:"
@@ -56,7 +57,7 @@ _DEV_LAN_CORS_ORIGIN_REGEX = (
 
 
 def _cors_origin_regex() -> str:
-    if settings.ENVIRONMENT.strip().lower() == "development":
+    if settings.ENVIRONMENT.strip().lower() in _DEV_ENVIRONMENTS:
         return _DEV_LAN_CORS_ORIGIN_REGEX
     return _LOOPBACK_CORS_ORIGIN_REGEX
 
