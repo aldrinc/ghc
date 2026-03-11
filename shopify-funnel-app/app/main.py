@@ -16,6 +16,8 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    AdminOAuthInstallUrlRequest,
+    AdminOAuthInstallUrlResponse,
     AuditThemeBrandRequest,
     AuditThemeBrandResponse,
     AutoProvisionStorefrontTokenRequest,
@@ -57,10 +59,12 @@ from app.schemas import (
     UpdateInstallationRequest,
 )
 from app.security import (
+    extract_shop_domain_from_session_token,
     normalize_shop_domain,
     require_internal_api_token,
-    require_shopify_session_shop_domain,
+    require_shopify_session_token,
     verify_oauth_hmac,
+    verify_shopify_session_token,
     verify_webhook_hmac,
 )
 from app.shopify_api import ShopifyApiClient, ShopifyApiError
@@ -100,9 +104,15 @@ def app_url_entrypoint(request: Request):
 
     host = raw_host.strip() if isinstance(raw_host, str) else ""
     if host:
-        query: dict[str, str] = {"host": host}
-        if isinstance(raw_shop, str) and raw_shop.strip():
-            query["shop"] = normalize_shop_domain(raw_shop)
+        if not isinstance(raw_shop, str) or not raw_shop.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing shop query parameter for embedded app launch.",
+            )
+        query: dict[str, str] = {
+            "host": host,
+            "shop": normalize_shop_domain(raw_shop),
+        }
         return RedirectResponse(
             url=f"{settings.app_base_url}/app?{urlencode(query)}",
             status_code=302,
@@ -243,10 +253,113 @@ def _serialize_installation(installation: ShopInstallation) -> InstallationRespo
     )
 
 
-def _build_shopify_oauth_url(*, shop_domain: str, state: str) -> str:
+def _clean_app_api_key(value: str | None) -> str:
+    cleaned = value.strip() if isinstance(value, str) else ""
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="appApiKey cannot be empty.",
+        )
+    return cleaned
+
+
+def _clean_app_api_secret(value: str | None) -> str:
+    cleaned = value.strip() if isinstance(value, str) else ""
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="appApiSecret cannot be empty.",
+        )
+    return cleaned
+
+
+def _get_shop_installation(
+    *,
+    session: Session,
+    shop_domain: str,
+    include_uninstalled: bool = True,
+) -> ShopInstallation | None:
+    statement = select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+    if not include_uninstalled:
+        statement = statement.where(ShopInstallation.uninstalled_at.is_(None))
+    return session.scalars(statement).first()
+
+
+def _require_installation_app_credentials(
+    *,
+    installation: ShopInstallation,
+    context: str,
+) -> tuple[str, str]:
+    app_api_key = (installation.app_api_key or "").strip()
+    app_api_secret = (installation.app_api_secret or "").strip()
+    if not app_api_key or not app_api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Shop installation credentials are missing for {context}. "
+                "Reconnect installation with workspace Shopify app credentials."
+            ),
+        )
+    return app_api_key, app_api_secret
+
+
+def _require_embedded_shop_installation(
+    session_token: str = Depends(require_shopify_session_token),
+    session: Session = Depends(get_session),
+) -> ShopInstallation:
+    extracted_shop_domain = extract_shop_domain_from_session_token(session_token)
+    installation = _get_shop_installation(
+        session=session,
+        shop_domain=extracted_shop_domain,
+        include_uninstalled=False,
+    )
+    if installation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shop installation not found. Install the app first.",
+        )
+    app_api_key, app_api_secret = _require_installation_app_credentials(
+        installation=installation,
+        context=f"embedded session token verification for shop={extracted_shop_domain}",
+    )
+    verified_shop_domain = verify_shopify_session_token(
+        token=session_token,
+        app_api_key=app_api_key,
+        app_api_secret=app_api_secret,
+    )
+    if verified_shop_domain != installation.shop_domain:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify session token shop does not match installation.",
+        )
+    return installation
+
+
+def _require_webhook_app_api_secret(*, session: Session, shop_domain: str) -> str:
+    installation = _get_shop_installation(
+        session=session,
+        shop_domain=shop_domain,
+        include_uninstalled=True,
+    )
+    if installation is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Cannot verify Shopify webhook because installation credentials were not found "
+                f"for shop={shop_domain}."
+            ),
+        )
+    _, app_api_secret = _require_installation_app_credentials(
+        installation=installation,
+        context=f"webhook signature verification for shop={shop_domain}",
+    )
+    return app_api_secret
+
+
+def _build_shopify_oauth_url(*, shop_domain: str, state: str, app_api_key: str) -> str:
     query = urlencode(
         {
-            "client_id": settings.SHOPIFY_APP_API_KEY,
+            "client_id": app_api_key,
             "scope": settings.admin_scopes_csv,
             "redirect_uri": f"{settings.app_base_url}/auth/callback",
             "state": state,
@@ -334,28 +447,104 @@ async def _apply_shop_connection_defaults(
 def auth_install(
     shop: str,
     client_id: str | None = None,
+    app_api_key: str | None = None,
+    app_api_secret: str | None = None,
     session: Session = Depends(get_session),
 ):
     shop_domain = normalize_shop_domain(shop)
+    normalized_client_id = client_id.strip() if isinstance(client_id, str) and client_id.strip() else None
+    normalized_app_api_key = app_api_key.strip() if isinstance(app_api_key, str) else ""
+    normalized_app_api_secret = app_api_secret.strip() if isinstance(app_api_secret, str) else ""
+    has_app_api_key = bool(normalized_app_api_key)
+    has_app_api_secret = bool(normalized_app_api_secret)
+    if has_app_api_key != has_app_api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both app_api_key and app_api_secret are required when either is provided.",
+        )
+
+    if not has_app_api_key:
+        installation = _get_shop_installation(
+            session=session,
+            shop_domain=shop_domain,
+            include_uninstalled=True,
+        )
+        if installation is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Shopify app credentials are required to start OAuth install. "
+                    "Use POST /admin/oauth/install-url from mOS backend."
+                ),
+            )
+        normalized_app_api_key, normalized_app_api_secret = _require_installation_app_credentials(
+            installation=installation,
+            context=f"auth install for shop={shop_domain}",
+        )
+
     state = uuid4().hex
-    oauth_state = OAuthState(state=state, shop_domain=shop_domain, client_id=client_id)
+    oauth_state = OAuthState(
+        state=state,
+        shop_domain=shop_domain,
+        client_id=normalized_client_id,
+        app_api_key=normalized_app_api_key,
+        app_api_secret=normalized_app_api_secret,
+    )
     session.add(oauth_state)
     session.commit()
 
     return RedirectResponse(
-        url=_build_shopify_oauth_url(shop_domain=shop_domain, state=state),
+        url=_build_shopify_oauth_url(
+            shop_domain=shop_domain,
+            state=state,
+            app_api_key=normalized_app_api_key,
+        ),
         status_code=302,
+    )
+
+
+@app.post(
+    "/admin/oauth/install-url",
+    response_model=AdminOAuthInstallUrlResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+def create_admin_oauth_install_url(
+    payload: AdminOAuthInstallUrlRequest,
+    session: Session = Depends(get_session),
+):
+    shop_domain = normalize_shop_domain(payload.shopDomain)
+    app_api_key = _clean_app_api_key(payload.appApiKey)
+    app_api_secret = _clean_app_api_secret(payload.appApiSecret)
+    client_id = (
+        payload.clientId.strip()
+        if isinstance(payload.clientId, str) and payload.clientId.strip()
+        else None
+    )
+
+    state = uuid4().hex
+    session.add(
+        OAuthState(
+            state=state,
+            shop_domain=shop_domain,
+            client_id=client_id,
+            app_api_key=app_api_key,
+            app_api_secret=app_api_secret,
+        )
+    )
+    session.commit()
+
+    return AdminOAuthInstallUrlResponse(
+        installUrl=_build_shopify_oauth_url(
+            shop_domain=shop_domain,
+            state=state,
+            app_api_key=app_api_key,
+        )
     )
 
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request, session: Session = Depends(get_session)):
     query_items = list(request.query_params.multi_items())
-    if not verify_oauth_hmac(query_items):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth HMAC"
-        )
-
     shop = request.query_params.get("shop")
     code = request.query_params.get("code")
     state_value = request.query_params.get("state")
@@ -376,30 +565,48 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OAuth state does not match the shop domain",
         )
+    app_api_key = (oauth_state.app_api_key or "").strip()
+    app_api_secret = (oauth_state.app_api_secret or "").strip()
+    if not app_api_key or not app_api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth state is missing app API credentials.",
+        )
+    if not verify_oauth_hmac(query_items, app_api_secret=app_api_secret):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth HMAC"
+        )
 
     auto_provision_error: str | None = None
-    auto_provisioned = False
     try:
         admin_access_token, scopes_csv = (
             await shopify_api.exchange_code_for_access_token(
                 shop_domain=shop_domain,
                 code=code,
+                app_api_key=app_api_key,
+                app_api_secret=app_api_secret,
             )
         )
 
-        installation = session.scalars(
-            select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-        ).first()
+        installation = _get_shop_installation(
+            session=session,
+            shop_domain=shop_domain,
+            include_uninstalled=True,
+        )
         if installation is None:
             installation = ShopInstallation(
                 shop_domain=shop_domain,
                 client_id=oauth_state.client_id,
+                app_api_key=app_api_key,
+                app_api_secret=app_api_secret,
                 admin_access_token=admin_access_token,
                 scopes=scopes_csv,
                 uninstalled_at=None,
             )
             session.add(installation)
         else:
+            installation.app_api_key = app_api_key
+            installation.app_api_secret = app_api_secret
             installation.admin_access_token = admin_access_token
             installation.scopes = scopes_csv
             installation.uninstalled_at = None
@@ -430,7 +637,7 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     try:
-        auto_provisioned = await _provision_storefront_token_if_missing(
+        await _provision_storefront_token_if_missing(
             installation=installation,
             session=session,
         )
@@ -461,14 +668,39 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
 
 
 @app.get("/app", response_class=HTMLResponse)
-def embedded_app_shell() -> HTMLResponse:
+def embedded_app_shell(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    raw_shop = request.query_params.get("shop")
+    if not isinstance(raw_shop, str) or not raw_shop.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Embedded app route requires a shop query parameter.",
+        )
+    shop_domain = normalize_shop_domain(raw_shop)
+    installation = _get_shop_installation(
+        session=session,
+        shop_domain=shop_domain,
+        include_uninstalled=False,
+    )
+    if installation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Shop installation not found for shop={shop_domain}.",
+        )
+    app_api_key, _ = _require_installation_app_credentials(
+        installation=installation,
+        context=f"embedded app shell for shop={shop_domain}",
+    )
+
     html = f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mOS Shopify App</title>
-    <meta name="shopify-api-key" content="{settings.SHOPIFY_APP_API_KEY}" />
+    <meta name="shopify-api-key" content="{app_api_key}" />
     <style>
       body {{
         margin: 0;
@@ -651,30 +883,21 @@ def embedded_app_shell() -> HTMLResponse:
 
 @app.get("/app/api/session", response_model=EmbeddedSessionResponse)
 def app_api_session(
-    shop_domain: str = Depends(require_shopify_session_shop_domain),
-    session: Session = Depends(get_session),
+    installation: ShopInstallation = Depends(_require_embedded_shop_installation),
 ):
-    installation = session.scalars(
-        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-    ).first()
-    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
+    return _serialize_embedded_session(
+        shop_domain=installation.shop_domain,
+        installation=installation,
+    )
 
 
 @app.post("/app/api/link-workspace", response_model=EmbeddedSessionResponse)
 async def app_api_link_workspace(
     payload: LinkWorkspaceRequest,
-    shop_domain: str = Depends(require_shopify_session_shop_domain),
+    installation: ShopInstallation = Depends(_require_embedded_shop_installation),
     session: Session = Depends(get_session),
 ):
     client_id = payload.clientId.strip()
-    installation = session.scalars(
-        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-    ).first()
-    if not installation or installation.uninstalled_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shop installation not found. Install the app first.",
-        )
     if installation.client_id and installation.client_id != client_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -700,24 +923,18 @@ async def app_api_link_workspace(
         session.commit()
         session.refresh(installation)
 
-    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
+    return _serialize_embedded_session(
+        shop_domain=installation.shop_domain,
+        installation=installation,
+    )
 
 
 @app.post("/app/api/storefront-token/auto", response_model=EmbeddedSessionResponse)
 async def app_api_auto_provision_storefront_token(
     payload: AutoProvisionStorefrontTokenRequest,
-    shop_domain: str = Depends(require_shopify_session_shop_domain),
+    installation: ShopInstallation = Depends(_require_embedded_shop_installation),
     session: Session = Depends(get_session),
 ):
-    installation = session.scalars(
-        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-    ).first()
-    if not installation or installation.uninstalled_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shop installation not found. Install the app first.",
-        )
-
     requested_client_id = (
         payload.clientId.strip() if isinstance(payload.clientId, str) else None
     )
@@ -750,7 +967,10 @@ async def app_api_auto_provision_storefront_token(
         session.rollback()
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
-    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
+    return _serialize_embedded_session(
+        shop_domain=installation.shop_domain,
+        installation=installation,
+    )
 
 
 @app.get("/admin/installations", dependencies=[Depends(require_internal_api_token)])
@@ -1656,27 +1876,32 @@ async def orders_create_webhook(
     request: Request, session: Session = Depends(get_session)
 ):
     body = await request.body()
-    if not verify_webhook_hmac(
-        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
-        )
-
     shop_header = request.headers.get("x-shopify-shop-domain")
-    event_id = request.headers.get("x-shopify-event-id")
     if not shop_header:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing x-shopify-shop-domain header",
         )
+    shop_domain = normalize_shop_domain(shop_header)
+    app_api_secret = _require_webhook_app_api_secret(
+        session=session,
+        shop_domain=shop_domain,
+    )
+    if not verify_webhook_hmac(
+        body=body,
+        supplied_hmac=request.headers.get("x-shopify-hmac-sha256"),
+        app_api_secret=app_api_secret,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
+        )
+
+    event_id = request.headers.get("x-shopify-event-id")
     if not event_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing x-shopify-event-id header",
         )
-
-    shop_domain = normalize_shop_domain(shop_header)
 
     existing = session.scalars(
         select(ProcessedWebhookEvent).where(
@@ -1752,13 +1977,6 @@ async def app_uninstalled_webhook(
     request: Request, session: Session = Depends(get_session)
 ):
     body = await request.body()
-    if not verify_webhook_hmac(
-        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
-        )
-
     shop_header = request.headers.get("x-shopify-shop-domain")
     if not shop_header:
         raise HTTPException(
@@ -1766,6 +1984,18 @@ async def app_uninstalled_webhook(
             detail="Missing x-shopify-shop-domain header",
         )
     shop_domain = normalize_shop_domain(shop_header)
+    app_api_secret = _require_webhook_app_api_secret(
+        session=session,
+        shop_domain=shop_domain,
+    )
+    if not verify_webhook_hmac(
+        body=body,
+        supplied_hmac=request.headers.get("x-shopify-hmac-sha256"),
+        app_api_secret=app_api_secret,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
+        )
 
     installation = session.scalars(
         select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
@@ -1784,8 +2014,21 @@ async def app_uninstalled_webhook(
 @app.post("/webhooks/compliance")
 async def compliance_webhook(request: Request, session: Session = Depends(get_session)):
     body = await request.body()
+    shop_header = request.headers.get("x-shopify-shop-domain")
+    if not shop_header:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing x-shopify-shop-domain header",
+        )
+    shop_domain = normalize_shop_domain(shop_header)
+    app_api_secret = _require_webhook_app_api_secret(
+        session=session,
+        shop_domain=shop_domain,
+    )
     if not verify_webhook_hmac(
-        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
+        body=body,
+        supplied_hmac=request.headers.get("x-shopify-hmac-sha256"),
+        app_api_secret=app_api_secret,
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
@@ -1807,19 +2050,12 @@ async def compliance_webhook(request: Request, session: Session = Depends(get_se
             ),
         )
 
-    shop_header = request.headers.get("x-shopify-shop-domain")
     event_id = request.headers.get("x-shopify-event-id")
-    if not shop_header:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing x-shopify-shop-domain header",
-        )
     if not event_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing x-shopify-event-id header",
         )
-    shop_domain = normalize_shop_domain(shop_header)
 
     try:
         payload = await request.json()

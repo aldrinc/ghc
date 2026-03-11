@@ -33,22 +33,38 @@ def test_build_client_shopify_install_url_resolves_custom_storefront_domain(monk
         lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
     )
     monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
-    monkeypatch.setattr(
-        shopify_connection,
-        "_require_checkout_service_config",
-        lambda: ("https://bridge.example.com", "internal-token"),
-    )
+    observed_bridge_request: dict[str, object] = {}
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        del timeout_seconds
+        observed_bridge_request["method"] = method
+        observed_bridge_request["path"] = path
+        observed_bridge_request["json_body"] = json_body
+        return {
+            "installUrl": "https://honest-herbalist.myshopify.com/admin/oauth/authorize?state=state_1"
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
 
     install_url = shopify_connection.build_client_shopify_install_url(
         client_id="client_1",
         shop_domain="thehonestherbalist.com",
+        app_api_key="shopify_key_1",
+        app_api_secret="shopify_secret_1",
     )
 
     assert observed_urls == ["https://thehonestherbalist.com/"]
-    assert (
-        install_url
-        == "https://bridge.example.com/auth/install?shop=honest-herbalist.myshopify.com&client_id=client_1"
-    )
+    assert install_url == "https://honest-herbalist.myshopify.com/admin/oauth/authorize?state=state_1"
+    assert observed_bridge_request == {
+        "method": "POST",
+        "path": "/admin/oauth/install-url",
+        "json_body": {
+            "clientId": "client_1",
+            "shopDomain": "honest-herbalist.myshopify.com",
+            "appApiKey": "shopify_key_1",
+            "appApiSecret": "shopify_secret_1",
+        },
+    }
 
 
 def test_build_client_shopify_install_url_resolves_custom_storefront_domain_from_shopify_html(monkeypatch):
@@ -71,22 +87,38 @@ def test_build_client_shopify_install_url_resolves_custom_storefront_domain_from
         lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
     )
     monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
-    monkeypatch.setattr(
-        shopify_connection,
-        "_require_checkout_service_config",
-        lambda: ("https://bridge.example.com", "internal-token"),
-    )
+    observed_bridge_request: dict[str, object] = {}
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        del timeout_seconds
+        observed_bridge_request["method"] = method
+        observed_bridge_request["path"] = path
+        observed_bridge_request["json_body"] = json_body
+        return {
+            "installUrl": "https://zewpcy-wy.myshopify.com/admin/oauth/authorize?state=state_2"
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
 
     install_url = shopify_connection.build_client_shopify_install_url(
         client_id="client_1",
         shop_domain="thehonestherbalist.com",
+        app_api_key="shopify_key_2",
+        app_api_secret="shopify_secret_2",
     )
 
     assert observed_urls == ["https://thehonestherbalist.com/"]
-    assert (
-        install_url
-        == "https://bridge.example.com/auth/install?shop=zewpcy-wy.myshopify.com&client_id=client_1"
-    )
+    assert install_url == "https://zewpcy-wy.myshopify.com/admin/oauth/authorize?state=state_2"
+    assert observed_bridge_request == {
+        "method": "POST",
+        "path": "/admin/oauth/install-url",
+        "json_body": {
+            "clientId": "client_1",
+            "shopDomain": "zewpcy-wy.myshopify.com",
+            "appApiKey": "shopify_key_2",
+            "appApiSecret": "shopify_secret_2",
+        },
+    }
 
 
 def test_normalize_shop_domain_rejects_custom_domain_without_myshopify_redirect(monkeypatch):

@@ -28,7 +28,14 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.base import SessionLocal
 from app.db.deps import get_session
-from app.db.models import ClientComplianceProfile, ClientUserPreference, Funnel, FunnelPage, Product
+from app.db.models import (
+    ClientComplianceProfile,
+    ClientShopifyAppCredential,
+    ClientUserPreference,
+    Funnel,
+    FunnelPage,
+    Product,
+)
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.client_compliance_profiles import (
     ClientComplianceProfilesRepository,
@@ -56,6 +63,8 @@ from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
 from app.schemas.intent import CampaignIntentRequest
 from app.schemas.shopify_connection import (
+    ShopifyAppCredentialsResponse,
+    ShopifyAppCredentialsUpdateRequest,
     ShopifyThemeBrandAuditRequest,
     ShopifyThemeBrandAuditResponse,
     ShopifyCreateProductRequest,
@@ -3744,6 +3753,66 @@ def _get_selected_shop_storefront_domain(
     if not isinstance(selected, str) or not selected.strip():
         return None
     return selected.strip().lower()
+
+
+def _get_client_shopify_app_credential(
+    *, session: Session, org_id: str, client_id: str
+) -> ClientShopifyAppCredential | None:
+    return session.scalar(
+        select(ClientShopifyAppCredential).where(
+            ClientShopifyAppCredential.org_id == org_id,
+            ClientShopifyAppCredential.client_id == client_id,
+        )
+    )
+
+
+def _serialize_client_shopify_app_credential(
+    credential: ClientShopifyAppCredential | None,
+) -> ShopifyAppCredentialsResponse:
+    if credential is None:
+        return ShopifyAppCredentialsResponse(
+            apiKey=None,
+            hasApiSecret=False,
+            isConfigured=False,
+            updatedAt=None,
+        )
+    cleaned_api_key = credential.api_key.strip()
+    cleaned_api_secret = credential.api_secret.strip()
+    return ShopifyAppCredentialsResponse(
+        apiKey=cleaned_api_key or None,
+        hasApiSecret=bool(cleaned_api_secret),
+        isConfigured=bool(cleaned_api_key and cleaned_api_secret),
+        updatedAt=credential.updated_at,
+    )
+
+
+def _require_client_shopify_app_credential(
+    *, session: Session, org_id: str, client_id: str
+) -> tuple[str, str]:
+    credential = _get_client_shopify_app_credential(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+    )
+    if credential is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify app credentials are not configured for this workspace. "
+                "Set API key and API secret in Brand before connecting."
+            ),
+        )
+    api_key = credential.api_key.strip()
+    api_secret = credential.api_secret.strip()
+    if not api_key or not api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify app credentials are incomplete for this workspace. "
+                "Set API key and API secret in Brand before connecting."
+            ),
+        )
+    return api_key, api_secret
 
 
 def _set_selected_shop_storefront_domain(
@@ -9721,6 +9790,71 @@ def _run_client_shopify_theme_template_publish_job(job_id: str) -> None:
         session.close()
 
 
+@router.get(
+    "/{client_id}/shopify/app-credentials",
+    response_model=ShopifyAppCredentialsResponse,
+)
+def get_client_shopify_app_credentials(
+    client_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    credential = _get_client_shopify_app_credential(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
+    return _serialize_client_shopify_app_credential(credential)
+
+
+@router.put(
+    "/{client_id}/shopify/app-credentials",
+    response_model=ShopifyAppCredentialsResponse,
+)
+def upsert_client_shopify_app_credentials(
+    client_id: str,
+    payload: ShopifyAppCredentialsUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    api_key = payload.apiKey.strip()
+    api_secret = payload.apiSecret.strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="apiKey cannot be empty.",
+        )
+    if not api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="apiSecret cannot be empty.",
+        )
+
+    credential = _get_client_shopify_app_credential(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
+    if credential is None:
+        credential = ClientShopifyAppCredential(
+            org_id=auth.org_id,
+            client_id=client_id,
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+        session.add(credential)
+    else:
+        credential.api_key = api_key
+        credential.api_secret = api_secret
+        credential.updated_at = func.now()
+        session.add(credential)
+    session.commit()
+    session.refresh(credential)
+    return _serialize_client_shopify_app_credential(credential)
+
+
 @router.get("/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse)
 def get_client_shopify_status(
     client_id: str,
@@ -9753,8 +9887,16 @@ def create_client_shopify_install_url(
     session: Session = Depends(get_session),
 ):
     _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    app_api_key, app_api_secret = _require_client_shopify_app_credential(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
     install_urls = build_client_shopify_install_urls(
-        client_id=client_id, shop_domain=payload.shopDomain
+        client_id=client_id,
+        shop_domain=payload.shopDomain,
+        app_api_key=app_api_key,
+        app_api_secret=app_api_secret,
     )
     _set_selected_shop_storefront_domain(
         session=session,

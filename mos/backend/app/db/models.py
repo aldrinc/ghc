@@ -1783,6 +1783,26 @@ class ClientUserPreference(Base):
     )
 
 
+class ClientShopifyAppCredential(Base):
+    __tablename__ = "client_shopify_app_credentials"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_client_shopify_app_credentials_org_client"),
+        sa.Index("idx_client_shopify_app_credentials_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    api_key: Mapped[str] = mapped_column(Text, nullable=False)
+    api_secret: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ClientComplianceProfile(Base):
     __tablename__ = "client_compliance_profiles"
     __table_args__ = (

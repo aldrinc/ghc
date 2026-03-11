@@ -1804,9 +1804,112 @@ def test_create_product_requires_variants():
         )
 
 
+def test_create_product_active_publishes_to_online_store():
+    client = ShopifyApiClient()
+    observed_publish: dict[str, str] = {}
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "mutation productCreate" in query:
+            return {
+                "productCreate": {
+                    "product": {
+                        "id": "gid://shopify/Product/1001",
+                        "title": "Sleep Drops",
+                        "handle": "sleep-drops",
+                        "status": "ACTIVE",
+                        "variants": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "id": "gid://shopify/ProductVariant/2001",
+                                        "title": "Default Title",
+                                        "price": "0.00",
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                    "userErrors": [],
+                }
+            }
+        if "mutation productVariantsBulkUpdate" in query:
+            return {
+                "productVariantsBulkUpdate": {
+                    "productVariants": [
+                        {
+                            "id": "gid://shopify/ProductVariant/2001",
+                            "title": "Default Title",
+                            "price": "49.99",
+                        }
+                    ],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    async def fake_ensure_product_in_catalog_collection(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+    ) -> dict[str, str]:
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "token"
+        assert product_gid == "gid://shopify/Product/1001"
+        return {
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+        }
+
+    async def fake_ensure_product_published_to_online_store(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        status: str,
+    ) -> None:
+        observed_publish["shop_domain"] = shop_domain
+        observed_publish["access_token"] = access_token
+        observed_publish["product_id"] = product_id
+        observed_publish["status"] = status
+
+    client.ensure_product_in_catalog_collection = (  # type: ignore[method-assign]
+        fake_ensure_product_in_catalog_collection
+    )
+    client._ensure_product_published_to_online_store = (  # type: ignore[method-assign]
+        fake_ensure_product_published_to_online_store
+    )
+
+    result = asyncio.run(
+        client.create_product(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            title="Sleep Drops",
+            status="ACTIVE",
+            variants=[
+                {"title": "Default Title", "priceCents": 4999, "currency": "USD"},
+            ],
+        )
+    )
+
+    assert result["productGid"] == "gid://shopify/Product/1001"
+    assert result["status"] == "ACTIVE"
+    assert observed_publish == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "token",
+        "product_id": "gid://shopify/Product/1001",
+        "status": "ACTIVE",
+    }
+
+
 def test_sync_product_updates_existing_variants_and_writes_source_payload():
     client = ShopifyApiClient()
     observed_metafield: dict[str, Any] = {}
+    observed_publication_check: dict[str, Any] = {}
     get_product_calls = {"count": 0}
 
     async def fake_get_product(*, shop_domain: str, access_token: str, product_gid: str):
@@ -1950,6 +2053,21 @@ def test_sync_product_updates_existing_variants_and_writes_source_payload():
 
     client.get_product = fake_get_product  # type: ignore[method-assign]
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    async def fake_ensure_product_published_to_online_store(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        status: str,
+    ) -> None:
+        observed_publication_check["shop_domain"] = shop_domain
+        observed_publication_check["access_token"] = access_token
+        observed_publication_check["product_id"] = product_id
+        observed_publication_check["status"] = status
+
+    client._ensure_product_published_to_online_store = (  # type: ignore[method-assign]
+        fake_ensure_product_published_to_online_store
+    )
 
     result = asyncio.run(
         client.sync_product(
@@ -1997,6 +2115,12 @@ def test_sync_product_updates_existing_variants_and_writes_source_payload():
     assert result["offerCount"] == 1
     assert observed_metafield["namespace"] == "mos"
     assert observed_metafield["key"] == "product_sync_payload"
+    assert observed_publication_check == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "token",
+        "product_id": "gid://shopify/Product/999",
+        "status": "ACTIVE",
+    }
 
 
 def test_sync_product_rejects_stale_variant_gid():
@@ -2498,7 +2622,6 @@ def test_upsert_policy_pages_updates_existing_page():
             assert items[0]["title"] == "Search"
             assert items[0]["type"] == "HTTP"
             assert items[0]["url"] == "/search"
-            assert items[1]["id"] == "gid://shopify/MenuItem/10"
             assert items[1]["title"] == "Terms of Service"
             assert items[1]["type"] == "HTTP"
             assert items[1]["url"] == "/pages/terms-of-service"

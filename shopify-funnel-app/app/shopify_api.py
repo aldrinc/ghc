@@ -1502,12 +1502,17 @@ class ShopifyApiClient:
         self._timeout = settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS
 
     async def exchange_code_for_access_token(
-        self, *, shop_domain: str, code: str
+        self,
+        *,
+        shop_domain: str,
+        code: str,
+        app_api_key: str,
+        app_api_secret: str,
     ) -> tuple[str, str]:
         url = f"https://{shop_domain}/admin/oauth/access_token"
         payload = {
-            "client_id": settings.SHOPIFY_APP_API_KEY,
-            "client_secret": settings.SHOPIFY_APP_API_SECRET,
+            "client_id": app_api_key,
+            "client_secret": app_api_secret,
             "code": code,
         }
         response = await self._post_json(url=url, payload=payload)
@@ -2220,6 +2225,137 @@ class ShopifyApiClient:
         self._assert_no_user_errors(
             user_errors=user_errors,
             mutation_name="publishablePublish",
+        )
+
+    async def _is_product_published_on_publication(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        publication_id: str,
+    ) -> bool:
+        cleaned_product_id = product_id.strip()
+        cleaned_publication_id = publication_id.strip()
+        if not cleaned_product_id:
+            raise ShopifyApiError(message="product_id cannot be empty.", status_code=400)
+        if not cleaned_publication_id:
+            raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
+
+        query = """
+        query productPublicationState($id: ID!, $publicationId: ID!) {
+            product(id: $id) {
+                id
+                publishedOnPublication(publicationId: $publicationId)
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": query,
+                "variables": {
+                    "id": cleaned_product_id,
+                    "publicationId": cleaned_publication_id,
+                },
+            },
+        )
+        product = response.get("product")
+        if product is None:
+            raise ShopifyApiError(
+                message=(
+                    "Product not found while checking publication state. "
+                    f"id={cleaned_product_id}."
+                ),
+                status_code=404,
+            )
+        if not isinstance(product, dict):
+            raise ShopifyApiError(message="product publication query response is invalid.")
+        published_on_publication = product.get("publishedOnPublication")
+        if not isinstance(published_on_publication, bool):
+            raise ShopifyApiError(
+                message="product publication query response is missing publishedOnPublication."
+            )
+        return published_on_publication
+
+    async def _publish_product_to_publication(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        publication_id: str,
+    ) -> None:
+        cleaned_product_id = product_id.strip()
+        cleaned_publication_id = publication_id.strip()
+        if not cleaned_product_id:
+            raise ShopifyApiError(message="product_id cannot be empty.", status_code=400)
+        if not cleaned_publication_id:
+            raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
+
+        mutation = """
+        mutation publishCatalogProduct($id: ID!, $input: [PublicationInput!]!) {
+            publishablePublish(id: $id, input: $input) {
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "id": cleaned_product_id,
+                    "input": [{"publicationId": cleaned_publication_id}],
+                },
+            },
+        )
+        payload = response.get("publishablePublish")
+        if not isinstance(payload, dict):
+            raise ShopifyApiError(message="publishablePublish response is missing payload.")
+        user_errors = payload.get("userErrors") or []
+        if not isinstance(user_errors, list):
+            raise ShopifyApiError(message="publishablePublish response has invalid userErrors.")
+        self._assert_no_user_errors(
+            user_errors=user_errors,
+            mutation_name="publishablePublish",
+        )
+
+    async def _ensure_product_published_to_online_store(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        status: str,
+    ) -> None:
+        normalized_status = status.strip().upper()
+        if normalized_status != "ACTIVE":
+            return
+
+        online_store_publication_id = await self._get_online_store_publication_id(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        is_published = await self._is_product_published_on_publication(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=product_id,
+            publication_id=online_store_publication_id,
+        )
+        if is_published:
+            return
+
+        await self._publish_product_to_publication(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=product_id,
+            publication_id=online_store_publication_id,
         )
 
     async def _create_collection(
@@ -3190,6 +3326,12 @@ class ShopifyApiClient:
             access_token=access_token,
             product_gid=product_gid,
         )
+        await self._ensure_product_published_to_online_store(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=product_gid,
+            status=product_status,
+        )
 
         return {
             "productGid": product_gid,
@@ -3649,6 +3791,12 @@ class ShopifyApiClient:
             shop_domain=shop_domain,
             access_token=access_token,
             product_gid=cleaned_product_gid,
+        )
+        await self._ensure_product_published_to_online_store(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=cleaned_product_gid,
+            status=str(final_product.get("status") or ""),
         )
         final_variants = final_product.get("variants") or []
         if len(final_variants) != len(prepared_variants):

@@ -17,10 +17,12 @@ import {
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
   useCreateClientShopifyInstallUrl,
+  useClientShopifyAppCredentials,
   useClientShopifyStatus,
   useDisconnectClientShopifyInstallation,
   useAutoProvisionClientShopifyStorefrontToken,
   useSetClientShopifyDefaultShop,
+  useUpdateClientShopifyAppCredentials,
   useUpdateClientShopifyThemeTemplateDraft,
   useUpdateClientShopifyInstallation,
   useUpdateClient,
@@ -835,6 +837,11 @@ export function BrandDesignSystemPage() {
   const { product: activeWorkspaceProduct, products: workspaceProducts } = useProductContext();
   const { data: client } = useClient(workspace?.id);
   const {
+    data: shopifyAppCredentials,
+    isLoading: isLoadingShopifyAppCredentials,
+    refetch: refetchShopifyAppCredentials,
+  } = useClientShopifyAppCredentials(workspace?.id);
+  const {
     data: shopifyStatus,
     isLoading: isLoadingShopifyStatus,
     refetch: refetchShopifyStatus,
@@ -842,6 +849,7 @@ export function BrandDesignSystemPage() {
   } = useClientShopifyStatus(workspace?.id);
   const { data: designSystems = [], isLoading } = useDesignSystems(workspace?.id);
   const updateClient = useUpdateClient();
+  const updateShopifyAppCredentials = useUpdateClientShopifyAppCredentials(workspace?.id || "");
   const createShopifyInstallUrl = useCreateClientShopifyInstallUrl(workspace?.id || "");
   const setDefaultShop = useSetClientShopifyDefaultShop(workspace?.id || "");
   const autoProvisionShopifyStorefrontToken = useAutoProvisionClientShopifyStorefrontToken(
@@ -894,6 +902,8 @@ export function BrandDesignSystemPage() {
     default: "",
     onDark: "",
   });
+  const [shopifyAppApiKeyDraft, setShopifyAppApiKeyDraft] = useState("");
+  const [shopifyAppApiSecretDraft, setShopifyAppApiSecretDraft] = useState("");
   const [shopifyShopDomainDraft, setShopifyShopDomainDraft] = useState("");
   const [defaultShopDomainDraft, setDefaultShopDomainDraft] = useState("");
   const [storefrontAccessTokenDraft, setStorefrontAccessTokenDraft] = useState("");
@@ -986,6 +996,7 @@ export function BrandDesignSystemPage() {
   const shopifyState = shopifyStatus?.state || "error";
   const installationState = shopifyStatus?.installationState || "not_installed";
   const canUseAdvancedShopifyFeatures = shopifyState === "ready";
+  const hasConfiguredShopifyAppCredentials = Boolean(shopifyAppCredentials?.isConfigured);
   const shopifyStatusTone = useMemo(() => {
     if (shopifyState === "ready") return "success" as const;
     if (shopifyState === "not_connected" || shopifyState === "installed_missing_storefront_token") return "neutral" as const;
@@ -1021,6 +1032,13 @@ export function BrandDesignSystemPage() {
     if (Number.isNaN(parsed.getTime())) return complianceProfile.updatedAt;
     return parsed.toLocaleString();
   }, [complianceProfile?.updatedAt]);
+  const shopifyAppCredentialsUpdatedAtLabel = useMemo(() => {
+    if (!shopifyAppCredentials?.updatedAt) return "";
+    const parsed = new Date(shopifyAppCredentials.updatedAt);
+    if (Number.isNaN(parsed.getTime())) return shopifyAppCredentials.updatedAt;
+    return parsed.toLocaleString();
+  }, [shopifyAppCredentials?.updatedAt]);
+  const isShopifyAppCredentialsMutating = updateShopifyAppCredentials.isPending;
   const isShopifyConnectionMutating =
     createShopifyInstallUrl.isPending ||
     autoProvisionShopifyStorefrontToken.isPending ||
@@ -1039,6 +1057,8 @@ export function BrandDesignSystemPage() {
       default: "",
       onDark: "",
     });
+    setShopifyAppApiKeyDraft("");
+    setShopifyAppApiSecretDraft("");
     setShopifyShopDomainDraft("");
     setDefaultShopDomainDraft("");
     setStorefrontAccessTokenDraft("");
@@ -1066,6 +1086,13 @@ export function BrandDesignSystemPage() {
     complianceProfileFormSeedRef.current = "";
     setComplianceProfileForm(buildComplianceProfileFormState(null, workspace?.name));
   }, [workspace?.id, workspace?.name]);
+
+  useEffect(() => {
+    const nextApiKey =
+      typeof shopifyAppCredentials?.apiKey === "string" ? shopifyAppCredentials.apiKey.trim() : "";
+    setShopifyAppApiKeyDraft(nextApiKey);
+    setShopifyAppApiSecretDraft("");
+  }, [shopifyAppCredentials?.apiKey]);
 
   useEffect(() => {
     const workspaceId = workspace?.id || "";
@@ -1525,9 +1552,36 @@ export function BrandDesignSystemPage() {
     });
   };
 
+  const handleSaveShopifyAppCredentials = async () => {
+    if (!workspace?.id) {
+      toast.error("Select a workspace before saving Shopify app credentials.");
+      return;
+    }
+    const nextApiKey = shopifyAppApiKeyDraft.trim();
+    const nextApiSecret = shopifyAppApiSecretDraft.trim();
+    if (!nextApiKey) {
+      toast.error("Shopify app API key is required.");
+      return;
+    }
+    if (!nextApiSecret) {
+      toast.error("Shopify app API secret is required.");
+      return;
+    }
+    await updateShopifyAppCredentials.mutateAsync({
+      apiKey: nextApiKey,
+      apiSecret: nextApiSecret,
+    });
+    setShopifyAppApiSecretDraft("");
+    await refetchShopifyAppCredentials();
+  };
+
   const handleConnectShopify = async () => {
     if (!workspace?.id) {
       toast.error("Select a workspace before connecting Shopify.");
+      return;
+    }
+    if (!hasConfiguredShopifyAppCredentials) {
+      toast.error("Set Shopify app API key and API secret before connecting Shopify.");
       return;
     }
     const nextDomain = shopifyShopDomainDraft.trim();
@@ -2286,6 +2340,59 @@ export function BrandDesignSystemPage() {
             </div>
             <Badge tone={shopifyStatusTone}>{isLoadingShopifyStatus ? "Checking…" : shopifyStatusLabel}</Badge>
           </div>
+          <div className="rounded-md border border-divider p-3 space-y-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-xs font-semibold text-content">Shopify app credentials</div>
+                <div className="text-xs text-content-muted">
+                  Required before connecting Shopify. Save one API key + API secret pair per workspace.
+                </div>
+              </div>
+              <Badge tone={hasConfiguredShopifyAppCredentials ? "success" : "neutral"}>
+                {isLoadingShopifyAppCredentials
+                  ? "Loading…"
+                  : hasConfiguredShopifyAppCredentials
+                    ? "Configured"
+                    : "Missing"}
+              </Badge>
+            </div>
+            {shopifyAppCredentialsUpdatedAtLabel ? (
+              <div className="text-xs text-content-muted">Updated: {shopifyAppCredentialsUpdatedAtLabel}</div>
+            ) : null}
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <Input
+                placeholder="Shopify app API key"
+                value={shopifyAppApiKeyDraft}
+                onChange={(e) => setShopifyAppApiKeyDraft(e.target.value)}
+                disabled={isShopifyAppCredentialsMutating}
+              />
+              <Input
+                type="password"
+                placeholder="Shopify app API secret"
+                value={shopifyAppApiSecretDraft}
+                onChange={(e) => setShopifyAppApiSecretDraft(e.target.value)}
+                disabled={isShopifyAppCredentialsMutating}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleSaveShopifyAppCredentials()}
+                disabled={
+                  !workspace?.id ||
+                  !shopifyAppApiKeyDraft.trim() ||
+                  !shopifyAppApiSecretDraft.trim() ||
+                  isShopifyAppCredentialsMutating
+                }
+              >
+                {isShopifyAppCredentialsMutating ? "Saving…" : "Save credentials"}
+              </Button>
+            </div>
+            {hasShopifyConnectionTarget ? (
+              <div className="text-xs text-content-muted">
+                To switch to a different Shopify app, disconnect the current store first, then reconnect.
+              </div>
+            ) : null}
+          </div>
           <div className="text-xs text-content-muted">{shopifyStatusMessage}</div>
           <div className="text-xs text-content-muted">Installation: {installationStatusLabel}</div>
           {shopifyStatus?.missingScopes?.length ? (
@@ -2356,7 +2463,12 @@ export function BrandDesignSystemPage() {
                 <Button
                   size="sm"
                   onClick={() => void handleConnectShopify()}
-                  disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+                  disabled={
+                    !workspace?.id ||
+                    !hasConfiguredShopifyAppCredentials ||
+                    !shopifyShopDomainDraft.trim() ||
+                    isShopifyConnectionMutating
+                  }
                 >
                   {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify app"}
                 </Button>

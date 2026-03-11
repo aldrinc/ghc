@@ -39,6 +39,13 @@ export type ClientShopifyInstallUrlResponse = {
   installUrl: string;
 };
 
+export type ClientShopifyAppCredentials = {
+  apiKey?: string | null;
+  hasApiSecret: boolean;
+  isConfigured: boolean;
+  updatedAt?: string | null;
+};
+
 export type ClientShopifyCatalogProduct = {
   productGid: string;
   title: string;
@@ -407,6 +414,38 @@ export function useClientShopifyStatus(clientId?: string) {
     queryKey: ["clients", "shopify-status", clientId],
     queryFn: () => get(`/clients/${clientId}/shopify/status`),
     enabled: Boolean(clientId),
+  });
+}
+
+export function useClientShopifyAppCredentials(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<ClientShopifyAppCredentials>({
+    queryKey: ["clients", "shopify-app-credentials", clientId],
+    queryFn: () => get(`/clients/${clientId}/shopify/app-credentials`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateClientShopifyAppCredentials(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { apiKey: string; apiSecret: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientShopifyAppCredentials>(`/clients/${clientId}/shopify/app-credentials`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Shopify app credentials saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "shopify-app-credentials", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save Shopify app credentials";
+      toast.error(message);
+    },
   });
 }
 

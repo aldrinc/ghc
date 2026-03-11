@@ -529,6 +529,17 @@ class UpdateInstallationRequest(BaseModel):
     storefrontAccessToken: str | None = None
 
 
+class AdminOAuthInstallUrlRequest(BaseModel):
+    shopDomain: str = Field(min_length=1)
+    appApiKey: str = Field(min_length=1)
+    appApiSecret: str = Field(min_length=1)
+    clientId: str | None = None
+
+
+class AdminOAuthInstallUrlResponse(BaseModel):
+    installUrl: str
+
+
 class AutoProvisionStorefrontTokenRequest(BaseModel):
     clientId: str | None = None
 

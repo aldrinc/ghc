@@ -5,8 +5,11 @@ import base64
 import hashlib
 import hmac
 import json
+import time
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+import jwt
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
@@ -22,11 +25,12 @@ def _build_oauth_callback_params(
     shop: str,
     code: str,
     state: str,
+    app_api_secret: str = "test_secret",
 ) -> dict[str, str]:
     items = [("code", code), ("shop", shop), ("state", state)]
     message = "&".join(f"{key}={value}" for key, value in sorted(items, key=lambda item: item[0]))
     digest = hmac.new(
-        settings.SHOPIFY_APP_API_SECRET.encode("utf-8"),
+        app_api_secret.encode("utf-8"),
         message.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
@@ -38,10 +42,11 @@ def _build_webhook_headers(
     body: bytes,
     shop_domain: str,
     event_id: str,
+    app_api_secret: str = "test_secret",
     topic: str | None = None,
 ) -> dict[str, str]:
     digest = hmac.new(
-        settings.SHOPIFY_APP_API_SECRET.encode("utf-8"),
+        app_api_secret.encode("utf-8"),
         body,
         hashlib.sha256,
     ).digest()
@@ -53,6 +58,24 @@ def _build_webhook_headers(
     if topic:
         headers["x-shopify-topic"] = topic
     return headers
+
+
+def _build_shopify_session_token(
+    *,
+    shop_domain: str,
+    app_api_key: str,
+    app_api_secret: str,
+) -> str:
+    now = int(time.time())
+    payload = {
+        "aud": app_api_key,
+        "dest": f"https://{shop_domain}",
+        "exp": now + 300,
+        "nbf": now - 30,
+        "iss": "https://shopify.com/admin",
+        "sub": "1",
+    }
+    return jwt.encode(payload, app_api_secret, algorithm="HS256")
 
 
 @pytest.fixture()
@@ -82,14 +105,28 @@ def api_client(monkeypatch):
 
 def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, monkeypatch):
     shop_domain = "example.myshopify.com"
-    oauth_state = OAuthState(state="state_1", shop_domain=shop_domain, client_id="client_1")
+    oauth_state = OAuthState(
+        state="state_1",
+        shop_domain=shop_domain,
+        client_id="client_1",
+        app_api_key="workspace_key_1",
+        app_api_secret="workspace_secret_1",
+    )
     db_session.add(oauth_state)
     db_session.commit()
     observed_default_syncs: list[tuple[str, str]] = []
 
-    async def fake_exchange_code_for_access_token(*, shop_domain: str, code: str):
+    async def fake_exchange_code_for_access_token(
+        *,
+        shop_domain: str,
+        code: str,
+        app_api_key: str,
+        app_api_secret: str,
+    ):
         assert shop_domain == "example.myshopify.com"
         assert code == "oauth_code"
+        assert app_api_key == "workspace_key_1"
+        assert app_api_secret == "workspace_secret_1"
         return "admin_access_token", "read_products,write_products"
 
     async def fake_register_webhook(*, shop_domain: str, access_token: str, topic: str, callback_url: str):
@@ -140,6 +177,7 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
             shop=shop_domain,
             code="oauth_code",
             state="state_1",
+            app_api_secret="workspace_secret_1",
         ),
         follow_redirects=False,
     )
@@ -154,6 +192,8 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
     ).first()
     assert installation is not None
     assert installation.client_id == "client_1"
+    assert installation.app_api_key == "workspace_key_1"
+    assert installation.app_api_secret == "workspace_secret_1"
     assert installation.storefront_access_token == "shpat_auto_token"
     assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
@@ -162,12 +202,26 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
     api_client, db_session, monkeypatch
 ):
     shop_domain = "example.myshopify.com"
-    oauth_state = OAuthState(state="state_2", shop_domain=shop_domain, client_id="client_2")
+    oauth_state = OAuthState(
+        state="state_2",
+        shop_domain=shop_domain,
+        client_id="client_2",
+        app_api_key="workspace_key_2",
+        app_api_secret="workspace_secret_2",
+    )
     db_session.add(oauth_state)
     db_session.commit()
     observed_default_syncs: list[tuple[str, str]] = []
 
-    async def fake_exchange_code_for_access_token(*, shop_domain: str, code: str):
+    async def fake_exchange_code_for_access_token(
+        *,
+        shop_domain: str,
+        code: str,
+        app_api_key: str,
+        app_api_secret: str,
+    ):
+        assert app_api_key == "workspace_key_2"
+        assert app_api_secret == "workspace_secret_2"
         return "admin_access_token", "read_products,write_products"
 
     async def fake_register_webhook(*, shop_domain: str, access_token: str, topic: str, callback_url: str):
@@ -215,6 +269,7 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
             shop=shop_domain,
             code="oauth_code",
             state="state_2",
+            app_api_secret="workspace_secret_2",
         ),
         follow_redirects=False,
     )
@@ -229,6 +284,8 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
     ).first()
     assert installation is not None
     assert installation.client_id == "client_2"
+    assert installation.app_api_key == "workspace_key_2"
+    assert installation.app_api_secret == "workspace_secret_2"
     assert installation.admin_access_token == "admin_access_token"
     assert installation.storefront_access_token is None
     assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
@@ -236,10 +293,24 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
 
 def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeypatch):
     shop_domain = "example.myshopify.com"
-    oauth_state = OAuthState(state="state_public_1", shop_domain=shop_domain, client_id="client_3")
+    oauth_state = OAuthState(
+        state="state_public_1",
+        shop_domain=shop_domain,
+        client_id="client_3",
+        app_api_key="workspace_key_3",
+        app_api_secret="workspace_secret_3",
+    )
     db_session.add(oauth_state)
     db_session.commit()
-    async def fake_exchange_code_for_access_token(*, shop_domain: str, code: str):
+    async def fake_exchange_code_for_access_token(
+        *,
+        shop_domain: str,
+        code: str,
+        app_api_key: str,
+        app_api_secret: str,
+    ):
+        assert app_api_key == "workspace_key_3"
+        assert app_api_secret == "workspace_secret_3"
         return "admin_access_token", "read_products,write_products"
 
     async def fake_register_webhook(*, shop_domain: str, access_token: str, topic: str, callback_url: str):
@@ -284,6 +355,7 @@ def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeyp
                 shop=shop_domain,
                 code="oauth_code",
                 state="state_public_1",
+                app_api_secret="workspace_secret_3",
             ),
         },
         follow_redirects=False,
@@ -291,6 +363,38 @@ def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeyp
 
     assert response.status_code == 302
     assert response.headers["location"].startswith(f"{settings.app_base_url}/app?shop={shop_domain}")
+
+
+def test_admin_oauth_install_url_creates_state_with_workspace_credentials(
+    api_client, db_session
+):
+    response = api_client.post(
+        "/admin/oauth/install-url",
+        headers={"Authorization": f"Bearer {settings.SHOPIFY_INTERNAL_API_TOKEN}"},
+        json={
+            "shopDomain": "example.myshopify.com",
+            "clientId": "client_9",
+            "appApiKey": "workspace_key_9",
+            "appApiSecret": "workspace_secret_9",
+        },
+    )
+
+    assert response.status_code == 200
+    install_url = response.json()["installUrl"]
+    parsed = urlparse(install_url)
+    query = parse_qs(parsed.query)
+    assert parsed.netloc == "example.myshopify.com"
+    assert query["client_id"] == ["workspace_key_9"]
+    assert query["scope"] == [settings.admin_scopes_csv]
+    assert query["redirect_uri"] == [f"{settings.app_base_url}/auth/callback"]
+    assert "state" in query and len(query["state"]) == 1
+
+    stored_state = db_session.get(OAuthState, query["state"][0])
+    assert stored_state is not None
+    assert stored_state.shop_domain == "example.myshopify.com"
+    assert stored_state.client_id == "client_9"
+    assert stored_state.app_api_key == "workspace_key_9"
+    assert stored_state.app_api_secret == "workspace_secret_9"
 
 
 def test_app_url_entrypoint_redirects_install_when_shop_is_present(api_client):
@@ -328,10 +432,24 @@ def test_app_url_entrypoint_returns_info_page_without_shop_context(api_client):
     assert "reserved for Shopify app launch and install flows" in response.text
 
 
-def test_embedded_shell_loads_latest_app_bridge_script(api_client):
-    response = api_client.get("/app")
+def test_embedded_shell_loads_latest_app_bridge_script(api_client, db_session):
+    db_session.add(
+        ShopInstallation(
+            shop_domain="example.myshopify.com",
+            client_id=None,
+            app_api_key="embedded_key",
+            app_api_secret="embedded_secret",
+            admin_access_token="admin_access_token",
+            storefront_access_token=None,
+            scopes="read_products",
+        )
+    )
+    db_session.commit()
+
+    response = api_client.get("/app", params={"shop": "example.myshopify.com"})
 
     assert response.status_code == 200
+    assert '<meta name="shopify-api-key" content="embedded_key"' in response.text
     assert "https://cdn.shopify.com/shopifycloud/app-bridge.js" in response.text
     assert "unpkg.com/@shopify/app-bridge" not in response.text
 
@@ -552,6 +670,19 @@ def test_compliance_customers_data_request_webhook_is_acknowledged(
     api_client, db_session
 ):
     shop_domain = "example.myshopify.com"
+    db_session.add(
+        ShopInstallation(
+            shop_domain=shop_domain,
+            client_id="client_1",
+            app_api_key="workspace_key_compliance",
+            app_api_secret="workspace_secret_compliance",
+            admin_access_token="admin_access_token",
+            storefront_access_token="storefront_token",
+            scopes="read_products",
+        )
+    )
+    db_session.commit()
+
     payload = {"shop_domain": shop_domain, "customer": {"id": 123456789}}
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
@@ -562,6 +693,7 @@ def test_compliance_customers_data_request_webhook_is_acknowledged(
             body=body,
             shop_domain=shop_domain,
             event_id="evt_customers_data_request_1",
+            app_api_secret="workspace_secret_compliance",
             topic="customers/data_request",
         ),
     )
@@ -586,6 +718,8 @@ def test_compliance_shop_redact_webhook_purges_shop_data(api_client, db_session)
         ShopInstallation(
             shop_domain=shop_domain,
             client_id="client_1",
+            app_api_key="workspace_key_redact",
+            app_api_secret="workspace_secret_redact",
             admin_access_token="admin_access_token",
             storefront_access_token="storefront_token",
             scopes="read_products",
@@ -614,6 +748,7 @@ def test_compliance_shop_redact_webhook_purges_shop_data(api_client, db_session)
             body=body,
             shop_domain=shop_domain,
             event_id="evt_shop_redact_1",
+            app_api_secret="workspace_secret_redact",
             topic="shop/redact",
         ),
     )
@@ -682,6 +817,8 @@ def test_embedded_session_reports_installation_state(api_client, db_session):
         ShopInstallation(
             shop_domain=shop_domain,
             client_id="client_1",
+            app_api_key="embedded_key_1",
+            app_api_secret="embedded_secret_1",
             admin_access_token="admin_access_token",
             storefront_access_token="storefront_token",
             scopes="read_products",
@@ -689,13 +826,15 @@ def test_embedded_session_reports_installation_state(api_client, db_session):
     )
     db_session.commit()
 
-    api_client.app.dependency_overrides[
-        main_module.require_shopify_session_shop_domain
-    ] = lambda: shop_domain
-    try:
-        response = api_client.get("/app/api/session")
-    finally:
-        api_client.app.dependency_overrides.clear()
+    session_token = _build_shopify_session_token(
+        shop_domain=shop_domain,
+        app_api_key="embedded_key_1",
+        app_api_secret="embedded_secret_1",
+    )
+    response = api_client.get(
+        "/app/api/session",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -712,6 +851,8 @@ def test_embedded_link_workspace_updates_client_binding(api_client, db_session, 
         ShopInstallation(
             shop_domain=shop_domain,
             client_id=None,
+            app_api_key="embedded_key_2",
+            app_api_secret="embedded_secret_2",
             admin_access_token="admin_access_token",
             storefront_access_token=None,
             scopes="read_products",
@@ -734,16 +875,16 @@ def test_embedded_link_workspace_updates_client_binding(api_client, db_session, 
         fake_apply_shop_connection_defaults,
     )
 
-    api_client.app.dependency_overrides[
-        main_module.require_shopify_session_shop_domain
-    ] = lambda: shop_domain
-    try:
-        response = api_client.post(
-            "/app/api/link-workspace",
-            json={"clientId": "client_abc"},
-        )
-    finally:
-        api_client.app.dependency_overrides.clear()
+    session_token = _build_shopify_session_token(
+        shop_domain=shop_domain,
+        app_api_key="embedded_key_2",
+        app_api_secret="embedded_secret_2",
+    )
+    response = api_client.post(
+        "/app/api/link-workspace",
+        headers={"Authorization": f"Bearer {session_token}"},
+        json={"clientId": "client_abc"},
+    )
 
     assert response.status_code == 200
     assert response.json()["linkedWorkspaceId"] == "client_abc"
@@ -765,6 +906,8 @@ def test_embedded_auto_storefront_token_provisions_token(api_client, db_session,
         ShopInstallation(
             shop_domain=shop_domain,
             client_id="client_1",
+            app_api_key="embedded_key_3",
+            app_api_secret="embedded_secret_3",
             admin_access_token="admin_access_token",
             storefront_access_token=None,
             scopes="read_products",
@@ -803,16 +946,16 @@ def test_embedded_auto_storefront_token_provisions_token(api_client, db_session,
         fake_apply_shop_connection_defaults,
     )
 
-    api_client.app.dependency_overrides[
-        main_module.require_shopify_session_shop_domain
-    ] = lambda: shop_domain
-    try:
-        response = api_client.post(
-            "/app/api/storefront-token/auto",
-            json={"clientId": "client_1"},
-        )
-    finally:
-        api_client.app.dependency_overrides.clear()
+    session_token = _build_shopify_session_token(
+        shop_domain=shop_domain,
+        app_api_key="embedded_key_3",
+        app_api_secret="embedded_secret_3",
+    )
+    response = api_client.post(
+        "/app/api/storefront-token/auto",
+        headers={"Authorization": f"Bearer {session_token}"},
+        json={"clientId": "client_1"},
+    )
 
     assert response.status_code == 200
     assert response.json()["hasStorefrontAccessToken"] is True
@@ -834,6 +977,8 @@ def test_embedded_auto_storefront_token_rejects_workspace_mismatch(
         ShopInstallation(
             shop_domain=shop_domain,
             client_id="client_existing",
+            app_api_key="embedded_key_4",
+            app_api_secret="embedded_secret_4",
             admin_access_token="admin_access_token",
             storefront_access_token=None,
             scopes="read_products",
@@ -841,16 +986,16 @@ def test_embedded_auto_storefront_token_rejects_workspace_mismatch(
     )
     db_session.commit()
 
-    api_client.app.dependency_overrides[
-        main_module.require_shopify_session_shop_domain
-    ] = lambda: shop_domain
-    try:
-        response = api_client.post(
-            "/app/api/storefront-token/auto",
-            json={"clientId": "client_other"},
-        )
-    finally:
-        api_client.app.dependency_overrides.clear()
+    session_token = _build_shopify_session_token(
+        shop_domain=shop_domain,
+        app_api_key="embedded_key_4",
+        app_api_secret="embedded_secret_4",
+    )
+    response = api_client.post(
+        "/app/api/storefront-token/auto",
+        headers={"Authorization": f"Bearer {session_token}"},
+        json={"clientId": "client_other"},
+    )
 
     assert response.status_code == 409
     assert (

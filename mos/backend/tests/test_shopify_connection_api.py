@@ -15,6 +15,7 @@ from app.db.enums import AssetSourceEnum, FunnelStatusEnum
 from app.db.models import (
     Asset,
     Client,
+    ClientShopifyAppCredential,
     ClientUserPreference,
     Funnel,
     FunnelPage,
@@ -35,6 +36,25 @@ def _create_client(api_client, *, name: str = "Shopify Workspace") -> str:
     response = api_client.post("/clients", json={"name": name, "industry": "Retail"})
     assert response.status_code == 201
     return response.json()["id"]
+
+
+def _upsert_shopify_app_credential(
+    db_session,
+    *,
+    client_id: str,
+    org_id: str,
+    api_key: str = "shopify_key",
+    api_secret: str = "shopify_secret",
+) -> None:
+    db_session.add(
+        ClientShopifyAppCredential(
+            org_id=UUID(org_id),
+            client_id=UUID(client_id),
+            api_key=api_key,
+            api_secret=api_secret,
+        )
+    )
+    db_session.commit()
 
 
 def _create_workspace_image_asset(
@@ -1693,16 +1713,65 @@ def test_get_shopify_status_syncs_workspace_catalog_when_ready(api_client, monke
     assert observed["shop_domain"] == "example.myshopify.com"
 
 
-def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
+def test_get_shopify_app_credentials_returns_not_configured_when_missing(api_client):
     client_id = _create_client(api_client)
+
+    response = api_client.get(f"/clients/{client_id}/shopify/app-credentials")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "apiKey": None,
+        "hasApiSecret": False,
+        "isConfigured": False,
+        "updatedAt": None,
+    }
+
+
+def test_put_shopify_app_credentials_persists_for_workspace(api_client):
+    client_id = _create_client(api_client)
+
+    save_response = api_client.put(
+        f"/clients/{client_id}/shopify/app-credentials",
+        json={"apiKey": "workspace_key", "apiSecret": "workspace_secret"},
+    )
+    assert save_response.status_code == 200
+    assert save_response.json()["apiKey"] == "workspace_key"
+    assert save_response.json()["hasApiSecret"] is True
+    assert save_response.json()["isConfigured"] is True
+    assert isinstance(save_response.json()["updatedAt"], str)
+
+    read_response = api_client.get(f"/clients/{client_id}/shopify/app-credentials")
+    assert read_response.status_code == 200
+    assert read_response.json()["apiKey"] == "workspace_key"
+    assert read_response.json()["hasApiSecret"] is True
+    assert read_response.json()["isConfigured"] is True
+
+
+def test_create_shopify_install_url_returns_url(api_client, db_session, auth_context, monkeypatch):
+    client_id = _create_client(api_client)
+    _upsert_shopify_app_credential(
+        db_session,
+        client_id=client_id,
+        org_id=auth_context.org_id,
+        api_key="workspace_key",
+        api_secret="workspace_secret",
+    )
 
     observed: dict[str, str] = {}
 
-    def fake_build(*, client_id: str, shop_domain: str) -> dict[str, str]:
+    def fake_build(
+        *,
+        client_id: str,
+        shop_domain: str,
+        app_api_key: str,
+        app_api_secret: str,
+    ) -> dict[str, str]:
         observed["client_id"] = client_id
         observed["shop_domain"] = shop_domain
+        observed["app_api_key"] = app_api_key
+        observed["app_api_secret"] = app_api_secret
         return {
-            "installUrl": "https://shopify-public.local/auth/install?shop=example.myshopify.com&client_id=test",
+            "installUrl": "https://example.myshopify.com/admin/oauth/authorize?client_id=workspace_key",
         }
 
     monkeypatch.setattr(clients_router, "build_client_shopify_install_urls", fake_build)
@@ -1713,21 +1782,56 @@ def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert observed == {"client_id": client_id, "shop_domain": "example.myshopify.com"}
+    assert observed == {
+        "client_id": client_id,
+        "shop_domain": "example.myshopify.com",
+        "app_api_key": "workspace_key",
+        "app_api_secret": "workspace_secret",
+    }
     body = response.json()
-    assert body["installUrl"].startswith("https://shopify-public.local/auth/install")
+    assert body["installUrl"].startswith("https://example.myshopify.com/admin/oauth/authorize")
+
+
+def test_create_shopify_install_url_requires_workspace_app_credentials(api_client):
+    client_id = _create_client(api_client)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/install-url",
+        json={"shopDomain": "example.myshopify.com"},
+    )
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "Shopify app credentials are not configured for this workspace. Set API key and API secret in Brand before connecting."
+    )
 
 
 def test_create_shopify_install_url_persists_storefront_domain_preference(
     api_client, db_session, auth_context, monkeypatch
 ):
     client_id = _create_client(api_client)
+    _upsert_shopify_app_credential(
+        db_session,
+        client_id=client_id,
+        org_id=auth_context.org_id,
+        api_key="workspace_key",
+        api_secret="workspace_secret",
+    )
 
-    def fake_build(*, client_id: str, shop_domain: str) -> dict[str, str]:
+    def fake_build(
+        *,
+        client_id: str,
+        shop_domain: str,
+        app_api_key: str,
+        app_api_secret: str,
+    ) -> dict[str, str]:
         assert client_id
         assert shop_domain == "https://thehonestherbalist.com"
+        assert app_api_key == "workspace_key"
+        assert app_api_secret == "workspace_secret"
         return {
-            "installUrl": "https://shopify-public.local/auth/install?shop=example.myshopify.com&client_id=test",
+            "installUrl": "https://example.myshopify.com/admin/oauth/authorize?client_id=workspace_key",
         }
 
     monkeypatch.setattr(clients_router, "build_client_shopify_install_urls", fake_build)
@@ -4487,6 +4591,13 @@ def test_audit_shopify_theme_brand_requires_ready_connection(api_client, monkeyp
 def test_shopify_routes_require_existing_client(api_client):
     missing_client_id = "00000000-0000-0000-0000-00000000abcd"
 
+    app_credentials_get_response = api_client.get(
+        f"/clients/{missing_client_id}/shopify/app-credentials"
+    )
+    app_credentials_put_response = api_client.put(
+        f"/clients/{missing_client_id}/shopify/app-credentials",
+        json={"apiKey": "workspace_key", "apiSecret": "workspace_secret"},
+    )
     status_response = api_client.get(f"/clients/{missing_client_id}/shopify/status")
     install_response = api_client.post(
         f"/clients/{missing_client_id}/shopify/install-url",
@@ -4526,6 +4637,8 @@ def test_shopify_routes_require_existing_client(api_client):
         json={"designSystemId": "design-system-1", "themeName": "futrgroup2-0theme"},
     )
 
+    assert app_credentials_get_response.status_code == 404
+    assert app_credentials_put_response.status_code == 404
     assert status_response.status_code == 404
     assert install_response.status_code == 404
     assert patch_response.status_code == 404

@@ -20,6 +20,8 @@ class ShopInstallation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     shop_domain: Mapped[str] = mapped_column(String(length=255), unique=True, nullable=False, index=True)
     client_id: Mapped[str | None] = mapped_column(String(length=64), nullable=True, index=True)
+    app_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_api_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     admin_access_token: Mapped[str] = mapped_column(Text, nullable=False)
     storefront_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     scopes: Mapped[str] = mapped_column(Text, nullable=False)
@@ -36,6 +38,8 @@ class OAuthState(Base):
     state: Mapped[str] = mapped_column(String(length=128), primary_key=True)
     shop_domain: Mapped[str] = mapped_column(String(length=255), nullable=False)
     client_id: Mapped[str | None] = mapped_column(String(length=64), nullable=True)
+    app_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_api_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 
