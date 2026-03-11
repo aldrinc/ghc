@@ -466,8 +466,8 @@ export function ProductDetailPage() {
       return;
     }
     const nextVariantPrice = Number(createShopifyVariantPriceDraft);
-    if (Number.isNaN(nextVariantPrice) || nextVariantPrice <= 0) {
-      toast.error("Shopify variant price must be greater than 0.");
+    if (Number.isNaN(nextVariantPrice) || nextVariantPrice < 0) {
+      toast.error("Shopify variant price must be 0 or greater.");
       return;
     }
     const nextCurrency = createShopifyCurrencyDraft.trim().toUpperCase();
