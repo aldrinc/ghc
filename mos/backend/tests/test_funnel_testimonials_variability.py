@@ -914,6 +914,45 @@ def test_testimonial_generation_count_enforces_sales_pdp_minimum():
     )
 
 
+def test_resolve_testimonial_generation_count_caps_budgeted_sales_pdp_runs():
+    budgeted_floor = max(12, funnel_testimonials._SALES_PDP_BUDGETED_MIN_REVIEWS)
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=12,
+            max_duration_seconds=900,
+        )
+        == budgeted_floor
+    )
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=90,
+            max_duration_seconds=900,
+        )
+        == 90
+    )
+
+
+def test_resolve_testimonial_generation_count_keeps_non_budgeted_behavior():
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=12,
+            max_duration_seconds=None,
+        )
+        == 75
+    )
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="pre-sales-listicle",
+            image_target_count=12,
+            max_duration_seconds=900,
+        )
+        == 12
+    )
+
+
 def test_sync_sales_pdp_guarantee_feed_images_updates_primary_guarantee_image():
     puck_data = {
         "content": [
