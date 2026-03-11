@@ -8,20 +8,6 @@ SKIP_PIP_INSTALL="${SKIP_PIP_INSTALL:-}"
 
 cd "$BACKEND_DIR"
 
-# Load root and backend env vars so LLM/Google creds are present for activities.
-if [ -f "$ROOT/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$ROOT/.env"
-  set +a
-fi
-if [ -f "$BACKEND_DIR/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$BACKEND_DIR/.env"
-  set +a
-fi
-
 if [ ! -d ".venv" ]; then
   echo "[worker] Creating Python 3.11 virtualenv..."
   python3.11 -m venv .venv
@@ -34,4 +20,5 @@ if [ -z "$SKIP_PIP_INSTALL" ]; then
 fi
 
 echo "[worker] Starting Temporal worker on task queue ${TASK_QUEUE}"
-exec .venv/bin/python -m app.temporal.worker
+exec .venv/bin/python "$ROOT/scripts/run_with_backend_env.py" \
+  .venv/bin/python -m app.temporal.worker
