@@ -1606,6 +1606,75 @@ def test_create_shopify_product_for_product_imports_shopify_variants(api_client,
     assert all(variant["provider"] == "shopify" for variant in variants)
 
 
+def test_create_shopify_product_for_product_uses_mos_active_status(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Import Active Status")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    publish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": "2026-03-11T12:00:00Z"},
+    )
+    assert publish_resp.status_code == 200
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed: dict[str, object] = {}
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["status_text"] = status_text
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/880",
+            "title": title,
+            "handle": "sleep-drops",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/881",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [{"title": "Starter", "priceCents": 4999, "currency": "USD"}],
+        },
+    )
+    assert response.status_code == 200
+    assert observed["status_text"] == "ACTIVE"
+    assert response.json()["status"] == "ACTIVE"
+
+
 def test_create_shopify_product_for_product_rejects_existing_mapping(api_client):
     client_id = _create_client(api_client, name="Shopify Product Already Mapped")
     product_id = _create_product(
@@ -1663,6 +1732,25 @@ def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
     assert observed["verified_product_gid"] == "gid://shopify/Product/901"
     assert observed["sync_client_id"] == client_id
     assert observed["extra_product_gids"] == ["gid://shopify/Product/901"]
+
+
+def test_update_product_allows_clearing_published_at(api_client):
+    client_id = _create_client(api_client, name="Product Publish Status")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    publish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": "2026-03-11T12:00:00Z"},
+    )
+    assert publish_resp.status_code == 200
+    assert publish_resp.json()["published_at"] == "2026-03-11T12:00:00+00:00"
+
+    unpublish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": None},
+    )
+    assert unpublish_resp.status_code == 200
+    assert unpublish_resp.json()["published_at"] is None
 
 
 def test_create_shopify_product_for_product_requires_ready_connection(api_client, monkeypatch):
