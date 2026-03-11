@@ -39,7 +39,7 @@ export function useApiClient(baseUrl: string = defaultBaseUrl) {
 
   const request = useCallback(
     async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers(init.headers || {});
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);

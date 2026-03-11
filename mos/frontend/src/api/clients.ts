@@ -879,7 +879,7 @@ export function useDownloadClientShopifyThemeTemplateZip(clientId?: string) {
     mutationFn: async (payload: ClientShopifyThemeTemplatePublishPayload) => {
       if (!clientId) throw new Error("Client ID is required.");
       if (!payload.draftId?.trim()) throw new Error("Draft ID is required.");
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers({ "Content-Type": "application/json" });
       if (token) headers.set("Authorization", `Bearer ${token}`);
       const response = await fetch(
