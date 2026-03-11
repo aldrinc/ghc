@@ -772,7 +772,9 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 schedule_to_close_timeout=timedelta(
                     minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
                 ),
-                heartbeat_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(
+                    minutes=max(5, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_HEARTBEAT_TIMEOUT_MINUTES)
+                ),
                 retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
@@ -1149,7 +1151,9 @@ class StrategyV2AngleIterationWorkflow:
                 schedule_to_close_timeout=timedelta(
                     minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
                 ),
-                heartbeat_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(
+                    minutes=max(5, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_HEARTBEAT_TIMEOUT_MINUTES)
+                ),
                 retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
