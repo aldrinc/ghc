@@ -32,10 +32,22 @@ def _stub_genai_types_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
             self.file_search = file_search
 
     class _FakeGenerateContentConfig:
-        def __init__(self, *, temperature: float, max_output_tokens: int, tools):
+        def __init__(
+            self,
+            *,
+            temperature: float,
+            max_output_tokens: int,
+            tools=None,
+            system_instruction: str | None = None,
+            response_mime_type: str | None = None,
+            response_json_schema=None,
+        ):
             self.temperature = temperature
             self.max_output_tokens = max_output_tokens
             self.tools = tools
+            self.system_instruction = system_instruction
+            self.response_mime_type = response_mime_type
+            self.response_json_schema = response_json_schema
 
     monkeypatch.setattr(
         swipe_activity,
