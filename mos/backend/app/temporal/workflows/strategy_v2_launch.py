@@ -45,6 +45,19 @@ _RETRY_POLICY = RetryPolicy(
     maximum_interval=timedelta(seconds=30),
     maximum_attempts=1,
 )
+_FUNNEL_GENERATION_RETRY_POLICY = RetryPolicy(
+    initial_interval=timedelta(seconds=5),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=2),
+    maximum_attempts=3,
+    non_retryable_error_types=[
+        "ToolExecutionError",
+        "TimeoutError",
+        "ValueError",
+        "RuntimeError",
+        "TestimonialGenerationError",
+    ],
+)
 _COPY_WORKFLOW_GENERATION_MODE = os.getenv(
     "STRATEGY_V2_COPY_WORKFLOW_GENERATION_MODE",
     os.getenv("STRATEGY_V2_COPY_GENERATION_MODE", "template_payload_only"),
@@ -759,7 +772,8 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 schedule_to_close_timeout=timedelta(
                     minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
                 ),
-                retry_policy=_RETRY_POLICY,
+                heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
             media_jobs = _extract_media_enrichment_jobs(funnels_payload)
@@ -1132,8 +1146,11 @@ class StrategyV2AngleIterationWorkflow:
                     "require_pinned_strategy_v2_context": True,
                     "require_shopify_connection": True,
                 },
-                schedule_to_close_timeout=timedelta(minutes=35),
-                retry_policy=_RETRY_POLICY,
+                schedule_to_close_timeout=timedelta(
+                    minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
+                ),
+                heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
             media_jobs = _extract_media_enrichment_jobs(funnels_payload)

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -101,6 +104,46 @@ _BOOK_CTA_LABELS: tuple[tuple[str, str], ...] = (
     ("manual", "Manual"),
     ("book", "Book"),
 )
+_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS = 20.0
+
+
+def _activity_heartbeat_safe(payload: dict[str, Any]) -> None:
+    try:
+        activity.heartbeat(payload)
+    except RuntimeError:
+        # Unit tests execute these helpers outside a Temporal activity context.
+        return
+
+
+@contextmanager
+def _activity_heartbeat_loop(
+    *,
+    payload_factory: Callable[[], dict[str, Any]],
+    interval_seconds: float | None = None,
+):
+    interval = (
+        float(interval_seconds)
+        if interval_seconds is not None
+        else float(_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS)
+    )
+    _activity_heartbeat_safe(payload_factory())
+    stop_event = threading.Event()
+
+    def _run() -> None:
+        while not stop_event.wait(interval):
+            _activity_heartbeat_safe(payload_factory())
+
+    thread = threading.Thread(
+        target=_run,
+        name="campaign-intent-heartbeat",
+        daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=max(1.0, interval))
 
 
 def _collect_image_generation_errors(
@@ -1136,37 +1179,49 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
                         )
                 try:
-                    result = _run_generate_page_draft_with_retries(
-                        run_generation=lambda: run_generate_page_draft(
-                            session=session,
-                            org_id=org_id,
-                            user_id=str(actor_user_id),
-                            funnel_id=str(funnel.id),
-                            page_id=str(page.id),
-                            prompt=prompt,
-                            current_puck_data=puck_data,
-                            template_id=template_id,
-                            idea_workspace_id=idea_workspace_id,
-                            generate_images=not async_media_enrichment,
-                            generate_testimonials=generate_testimonials and not async_media_enrichment,
-                            skip_draft_generation=strategy_v2_payload_applied,
-                            copy_pack=template_payload_json,
-                        ),
-                        max_attempts=ai_draft_max_attempts,
-                        on_retry=lambda attempt, exc: log_activity(
-                            "funnel_page_draft",
-                            "retrying",
-                            payload_in={
-                                "page_id": str(page.id),
-                                "template_id": template_id,
-                                "funnel_id": str(funnel.id),
-                                "attempt": attempt,
-                                "max_attempts": ai_draft_max_attempts,
-                                "reason": "empty_page_generation",
-                                "error": str(exc),
-                            },
-                        ),
-                    )
+                    heartbeat_started_at = time.monotonic()
+
+                    def _heartbeat_payload() -> dict[str, Any]:
+                        return {
+                            "phase": "funnel_page_generation",
+                            "funnel_id": str(funnel.id),
+                            "page_id": str(page.id),
+                            "template_id": str(template_id),
+                            "elapsed_seconds": int(time.monotonic() - heartbeat_started_at),
+                        }
+
+                    with _activity_heartbeat_loop(payload_factory=_heartbeat_payload):
+                        result = _run_generate_page_draft_with_retries(
+                            run_generation=lambda: run_generate_page_draft(
+                                session=session,
+                                org_id=org_id,
+                                user_id=str(actor_user_id),
+                                funnel_id=str(funnel.id),
+                                page_id=str(page.id),
+                                prompt=prompt,
+                                current_puck_data=puck_data,
+                                template_id=template_id,
+                                idea_workspace_id=idea_workspace_id,
+                                generate_images=not async_media_enrichment,
+                                generate_testimonials=generate_testimonials and not async_media_enrichment,
+                                skip_draft_generation=strategy_v2_payload_applied,
+                                copy_pack=template_payload_json,
+                            ),
+                            max_attempts=ai_draft_max_attempts,
+                            on_retry=lambda attempt, exc: log_activity(
+                                "funnel_page_draft",
+                                "retrying",
+                                payload_in={
+                                    "page_id": str(page.id),
+                                    "template_id": template_id,
+                                    "funnel_id": str(funnel.id),
+                                    "attempt": attempt,
+                                    "max_attempts": ai_draft_max_attempts,
+                                    "reason": "empty_page_generation",
+                                    "error": str(exc),
+                                },
+                            ),
+                        )
                     draft_version_id = result.get("draftVersionId") or ""
                     generated_images = result.get("generatedImages") or []
                     if not draft_version_id:

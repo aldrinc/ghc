@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -379,6 +380,87 @@ def test_build_policy_footer_payload_returns_links_brand_year_and_icons(monkeypa
     ]
     assert copyright_text == f"© {datetime.now(timezone.utc).year} The Honest Herbalist"
     assert icon_keys == cia._FOOTER_PAYMENT_ICON_KEYS
+
+
+def test_create_funnel_drafts_activity_emits_activity_heartbeats_during_page_generation(
+    db_session, monkeypatch
+):
+    test_org_id = UUID("00000000-0000-0000-0000-000000000001")
+    client = Client(org_id=test_org_id, name="Heartbeat Client", industry="Health")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(
+        org_id=test_org_id,
+        client_id=client.id,
+        title="Heartbeat Product",
+        description="Launch-ready product description.",
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    campaign = Campaign(
+        org_id=test_org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Heartbeat Campaign",
+        channels=["meta"],
+        asset_brief_types=["static-image"],
+    )
+    db_session.add(campaign)
+    db_session.commit()
+    db_session.refresh(campaign)
+
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    heartbeat_payloads: list[dict[str, object]] = []
+
+    def _heartbeat(payload):
+        heartbeat_payloads.append(dict(payload))
+
+    def _run_generate_page_draft_stub(**_kwargs):
+        time.sleep(0.05)
+        return {"draftVersionId": "draft-heartbeat", "generatedImages": []}
+
+    monkeypatch.setattr(cia, "session_scope", _session_scope_override)
+    monkeypatch.setattr(cia, "apply_template_assets", lambda **kwargs: kwargs["template"].puck_data)
+    monkeypatch.setattr(cia, "resolve_design_system_tokens", lambda **_kwargs: None)
+    monkeypatch.setattr(cia, "normalize_public_page_metadata_for_context", lambda **_kwargs: None)
+    monkeypatch.setattr(cia, "run_generate_page_draft", _run_generate_page_draft_stub)
+    monkeypatch.setattr(cia.activity, "heartbeat", _heartbeat)
+    monkeypatch.setattr(cia, "_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS", 0.01)
+
+    cia.create_funnel_drafts_activity(
+        {
+            "org_id": str(test_org_id),
+            "client_id": str(client.id),
+            "campaign_id": str(campaign.id),
+            "product_id": str(product.id),
+            "experiment_spec_id": "experiment-1",
+            "funnel_name": "Launch",
+            "pages": [
+                {"template_id": "pre-sales-listicle", "name": "Pre-Sales", "slug": "pre-sales"},
+                {"template_id": "sales-pdp", "name": "Sales", "slug": "sales"},
+            ],
+            "experiment": {"id": "experiment-1", "name": "Angle Test", "hypothesis": "Pinned copy wins"},
+            "variant": {"id": "variant-a", "name": "Control", "description": "Pinned Strategy V2 copy"},
+            "strategy_sheet": {"goal": "Launch", "hypothesis": "Pinned copy"},
+            "asset_briefs": [],
+            "strategy_v2_packet": {},
+            "strategy_v2_copy_context": {},
+            "generate_ai_drafts": True,
+            "generate_testimonials": False,
+        }
+    )
+
+    assert heartbeat_payloads
+    latest_payload = heartbeat_payloads[-1]
+    assert latest_payload["phase"] == "funnel_page_generation"
+    assert latest_payload["template_id"] in {"pre-sales-listicle", "sales-pdp"}
 
 
 @pytest.mark.parametrize(

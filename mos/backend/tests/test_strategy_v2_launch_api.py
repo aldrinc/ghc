@@ -8,6 +8,7 @@ import pytest
 from app.db.enums import ArtifactTypeEnum, WorkflowKindEnum, WorkflowStatusEnum
 from app.db.models import Artifact, Campaign, Client, Product, ResearchArtifact, StrategyV2Launch, WorkflowRun
 from app.routers import workflows as workflows_router
+from app.temporal.workflows import strategy_v2_launch as strategy_v2_launch_workflow
 from app.strategy_v2 import launches as strategy_v2_launches
 from app.strategy_v2.launches import load_strategy_v2_source_context
 from tests.conftest import TEST_ORG_ID
@@ -170,6 +171,15 @@ def test_launch_angle_campaign_uses_created_workflow_run_id(api_client, db_sessi
     assert launch_run is not None
     assert launch_run.kind == WorkflowKindEnum.strategy_v2_angle_launch
     assert launch_run.temporal_run_id != "pending"
+
+
+def test_launch_workflow_retries_funnel_generation_on_infra_failures_only():
+    retry_policy = strategy_v2_launch_workflow._FUNNEL_GENERATION_RETRY_POLICY
+
+    assert retry_policy.maximum_attempts == 3
+    assert retry_policy.non_retryable_error_types is not None
+    assert "TimeoutError" in retry_policy.non_retryable_error_types
+    assert "ToolExecutionError" in retry_policy.non_retryable_error_types
 
 
 def test_campaign_launch_history_endpoint_returns_launch_status(api_client, db_session):
