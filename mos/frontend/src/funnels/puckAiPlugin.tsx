@@ -272,7 +272,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
 
       const uploadAttachment = async () => {
         try {
-          const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+          const token = await getToken({ template: clerkTokenTemplate });
           const formData = new FormData();
           formData.append("files", file);
           const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -425,7 +425,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       };
 
       try {
-        const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+        const token = await getToken({ template: clerkTokenTemplate });
         const headers = new Headers();
         headers.set("Content-Type", "application/json");
         if (token) headers.set("Authorization", `Bearer ${token}`);

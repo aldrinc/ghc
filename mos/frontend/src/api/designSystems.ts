@@ -119,7 +119,7 @@ export function useUploadDesignSystemLogo() {
       if (!clientId) throw new Error("Client ID is required to upload a logo.");
       if (!file) throw new Error("Logo file is required.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       formData.append("file", file);
       const query = new URLSearchParams();

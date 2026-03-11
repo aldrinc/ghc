@@ -63,7 +63,7 @@ export function useClaudeStream() {
       onEvent: (event: ClaudeStreamEvent) => void
     ): Promise<ClaudeStreamHandle> => {
       const controller = new AbortController();
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers({ "Content-Type": "application/json" });
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);

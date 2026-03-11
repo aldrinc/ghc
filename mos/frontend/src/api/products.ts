@@ -195,7 +195,7 @@ export function useUploadProductAssets(productId: string) {
       if (!productId) throw new Error("Product ID is required to upload assets.");
       if (!files.length) throw new Error("No files selected for upload.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
@@ -235,7 +235,7 @@ export function useUploadProductAssetsById() {
       if (!productId) throw new Error("Product ID is required to upload assets.");
       if (!files.length) throw new Error("No files selected for upload.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
