@@ -7,7 +7,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import httpx
 
@@ -20,7 +20,7 @@ from app.observability import start_langfuse_generation
 logger = logging.getLogger(__name__)
 CLAUDE_API_BASE_URL = os.getenv("ANTHROPIC_API_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
 CLAUDE_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_HTTP_TIMEOUT", "300"))
-CLAUDE_DEFAULT_MODEL = os.getenv("CLAUDE_DEFAULT_MODEL", "claude-3-5-sonnet-20241022")
+CLAUDE_DEFAULT_MODEL = os.getenv("CLAUDE_DEFAULT_MODEL", "claude-opus-4-6")
 CLAUDE_STRUCTURED_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_STRUCTURED_HTTP_TIMEOUT", "900"))
 CLAUDE_STRUCTURED_MAX_ATTEMPTS = max(1, int(os.getenv("ANTHROPIC_STRUCTURED_MAX_ATTEMPTS", "3")))
 CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504, 529}
@@ -501,6 +501,7 @@ def call_claude_structured_message(
     temperature: float = 0.0,
     http_timeout_seconds: Optional[float] = None,
     max_attempts: Optional[int] = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> Dict[str, Any]:
     """
     Call Claude Messages API with structured outputs enabled and return parsed JSON + raw response.
@@ -573,9 +574,36 @@ def call_claude_structured_message(
         tags=["llm", "anthropic", "structured"],
         trace_name="llm.workflow",
     ) as generation:
+        call_started_at = time.monotonic()
         request_id: str | None = None
         payload: Dict[str, Any] | None = None
         last_retryable_error: Exception | None = None
+
+        def _emit_progress(status: str, **extra: Any) -> None:
+            if progress_callback is None:
+                return
+            progress_payload: dict[str, Any] = {
+                "status": status,
+                "provider": "anthropic",
+                "model": candidate_model,
+            }
+            for key, value in extra.items():
+                if value is not None:
+                    progress_payload[key] = value
+            progress_callback(progress_payload)
+
+        logger.info(
+            "claude_structured_message_started",
+            extra={
+                "model": candidate_model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "timeout_seconds": structured_timeout,
+                "max_attempts": structured_max_attempts,
+                "message_count": len(request_messages),
+            },
+        )
+        _emit_progress("submitted", max_attempts=structured_max_attempts, message_count=len(request_messages))
 
         for attempt in range(1, structured_max_attempts + 1):
             try:
@@ -609,11 +637,35 @@ def call_claude_structured_message(
                             "model": candidate_model,
                         },
                     )
+                    _emit_progress(
+                        "retrying",
+                        attempt=attempt,
+                        request_id=request_id,
+                        status_code=status_code,
+                        elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                    )
                     time.sleep(min(2 ** (attempt - 1), 8))
                     continue
 
                 body_text = exc.response.text if exc.response else ""
                 status = exc.response.status_code if exc.response else "unknown"
+                logger.error(
+                    "claude_structured_message_failed",
+                    extra={
+                        "model": candidate_model,
+                        "request_id": request_id,
+                        "status_code": status,
+                        "attempt": attempt,
+                        "elapsed_seconds": round(time.monotonic() - call_started_at, 3),
+                    },
+                )
+                _emit_progress(
+                    "failed",
+                    attempt=attempt,
+                    request_id=request_id,
+                    status_code=status,
+                    elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                )
                 raise RuntimeError(
                     f"Claude structured message failed (status={status}{request_id_suffix}): {body_text}"
                 ) from exc
@@ -629,12 +681,48 @@ def call_claude_structured_message(
                             "error": str(exc),
                         },
                     )
+                    _emit_progress(
+                        "retrying",
+                        attempt=attempt,
+                        error=str(exc),
+                        elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                    )
                     time.sleep(min(2 ** (attempt - 1), 8))
                     continue
+                logger.error(
+                    "claude_structured_message_failed",
+                    extra={
+                        "model": candidate_model,
+                        "attempt": attempt,
+                        "elapsed_seconds": round(time.monotonic() - call_started_at, 3),
+                        "error": str(exc),
+                    },
+                )
+                _emit_progress(
+                    "failed",
+                    attempt=attempt,
+                    error=str(exc),
+                    elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                )
                 raise RuntimeError(f"Claude structured message failed: {exc}") from exc
 
         if payload is None:
             terminal_error = last_retryable_error or RuntimeError("unknown Claude structured message error")
+            logger.error(
+                "claude_structured_message_failed",
+                extra={
+                    "model": candidate_model,
+                    "attempts": structured_max_attempts,
+                    "elapsed_seconds": round(time.monotonic() - call_started_at, 3),
+                    "error": str(terminal_error),
+                },
+            )
+            _emit_progress(
+                "failed",
+                attempts=structured_max_attempts,
+                error=str(terminal_error),
+                elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+            )
             raise RuntimeError(
                 "Claude structured message failed after retry budget exhausted. "
                 f"attempts={structured_max_attempts} error={terminal_error}"
@@ -680,6 +768,34 @@ def call_claude_structured_message(
             )
 
         usage_details = _extract_anthropic_usage_from_payload(payload)
+        elapsed_seconds = round(time.monotonic() - call_started_at, 3)
+        logger.info(
+            "claude_structured_message_completed",
+            extra={
+                "model": candidate_model,
+                "request_id": request_id,
+                "stop_reason": stop_reason,
+                "elapsed_seconds": elapsed_seconds,
+                "input_tokens": usage_details.get("input") if isinstance(usage_details, dict) else None,
+                "output_tokens": usage_details.get("output") if isinstance(usage_details, dict) else None,
+                "output_chars": len(text_content) if text_content else len(json.dumps(parsed, ensure_ascii=False)),
+            },
+        )
+        progress_payload: dict[str, Any] = {
+            "request_id": request_id,
+            "stop_reason": stop_reason,
+            "elapsed_seconds": elapsed_seconds,
+        }
+        if isinstance(usage_details, dict):
+            input_tokens = usage_details.get("input")
+            output_tokens = usage_details.get("output")
+            if isinstance(input_tokens, int):
+                progress_payload["input_tokens"] = input_tokens
+            if isinstance(output_tokens, int):
+                progress_payload["output_tokens"] = output_tokens
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+                progress_payload["total_tokens"] = input_tokens + output_tokens
+        _emit_progress("completed", **progress_payload)
         if generation is not None:
             generation.update(
                 output=_structured_output_summary(payload=payload, parsed=parsed, text_content=text_content),

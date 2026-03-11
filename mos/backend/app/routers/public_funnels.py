@@ -116,8 +116,13 @@ def _publication_id_for_public_response(funnel: Funnel) -> str:
     return str(funnel.active_publication_id or funnel.id)
 
 
+def _normalize_variant_provider(provider: str | None) -> str | None:
+    cleaned = str(provider or "").strip().lower()
+    return cleaned or None
+
+
 def _is_checkout_ready_variant(variant: ProductVariant) -> bool:
-    provider = str(variant.provider or "").strip().lower()
+    provider = _normalize_variant_provider(variant.provider)
     if not provider:
         return False
     external_price_id = str(variant.external_price_id or "").strip()
@@ -532,11 +537,13 @@ def public_checkout(
     if not variant:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Variant resolution failed.")
 
-    if not variant.provider:
+    normalized_provider = _normalize_variant_provider(variant.provider)
+    if not normalized_provider:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Variant provider is required for checkout.",
         )
+    external_price_id = str(variant.external_price_id or "").strip() or None
     metadata = {
         "funnel_slug": _metadata_value(payload.funnelSlug, "funnelSlug"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
@@ -552,8 +559,8 @@ def public_checkout(
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
-    if variant.provider == "stripe":
-        if not variant.external_price_id:
+    if normalized_provider == "stripe":
+        if not external_price_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Stripe price ID is missing for this variant.",
@@ -578,20 +585,20 @@ def public_checkout(
             mode="payment",
             success_url=str(payload.successUrl),
             cancel_url=str(payload.cancelUrl),
-            line_items=[{"price": variant.external_price_id, "quantity": payload.quantity}],
+            line_items=[{"price": external_price_id, "quantity": payload.quantity}],
             metadata=metadata,
         )
         return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
-    if variant.provider == "shopify":
-        if not variant.external_price_id:
+    if normalized_provider == "shopify":
+        if not external_price_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Shopify variant GID is missing for this variant.",
             )
         checkout = create_shopify_checkout(
             client_id=str(funnel.client_id),
-            variant_gid=variant.external_price_id,
+            variant_gid=external_price_id,
             quantity=payload.quantity,
             metadata=metadata,
         )

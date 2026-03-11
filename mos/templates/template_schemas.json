@@ -218,7 +218,8 @@
         "type": "object",
         "required": ["logo"],
         "fields": {
-          "logo": { "type_ref": "shared.ImageAsset", "required": true }
+          "logo": { "type_ref": "shared.ImageAsset", "required": true },
+          "logoVariant": { "type": "string", "required": false, "enum": ["default", "onDark"] }
         }
       },
       "FloatingCta": {
@@ -786,6 +787,7 @@
         "required": ["logo", "copyright"],
         "fields": {
           "logo": { "type_ref": "shared.ImageAsset", "required": true },
+          "logoVariant": { "type": "string", "required": false, "enum": ["default", "onDark"] },
           "copyright": { "type": "string", "required": true },
           "company": { "type": "string", "required": false }
         }

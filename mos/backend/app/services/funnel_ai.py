@@ -2470,6 +2470,108 @@ def _format_sales_pdp_money(value: float) -> str:
     return f"${rounded:.2f}".rstrip("0").rstrip(".")
 
 
+def _select_sales_pdp_default_offer_option(purchase: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(purchase, dict):
+        return None
+    offer = purchase.get("offer")
+    if not isinstance(offer, dict):
+        return None
+    options = offer.get("options")
+    if not isinstance(options, list) or not options:
+        return None
+
+    variant_schema = purchase.get("variantSchema")
+    defaults = variant_schema.get("defaults") if isinstance(variant_schema, dict) else None
+    default_offer_id = defaults.get("offerId") if isinstance(defaults, dict) else None
+    if isinstance(default_offer_id, str) and default_offer_id.strip():
+        for option in options:
+            price = option.get("price") if isinstance(option, dict) else None
+            if (
+                isinstance(option, dict)
+                and option.get("id") == default_offer_id
+                and isinstance(price, (int, float))
+                and not isinstance(price, bool)
+            ):
+                return option
+
+    for option in options:
+        price = option.get("price") if isinstance(option, dict) else None
+        if isinstance(option, dict) and isinstance(price, (int, float)) and not isinstance(price, bool):
+            return option
+    return None
+
+
+def _sync_sales_pdp_header_cta_labels(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+) -> None:
+    label_template: str | None = None
+    price_label: str | None = None
+
+    def iter_component_configs(
+        component_types: set[str],
+    ) -> Iterator[tuple[str, Any, _ConfigJsonContext | None]]:
+        for ctx in config_contexts:
+            if ctx.component_type in component_types and isinstance(ctx.parsed, dict):
+                yield ctx.component_type, ctx.parsed, ctx
+        for obj in walk_json(puck_data):
+            if not isinstance(obj, dict):
+                continue
+            comp_type = obj.get("type")
+            if comp_type not in component_types:
+                continue
+            props = obj.get("props")
+            if not isinstance(props, dict):
+                continue
+            config = props.get("config")
+            if isinstance(config, dict):
+                yield comp_type, config, None
+
+    for comp_type, config, _ctx in iter_component_configs({"SalesPdpHero", "SalesPdpTemplate"}):
+        hero = config.get("hero") if comp_type == "SalesPdpTemplate" else config
+        if not isinstance(hero, dict):
+            continue
+        purchase = hero.get("purchase")
+        if not isinstance(purchase, dict):
+            continue
+        cta = purchase.get("cta")
+        if isinstance(cta, dict):
+            raw_template = cta.get("labelTemplate")
+            if isinstance(raw_template, str) and raw_template.strip():
+                label_template = raw_template.strip()
+        default_offer = _select_sales_pdp_default_offer_option(purchase)
+        if isinstance(default_offer, dict):
+            raw_price = default_offer.get("price")
+            if isinstance(raw_price, (int, float)) and not isinstance(raw_price, bool):
+                price_label = _format_sales_pdp_money(float(raw_price))
+        if label_template and price_label:
+            break
+
+    if not label_template or not price_label:
+        return
+
+    resolved_label = label_template.replace("{price}", price_label)
+
+    for comp_type, config, ctx in iter_component_configs({"SalesPdpHeader", "SalesPdpHero", "SalesPdpTemplate"}):
+        header = config
+        if comp_type == "SalesPdpHero":
+            header = config.get("header")
+        elif comp_type == "SalesPdpTemplate":
+            hero = config.get("hero")
+            header = hero.get("header") if isinstance(hero, dict) else None
+        if not isinstance(header, dict):
+            continue
+        cta = header.get("cta")
+        if not isinstance(cta, dict):
+            continue
+        if cta.get("label") == resolved_label:
+            continue
+        cta["label"] = resolved_label
+        if ctx:
+            ctx.dirty = True
+
+
 def _product_prompt_mentions_devices(prompt: str | None) -> bool:
     if not isinstance(prompt, str) or not prompt.strip():
         return False
@@ -2942,6 +3044,29 @@ def _apply_product_image_overrides_for_ai(
                             prompt_hint=prompt_hint,
                             product_type=product_type,
                             alt="Product in use",
+                        )
+                        if ctx:
+                            ctx.dirty = True
+                        continue
+
+                    prompt = image.get("prompt")
+                    has_prompt = isinstance(prompt, str) and prompt.strip() != ""
+                    src_value = image.get("src")
+                    has_placeholder_src = isinstance(src_value, str) and _is_placeholder_src(src_value)
+                    has_reference_asset = isinstance(image.get("referenceAssetPublicId"), str) and bool(
+                        image.get("referenceAssetPublicId").strip()
+                    )
+                    has_direct_asset = isinstance(image.get("assetPublicId"), str) and bool(
+                        image.get("assetPublicId").strip()
+                    )
+                    if comp_type == "SalesPdpStoryProblem" and (
+                        has_placeholder_src or (not has_prompt and not has_reference_asset and not has_direct_asset)
+                    ):
+                        prompt_hint = _build_editorial_context_prompt(text or "problem section image")
+                        _apply_editorial_prompt(
+                            image,
+                            prompt_hint=prompt_hint,
+                            alt="Problem section image",
                         )
                         if ctx:
                             ctx.dirty = True
@@ -5502,6 +5627,10 @@ def generate_funnel_page_draft(
         brand_logo_public_id=brand_logo_public_id,
     )
     if template_component_kind == "sales-pdp":
+        _sync_sales_pdp_header_cta_labels(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+        )
         _enforce_sales_pdp_guarantee_testimonial_only_images(
             puck_data=puck_data,
             config_contexts=config_contexts,
@@ -6247,6 +6376,10 @@ def stream_funnel_page_draft(
             brand_logo_public_id=brand_logo_public_id,
         )
         if template_component_kind == "sales-pdp":
+            _sync_sales_pdp_header_cta_labels(
+                puck_data=puck_data,
+                config_contexts=config_contexts,
+            )
             _enforce_sales_pdp_guarantee_testimonial_only_images(
                 puck_data=puck_data,
                 config_contexts=config_contexts,

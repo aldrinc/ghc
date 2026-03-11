@@ -63,6 +63,6 @@ def test_llm_client_default_model_falls_back_to_claude(monkeypatch) -> None:
 
     importlib.reload(llm_client_module)
     try:
-        assert llm_client_module._DEFAULT_MODEL == "claude-sonnet-4-6"
+        assert llm_client_module._DEFAULT_MODEL == "claude-opus-4-6"
     finally:
         importlib.reload(llm_client_module)

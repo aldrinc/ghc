@@ -287,6 +287,8 @@ def test_copy_input_packet_and_runtime_blocks_build_successfully() -> None:
     assert "problem_recap" in sales_page_runtime
     assert "cta_primary" in sales_page_runtime
     assert "`whats_inside.benefits` must be exactly 4 short, outcome-led purchase-module bullets." in sales_page_runtime
+    assert "`mechanism.comparison.badge` must be exactly `US vs THEM`." in sales_page_runtime
+    assert "`faq.items` must contain at least 8 entries." in sales_page_runtime
 
 
 def test_copy_repair_directives_add_cta_budget_fix_when_cta_count_fails() -> None:
@@ -784,6 +786,7 @@ def test_llm_generate_text_uses_claude_structured_output_when_schema_requested(m
         output_schema: dict[str, object],
         max_tokens: int,
         temperature: float,
+        progress_callback=None,
     ) -> dict[str, object]:
         captured["model"] = model
         captured["system"] = system
@@ -851,6 +854,7 @@ def test_llm_generate_text_uses_explicit_claude_messages_when_provided(monkeypat
         temperature: float,
         user_content: list[dict[str, object]] | None = None,
         messages: list[dict[str, object]] | None = None,
+        progress_callback=None,
     ) -> dict[str, object]:
         captured["model"] = model
         captured["system"] = system

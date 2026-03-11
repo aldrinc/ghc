@@ -26,6 +26,11 @@ import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api
 import { toast } from "@/components/ui/toast";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  SUPPORTED_PRODUCT_IMAGE_ACCEPT,
+  SUPPORTED_PRODUCT_IMAGE_LABEL,
+  isSupportedProductImageFile,
+} from "@/lib/productAssetUpload";
 import type { Client } from "@/types/common";
 
 type WizardStep = {
@@ -447,30 +452,35 @@ export function OnboardingWizard({
         productName: (response as any)?.product_name || firstProduct.product_name.trim(),
       };
       const primaryImageFile = firstProduct.primary_image_file;
+      let imageSetupFailed = false;
       if (primaryImageFile) {
-        void (async () => {
-          try {
-            const uploadedAssets = await uploadProductAssetsById.mutateAsync({
-              productId,
-              files: [primaryImageFile],
-            });
-            const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
-            if (!primaryImageAsset?.id) {
-              throw new Error("Product image upload did not return an image asset.");
-            }
-            await setProductPrimaryAssetById.mutateAsync({
-              productId,
-              primaryAssetId: primaryImageAsset.id,
-            });
-          } catch (error) {
-            console.error("Post-onboarding product image setup failed", error);
+        try {
+          const uploadedAssets = await uploadProductAssetsById.mutateAsync({
+            productId,
+            files: [primaryImageFile],
+          });
+          const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
+          if (!primaryImageAsset?.id) {
+            throw new Error("Product image upload did not return an image asset.");
           }
-        })();
+          await setProductPrimaryAssetById.mutateAsync({
+            productId,
+            primaryAssetId: primaryImageAsset.id,
+          });
+        } catch (error) {
+          imageSetupFailed = true;
+          console.error("Post-onboarding product image setup failed", error);
+        }
       }
 
       resetWizard();
       setOpen(false);
       completeOnboarding(completionPayload);
+      if (imageSetupFailed) {
+        toast.error(
+          `Onboarding started, but the primary product image was not saved. Upload a ${SUPPORTED_PRODUCT_IMAGE_LABEL} file from the product page.`,
+        );
+      }
     } catch (err) {
       // errors are surfaced via mutation onError handlers
     }
@@ -834,18 +844,22 @@ export function OnboardingWizard({
 
                 <FieldRoot name="primary_image_file" className="md:col-span-2">
                   <FieldLabel>Primary product image</FieldLabel>
-                  <FieldDescription>Required. Upload the product image used for downstream generation.</FieldDescription>
+                  <FieldDescription>
+                    Required. Upload the product image used for downstream generation. Supported:{" "}
+                    {SUPPORTED_PRODUCT_IMAGE_LABEL}.
+                  </FieldDescription>
                   <Input
                     type="file"
-                    accept="image/*"
+                    accept={SUPPORTED_PRODUCT_IMAGE_ACCEPT}
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       if (!file) {
                         setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
                         return;
                       }
-                      if (!file.type.startsWith("image/")) {
-                        toast.error("Primary product image must be an image file.");
+                      if (!isSupportedProductImageFile(file)) {
+                        setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
+                        toast.error(`Primary product image must be a ${SUPPORTED_PRODUCT_IMAGE_LABEL} file.`);
                         e.currentTarget.value = "";
                         return;
                       }

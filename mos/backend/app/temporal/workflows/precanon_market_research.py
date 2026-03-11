@@ -48,7 +48,7 @@ with workflow.unsafe.imports_passed_through():
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL", "gpt-5.2-2025-12-11")
+DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL", "claude-opus-4-6")
 DEFAULT_REASONING_MODEL = os.getenv("PRECANON_REASONING_MODEL", "gpt-5.2-2025-12-11")
 DEFAULT_PARENT_FOLDER_ID = os.getenv("RESEARCH_DRIVE_PARENT_FOLDER_ID") or os.getenv("PARENT_FOLDER_ID")
 STEP04_START_TO_CLOSE_MINUTES = int(os.getenv("PRECANON_STEP04_START_TO_CLOSE_MINUTES", "360"))

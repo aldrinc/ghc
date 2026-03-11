@@ -33,6 +33,40 @@ function currency(n: number) {
   return `$${Math.round(n)}`
 }
 
+const COMPARISON_VS_RE = /\s+vs\.?\s+/i
+
+function looksLikePrimaryComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ['our ', 'workflow', 'triage', 'structured', 'system', 'handbook', 'approach'].some((token) =>
+    normalized.includes(token)
+  )
+}
+
+function looksLikeAlternativeComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ['typical', 'standard', 'generic', 'other', 'alternative', 'old way', 'scattered', 'checking'].some(
+    (token) => normalized.includes(token)
+  )
+}
+
+function normalizeComparisonTitle(title: string, columns: PdpConfig['comparison']['columns']) {
+  const cleaned = title.trim()
+  if (!cleaned) return `${columns.pup} vs. ${columns.disposable}`
+  const parts = cleaned.split(COMPARISON_VS_RE)
+  if (parts.length !== 2) return cleaned
+  const [left, right] = parts.map((value) => value.trim())
+  const leftPrimary = looksLikePrimaryComparisonLabel(left)
+  const rightPrimary = looksLikePrimaryComparisonLabel(right)
+  const leftAlternative = looksLikeAlternativeComparisonLabel(left)
+  const rightAlternative = looksLikeAlternativeComparisonLabel(right)
+  if ((rightPrimary && !leftPrimary) || (leftAlternative && !rightAlternative)) {
+    return `${right} vs. ${left}`
+  }
+  return `${left} vs. ${right}`
+}
+
 function resolveUrgencyMonthLabels(now: Date = new Date()) {
   const currentYear = now.getUTCFullYear()
   const currentMonthIndex = now.getUTCMonth()
@@ -858,6 +892,8 @@ export function PdpPage({ config, copy }: Props) {
     return { left, right }
   }, [guaranteeImages])
 
+  const comparisonTitle = normalizeComparisonTitle(config.comparison.title, config.comparison.columns)
+
   const showOutOfStock = isRuleMatch(config.hero.purchase.outOfStock, selectedSize, selectedColor)
   const showShippingDelay = isRuleMatch(config.hero.purchase.shippingDelay, selectedSize, selectedColor)
 
@@ -1229,13 +1265,17 @@ export function PdpPage({ config, copy }: Props) {
           >
             {config.story.problem.layout === 'textRight' ? (
               <>
-                <img className={styles.storyImage} src={config.story.problem.image.src} alt={config.story.problem.image.alt} />
+                <div className={styles.storyMediaFrame}>
+                  <img className={styles.storyImage} src={config.story.problem.image.src} alt={config.story.problem.image.alt} />
+                </div>
                 <StoryText section={config.story.problem} />
               </>
             ) : (
               <>
                 <StoryText section={config.story.problem} />
-                <img className={styles.storyImage} src={config.story.problem.image.src} alt={config.story.problem.image.alt} />
+                <div className={styles.storyMediaFrame}>
+                  <img className={styles.storyImage} src={config.story.problem.image.src} alt={config.story.problem.image.alt} />
+                </div>
               </>
             )}
           </div>
@@ -1255,13 +1295,17 @@ export function PdpPage({ config, copy }: Props) {
           >
             {config.story.solution.layout === 'textRight' ? (
               <>
-                <img className={styles.storyImage} src={config.story.solution.image.src} alt={config.story.solution.image.alt} />
+                <div className={styles.storyMediaFrame}>
+                  <img className={styles.storyImage} src={config.story.solution.image.src} alt={config.story.solution.image.alt} />
+                </div>
                 <StoryText section={config.story.solution} />
               </>
             ) : (
               <>
                 <StoryText section={config.story.solution} />
-                <img className={styles.storyImage} src={config.story.solution.image.src} alt={config.story.solution.image.alt} />
+                <div className={styles.storyMediaFrame}>
+                  <img className={styles.storyImage} src={config.story.solution.image.src} alt={config.story.solution.image.alt} />
+                </div>
               </>
             )}
           </div>
@@ -1284,7 +1328,7 @@ export function PdpPage({ config, copy }: Props) {
         <Container>
           <div style={{ textAlign: 'center' }}>
             <div className={styles.sectionBadge}>{config.comparison.badge}</div>
-            <h2 className={styles.sectionHeading}>{config.comparison.title}</h2>
+            <h2 className={styles.sectionHeading}>{comparisonTitle}</h2>
             <div className={styles.comparisonHint}>{config.comparison.swipeHint}</div>
           </div>
 

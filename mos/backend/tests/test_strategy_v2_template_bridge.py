@@ -14,6 +14,23 @@ from app.strategy_v2.template_bridge import (
 )
 
 
+def _faq_items() -> list[dict[str, str]]:
+    return [
+        {"question": "Is this medical advice?", "answer": "No, educational guidance only."},
+        {"question": "Is this digital?", "answer": "Yes, instant access after purchase."},
+        {"question": "How fast can I start?", "answer": "Most readers can start the same day."},
+        {"question": "Does it work with multiple meds?", "answer": "Yes, it is built for medication-aware checks."},
+        {"question": "Do I need prior experience?", "answer": "No, the guidance is written for beginners."},
+        {"question": "Can I print it?", "answer": "Yes, you can print the worksheets and reference pages."},
+        {"question": "Is there a refund policy?", "answer": "Yes, the guarantee terms explain the refund window."},
+        {"question": "What support does it include?", "answer": "It includes practical prompts and clear next steps."},
+    ]
+
+
+def _faq_pills() -> list[dict[str, str]]:
+    return [{"label": item["question"], "answer": item["answer"]} for item in _faq_items()]
+
+
 def _sales_markdown() -> str:
     return """
 # Headline
@@ -58,7 +75,7 @@ Everything is organized for quick lookup.
 ## Bonus Stack + Value: Included extras
 You also get a compact quick-start reference page.
 
-## Guarantee: 30-day confidence promise
+## Guarantee: 30-Day Risk Free Guarantee
 Try it for 30 days and request a refund if it is not a fit.
 Why this guarantee exists
 Because this is designed for practical, repeatable use.
@@ -74,10 +91,63 @@ A: No. It is an educational reference with safety guardrails.
 Q: Is this digital?
 A: Yes, it is delivered digitally for instant access.
 
+Q: How fast can I start?
+A: Most readers can start the same day.
+
+Q: Does it work with multiple meds?
+A: Yes, it is built for medication-aware checks.
+
+Q: Do I need prior experience?
+A: No, the guidance is written for beginners.
+
+Q: Can I print it?
+A: Yes, you can print the worksheets and reference pages.
+
+Q: Is there a refund policy?
+A: Yes, the guarantee terms explain the refund window.
+
+Q: What support does it include?
+A: It includes practical prompts and clear next steps.
+
 ## CTA #3 + P.S.: Final step
 Use this reference before your next remedy decision.
 [Get access now](#offer)
 """
+
+
+def _valid_pre_sales_reasons() -> list[dict[str, object]]:
+    return [
+        {
+            "number": 1,
+            "title": "Conflicting advice is common",
+            "body": "A structured checklist helps you evaluate signals quickly. It keeps next steps clear.",
+            "image": {"alt": "Reader reviewing a medication-aware herbal checklist"},
+        },
+        {
+            "number": 2,
+            "title": "Red flags are easy to miss",
+            "body": "Simple stop signs reduce rushed decisions. They make follow-up questions more precise.",
+            "image": {"alt": "Highlighted stop-sign notes on a herbal screening worksheet"},
+        },
+        {
+            "number": 3,
+            "title": "Prep changes the appointment",
+            "body": "Better notes shorten the back-and-forth. Families leave with clearer answers.",
+            "image": {"alt": "Parent organizing questions before a practitioner visit"},
+        },
+        {
+            "number": 4,
+            "title": "One reference beats scattered tabs",
+            "body": "A single workflow keeps safety checks in one place. It reduces second-guessing mid-decision.",
+            "image": {"alt": "Open handbook beside a neat stack of notes"},
+        },
+        {
+            "number": 5,
+            "title": "Confidence comes from clear boundaries",
+            "body": "Knowing when to pause lowers avoidable risk. That makes the next action easier to choose.",
+            "image": {"alt": "Checklist with clear do-now and pause-now sections"},
+        },
+    ]
 
 
 def _valid_sales_payload() -> dict[str, object]:
@@ -109,7 +179,7 @@ def _valid_sales_payload() -> dict[str, object]:
                 "right_body": "Verifiable, structured, and practical.",
             },
             "comparison": {
-                "badge": "SIDE-BY-SIDE COMPARISON",
+                "badge": "US vs THEM",
                 "title": "Safety-first handbook vs marketplace books",
                 "swipe_hint": "Swipe right to see comparison ->",
                 "columns": {"pup": "SAFETY-FIRST HANDBOOK", "disposable": "MARKETPLACE BOOKS"},
@@ -147,7 +217,7 @@ def _valid_sales_payload() -> dict[str, object]:
             "free_gifts_body": "A concise one-page reference.",
         },
         "guarantee": {
-            "title": "Try it with confidence",
+            "title": "30-Day Risk Free Guarantee",
             "paragraphs": ["If it is not a fit, request a refund."],
             "why_title": "Why this guarantee exists",
             "why_body": "It is built for practical repeatable use.",
@@ -155,12 +225,9 @@ def _valid_sales_payload() -> dict[str, object]:
         },
         "faq": {
             "title": "Common questions",
-            "items": [{"question": "Is this medical advice?", "answer": "No, educational guidance only."}],
+            "items": _faq_items(),
         },
-        "faq_pills": [
-            {"label": "Is this medical advice?", "answer": "No, educational guidance only."},
-            {"label": "Is this digital?", "answer": "Yes, instant access after purchase."},
-        ],
+        "faq_pills": _faq_pills(),
         "marquee_items": [
             "Medication-aware",
             "Safety-first",
@@ -269,12 +336,12 @@ def test_upgrade_sales_payload_normalizes_common_legacy_keys() -> None:
             "items": [{"title": "Bonus A"}, {"title": "Bonus B"}],
         },
         "guarantee": {
-            "heading": "Legacy Guarantee Heading",
+            "heading": "45-Day Risk Free Guarantee",
             "body": "Try it and request a refund if needed.",
         },
         "faq": {
             "heading": "Legacy FAQ Heading",
-            "items": [{"q": "Is this digital?", "a": "Yes."}],
+            "items": _faq_items(),
         },
         "cta_close": {"cta_label": "Start now"},
         "problem_recap": {"heading": "Should be removed"},
@@ -294,7 +361,7 @@ def test_upgrade_sales_payload_normalizes_common_legacy_keys() -> None:
     assert validated["hero"]["purchase_title"] == "Legacy Hero Headline"
     assert validated["problem"]["title"] == "Legacy Problem Heading"
     assert validated["mechanism"]["comparison"]["columns"]["pup"] == "Our way"
-    assert validated["faq_pills"][0]["label"] == "Is this digital?"
+    assert validated["faq_pills"][0]["label"] == "Is this medical advice?"
     assert "schema" not in upgraded
     assert "template_id" not in upgraded
 
@@ -364,13 +431,13 @@ def test_upgrade_sales_payload_normalizes_problem_recap_and_comparison_variants(
             "total_value_statement": "Total bonus value included.",
         },
         "guarantee": {
-            "headline": "60-day guarantee",
+            "headline": "60-Day Risk Free Guarantee",
             "body": "Request a refund within 60 days.",
             "badge_text": "Money-back",
         },
         "faq": {
             "headline": "FAQ",
-            "items": [{"q": "Is this digital?", "a": "Yes."}],
+            "items": _faq_items(),
         },
         "cta_close": {"cta_label": "Get access now"},
         "marquee_items": [
@@ -451,11 +518,8 @@ def test_upgrade_sales_payload_derives_faq_items_and_cta_close_from_legacy_keys(
             "headline": "Inside",
         },
         "bonus": {"headline": "Bonus", "free_gifts_body": "Included extras."},
-        "guarantee": {"headline": "Guarantee", "body": "Refund within 60 days."},
-        "faq_pills": [
-            {"label": "Is this digital?", "answer": "Yes."},
-            {"label": "Is this medical advice?", "answer": "No."},
-        ],
+        "guarantee": {"headline": "30-Day Risk Free Guarantee", "body": "Refund within 60 days."},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Fast", "Practical", "Structured", "Safety-first"],
         "urgency_message": "Selling out quickly.",
         "cta_primary": {"label": "Start now"},
@@ -470,9 +534,9 @@ def test_upgrade_sales_payload_derives_faq_items_and_cta_close_from_legacy_keys(
         payload_fields=upgraded,
     )
 
-    assert validated["faq"]["items"][0]["question"] == "Is this digital?"
-    assert validated["faq"]["items"][0]["answer"] == "Yes."
-    assert validated["faq_pills"][1]["label"] == "Is this medical advice?"
+    assert validated["faq"]["items"][0]["question"] == "Is this medical advice?"
+    assert validated["faq"]["items"][0]["answer"] == "No, educational guidance only."
+    assert validated["faq_pills"][1]["label"] == "Is this digital?"
     assert validated["cta_close"] == "Start now"
 
 
@@ -537,13 +601,13 @@ def test_upgrade_sales_payload_handles_two_column_rows_and_strips_known_drift_ke
             "free_gifts_body": "Four support tools included.",
         },
         "guarantee": {
-            "headline": "60-day guarantee",
+            "headline": "60-Day Risk Free Guarantee",
             "body": "Request a refund if not a fit.",
             "cta_label": "Start now",
             "cta_url": "https://example.com/order",
         },
-        "faq": {"headline": "FAQ", "items": [{"q": "Is this digital?", "a": "Yes."}]},
-        "faq_pills": [{"label": "Is this digital?", "answer": "Yes."}],
+        "faq": {"headline": "FAQ", "items": _faq_items()},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Safety-first", "Practical", "Medication-aware", "Actionable"],
         "urgency_message": "Selling out faster than expected.",
         "cta_close": {"cta_label": "Get access now"},
@@ -567,6 +631,90 @@ def test_upgrade_sales_payload_handles_two_column_rows_and_strips_known_drift_ke
     assert "free_gifts_label" not in upgraded["bonus"]
     assert "cta_label" not in upgraded["guarantee"]
     assert "cta_url" not in upgraded["guarantee"]
+
+
+def test_upgrade_sales_payload_handles_feature_us_them_comparison_rows() -> None:
+    legacy_payload = {
+        "hero": {
+            "headline": "Interaction triage workflow",
+            "primary_cta_label": "Get access",
+            "primary_cta_subbullets": ["Fast setup", "No subscription"],
+        },
+        "problem": {
+            "headline": "Why this matters",
+            "body": "Most shoppers are left to guess at herb-drug interactions.",
+        },
+        "mechanism": {
+            "headline": "How this works",
+            "subheadline": "Use a structured screen before trying anything.",
+            "bullets": [
+                {"title": "Step 1", "body": "List the herb and medication."},
+                {"title": "Step 2", "body": "Check red flags."},
+                {"title": "Step 3", "body": "Cross-check sources."},
+                {"title": "Step 4", "body": "Prepare clinician questions."},
+                {"title": "Step 5", "body": "Review final contraindications."},
+            ],
+            "callout": {
+                "left_title": "Typical guide",
+                "left_body": "Generic and vague",
+                "right_title": "Workflow",
+                "right_body": "Specific and actionable",
+            },
+            "comparison": {
+                "badge": "US vs THEM",
+                "title": "Interaction Triage Workflow vs. Random Google Searches",
+                "swipe_hint": "Swipe to compare",
+                "columns": ["Honest Herbalist Handbook", "Typical Herbal Guides"],
+                "rows": [
+                    {
+                        "feature": "Herb-drug interaction screening",
+                        "us": "Built-in triage checklist for every herb",
+                        "them": "Rarely mentioned or buried in fine print",
+                    }
+                ],
+            },
+        },
+        "social_proof": {
+            "headline": "What readers say",
+            "testimonials": [{"quote": "This gave me a clear process."}],
+        },
+        "whats_inside": {
+            "benefits": [
+                "Start Faster",
+                "Stay On Track",
+                "Ask Better Questions",
+                "Feel More Certain",
+            ],
+            "headline": "Everything included",
+        },
+        "bonus": {
+            "headline": "Bonus stack",
+            "free_gifts_body": "Four support tools included.",
+        },
+        "guarantee": {
+            "headline": "30-Day Risk Free Guarantee",
+            "body": "Request a refund if not a fit.",
+        },
+        "faq": {"headline": "FAQ", "items": _faq_items()},
+        "faq_pills": _faq_pills(),
+        "marquee_items": ["Safety-first", "Practical", "Medication-aware", "Actionable"],
+        "urgency_message": "Selling out faster than expected.",
+        "cta_close": {"cta_label": "Get access now"},
+    }
+
+    upgraded = upgrade_strategy_v2_template_payload_fields(
+        template_id="sales-pdp",
+        payload_fields=legacy_payload,
+    )
+    validated = validate_strategy_v2_template_payload_fields(
+        template_id="sales-pdp",
+        payload_fields=upgraded,
+    )
+
+    row = validated["mechanism"]["comparison"]["rows"][0]
+    assert row["label"] == "Herb-drug interaction screening"
+    assert row["pup"] == "Built-in triage checklist for every herb"
+    assert row["disposable"] == "Rarely mentioned or buried in fine print"
 
 
 def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
@@ -613,11 +761,8 @@ def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
             "headline": "Inside",
         },
         "bonus": {"headline": "Bonus", "free_gifts_body": "Included extras."},
-        "guarantee": {"headline": "Guarantee", "body": "Refund within 60 days."},
-        "faq_pills": [
-            {"label": "Is this digital?", "answer": "Yes."},
-            {"label": "Is this medical advice?", "answer": "No."},
-        ],
+        "guarantee": {"headline": "30-Day Risk Free Guarantee", "body": "Refund within 60 days."},
+        "faq_pills": _faq_pills(),
         "marquee_items": ["Fast", "Practical", "Structured", "Safety-first"],
         "urgency_message": "Selling out quickly.",
         "cta_primary": {"label": "Start now"},
@@ -637,6 +782,18 @@ def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
 
 
 def test_upgrade_presales_payload_clamps_legacy_fields_to_contract_caps() -> None:
+    reasons = _valid_pre_sales_reasons()
+    reasons[0] = {
+        "number": 1,
+        "title": "Why long-form safety explanations need to be constrained for template payloads",
+        "body": (
+            "Sentence one explains the issue in detail. "
+            "Sentence two adds practical context. "
+            "Sentence three reinforces the action. "
+            "Sentence four should be trimmed."
+        ),
+        "image": {"alt": "Checklist visual"},
+    }
     legacy_payload = {
         "hero": {
             "title": "Safety-first herbal screening process " * 4,
@@ -653,19 +810,7 @@ def test_upgrade_presales_payload_clamps_legacy_fields_to_contract_caps() -> Non
                 }
             ],
         },
-        "reasons": [
-            {
-                "number": 1,
-                "title": "Why long-form safety explanations need to be constrained for template payloads",
-                "body": (
-                    "Sentence one explains the issue in detail. "
-                    "Sentence two adds practical context. "
-                    "Sentence three reinforces the action. "
-                    "Sentence four should be trimmed."
-                ),
-                "image": {"alt": "Checklist visual"},
-            }
-        ],
+        "reasons": reasons,
         "marquee": [
             "Interaction Triage Workflow For Parents",
             "Contraindication Flag Checker With Extra Words",
@@ -795,6 +940,7 @@ def test_template_payload_patch_operations_apply_to_sales_template() -> None:
 
 
 def test_template_payload_patch_operations_apply_to_presales_template() -> None:
+    reasons = _valid_pre_sales_reasons()
     fields = validate_strategy_v2_template_payload_fields(
         template_id="pre-sales-listicle",
         payload_fields={
@@ -816,16 +962,7 @@ def test_template_payload_patch_operations_apply_to_presales_template() -> None:
                     },
                 ],
             },
-            "reasons": [
-                {
-                    "number": 1,
-                    "title": "Conflicting advice is common",
-                    "body": "A structured checklist helps you evaluate signals quickly.",
-                    "image": {
-                        "alt": "Reader reviewing a medication-aware herbal checklist",
-                    },
-                }
-            ],
+            "reasons": reasons,
             "marquee": ["Safety first", "Clear decisions"],
             "pitch": {
                 "title": "Use the handbook for faster, safer choices",
@@ -894,14 +1031,7 @@ def test_validate_presales_payload_normalizes_social_proof_badges() -> None:
                     }
                 ],
             },
-            "reasons": [
-                {
-                    "number": 1,
-                    "title": "Conflicting advice is common",
-                    "body": "A structured checklist helps you evaluate signals quickly.",
-                    "image": {"alt": "Checklist visual"},
-                }
-            ],
+            "reasons": _valid_pre_sales_reasons(),
             "marquee": ["Safety first"],
             "pitch": {
                 "title": "Use the handbook for faster, safer choices",
@@ -927,6 +1057,37 @@ def test_validate_presales_payload_normalizes_social_proof_badges() -> None:
     assert fields["review_wall"]["title"].endswith("5 Star Reviews")
 
 
+def test_presales_template_payload_requires_at_least_five_reasons() -> None:
+    payload = {
+        "hero": {
+            "title": "What if your remedy process felt clear and safe?",
+            "subtitle": "A practical checklist before your next decision.",
+            "badges": [
+                {
+                    "label": "Original badge",
+                    "icon": {"alt": "Original icon", "prompt": "icon of something else"},
+                }
+            ],
+        },
+        "reasons": _valid_pre_sales_reasons()[:4],
+        "marquee": ["Safety first"],
+        "pitch": {
+            "title": "Use the handbook for faster, safer choices",
+            "bullets": ["Simple steps", "Clear boundaries", "Faster prep", "Better questions"],
+            "cta_label": "Learn more",
+            "image": {"alt": "Pitch visual"},
+        },
+        "review_wall": {
+            "title": "Trusted by practical families",
+            "button_label": "Open full reviews",
+        },
+        "floating_cta": {"label": "Learn more"},
+    }
+
+    with pytest.raises(StrategyV2DecisionError, match="reasons"):
+        validate_strategy_v2_template_payload_fields(template_id="pre-sales-listicle", payload_fields=payload)
+
+
 def test_sales_template_payload_requires_exactly_two_cta_subbullets() -> None:
     payload = _valid_sales_payload()
     hero = dict(payload["hero"])
@@ -943,6 +1104,27 @@ def test_sales_template_payload_rejects_hardcoded_cta_price() -> None:
     payload["hero"] = hero
 
     with pytest.raises(StrategyV2DecisionError, match="hero.primary_cta_label"):
+        validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
+
+
+def test_sales_template_payload_requires_risk_free_guarantee_language() -> None:
+    payload = _valid_sales_payload()
+    guarantee = dict(payload["guarantee"])
+    guarantee["title"] = "30-Day Confidence Guarantee"
+    payload["guarantee"] = guarantee
+
+    with pytest.raises(StrategyV2DecisionError, match="Risk Free Guarantee"):
+        validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
+
+
+def test_sales_template_payload_requires_at_least_eight_faqs() -> None:
+    payload = _valid_sales_payload()
+    faq = dict(payload["faq"])
+    faq["items"] = faq["items"][:2]
+    payload["faq"] = faq
+    payload["faq_pills"] = payload["faq_pills"][:2]
+
+    with pytest.raises(StrategyV2DecisionError, match="faq.items"):
         validate_strategy_v2_template_payload_fields(template_id="sales-pdp", payload_fields=payload)
 
 

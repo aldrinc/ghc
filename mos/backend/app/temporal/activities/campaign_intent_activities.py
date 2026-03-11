@@ -58,6 +58,36 @@ _BOOK_HELPER_TEXT_DISALLOWED_PHRASES: tuple[str, ...] = (
     "download",
     "pdf",
 )
+_BOOK_HELPER_TEXT_CORE_BOOK_SIGNALS: tuple[str, ...] = (
+    "book",
+    "books",
+    "field guide",
+    "guide",
+    "guidebook",
+    "handbook",
+    "manual",
+)
+_BOOK_HELPER_TEXT_DIGITAL_BOOK_PHRASES: tuple[str, ...] = (
+    "digital book",
+    "digital books",
+    "digital field guide",
+    "digital guide",
+    "digital guidebook",
+    "digital handbook",
+    "digital manual",
+    "downloadable book",
+    "downloadable field guide",
+    "downloadable guide",
+    "downloadable handbook",
+    "downloadable manual",
+    "ebook",
+    "e-book",
+    "pdf book",
+    "pdf field guide",
+    "pdf guide",
+    "pdf handbook",
+    "pdf manual",
+)
 _BOOK_CTA_DISALLOWED_PHRASES: tuple[str, ...] = (
     "get instant access",
     "instant access",
@@ -123,11 +153,20 @@ def _normalize_book_text_whitespace(text: str) -> str:
     return _BOOK_TEXT_WHITESPACE_RE.sub(" ", text).strip()
 
 
+def _book_offer_helper_mentions_core_book(text: str) -> bool:
+    lowered = text.lower()
+    if any(phrase in lowered for phrase in _BOOK_HELPER_TEXT_DIGITAL_BOOK_PHRASES):
+        return False
+    return any(signal in lowered for signal in _BOOK_HELPER_TEXT_CORE_BOOK_SIGNALS)
+
+
 def _normalize_book_offer_helper_text(text: str) -> str:
     cleaned = _normalize_book_text_whitespace(text)
     if not cleaned:
         return ""
     if _find_disallowed_phrase(cleaned, _BOOK_HELPER_TEXT_DISALLOWED_PHRASES) is None:
+        return cleaned
+    if _book_offer_helper_mentions_core_book(cleaned):
         return cleaned
 
     sentences = [part.strip() for part in _BOOK_HELPER_SENTENCE_SPLIT_RE.split(cleaned) if part.strip()]
@@ -242,7 +281,7 @@ def _assert_sales_payload_matches_product_type(
     cta_label = str(hero.get("primary_cta_label") or "").strip() if isinstance(hero, dict) else ""
 
     helper_phrase = _find_disallowed_phrase(helper_text, _BOOK_HELPER_TEXT_DISALLOWED_PHRASES)
-    if helper_phrase:
+    if helper_phrase and not _book_offer_helper_mentions_core_book(helper_text):
         raise ValueError(
             "Sales template payload uses digital-only delivery language for a book product. "
             f"field=whats_inside.offer_helper_text phrase={helper_phrase!r}. "

@@ -1827,6 +1827,124 @@ class ClientComplianceProfile(Base):
     )
 
 
+class PaidAdsPlatformProfile(Base):
+    __tablename__ = "paid_ads_platform_profiles"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", "platform", name="uq_paid_ads_platform_profiles_org_client_platform"),
+        sa.Index("idx_paid_ads_platform_profiles_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    ruleset_version: Mapped[str] = mapped_column(Text, nullable=False)
+
+    business_manager_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_manager_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ad_account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ad_account_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payment_method_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payment_method_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pixel_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_set_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_set_shopify_partner_installed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    data_set_data_sharing_level: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_set_assigned_to_ad_account: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    verified_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verified_domain_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attribution_click_window: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attribution_view_window: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    view_through_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    tracking_provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tracking_url_parameters: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PaidAdsQaRun(Base):
+    __tablename__ = "paid_ads_qa_runs"
+    __table_args__ = (
+        sa.Index("idx_paid_ads_qa_runs_org_client", "org_id", "client_id"),
+        sa.Index("idx_paid_ads_qa_runs_org_campaign", "org_id", "campaign_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=True
+    )
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[str] = mapped_column(Text, nullable=False)
+    ruleset_version: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    blocker_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    high_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    medium_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    low_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    needs_manual_review_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    checked_rule_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    report_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    report_file_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PaidAdsQaFinding(Base):
+    __tablename__ = "paid_ads_qa_findings"
+    __table_args__ = (
+        sa.Index("idx_paid_ads_qa_findings_run", "qa_run_id"),
+        sa.Index("idx_paid_ads_qa_findings_org_rule", "org_id", "rule_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    qa_run_id: Mapped[str] = mapped_column(
+        ForeignKey("paid_ads_qa_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    rule_id: Mapped[str] = mapped_column(Text, nullable=False)
+    rule_type: Mapped[str] = mapped_column(Text, nullable=False)
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_type: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    fix_guidance_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    needs_verification: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    source_title: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    policy_anchor_quote: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ResearchRun(Base):
     __tablename__ = "research_runs"
 

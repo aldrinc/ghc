@@ -1674,7 +1674,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
         },
         "reasons": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 5,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -1805,18 +1805,19 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                 "paragraphs": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 1,
                     "items": {"type": "string", "minLength": 1},
                 },
                 "bullets": {
                     "type": "array",
-                    "minItems": 4,
-                    "maxItems": 6,
+                    "minItems": 5,
+                    "maxItems": 5,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "title": {"type": "string", "minLength": 1, "maxLength": 90},
-                            "body": {"type": "string", "minLength": 1, "maxLength": 240},
+                            "title": {"type": "string", "minLength": 1, "maxLength": 56},
+                            "body": {"type": "string", "minLength": 1, "maxLength": 160},
                         },
                         "required": ["title", "body"],
                     },
@@ -1836,7 +1837,7 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "badge": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "badge": {"type": "string", "const": "US vs THEM"},
                         "title": {"type": "string", "minLength": 1, "maxLength": 160},
                         "swipe_hint": {"type": "string", "minLength": 1, "maxLength": 120},
                         "columns": {
@@ -1886,9 +1887,9 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "benefits": {
                     "type": "array",
-                    "minItems": 1,
-                    "maxItems": 6,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 140},
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 38},
                 },
                 "offer_helper_text": {"type": "string", "minLength": 1},
             },
@@ -1926,13 +1927,14 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                 "title": {"type": "string", "minLength": 1},
                 "items": {
                     "type": "array",
-                    "minItems": 1,
+                    "minItems": 8,
+                    "maxItems": 12,
                     "items": {
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "question": {"type": "string", "minLength": 1},
-                            "answer": {"type": "string", "minLength": 1},
+                            "question": {"type": "string", "minLength": 1, "maxLength": 120},
+                            "answer": {"type": "string", "minLength": 1, "maxLength": 280},
                         },
                         "required": ["question", "answer"],
                     },
@@ -1942,14 +1944,14 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
         },
         "faq_pills": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 8,
             "maxItems": 12,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
-                    "label": {"type": "string", "minLength": 1},
-                    "answer": {"type": "string", "minLength": 1},
+                    "label": {"type": "string", "minLength": 1, "maxLength": 120},
+                    "answer": {"type": "string", "minLength": 1, "maxLength": 420},
                 },
                 "required": ["label", "answer"],
             },
@@ -1978,19 +1980,233 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
         "cta_close",
     ],
 }
+
+_SALES_TEMPLATE_PAYLOAD_DIRECT_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "hero": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "purchase_title": {"type": "string"},
+                "primary_cta_label": {"type": "string"},
+                "primary_cta_subbullets": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["purchase_title", "primary_cta_label", "primary_cta_subbullets"],
+        },
+        "problem": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string"},
+                },
+                "emphasis_line": {"type": "string"},
+            },
+            "required": ["title", "paragraphs", "emphasis_line"],
+        },
+        "mechanism": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "items": {"type": "string"},
+                },
+                "bullets": {
+                    "type": "array",
+                    "minItems": 5,
+                    "maxItems": 5,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "title": {"type": "string"},
+                            "body": {"type": "string"},
+                        },
+                        "required": ["title", "body"],
+                    },
+                },
+                "callout": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "left_title": {"type": "string"},
+                        "left_body": {"type": "string"},
+                        "right_title": {"type": "string"},
+                        "right_body": {"type": "string"},
+                    },
+                    "required": ["left_title", "left_body", "right_title", "right_body"],
+                },
+                "comparison": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "badge": {"type": "string", "const": "US vs THEM"},
+                        "title": {"type": "string"},
+                        "swipe_hint": {"type": "string"},
+                        "columns": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "pup": {"type": "string"},
+                                "disposable": {"type": "string"},
+                            },
+                            "required": ["pup", "disposable"],
+                        },
+                        "rows": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "label": {"type": "string"},
+                                    "pup": {"type": "string"},
+                                    "disposable": {"type": "string"},
+                                },
+                                "required": ["label", "pup", "disposable"],
+                            },
+                        },
+                    },
+                    "required": ["badge", "title", "swipe_hint", "columns", "rows"],
+                },
+            },
+            "required": ["title", "paragraphs", "bullets", "callout", "comparison"],
+        },
+        "social_proof": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "badge": {"type": "string"},
+                "title": {"type": "string"},
+                "rating_label": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+            "required": ["badge", "title", "rating_label", "summary"],
+        },
+        "whats_inside": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "benefits": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {"type": "string"},
+                },
+                "offer_helper_text": {"type": "string"},
+            },
+            "required": ["benefits", "offer_helper_text"],
+        },
+        "bonus": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "free_gifts_title": {"type": "string"},
+                "free_gifts_body": {"type": "string"},
+            },
+            "required": ["free_gifts_title", "free_gifts_body"],
+        },
+        "guarantee": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string"},
+                },
+                "why_title": {"type": "string"},
+                "why_body": {"type": "string"},
+                "closing_line": {"type": "string"},
+            },
+            "required": ["title", "paragraphs", "why_title", "why_body", "closing_line"],
+        },
+        "faq": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "items": {
+                    "type": "array",
+                    "minItems": 8,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "question": {"type": "string"},
+                            "answer": {"type": "string"},
+                        },
+                        "required": ["question", "answer"],
+                    },
+                },
+            },
+            "required": ["title", "items"],
+        },
+        "faq_pills": {
+            "type": "array",
+            "minItems": 8,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "label": {"type": "string"},
+                    "answer": {"type": "string"},
+                },
+                "required": ["label", "answer"],
+            },
+        },
+        "marquee_items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"},
+        },
+        "urgency_message": {"type": "string"},
+        "cta_close": {"type": "string"},
+    },
+    "required": [
+        "hero",
+        "problem",
+        "mechanism",
+        "social_proof",
+        "whats_inside",
+        "bonus",
+        "guarantee",
+        "faq",
+        "faq_pills",
+        "marquee_items",
+        "urgency_message",
+        "cta_close",
+    ],
+}
 _PRE_SALES_TEMPLATE_LIMITS_INSTRUCTION = (
     "Hard limits for pre-sales template payload:\n"
     "- hero.title <= 90 chars\n"
     "- hero.subtitle <= 140 chars (max 2 sentences)\n"
     "- hero.badges must be exactly 3 items: [<review count> 5-Star Reviews, 24/7 Customer Support, Risk Free Trial]\n"
     "- hero.badges[].value <= 24 chars when present\n"
+    "- reasons must include at least 5 items\n"
     "- reasons[].title <= 72 chars\n"
     "- reasons[].body <= 420 chars and MUST be 2-3 sentences (never 4+)\n"
     "- reasons[].image.prompt must stay editorial before the marquee; do not depict the product reference image, packaging, or exact book/product identity\n"
     "- marquee[] each <= 24 chars, 1-4 words\n"
     "- pitch.title <= 78 chars\n"
     "- pitch.bullets must be exactly 4 items; each <= 90 chars\n"
-    "- pitch.image is the first section allowed to introduce the product after the marquee\n"
+    "- pitch.image is the first section allowed to introduce the product after the marquee; it must depict the actual product identity and will be rendered from the product reference image when available\n"
     "- pitch.cta_label must be short, non-transactional; use 'Learn more'\n"
 )
 
@@ -2005,12 +2221,19 @@ _SALES_TEMPLATE_LIMITS_INSTRUCTION = (
     "- whats_inside.benefits must not use parentheses, colons, arrows, commas, or explanatory clauses\n"
     "- whats_inside.offer_helper_text <= 180 chars and max 2 sentences\n"
     "- problem.paragraphs: 1-2 items, each <= 320 chars\n"
-    "- mechanism.paragraphs: 1-2 items, each <= 220 chars\n"
+    "- mechanism.paragraphs: exactly 1 item <= 180 chars\n"
     "- mechanism.bullets: exactly 5 items; title <= 56 chars; body <= 160 chars\n"
+    "- mechanism.comparison.badge must be exactly `US vs THEM`\n"
+    "- mechanism.comparison.title must put your solution first: `<your approach> vs. <alternative>`\n"
+    "- mechanism.comparison.columns must be an object with exactly 2 string keys: `pup` and `disposable` (not an array)\n"
+    "- mechanism.comparison.rows must be an array of objects with exactly 3 string keys per row: `label`, `pup`, `disposable`\n"
+    "- do not use legacy comparison row keys like `feature`, `us`, `them`, `left`, `right`, `col1`, `col2`, or `values`\n"
     "- guarantee.paragraphs: exactly 1 item <= 260 chars\n"
+    "- guarantee.title must use `Risk Free Guarantee` language; if a timeframe is present, format it like `<X>-Day Risk Free Guarantee`\n"
+    "- never use `Workflow Fit Guarantee` phrasing\n"
     "- guarantee.why_body <= 220 chars; closing_line <= 140 chars\n"
-    "- faq.items[].question <= 120 chars; answer <= 280 chars (max 3 sentences)\n"
-    "- faq_pills[].label <= 120 chars; answer <= 420 chars (max 3 sentences)\n"
+    "- faq.items must include at least 8 entries; question <= 120 chars; answer <= 280 chars (max 3 sentences)\n"
+    "- faq_pills must include at least 8 entries; label <= 120 chars; answer <= 420 chars (max 3 sentences)\n"
     "- marquee_items[] each <= 24 chars, 1-3 words\n"
     "- urgency_message <= 220 chars\n"
 )
@@ -3918,6 +4141,7 @@ def _llm_generate_text(
             "output_schema": schema,
             "max_tokens": claude_structured_max_tokens,
             "temperature": 0.0,
+            "progress_callback": progress_callback,
         }
         if claude_messages is not None:
             if not isinstance(claude_messages, list) or not claude_messages:
@@ -4759,6 +4983,8 @@ def _run_prompt_json_object(
     llm_call_log: list[dict[str, Any]] | None = None,
     llm_call_label: str | None = None,
     append_schema_instruction: bool = True,
+    workflow_run_id: str | None = None,
+    activity_step: str | None = None,
 ) -> tuple[dict[str, Any], str, dict[str, str]]:
     rendered = _render_prompt_asset(asset=asset, context=context, variables=variables).rstrip()
     instruction_block = runtime_instruction.strip()
@@ -4788,22 +5014,56 @@ def _run_prompt_json_object(
         claude_messages = list(conversation_messages)
         claude_messages.append(claude_user_turn)
     llm_progress: dict[str, Any] = {}
-    started_monotonic = time.monotonic()
-    raw_output = _llm_generate_text(
-        prompt=prompt,
+    prompt_activity_payload_in = _build_prompt_activity_payload(
+        context=context,
         model=model,
-        use_reasoning=use_reasoning,
-        reasoning_effort=reasoning_effort,
-        use_web_search=use_web_search,
+        schema_name=schema_name,
+        prompt=prompt,
+        llm_call_label=llm_call_label,
         max_tokens=max_tokens,
-        response_format=_json_schema_response_format(name=schema_name, schema=schema),
-        openai_tools=openai_tools,
-        openai_tool_choice=openai_tool_choice,
-        openai_context_management=openai_context_management,
-        claude_messages=claude_messages,
+        log_metadata=log_metadata,
         heartbeat_context=heartbeat_context,
-        progress_sink=llm_progress,
+        conversation_message_count=len(claude_messages) if claude_messages is not None else None,
     )
+    if workflow_run_id and activity_step:
+        _log_workflow_activity_safe(
+            workflow_run_id=workflow_run_id,
+            step=activity_step,
+            status="started",
+            payload_in=prompt_activity_payload_in,
+        )
+    started_monotonic = time.monotonic()
+    try:
+        raw_output = _llm_generate_text(
+            prompt=prompt,
+            model=model,
+            use_reasoning=use_reasoning,
+            reasoning_effort=reasoning_effort,
+            use_web_search=use_web_search,
+            max_tokens=max_tokens,
+            response_format=_json_schema_response_format(name=schema_name, schema=schema),
+            openai_tools=openai_tools,
+            openai_tool_choice=openai_tool_choice,
+            openai_context_management=openai_context_management,
+            claude_messages=claude_messages,
+            heartbeat_context=heartbeat_context,
+            progress_sink=llm_progress,
+        )
+    except Exception as exc:
+        if workflow_run_id and activity_step:
+            failure_payload_out = {
+                "elapsed_seconds": round(time.monotonic() - started_monotonic, 3),
+            }
+            _extend_prompt_progress_payload(failure_payload_out, llm_progress)
+            _log_workflow_activity_safe(
+                workflow_run_id=workflow_run_id,
+                step=activity_step,
+                status="failed",
+                payload_in=prompt_activity_payload_in,
+                payload_out=failure_payload_out,
+                error=str(exc),
+            )
+        raise
     if conversation_messages is not None and claude_user_turn is not None:
         conversation_messages.append(claude_user_turn)
         conversation_messages.append(
@@ -4813,6 +5073,19 @@ def _run_prompt_json_object(
             }
         )
     elapsed_seconds = round(time.monotonic() - started_monotonic, 3)
+    if workflow_run_id and activity_step:
+        completion_payload_out = {
+            "elapsed_seconds": elapsed_seconds,
+            "output_chars": len(raw_output),
+        }
+        _extend_prompt_progress_payload(completion_payload_out, llm_progress)
+        _log_workflow_activity_safe(
+            workflow_run_id=workflow_run_id,
+            step=activity_step,
+            status="completed",
+            payload_in=prompt_activity_payload_in,
+            payload_out=completion_payload_out,
+        )
     if llm_call_log is not None:
         log_row: dict[str, Any] = {
             "label": llm_call_label or context,
@@ -4882,6 +5155,8 @@ def _run_prompt_json_array(
     llm_call_log: list[dict[str, Any]] | None = None,
     llm_call_label: str | None = None,
     append_schema_instruction: bool = True,
+    workflow_run_id: str | None = None,
+    activity_step: str | None = None,
 ) -> tuple[list[Any], str, dict[str, str]]:
     rendered = _render_prompt_asset(asset=asset, context=context, variables=variables).rstrip()
     instruction_block = runtime_instruction.strip()
@@ -4902,23 +5177,70 @@ def _run_prompt_json_array(
             }
         )
     llm_progress: dict[str, Any] = {}
-    started_monotonic = time.monotonic()
-    raw_output = _llm_generate_text(
-        prompt=prompt,
+    prompt_activity_payload_in = _build_prompt_activity_payload(
+        context=context,
         model=model,
-        use_reasoning=use_reasoning,
-        reasoning_effort=reasoning_effort,
-        use_web_search=use_web_search,
+        schema_name=schema_name,
+        prompt=prompt,
+        llm_call_label=llm_call_label,
         max_tokens=max_tokens,
-        response_format=_json_schema_response_format(name=schema_name, schema=schema),
-        openai_tools=openai_tools,
-        openai_tool_choice=openai_tool_choice,
-        openai_context_management=openai_context_management,
-        claude_messages=claude_messages,
+        log_metadata=log_metadata,
         heartbeat_context=heartbeat_context,
-        progress_sink=llm_progress,
+        conversation_message_count=len(claude_messages) if claude_messages is not None else None,
     )
+    if workflow_run_id and activity_step:
+        _log_workflow_activity_safe(
+            workflow_run_id=workflow_run_id,
+            step=activity_step,
+            status="started",
+            payload_in=prompt_activity_payload_in,
+        )
+    started_monotonic = time.monotonic()
+    try:
+        raw_output = _llm_generate_text(
+            prompt=prompt,
+            model=model,
+            use_reasoning=use_reasoning,
+            reasoning_effort=reasoning_effort,
+            use_web_search=use_web_search,
+            max_tokens=max_tokens,
+            response_format=_json_schema_response_format(name=schema_name, schema=schema),
+            openai_tools=openai_tools,
+            openai_tool_choice=openai_tool_choice,
+            openai_context_management=openai_context_management,
+            claude_messages=claude_messages,
+            heartbeat_context=heartbeat_context,
+            progress_sink=llm_progress,
+        )
+    except Exception as exc:
+        if workflow_run_id and activity_step:
+            failure_payload_out = {
+                "elapsed_seconds": round(time.monotonic() - started_monotonic, 3),
+            }
+            _extend_prompt_progress_payload(failure_payload_out, llm_progress)
+            _log_workflow_activity_safe(
+                workflow_run_id=workflow_run_id,
+                step=activity_step,
+                status="failed",
+                payload_in=prompt_activity_payload_in,
+                payload_out=failure_payload_out,
+                error=str(exc),
+            )
+        raise
     elapsed_seconds = round(time.monotonic() - started_monotonic, 3)
+    if workflow_run_id and activity_step:
+        completion_payload_out = {
+            "elapsed_seconds": elapsed_seconds,
+            "output_chars": len(raw_output),
+        }
+        _extend_prompt_progress_payload(completion_payload_out, llm_progress)
+        _log_workflow_activity_safe(
+            workflow_run_id=workflow_run_id,
+            step=activity_step,
+            status="completed",
+            payload_in=prompt_activity_payload_in,
+            payload_out=completion_payload_out,
+        )
     if llm_call_log is not None:
         log_row: dict[str, Any] = {
             "label": llm_call_label or context,
@@ -5121,6 +5443,68 @@ def _log_workflow_activity_safe(
                 "status": status,
             },
         )
+
+
+def _extend_prompt_progress_payload(payload: dict[str, Any], progress: Mapping[str, Any] | None) -> None:
+    if not isinstance(progress, Mapping):
+        return
+    for key in (
+        "response_id",
+        "request_id",
+        "status",
+        "elapsed_seconds",
+        "stop_reason",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "reasoning_tokens",
+        "cached_input_tokens",
+        "provider",
+    ):
+        value = progress.get(key)
+        if value is not None:
+            payload[key] = value
+
+
+def _build_prompt_activity_payload(
+    *,
+    context: str,
+    model: str,
+    schema_name: str,
+    prompt: str,
+    llm_call_label: str | None,
+    max_tokens: int | None,
+    log_metadata: Mapping[str, Any] | None,
+    heartbeat_context: Mapping[str, Any] | None,
+    conversation_message_count: int | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "context": context,
+        "model": model,
+        "schema_name": schema_name,
+        "prompt_chars": len(prompt),
+    }
+    if llm_call_label:
+        payload["label"] = llm_call_label
+    if isinstance(max_tokens, int) and max_tokens > 0:
+        payload["max_tokens"] = max_tokens
+    if isinstance(conversation_message_count, int) and conversation_message_count > 0:
+        payload["conversation_message_count"] = conversation_message_count
+    if log_metadata:
+        safe_log_metadata: dict[str, Any] = {}
+        for key, value in log_metadata.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                safe_log_metadata[str(key)] = value
+        if safe_log_metadata:
+            payload["log_metadata"] = safe_log_metadata
+    if heartbeat_context:
+        safe_heartbeat: dict[str, Any] = {}
+        for key, value in heartbeat_context.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                safe_heartbeat[str(key)] = value
+        if safe_heartbeat:
+            payload["heartbeat_context"] = safe_heartbeat
+    return payload
 
 
 def _persist_step_payload(
@@ -6262,7 +6646,8 @@ def _normalize_offer_step04_bonus_items(
             raise StrategyV2SchemaValidationError(f"Offer Step 04 bonus_item '{bonus_slot}' title is required.")
         if len(title) > _STEP04_BONUS_TITLE_MAX_CHARS:
             raise StrategyV2SchemaValidationError(
-                f"Offer Step 04 bonus_item '{bonus_slot}' title exceeds {_STEP04_BONUS_TITLE_MAX_CHARS} chars."
+                f"Offer Step 04 bonus_item '{bonus_slot}' title exceeds "
+                f"{_STEP04_BONUS_TITLE_MAX_CHARS} chars."
             )
         raw_product_type = str(bonus_item.get("product_type") or "").strip()
         product_type = canonical_product_type(raw_product_type)
@@ -6510,17 +6895,18 @@ def _persist_generated_strategy_v2_bonus_stack(
                 raise StrategyV2MissingContextError(
                     f"Existing strategy_v2 bonus product for slot '{bonus_slot}' no longer exists."
                 )
-            linked_product = products_repo.update(
+            updated_product = products_repo.update(
                 org_id=org_id,
                 product_id=str(linked_product.id),
                 title=title,
                 description=description,
                 product_type=product_type,
             )
-            if linked_product is None:
+            if updated_product is None:
                 raise StrategyV2MissingContextError(
                     f"Failed to update strategy_v2 bonus product for slot '{bonus_slot}'."
                 )
+            linked_product = updated_product
         else:
             linked_product = products_repo.create(
                 org_id=org_id,
@@ -12183,7 +12569,6 @@ def _model_prompt_input_token_budget(*, model: str, max_tokens: int | None) -> i
         budget = _GPT52_CONTEXT_WINDOW_TOKENS - reserved_output_tokens - _PROMPT_INPUT_TOKEN_SAFETY_BUFFER
         return max(budget, 1)
     return None
-
 
 def _map_offer_pipeline_input_with_price_resolution(
     *,
@@ -19792,6 +20177,7 @@ def _is_non_retryable_sales_payload_failure(error_message: str) -> bool:
         )
     return (
         "sales template payload json parse failed" in lowered
+        or "template_payload_validation:" in lowered
         or "invalid template_payload object" in lowered
         or "legacy sales payload upgrade failed" in lowered
     )
@@ -20236,6 +20622,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             },
             llm_call_log=prompt_call_logs,
             llm_call_label="headline_prompt",
+            workflow_run_id=workflow_run_id,
+            activity_step="v2-10.prompt.headline",
         )
         prompt_headlines = headline_parsed.get("headline_candidates")
         if not isinstance(prompt_headlines, list):
@@ -20493,6 +20881,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 },
                 llm_call_log=prompt_call_logs,
                 llm_call_label="promise_contract_prompt",
+                workflow_run_id=workflow_run_id,
+                activity_step="v2-10.prompt.promise_contract",
             )
             promise_contract = {
                 "loop_question": str(promise_parsed.get("loop_question") or "").strip(),
@@ -20623,6 +21013,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                             },
                             llm_call_log=prompt_call_logs,
                             llm_call_label="advertorial_template_payload_prompt",
+                            workflow_run_id=workflow_run_id,
+                            activity_step="v2-10.prompt.advertorial_template_payload",
                         )
                         presell_template_payload = _require_dict(
                             payload=advertorial_payload_parsed.get("template_payload"),
@@ -20675,6 +21067,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                             },
                             llm_call_log=prompt_call_logs,
                             llm_call_label="sales_template_payload_prompt",
+                            workflow_run_id=workflow_run_id,
+                            activity_step="v2-10.prompt.sales_template_payload",
                         )
                         sales_template_payload_json = str(
                             sales_payload_parsed.get("template_payload_json") or ""
@@ -20696,7 +21090,14 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                                 f"Details: {exc}"
                             ) from exc
                         if isinstance(sales_payload_parse_meta, dict):
-                            page_observability_row["sales_template_payload_parse_recovery"] = sales_payload_parse_meta
+                            page_observability_row["sales_template_payload_parse_recovery"] = (
+                                sales_payload_parse_meta
+                            )
+                        if not sales_template_payload:
+                            raise StrategyV2DecisionError(
+                                "Sales payload prompt returned empty template_payload_json object. "
+                                "Remediation: return a full sales template payload JSON object."
+                            )
                         presell_template_payload = upgrade_strategy_v2_template_payload_fields(
                             template_id="pre-sales-listicle",
                             payload_fields=presell_template_payload,
@@ -20889,6 +21290,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         },
                         llm_call_log=prompt_call_logs,
                         llm_call_label="advertorial_prompt",
+                        workflow_run_id=workflow_run_id,
+                        activity_step="v2-10.prompt.advertorial",
                     )
                     presell_markdown = str(advertorial_parsed.get("markdown") or "").strip()
                     presell_template_payload = _require_dict(
@@ -20964,6 +21367,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         },
                         llm_call_log=prompt_call_logs,
                         llm_call_label="sales_page_markdown_prompt",
+                        workflow_run_id=workflow_run_id,
+                        activity_step="v2-10.prompt.sales_page_markdown",
                     )
                     sales_page_markdown = str(sales_markdown_parsed.get("markdown") or "").strip()
                     sales_markdown_for_observability = sales_page_markdown
@@ -21074,6 +21479,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         },
                         llm_call_log=prompt_call_logs,
                         llm_call_label="sales_template_payload_prompt",
+                        workflow_run_id=workflow_run_id,
+                        activity_step="v2-10.prompt.sales_template_payload",
                     )
                     sales_template_payload_json = str(sales_payload_parsed.get("template_payload_json") or "").strip()
                     sales_template_payload_json_for_observability = sales_template_payload_json

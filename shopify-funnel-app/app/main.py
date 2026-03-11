@@ -43,6 +43,8 @@ from app.schemas import (
     ResolveImageUrlsToShopifyFilesResponse,
     SyncCatalogCollectionRequest,
     SyncCatalogCollectionResponse,
+    SyncCatalogProductRequest,
+    SyncCatalogProductResponse,
     SyncThemeBrandRequest,
     SyncThemeBrandResponse,
     UpsertedPolicyPage,
@@ -1137,6 +1139,71 @@ async def create_catalog_product(
                 currency=item["currency"],
             )
             for item in created["variants"]
+        ],
+    )
+
+
+@app.post(
+    "/v1/catalog/products/sync",
+    response_model=SyncCatalogProductResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def sync_catalog_product(
+    payload: SyncCatalogProductRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        synced = await shopify_api.sync_product(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            product_gid=payload.productGid,
+            title=payload.title,
+            description=payload.description,
+            handle=payload.handle,
+            vendor=payload.vendor,
+            product_type=payload.productType,
+            tags=payload.tags,
+            status=payload.status,
+            variants=[variant.model_dump() for variant in payload.variants],
+            source_of_truth_payload=payload.sourceOfTruthPayload,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return SyncCatalogProductResponse(
+        shopDomain=installation.shop_domain,
+        productGid=synced["productGid"],
+        title=synced["title"],
+        handle=synced["handle"],
+        status=synced["status"],
+        createdVariantCount=synced["createdVariantCount"],
+        updatedVariantCount=synced["updatedVariantCount"],
+        deletedVariantCount=synced["deletedVariantCount"],
+        offerCount=synced["offerCount"],
+        metafieldNamespace=synced["metafieldNamespace"],
+        metafieldKey=synced["metafieldKey"],
+        variants=[
+            CatalogProductVariant(
+                variantGid=item["variantGid"],
+                title=item["title"],
+                priceCents=item["priceCents"],
+                currency=item["currency"],
+                compareAtPriceCents=item.get("compareAtPriceCents"),
+                sku=item.get("sku"),
+                barcode=item.get("barcode"),
+                taxable=item["taxable"],
+                requiresShipping=item["requiresShipping"],
+                inventoryPolicy=item.get("inventoryPolicy"),
+                inventoryManagement=item.get("inventoryManagement"),
+                inventoryQuantity=item.get("inventoryQuantity"),
+                optionValues=item.get("optionValues") or {},
+            )
+            for item in synced["variants"]
         ],
     )
 

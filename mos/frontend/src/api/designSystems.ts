@@ -3,9 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import type { DesignSystem } from "@/types/designSystems";
 import { toast } from "@/components/ui/toast";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
+
+export type DesignSystemLogoVariant = "default" | "onDark";
 
 async function readUploadError(resp: Response): Promise<string> {
   try {
@@ -105,23 +108,30 @@ export function useUploadDesignSystemLogo() {
       designSystemId,
       clientId,
       file,
+      variant = "default",
     }: {
       designSystemId: string;
       clientId: string;
       file: File;
+      variant?: DesignSystemLogoVariant;
     }) => {
       if (!designSystemId) throw new Error("Design system ID is required to upload a logo.");
       if (!clientId) throw new Error("Client ID is required to upload a logo.");
       if (!file) throw new Error("Logo file is required.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       formData.append("file", file);
-      const resp = await fetch(`${defaultBaseUrl}/design-systems/${designSystemId}/logo`, {
+      const query = new URLSearchParams();
+      if (variant !== "default") query.set("variant", variant);
+      const resp = await fetch(
+        `${defaultBaseUrl}/design-systems/${designSystemId}/logo${query.toString() ? `?${query.toString()}` : ""}`,
+        {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: formData,
-      });
+        }
+      );
       if (!resp.ok) {
         throw new Error(await readUploadError(resp));
       }
@@ -129,11 +139,12 @@ export function useUploadDesignSystemLogo() {
         assetId: string;
         publicId: string;
         url: string;
+        variant: DesignSystemLogoVariant;
         designSystem: DesignSystem;
       };
     },
     onSuccess: (_data, vars) => {
-      toast.success("Logo uploaded and applied");
+      toast.success(vars.variant === "onDark" ? "Dark-surface logo uploaded and applied" : "Logo uploaded and applied");
       queryClient.invalidateQueries({ queryKey: ["design-systems", "list", vars.clientId] });
     },
     onError: (err: ApiError | Error) => {

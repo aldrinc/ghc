@@ -379,7 +379,39 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "image": {
                         "alt": "Caregiver reviewing a nightly routine checklist",
                     },
-                }
+                },
+                {
+                    "number": 2,
+                    "title": "Advice overload creates more second-guessing",
+                    "body": "Too many disconnected tips make it harder to stay consistent under pressure.",
+                    "image": {
+                        "alt": "Open tabs and notes scattered across a kitchen table",
+                    },
+                },
+                {
+                    "number": 3,
+                    "title": "Sequence errors look like motivation problems",
+                    "body": "The real issue is often order of operations, not effort or commitment.",
+                    "image": {
+                        "alt": "Parent checking a clock beside a bedtime routine chart",
+                    },
+                },
+                {
+                    "number": 4,
+                    "title": "Small misses cascade into full routine resets",
+                    "body": "Without a recovery branch, one disruption turns into an entire lost evening.",
+                    "image": {
+                        "alt": "Bedtime supplies laid out beside a crossed-out checklist",
+                    },
+                },
+                {
+                    "number": 5,
+                    "title": "A repeatable system lowers stress fast",
+                    "body": "Clear checkpoints and mechanism-fit steps make the whole routine easier to repeat.",
+                    "image": {
+                        "alt": "Calmer evening routine with a printed nightly plan on the counter",
+                    },
+                },
             ],
             "marquee": [
                 "Mechanism-first",
@@ -493,7 +525,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
             },
             "guarantee": {
-                "title": "30-day confidence guarantee",
+                "title": "30-Day Risk Free Guarantee",
                 "paragraphs": [
                     "Run the system and evaluate fit using measurable checkpoints.",
                 ],
@@ -507,14 +539,70 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     {
                         "question": "How quickly can we start?",
                         "answer": "Most families can run the first sequence tonight.",
-                    }
+                    },
+                    {
+                        "question": "Is this digital?",
+                        "answer": "Yes, access is delivered immediately after purchase.",
+                    },
+                    {
+                        "question": "Does it work with multiple meds?",
+                        "answer": "Yes, the workflow is built for medication-aware decisions.",
+                    },
+                    {
+                        "question": "Do I need prior experience?",
+                        "answer": "No, the guidance is written for beginners.",
+                    },
+                    {
+                        "question": "Can I print the worksheets?",
+                        "answer": "Yes, the supporting worksheets are printable.",
+                    },
+                    {
+                        "question": "What does the guarantee cover?",
+                        "answer": "It covers the stated refund window if the system is not a fit.",
+                    },
+                    {
+                        "question": "How long does setup take?",
+                        "answer": "Most households can complete setup quickly.",
+                    },
+                    {
+                        "question": "What kind of support is included?",
+                        "answer": "It includes prompts, walkthroughs, and practical next steps.",
+                    },
                 ],
             },
             "faq_pills": [
                 {
                     "label": "How quickly can we start?",
                     "answer": "Most families can run the first sequence tonight.",
-                }
+                },
+                {
+                    "label": "Is this digital?",
+                    "answer": "Yes, access is delivered immediately after purchase.",
+                },
+                {
+                    "label": "Does it work with multiple meds?",
+                    "answer": "Yes, the workflow is built for medication-aware decisions.",
+                },
+                {
+                    "label": "Do I need prior experience?",
+                    "answer": "No, the guidance is written for beginners.",
+                },
+                {
+                    "label": "Can I print the worksheets?",
+                    "answer": "Yes, the supporting worksheets are printable.",
+                },
+                {
+                    "label": "What does the guarantee cover?",
+                    "answer": "It covers the stated refund window if the system is not a fit.",
+                },
+                {
+                    "label": "How long does setup take?",
+                    "answer": "Most households can complete setup quickly.",
+                },
+                {
+                    "label": "What kind of support is included?",
+                    "answer": "It includes prompts, walkthroughs, and practical next steps.",
+                },
             ],
             "marquee_items": [
                 "Mechanism-first",
@@ -3515,6 +3603,7 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
             "product_name": "The Honest Herbalist Handbook",
             "brand_story": "We sell a natural remedies handbook.",
             "product_description": "A practical handbook for natural remedy routines at home.",
+            "price": "$49",
             "product_customizable": True,
             "product_category": "Health & Wellness",
             "price": "$49",
@@ -3809,6 +3898,95 @@ def test_build_offer_variants_requires_nonempty_revision_notes(
                 },
             }
         )
+def test_offer_data_readiness_allows_zero_prelinked_bonuses(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    monkeypatch.setattr(strategy_v2_activities, "session_scope", _session_scope_override)
+
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="OfferReadiness",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    default_offer = ProductOffer(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        name="Default Offer",
+        business_model="one-time",
+    )
+    db_session.add(default_offer)
+    db_session.flush()
+    db_session.add(
+        ProductVariant(
+            product_id=product_uuid,
+            offer_id=default_offer.id,
+            title="Default Offer",
+            price=4900,
+            currency="USD",
+        )
+    )
+    onboarding_payload = OnboardingPayload(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        data={
+            "product_name": "Offer Readiness Product",
+            "product_type": "digital",
+            "price": "$49",
+            "default_offer_id": str(default_offer.id),
+        },
+    )
+    db_session.add(onboarding_payload)
+    db_session.commit()
+    db_session.refresh(onboarding_payload)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-offer-readiness-workflow",
+        temporal_run_id="strategy-v2-offer-readiness-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    readiness = strategy_v2_activities.validate_strategy_v2_offer_data_readiness_activity(
+        {
+            "org_id": auth_context.org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": None,
+            "workflow_run_id": str(workflow_run.id),
+            "onboarding_payload_id": str(onboarding_payload.id),
+            "offer_pipeline_output": {
+                "offer_input": {
+                    "product_brief": {
+                        "price_cents": 4900,
+                        "currency": "USD",
+                    }
+                }
+            },
+        }
+    )
+
+    assert readiness["status"] == "ready"
+    assert readiness["context"]["offer_id"] == str(default_offer.id)
+    assert readiness["context"]["bonus_items"] == []
 
 
 def test_offer_data_readiness_allows_zero_prelinked_bonuses(
@@ -4195,10 +4373,6 @@ SEGMENT_HINT: parents
                 "operator_user_id": "operator-1",
                 "selected_angle": selected_angle,
                 "rejected_angle_ids": [],
-                "reviewed_candidate_ids": [str(selected_angle["angle_id"])],
-                **_manual_hitl_fields(
-                    operator_note="Selected the strongest angle after reviewing scored candidate evidence.",
-                ),
             },
         }
     )
@@ -4261,11 +4435,6 @@ SEGMENT_HINT: parents
             "ump_ums_selection_decision": {
                 "operator_user_id": "operator-1",
                 "pair_id": pair_id,
-                "rejected_pair_ids": [],
-                "reviewed_candidate_ids": [pair_id],
-                **_manual_hitl_fields(
-                    operator_note="Selected this UMP/UMS pair based on fit, clarity, and risk profile.",
-                ),
             },
         }
     )
@@ -4284,11 +4453,6 @@ SEGMENT_HINT: parents
             "offer_winner_decision": {
                 "operator_user_id": "operator-1",
                 "variant_id": variant_id,
-                "rejected_variant_ids": [],
-                "reviewed_candidate_ids": [variant_id],
-                **_manual_hitl_fields(
-                    operator_note="Selected winner variant after reviewing scored variants and rationale.",
-                ),
             },
             "brand_voice_notes": "Direct, concrete, no hype.",
             "compliance_notes": "Avoid medical cure claims.",
@@ -4324,7 +4488,7 @@ SEGMENT_HINT: parents
         .filter(
             Product.id.in_([link.bonus_product_id for link in synced_bonus_links]),
             Product.org_id == org_uuid,
-            Product.client_id == client_id,
+            Product.client_id == client_uuid,
         )
         .all()
     )
@@ -4395,10 +4559,6 @@ SEGMENT_HINT: parents
             "final_approval_decision": {
                 "operator_user_id": "operator-1",
                 "approved": True,
-                "reviewed_candidate_ids": ["copy-artifact-1"],
-                **_manual_hitl_fields(
-                    operator_note="Reviewed copy quality and congruency outputs and approve release.",
-                ),
             },
             "copy_payload": copy_result["copy_payload"],
         }

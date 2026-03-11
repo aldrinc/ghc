@@ -524,8 +524,6 @@
   --pdp-urgency-highlight-text: #17291d;
   --pdp-urgency-icon-bg: #e8efe8;
   --pdp-urgency-icon-border: rgba(15, 38, 24, 0.14);
-  --pdp-comparison-good: #16a34a;
-  --pdp-comparison-bad: #ef4444;
   --faq-card-gap: 18px;
   --faq-heading-margin-bottom: 32px;
 
@@ -551,7 +549,7 @@
   --story-title-weight: 700;
   --story-title-letter-spacing: -0.02em;
   --story-media-frame-max-width: 520px;
-  --story-media-frame-aspect: 4 / 5;
+  --story-media-frame-aspect: 1 / 1;
   --story-media-frame-padding: 12px;
   --story-media-border: 1px solid var(--pdp-brand-12);
 
@@ -561,6 +559,10 @@
 
   /* Comparison */
   --comparison-max-width: 1180px;
+  --comparison-heading-max-width: 26ch;
+  --comparison-icon-bg: rgba(255, 255, 255, 0.96);
+  --comparison-icon-good-color: #22c55e;
+  --comparison-icon-bad-color: #ef4444;
   --comparison-hint-size: 14px;
   --comparison-hint-color: var(--color-brand);
   --comparison-cell-size: 15px;

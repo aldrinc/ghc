@@ -29,7 +29,10 @@ import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
-import { withDesignSystemBrandLogo } from "@/funnels/templates/shared/designSystemBrandLogo";
+import {
+  resolveDesignSystemBrandLogoVariant,
+  withDesignSystemBrandLogo,
+} from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
 
@@ -212,6 +215,40 @@ function normalizeStepTitle(title: string): string {
 function formatStepTitle(title: string, stepNumber: number | null) {
   const baseTitle = normalizeStepTitle(title)
   return stepNumber ? `${stepNumber}. ${baseTitle}` : baseTitle
+}
+
+const COMPARISON_VS_RE = /\s+vs\.?\s+/i
+
+function looksLikePrimaryComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ["our ", "workflow", "triage", "structured", "system", "handbook", "approach"].some((token) =>
+    normalized.includes(token)
+  )
+}
+
+function looksLikeAlternativeComparisonLabel(value: string) {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return false
+  return ["typical", "standard", "generic", "other", "alternative", "old way", "scattered", "checking"].some(
+    (token) => normalized.includes(token)
+  )
+}
+
+function normalizeComparisonTitle(title: string, columns: ComparisonConfig["columns"]) {
+  const cleaned = title.trim()
+  if (!cleaned) return `${columns.pup} vs. ${columns.disposable}`
+  const parts = cleaned.split(COMPARISON_VS_RE)
+  if (parts.length !== 2) return cleaned
+  const [left, right] = parts.map((value) => value.trim())
+  const leftPrimary = looksLikePrimaryComparisonLabel(left)
+  const rightPrimary = looksLikePrimaryComparisonLabel(right)
+  const leftAlternative = looksLikeAlternativeComparisonLabel(left)
+  const rightAlternative = looksLikeAlternativeComparisonLabel(right)
+  if ((rightPrimary && !leftPrimary) || (leftAlternative && !rightAlternative)) {
+    return `${right} vs. ${left}`
+  }
+  return `${left} vs. ${right}`
 }
 
 function resolveUrgencyMonthLabels(now: Date = new Date()) {
@@ -520,7 +557,7 @@ function Gallery({
   return (
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
-        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchPriority="high" />
+        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchpriority="high" />
       </div>
 
       <div className={styles.galleryControls}>
@@ -1702,14 +1739,13 @@ type SalesPdpComparisonProps = {
 
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
   const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
-  const comparisonGoodColor = 'var(--pdp-comparison-good, #16a34a)'
-  const comparisonBadColor = 'var(--pdp-comparison-bad, #dc2626)'
+  const comparisonTitle = normalizeComparisonTitle(resolvedConfig.title, resolvedConfig.columns)
   return (
     <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
       <Container>
         <div style={{ textAlign: 'center' }}>
           <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
-          <h2 className={styles.sectionHeading}>{resolvedConfig.title}</h2>
+          <h2 className={styles.sectionHeading}>{comparisonTitle}</h2>
           <div className={styles.comparisonHint}>{resolvedConfig.swipeHint}</div>
         </div>
 
@@ -1728,11 +1764,7 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   <td className={styles.tableLabel}>{r.label}</td>
                   <td>
                     <div className={styles.cell}>
-                      <span
-                        className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`}
-                        aria-hidden="true"
-                        style={{ color: comparisonGoodColor, borderColor: comparisonGoodColor }}
-                      >
+                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`} aria-hidden="true">
                         <IconCheck size={12} />
                       </span>
                       {r.pup}
@@ -1740,11 +1772,7 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   </td>
                   <td>
                     <div className={styles.cell}>
-                      <span
-                        className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`}
-                        aria-hidden="true"
-                        style={{ color: comparisonBadColor, borderColor: comparisonBadColor }}
-                      >
+                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`} aria-hidden="true">
                         <IconClose size={12} />
                       </span>
                       {r.disposable}
@@ -1981,9 +2009,10 @@ type SalesPdpFooterProps = {
 export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
   const designSystemTokens = useDesignSystemTokens()
   const resolvedConfig = parseJson<FooterConfig>(configJson) ?? config ?? salesPdpDefaults.config.footer
+  const logoVariant = resolveDesignSystemBrandLogoVariant(resolvedConfig.logoVariant, "onDark")
   const resolvedLogo = useMemo(
-    () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo),
-    [designSystemTokens, resolvedConfig.logo]
+    () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo, logoVariant),
+    [designSystemTokens, logoVariant, resolvedConfig.logo]
   )
   const links = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
   const paymentIcons = Array.isArray(resolvedConfig.paymentIcons) ? resolvedConfig.paymentIcons : []

@@ -826,21 +826,24 @@ def _extract_embedded_asset_public_ids(
 
     if isinstance(design_system_tokens, dict):
         brand = design_system_tokens.get("brand")
-        if isinstance(brand, dict) and brand.get("logoAssetPublicId") is not None:
-            raw_logo_public_id = brand.get("logoAssetPublicId")
-            if not isinstance(raw_logo_public_id, str) or not raw_logo_public_id.strip():
-                raise DeployError(
-                    f"{context_label} designSystemTokens.brand.logoAssetPublicId must be a non-empty UUID string."
-                )
-            cleaned_logo_public_id = raw_logo_public_id.strip()
-            try:
-                normalized_logo_public_id = str(UUID(cleaned_logo_public_id))
-            except ValueError as exc:
-                raise DeployError(
-                    f"{context_label} designSystemTokens.brand.logoAssetPublicId "
-                    f"'{cleaned_logo_public_id}' is not a valid UUID."
-                ) from exc
-            public_ids.add(normalized_logo_public_id)
+        if isinstance(brand, dict):
+            for token_key in ("logoAssetPublicId", "logoOnDarkAssetPublicId"):
+                if brand.get(token_key) is None:
+                    continue
+                raw_logo_public_id = brand.get(token_key)
+                if not isinstance(raw_logo_public_id, str) or not raw_logo_public_id.strip():
+                    raise DeployError(
+                        f"{context_label} designSystemTokens.brand.{token_key} must be a non-empty UUID string."
+                    )
+                cleaned_logo_public_id = raw_logo_public_id.strip()
+                try:
+                    normalized_logo_public_id = str(UUID(cleaned_logo_public_id))
+                except ValueError as exc:
+                    raise DeployError(
+                        f"{context_label} designSystemTokens.brand.{token_key} "
+                        f"'{cleaned_logo_public_id}' is not a valid UUID."
+                    ) from exc
+                public_ids.add(normalized_logo_public_id)
 
     return public_ids
 

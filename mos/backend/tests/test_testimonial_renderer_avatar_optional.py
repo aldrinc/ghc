@@ -123,6 +123,43 @@ def test_pdp_ugc_standard_accepts_square_output_preset():
     assert validated["output"]["preset"] == "square"
 
 
+def test_pdp_ugc_standard_accepts_dual_comments():
+    payload = {
+        "template": "pdp_ugc_standard",
+        "output": {"preset": "feed"},
+        "brand": {
+            "logoText": "SampleLogo",
+            "stripBgColor": "#be3b7a",
+            "stripTextColor": "#ffffff",
+        },
+        "rating": {"valueText": "4.9/5", "detailText": "Rated by 10,000+ Customers"},
+        "cta": {"text": "SEE WHY PEOPLE SWITCHED"},
+        "background": {
+            "promptVars": {
+                "product": "a supplement bottle on a bathroom counter",
+                "scene": "morning natural light",
+            }
+        },
+        "comments": [
+            {
+                "handle": "skeptical_user",
+                "text": "Is this actually worth it?",
+                "verified": True,
+            },
+            {
+                "handle": "realuser42",
+                "text": "It gave me a clear checklist instead of more guesswork.",
+                "verified": True,
+            },
+        ],
+    }
+
+    validated = validate_payload(payload)
+    assert len(validated["comments"]) == 2
+    assert validated["comment"]["handle"] == "skeptical_user"
+    assert validated["comments"][1]["handle"] == "realuser42"
+
+
 def test_pdp_square_preset_requests_square_background_generation(monkeypatch):
     observed: dict[str, str] = {}
 
@@ -159,6 +196,79 @@ def test_pdp_square_preset_requests_square_background_generation(monkeypatch):
     output = renderer.maybe_generate_pdp_background(payload)
     assert observed["model"] == "test-model"
     assert observed["aspect_ratio"] == "1:1"
+    assert output["background"]["imageUrl"].startswith("data:image/png;base64,")
+
+
+def test_pdp_background_prompt_file_is_hydrated(tmp_path):
+    prompt_file = tmp_path / "pdp-structure.md"
+    prompt_file.write_text("Structured prompt from file.", encoding="utf-8")
+
+    payload = {
+        "template": "pdp_ugc_standard",
+        "output": {"preset": "feed"},
+        "brand": {
+            "logoText": "SampleLogo",
+            "stripBgColor": "#be3b7a",
+            "stripTextColor": "#ffffff",
+        },
+        "rating": {"valueText": "4.9/5", "detailText": "Rated by 10,000+ Customers"},
+        "cta": {"text": "SEE WHY PEOPLE SWITCHED"},
+        "background": {
+            "promptFile": "pdp-structure.md",
+        },
+        "comment": {
+            "handle": "realuser42",
+            "text": "This finally fit into my routine.",
+        },
+    }
+
+    validated = validate_payload(payload, base_dir=tmp_path)
+    assert validated["background"]["prompt"] == "Structured prompt from file."
+    assert validated["background"]["promptVars"] is None
+
+
+def test_pdp_background_generation_uses_prompt_from_hydrated_prompt_file(monkeypatch, tmp_path):
+    prompt_file = tmp_path / "pdp-structure.md"
+    prompt_file.write_text("Structured prompt from file.", encoding="utf-8")
+    observed: dict[str, str] = {}
+
+    def fake_generate_nano_image_bytes(*, model, prompt, image_config, reference_images, reference_first, base_dir):
+        observed["model"] = model
+        observed["prompt"] = prompt
+        observed["aspect_ratio"] = str(image_config.get("aspectRatio"))
+        return b"\x89PNG\r\n\x1a\n", "image/png"
+
+    monkeypatch.setattr(renderer, "_generate_nano_image_bytes", fake_generate_nano_image_bytes)
+
+    payload = {
+        "template": "pdp_ugc_standard",
+        "output": {"preset": "feed"},
+        "brand": {
+            "logoText": "SampleLogo",
+            "stripBgColor": "#be3b7a",
+            "stripTextColor": "#ffffff",
+        },
+        "rating": {"valueText": "4.9/5", "detailText": "Rated by 10,000+ Customers"},
+        "cta": {"text": "SEE WHY PEOPLE SWITCHED"},
+        "background": {
+            "promptFile": "pdp-structure.md",
+            "imageModel": "test-model",
+        },
+        "comment": {
+            "handle": "realuser42",
+            "text": "This finally fit into my routine.",
+        },
+    }
+
+    validated = validate_payload(payload, base_dir=tmp_path)
+    output = renderer.maybe_generate_pdp_background(validated)
+
+    assert observed["model"] == "test-model"
+    assert observed["prompt"].startswith("Structured prompt from file.")
+    assert "Logo text: SampleLogo." in observed["prompt"]
+    assert "Primary brand color: #be3b7a." in observed["prompt"]
+    assert "Contrast text color: #ffffff." in observed["prompt"]
+    assert observed["aspect_ratio"] == "4:5"
     assert output["background"]["imageUrl"].startswith("data:image/png;base64,")
 
 

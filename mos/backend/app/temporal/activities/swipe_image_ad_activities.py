@@ -24,17 +24,14 @@ from temporalio import activity
 from app.config import settings
 from app.db.base import session_scope
 from app.db.enums import ArtifactTypeEnum
-from app.db.models import DesignSystem, Funnel, ProductOffer, ProductVariant
+from app.db.models import DesignSystem, Funnel, FunnelPage, ProductOffer, ProductVariant
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
 from app.db.repositories.workflows import WorkflowsRepository
-from app.observability import (
-    LangfuseTraceContext,
-    bind_langfuse_trace_context,
-    start_langfuse_generation,
-)
+from app.observability import LangfuseTraceContext, bind_langfuse_trace_context, start_langfuse_generation
+from app.schemas.creative_generation import SwipeAdCopyPack
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
 from app.services.creative_service_client import (
     CreativeServiceClient,
@@ -1254,6 +1251,740 @@ def _build_swipe_stage1_prompt_input(
     )
 
 
+def _resolve_swipe_copy_platform(*, channel_id: str) -> str:
+    normalized = (channel_id or "").strip().lower()
+    if normalized in {"facebook", "instagram", "meta", "facebook_ads", "instagram_ads"}:
+        return "Meta"
+    if normalized in {"tiktok", "tik_tok", "tik-tok"}:
+        return "TikTok"
+    raise ValueError(
+        "Swipe Stage 1 copy generation only supports Meta and TikTok channels. "
+        f"Received channel={channel_id!r}."
+    )
+
+
+def _resolve_destination_type(
+    *,
+    session,
+    funnel_id: str | None,
+    funnel_stage: str | None,
+) -> str:
+    normalized_stage = (funnel_stage or "").strip().lower()
+    if not isinstance(funnel_id, str) or not funnel_id.strip():
+        if normalized_stage in {"top-of-funnel", "top", "tof", "middle-of-funnel", "middle", "mid", "mof"}:
+            return "Presales Listicle Page"
+        if normalized_stage in {"bottom-of-funnel", "bottom", "bof"}:
+            return "Sales Page"
+        raise ValueError(
+            "funnel_id is required to resolve swipe copy destination type when funnelStage is missing or unsupported."
+        )
+
+    pages = session.scalars(
+        select(FunnelPage).where(FunnelPage.funnel_id == funnel_id.strip())
+    ).all()
+    template_ids = {
+        str(page.template_id).strip()
+        for page in pages
+        if isinstance(page.template_id, str) and page.template_id.strip()
+    }
+    if not template_ids:
+        raise ValueError(
+            "No funnel page template ids were available to resolve swipe copy destination type "
+            f"(funnel_id={funnel_id})."
+        )
+
+    if normalized_stage in {"bottom-of-funnel", "bottom", "bof"}:
+        if "sales-pdp" in template_ids:
+            return "Sales Page"
+        if len(template_ids) == 1 and "pre-sales-listicle" in template_ids:
+            return "Presales Listicle Page"
+        raise ValueError(
+            "Bottom-of-funnel requirement could not be mapped to a supported destination page type. "
+            f"funnel_id={funnel_id} template_ids={sorted(template_ids)}"
+        )
+
+    if "pre-sales-listicle" in template_ids:
+        return "Presales Listicle Page"
+    if "sales-pdp" in template_ids:
+        return "Sales Page"
+
+    raise ValueError(
+        "Swipe Stage 1 copy destination type is unsupported for the funnel pages attached to this brief. "
+        f"funnel_id={funnel_id} template_ids={sorted(template_ids)}"
+    )
+
+
+def _resolve_swipe_copy_asset_type(*, mime_type: str) -> str:
+    normalized = (mime_type or "").strip().lower()
+    if normalized.startswith("image/"):
+        return "image"
+    if normalized.startswith("video/"):
+        return "video"
+    raise ValueError(
+        "Swipe Stage 1 copy generation only supports image or video creatives. "
+        f"Received mime_type={mime_type!r}."
+    )
+
+
+_BLIND_ANGLE_MECHANISM_TERMS = {
+    "check",
+    "checks",
+    "checklist",
+    "checklists",
+    "compound",
+    "compounds",
+    "dose",
+    "doses",
+    "dosage",
+    "dosages",
+    "dosing",
+    "drug",
+    "drugs",
+    "enzyme",
+    "enzymes",
+    "formula",
+    "formulas",
+    "guide",
+    "guides",
+    "ingredient",
+    "ingredients",
+    "interaction",
+    "interactions",
+    "mechanism",
+    "mechanisms",
+    "method",
+    "methods",
+    "mg",
+    "milligram",
+    "milligrams",
+    "pathway",
+    "pathways",
+    "precision",
+    "process",
+    "processes",
+    "protocol",
+    "protocols",
+    "requirement",
+    "requirements",
+    "rule",
+    "rules",
+    "safety",
+    "screen",
+    "screening",
+    "step",
+    "steps",
+    "triage",
+    "workflow",
+    "workflows",
+}
+
+_GLOBAL_BLIND_ANGLE_REVEAL_TERMS = {
+    "bring to your pharmacist",
+    "check",
+    "checks",
+    "checklist",
+    "checklists",
+    "focused question list",
+    "guide",
+    "guides",
+    "handbook",
+    "how it works",
+    "method",
+    "methods",
+    "process",
+    "processes",
+    "protocol",
+    "protocols",
+    "question list",
+    "question lists",
+    "run it yourself",
+    "screen",
+    "screening",
+    "self directed",
+    "step by step",
+    "step",
+    "steps",
+    "walks you through",
+    "way to check",
+    "workflow",
+    "workflows",
+}
+
+
+def _normalize_blind_angle_text(value: str) -> str:
+    normalized = value.lower()
+    normalized = (
+        normalized.replace("–", " ")
+        .replace("—", " ")
+        .replace("-", " ")
+        .replace("/", " ")
+        .replace("'", " ")
+        .replace('"', " ")
+    )
+    normalized = re.sub(r"[^a-z0-9\s-]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def _collect_blind_angle_forbidden_terms(*values: str | None) -> list[str]:
+    phrases: set[str] = set()
+    for raw_value in values:
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            continue
+        normalized_value = _normalize_blind_angle_text(raw_value)
+        if not normalized_value:
+            continue
+        tokens = normalized_value.split()
+        for idx, token in enumerate(tokens):
+            if token not in _BLIND_ANGLE_MECHANISM_TERMS:
+                continue
+            phrases.add(token)
+            start = max(0, idx - 2)
+            end = min(len(tokens), idx + 3)
+            phrase = " ".join(tokens[start:end]).strip()
+            if phrase and phrase != token:
+                phrases.add(phrase)
+        for match in re.finditer(r"['\"]([^'\"]{2,120})['\"]", raw_value):
+            candidate = _normalize_blind_angle_text(match.group(1))
+            if not candidate:
+                continue
+            candidate_tokens = candidate.split()
+            if any(token in _BLIND_ANGLE_MECHANISM_TERMS for token in candidate_tokens):
+                phrases.add(candidate)
+    return sorted((phrase for phrase in phrases if phrase), key=lambda item: (-len(item), item))
+
+
+def _validate_swipe_copy_blind_angle_blackout(
+    *,
+    copy_pack: SwipeAdCopyPack,
+    forbidden_terms: list[str],
+) -> None:
+    if not forbidden_terms:
+        return
+    candidate_text = "\n".join(
+        value
+        for value in (
+            copy_pack.formatted_variations_markdown,
+            copy_pack.meta_primary_text,
+            copy_pack.meta_headline,
+            copy_pack.meta_description,
+            copy_pack.tiktok_caption,
+            copy_pack.tiktok_on_screen_text,
+        )
+        if isinstance(value, str) and value.strip()
+    )
+    normalized_candidate = f" {_normalize_blind_angle_text(candidate_text)} "
+    matches: list[str] = []
+    for term in forbidden_terms:
+        normalized_term = _normalize_blind_angle_text(term)
+        if normalized_term and f" {normalized_term} " in normalized_candidate:
+            matches.append(term)
+    if matches:
+        preview = ", ".join(repr(term) for term in matches[:8])
+        if len(matches) > 8:
+            preview += ", ..."
+        raise ValueError(
+            "Swipe Stage 1 copy leaked forbidden blind-angle terms into feed copy: "
+            f"{preview}. Regenerate with a stronger curiosity gap."
+        )
+
+
+def _build_swipe_copy_stage1_prompt(
+    *,
+    brief: Dict[str, Any],
+    requirement_index: int,
+    requirement: Dict[str, Any],
+    platform: str,
+    destination_type: str,
+    swipe_asset_type: str,
+    swipe_mime_type: str,
+    swipe_source_label: str | None,
+    swipe_source_url: str,
+    forbidden_terms: list[str],
+    retry_feedback: str | None = None,
+) -> str:
+    input_payload = {
+        "Platform": platform,
+        "Ad Image or Video": {
+            "assetType": swipe_asset_type,
+            "sourceLabel": swipe_source_label,
+            "sourceUrl": swipe_source_url,
+            "mimeType": swipe_mime_type,
+            "attachedInlineToGemini": True,
+        },
+        "Angle Used": requirement.get("angle"),
+        "Destination Page": destination_type,
+        "Project Docs": {
+            "assetBriefId": brief.get("id"),
+            "campaignId": brief.get("campaignId"),
+            "funnelId": brief.get("funnelId"),
+            "variantId": brief.get("variantId"),
+            "variantName": brief.get("variantName"),
+            "creativeConcept": brief.get("creativeConcept"),
+            "constraints": brief.get("constraints") or [],
+            "toneGuidelines": brief.get("toneGuidelines") or [],
+            "visualGuidelines": brief.get("visualGuidelines") or [],
+        },
+        "Requirement Context": {
+            "requirementIndex": requirement_index,
+            "channel": requirement.get("channel"),
+            "format": requirement.get("format"),
+            "funnelStage": requirement.get("funnelStage"),
+            "hook": requirement.get("hook"),
+        },
+        "Blind Angle Forbidden Terms": forbidden_terms,
+    }
+
+    prompt = (
+        "ROLE:\n"
+        "You are an elite, top-tier Direct Response Copywriter and Media Buying Strategist specializing strictly "
+        "in Meta (Facebook/Instagram) and TikTok in-feed ads. Your expertise lies in analyzing visual ad creatives, "
+        "extracting their core psychological angles, and writing visceral ad copy designed with one singular goal: "
+        "maximizing Link Click-Through Rate (CTR).\n\n"
+        "OBJECTIVE:\n"
+        "Take the attached ad creative, the declared destination page, the attached project documentation, the "
+        "specified Angle Used, and the target platform. Silently analyze everything, then build three copy "
+        "variations that stay locked to the exact same angle.\n\n"
+        "INPUTS YOU WILL RECEIVE:\n"
+        f"- Platform: {platform}\n"
+        f"- Ad Image or Video: attached {swipe_asset_type} asset ({swipe_source_label or 'unlabeled asset'}, {swipe_mime_type})\n"
+        f"- Angle Used: {requirement.get('angle')}\n"
+        f"- Destination Page: {destination_type}\n"
+        "- Project Docs: attached through Gemini File Search context.\n\n"
+        "THE SINGLE ANGLE CONSTRAINT:\n"
+        "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
+        "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
+        "same angle.\n\n"
+        "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
+        "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
+        "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "
+        "not use that exact mechanism language in the feed copy. Translate it into a blind curiosity gap using vague, "
+        "ominous references such as 'this', 'that one hidden detail', 'the fatal flaw', or 'the one thing'. Sell the "
+        "click, not the lesson.\n\n"
+        "BLACKOUT ENFORCEMENT:\n"
+        "The following words and phrases are banned from the ad copy because they reveal the angle. Do not use them in "
+        "variation titles, primary text, headlines, descriptions, captions, or on-screen text:\n"
+        f"{json.dumps(forbidden_terms, ensure_ascii=False)}\n\n"
+        "If you need to refer to the promised thing, use only blind nouns like 'this', 'the missing piece', "
+        "'the one detail', 'what they left out', or 'the thing nobody warns you about'. Never call it a guide, "
+        "check, checklist, process, workflow, method, step, screen, handbook, or question list.\n\n"
+        "THE SLIPPERY SLOPE RULE:\n"
+        "Never write block paragraphs. Each sentence in the primary text must be separated by a hard line break, "
+        "but the copy must still read as one cohesive escalation from hook to agitation to bridge to CTA.\n\n"
+        "PLATFORM RULES:\n"
+        "- Meta: Primary Text must stay short, narrative, and broken into 3-5 punchy lines. Headline must be "
+        "40-60 characters. Description must be a short urgency trigger. CTA must be one of Learn More, Shop Now, "
+        "Watch More, or Sign Up.\n"
+        "- TikTok: Caption must feel native and stay under 150 characters. Include 1-3 relevant hashtags. "
+        "On-screen text must be a visceral 1-2 sentence hook for the first 3 seconds. CTA must be Learn More or Shop Now.\n\n"
+        "GENERAL RULES:\n"
+        "- If the Destination Page is a listicle, do not use specific numbers in the copy or headline.\n"
+        "- Use plain, bar-stool language. Ban fluffy corporate words.\n"
+        "- Match the destination scent. If the Destination Page is a presell page, the copy should feel like "
+        "a warning, a leak, a breaking discovery, or a shocking reveal.\n"
+        "- Respect attached project constraints and compliance rules. If a project constraint conflicts with the "
+        "aggressive copy style, obey the constraint and stay as direct-response as the source materials allow.\n\n"
+        "STRUCTURED OUTPUT RULE:\n"
+        "Return valid JSON only. Do not wrap the JSON in prose. If you use a markdown fence, use a single ```json fence "
+        "that contains only the JSON object. Escape every newline inside string values as \\n. Put the exact requested "
+        "three-variation output inside `formattedVariationsMarkdown` as one markdown code block string. The code block "
+        "must contain exactly 3 variations and use the requested field labels. "
+        "Do not use literal double-quote characters inside any string value unless they are escaped. Prefer paraphrasing "
+        "quoted speech instead of quoting it.\n"
+        "Then populate the platform-specific selected variation fields in JSON:\n"
+        "- For Meta, fill `metaPrimaryText`, `metaHeadline`, `metaDescription`, and `metaCta` from the best single variation.\n"
+        "- For TikTok, fill `tiktokCaption`, `tiktokOnScreenText`, and `tiktokCta` from the best single variation.\n"
+        "- `selectedVariation` must name the winning variation exactly.\n"
+        "- `claimsGuardrails` must contain short, concrete publishing guardrails grounded in the attached docs.\n"
+        "- Do not output strategy notes or creative breakdown outside the JSON fields.\n\n"
+        "JSON SHAPE:\n"
+        "{\n"
+        '  "selectedVariation": "Variation 1: ...",\n'
+        '  "formattedVariationsMarkdown": "```text\\\\n**Variation 1: ...",\n'
+        '  "metaPrimaryText": "Sentence 1\\\\n\\\\nSentence 2...",\n'
+        '  "metaHeadline": "Headline here",\n'
+        '  "metaDescription": "Description here",\n'
+        '  "metaCta": "Learn More",\n'
+        '  "tiktokCaption": null,\n'
+        '  "tiktokOnScreenText": null,\n'
+        '  "tiktokCta": null,\n'
+        '  "claimsGuardrails": ["Guardrail 1", "Guardrail 2"]\n'
+        "}\n\n"
+        "OUTPUT LAYOUT TO MIRROR INSIDE formattedVariationsMarkdown:\n"
+        "```text\n"
+        "**Variation 1: [Target Angle - Approach]**\n\n"
+        "**Primary Text:** [Sentence 1]\n\n"
+        "[Sentence 2]\n\n"
+        "[Sentence 3]\n\n"
+        "[Sentence 4 if needed]\n\n"
+        "**Headline:** [Headline]\n"
+        "**Description:** [Description]\n"
+        "**CTA:** [Button]\n\n"
+        "---\n\n"
+        "**Variation 2: [Target Angle - Approach]**\n"
+        "...\n\n"
+        "---\n\n"
+        "**Variation 3: [Target Angle - Approach]**\n"
+        "...\n"
+        "```\n\n"
+    )
+    if isinstance(retry_feedback, str) and retry_feedback.strip():
+        prompt += f"RETRY CORRECTION:\n{retry_feedback}\n\n"
+    prompt += f"INPUT JSON:\n{json.dumps(input_payload, ensure_ascii=False, indent=2)}"
+    return prompt
+
+
+def _extract_first_json_object_from_text(text: str) -> Dict[str, Any]:
+    start = text.find("{")
+    if start < 0:
+        raise RuntimeError("Swipe Stage 1 copy response did not contain a JSON object.")
+
+    depth = 0
+    in_string = False
+    escape = False
+    for idx in range(start, len(text)):
+        char = text[idx]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start : idx + 1]
+                return json.loads(candidate)
+
+    raise RuntimeError("Swipe Stage 1 copy response contained malformed JSON.")
+
+
+def _strip_json_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", stripped, flags=re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return stripped
+
+
+def _extract_gemini_finish_reason(response: Any) -> str | None:
+    candidates = getattr(response, "candidates", None)
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    reason = getattr(candidates[0], "finish_reason", None)
+    if reason is None:
+        return None
+    return str(getattr(reason, "value", reason))
+
+
+def _call_swipe_copy_gemini_json_message(
+    *,
+    model: str,
+    system_instruction: str,
+    contents: List[Any],
+    store_names: list[str] | None,
+    max_tokens: int,
+    temperature: float,
+    response_schema: Any | None = None,
+) -> Dict[str, Any]:
+    gemini_client = _ensure_gemini_client()
+    unique_store_names = sorted(
+        {name.strip() for name in (store_names or []) if isinstance(name, str) and name.strip()}
+    )
+    config_kwargs: Dict[str, Any] = {
+        "temperature": temperature,
+        "max_output_tokens": max_tokens,
+        "system_instruction": system_instruction,
+    }
+    if unique_store_names:
+        config_kwargs["tools"] = [
+            genai_types.Tool(
+                file_search=genai_types.FileSearch(file_search_store_names=unique_store_names)
+            )
+        ]
+    if response_schema is not None and not unique_store_names:
+        config_kwargs["response_mime_type"] = "application/json"
+        if hasattr(response_schema, "model_json_schema"):
+            config_kwargs["response_json_schema"] = response_schema.model_json_schema()
+        else:
+            config_kwargs["response_json_schema"] = response_schema
+    try:
+        response = gemini_client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=genai_types.GenerateContentConfig(**config_kwargs),
+        )
+    except Exception as exc:  # noqa: BLE001
+        error_text = str(exc)
+        if "File search tool is not enabled for this model" in error_text:
+            raise RuntimeError(
+                "Swipe Stage 1 copy generation model does not support Gemini File Search. "
+                f"model={model}. Choose a Gemini model with File Search support for this workflow."
+            ) from exc
+        raise RuntimeError(f"Swipe Stage 1 copy generation failed with Gemini: {error_text}") from exc
+
+    parsed = getattr(response, "parsed", None)
+    if parsed is not None and hasattr(parsed, "model_dump"):
+        parsed = parsed.model_dump(mode="json", by_alias=True, exclude_none=False)
+
+    text = _extract_gemini_text(response) or ""
+    text = _strip_json_fence(text)
+    if parsed is None:
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            try:
+                parsed = _extract_first_json_object_from_text(text)
+            except RuntimeError as exc:
+                preview = text.strip()[:1200]
+                raise RuntimeError(
+                    "Swipe Stage 1 copy response was not valid JSON. "
+                    f"Raw response preview: {preview!r}"
+                ) from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Swipe Stage 1 copy generation returned a non-object JSON payload.")
+    return {
+        "parsed": parsed,
+        "text": text,
+        "stop_reason": _extract_gemini_finish_reason(response),
+        "output_tokens": (_extract_gemini_usage_details(response) or {}).get("output"),
+    }
+
+
+def _audit_swipe_copy_blind_angle_blackout(
+    *,
+    copy_pack: SwipeAdCopyPack,
+    angle: str | None,
+    hook: str | None,
+    forbidden_terms: list[str],
+    destination_type: str,
+    model: str,
+) -> tuple[bool, str | None]:
+    audit_payload = {
+        "platform": copy_pack.platform,
+        "destinationPage": destination_type,
+        "angleUsed": angle,
+        "hook": hook,
+        "forbiddenTerms": forbidden_terms,
+        "selectedVariation": copy_pack.selected_variation,
+        "formattedVariationsMarkdown": copy_pack.formatted_variations_markdown,
+        "metaPrimaryText": copy_pack.meta_primary_text,
+        "metaHeadline": copy_pack.meta_headline,
+        "metaDescription": copy_pack.meta_description,
+        "metaCta": copy_pack.meta_cta,
+        "tiktokCaption": copy_pack.tiktok_caption,
+        "tiktokOnScreenText": copy_pack.tiktok_on_screen_text,
+        "tiktokCta": copy_pack.tiktok_cta,
+    }
+    audit_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "passes": {"type": "boolean"},
+            "violations": {"type": "array", "items": {"type": "string"}},
+            "retryFeedback": {"type": ["string", "null"]},
+        },
+        "required": ["passes", "violations", "retryFeedback"],
+    }
+    response = _call_swipe_copy_gemini_json_message(
+        model=model,
+        system_instruction=(
+            "You are a strict direct-response copy QA auditor. Your job is to reject ad copy that violates the blind "
+            "angle or information blackout rule. Return JSON only."
+        ),
+        contents=[
+            (
+                "Audit the candidate ad copy below.\n\n"
+                "FAIL the copy if ANY of the following are true:\n"
+                "- It repeats or closely reveals the mechanism, requirement, workflow, checklist, guide, screening, "
+                "process, step, protocol, interaction, dosage, ingredient, or other lesson named in the angle/hook.\n"
+                "- It explains what the solution is, how it works, how to do it, or what exact tool/process the user "
+                "will see after clicking.\n"
+                "- It names a concrete self-service process such as a check, checklist, guide, workflow, question list, "
+                "screening step, or run-it-yourself method.\n"
+                "- It uses the forbidden terms list directly.\n"
+                "- If the destination page is a listicle, it uses specific numbers in copy or headline.\n\n"
+                "PASS only if the copy stays blind, curiosity-driven, and sells the click without teaching the lesson.\n\n"
+                "Return valid JSON with exactly this shape:\n"
+                "{\n"
+                '  "passes": true,\n'
+                '  "violations": [],\n'
+                '  "retryFeedback": null\n'
+                "}\n\n"
+                "If it fails, set `passes` to false, list concise violations, and provide a short `retryFeedback` that tells "
+                "the generator what to remove.\n\n"
+                f"CANDIDATE JSON:\n{json.dumps(audit_payload, ensure_ascii=False, indent=2)}"
+            )
+        ],
+        store_names=[],
+        max_tokens=1200,
+        temperature=0.0,
+        response_schema=audit_schema,
+    )
+    parsed = response.get("parsed")
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Swipe Stage 1 copy blackout audit returned a non-dict parsed payload.")
+    passes = bool(parsed.get("passes"))
+    if passes:
+        return True, None
+    retry_feedback = parsed.get("retryFeedback")
+    if isinstance(retry_feedback, str) and retry_feedback.strip():
+        return False, retry_feedback.strip()
+    violations = parsed.get("violations")
+    if isinstance(violations, list):
+        flattened = "; ".join(str(item).strip() for item in violations if str(item).strip())
+        if flattened:
+            return False, flattened
+    return False, "Copy failed the blind-angle blackout audit. Remove all solution and mechanism reveals."
+
+
+def _generate_swipe_stage1_copy_pack(
+    *,
+    session,
+    brief: Dict[str, Any],
+    requirement_index: int,
+    requirement: Dict[str, Any],
+    copy_model: str,
+    gemini_store_names: list[str],
+    swipe_bytes: bytes,
+    swipe_mime_type: str,
+    swipe_source_url: str,
+    swipe_source_label: str | None,
+    product_prompt_image_bytes: bytes | None,
+    product_prompt_image_mime_type: str | None,
+) -> tuple[SwipeAdCopyPack, Dict[str, Any], str]:
+    channel_id = str(requirement.get("channel") or "").strip()
+    if not channel_id:
+        raise ValueError("Swipe Stage 1 copy generation requires a non-empty requirement channel.")
+    platform = _resolve_swipe_copy_platform(channel_id=channel_id)
+    swipe_asset_type = _resolve_swipe_copy_asset_type(mime_type=swipe_mime_type)
+    forbidden_terms = sorted(
+        {
+            *_GLOBAL_BLIND_ANGLE_REVEAL_TERMS,
+            *_collect_blind_angle_forbidden_terms(
+                requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
+                requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
+            ),
+        },
+        key=lambda item: (-len(item), item),
+    )
+    destination_type = _resolve_destination_type(
+        session=session,
+        funnel_id=str(brief.get("funnelId") or "").strip() or None,
+        funnel_stage=(
+            str(requirement.get("funnelStage")).strip()
+            if isinstance(requirement.get("funnelStage"), str) and requirement.get("funnelStage").strip()
+            else None
+        ),
+    )
+    retry_feedback: str | None = None
+    last_response: Dict[str, Any] | None = None
+    for attempt in range(1, 6):
+        prompt = _build_swipe_copy_stage1_prompt(
+            brief=brief,
+            requirement_index=requirement_index,
+            requirement=requirement,
+            platform=platform,
+            destination_type=destination_type,
+            swipe_asset_type=swipe_asset_type,
+            swipe_mime_type=swipe_mime_type,
+            swipe_source_label=swipe_source_label,
+            swipe_source_url=swipe_source_url,
+            forbidden_terms=forbidden_terms,
+            retry_feedback=retry_feedback,
+        )
+        contents: List[Any] = [
+            prompt,
+            "Ad Image or Video asset:",
+            genai_types.Part.from_bytes(data=swipe_bytes, mime_type=swipe_mime_type),
+        ]
+        if product_prompt_image_bytes is not None and product_prompt_image_mime_type is not None:
+            contents.extend(
+                [
+                    "Product reference image asset:",
+                    genai_types.Part.from_bytes(
+                        data=product_prompt_image_bytes,
+                        mime_type=product_prompt_image_mime_type,
+                    ),
+                ]
+            )
+        response = _call_swipe_copy_gemini_json_message(
+            model=copy_model,
+            system_instruction=(
+                "Generate swipe-specific direct response ad copy. Use the attached project documents as the source of truth. "
+                "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
+                "Return JSON only."
+            ),
+            contents=contents,
+            store_names=gemini_store_names,
+            max_tokens=6000,
+            temperature=0.2,
+            response_schema=SwipeAdCopyPack,
+        )
+        last_response = response
+        parsed = response.get("parsed")
+        if not isinstance(parsed, dict):
+            raise RuntimeError("Swipe Stage 1 copy generation returned a non-dict parsed payload.")
+
+        merged_payload = dict(parsed)
+        merged_payload.update(
+            {
+                "platform": platform,
+                "requirementIndex": requirement_index,
+                "channel": str(requirement.get("channel") or ""),
+                "format": str(requirement.get("format") or ""),
+                "funnelStage": requirement.get("funnelStage"),
+                "angle": requirement.get("angle"),
+                "hook": requirement.get("hook"),
+                "destinationType": destination_type,
+            }
+        )
+        validated = SwipeAdCopyPack.model_validate(merged_payload)
+        try:
+            _validate_swipe_copy_blind_angle_blackout(
+                copy_pack=validated,
+                forbidden_terms=forbidden_terms,
+            )
+        except ValueError as exc:
+            if attempt >= 5:
+                raise RuntimeError(str(exc)) from exc
+            retry_feedback = (
+                f"{exc} Remove the banned terms entirely and rebuild all 3 variations around a blind curiosity gap."
+            )
+            continue
+        passes_audit, audit_feedback = _audit_swipe_copy_blind_angle_blackout(
+            copy_pack=validated,
+            angle=requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
+            hook=requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
+            forbidden_terms=forbidden_terms,
+            destination_type=destination_type,
+            model=copy_model,
+        )
+        if not passes_audit:
+            if attempt >= 5:
+                raise RuntimeError(audit_feedback or "Swipe Stage 1 copy failed the blackout audit.")
+            retry_feedback = audit_feedback or (
+                "The copy still reveals the solution or the angle mechanics. Remove those reveals and make the click "
+                "curiosity-driven."
+            )
+            continue
+        return validated, response, copy_model
+    raise RuntimeError(
+        "Swipe Stage 1 copy generation exhausted retry attempts without producing a valid blind-angle-compliant output."
+        if last_response is not None
+        else "Swipe Stage 1 copy generation did not produce a response."
+    )
+
+
 def _poll_image_job(
     *,
     creative_client: Any,
@@ -1517,6 +2248,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 swipe_source_url=swipe_source_url,
             )
         )
+        swipe_source_label = (
+            str(params.get("swipe_source_label")).strip()
+            if isinstance(params.get("swipe_source_label"), str) and str(params.get("swipe_source_label")).strip()
+            else swipe_source_filename
+        )
 
         if resolved_swipe_requires_product_image is False:
             product_reference_assets = []
@@ -1626,6 +2362,55 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             funnel_id=funnel_id,
             asset_brief_artifact_id=brief_artifact_id,
         )
+        swipe_copy_pack, swipe_copy_response, swipe_copy_model = _generate_swipe_stage1_copy_pack(
+            session=session,
+            brief=brief,
+            requirement_index=requirement_index,
+            requirement=requirement,
+            copy_model=model_name,
+            gemini_store_names=gemini_store_names,
+            swipe_bytes=swipe_bytes,
+            swipe_mime_type=swipe_mime_type,
+            swipe_source_url=swipe_source_url,
+            swipe_source_label=swipe_source_label,
+            product_prompt_image_bytes=product_prompt_image_bytes,
+            product_prompt_image_mime_type=product_prompt_image_mime_type,
+        )
+        swipe_copy_pack_payload = swipe_copy_pack.model_dump(mode="json", by_alias=True)
+        swipe_copy_prompt_sha256 = hashlib.sha256(
+            _build_swipe_copy_stage1_prompt(
+                brief=brief,
+                requirement_index=requirement_index,
+                requirement=requirement,
+                platform=swipe_copy_pack.platform,
+                destination_type=swipe_copy_pack.destination_type,
+                swipe_asset_type=_resolve_swipe_copy_asset_type(mime_type=swipe_mime_type),
+                swipe_mime_type=swipe_mime_type,
+                swipe_source_label=swipe_source_label,
+                swipe_source_url=swipe_source_url,
+                forbidden_terms=sorted(
+                    {
+                        *_GLOBAL_BLIND_ANGLE_REVEAL_TERMS,
+                        *_collect_blind_angle_forbidden_terms(
+                            requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
+                            requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
+                        ),
+                    },
+                    key=lambda item: (-len(item), item),
+                ),
+            ).encode("utf-8")
+        ).hexdigest()
+        swipe_copy_inputs = {
+            "platform": swipe_copy_pack.platform,
+            "adImageOrVideo": {
+                "assetType": _resolve_swipe_copy_asset_type(mime_type=swipe_mime_type),
+                "sourceLabel": swipe_source_label,
+                "sourceUrl": swipe_source_url,
+                "mimeType": swipe_mime_type,
+            },
+            "angleUsed": requirement.get("angle"),
+            "destinationPage": swipe_copy_pack.destination_type,
+        }
 
         # Run Gemini vision with File Search context to generate the generation-ready image prompt.
         gemini_client = _ensure_gemini_client()
@@ -1806,6 +2591,14 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeRenderModelIdRequested": requested_render_model_id,
                 "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
                 "swipeRenderProvider": render_provider,
+                "swipeCopyPack": swipe_copy_pack_payload,
+                "swipeCopyModel": swipe_copy_model,
+                "swipeCopyRequestId": swipe_copy_response.get("request_id"),
+                "swipeCopyStopReason": swipe_copy_response.get("stop_reason"),
+                "swipeCopyOutputTokens": swipe_copy_response.get("output_tokens"),
+                "swipeCopyPromptSha256": swipe_copy_prompt_sha256,
+                "swipeCopyInputs": swipe_copy_inputs,
+                "swipeCopyGeminiStoreNames": gemini_store_names,
                 "swipeGeminiStoreNames": gemini_store_names,
                 "swipeGeminiRagDocKeys": gemini_rag_doc_keys,
                 "swipeGeminiRagBundleDocKeys": gemini_rag_bundle_doc_keys,
@@ -1896,6 +2689,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_prompt_model": model_name,
             "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
             "swipe_render_provider": render_provider,
+            "swipe_copy_pack": swipe_copy_pack_payload,
+            "swipe_copy_model": swipe_copy_model,
             "stores_attached": len(gemini_store_names),
             "gemini_rag_doc_keys": gemini_rag_doc_keys,
             "gemini_rag_bundle_doc_keys": gemini_rag_bundle_doc_keys,

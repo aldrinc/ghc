@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
+from app.db.models import ProductOffer, ProductOfferBonus
 from app.routers import products as products_router
 
 
@@ -117,7 +119,7 @@ def test_add_offer_bonus_verifies_shopify_product(api_client, monkeypatch):
     assert offers[0]["bonuses"][0]["bonus_product"]["id"] == bonus_product_id
 
 
-def test_add_offer_bonus_requires_shopify_product_gid(api_client, monkeypatch):
+def test_add_offer_bonus_creates_shopify_product_when_gid_missing(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Offer Bonus Missing GID")
     primary_product_id = _create_product(
         api_client,
@@ -132,20 +134,91 @@ def test_add_offer_bonus_requires_shopify_product_gid(api_client, monkeypatch):
         title="Bonus Without Shopify GID",
     )
 
-    called = {"value": False}
+    variant_resp = api_client.post(
+        f"/products/{bonus_product_id}/variants",
+        json={
+            "title": "Bonus Default",
+            "price": 1900,
+            "currency": "usd",
+        },
+    )
+    assert variant_resp.status_code == 201
+
+    observed: dict[str, object] = {"verified": False}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        observed["status_client_id"] = client_id
+        observed["selected_shop_domain"] = selected_shop_domain
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
 
     def fake_verify(*, client_id: str, product_gid: str) -> None:
-        called["value"] = True
+        observed["verified"] = True
 
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["create_client_id"] = client_id
+        observed["create_title"] = title
+        observed["create_variants"] = variants
+        observed["create_shop_domain"] = shop_domain
+        observed["create_status_text"] = status_text
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/666",
+            "title": title,
+            "handle": "bonus-without-shopify-gid",
+            "status": status_text,
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/667",
+                    "title": "Bonus Default",
+                    "priceCents": 1900,
+                    "currency": "USD",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
     monkeypatch.setattr(products_router, "verify_shopify_product_exists", fake_verify)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
 
     response = api_client.post(
         f"/products/offers/{offer_id}/bonuses",
         json={"bonusProductId": bonus_product_id},
     )
-    assert response.status_code == 409
-    assert response.json()["detail"] == "Bonus product must include a Shopify product GID."
-    assert called["value"] is False
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["bonus_product"]["shopify_product_gid"] == "gid://shopify/Product/666"
+    assert observed["verified"] is False
+    assert observed["create_client_id"] == client_id
+    assert observed["create_title"] == "Bonus Without Shopify GID"
+    assert observed["create_variants"] == [
+        {"title": "Bonus Default", "priceCents": 1900, "currency": "USD"}
+    ]
+    assert observed["create_shop_domain"] == "example.myshopify.com"
+    assert observed["create_status_text"] == "DRAFT"
+
+    detail_resp = api_client.get(f"/products/{bonus_product_id}")
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["shopify_product_gid"] == "gid://shopify/Product/666"
 
 
 def test_add_offer_bonus_bubbles_shopify_verification_error(api_client, monkeypatch):
@@ -349,6 +422,27 @@ def test_create_variant_rejects_non_gid_external_price_id_for_shopify_provider(a
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Shopify externalPriceId must be a Shopify variant GID."
+
+
+def test_create_variant_normalizes_shopify_provider(api_client):
+    client_id = _create_client(api_client, name="Shopify Variant Provider Normalize")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    response = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": " Shopify ",
+            "externalPriceId": " gid://shopify/ProductVariant/123456789 ",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["provider"] == "shopify"
+    assert payload["external_price_id"] == "gid://shopify/ProductVariant/123456789"
 
 
 def test_update_variant_rejects_shopify_gid_with_non_shopify_provider(api_client):
@@ -870,6 +964,670 @@ def test_sync_shopify_variants_for_product_accepts_short_product_id(api_client, 
     assert variants[0]["title"] == "Starter"
 
 
+def test_sync_shopify_variants_for_product_backfills_unmapped_variants_by_title(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Pull Backfill")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/915",
+    )
+
+    existing_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter",
+            "price": 4900,
+            "currency": "usd",
+        },
+    )
+    assert existing_variant_resp.status_code == 201
+    existing_variant_id = existing_variant_resp.json()["id"]
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_get_product(*, client_id: str, product_gid: str, shop_domain: str | None = None):
+        assert product_gid == "gid://shopify/Product/915"
+        assert shop_domain == "example.myshopify.com"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/915",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/9151",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": "SKU-STARTER",
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 10,
+                    "optionValues": {"Title": "Starter"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_product)
+
+    sync_resp = api_client.post(f"/products/{product_id}/shopify/sync-variants", json={})
+    assert sync_resp.status_code == 200
+    payload = sync_resp.json()
+    assert payload["createdCount"] == 0
+    assert payload["updatedCount"] == 1
+    assert payload["totalFetched"] == 1
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert len(variants) == 1
+    variant = next(item for item in variants if item["id"] == existing_variant_id)
+    assert variant["provider"] == "shopify"
+    assert variant["external_price_id"] == "gid://shopify/ProductVariant/9151"
+    assert variant["price"] == 4999
+
+
+def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Push Sync")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/111",
+    )
+    offer_id = _create_offer(api_client, product_id=product_id)
+    bonus_product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Bonus Guide",
+        shopify_product_gid="gid://shopify/Product/222",
+    )
+
+    monkeypatch.setattr(products_router, "verify_shopify_product_exists", lambda **_: None)
+
+    add_bonus_resp = api_client.post(
+        f"/products/offers/{offer_id}/bonuses",
+        json={"bonusProductId": bonus_product_id},
+    )
+    assert add_bonus_resp.status_code == 201
+
+    bundle_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter Bundle",
+            "price": 7900,
+            "currency": "usd",
+            "offerId": offer_id,
+            "provider": "stripe",
+            "externalPriceId": "price_bundle",
+        },
+    )
+    assert bundle_variant_resp.status_code == 201
+    bundle_variant_id = bundle_variant_resp.json()["id"]
+
+    upsell_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Mega Bundle",
+            "price": 11900,
+            "currency": "usd",
+        },
+    )
+    assert upsell_variant_resp.status_code == 201
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed: dict[str, object] = {}
+
+    def fake_sync_client_shopify_product(
+        *,
+        client_id: str,
+        product_gid: str,
+        title: str,
+        variants: list[dict],
+        source_of_truth_payload: dict,
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["client_id"] = client_id
+        observed["product_gid"] = product_gid
+        observed["title"] = title
+        observed["variants"] = variants
+        observed["source_of_truth_payload"] = source_of_truth_payload
+        observed["status_text"] = status_text
+        observed["shop_domain"] = shop_domain
+        assert source_of_truth_payload["offers"][0]["id"] == offer_id
+        assert source_of_truth_payload["offers"][0]["variantIds"] == [bundle_variant_id]
+        assert source_of_truth_payload["offers"][0]["basket"]["bonusProductGids"] == [
+            "gid://shopify/Product/222"
+        ]
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/111",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "DRAFT",
+            "createdVariantCount": 1,
+            "updatedVariantCount": 1,
+            "deletedVariantCount": 0,
+            "offerCount": 1,
+            "metafieldNamespace": "mos",
+            "metafieldKey": "product_sync_payload",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/301",
+                    "title": "Starter Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Starter Bundle"},
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/302",
+                    "title": "Mega Bundle",
+                    "priceCents": 11900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Mega Bundle"},
+                },
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+
+    response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["productGid"] == "gid://shopify/Product/111"
+    assert body["createdCount"] == 1
+    assert body["updatedCount"] == 1
+    assert body["deletedCount"] == 0
+    assert body["offerCount"] == 1
+    assert body["metafieldNamespace"] == "mos"
+    assert body["metafieldKey"] == "product_sync_payload"
+    assert observed["client_id"] == client_id
+    assert observed["product_gid"] == "gid://shopify/Product/111"
+    assert observed["status_text"] == "DRAFT"
+    assert observed["shop_domain"] == "example.myshopify.com"
+
+    synced_variants = observed["variants"]
+    assert isinstance(synced_variants, list)
+    assert {item["title"] for item in synced_variants} == {"Starter Bundle", "Mega Bundle"}
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    variants = detail.get("variants") or []
+    assert len(variants) == 2
+    assert all(variant["shopify_last_synced_at"] is not None for variant in variants)
+    assert all(variant["shopify_last_sync_error"] is None for variant in variants)
+    assert {variant["external_price_id"] for variant in variants} == {
+        "price_bundle",
+        "gid://shopify/ProductVariant/302",
+    }
+    mega_variant = next(item for item in variants if item["title"] == "Mega Bundle")
+    assert mega_variant["provider"] == "shopify"
+
+
+def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_client, monkeypatch, db_session):
+    client_id = _create_client(api_client, name="Shopify Product Push Sync Bonus Create")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/111",
+    )
+    offer_id = _create_offer(api_client, product_id=product_id)
+    bonus_product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Bonus Guide",
+    )
+
+    bonus_variant_resp = api_client.post(
+        f"/products/{bonus_product_id}/variants",
+        json={
+            "title": "Bonus Default",
+            "price": 900,
+            "currency": "usd",
+        },
+    )
+    assert bonus_variant_resp.status_code == 201
+
+    offer = db_session.scalar(select(ProductOffer).where(ProductOffer.id == offer_id))
+    assert offer is not None
+    db_session.add(
+        ProductOfferBonus(
+            org_id=offer.org_id,
+            client_id=offer.client_id,
+            offer_id=offer.id,
+            bonus_product_id=bonus_product_id,
+            position=0,
+        )
+    )
+    db_session.commit()
+
+    bundle_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter Bundle",
+            "price": 7900,
+            "currency": "usd",
+            "offerId": offer_id,
+            "provider": "stripe",
+            "externalPriceId": "price_bundle",
+        },
+    )
+    assert bundle_variant_resp.status_code == 201
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed: dict[str, object] = {"created_titles": []}
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["created_titles"].append(title)
+        observed["create_variants"] = variants
+        if title == "Bonus Guide":
+            return {
+                "shopDomain": "example.myshopify.com",
+                "productGid": "gid://shopify/Product/222",
+                "title": title,
+                "handle": "bonus-guide",
+                "status": status_text,
+                "variants": [
+                    {
+                        "variantGid": "gid://shopify/ProductVariant/223",
+                        "title": "Bonus Default",
+                        "priceCents": 900,
+                        "currency": "USD",
+                    }
+                ],
+            }
+        raise AssertionError(f"Unexpected product creation for {title}")
+
+    def fake_sync_client_shopify_product(
+        *,
+        client_id: str,
+        product_gid: str,
+        title: str,
+        variants: list[dict],
+        source_of_truth_payload: dict,
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["sync_source_of_truth_payload"] = source_of_truth_payload
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/111",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "DRAFT",
+            "createdVariantCount": 0,
+            "updatedVariantCount": 1,
+            "deletedVariantCount": 0,
+            "offerCount": 1,
+            "metafieldNamespace": "mos",
+            "metafieldKey": "product_sync_payload",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/301",
+                    "title": "Starter Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Starter Bundle"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+
+    response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
+    assert response.status_code == 200
+    assert observed["created_titles"] == ["Bonus Guide"]
+    assert observed["sync_source_of_truth_payload"]["offers"][0]["basket"]["bonusProductGids"] == [
+        "gid://shopify/Product/222"
+    ]
+
+    bonus_detail_resp = api_client.get(f"/products/{bonus_product_id}")
+    assert bonus_detail_resp.status_code == 200
+    assert bonus_detail_resp.json()["shopify_product_gid"] == "gid://shopify/Product/222"
+
+
+def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Initial Push Sync")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+    )
+    update_product_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={
+            "description": "Primary description",
+            "handle": "primary-product",
+            "vendor": "mOS",
+            "productType": "supplement",
+            "tags": ["featured", "bundle"],
+        },
+    )
+    assert update_product_resp.status_code == 200
+    offer_id = _create_offer(api_client, product_id=product_id)
+
+    starter_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter Bundle",
+            "price": 7900,
+            "currency": "usd",
+            "offerId": offer_id,
+            "provider": "stripe",
+            "externalPriceId": "price_starter_bundle",
+        },
+    )
+    assert starter_variant_resp.status_code == 201
+
+    mega_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Mega Bundle",
+            "price": 11900,
+            "currency": "usd",
+        },
+    )
+    assert mega_variant_resp.status_code == 201
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed: dict[str, object] = {}
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["create_client_id"] = client_id
+        observed["create_title"] = title
+        observed["create_variants"] = variants
+        observed["create_description"] = description
+        observed["create_handle"] = handle
+        observed["create_vendor"] = vendor
+        observed["create_product_type"] = product_type
+        observed["create_tags"] = tags
+        observed["create_status_text"] = status_text
+        observed["create_shop_domain"] = shop_domain
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/777",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "DRAFT",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/901",
+                    "title": "Starter Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/902",
+                    "title": "Mega Bundle",
+                    "priceCents": 11900,
+                    "currency": "USD",
+                },
+            ],
+        }
+
+    def fake_sync_client_shopify_product(
+        *,
+        client_id: str,
+        product_gid: str,
+        title: str,
+        variants: list[dict],
+        source_of_truth_payload: dict,
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["sync_client_id"] = client_id
+        observed["sync_product_gid"] = product_gid
+        observed["sync_title"] = title
+        observed["sync_variants"] = variants
+        observed["sync_source_of_truth_payload"] = source_of_truth_payload
+        observed["sync_description"] = description
+        observed["sync_handle"] = handle
+        observed["sync_vendor"] = vendor
+        observed["sync_product_type"] = product_type
+        observed["sync_tags"] = tags
+        observed["sync_status_text"] = status_text
+        observed["sync_shop_domain"] = shop_domain
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": product_gid,
+            "title": title,
+            "handle": handle or "primary-product",
+            "status": status_text,
+            "createdVariantCount": 0,
+            "updatedVariantCount": 2,
+            "deletedVariantCount": 0,
+            "offerCount": 1,
+            "metafieldNamespace": "mos",
+            "metafieldKey": "product_sync_payload",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/901",
+                    "title": "Starter Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Starter Bundle"},
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/902",
+                    "title": "Mega Bundle",
+                    "priceCents": 11900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Mega Bundle"},
+                },
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+
+    response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["productGid"] == "gid://shopify/Product/777"
+    assert body["updatedCount"] == 2
+    assert observed["create_client_id"] == client_id
+    assert observed["create_title"] == "Primary Product"
+    assert observed["create_description"] == "Primary description"
+    assert observed["create_handle"] == "primary-product"
+    assert observed["create_vendor"] == "mOS"
+    assert observed["create_product_type"] == "supplement"
+    assert observed["create_tags"] == ["featured", "bundle"]
+    assert observed["create_status_text"] == "DRAFT"
+    assert observed["create_shop_domain"] == "example.myshopify.com"
+    assert observed["create_variants"] == [
+        {"title": "Starter Bundle", "priceCents": 7900, "currency": "USD"},
+        {"title": "Mega Bundle", "priceCents": 11900, "currency": "USD"},
+    ]
+    assert observed["sync_product_gid"] == "gid://shopify/Product/777"
+    assert observed["sync_source_of_truth_payload"]["product"]["title"] == "Primary Product"
+    assert observed["sync_source_of_truth_payload"]["offers"][0]["basket"]["primaryProductGid"] == (
+        "gid://shopify/Product/777"
+    )
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert detail["shopify_product_gid"] == "gid://shopify/Product/777"
+
+
+def test_sync_shopify_product_for_product_rejects_unsupported_inventory_quantity(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Push Unsupported Field")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/555",
+    )
+
+    create_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Inventory Managed Variant",
+            "price": 9900,
+            "currency": "usd",
+            "inventoryQuantity": 5,
+        },
+    )
+    assert create_variant_resp.status_code == 201
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed = {"called": False}
+
+    def fake_sync_client_shopify_product(**kwargs):
+        observed["called"] = True
+        return kwargs
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+
+    response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
+    assert response.status_code == 409
+    assert "inventory_quantity" in response.json()["detail"]
+    assert observed["called"] is False
+
+
 def test_create_shopify_product_for_product_imports_shopify_variants(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Import")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
@@ -953,6 +1711,75 @@ def test_create_shopify_product_for_product_imports_shopify_variants(api_client,
     assert all(variant["provider"] == "shopify" for variant in variants)
 
 
+def test_create_shopify_product_for_product_uses_mos_active_status(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Import Active Status")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    publish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": "2026-03-11T12:00:00Z"},
+    )
+    assert publish_resp.status_code == 200
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed: dict[str, object] = {}
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["status_text"] = status_text
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/880",
+            "title": title,
+            "handle": "sleep-drops",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/881",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [{"title": "Starter", "priceCents": 4999, "currency": "USD"}],
+        },
+    )
+    assert response.status_code == 200
+    assert observed["status_text"] == "ACTIVE"
+    assert response.json()["status"] == "ACTIVE"
+
+
 def test_create_shopify_product_for_product_rejects_existing_mapping(api_client):
     client_id = _create_client(api_client, name="Shopify Product Already Mapped")
     product_id = _create_product(
@@ -1010,6 +1837,25 @@ def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
     assert observed["verified_product_gid"] == "gid://shopify/Product/901"
     assert observed["sync_client_id"] == client_id
     assert observed["extra_product_gids"] == ["gid://shopify/Product/901"]
+
+
+def test_update_product_allows_clearing_published_at(api_client):
+    client_id = _create_client(api_client, name="Product Publish Status")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    publish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": "2026-03-11T12:00:00Z"},
+    )
+    assert publish_resp.status_code == 200
+    assert publish_resp.json()["published_at"] == "2026-03-11T12:00:00+00:00"
+
+    unpublish_resp = api_client.patch(
+        f"/products/{product_id}",
+        json={"publishedAt": None},
+    )
+    assert unpublish_resp.status_code == 200
+    assert unpublish_resp.json()["published_at"] is None
 
 
 def test_create_shopify_product_for_product_requires_ready_connection(api_client, monkeypatch):

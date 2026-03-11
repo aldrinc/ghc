@@ -3,10 +3,31 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHOPIFY_DIR="$ROOT/shopify-funnel-app"
+HOST="${SHOPIFY_FUNNEL_HOST:-127.0.0.1}"
+PORT="${SHOPIFY_FUNNEL_PORT:-8011}"
+FORWARDED_ALLOW_IPS="${SHOPIFY_FUNNEL_FORWARDED_ALLOW_IPS:-127.0.0.1}"
 
 fail() {
   echo "[shopify-funnel] error: $*" >&2
   exit 1
+}
+
+listener_pid() {
+  local pids
+  pids="$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+  printf '%s\n' "$pids" | sed -n '1p'
+}
+
+matching_shopify_pid() {
+  local matches
+  matches="$(pgrep -f "$SHOPIFY_DIR/.venv/bin/uvicorn app.main:app .*--port $1( |$)" || true)"
+  if [ -z "$matches" ]; then
+    return 0
+  fi
+  printf '%s\n' "$matches" | sed -n '1p'
 }
 
 if ! command -v python3.11 >/dev/null 2>&1; then
@@ -25,6 +46,22 @@ fi
 
 if [ ! -f "shopify.app.toml" ]; then
   fail "Missing $SHOPIFY_DIR/shopify.app.toml."
+fi
+
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+  fail "Invalid SHOPIFY_FUNNEL_PORT '$PORT' (expected 1-65535)."
+fi
+
+existing_shopify_pid="$(matching_shopify_pid "$PORT")"
+if [ -n "$existing_shopify_pid" ]; then
+  echo "[shopify-funnel] Uvicorn already running on http://${HOST}:${PORT} (pid ${existing_shopify_pid})."
+  exit 0
+fi
+
+existing_pid="$(listener_pid "$PORT")"
+if [ -n "$existing_pid" ]; then
+  existing_cmd="$(ps -p "$existing_pid" -o command= | sed 's/^ *//')"
+  fail "Port ${PORT} is in use by pid ${existing_pid}: ${existing_cmd}"
 fi
 
 if [ ! -d ".venv" ]; then
@@ -95,14 +132,6 @@ if manifest_scopes != env_scopes:
 
 print("[shopify-funnel] Config validation passed.")
 PY
-
-HOST="${SHOPIFY_FUNNEL_HOST:-127.0.0.1}"
-PORT="${SHOPIFY_FUNNEL_PORT:-8011}"
-FORWARDED_ALLOW_IPS="${SHOPIFY_FUNNEL_FORWARDED_ALLOW_IPS:-127.0.0.1}"
-
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
-  fail "Invalid SHOPIFY_FUNNEL_PORT '$PORT' (expected 1-65535)."
-fi
 
 echo "[shopify-funnel] Starting uvicorn on http://${HOST}:${PORT}"
 exec .venv/bin/uvicorn app.main:app \

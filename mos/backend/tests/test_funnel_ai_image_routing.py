@@ -1137,3 +1137,114 @@ def test_sales_pdp_hero_gallery_slides_are_not_overridden_with_product_assets(
     offer_image = hero_config["purchase"]["offer"]["options"][0]["image"]
     assert offer_image["referenceAssetPublicId"] == "prod-ref-public-id"
     assert offer_image["imageSource"] == "ai"
+
+
+def test_sales_pdp_story_problem_placeholder_image_gets_editorial_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        funnel_ai,
+        "_collect_product_image_public_ids",
+        lambda **_: ["prod-ref-public-id"],
+    )
+
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpStoryProblem",
+                "props": {
+                    "id": "how-it-works",
+                    "config": {
+                        "title": "What makes supplement decisions feel risky",
+                        "paragraphs": [
+                            "The ingredient list looks familiar until the interactions stack up.",
+                            "One rushed choice can create avoidable uncertainty.",
+                        ],
+                        "image": {
+                            "assetPublicId": "template-placeholder-asset",
+                            "src": "/assets/ph-4x3.svg",
+                            "alt": "Problem image",
+                        },
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    product = SimpleNamespace(
+        id="product-1",
+        primary_asset_id=None,
+        product_type="book",
+        title="The Honest Herbalist Handbook",
+        description="Printed handbook for herb-drug screening",
+    )
+
+    funnel_ai._apply_product_image_overrides_for_ai(
+        session=None,
+        org_id="org-1",
+        client_id="client-1",
+        puck_data=puck_data,
+        config_contexts=[],
+        template_kind="sales-pdp",
+        product=product,
+    )
+
+    image = puck_data["content"][0]["props"]["config"]["image"]
+    assert "assetPublicId" not in image
+    assert "referenceAssetPublicId" not in image
+    assert image["imageSource"] == "ai"
+    assert "editorial article image" in image["prompt"].lower()
+    assert "product reference image" in image["prompt"].lower()
+
+
+def test_sync_sales_pdp_header_cta_labels_uses_default_offer_price():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpHeader",
+                "props": {
+                    "config": {
+                        "logo": {"alt": "The Honest Herbalist", "src": "/logo.svg"},
+                        "nav": [],
+                        "cta": {"label": "Get the Book - {price}", "href": "#top"},
+                    }
+                },
+            },
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "config": {
+                        "header": {
+                            "logo": {"alt": "The Honest Herbalist", "src": "/logo.svg"},
+                            "nav": [],
+                            "cta": {"label": "Get the Book - {price}", "href": "#top"},
+                        },
+                        "purchase": {
+                            "cta": {"labelTemplate": "Get the Book - {price}"},
+                            "variantSchema": {"defaults": {"offerId": "bundle"}},
+                            "offer": {
+                                "options": [
+                                    {"id": "single_book", "title": "Single Book", "price": 49.0},
+                                    {"id": "bundle", "title": "Share & Save", "price": 79.0},
+                                ]
+                            },
+                        },
+                    }
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    funnel_ai._sync_sales_pdp_header_cta_labels(
+        puck_data=puck_data,
+        config_contexts=[],
+    )
+
+    header_cta = puck_data["content"][0]["props"]["config"]["cta"]
+    hero_header_cta = puck_data["content"][1]["props"]["config"]["header"]["cta"]
+    assert header_cta["label"] == "Get the Book - $79"
+    assert hero_header_cta["label"] == "Get the Book - $79"

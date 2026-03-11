@@ -550,6 +550,8 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
         ),
     ),
 }
+_MOS_SOURCE_OF_TRUTH_METAFIELD_NAMESPACE = "mos"
+_MOS_SOURCE_OF_TRUTH_METAFIELD_KEY = "product_sync_payload"
 _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
     "futrgroup2-0theme": (
         """@media screen and (max-width: 749px) {
@@ -3195,6 +3197,582 @@ class ShopifyApiClient:
             "handle": product_handle,
             "status": product_status,
             "variants": variant_rows,
+        }
+
+    @staticmethod
+    def _normalize_weight_unit(value: str) -> str:
+        cleaned = value.strip().lower()
+        mapping = {
+            "g": "GRAMS",
+            "gram": "GRAMS",
+            "grams": "GRAMS",
+            "kg": "KILOGRAMS",
+            "kilogram": "KILOGRAMS",
+            "kilograms": "KILOGRAMS",
+            "lb": "POUNDS",
+            "lbs": "POUNDS",
+            "pound": "POUNDS",
+            "pounds": "POUNDS",
+            "oz": "OUNCES",
+            "ounce": "OUNCES",
+            "ounces": "OUNCES",
+        }
+        normalized = mapping.get(cleaned)
+        if normalized is None:
+            raise ShopifyApiError(
+                message=(
+                    "weightUnit must be one of: g, gram(s), kg, kilogram(s), "
+                    "lb, lbs, pound(s), oz, ounce(s)."
+                ),
+                status_code=400,
+            )
+        return normalized
+
+    @staticmethod
+    def _enrich_source_of_truth_payload(
+        *,
+        source_payload: dict[str, Any],
+        product_gid: str,
+        variant_gid_by_source_id: dict[str, str],
+    ) -> dict[str, Any]:
+        payload = deepcopy(source_payload)
+
+        product = payload.get("product")
+        if isinstance(product, dict):
+            product["shopifyProductGid"] = product_gid
+
+        variants = payload.get("variants")
+        if isinstance(variants, list):
+            for item in variants:
+                if not isinstance(item, dict):
+                    continue
+                source_variant_id = item.get("id")
+                if not isinstance(source_variant_id, str) or not source_variant_id.strip():
+                    continue
+                variant_gid = variant_gid_by_source_id.get(source_variant_id.strip())
+                if variant_gid:
+                    item["shopifyVariantGid"] = variant_gid
+
+        offers = payload.get("offers")
+        if isinstance(offers, list):
+            for offer in offers:
+                if not isinstance(offer, dict):
+                    continue
+
+                raw_variant_ids = offer.get("variantIds")
+                if isinstance(raw_variant_ids, list):
+                    offer["shopifyVariantGids"] = [
+                        variant_gid_by_source_id[variant_id.strip()]
+                        for variant_id in raw_variant_ids
+                        if isinstance(variant_id, str)
+                        and variant_id.strip()
+                        and variant_id.strip() in variant_gid_by_source_id
+                    ]
+
+                basket = offer.get("basket")
+                if isinstance(basket, dict):
+                    basket["primaryProductGid"] = product_gid
+                    raw_basket_variant_ids = basket.get("variantIds")
+                    if isinstance(raw_basket_variant_ids, list):
+                        basket["shopifyVariantGids"] = [
+                            variant_gid_by_source_id[variant_id.strip()]
+                            for variant_id in raw_basket_variant_ids
+                            if isinstance(variant_id, str)
+                            and variant_id.strip()
+                            and variant_id.strip() in variant_gid_by_source_id
+                        ]
+
+        return payload
+
+    async def sync_product(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+        title: str,
+        variants: list[dict[str, Any]],
+        source_of_truth_payload: dict[str, Any],
+        description: str | None = None,
+        handle: str | None = None,
+        vendor: str | None = None,
+        product_type: str | None = None,
+        tags: list[str] | None = None,
+        status: str = "DRAFT",
+    ) -> dict[str, Any]:
+        cleaned_product_gid = product_gid.strip()
+        if not cleaned_product_gid.startswith("gid://shopify/Product/"):
+            raise ShopifyApiError(
+                message="productGid must be a valid Shopify Product GID.",
+                status_code=400,
+            )
+        cleaned_title = title.strip()
+        if not cleaned_title:
+            raise ShopifyApiError(message="title is required.", status_code=400)
+        if not variants:
+            raise ShopifyApiError(
+                message="At least one variant is required for Shopify product sync.",
+                status_code=400,
+            )
+        if not isinstance(source_of_truth_payload, dict):
+            raise ShopifyApiError(
+                message="sourceOfTruthPayload must be an object.",
+                status_code=400,
+            )
+
+        current_product = await self.get_product(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_gid=cleaned_product_gid,
+        )
+        current_variants = current_product.get("variants") or []
+        if not isinstance(current_variants, list):
+            raise ShopifyApiError(message="Current Shopify product variants payload is invalid.")
+        if not current_variants:
+            raise ShopifyApiError(
+                message="Mapped Shopify product must already contain at least one variant.",
+                status_code=409,
+            )
+
+        current_currency_raw = current_variants[0].get("currency")
+        if not isinstance(current_currency_raw, str) or len(current_currency_raw.strip()) != 3:
+            raise ShopifyApiError(
+                message="Current Shopify product is missing a valid shop currency.",
+            )
+        current_currency = current_currency_raw.strip().upper()
+
+        current_variant_by_id: dict[str, dict[str, Any]] = {}
+        current_variants_by_title: dict[str, list[dict[str, Any]]] = {}
+        for current_variant in current_variants:
+            if not isinstance(current_variant, dict):
+                raise ShopifyApiError(message="Current Shopify product variant payload is invalid.")
+            variant_gid = current_variant.get("variantGid")
+            variant_title = current_variant.get("title")
+            if not isinstance(variant_gid, str) or not variant_gid.strip():
+                raise ShopifyApiError(message="Current Shopify product variant is missing variantGid.")
+            if not isinstance(variant_title, str) or not variant_title.strip():
+                raise ShopifyApiError(message="Current Shopify product variant is missing title.")
+            normalized_variant_gid = variant_gid.strip()
+            current_variant_by_id[normalized_variant_gid] = current_variant
+            current_variants_by_title.setdefault(variant_title.strip().lower(), []).append(current_variant)
+
+        cleaned_tags: list[str] = []
+        for raw_tag in tags or []:
+            if not isinstance(raw_tag, str):
+                raise ShopifyApiError(message="tags must contain only strings.", status_code=400)
+            cleaned_tag = raw_tag.strip()
+            if cleaned_tag:
+                cleaned_tags.append(cleaned_tag)
+
+        prepared_variants: list[dict[str, Any]] = []
+        seen_titles: set[str] = set()
+        seen_variant_gids: set[str] = set()
+        source_variant_title_by_id: dict[str, str] = {}
+        desired_variant_ids: set[str] = set()
+        for raw_variant in variants:
+            if not isinstance(raw_variant, dict):
+                raise ShopifyApiError(
+                    message="Each sync variant must be an object.",
+                    status_code=400,
+                )
+
+            raw_source_variant_id = raw_variant.get("sourceVariantId")
+            if not isinstance(raw_source_variant_id, str) or not raw_source_variant_id.strip():
+                raise ShopifyApiError(
+                    message="Each sync variant requires sourceVariantId.",
+                    status_code=400,
+                )
+            source_variant_id = raw_source_variant_id.strip()
+
+            raw_title = raw_variant.get("title")
+            if not isinstance(raw_title, str) or not raw_title.strip():
+                raise ShopifyApiError(
+                    message="Each sync variant requires a non-empty title.",
+                    status_code=400,
+                )
+            variant_title = raw_title.strip()
+            normalized_title = variant_title.lower()
+            if normalized_title in seen_titles:
+                raise ShopifyApiError(
+                    message="Variant titles must be unique for Shopify sync.",
+                    status_code=400,
+                )
+            seen_titles.add(normalized_title)
+            source_variant_title_by_id[source_variant_id] = variant_title
+
+            raw_price_cents = raw_variant.get("priceCents")
+            if not isinstance(raw_price_cents, int) or raw_price_cents < 0:
+                raise ShopifyApiError(
+                    message="Each sync variant requires a non-negative integer priceCents.",
+                    status_code=400,
+                )
+
+            raw_currency = raw_variant.get("currency")
+            if not isinstance(raw_currency, str) or len(raw_currency.strip()) != 3:
+                raise ShopifyApiError(
+                    message="Each sync variant requires a 3-letter currency code.",
+                    status_code=400,
+                )
+            normalized_currency = raw_currency.strip().upper()
+            if normalized_currency != current_currency:
+                raise ShopifyApiError(
+                    message=(
+                        "All synced variants must match the Shopify shop currency "
+                        f"({current_currency})."
+                    ),
+                    status_code=409,
+                )
+
+            matched_variant_gid: str | None = None
+            raw_variant_gid = raw_variant.get("variantGid")
+            if raw_variant_gid is not None:
+                if not isinstance(raw_variant_gid, str) or not raw_variant_gid.strip():
+                    raise ShopifyApiError(
+                        message="variantGid must be null or a non-empty string.",
+                        status_code=400,
+                    )
+                matched_variant_gid = raw_variant_gid.strip()
+                if not matched_variant_gid.startswith("gid://shopify/ProductVariant/"):
+                    raise ShopifyApiError(
+                        message="variantGid must be a valid Shopify ProductVariant GID.",
+                        status_code=400,
+                    )
+                if matched_variant_gid not in current_variant_by_id:
+                    raise ShopifyApiError(
+                        message=(
+                            "variantGid does not belong to the mapped Shopify product: "
+                            f"{matched_variant_gid}"
+                        ),
+                        status_code=409,
+                    )
+            else:
+                current_title_matches = current_variants_by_title.get(normalized_title) or []
+                if len(current_title_matches) > 1:
+                    raise ShopifyApiError(
+                        message=(
+                            "Cannot match Shopify variant by title because multiple Shopify variants "
+                            f'use the title "{variant_title}".'
+                        ),
+                        status_code=409,
+                    )
+                if current_title_matches:
+                    matched_variant_gid = str(current_title_matches[0]["variantGid"]).strip()
+
+            if matched_variant_gid is not None:
+                if matched_variant_gid in seen_variant_gids:
+                    raise ShopifyApiError(
+                        message=(
+                            "Multiple mOS variants resolve to the same Shopify variant: "
+                            f"{matched_variant_gid}"
+                        ),
+                        status_code=409,
+                    )
+                seen_variant_gids.add(matched_variant_gid)
+                desired_variant_ids.add(matched_variant_gid)
+
+            product_variant_input: dict[str, Any] = {
+                "optionValues": [{"optionName": "Title", "name": variant_title}],
+                "price": self._price_cents_to_decimal_string(raw_price_cents),
+                "compareAtPrice": (
+                    self._price_cents_to_decimal_string(raw_variant["compareAtPriceCents"])
+                    if isinstance(raw_variant.get("compareAtPriceCents"), int)
+                    else None
+                ),
+            }
+            if matched_variant_gid is not None:
+                product_variant_input["id"] = matched_variant_gid
+
+            raw_sku = raw_variant.get("sku")
+            if raw_sku is not None:
+                if not isinstance(raw_sku, str):
+                    raise ShopifyApiError(message="sku must be null or a string.", status_code=400)
+                product_variant_input["sku"] = raw_sku.strip() or None
+
+            raw_barcode = raw_variant.get("barcode")
+            if raw_barcode is not None:
+                if not isinstance(raw_barcode, str):
+                    raise ShopifyApiError(message="barcode must be null or a string.", status_code=400)
+                product_variant_input["barcode"] = raw_barcode.strip() or None
+
+            raw_taxable = raw_variant.get("taxable")
+            if raw_taxable is not None:
+                if not isinstance(raw_taxable, bool):
+                    raise ShopifyApiError(message="taxable must be null or a boolean.", status_code=400)
+                product_variant_input["taxable"] = raw_taxable
+
+            raw_inventory_policy = raw_variant.get("inventoryPolicy")
+            if raw_inventory_policy is not None:
+                if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+                    raise ShopifyApiError(
+                        message="inventoryPolicy must be null or one of: deny, continue.",
+                        status_code=400,
+                    )
+                normalized_inventory_policy = raw_inventory_policy.strip().upper()
+                if normalized_inventory_policy not in {"DENY", "CONTINUE"}:
+                    raise ShopifyApiError(
+                        message="inventoryPolicy must be null or one of: deny, continue.",
+                        status_code=400,
+                    )
+                product_variant_input["inventoryPolicy"] = normalized_inventory_policy
+
+            inventory_item_input: dict[str, Any] = {}
+            raw_inventory_management = raw_variant.get("inventoryManagement")
+            if raw_inventory_management is not None:
+                if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
+                    inventory_item_input["tracked"] = False
+                else:
+                    normalized_inventory_management = raw_inventory_management.strip().lower()
+                    if normalized_inventory_management != "shopify":
+                        raise ShopifyApiError(
+                            message="inventoryManagement must be null or 'shopify'.",
+                            status_code=400,
+                        )
+                    inventory_item_input["tracked"] = True
+
+            raw_requires_shipping = raw_variant.get("requiresShipping")
+            if raw_requires_shipping is not None:
+                if not isinstance(raw_requires_shipping, bool):
+                    raise ShopifyApiError(
+                        message="requiresShipping must be null or a boolean.",
+                        status_code=400,
+                    )
+                inventory_item_input["requiresShipping"] = raw_requires_shipping
+
+            raw_weight = raw_variant.get("weight")
+            raw_weight_unit = raw_variant.get("weightUnit")
+            if raw_weight is not None:
+                if not isinstance(raw_weight, (int, float)) or raw_weight < 0:
+                    raise ShopifyApiError(
+                        message="weight must be null or a non-negative number.",
+                        status_code=400,
+                    )
+                if not isinstance(raw_weight_unit, str) or not raw_weight_unit.strip():
+                    raise ShopifyApiError(
+                        message="weightUnit is required when weight is set.",
+                        status_code=400,
+                    )
+                inventory_item_input["measurement"] = {
+                    "weight": {
+                        "value": float(raw_weight),
+                        "unit": self._normalize_weight_unit(raw_weight_unit),
+                    }
+                }
+            elif raw_weight_unit is not None:
+                raise ShopifyApiError(
+                    message="weightUnit cannot be set without weight.",
+                    status_code=400,
+                )
+
+            if inventory_item_input:
+                product_variant_input["inventoryItem"] = inventory_item_input
+
+            prepared_variants.append(product_variant_input)
+
+        normalized_status = status.strip().upper()
+        if normalized_status not in {"ACTIVE", "DRAFT"}:
+            raise ShopifyApiError(
+                message="status must be one of: ACTIVE, DRAFT.",
+                status_code=400,
+            )
+
+        product_input: dict[str, Any] = {
+            "title": cleaned_title,
+            "status": normalized_status,
+            "tags": cleaned_tags,
+            "productOptions": [
+                {
+                    "name": "Title",
+                    "values": [{"name": title_value} for title_value in source_variant_title_by_id.values()],
+                }
+            ],
+            "variants": prepared_variants,
+        }
+        if description is not None:
+            product_input["descriptionHtml"] = description.strip()
+        if handle is not None and handle.strip():
+            product_input["handle"] = handle.strip()
+        if vendor is not None and vendor.strip():
+            product_input["vendor"] = vendor.strip()
+        if product_type is not None and product_type.strip():
+            product_input["productType"] = product_type.strip()
+
+        product_set_query = """
+        mutation productSetSync(
+            $identifier: ProductSetIdentifiers,
+            $input: ProductSetInput!,
+            $synchronous: Boolean!
+        ) {
+            productSet(identifier: $identifier, input: $input, synchronous: $synchronous) {
+                product {
+                    id
+                    title
+                    handle
+                    status
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        product_set_response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": product_set_query,
+                "variables": {
+                    "identifier": {"id": cleaned_product_gid},
+                    "input": product_input,
+                    "synchronous": True,
+                },
+            },
+        )
+        product_set_data = product_set_response.get("productSet") or {}
+        product_set_errors = product_set_data.get("userErrors") or []
+        if product_set_errors:
+            messages = "; ".join(str(error.get("message")) for error in product_set_errors)
+            raise ShopifyApiError(
+                message=f"productSet failed: {messages}",
+                status_code=409,
+            )
+
+        synced_product = product_set_data.get("product")
+        if not isinstance(synced_product, dict):
+            raise ShopifyApiError(message="productSet response is missing product.")
+
+        response_product_gid = synced_product.get("id")
+        if not isinstance(response_product_gid, str) or response_product_gid.strip() != cleaned_product_gid:
+            raise ShopifyApiError(message="productSet response returned an unexpected product id.")
+
+        final_product = await self.get_product(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_gid=cleaned_product_gid,
+        )
+        final_variants = final_product.get("variants") or []
+        if len(final_variants) != len(prepared_variants):
+            raise ShopifyApiError(
+                message=(
+                    "Shopify sync returned an unexpected number of variants. "
+                    f"Expected {len(prepared_variants)}, got {len(final_variants)}."
+                )
+            )
+
+        final_variants_by_title: dict[str, dict[str, Any]] = {}
+        final_variant_ids: set[str] = set()
+        for final_variant in final_variants:
+            if not isinstance(final_variant, dict):
+                raise ShopifyApiError(message="Synced Shopify variant payload is invalid.")
+            final_variant_gid = final_variant.get("variantGid")
+            final_variant_title = final_variant.get("title")
+            if not isinstance(final_variant_gid, str) or not final_variant_gid.strip():
+                raise ShopifyApiError(message="Synced Shopify variant is missing variantGid.")
+            if not isinstance(final_variant_title, str) or not final_variant_title.strip():
+                raise ShopifyApiError(message="Synced Shopify variant is missing title.")
+            normalized_final_title = final_variant_title.strip().lower()
+            if normalized_final_title in final_variants_by_title:
+                raise ShopifyApiError(
+                    message=(
+                        "Synced Shopify product contains duplicate variant titles, which makes "
+                        "source mapping ambiguous."
+                    )
+                )
+            final_variants_by_title[normalized_final_title] = final_variant
+            final_variant_ids.add(final_variant_gid.strip())
+
+        variant_gid_by_source_id: dict[str, str] = {}
+        for source_variant_id, synced_variant_title in source_variant_title_by_id.items():
+            matched_final_variant = final_variants_by_title.get(synced_variant_title.lower())
+            if matched_final_variant is None:
+                raise ShopifyApiError(
+                    message=(
+                        "Unable to map synced Shopify variant back to mOS source variant: "
+                        f"{source_variant_id}"
+                    )
+                )
+            variant_gid_by_source_id[source_variant_id] = str(matched_final_variant["variantGid"]).strip()
+
+        try:
+            serialized_source_payload = json.dumps(
+                self._enrich_source_of_truth_payload(
+                    source_payload=source_of_truth_payload,
+                    product_gid=cleaned_product_gid,
+                    variant_gid_by_source_id=variant_gid_by_source_id,
+                ),
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ShopifyApiError(
+                message=f"sourceOfTruthPayload must be JSON-serializable: {exc}",
+                status_code=400,
+            ) from exc
+
+        metafields_set_query = """
+        mutation setMosProductSyncPayload($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+                metafields {
+                    namespace
+                    key
+                    type
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        metafields_set_response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": metafields_set_query,
+                "variables": {
+                    "metafields": [
+                        {
+                            "ownerId": cleaned_product_gid,
+                            "namespace": _MOS_SOURCE_OF_TRUTH_METAFIELD_NAMESPACE,
+                            "key": _MOS_SOURCE_OF_TRUTH_METAFIELD_KEY,
+                            "type": "json",
+                            "value": serialized_source_payload,
+                        }
+                    ]
+                },
+            },
+        )
+        metafields_set_data = metafields_set_response.get("metafieldsSet") or {}
+        metafields_set_errors = metafields_set_data.get("userErrors") or []
+        if metafields_set_errors:
+            messages = "; ".join(str(error.get("message")) for error in metafields_set_errors)
+            raise ShopifyApiError(
+                message=f"metafieldsSet failed: {messages}",
+                status_code=409,
+            )
+
+        current_variant_ids = {
+            str(item["variantGid"]).strip()
+            for item in current_variants
+            if isinstance(item, dict) and isinstance(item.get("variantGid"), str)
+        }
+        offer_count = 0
+        raw_offers = source_of_truth_payload.get("offers")
+        if isinstance(raw_offers, list):
+            offer_count = sum(1 for item in raw_offers if isinstance(item, dict))
+
+        return {
+            "productGid": cleaned_product_gid,
+            "title": final_product["title"],
+            "handle": final_product["handle"],
+            "status": final_product["status"],
+            "createdVariantCount": len(final_variant_ids - current_variant_ids),
+            "updatedVariantCount": len(final_variant_ids & current_variant_ids),
+            "deletedVariantCount": len(current_variant_ids - final_variant_ids),
+            "offerCount": offer_count,
+            "metafieldNamespace": _MOS_SOURCE_OF_TRUTH_METAFIELD_NAMESPACE,
+            "metafieldKey": _MOS_SOURCE_OF_TRUTH_METAFIELD_KEY,
+            "variants": final_variants,
         }
 
     async def _resolve_variant_product_gid(

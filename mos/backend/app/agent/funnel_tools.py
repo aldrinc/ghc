@@ -1616,6 +1616,10 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             brand_logo_public_id=args.brandLogoAssetPublicId,
         )
         if args.templateKind == "sales-pdp":
+            funnel_ai._sync_sales_pdp_header_cta_labels(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+            )
             funnel_ai._enforce_sales_pdp_guarantee_testimonial_only_images(
                 puck_data=args.puckData,
                 config_contexts=config_contexts,

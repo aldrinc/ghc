@@ -1,4 +1,5 @@
 import type { FooterLink, PaymentIconKey } from "../shared/footerTypes"
+import type { DesignSystemBrandLogoVariant } from "../shared/designSystemBrandLogo"
 
 export type ImageAsset = {
   src: string
@@ -87,6 +88,7 @@ export type ReviewsWall = {
 
 export type Footer = {
   logo: ImageAsset
+  logoVariant?: DesignSystemBrandLogoVariant
   copyright?: string
   links?: FooterLink[]
   paymentIcons?: PaymentIconKey[]

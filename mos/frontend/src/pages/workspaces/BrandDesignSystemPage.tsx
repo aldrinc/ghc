@@ -8,6 +8,7 @@ import {
   useUpdateDesignSystem,
   useDeleteDesignSystem,
   useUploadDesignSystemLogo,
+  type DesignSystemLogoVariant,
 } from "@/api/designSystems";
 import {
   useClient,
@@ -49,6 +50,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import type { DesignSystem } from "@/types/designSystems";
+import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 
@@ -386,6 +388,32 @@ const DEFAULT_TOKENS = (() => {
   }
 })();
 
+const DESIGN_SYSTEM_LOGO_VARIANTS: Array<{
+  variant: DesignSystemLogoVariant;
+  title: string;
+  description: string;
+  tokenKey: "logoAssetPublicId" | "logoOnDarkAssetPublicId";
+  previewBackground: string;
+  emptyLabel: string;
+}> = [
+  {
+    variant: "default",
+    title: "Default logo",
+    description: "Used on light surfaces and as the base brand logo.",
+    tokenKey: "logoAssetPublicId",
+    previewBackground: "var(--color-bg)",
+    emptyLabel: "Default logo",
+  },
+  {
+    variant: "onDark",
+    title: "Dark-surface logo",
+    description: "Optional. Used when the logo needs a light mark on dark backgrounds.",
+    tokenKey: "logoOnDarkAssetPublicId",
+    previewBackground: "#07151b",
+    emptyLabel: "Dark logo",
+  },
+];
+
 const DESIGN_SYSTEM_PROMPT = `Update our DESIGN SYSTEM TEMPLATE for a specific brand.
 - Output ONLY valid JSON (no markdown).
 - Start from the provided template JSON and change ONLY a small set of tokens needed to match the brand.
@@ -442,7 +470,12 @@ function normalizeFontUrls(tokens: unknown): string[] {
     .filter(Boolean);
 }
 
-function normalizeBrand(tokens: unknown): { name?: string; logoAssetPublicId?: string; logoAlt?: string } {
+function normalizeBrand(tokens: unknown): {
+  name?: string;
+  logoAssetPublicId?: string;
+  logoOnDarkAssetPublicId?: string;
+  logoAlt?: string;
+} {
   if (!isRecord(tokens) || !isRecord(tokens.brand)) return {};
   const brand = tokens.brand;
   const name = typeof brand.name === "string" && brand.name.trim() ? brand.name.trim() : undefined;
@@ -450,14 +483,19 @@ function normalizeBrand(tokens: unknown): { name?: string; logoAssetPublicId?: s
     typeof brand.logoAssetPublicId === "string" && brand.logoAssetPublicId.trim()
       ? brand.logoAssetPublicId.trim()
       : undefined;
+  const logoOnDarkAssetPublicId =
+    typeof brand.logoOnDarkAssetPublicId === "string" && brand.logoOnDarkAssetPublicId.trim()
+      ? brand.logoOnDarkAssetPublicId.trim()
+      : undefined;
   const logoAlt = typeof brand.logoAlt === "string" && brand.logoAlt.trim() ? brand.logoAlt.trim() : undefined;
-  return { name, logoAssetPublicId, logoAlt };
+  return { name, logoAssetPublicId, logoOnDarkAssetPublicId, logoAlt };
 }
 
 function applyLogoPublicIdToTokens(
   tokens: unknown,
   logoPublicId: string,
-  defaultLogoAlt?: string
+  defaultLogoAlt?: string,
+  variant: DesignSystemLogoVariant = "default"
 ): { value?: Record<string, unknown>; error?: string } {
   if (!isRecord(tokens)) {
     return { error: "Design system tokens must be a JSON object." };
@@ -468,7 +506,7 @@ function applyLogoPublicIdToTokens(
     return { error: "Design system tokens.brand must be a JSON object." };
   }
   const nextBrand: Record<string, unknown> = isRecord(brand) ? { ...brand } : {};
-  nextBrand.logoAssetPublicId = logoPublicId;
+  nextBrand[variant === "onDark" ? "logoOnDarkAssetPublicId" : "logoAssetPublicId"] = logoPublicId;
   if (
     defaultLogoAlt &&
     !(typeof nextBrand.logoAlt === "string" && nextBrand.logoAlt.trim())
@@ -477,6 +515,11 @@ function applyLogoPublicIdToTokens(
   }
   nextTokens.brand = nextBrand;
   return { value: nextTokens };
+}
+
+function buildPublicAssetPreviewUrl(apiBaseUrl: string | undefined, publicId?: string): string | undefined {
+  if (!apiBaseUrl || !publicId) return undefined;
+  return `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${publicId}`;
 }
 
 function isColorLikeCssValue(raw: string): boolean {
@@ -847,8 +890,16 @@ export function BrandDesignSystemPage() {
 
   const [previewDesignSystemId, setPreviewDesignSystemId] = useState("");
   const [varsFilter, setVarsFilter] = useState("");
-  const [logoErrored, setLogoErrored] = useState(false);
-  const [selectedLogoPublicId, setSelectedLogoPublicId] = useState("");
+  const [logoErrorByVariant, setLogoErrorByVariant] = useState<Record<DesignSystemLogoVariant, boolean>>({
+    default: false,
+    onDark: false,
+  });
+  const [selectedLogoPublicIdByVariant, setSelectedLogoPublicIdByVariant] = useState<
+    Record<DesignSystemLogoVariant, string>
+  >({
+    default: "",
+    onDark: "",
+  });
   const [shopifyShopDomainDraft, setShopifyShopDomainDraft] = useState("");
   const [defaultShopDomainDraft, setDefaultShopDomainDraft] = useState("");
   const [storefrontAccessTokenDraft, setStorefrontAccessTokenDraft] = useState("");
@@ -986,8 +1037,14 @@ export function BrandDesignSystemPage() {
   useEffect(() => {
     setPreviewDesignSystemId("");
     setVarsFilter("");
-    setLogoErrored(false);
-    setSelectedLogoPublicId("");
+    setLogoErrorByVariant({
+      default: false,
+      onDark: false,
+    });
+    setSelectedLogoPublicIdByVariant({
+      default: "",
+      onDark: "",
+    });
     setShopifyShopDomainDraft("");
     setDefaultShopDomainDraft("");
     setStorefrontAccessTokenDraft("");
@@ -1232,14 +1289,20 @@ export function BrandDesignSystemPage() {
   const previewFontUrls = useMemo(() => normalizeFontUrls(previewTokens), [previewTokens]);
 
   useEffect(() => {
-    setLogoErrored(false);
-  }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
+    setLogoErrorByVariant({
+      default: false,
+      onDark: false,
+    });
+  }, [previewBrand.logoAssetPublicId, previewBrand.logoOnDarkAssetPublicId, previewDesignSystemId]);
 
   useEffect(() => {
-    setSelectedLogoPublicId(previewBrand.logoAssetPublicId || "");
-  }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
+    setSelectedLogoPublicIdByVariant({
+      default: previewBrand.logoAssetPublicId || "",
+      onDark: previewBrand.logoOnDarkAssetPublicId || "",
+    });
+  }, [previewBrand.logoAssetPublicId, previewBrand.logoOnDarkAssetPublicId, previewDesignSystemId]);
 
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveOptionalApiBaseUrl();
   const publicAssetBaseUrl = apiBaseUrl?.replace(/\/$/, "");
   const productById = useMemo(
     () => new Map(workspaceProducts.map((product) => [product.id, product])),
@@ -1309,10 +1372,10 @@ export function BrandDesignSystemPage() {
     () => new Map(workspaceProductImageAssetEntries.map((entry) => [entry.asset.public_id, entry])),
     [workspaceProductImageAssetEntries]
   );
-  const previewLogoSrc =
-    previewBrand.logoAssetPublicId && apiBaseUrl
-      ? `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${previewBrand.logoAssetPublicId}`
-      : undefined;
+  const previewLogoSrcByVariant: Record<DesignSystemLogoVariant, string | undefined> = {
+    default: buildPublicAssetPreviewUrl(apiBaseUrl, previewBrand.logoAssetPublicId),
+    onDark: buildPublicAssetPreviewUrl(apiBaseUrl, previewBrand.logoOnDarkAssetPublicId),
+  };
   const parsedTemplateDraftImageMapResult = useMemo(
     () => parseStringMap(templateDraftImageMapInput, "Image map"),
     [templateDraftImageMapInput]
@@ -1429,23 +1492,30 @@ export function BrandDesignSystemPage() {
     [logoAssets]
   );
 
-  const applySelectedLogoAsset = () => {
+  const applySelectedLogoAsset = (variant: DesignSystemLogoVariant) => {
     if (!workspace?.id) return;
     if (!previewDesignSystem) {
       toast.error("Select a design system first.");
       return;
     }
-    if (!selectedLogoPublicId) {
-      toast.error("Select a logo asset first.");
+    const nextLogoPublicId = selectedLogoPublicIdByVariant[variant];
+    if (!nextLogoPublicId) {
+      toast.error(variant === "onDark" ? "Select a dark-surface logo asset first." : "Select a logo asset first.");
       return;
     }
     const patched = applyLogoPublicIdToTokens(
       previewDesignSystem.tokens,
-      selectedLogoPublicId,
-      previewBrand.logoAlt || previewBrand.name || previewDesignSystem.name
+      nextLogoPublicId,
+      previewBrand.logoAlt || previewBrand.name || previewDesignSystem.name,
+      variant
     );
     if (!patched.value) {
-      toast.error(patched.error || "Unable to update design system logo.");
+      toast.error(
+        patched.error ||
+          (variant === "onDark"
+            ? "Unable to update the dark-surface design system logo."
+            : "Unable to update design system logo.")
+      );
       return;
     }
     updateDesignSystem.mutate({
@@ -1453,7 +1523,11 @@ export function BrandDesignSystemPage() {
       payload: { tokens: patched.value },
       clientId: workspace.id,
     }, {
-      onSuccess: () => setLogoErrored(false),
+      onSuccess: () =>
+        setLogoErrorByVariant((current) => ({
+          ...current,
+          [variant]: false,
+        })),
     });
   };
 
@@ -2031,30 +2105,38 @@ export function BrandDesignSystemPage() {
     }
   };
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
-    if (!workspace?.id) {
-      toast.error("Select a workspace first.");
-      return;
-    }
-    if (!previewDesignSystem) {
-      toast.error("Select a design system first.");
-      return;
-    }
-    try {
-      const uploaded = await uploadDesignSystemLogo.mutateAsync({
-        designSystemId: previewDesignSystem.id,
-        clientId: workspace.id,
-        file,
-      });
-      setSelectedLogoPublicId(uploaded.publicId);
-      setLogoErrored(false);
-    } catch {
-      // Error toast is emitted by the mutation hook.
-    }
-  };
+  const handleLogoUpload =
+    (variant: DesignSystemLogoVariant) => async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.currentTarget.value = "";
+      if (!file) return;
+      if (!workspace?.id) {
+        toast.error("Select a workspace first.");
+        return;
+      }
+      if (!previewDesignSystem) {
+        toast.error("Select a design system first.");
+        return;
+      }
+      try {
+        const uploaded = await uploadDesignSystemLogo.mutateAsync({
+          designSystemId: previewDesignSystem.id,
+          clientId: workspace.id,
+          file,
+          variant,
+        });
+        setSelectedLogoPublicIdByVariant((current) => ({
+          ...current,
+          [variant]: uploaded.publicId,
+        }));
+        setLogoErrorByVariant((current) => ({
+          ...current,
+          [variant]: false,
+        }));
+      } catch {
+        // Error toast is emitted by the mutation hook.
+      }
+    };
 
   const coreColorKeys = useMemo(
     () => [
@@ -3023,62 +3105,77 @@ export function BrandDesignSystemPage() {
             </TabsList>
 
             <TabsContent value="preview" flush>
-              <div className="mb-4 space-y-2 rounded-md border border-border bg-surface p-3 shadow-sm">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <select
-                    className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
-                    value={selectedLogoPublicId}
-                    onChange={(e) => setSelectedLogoPublicId(e.target.value)}
-                    disabled={isLoadingLogoAssets || !logoAssetOptions.length}
-                  >
-                    <option value="">
-                      {isLoadingLogoAssets
-                        ? "Loading image assets…"
-                        : logoAssetOptions.length
-                          ? "Select existing image asset"
-                          : "No image assets available"}
-                    </option>
-                    {logoAssetOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    type="button"
-                    onClick={applySelectedLogoAsset}
-                    disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
-                  >
-                    {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
-                  </Button>
-                  <div className="relative">
-                    <span
-                      className={buttonClasses({
-                        size: "sm",
-                        variant: "secondary",
-                        className: cn(
-                          "pointer-events-none justify-center",
-                          uploadDesignSystemLogo.isPending && "opacity-60",
-                        ),
-                      })}
-                      aria-hidden="true"
-                    >
-                      {uploadDesignSystemLogo.isPending ? "Uploading..." : "Upload logo"}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                      onChange={handleLogoUpload}
-                      disabled={uploadDesignSystemLogo.isPending}
-                      className="absolute inset-0 h-9 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                      aria-label="Upload logo"
-                    />
+              <div className="mb-4 grid gap-3 md:grid-cols-2">
+                {DESIGN_SYSTEM_LOGO_VARIANTS.map(({ variant, title, description }) => (
+                  <div key={variant} className="space-y-2 rounded-md border border-border bg-surface p-3 shadow-sm">
+                    <div>
+                      <div className="text-xs font-semibold text-content">{title}</div>
+                      <div className="text-[11px] text-content-muted">{description}</div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                      <select
+                        className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
+                        value={selectedLogoPublicIdByVariant[variant]}
+                        onChange={(e) =>
+                          setSelectedLogoPublicIdByVariant((current) => ({
+                            ...current,
+                            [variant]: e.target.value,
+                          }))
+                        }
+                        disabled={isLoadingLogoAssets || !logoAssetOptions.length}
+                      >
+                        <option value="">
+                          {isLoadingLogoAssets
+                            ? "Loading image assets…"
+                            : logoAssetOptions.length
+                              ? variant === "onDark"
+                                ? "Select existing dark-surface logo asset"
+                                : "Select existing image asset"
+                              : "No image assets available"}
+                        </option>
+                        {logoAssetOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => applySelectedLogoAsset(variant)}
+                        disabled={!selectedLogoPublicIdByVariant[variant] || updateDesignSystem.isPending}
+                      >
+                        {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
+                      </Button>
+                      <div className="relative">
+                        <span
+                          className={buttonClasses({
+                            size: "sm",
+                            variant: "secondary",
+                            className: cn(
+                              "pointer-events-none justify-center",
+                              uploadDesignSystemLogo.isPending && "opacity-60",
+                            ),
+                          })}
+                          aria-hidden="true"
+                        >
+                          {uploadDesignSystemLogo.isPending ? "Uploading..." : "Upload logo"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                          onChange={handleLogoUpload(variant)}
+                          disabled={uploadDesignSystemLogo.isPending}
+                          className="absolute inset-0 h-9 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                          aria-label={`Upload ${title.toLowerCase()}`}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="text-[11px] text-content-muted">
-                  Selecting or uploading a logo updates this design system token automatically.
-                </div>
+                ))}
+              </div>
+              <div className="mb-4 text-[11px] text-content-muted">
+                The dark-surface logo is optional. When present, dark footers can use it without changing the default logo.
               </div>
               <DesignSystemProvider tokens={previewTokens}>
                 <div
@@ -3090,55 +3187,69 @@ export function BrandDesignSystemPage() {
                 >
                   <div className="p-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="grid size-14 place-items-center overflow-hidden border"
-                          style={{
-                            borderColor: "var(--color-border)",
-                            borderRadius: "var(--radius-md)",
-                            backgroundColor: "var(--color-bg)",
-                          }}
-                        >
-                          {previewLogoSrc && !logoErrored ? (
-                            <img
-                              src={previewLogoSrc}
-                              alt={previewBrand.logoAlt || previewBrand.name || "Logo"}
-                              className="h-full w-full object-contain"
-                              onError={() => setLogoErrored(true)}
-                            />
-                          ) : (
-                            <div
-                              className="px-2 text-center text-[11px] font-semibold"
-                              style={{ color: "var(--color-muted)" }}
-                            >
-                              Logo
-                            </div>
-                          )}
+                      <div className="space-y-3">
+                        <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+                          {previewBrand.name || previewDesignSystem.name}
                         </div>
-
-                        <div className="min-w-[240px]">
-                          <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
-                            {previewBrand.name || previewDesignSystem.name}
-                          </div>
-                          <div className="mt-1 space-y-1 text-[11px]" style={{ color: "var(--color-muted)" }}>
-                            <div>
-                              <span className="font-semibold" style={{ color: "var(--color-text)" }}>
-                                logoAssetPublicId:
-                              </span>{" "}
-                              <span className="font-mono" style={{ color: "var(--color-text)" }}>
-                                {previewBrand.logoAssetPublicId || "Not set"}
-                              </span>
-                            </div>
-                            {!apiBaseUrl ? (
-                              <div className="text-danger">
-                                Missing `VITE_API_BASE_URL` so the logo image preview cannot be loaded.
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {DESIGN_SYSTEM_LOGO_VARIANTS.map(
+                            ({ variant, title, tokenKey, previewBackground, emptyLabel }) => (
+                              <div key={variant} className="min-w-[220px]">
+                                <div className="mb-2 text-[11px] font-semibold" style={{ color: "var(--color-text)" }}>
+                                  {title}
+                                </div>
+                                <div
+                                  className="grid h-20 place-items-center overflow-hidden border px-3"
+                                  style={{
+                                    borderColor: "var(--color-border)",
+                                    borderRadius: "var(--radius-md)",
+                                    backgroundColor: previewBackground,
+                                  }}
+                                >
+                                  {previewLogoSrcByVariant[variant] && !logoErrorByVariant[variant] ? (
+                                    <img
+                                      src={previewLogoSrcByVariant[variant]}
+                                      alt={previewBrand.logoAlt || previewBrand.name || title}
+                                      className="h-full w-full object-contain"
+                                      onError={() =>
+                                        setLogoErrorByVariant((current) => ({
+                                          ...current,
+                                          [variant]: true,
+                                        }))
+                                      }
+                                    />
+                                  ) : (
+                                    <div
+                                      className="px-2 text-center text-[11px] font-semibold"
+                                      style={{ color: variant === "onDark" ? "rgba(255,255,255,0.72)" : "var(--color-muted)" }}
+                                    >
+                                      {emptyLabel}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="mt-2 space-y-1 text-[11px]" style={{ color: "var(--color-muted)" }}>
+                                  <div>
+                                    <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                                      {tokenKey}:
+                                    </span>{" "}
+                                    <span className="font-mono" style={{ color: "var(--color-text)" }}>
+                                      {previewBrand[tokenKey] || "Not set"}
+                                    </span>
+                                  </div>
+                                  {!apiBaseUrl ? (
+                                    <div className="text-danger">
+                                      Missing `VITE_API_BASE_URL` so the logo image preview cannot be loaded.
+                                    </div>
+                                  ) : logoErrorByVariant[variant] && previewBrand[tokenKey] ? (
+                                    <div className="text-danger">
+                                      Unable to load logo from{" "}
+                                      <span className="font-mono">{previewLogoSrcByVariant[variant]}</span>
+                                    </div>
+                                  ) : null}
+                                </div>
                               </div>
-                            ) : logoErrored && previewBrand.logoAssetPublicId ? (
-                              <div className="text-danger">
-                                Unable to load logo from <span className="font-mono">{previewLogoSrc}</span>
-                              </div>
-                            ) : null}
-                          </div>
+                            )
+                          )}
                         </div>
                       </div>
 

@@ -1312,6 +1312,7 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
         design_system_tokens={
             "brand": {
                 "logoAssetPublicId": "33333333-3333-3333-3333-333333333333",
+                "logoOnDarkAssetPublicId": "66666666-6666-6666-6666-666666666666",
             }
         },
         context_label="test-page",
@@ -1323,6 +1324,7 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
         "33333333-3333-3333-3333-333333333333",
         "44444444-4444-4444-4444-444444444444",
         "55555555-5555-5555-5555-555555555555",
+        "66666666-6666-6666-6666-666666666666",
     }
 
 

@@ -1,20 +1,15 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from dotenv import load_dotenv
 from pydantic import AnyUrl, Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from app.env_loader import load_backend_env_files
 
 # Load env values for components that read os.environ directly (e.g., Google clients).
 _backend_root = Path(__file__).resolve().parents[1]
-_project_root = _backend_root.parent.parent
-load_dotenv(_project_root / ".env", override=False)
-# Optional consolidated env (gitignored) used in local dev to store secrets outside repo-tracked env examples.
-load_dotenv(_project_root / ".env.local.consolidated", override=False)
-# Keep process-level env vars authoritative so ad-hoc overrides (for tests/replays/deploy)
-# are not silently replaced by repo-local defaults.
-load_dotenv(_backend_root / ".env", override=False)
+load_backend_env_files(_backend_root)
 
 
 def _coerce_json(value: str):
@@ -22,6 +17,18 @@ def _coerce_json(value: str):
         return json.loads(value)
     except json.JSONDecodeError:
         return value
+
+
+def _parse_string_list(value: str | list[str]) -> list[str]:
+    if isinstance(value, list):
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+    parsed = _coerce_json(value)
+    if isinstance(parsed, list):
+        return [item.strip() for item in parsed if isinstance(item, str) and item.strip()]
+    if isinstance(parsed, str):
+        return [item.strip() for item in parsed.split(",") if item.strip()]
+    raise ValueError("Expected a JSON string array or comma-separated string.")
 
 
 _LOCAL_DEV_CORS_ORIGINS = {
@@ -32,6 +39,10 @@ _LOCAL_DEV_CORS_ORIGINS = {
 }
 
 
+def _default_backend_cors_origins() -> list[str]:
+    return sorted(_LOCAL_DEV_CORS_ORIGINS)
+
+
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION: bool = False
@@ -39,7 +50,7 @@ class Settings(BaseSettings):
     DATABASE_URL: AnyUrl
     CLERK_JWT_ISSUER: str
     CLERK_JWKS_URL: str
-    CLERK_AUDIENCE: list[str] = ["http://localhost:5173", "backend"]
+    CLERK_AUDIENCE: Annotated[list[str], NoDecode] = ["http://localhost:5173", "backend"]
 
     DB_POOL_SIZE: int = 20
     DB_POOL_MAX_OVERFLOW: int = 20
@@ -54,8 +65,8 @@ class Settings(BaseSettings):
     STRATEGY_V2_DEFAULT_ENABLED: bool = False
     STRATEGY_V2_VOC_MODEL: str = "gpt-5.2-2025-12-11"
     STRATEGY_V2_OFFER_MODEL: str = "gpt-5.2-2025-12-11"
-    STRATEGY_V2_COPY_MODEL: str = "claude-sonnet-4-6"
-    STRATEGY_V2_COPY_QA_MODEL: str = "claude-sonnet-4-6"
+    STRATEGY_V2_COPY_MODEL: str = "claude-opus-4-6"
+    STRATEGY_V2_COPY_QA_MODEL: str = "claude-opus-4-6"
     STRATEGY_V2_APIFY_ENABLED: bool = False
     STRATEGY_V2_APIFY_MAX_WAIT_SECONDS: int = 900
     STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET: int = 500
@@ -73,7 +84,7 @@ class Settings(BaseSettings):
     STRATEGY_V2_VOC_PROMPT_EXTERNAL_ROWS: int = 40
     STRATEGY_V2_VOC_SOURCE_DIVERSITY_MAX_RATIO: float = 0.25
 
-    BACKEND_CORS_ORIGINS: list[str]
+    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(default_factory=_default_backend_cors_origins)
 
     OPENAI_API_KEY: str | None = None
     BASETEN_API_KEY: str | None = None
@@ -187,11 +198,7 @@ class Settings(BaseSettings):
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:
-        origins: list[str]
-        if isinstance(value, str):
-            origins = [origin.strip() for origin in value.split(",") if origin.strip()]
-        else:
-            origins = list(value)
+        origins = _parse_string_list(value)
         if "http://localhost:5275" not in origins and "http://127.0.0.1:5275" not in origins:
             origins.extend(sorted(_LOCAL_DEV_CORS_ORIGINS))
         return sorted(set(origins))
@@ -199,9 +206,7 @@ class Settings(BaseSettings):
     @field_validator("CLERK_AUDIENCE", mode="before")
     @classmethod
     def split_audience(cls, value: str | list[str]) -> list[str]:
-        if isinstance(value, str):
-            return [aud.strip() for aud in value.split(",") if aud.strip()]
-        return value
+        return _parse_string_list(value)
 
     model_config = SettingsConfigDict(env_file=".env", env_json_loads=_coerce_json, extra="ignore")
 

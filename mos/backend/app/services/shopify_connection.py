@@ -311,6 +311,16 @@ def _normalize_currency_code(value: str) -> str:
     return cleaned
 
 
+def _validate_shopify_variant_gid(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned.startswith(_SHOPIFY_VARIANT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variantGid must be a Shopify variant GID.",
+        )
+    return cleaned
+
+
 def update_client_shopify_variant(
     *,
     client_id: str,
@@ -1332,6 +1342,487 @@ def create_client_shopify_product(
         "title": product_title.strip(),
         "handle": product_handle.strip(),
         "status": product_status.strip(),
+        "variants": response_variants,
+    }
+
+
+def sync_client_shopify_product(
+    *,
+    client_id: str,
+    product_gid: str,
+    title: str,
+    variants: list[dict[str, Any]],
+    source_of_truth_payload: dict[str, Any],
+    description: str | None = None,
+    handle: str | None = None,
+    vendor: str | None = None,
+    product_type: str | None = None,
+    tags: list[str] | None = None,
+    status_text: str = "DRAFT",
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    cleaned_product_gid = product_gid.strip()
+    if not cleaned_product_gid.startswith(_SHOPIFY_PRODUCT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="productGid must be a Shopify product GID.",
+        )
+
+    cleaned_title = title.strip()
+    if not cleaned_title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="title is required.",
+        )
+
+    if not isinstance(source_of_truth_payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sourceOfTruthPayload must be an object.",
+        )
+
+    cleaned_status = status_text.strip().upper()
+    if cleaned_status not in {"ACTIVE", "DRAFT"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='status must be "ACTIVE" or "DRAFT".',
+        )
+
+    if not variants:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variants must contain at least one item.",
+        )
+
+    cleaned_variants: list[dict[str, Any]] = []
+    seen_variant_titles: set[str] = set()
+    for raw_variant in variants:
+        if not isinstance(raw_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant must be an object.",
+            )
+
+        raw_source_variant_id = raw_variant.get("sourceVariantId")
+        if not isinstance(raw_source_variant_id, str) or not raw_source_variant_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires sourceVariantId.",
+            )
+        source_variant_id = raw_source_variant_id.strip()
+
+        raw_title = raw_variant.get("title")
+        if not isinstance(raw_title, str) or not raw_title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires a non-empty title.",
+            )
+        normalized_title = raw_title.strip()
+        lower_title = normalized_title.lower()
+        if lower_title in seen_variant_titles:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Variant titles must be unique.",
+            )
+        seen_variant_titles.add(lower_title)
+
+        raw_price = raw_variant.get("priceCents")
+        if not isinstance(raw_price, int) or raw_price < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires a non-negative integer priceCents.",
+            )
+
+        raw_currency = raw_variant.get("currency")
+        if not isinstance(raw_currency, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires currency.",
+            )
+        cleaned_currency = _normalize_currency_code(raw_currency)
+
+        cleaned_variant_gid: str | None = None
+        raw_variant_gid = raw_variant.get("variantGid")
+        if raw_variant_gid is not None:
+            if not isinstance(raw_variant_gid, str) or not raw_variant_gid.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="variantGid must be null or a non-empty Shopify variant GID.",
+                )
+            cleaned_variant_gid = _validate_shopify_variant_gid(raw_variant_gid)
+
+        raw_compare_at_price = raw_variant.get("compareAtPriceCents")
+        if raw_compare_at_price is not None and (
+            not isinstance(raw_compare_at_price, int) or raw_compare_at_price < 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="compareAtPriceCents must be null or a non-negative integer.",
+            )
+
+        cleaned_sku: str | None = None
+        raw_sku = raw_variant.get("sku")
+        if raw_sku is not None:
+            if not isinstance(raw_sku, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="sku must be null or a string.",
+                )
+            cleaned_sku = raw_sku.strip() or None
+
+        cleaned_barcode: str | None = None
+        raw_barcode = raw_variant.get("barcode")
+        if raw_barcode is not None:
+            if not isinstance(raw_barcode, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="barcode must be null or a string.",
+                )
+            cleaned_barcode = raw_barcode.strip() or None
+
+        raw_taxable = raw_variant.get("taxable")
+        if raw_taxable is not None and not isinstance(raw_taxable, bool):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="taxable must be null or a boolean.",
+            )
+
+        raw_requires_shipping = raw_variant.get("requiresShipping")
+        if raw_requires_shipping is not None and not isinstance(raw_requires_shipping, bool):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="requiresShipping must be null or a boolean.",
+            )
+
+        raw_inventory_policy = raw_variant.get("inventoryPolicy")
+        cleaned_inventory_policy: str | None = None
+        if raw_inventory_policy is not None:
+            if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="inventoryPolicy must be null or one of: deny, continue.",
+                )
+            cleaned_inventory_policy = raw_inventory_policy.strip().lower()
+            if cleaned_inventory_policy not in {"deny", "continue"}:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="inventoryPolicy must be null or one of: deny, continue.",
+                )
+
+        raw_inventory_management = raw_variant.get("inventoryManagement")
+        cleaned_inventory_management: str | None = None
+        if raw_inventory_management is not None:
+            if isinstance(raw_inventory_management, str) and raw_inventory_management.strip():
+                cleaned_inventory_management = raw_inventory_management.strip().lower()
+                if cleaned_inventory_management != "shopify":
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="inventoryManagement must be null or 'shopify'.",
+                    )
+
+        raw_weight = raw_variant.get("weight")
+        if raw_weight is not None and not isinstance(raw_weight, (int, float)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="weight must be null or a number.",
+            )
+
+        raw_weight_unit = raw_variant.get("weightUnit")
+        cleaned_weight_unit: str | None = None
+        if raw_weight_unit is not None:
+            if not isinstance(raw_weight_unit, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="weightUnit must be null or a string.",
+                )
+            cleaned_weight_unit = raw_weight_unit.strip() or None
+
+        cleaned_variants.append(
+            {
+                "sourceVariantId": source_variant_id,
+                "variantGid": cleaned_variant_gid,
+                "title": normalized_title,
+                "priceCents": raw_price,
+                "currency": cleaned_currency,
+                "compareAtPriceCents": raw_compare_at_price,
+                "sku": cleaned_sku,
+                "barcode": cleaned_barcode,
+                "taxable": raw_taxable,
+                "requiresShipping": raw_requires_shipping,
+                "inventoryPolicy": cleaned_inventory_policy,
+                "inventoryManagement": cleaned_inventory_management,
+                "weight": float(raw_weight) if isinstance(raw_weight, (int, float)) else None,
+                "weightUnit": cleaned_weight_unit,
+            }
+        )
+
+    first_currency = cleaned_variants[0]["currency"]
+    if any(item["currency"] != first_currency for item in cleaned_variants):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="All variants must use the same currency for Shopify product sync.",
+        )
+
+    cleaned_tags: list[str] = []
+    for raw_tag in tags or []:
+        if not isinstance(raw_tag, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tags must contain only strings.",
+            )
+        cleaned_tag = raw_tag.strip()
+        if not cleaned_tag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tags cannot contain empty values.",
+            )
+        cleaned_tags.append(cleaned_tag)
+
+    request_payload: dict[str, Any] = {
+        "productGid": cleaned_product_gid,
+        "title": cleaned_title,
+        "description": description.strip() if isinstance(description, str) else None,
+        "handle": handle.strip() if isinstance(handle, str) and handle.strip() else None,
+        "vendor": vendor.strip() if isinstance(vendor, str) and vendor.strip() else None,
+        "productType": (
+            product_type.strip()
+            if isinstance(product_type, str) and product_type.strip()
+            else None
+        ),
+        "tags": cleaned_tags,
+        "status": cleaned_status,
+        "variants": cleaned_variants,
+        "sourceOfTruthPayload": source_of_truth_payload,
+    }
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/catalog/products/sync",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid sync-product payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid shopDomain for synced product.",
+        )
+
+    response_product_gid = payload.get("productGid")
+    if not isinstance(response_product_gid, str) or not response_product_gid.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid productGid for synced product.",
+        )
+
+    response_title = payload.get("title")
+    if not isinstance(response_title, str) or not response_title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid title for synced product.",
+        )
+
+    response_handle = payload.get("handle")
+    if not isinstance(response_handle, str) or not response_handle.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid handle for synced product.",
+        )
+
+    response_status = payload.get("status")
+    if not isinstance(response_status, str) or not response_status.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid status for synced product.",
+        )
+
+    created_count = payload.get("createdVariantCount")
+    if not isinstance(created_count, int) or created_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid createdVariantCount.",
+        )
+
+    updated_count = payload.get("updatedVariantCount")
+    if not isinstance(updated_count, int) or updated_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid updatedVariantCount.",
+        )
+
+    deleted_count = payload.get("deletedVariantCount")
+    if not isinstance(deleted_count, int) or deleted_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid deletedVariantCount.",
+        )
+
+    offer_count = payload.get("offerCount")
+    if not isinstance(offer_count, int) or offer_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid offerCount.",
+        )
+
+    metafield_namespace = payload.get("metafieldNamespace")
+    if not isinstance(metafield_namespace, str) or not metafield_namespace.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid metafieldNamespace.",
+        )
+
+    metafield_key = payload.get("metafieldKey")
+    if not isinstance(metafield_key, str) or not metafield_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid metafieldKey.",
+        )
+
+    raw_variants = payload.get("variants")
+    if not isinstance(raw_variants, list) or not raw_variants:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid variants for synced product.",
+        )
+
+    response_variants: list[dict[str, Any]] = []
+    for raw_variant in raw_variants:
+        if not isinstance(raw_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid synced variant object.",
+            )
+
+        variant_gid = raw_variant.get("variantGid")
+        title = raw_variant.get("title")
+        price_cents = raw_variant.get("priceCents")
+        currency = raw_variant.get("currency")
+        compare_at_price_cents = raw_variant.get("compareAtPriceCents")
+        sku = raw_variant.get("sku")
+        barcode = raw_variant.get("barcode")
+        taxable = raw_variant.get("taxable")
+        requires_shipping = raw_variant.get("requiresShipping")
+        inventory_policy = raw_variant.get("inventoryPolicy")
+        inventory_management = raw_variant.get("inventoryManagement")
+        inventory_quantity = raw_variant.get("inventoryQuantity")
+        option_values = raw_variant.get("optionValues")
+
+        if not isinstance(variant_gid, str) or not variant_gid.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variantGid in synced payload.",
+            )
+        if not isinstance(title, str) or not title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant title in synced payload.",
+            )
+        if not isinstance(price_cents, int) or price_cents < 0:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant priceCents in synced payload.",
+            )
+        if not isinstance(currency, str) or not currency.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant currency in synced payload.",
+            )
+        if compare_at_price_cents is not None and (
+            not isinstance(compare_at_price_cents, int) or compare_at_price_cents < 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid compareAtPriceCents in synced payload.",
+            )
+        if sku is not None and not isinstance(sku, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid sku in synced payload.",
+            )
+        if barcode is not None and not isinstance(barcode, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid barcode in synced payload.",
+            )
+        if not isinstance(taxable, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid taxable in synced payload.",
+            )
+        if not isinstance(requires_shipping, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid requiresShipping in synced payload.",
+            )
+        if inventory_policy is not None and not isinstance(inventory_policy, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryPolicy in synced payload.",
+            )
+        if inventory_management is not None and not isinstance(inventory_management, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryManagement in synced payload.",
+            )
+        if inventory_quantity is not None and not isinstance(inventory_quantity, int):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryQuantity in synced payload.",
+            )
+        if not isinstance(option_values, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid optionValues in synced payload.",
+            )
+
+        cleaned_option_values: dict[str, str] = {}
+        for raw_key, raw_value in option_values.items():
+            if not isinstance(raw_key, str) or not isinstance(raw_value, str):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Shopify checkout app returned invalid optionValues entry in synced payload.",
+                )
+            cleaned_option_values[raw_key] = raw_value
+
+        response_variants.append(
+            {
+                "variantGid": variant_gid.strip(),
+                "title": title.strip(),
+                "priceCents": price_cents,
+                "currency": _normalize_currency_code(currency),
+                "compareAtPriceCents": compare_at_price_cents,
+                "sku": sku.strip() if isinstance(sku, str) and sku.strip() else None,
+                "barcode": barcode.strip() if isinstance(barcode, str) and barcode.strip() else None,
+                "taxable": taxable,
+                "requiresShipping": requires_shipping,
+                "inventoryPolicy": inventory_policy.strip().lower() if isinstance(inventory_policy, str) and inventory_policy.strip() else None,
+                "inventoryManagement": inventory_management.strip().lower() if isinstance(inventory_management, str) and inventory_management.strip() else None,
+                "inventoryQuantity": inventory_quantity,
+                "optionValues": cleaned_option_values,
+            }
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "productGid": response_product_gid.strip(),
+        "title": response_title.strip(),
+        "handle": response_handle.strip(),
+        "status": response_status.strip(),
+        "createdVariantCount": created_count,
+        "updatedVariantCount": updated_count,
+        "deletedVariantCount": deleted_count,
+        "offerCount": offer_count,
+        "metafieldNamespace": metafield_namespace.strip(),
+        "metafieldKey": metafield_key.strip(),
         "variants": response_variants,
     }
 

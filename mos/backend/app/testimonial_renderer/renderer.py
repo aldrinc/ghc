@@ -590,7 +590,8 @@ class TestimonialRenderer:
         if self._browser is None:
             raise TestimonialRenderError("Renderer is not started. Use TestimonialRenderer as a context manager.")
 
-        hydrated = maybe_generate_pdp_background(maybe_generate_review_card_assets(payload))
+        validated_input = validate_payload(payload, base_dir=Path.cwd())
+        hydrated = maybe_generate_pdp_background(maybe_generate_review_card_assets(validated_input))
         validated = validate_payload(hydrated, base_dir=Path.cwd())
         template_url = _resolve_template_url(validated["template"])
 

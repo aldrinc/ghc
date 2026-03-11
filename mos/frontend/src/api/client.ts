@@ -1,7 +1,8 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useMemo } from "react";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 export type ApiError = {
@@ -38,7 +39,7 @@ export function useApiClient(baseUrl: string = defaultBaseUrl) {
 
   const request = useCallback(
     async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers(init.headers || {});
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);

@@ -1,3 +1,5 @@
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
+
 type DeployRuntimeConfig = {
   bundleMode?: boolean;
   defaultProductSlug?: string;
@@ -23,8 +25,6 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
   }
   return candidate;
 }
-
-const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8008").replace(/\/+$/, "");
 
 export function normalizeRouteToken(value: string | null | undefined): string {
   const normalized = (value || "")
@@ -54,7 +54,7 @@ export function resolvePublicApiBaseUrl(): string {
   if (isStandaloneBundleMode()) {
     return "/api";
   }
-  return configuredApiBaseUrl;
+  return resolveRequiredApiBaseUrl();
 }
 
 export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: string } | null {

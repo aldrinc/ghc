@@ -11,7 +11,6 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
 try:
     import google.generativeai as genai
     _GENAI_IMPORT_ERROR: Exception | None = None
@@ -19,6 +18,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     genai = None
     _GENAI_IMPORT_ERROR = exc
 
+from app.env_loader import load_backend_env_files
 from app.observability import (
     get_openai_client_class,
     start_langfuse_generation,
@@ -27,10 +27,7 @@ from app.observability import (
 
 # Ensure API keys in .env are loaded even if app.config hasn't been imported yet.
 _backend_root = Path(__file__).resolve().parents[2]
-_repo_root = _backend_root.parent.parent
-load_dotenv(_repo_root / ".env", override=False)
-# Keep process-level env authoritative so explicit runtime overrides are not silently replaced.
-load_dotenv(_backend_root / ".env", override=False)
+load_backend_env_files(_backend_root)
 
 
 class LLMClientConfigError(Exception):
@@ -76,7 +73,7 @@ class OpenAIResponseFailedError(RuntimeError):
 
 
 logger = logging.getLogger(__name__)
-_DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or os.getenv("CLAUDE_DEFAULT_MODEL") or "claude-sonnet-4-6"
+_DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or os.getenv("CLAUDE_DEFAULT_MODEL") or "claude-opus-4-6"
 _DEFAULT_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
 _MAX_RETRIES = int(os.getenv("LLM_REQUEST_RETRIES", "2"))
 _O3_MAX_OUTPUT_TOKENS = int(os.getenv("O3_DEEP_RESEARCH_MAX_OUTPUT_TOKENS", "64000"))
@@ -878,6 +875,18 @@ class LLMClient:
         return None
 
     @staticmethod
+    def _extract_anthropic_request_id(response: Any) -> str | None:
+        for attr_name in ("_request_id", "request_id"):
+            request_id = getattr(response, attr_name, None)
+            if isinstance(request_id, str) and request_id.strip():
+                return request_id.strip()
+        if isinstance(response, dict):
+            request_id = response.get("request_id") or response.get("_request_id")
+            if isinstance(request_id, str) and request_id.strip():
+                return request_id.strip()
+        return None
+
+    @staticmethod
     def _extract_chat_completion_usage(completion: Any) -> dict[str, int] | None:
         usage = getattr(completion, "usage", None)
         if usage is None and isinstance(completion, dict):
@@ -1402,9 +1411,35 @@ class LLMClient:
         max_tokens = params.max_tokens if params and params.max_tokens else _ANTHROPIC_DEFAULT_MAX_TOKENS
         temperature = params.temperature if params else 0.2
         timeout = _DEFAULT_TIMEOUT
+        progress_callback = params.progress_callback if params else None
 
         text = None
         last_error: Exception | None = None
+        call_started_at = time.monotonic()
+
+        def _emit_progress(status: str, **extra: Any) -> None:
+            if progress_callback is None:
+                return
+            payload: dict[str, Any] = {
+                "status": status,
+                "provider": "anthropic",
+                "model": model,
+            }
+            for key, value in extra.items():
+                if value is not None:
+                    payload[key] = value
+            progress_callback(payload)
+
+        logger.info(
+            "anthropic_generation_started",
+            extra={
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "prompt_chars": len(prompt),
+            },
+        )
+        _emit_progress("submitted")
         with start_langfuse_generation(
             name="llm.anthropic.generate",
             model=model,
@@ -1429,23 +1464,77 @@ class LLMClient:
                         timeout=timeout,
                     )
                     text = self._extract_anthropic_text(response)
+                    request_id = self._extract_anthropic_request_id(response)
+                    usage_details = self._extract_anthropic_usage(response) or {}
                     if text:
+                        elapsed_seconds = round(time.monotonic() - call_started_at, 3)
+                        logger.info(
+                            "anthropic_generation_completed",
+                            extra={
+                                "model": model,
+                                "request_id": request_id,
+                                "elapsed_seconds": elapsed_seconds,
+                                "input_tokens": usage_details.get("input"),
+                                "output_tokens": usage_details.get("output"),
+                                "output_chars": len(text),
+                            },
+                        )
+                        progress_payload: dict[str, Any] = {
+                            "request_id": request_id,
+                            "elapsed_seconds": elapsed_seconds,
+                        }
+                        input_tokens = usage_details.get("input")
+                        output_tokens = usage_details.get("output")
+                        if isinstance(input_tokens, int):
+                            progress_payload["input_tokens"] = input_tokens
+                        if isinstance(output_tokens, int):
+                            progress_payload["output_tokens"] = output_tokens
+                        if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+                            progress_payload["total_tokens"] = input_tokens + output_tokens
+                        _emit_progress("completed", **progress_payload)
                         if generation is not None:
                             generation.update(
                                 output=text,
-                                usage_details=self._extract_anthropic_usage(response),
+                                usage_details=usage_details,
                             )
                         break
                     stop_reason = getattr(response, "stop_reason", None)
                     content_types = [
                         getattr(content, "type", type(content).__name__) for content in getattr(response, "content", [])
                     ]
+                    logger.warning(
+                        "anthropic_generation_no_text",
+                        extra={
+                            "model": model,
+                            "request_id": request_id,
+                            "stop_reason": stop_reason,
+                            "elapsed_seconds": round(time.monotonic() - call_started_at, 3),
+                            "content_types": content_types,
+                        },
+                    )
+                    _emit_progress(
+                        "failed",
+                        request_id=request_id,
+                        stop_reason=stop_reason,
+                        elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                    )
                     last_error = RuntimeError(
                         "Anthropic response had no text content "
                         f"(stop_reason={stop_reason}, content_types={content_types})"
                     )
                 except Exception as exc:
-                    logger.exception("Anthropic generation attempt failed", extra={"model": model})
+                    logger.exception(
+                        "Anthropic generation attempt failed",
+                        extra={
+                            "model": model,
+                            "elapsed_seconds": round(time.monotonic() - call_started_at, 3),
+                        },
+                    )
+                    _emit_progress(
+                        "failed",
+                        error=str(exc),
+                        elapsed_seconds=round(time.monotonic() - call_started_at, 3),
+                    )
                     text = None
                     last_error = exc
 

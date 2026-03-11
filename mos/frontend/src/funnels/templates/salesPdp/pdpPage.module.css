@@ -1309,7 +1309,7 @@
 .bulletList {
   margin-top: 14px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .bulletItem {
@@ -1327,6 +1327,7 @@
 .bulletItemBody {
   color: var(--color-muted);
   font-size: var(--text-base);
+  line-height: 1.45;
 }
 
 .storyMediaFrame {
@@ -1346,11 +1347,11 @@
 }
 
 .storyImage {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
   object-position: center;
 }
 
@@ -1388,7 +1389,7 @@
 /* Comparison */
 
 .comparisonSection .sectionHeading {
-  max-width: 18ch;
+  max-width: var(--comparison-heading-max-width);
   font-size: var(--section-heading-size);
   font-weight: var(--section-heading-weight);
   line-height: var(--section-heading-line);
@@ -1478,7 +1479,8 @@
   width: 22px;
   height: 22px;
   border-radius: var(--pdp-radius-pill);
-  border: 1.6px solid currentColor;
+  border: 2px solid currentColor;
+  background: var(--comparison-icon-bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1488,14 +1490,15 @@
 
 .comparisonIcon svg {
   display: block;
+  color: currentColor;
 }
 
 .comparisonIconGood {
-  color: var(--pdp-comparison-good, #16a34a);
+  color: var(--comparison-icon-good-color);
 }
 
 .comparisonIconBad {
-  color: var(--pdp-comparison-bad, #dc2626);
+  color: var(--comparison-icon-bad-color);
 }
 
 /* Review slider */

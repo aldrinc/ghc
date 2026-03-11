@@ -118,6 +118,50 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert metadata["offer_id"] == str(seeded["offer"].id)
 
 
+def test_public_checkout_routes_shopify_provider_with_stale_formatting(
+    api_client, db_session, auth_context, monkeypatch
+):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    seeded["variant"].provider = " Shopify "
+    seeded["variant"].external_price_id = " gid://shopify/ProductVariant/123456789 "
+    db_session.add(seeded["variant"])
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    def fake_create_shopify_checkout(**kwargs):
+        observed.update(kwargs)
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/example-token",
+            "cartId": "gid://shopify/Cart/example",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "variantId": str(seeded["variant"].id),
+            "selection": {},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": None,
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
+
+
 def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, db_session, auth_context):
     seeded = _seed_shopify_funnel(
         db_session=db_session,

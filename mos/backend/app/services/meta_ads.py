@@ -169,6 +169,55 @@ class MetaAdsClient:
             params["render_type"] = render_type
         return self._request("GET", f"{creative_id}/previews", params=params)
 
+    def get_object(self, *, object_id: str, fields: str) -> dict[str, Any]:
+        return self._request("GET", object_id, params={"fields": fields})
+
+    def list_user_pages(
+        self,
+        *,
+        fields: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> dict[str, Any]:
+        return self._list_edge(path="me/accounts", fields=fields, limit=limit, after=after)
+
+    def list_user_adaccounts(
+        self,
+        *,
+        fields: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> dict[str, Any]:
+        return self._list_edge(path="me/adaccounts", fields=fields, limit=limit, after=after)
+
+    def list_user_businesses(
+        self,
+        *,
+        fields: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> dict[str, Any]:
+        return self._list_edge(path="me/businesses", fields=fields, limit=limit, after=after)
+
+    def get_ad_account(self, *, ad_account_id: str, fields: str) -> dict[str, Any]:
+        return self.get_object(object_id=_normalize_ad_account_id(ad_account_id), fields=fields)
+
+    def list_ad_pixels(
+        self,
+        *,
+        ad_account_id: str,
+        fields: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> dict[str, Any]:
+        return self._list_ad_account_edge(
+            ad_account_id=ad_account_id,
+            edge="adspixels",
+            fields=fields,
+            limit=limit,
+            after=after,
+        )
+
     def list_ad_images(
         self,
         *,
@@ -274,10 +323,20 @@ class MetaAdsClient:
         limit: Optional[int],
         after: Optional[str],
     ) -> dict[str, Any]:
+        path = f"{_normalize_ad_account_id(ad_account_id)}/{edge}"
+        return self._list_edge(path=path, fields=fields, limit=limit, after=after)
+
+    def _list_edge(
+        self,
+        *,
+        path: str,
+        fields: str,
+        limit: Optional[int],
+        after: Optional[str],
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {"fields": fields}
         if limit is not None:
             params["limit"] = limit
         if after:
             params["after"] = after
-        path = f"{_normalize_ad_account_id(ad_account_id)}/{edge}"
         return self._request("GET", path, params=params)

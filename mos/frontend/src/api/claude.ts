@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback } from "react";
 import { useApiClient, type ApiError } from "@/api/client";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import type { ClaudeChatRequestPayload, ClaudeContextFile, ClaudeStreamEvent } from "@/types/claude";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 async function parseError(resp: Response): Promise<ApiError> {
@@ -62,7 +63,7 @@ export function useClaudeStream() {
       onEvent: (event: ClaudeStreamEvent) => void
     ): Promise<ClaudeStreamHandle> => {
       const controller = new AbortController();
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers({ "Content-Type": "application/json" });
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);

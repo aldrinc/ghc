@@ -40,10 +40,26 @@ from app.routers import (
     meta_ads,
     shopify_webhooks,
     deploy,
+    paid_ads_qa,
 )
 
 logger = logging.getLogger(__name__)
+_DEV_ENVIRONMENTS = {"development", "local", "test"}
 _LOOPBACK_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?$"
+_DEV_LAN_CORS_ORIGIN_REGEX = (
+    r"^https?://(?:"
+    r"(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?|"
+    r"(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2}|"
+    r"100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])(?:\.\d{1,3}){2})"
+    r":(?:5173|5275)"
+    r")$"
+)
+
+
+def _cors_origin_regex() -> str:
+    if settings.ENVIRONMENT.strip().lower() in _DEV_ENVIRONMENTS:
+        return _DEV_LAN_CORS_ORIGIN_REGEX
+    return _LOOPBACK_CORS_ORIGIN_REGEX
 
 
 def _is_schema_mismatch_programming_error(exc: ProgrammingError) -> bool:
@@ -84,7 +100,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
-        allow_origin_regex=_LOOPBACK_CORS_ORIGIN_REGEX,
+        allow_origin_regex=_cors_origin_regex(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -143,6 +159,7 @@ def create_app() -> FastAPI:
     app.include_router(teardowns.router)
     app.include_router(ads.router)
     app.include_router(meta_ads.router)
+    app.include_router(paid_ads_qa.router)
     app.include_router(shopify_webhooks.router)
     app.include_router(workflows.router)
     app.include_router(deep_research.router)

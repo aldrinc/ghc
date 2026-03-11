@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import { toast } from "@/components/ui/toast";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import type {
   Product,
   ProductAsset,
@@ -52,7 +53,22 @@ type ShopifyVariantSyncResponse = {
   variants: ShopifyCatalogVariant[];
 };
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+export type ShopifyProductSyncResponse = {
+  shopDomain: string;
+  productGid: string;
+  title: string;
+  handle: string;
+  status: string;
+  createdCount: number;
+  updatedCount: number;
+  deletedCount: number;
+  offerCount: number;
+  metafieldNamespace: string;
+  metafieldKey: string;
+  variants: ShopifyCatalogVariant[];
+};
+
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 async function readUploadError(resp: Response): Promise<string> {
@@ -127,6 +143,7 @@ export function useUpdateProduct(productId: string) {
       title?: string;
       description?: string | null;
       productType?: string | null;
+      publishedAt?: string | null;
       shopifyProductGid?: string | null;
       primaryBenefits?: string[] | null;
       featureBullets?: string[] | null;
@@ -178,7 +195,7 @@ export function useUploadProductAssets(productId: string) {
       if (!productId) throw new Error("Product ID is required to upload assets.");
       if (!files.length) throw new Error("No files selected for upload.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
@@ -218,7 +235,7 @@ export function useUploadProductAssetsById() {
       if (!productId) throw new Error("Product ID is required to upload assets.");
       if (!files.length) throw new Error("No files selected for upload.");
 
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
@@ -359,6 +376,26 @@ export function useSyncShopifyVariantsForProduct(productId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify variants";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncShopifyProductForProduct(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: { shopDomain?: string }) =>
+      post<ShopifyProductSyncResponse>(`/products/${productId}/shopify/sync`, payload || {}),
+    onSuccess: (response) => {
+      toast.success(
+        `Shopify product synced (${response.createdCount} created, ${response.updatedCount} updated, ${response.deletedCount} deleted)`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify product";
       toast.error(message);
     },
   });

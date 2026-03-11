@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ipaddress
 import time
 from typing import Any, Dict, Optional
 import logging
+from urllib.parse import urlparse
 
 import httpx
 from jose import jwk, jwt
@@ -14,6 +16,8 @@ from app.config import settings
 
 
 logger = logging.getLogger("auth.clerk")
+_LOCAL_DEV_ALLOWED_PORTS = {5173, 5275}
+_SHARED_ADDRESS_SPACE = ipaddress.ip_network("100.64.0.0/10")
 
 
 class _JWKSCache:
@@ -33,6 +37,46 @@ class _JWKSCache:
 
 
 _cache = _JWKSCache()
+
+
+def _is_local_dev_origin(value: str) -> bool:
+    if settings.ENVIRONMENT.strip().lower() != "development":
+        return False
+
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
+
+    if parsed.scheme not in {"http", "https"}:
+        return False
+
+    hostname = parsed.hostname
+    if not hostname or parsed.port not in _LOCAL_DEV_ALLOWED_PORTS:
+        return False
+
+    if hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+        return True
+
+    try:
+        address = ipaddress.ip_address(hostname)
+        return address.is_private or address in _SHARED_ADDRESS_SPACE
+    except ValueError:
+        return False
+
+
+def _audience_value_allowed(value: Any, allowed_audiences: list[str]) -> bool:
+    return isinstance(value, str) and (value in allowed_audiences or _is_local_dev_origin(value))
+
+
+def _audience_claim_allowed(aud_claim: Any, azp_claim: Any, allowed_audiences: list[str]) -> bool:
+    if isinstance(aud_claim, str):
+        return _audience_value_allowed(aud_claim, allowed_audiences)
+    if isinstance(aud_claim, list):
+        return any(_audience_value_allowed(aud, allowed_audiences) for aud in aud_claim)
+    if aud_claim is None and isinstance(azp_claim, str):
+        return _audience_value_allowed(azp_claim, allowed_audiences)
+    return False
 
 
 def _fetch_jwks() -> Dict[str, Any]:
@@ -97,13 +141,8 @@ def verify_clerk_token(token: str) -> Dict[str, Any]:
         aud_claim = claims.get("aud")
         azp_claim = claims.get("azp")
         allowed_audiences = settings.CLERK_AUDIENCE
-        if isinstance(aud_claim, str):
-            aud_ok = aud_claim in allowed_audiences
-        elif isinstance(aud_claim, list):
-            aud_ok = any(isinstance(aud, str) and aud in allowed_audiences for aud in aud_claim)
-        elif aud_claim is None and isinstance(azp_claim, str):
-            aud_ok = azp_claim in allowed_audiences
-        else:
+        aud_type_valid = isinstance(aud_claim, (str, list)) or (aud_claim is None and isinstance(azp_claim, str))
+        if not aud_type_valid:
             logger.warning(
                 "Invalid token audience type",
                 extra={"aud": aud_claim, "azp": azp_claim, "allowed": allowed_audiences},
@@ -112,6 +151,7 @@ def verify_clerk_token(token: str) -> Dict[str, Any]:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid token audience (aud={aud_claim}, azp={azp_claim}, allowed={allowed_audiences})",
             )
+        aud_ok = _audience_claim_allowed(aud_claim, azp_claim, allowed_audiences)
         if not aud_ok:
             logger.warning(
                 "Token audience rejected",

@@ -3,8 +3,9 @@ import { useAuth } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
 import type { Client } from "@/types/common";
 import { toast } from "@/components/ui/toast";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
-const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 export type ShopifyConnectionState =
@@ -880,7 +881,7 @@ export function useDownloadClientShopifyThemeTemplateZip(clientId?: string) {
     mutationFn: async (payload: ClientShopifyThemeTemplatePublishPayload) => {
       if (!clientId) throw new Error("Client ID is required.");
       if (!payload.draftId?.trim()) throw new Error("Draft ID is required.");
-      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const token = await getToken({ template: clerkTokenTemplate });
       const headers = new Headers({ "Content-Type": "application/json" });
       if (token) headers.set("Authorization", `Bearer ${token}`);
       const response = await fetch(

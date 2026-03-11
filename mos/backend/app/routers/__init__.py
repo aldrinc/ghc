@@ -26,6 +26,7 @@ from app.routers import (
     products,
     stripe_webhooks,
     meta_ads,
+    paid_ads_qa,
 )
 
 __all__ = [
@@ -54,4 +55,5 @@ __all__ = [
     "teardowns",
     "ads",
     "meta_ads",
+    "paid_ads_qa",
 ]

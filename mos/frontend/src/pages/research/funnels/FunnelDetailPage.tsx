@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
+import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -18,7 +19,7 @@ const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
 const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
 const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
-const deployApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const deployApiBaseUrl = resolveOptionalApiBaseUrl() || "";
 const deployDestinationPath = (import.meta.env.VITE_DEPLOY_DESTINATION_PATH || "/opt/apps").trim();
 const deployBunnyPullZoneOriginIp = (import.meta.env.VITE_DEPLOY_BUNNY_PULLZONE_ORIGIN_IP || "").trim();
 
