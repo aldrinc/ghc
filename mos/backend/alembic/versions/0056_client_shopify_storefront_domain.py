@@ -6,8 +6,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = "0055_client_shopify_storefront_domain"
-down_revision = "0054_creative_generation_plan_artifacts"
+revision = "0056_client_shopify_storefront_domain"
+down_revision = "0055_paid_ads_qa_foundation"
 branch_labels = None
 depends_on = None
 
