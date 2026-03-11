@@ -797,7 +797,8 @@ export function ProductDetailPage() {
               <div>
                 <div className="text-xs font-semibold uppercase text-content-muted">Shopify Product Mapping</div>
                 <div className="text-xs text-content-muted">
-                  Required for bonus products and Shopify offer verification.
+                  Used for offer baskets, bonus products, and Shopify product sync. Missing mappings can be created from
+                  mOS during attach and sync flows.
                 </div>
               </div>
               {!isShopifyReady ? (
@@ -1155,7 +1156,7 @@ export function ProductDetailPage() {
                                   <div className="min-w-0">
                                     <div className="text-xs font-semibold text-content">{bonus.bonus_product.title}</div>
                                     <div className="text-[11px] text-content-muted">
-                                      {bonus.bonus_product.shopify_product_gid || "Missing Shopify product GID"}
+                                      {bonus.bonus_product.shopify_product_gid || "Will create in Shopify on next sync"}
                                     </div>
                                   </div>
                                   <Button
@@ -1187,9 +1188,9 @@ export function ProductDetailPage() {
                           >
                             <option value="">Select bonus product</option>
                             {addableBonuses.map((candidate) => (
-                              <option key={candidate.id} value={candidate.id} disabled={!candidate.shopifyProductGid}>
+                              <option key={candidate.id} value={candidate.id}>
                                 {candidate.title}
-                                {candidate.shopifyProductGid ? "" : " (missing Shopify GID)"}
+                                {candidate.shopifyProductGid ? "" : " (will create in Shopify on add)"}
                               </option>
                             ))}
                           </select>
@@ -1224,19 +1225,26 @@ export function ProductDetailPage() {
               <div className="mt-4 space-y-3">
                 {productDetail.variants.length ? (
                   productDetail.variants.map((variant) => {
-                    const isShopifyMapped =
-                      variant.provider === "shopify" &&
+                    const hasShopifyVariantGid =
                       typeof variant.external_price_id === "string" &&
                       variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
                     const syncTimestamp = formatTimestamp(variant.shopify_last_synced_at);
                     const syncError = variant.shopify_last_sync_error?.trim() || null;
-                    const syncStatus = !isShopifyMapped
-                      ? "Not Shopify"
-                      : syncError
-                        ? "Error"
-                        : syncTimestamp
-                          ? "Synced"
-                          : "Pending";
+                    const hasShopifySyncRecord = Boolean(syncTimestamp || syncError);
+                    const shopifyMappingStatus = hasShopifyVariantGid
+                      ? "Variant GID mapped"
+                      : hasShopifySyncRecord
+                        ? "Managed by product sync"
+                        : variant.provider === "shopify"
+                          ? "Missing valid Shopify variant GID"
+                          : "Not mapped";
+                    const syncStatus = syncError
+                      ? "Error"
+                      : syncTimestamp
+                        ? "Synced"
+                        : hasShopifyVariantGid || variant.provider === "shopify"
+                          ? "Pending"
+                          : "Not synced";
 
                     return (
                       <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
@@ -1271,11 +1279,7 @@ export function ProductDetailPage() {
                         <div className="grid gap-2 text-xs text-content-muted">
                           <div>
                             <span className="font-semibold text-content">Shopify mapping:</span>{" "}
-                            {isShopifyMapped
-                              ? "Ready"
-                              : variant.provider === "shopify"
-                                ? "Missing valid Shopify variant GID"
-                                : "Not Shopify"}
+                            {shopifyMappingStatus}
                           </div>
                           <div>
                             <span className="font-semibold text-content">Sync status:</span> {syncStatus}
