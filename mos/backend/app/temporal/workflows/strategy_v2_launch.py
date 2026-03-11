@@ -756,7 +756,9 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                     "require_pinned_strategy_v2_context": True,
                     "require_shopify_connection": True,
                 },
-                schedule_to_close_timeout=timedelta(minutes=35),
+                schedule_to_close_timeout=timedelta(
+                    minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
+                ),
                 retry_policy=_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
@@ -997,7 +999,9 @@ class StrategyV2AngleIterationWorkflow:
                     "operator_user_id": input.operator_user_id,
                     "copy_generation_mode": _COPY_WORKFLOW_GENERATION_MODE,
                 },
-                schedule_to_close_timeout=timedelta(minutes=35),
+                schedule_to_close_timeout=timedelta(
+                    minutes=max(35, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
+                ),
                 retry_policy=_RETRY_POLICY,
             )
             copy_payload = _require_dict(copy_result.get("copy_payload"), field_name="copy_result.copy_payload")
