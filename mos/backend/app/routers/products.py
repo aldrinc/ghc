@@ -905,8 +905,15 @@ def sync_shopify_variants_for_product(
         select(ProductVariant).where(ProductVariant.product_id == product.id)
     ).all()
     existing_by_external_id: dict[str, ProductVariant] = {}
+    existing_unmapped_by_title: dict[str, list[ProductVariant]] = {}
     for variant in existing_variants:
         if not isinstance(variant.external_price_id, str) or not variant.external_price_id.strip():
+            normalized_provider = _normalize_variant_provider(variant.provider)
+            if normalized_provider not in {None, "shopify"}:
+                continue
+            normalized_title = str(variant.title or "").strip().lower()
+            if normalized_title:
+                existing_unmapped_by_title.setdefault(normalized_title, []).append(variant)
             continue
         normalized_external_id = variant.external_price_id.strip()
         if normalized_external_id in existing_by_external_id:
@@ -928,8 +935,23 @@ def sync_shopify_variants_for_product(
         normalized_option_values = (
             {key: value for key, value in option_values.items()} if option_values else None
         )
-        if variant_gid in existing_by_external_id:
-            variant = existing_by_external_id[variant_gid]
+        variant = existing_by_external_id.get(variant_gid)
+        if variant is None:
+            normalized_title = str(shopify_variant["title"] or "").strip().lower()
+            title_matches = existing_unmapped_by_title.get(normalized_title) or []
+            if len(title_matches) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Cannot sync Shopify variants because multiple unmapped MOS variants share the title "
+                        f'"{shopify_variant["title"]}".'
+                    ),
+                )
+            if len(title_matches) == 1:
+                variant = title_matches[0]
+                existing_unmapped_by_title.pop(normalized_title, None)
+
+        if variant is not None:
             variant.title = shopify_variant["title"]
             variant.price = shopify_variant["priceCents"]
             variant.currency = shopify_variant["currency"].lower()
@@ -1123,9 +1145,12 @@ def sync_shopify_product_for_product(
         normalized_provider = _normalize_variant_provider(variant.provider)
         if normalized_provider == "shopify" and variant.provider != normalized_provider:
             variant.provider = normalized_provider
-        if normalized_provider == "shopify" and not _is_shopify_managed_variant(variant):
-            matched_variant = response_variants_by_title.get(str(variant.title or "").strip().lower())
-            if matched_variant is not None:
+        matched_variant = response_variants_by_title.get(str(variant.title or "").strip().lower())
+        if matched_variant is not None:
+            if normalized_provider == "shopify" and not _is_shopify_managed_variant(variant):
+                variant.external_price_id = matched_variant["variantGid"]
+            elif normalized_provider is None and not str(variant.external_price_id or "").strip():
+                variant.provider = "shopify"
                 variant.external_price_id = matched_variant["variantGid"]
         session.add(variant)
     session.commit()

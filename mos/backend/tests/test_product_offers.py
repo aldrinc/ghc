@@ -964,6 +964,85 @@ def test_sync_shopify_variants_for_product_accepts_short_product_id(api_client, 
     assert variants[0]["title"] == "Starter"
 
 
+def test_sync_shopify_variants_for_product_backfills_unmapped_variants_by_title(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Pull Backfill")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/915",
+    )
+
+    existing_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter",
+            "price": 4900,
+            "currency": "usd",
+        },
+    )
+    assert existing_variant_resp.status_code == 201
+    existing_variant_id = existing_variant_resp.json()["id"]
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_get_product(*, client_id: str, product_gid: str, shop_domain: str | None = None):
+        assert product_gid == "gid://shopify/Product/915"
+        assert shop_domain == "example.myshopify.com"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/915",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/9151",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": "SKU-STARTER",
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 10,
+                    "optionValues": {"Title": "Starter"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_product)
+
+    sync_resp = api_client.post(f"/products/{product_id}/shopify/sync-variants", json={})
+    assert sync_resp.status_code == 200
+    payload = sync_resp.json()
+    assert payload["createdCount"] == 0
+    assert payload["updatedCount"] == 1
+    assert payload["totalFetched"] == 1
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert len(variants) == 1
+    variant = next(item for item in variants if item["id"] == existing_variant_id)
+    assert variant["provider"] == "shopify"
+    assert variant["external_price_id"] == "gid://shopify/ProductVariant/9151"
+    assert variant["price"] == 4999
+
+
 def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Push Sync")
     product_id = _create_product(
@@ -1127,7 +1206,12 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
     assert len(variants) == 2
     assert all(variant["shopify_last_synced_at"] is not None for variant in variants)
     assert all(variant["shopify_last_sync_error"] is None for variant in variants)
-    assert {variant["external_price_id"] for variant in variants} == {"price_bundle", None}
+    assert {variant["external_price_id"] for variant in variants} == {
+        "price_bundle",
+        "gid://shopify/ProductVariant/302",
+    }
+    mega_variant = next(item for item in variants if item["title"] == "Mega Bundle")
+    assert mega_variant["provider"] == "shopify"
 
 
 def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_client, monkeypatch, db_session):
