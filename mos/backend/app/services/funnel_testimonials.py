@@ -13,12 +13,13 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator, Optional, cast
+from typing import Any, Callable, Iterator, Optional, cast
 from uuid import uuid4
 
 from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from temporalio import activity as temporal_activity
 
 from app.config import settings
 from app.db.base import SessionLocal
@@ -48,6 +49,19 @@ class TestimonialGenerationError(RuntimeError):
 
 class TestimonialGenerationNotFoundError(RuntimeError):
     pass
+
+
+def _heartbeat_activity_progress(*, phase: str, step: str, **fields: Any) -> None:
+    payload: dict[str, Any] = {"phase": phase, "step": step}
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, (str, int, float, bool)):
+            payload[key] = value
+    try:
+        temporal_activity.heartbeat(payload)
+    except RuntimeError:
+        return
 
 
 @dataclass
@@ -3577,6 +3591,16 @@ def generate_sales_pdp_carousel_images(
         expected_count=expected_count,
     )
 
+    def _carousel_heartbeat(step: str, **fields: Any) -> None:
+        _heartbeat_activity_progress(
+            phase="sales_pdp_carousel_generation",
+            step=step,
+            funnel_id=funnel_id,
+            page_id=page_id,
+            template_id=resolved_template_id,
+            **fields,
+        )
+
     product, _, product_context = _load_product_context(
         session=session,
         org_id=org_id,
@@ -3606,6 +3630,7 @@ def generate_sales_pdp_carousel_images(
     today = datetime.now(timezone.utc).date().isoformat()
 
     ensure_within_budget("requesting Sales PDP carousel plan")
+    _carousel_heartbeat("carousel_plan_requested", slot_count=expected_count)
     prompt = _build_sales_pdp_carousel_prompt(
         product_context=product_context,
         copy=copy_text,
@@ -3655,6 +3680,7 @@ def generate_sales_pdp_carousel_images(
     )
     if not validated_plan:
         raise TestimonialGenerationError("Sales PDP carousel plan returned no slides.")
+    _carousel_heartbeat("carousel_plan_completed", slide_count=len(validated_plan))
     variant_spec_by_id = {spec["variantId"]: spec for spec in _SALES_PDP_CAROUSEL_VARIANTS}
 
     logo_selection = _resolve_sales_pdp_logo_selection(
@@ -3778,11 +3804,13 @@ def generate_sales_pdp_carousel_images(
                     slot_index = cast(int, job["slot_index"])
                     render_payload = cast(dict[str, Any], job["render_payload"])
                     ensure_within_budget(f"queuing carousel slot render {slot_index + 1}")
+                    _carousel_heartbeat("carousel_render_queued", slot_index=slot_index + 1)
                     render_futures[slot_index] = pool.submit(renderer.render_png, render_payload)
 
                 for job in render_jobs:
                     slot_index = cast(int, job["slot_index"])
                     ensure_within_budget(f"waiting for carousel slot render {slot_index + 1}")
+                    _carousel_heartbeat("carousel_render_waiting", slot_index=slot_index + 1)
                     future = render_futures[slot_index]
                     try:
                         if deadline_ts is None:
@@ -3799,6 +3827,7 @@ def generate_sales_pdp_carousel_images(
                         raise TestimonialGenerationError(
                             f"Sales PDP carousel step exceeded configured time budget while rendering slot {slot_index + 1}."
                         ) from exc
+                    _carousel_heartbeat("carousel_render_completed", slot_index=slot_index + 1)
 
         for job in render_jobs:
             slot_index = cast(int, job["slot_index"])
@@ -3812,6 +3841,7 @@ def generate_sales_pdp_carousel_images(
                 render_payload.get("comment") or cast(list[dict[str, Any]], render_payload.get("comments"))[0],
             )
             image_bytes = rendered_bytes_by_slot[slot_index]
+            _carousel_heartbeat("carousel_asset_persist_started", slot_index=slot_index + 1)
             asset = create_funnel_upload_asset(
                 session=session,
                 org_id=org_id,
@@ -3882,6 +3912,7 @@ def generate_sales_pdp_carousel_images(
                     },
                 }
             )
+            _carousel_heartbeat("carousel_asset_persist_completed", slot_index=slot_index + 1)
     except TestimonialRenderError as exc:
         raise TestimonialGenerationError(str(exc)) from exc
 
@@ -3936,6 +3967,7 @@ def _generate_validated_synthetic_testimonials(
     max_tokens: int | None = None,
     max_duration_seconds: int | None = None,
     uniqueness_scope: str,
+    progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     if count < 0:
         raise TestimonialGenerationError("count must be non-negative.")
@@ -3973,6 +4005,14 @@ def _generate_validated_synthetic_testimonials(
     validated_testimonials: list[dict[str, Any]] = []
     for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
         ensure_within_budget("generating testimonial identities")
+        if progress_callback is not None:
+            progress_callback(
+                "identity_attempt_started",
+                {
+                    "identity_attempt": identity_attempt,
+                    "requested_count": count,
+                },
+            )
         candidate_validated: list[dict[str, Any]] = []
         reserved_names: list[str] = []
         reserved_name_keys: set[str] = set()
@@ -3983,6 +4023,15 @@ def _generate_validated_synthetic_testimonials(
         for batch_idx, start in enumerate(range(0, count, batch_size)):
             ensure_within_budget("requesting testimonial LLM batches")
             batch_count = min(batch_size, count - start)
+            if progress_callback is not None:
+                progress_callback(
+                    "batch_requested",
+                    {
+                        "identity_attempt": identity_attempt,
+                        "batch_index": batch_idx + 1,
+                        "batch_count": batch_count,
+                    },
+                )
             prompt = _build_testimonial_prompt(
                 count=batch_count,
                 copy=copy_text,
@@ -4038,6 +4087,15 @@ def _generate_validated_synthetic_testimonials(
                 raise TestimonialGenerationError(
                     f"Expected {batch_count} testimonials, received {len(batch_items)}."
                 )
+            if progress_callback is not None:
+                progress_callback(
+                    "batch_received",
+                    {
+                        "identity_attempt": identity_attempt,
+                        "batch_index": batch_idx + 1,
+                        "batch_count": len(batch_items),
+                    },
+                )
 
             batch_validated: list[dict[str, Any]] = []
             for idx, raw in enumerate(batch_items):
@@ -4052,6 +4110,15 @@ def _generate_validated_synthetic_testimonials(
             if batch_validation_error is not None:
                 break
             candidate_validated.extend(batch_validated)
+            if progress_callback is not None:
+                progress_callback(
+                    "batch_validated",
+                    {
+                        "identity_attempt": identity_attempt,
+                        "batch_index": batch_idx + 1,
+                        "validated_count": len(batch_validated),
+                    },
+                )
 
             for item in batch_validated:
                 primary = item.get("name")
@@ -4093,6 +4160,14 @@ def _generate_validated_synthetic_testimonials(
                 continue
 
         validated_testimonials = candidate_validated
+        if progress_callback is not None:
+            progress_callback(
+                "identity_attempt_completed",
+                {
+                    "identity_attempt": identity_attempt,
+                    "validated_count": len(candidate_validated),
+                },
+            )
         break
 
     if not validated_testimonials:
@@ -4277,6 +4352,16 @@ def generate_funnel_page_testimonials(
 
     groups, contexts = _collect_testimonial_targets(base_puck, template_kind)
 
+    def _heartbeat(step: str, **fields: Any) -> None:
+        _heartbeat_activity_progress(
+            phase="testimonials_generation",
+            step=step,
+            funnel_id=funnel_id,
+            page_id=page_id,
+            template_id=resolved_template_id,
+            **fields,
+        )
+
     product, _, product_context = _load_product_context(
         session=session,
         org_id=org_id,
@@ -4356,6 +4441,11 @@ def generate_funnel_page_testimonials(
         template_kind=template_kind,
         image_target_count=len(groups),
     )
+    _heartbeat(
+        "testimonial_payload_request_started",
+        group_count=len(groups),
+        testimonial_count=testimonial_count,
+    )
     validated_testimonials, model_id = _generate_validated_synthetic_testimonials(
         count=testimonial_count,
         copy_text=copy_text,
@@ -4367,6 +4457,11 @@ def generate_funnel_page_testimonials(
         max_tokens=max_tokens,
         max_duration_seconds=remaining_duration_seconds,
         uniqueness_scope=f"{funnel_id}:{page_id}:{resolved_template_id}",
+        progress_callback=lambda step, details: _heartbeat(step, **details),
+    )
+    _heartbeat(
+        "testimonial_payload_request_completed",
+        testimonial_count=len(validated_testimonials),
     )
 
     generated: list[dict[str, Any]] = []
@@ -4377,6 +4472,7 @@ def generate_funnel_page_testimonials(
         ) as renderer:
             def render_with_budget(render_payload: dict[str, Any], *, label: str) -> bytes:
                 ensure_within_budget(f"rendering {label}")
+                _heartbeat("testimonial_render_requested", label=label)
                 timeout_ms = _TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS
                 if deadline_ts is not None:
                     remaining_seconds = deadline_ts - time.monotonic()
@@ -4389,6 +4485,11 @@ def generate_funnel_page_testimonials(
 
             for idx, group in enumerate(groups):
                 ensure_within_budget("rendering testimonial groups")
+                _heartbeat(
+                    "testimonial_group_started",
+                    group_index=idx + 1,
+                    group_count=len(groups),
+                )
                 validated = validated_testimonials[idx]
 
                 if group.slide is not None:
@@ -4417,6 +4518,11 @@ def generate_funnel_page_testimonials(
 
                 for render in group.renders:
                     ensure_within_budget(f"rendering {render.label}")
+                    _heartbeat(
+                        "testimonial_render_started",
+                        group_index=idx + 1,
+                        label=render.label,
+                    )
                     setting_value = _derive_setting(
                         validated=validated,
                         fallback_text=validated["heroImagePrompt"],
@@ -4514,6 +4620,11 @@ def generate_funnel_page_testimonials(
                                 "mediaPrompt": media_prompt,
                                 "sceneMode": media_scene_mode,
                             }
+                        )
+                        _heartbeat(
+                            "testimonial_render_completed",
+                            group_index=idx + 1,
+                            label=render.label,
                         )
                         continue
 
@@ -4686,6 +4797,11 @@ def generate_funnel_page_testimonials(
                                 "heroGenerationError": hero_error,
                                 "avatarGenerationError": avatar_error,
                             }
+                        )
+                        _heartbeat(
+                            "testimonial_render_completed",
+                            group_index=idx + 1,
+                            label=render.label,
                         )
                         continue
 
@@ -4996,6 +5112,11 @@ def generate_funnel_page_testimonials(
                             "attachmentGenerationError": attachment_error,
                             "replyAvatarGenerationError": reply_avatar_error,
                         }
+                    )
+                    _heartbeat(
+                        "testimonial_render_completed",
+                        group_index=idx + 1,
+                        label=render.label,
                     )
     except TestimonialRenderError as exc:
         raise TestimonialGenerationError(str(exc)) from exc
