@@ -30,9 +30,6 @@ from app.services.shopify_connection import get_client_shopify_connection_status
 from app.strategy_v2.downstream import load_strategy_v2_outputs
 from app.strategy_v2.template_bridge import (
     apply_strategy_v2_template_patch,
-    build_strategy_v2_template_patch_operations,
-    upgrade_strategy_v2_template_payload_fields,
-    validate_strategy_v2_template_payload_fields,
 )
 
 
@@ -420,6 +417,40 @@ def _resolve_strategy_v2_selected_offer_id(
     if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
         return None
     return raw_offer_id.strip()
+
+
+def _apply_pinned_strategy_v2_template_payload(
+    *,
+    template_id: str,
+    payload_entry: dict[str, Any],
+    base_puck_data: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    payload_template_id = str(payload_entry.get("template_id") or "").strip()
+    if payload_template_id != template_id:
+        raise ValueError(
+            "Strategy V2 template payload template_id mismatch for funnel page generation. "
+            f"Expected={template_id}, received={payload_template_id or '<empty>'}."
+        )
+
+    patch_operations = payload_entry.get("template_patch")
+    if not isinstance(patch_operations, list) or not patch_operations:
+        raise ValueError(
+            f"Strategy V2 template payload for {template_id} is missing template_patch operations."
+        )
+
+    try:
+        patched_puck_data = apply_strategy_v2_template_patch(
+            base_puck_data=base_puck_data,
+            operations=patch_operations,
+            template_id=template_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(
+            f"Strategy V2 template payload patch could not be applied for {template_id}. "
+            f"Details: {exc}"
+        ) from exc
+
+    return patched_puck_data, json.dumps(payload_entry, ensure_ascii=True)
 
 
 def _validate_selected_offer_for_funnel(
@@ -937,59 +968,10 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         "Strategy V2 template payload is missing for page template "
                         f"{template_id}."
                     )
-                payload_template_id = str(payload_entry.get("template_id") or "").strip()
-                if payload_template_id != template_id:
-                    raise ValueError(
-                        "Strategy V2 template payload template_id mismatch for funnel page generation. "
-                        f"Expected={template_id}, received={payload_template_id or '<empty>'}."
-                    )
-                payload_fields = payload_entry.get("fields")
-                if not isinstance(payload_fields, dict):
-                    raise ValueError(
-                        f"Strategy V2 template payload for {template_id} is missing fields."
-                    )
-                upgraded_fields = upgrade_strategy_v2_template_payload_fields(
+                puck_data, template_payload_json = _apply_pinned_strategy_v2_template_payload(
                     template_id=template_id,
-                    payload_fields=payload_fields,
-                )
-                validated_fields = validate_strategy_v2_template_payload_fields(
-                    template_id=template_id,
-                    payload_fields=upgraded_fields,
-                )
-                validated_fields = _normalize_sales_payload_for_product_type(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                    product_type=product_type,
-                )
-                validated_fields = validate_strategy_v2_template_payload_fields(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                )
-                _assert_sales_payload_matches_product_type(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                    product_type=product_type,
-                )
-                patch_operations = build_strategy_v2_template_patch_operations(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                )
-                if not patch_operations:
-                    raise ValueError(
-                        f"Strategy V2 template payload for {template_id} could not produce template_patch operations."
-                    )
-                puck_data = apply_strategy_v2_template_patch(
+                    payload_entry=payload_entry,
                     base_puck_data=puck_data,
-                    operations=patch_operations,
-                    template_id=template_id,
-                )
-                template_payload_json = json.dumps(
-                    {
-                        **payload_entry,
-                        "fields": validated_fields,
-                        "template_patch": patch_operations,
-                    },
-                    ensure_ascii=True,
                 )
                 strategy_v2_payload_applied = True
                 footer_links, footer_copyright, footer_icons = _build_policy_footer_payload(
