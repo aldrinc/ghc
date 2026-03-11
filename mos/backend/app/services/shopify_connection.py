@@ -306,6 +306,16 @@ def _normalize_currency_code(value: str) -> str:
     return cleaned
 
 
+def _validate_shopify_variant_gid(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned.startswith(_SHOPIFY_VARIANT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variantGid must be a Shopify variant GID.",
+        )
+    return cleaned
+
+
 def update_client_shopify_variant(
     *,
     client_id: str,
