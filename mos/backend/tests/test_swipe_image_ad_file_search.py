@@ -277,9 +277,8 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             )
 
     monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
-    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "creative_service")
-    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeCreativeClient())
-    monkeypatch.setattr(swipe_activity, "CreativeServiceClient", lambda: _FakeCreativeClient())
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda **_kwargs: "creative_service")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda **_kwargs: _FakeCreativeClient())
     monkeypatch.setattr(
         swipe_activity,
         "load_swipe_to_image_ad_prompt",
@@ -358,11 +357,6 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     )
     monkeypatch.setattr(
         swipe_activity,
-        "_ensure_remote_reference_asset_ids",
-        lambda **_kwargs: ["remote-product-asset-1"],
-    )
-    monkeypatch.setattr(
-        swipe_activity,
         "_resolve_swipe_image",
         lambda **_kwargs: (b"image-bytes", "image/png", "https://example.com/swipe.png"),
     )
@@ -403,8 +397,8 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert result["stores_attached"] == 1
     assert captured["model"] == "gemini-2.5-flash"
     assert captured["creative_payload_count"] == 1
-    assert captured["creative_payload_reference_asset_ids"] == ["remote-product-asset-1"]
-    assert captured["creative_payload_reference_image_urls"] == ["https://example.com/product-1.png"]
+    assert captured["creative_payload_reference_asset_ids"] == ["local-product-asset-1"]
+    assert captured["creative_payload_reference_image_urls"] == []
     assert captured["creative_payload_model_id"] == "models/gemini-3-pro-image-preview"
     prompt_input = captured["contents"][0]
     assert isinstance(prompt_input, str)
@@ -485,8 +479,8 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
             )
 
     monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
-    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "higgsfield")
-    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeCreativeClient())
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda **_kwargs: "higgsfield")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda **_kwargs: _FakeCreativeClient())
     monkeypatch.setattr(
         swipe_activity,
         "load_swipe_to_image_ad_prompt",
@@ -640,8 +634,8 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
             )
 
     monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
-    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "higgsfield")
-    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeRenderClient())
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda **_kwargs: "higgsfield")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda **_kwargs: _FakeRenderClient())
     monkeypatch.setattr(
         swipe_activity,
         "load_swipe_to_image_ad_prompt",
@@ -761,8 +755,8 @@ def test_generate_swipe_image_ad_activity_errors_when_policy_true_and_no_product
             raise AssertionError("render call should not happen when product policy validation fails early")
 
     monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
-    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "higgsfield")
-    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeRenderClient())
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda **_kwargs: "higgsfield")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda **_kwargs: _FakeRenderClient())
     monkeypatch.setattr(
         swipe_activity,
         "load_swipe_to_image_ad_prompt",

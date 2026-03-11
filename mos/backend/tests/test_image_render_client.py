@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
+from app.services import embedded_freestyle_image_client as embedded_freestyle
 from app.services import image_render_client as image_render
 
 
@@ -26,6 +27,110 @@ def test_get_image_render_provider_uses_higgsfield_for_nano_banana_models(monkey
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
 
     assert image_render.get_image_render_provider(model_id="nano-banana-pro") == "higgsfield"
+
+
+def test_build_image_render_client_returns_embedded_freestyle_for_creative_service_provider(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
+
+    client = image_render.build_image_render_client(org_id="org-123")
+
+    assert isinstance(client, embedded_freestyle.EmbeddedFreestyleImageRenderClient)
+    assert client.org_id == "org-123"
+
+
+def test_embedded_freestyle_rejects_reference_image_urls() -> None:
+    client = embedded_freestyle.EmbeddedFreestyleImageRenderClient()
+
+    with pytest.raises(image_render.CreativeServiceRequestError, match="does not accept reference_image_urls"):
+        client.create_image_ads(
+            payload=CreativeServiceImageAdsCreateIn(
+                prompt="Create an ad image",
+                count=1,
+                reference_image_urls=["https://example.com/reference.png"],
+            ),
+            idempotency_key="idem-1",
+        )
+
+
+def test_embedded_freestyle_create_image_ads_uses_local_reference_assets(monkeypatch) -> None:
+    client = embedded_freestyle.EmbeddedFreestyleImageRenderClient(org_id="org-123")
+    captured_prompts: list[str] = []
+    uploaded_objects: list[tuple[str, str, bytes, str | None]] = []
+
+    class _FakeStorage:
+        bucket = "media-bucket"
+
+        def build_key(self, *, sha256: str, ext: str, kind: str = "orig") -> str:
+            assert kind == "orig"
+            return f"orig/{sha256}.{ext.lstrip('.')}"
+
+        def object_exists(self, *, bucket: str, key: str) -> bool:
+            assert bucket == self.bucket
+            return any(existing_key == key for _, existing_key, _, _ in uploaded_objects)
+
+        def upload_bytes(
+            self,
+            *,
+            bucket: str,
+            key: str,
+            data: bytes,
+            content_type: str | None,
+            cache_control: str | None = None,
+            extra_metadata: dict[str, str] | None = None,
+        ) -> None:
+            del cache_control, extra_metadata
+            uploaded_objects.append((bucket, key, data, content_type))
+
+        def presign_get(self, *, bucket: str, key: str, expires_in: int | None = None) -> str:
+            del expires_in
+            return f"https://cdn.example/{bucket}/{key}"
+
+    class _FakeNanoBananaClient:
+        def __init__(self, config=None) -> None:
+            self.config = config
+
+        def generate_image(self, *, prompt: str, reference_images=None, reference_text=None):
+            del reference_text
+            captured_prompts.append(prompt)
+            assert reference_images == [(b"reference-bytes", "image/png")]
+            return f"generated-{len(captured_prompts)}".encode("utf-8"), "image/png"
+
+    monkeypatch.setattr(embedded_freestyle, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(embedded_freestyle, "NanoBananaClient", _FakeNanoBananaClient)
+    monkeypatch.setattr(
+        client,
+        "_load_reference_images",
+        lambda *, storage, reference_asset_ids: (
+            [
+                embedded_freestyle.CreativeServiceAssetRef(
+                    asset_id="asset-1",
+                    position=0,
+                    primary_url="https://cdn.example/reference.png",
+                )
+            ],
+            [(b"reference-bytes", "image/png")],
+        ),
+    )
+
+    job = client.create_image_ads(
+        payload=CreativeServiceImageAdsCreateIn(
+            prompt="Create an ad image",
+            reference_asset_ids=["asset-1"],
+            count=2,
+            aspect_ratio="1:1",
+            model_id="models/gemini-3-pro-image-preview",
+        ),
+        idempotency_key="idem-embedded-1",
+    )
+
+    assert job.status == "succeeded"
+    assert job.model_id == "models/gemini-3-pro-image-preview"
+    assert [ref.asset_id for ref in job.references] == ["asset-1"]
+    assert len(job.outputs) == 2
+    assert "Variation 1:" in captured_prompts[0]
+    assert "Variation 2:" in captured_prompts[1]
+    assert all("Aspect ratio: 1:1." in prompt for prompt in captured_prompts)
+    assert len(uploaded_objects) == 2
 
 
 def test_higgsfield_create_image_ads_uses_model_defaults(monkeypatch) -> None:

@@ -16,10 +16,10 @@ from app.schemas.creative_service import (
     CreativeServiceImageAdsJob,
 )
 from app.services.creative_service_client import (
-    CreativeServiceClient,
     CreativeServiceConfigError,
     CreativeServiceRequestError,
 )
+from app.services.embedded_freestyle_image_client import EmbeddedFreestyleImageRenderClient
 
 _PROVIDER_CREATIVE_SERVICE = "creative_service"
 _PROVIDER_HIGGSFIELD = "higgsfield"
@@ -80,10 +80,10 @@ def get_image_render_provider(*, model_id: str | None = None) -> str:
     return provider
 
 
-def build_image_render_client(*, model_id: str | None = None) -> ImageRenderClient:
+def build_image_render_client(*, model_id: str | None = None, org_id: str | None = None) -> ImageRenderClient:
     provider = get_image_render_provider(model_id=model_id)
     if provider == _PROVIDER_CREATIVE_SERVICE:
-        return CreativeServiceClient()
+        return EmbeddedFreestyleImageRenderClient(org_id=org_id)
     if provider == _PROVIDER_HIGGSFIELD:
         return HiggsfieldImageRenderClient()
     raise ValueError(f"Unsupported image render provider: {provider!r}")

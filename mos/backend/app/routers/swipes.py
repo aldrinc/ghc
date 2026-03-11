@@ -45,7 +45,7 @@ async def generate_image_ad_from_swipe(
     Start a Temporal workflow that:
       - Generates a generation-ready image prompt from a competitor swipe image
         (Gemini vision + Gemini File Search workspace context)
-      - Renders the final image(s) via the creative service (Freestyle)
+      - Renders the final image(s) via the MOS-embedded Freestyle renderer
       - Persists generated assets attached to the provided asset brief
     """
 

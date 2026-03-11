@@ -34,7 +34,6 @@ from app.observability import LangfuseTraceContext, bind_langfuse_trace_context,
 from app.schemas.creative_generation import SwipeAdCopyPack
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
 from app.services.creative_service_client import (
-    CreativeServiceClient,
     CreativeServiceConfigError,
     CreativeServiceRequestError,
 )
@@ -56,7 +55,6 @@ from app.services.swipe_prompt import (
 # Reuse existing asset generation helpers to keep asset storage consistent.
 from app.temporal.activities.asset_activities import (  # noqa: E402
     _create_generated_asset_from_url,
-    _ensure_remote_reference_asset_ids,
     _extract_brief,
     _retention_expires_at,
     _select_product_reference_assets,
@@ -1989,7 +1987,11 @@ def _poll_image_job(
     *,
     creative_client: Any,
     job_id: str,
+    initial_job: Any | None = None,
 ) -> Any:
+    if initial_job is not None and getattr(initial_job, "status", None) in ("succeeded", "failed"):
+        return initial_job
+
     poll_interval = float(settings.CREATIVE_SERVICE_POLL_INTERVAL_SECONDS or 2.0)
     poll_timeout = float(settings.CREATIVE_SERVICE_POLL_TIMEOUT_SECONDS or 300.0)
     if poll_interval <= 0:
@@ -2085,7 +2087,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
       1) Use Gemini (vision) with the stage-1 prompt template + runtime brand/angle + attached RAG docs + the
          competitor swipe image to produce a dense, generation-ready image prompt.
       2) Extract ONLY the prompt from the Gemini markdown output (```text fenced block).
-      3) Send ONLY that extracted prompt to the creative service (Freestyle) to render the final image(s).
+      3) Send ONLY that extracted prompt to the MOS-embedded Freestyle renderer to render the final image(s).
       4) Persist generated assets attached to the provided asset brief.
     """
 
@@ -2162,7 +2164,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 error=error,
             )
 
-    render_provider = get_image_render_provider()
+    render_provider = get_image_render_provider(model_id=render_model_id)
     log_activity(
         "swipe_image_ad",
         "started",
@@ -2184,7 +2186,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        render_client = build_image_render_client()
+        render_client = build_image_render_client(model_id=render_model_id, org_id=org_id)
     except CreativeServiceConfigError as exc:
         raise RuntimeError(str(exc)) from exc
 
@@ -2289,18 +2291,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     raise
 
-        product_reference_remote_ids: list[str] = []
-        if render_provider == "creative_service" and product_reference_assets:
-            try:
-                reference_client = CreativeServiceClient()
-            except CreativeServiceConfigError as exc:
-                raise RuntimeError(str(exc)) from exc
-            product_reference_remote_ids = _ensure_remote_reference_asset_ids(
-                session=session,
-                org_id=org_id,
-                creative_client=reference_client,
-                references=product_reference_assets,
-            )
+        product_reference_render_ids: list[str] = []
+        if render_provider == "creative_service":
+            product_reference_render_ids = [
+                reference.local_asset_id
+                for reference in product_reference_assets
+                if isinstance(reference.local_asset_id, str) and reference.local_asset_id.strip()
+            ]
         all_product_reference_image_urls = [
             reference.primary_url
             for reference in product_reference_assets
@@ -2310,8 +2307,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             all_product_reference_image_urls[:1] if render_provider == "higgsfield" else all_product_reference_image_urls
         )
         reference_signature_parts = (
-            product_reference_remote_ids
-            if product_reference_remote_ids
+            product_reference_render_ids
+            if product_reference_render_ids
             else [reference.local_asset_id for reference in product_reference_assets]
         )
         if not reference_signature_parts:
@@ -2531,8 +2528,10 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
             image_payload = CreativeServiceImageAdsCreateIn(
                 prompt=image_prompt,
-                reference_asset_ids=product_reference_remote_ids,
-                reference_image_urls=product_reference_image_urls,
+                reference_asset_ids=product_reference_render_ids,
+                reference_image_urls=(
+                    product_reference_image_urls if render_provider == "higgsfield" else []
+                ),
                 count=render_count,
                 aspect_ratio=aspect_ratio,
                 model_id=render_model_id,
@@ -2550,7 +2549,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     continue
                 raise RuntimeError(last_render_error) from exc
 
-            completed_job = _poll_image_job(creative_client=render_client, job_id=created_job.id)
+            completed_job = _poll_image_job(
+                creative_client=render_client,
+                job_id=created_job.id,
+                initial_job=created_job,
+            )
             if completed_job.status == "succeeded":
                 break
 
@@ -2624,7 +2627,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipePromptMarkdownPreview": raw_output[:4000],
                 "swipePromptExtractedRaw": extracted_image_prompt_raw,
                 "swipePromptInlinedPlaceholderMap": inlined_placeholder_map,
-                "swipeProductReferenceRemoteAssetIds": product_reference_remote_ids,
+                "swipeProductReferenceRenderAssetIds": product_reference_render_ids,
                 "swipeProductReferenceLocalAssetIds": [
                     reference.local_asset_id for reference in product_reference_assets
                 ],
