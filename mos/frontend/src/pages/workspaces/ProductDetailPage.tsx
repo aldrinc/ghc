@@ -70,6 +70,7 @@ type SalesPdpVariantMappingDraft = {
 };
 
 const SALES_PDP_MAPPING_KEYS: Array<keyof SalesPdpVariantMappingDraft> = ["offerId", "sizeId", "colorId"];
+const SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/";
 
 function asPlainRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -115,6 +116,19 @@ function buildSalesPdpVariantMapping(draft: SalesPdpVariantMappingDraft): {
     mapping: Object.keys(mapping).length ? mapping : null,
     duplicateSourceKey: null,
   };
+}
+
+function normalizeVariantProvider(provider: string | null | undefined): string | null {
+  const cleaned = (provider || "").trim().toLowerCase();
+  return cleaned || null;
+}
+
+function isShopifyVariantGid(externalPriceId: string | null | undefined): boolean {
+  return typeof externalPriceId === "string" && externalPriceId.trim().startsWith(SHOPIFY_VARIANT_GID_PREFIX);
+}
+
+function isShopifyCheckoutVariant(variant: Pick<ProductVariant, "provider" | "external_price_id">): boolean {
+  return normalizeVariantProvider(variant.provider) === "shopify" && isShopifyVariantGid(variant.external_price_id);
 }
 
 function mergeSalesPdpVariantMappingIntoOptionsSchema(
@@ -295,8 +309,8 @@ export function ProductDetailPage() {
     if (!workspace || !productId) return;
     const price = Number(variantPrice);
     const normalizedTitle = variantTitle.trim();
-    if (!normalizedTitle || Number.isNaN(price) || price <= 0) {
-      toast.error("Variant title and price are required.");
+    if (!normalizedTitle || Number.isNaN(price) || price < 0) {
+      toast.error("Variant title is required and price cannot be negative.");
       return;
     }
     const normalizedCurrency = variantCurrency.trim().toLowerCase();
@@ -304,7 +318,7 @@ export function ProductDetailPage() {
       toast.error("Currency is required.");
       return;
     }
-    const normalizedProvider = variantProvider.trim() || null;
+    const normalizedProvider = normalizeVariantProvider(variantProvider);
     const normalizedExternalPriceId = variantExternalId.trim() || null;
     const normalizedOfferId = variantOfferId.trim() || null;
     if (normalizedExternalPriceId && !normalizedProvider) {
@@ -383,10 +397,7 @@ export function ProductDetailPage() {
   };
 
   const handleDeleteVariant = async (variant: ProductVariant) => {
-    const isShopifyMapped =
-      variant.provider === "shopify" &&
-      typeof variant.external_price_id === "string" &&
-      variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
+    const isShopifyMapped = isShopifyCheckoutVariant(variant);
 
     const confirmed = window.confirm(
       isShopifyMapped
@@ -720,12 +731,7 @@ export function ProductDetailPage() {
   const hasShopifyCheckoutVariant = useMemo(
     () =>
       Boolean(
-        productDetail?.variants.some(
-          (variant) =>
-            variant.provider === "shopify" &&
-            typeof variant.external_price_id === "string" &&
-            variant.external_price_id.startsWith("gid://shopify/ProductVariant/"),
-        ),
+        productDetail?.variants.some((variant) => isShopifyCheckoutVariant(variant)),
       ),
     [productDetail?.variants],
   );
@@ -1286,9 +1292,8 @@ export function ProductDetailPage() {
               <div className="mt-4 space-y-3">
                 {productDetail.variants.length ? (
                   productDetail.variants.map((variant) => {
-                    const hasShopifyVariantGid =
-                      typeof variant.external_price_id === "string" &&
-                      variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
+                    const normalizedProvider = normalizeVariantProvider(variant.provider);
+                    const hasShopifyVariantGid = isShopifyVariantGid(variant.external_price_id);
                     const syncTimestamp = formatTimestamp(variant.shopify_last_synced_at);
                     const syncError = variant.shopify_last_sync_error?.trim() || null;
                     const hasShopifySyncRecord = Boolean(syncTimestamp || syncError);
@@ -1296,14 +1301,14 @@ export function ProductDetailPage() {
                       ? "Variant GID mapped"
                       : hasShopifySyncRecord
                         ? "Managed by product sync"
-                        : variant.provider === "shopify"
+                        : normalizedProvider === "shopify"
                           ? "Missing valid Shopify variant GID"
                           : "Not mapped";
                     const syncStatus = syncError
                       ? "Error"
                       : syncTimestamp
                         ? "Synced"
-                        : hasShopifyVariantGid || variant.provider === "shopify"
+                        : hasShopifyVariantGid || normalizedProvider === "shopify"
                           ? "Pending"
                           : "Not synced";
 

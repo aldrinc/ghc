@@ -424,6 +424,27 @@ def test_create_variant_rejects_non_gid_external_price_id_for_shopify_provider(a
     assert response.json()["detail"] == "Shopify externalPriceId must be a Shopify variant GID."
 
 
+def test_create_variant_normalizes_shopify_provider(api_client):
+    client_id = _create_client(api_client, name="Shopify Variant Provider Normalize")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    response = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": " Shopify ",
+            "externalPriceId": " gid://shopify/ProductVariant/123456789 ",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["provider"] == "shopify"
+    assert payload["external_price_id"] == "gid://shopify/ProductVariant/123456789"
+
+
 def test_update_variant_rejects_shopify_gid_with_non_shopify_provider(api_client):
     client_id = _create_client(api_client, name="Shopify Variant Update Validation")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
