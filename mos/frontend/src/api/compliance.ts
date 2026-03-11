@@ -16,9 +16,7 @@ export type CompliancePolicyPageKey =
   | "terms_of_service"
   | "returns_refunds_policy"
   | "shipping_policy"
-  | "contact_support"
-  | "company_information"
-  | "subscription_terms_and_cancellation";
+  | "contact_support";
 
 export type ComplianceShopifyPolicySyncPayload = {
   shopDomain?: string;
@@ -75,13 +73,10 @@ export type ClientComplianceProfileUpsertPayload = {
   rulesetVersion: string;
   businessModels: ComplianceBusinessModel[];
   legalBusinessName?: string;
-  operatingEntityName?: string;
   companyAddressText?: string;
-  businessLicenseIdentifier?: string;
   supportEmail?: string;
   supportPhone?: string;
   supportHoursText?: string;
-  responseTimeCommitment?: string;
   privacyPolicyUrl?: string;
   termsOfServiceUrl?: string;
   returnsRefundsPolicyUrl?: string;

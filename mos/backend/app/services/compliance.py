@@ -39,8 +39,6 @@ _PAGE_ORDER = [
     "returns_refunds_policy",
     "shipping_policy",
     "contact_support",
-    "company_information",
-    "subscription_terms_and_cancellation",
 ]
 
 _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY = {
@@ -292,7 +290,7 @@ _RULESET: dict[str, Any] = {
             "platform": "tiktok",
             "classification": "required",
             "summary": (
-                "Ecommerce landing pages must include valid contact/company/privacy/terms/refund/shipping information."
+                "Ecommerce landing pages must include valid contact/privacy/terms/refund/shipping information."
             ),
             "appliesToModels": ["ecommerce"],
             "pageKeys": [
@@ -301,7 +299,6 @@ _RULESET: dict[str, Any] = {
                 "returns_refunds_policy",
                 "shipping_policy",
                 "contact_support",
-                "company_information",
             ],
             "sourceIds": ["tiktok.ad_format_and_functionality"],
         },
@@ -363,7 +360,7 @@ _RULESET: dict[str, Any] = {
                 "online_service",
                 "lead_generation",
             ],
-            "pageKeys": ["company_information", "contact_support", "privacy_policy", "terms_of_service"],
+            "pageKeys": ["contact_support", "privacy_policy", "terms_of_service"],
             "sourceIds": ["tiktok.landing_page_best_practices"],
         },
         {
@@ -372,7 +369,7 @@ _RULESET: dict[str, Any] = {
             "classification": "required",
             "summary": "Subscriptions require upfront recurring-charge disclosure, explicit opt-in, and easy cancellation.",
             "appliesToModels": ["saas_subscription"],
-            "pageKeys": ["subscription_terms_and_cancellation"],
+            "pageKeys": [],
             "sourceIds": ["tiktok.after_conversion_experience"],
         },
         {
@@ -423,7 +420,7 @@ _RULESET: dict[str, Any] = {
             "classification": "required",
             "summary": "Subscription promotions must clearly disclose price and recurring billing interval.",
             "appliesToModels": ["saas_subscription"],
-            "pageKeys": ["subscription_terms_and_cancellation"],
+            "pageKeys": [],
             "sourceIds": ["meta.subscription_services"],
         },
         {
@@ -453,7 +450,7 @@ _RULESET: dict[str, Any] = {
                 "online_service",
                 "lead_generation",
             ],
-            "pageKeys": ["company_information", "contact_support", "terms_of_service"],
+            "pageKeys": ["contact_support", "terms_of_service"],
             "sourceIds": [
                 "meta.unacceptable_business_practices",
                 "meta.fraud_scams_deceptive_practices",
@@ -806,21 +803,16 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "contact_support",
         "title": "Contact and Support",
         "templateVersion": "v1",
-        "description": "Accessible support channels and response-time commitments.",
+        "description": "Accessible support channels, support hours, and business address.",
         "requiredSections": [
             {"sectionKey": "contact_channels", "title": "Contact Channels"},
             {"sectionKey": "support_hours", "title": "Support Hours"},
-            {"sectionKey": "response_sla", "title": "Expected Response Time"},
-            {"sectionKey": "order_help", "title": "Order and Account Help"},
             {"sectionKey": "business_address", "title": "Business Address"},
-            {"sectionKey": "policy_links", "title": "Related Policy Links"},
         ],
         "placeholders": [
             "support_email",
             "support_phone",
             "support_hours_text",
-            "response_time_commitment",
-            "support_order_help_links",
             "company_address_text",
         ],
         "templateMarkdown": (
@@ -830,14 +822,8 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "- Phone: {{support_phone}}\n\n"
             "## Support Hours\n"
             "{{support_hours_text}}\n\n"
-            "## Expected Response Time\n"
-            "{{response_time_commitment}}\n\n"
-            "## Order and Account Help\n"
-            "{{support_order_help_links}}\n\n"
             "## Business Address\n"
-            "{{company_address_text}}\n\n"
-            "## Related Policy Links\n"
-            "Link to returns/refunds, shipping, privacy, and subscription terms (if applicable).\n"
+            "{{company_address_text}}\n"
         ),
     },
     "company_information": {

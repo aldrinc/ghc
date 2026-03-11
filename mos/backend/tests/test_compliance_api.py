@@ -185,7 +185,8 @@ def test_compliance_requirements_show_missing_required_pages(api_client):
     assert "returns_refunds_policy" in missing_required
     assert "shipping_policy" in missing_required
     assert "contact_support" in missing_required
-    assert "company_information" in missing_required
+    assert "company_information" not in missing_required
+    assert "subscription_terms_and_cancellation" not in missing_required
 
 
 def test_put_compliance_profile_rejects_invalid_ruleset_version(api_client):
@@ -447,6 +448,59 @@ def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client
     assert "Use the contact form on this page" in page_html_by_key["contact_support"]  # type: ignore[index]
     assert "mailto:support@acme.test" in page_html_by_key["contact_support"]  # type: ignore[index]
     assert "24/7" in page_html_by_key["contact_support"]  # type: ignore[index]
+
+
+def test_contact_support_sync_uses_updated_profile_values_without_removed_fields(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Contact Update Workspace")
+    initial_payload = _sync_ready_profile_payload()
+    initial_payload["operatingEntityName"] = "Legacy Entity LLC"
+    initial_payload["businessLicenseIdentifier"] = "TX-OLD-123"
+    initial_payload["responseTimeCommitment"] = "Within 1 business day"
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=initial_payload)
+    assert upsert_response.status_code == 200
+
+    updated_payload = _sync_ready_profile_payload()
+    updated_payload["operatingEntityName"] = None
+    updated_payload["businessLicenseIdentifier"] = None
+    updated_payload["responseTimeCommitment"] = None
+    updated_payload["supportEmail"] = "help@acme.test"
+    updated_payload["supportPhone"] = "+1-555-999-0000"
+    updated_payload["supportHoursText"] = "Mon-Sat 8:00-18:00 CT"
+    updated_payload["companyAddressText"] = "500 Updated Ave, Tulsa, OK 74103"
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=updated_payload)
+    assert upsert_response.status_code == 200
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["pages"] = pages
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={"pageKeys": ["contact_support"], "shopDomain": "example.myshopify.com"},
+    )
+    assert sync_response.status_code == 200
+
+    pages = observed["pages"]  # type: ignore[assignment]
+    assert len(pages) == 1
+    assert pages[0]["pageKey"] == "contact_support"  # type: ignore[index]
+    assert "mailto:help@acme.test" in pages[0]["bodyHtml"]  # type: ignore[index]
+    assert "+1-555-999-0000" in pages[0]["bodyHtml"]  # type: ignore[index]
+    assert "Mon-Sat 8:00-18:00 CT" in pages[0]["bodyHtml"]  # type: ignore[index]
+    assert "500 Updated Ave, Tulsa, OK 74103" in pages[0]["bodyHtml"]  # type: ignore[index]
+
+    profile_response = api_client.get(f"/clients/{client_id}/compliance/profile")
+    assert profile_response.status_code == 200
+    profile = profile_response.json()
+    assert profile["operatingEntityName"] is None
+    assert profile["businessLicenseIdentifier"] is None
+    assert profile["responseTimeCommitment"] is None
 
 
 def test_sync_compliance_policy_pages_requires_existing_profile(api_client):

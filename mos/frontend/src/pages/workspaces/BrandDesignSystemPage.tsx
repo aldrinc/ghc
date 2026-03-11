@@ -776,13 +776,10 @@ function buildTextSlotReadableLabelMap(
 type ComplianceProfileFormState = {
   businessModelsCsv: string;
   legalBusinessName: string;
-  operatingEntityName: string;
   companyAddressText: string;
-  businessLicenseIdentifier: string;
   supportEmail: string;
   supportPhone: string;
   supportHoursText: string;
-  responseTimeCommitment: string;
 };
 
 const ALLOWED_COMPLIANCE_BUSINESS_MODELS: ComplianceBusinessModel[] = [
@@ -802,13 +799,10 @@ function buildComplianceProfileFormState(
   return {
     businessModelsCsv: businessModels.join(", "),
     legalBusinessName: profile?.legalBusinessName?.trim() || workspaceName?.trim() || "",
-    operatingEntityName: profile?.operatingEntityName?.trim() || "",
     companyAddressText: profile?.companyAddressText?.trim() || "",
-    businessLicenseIdentifier: profile?.businessLicenseIdentifier?.trim() || "",
     supportEmail: profile?.supportEmail?.trim() || "",
     supportPhone: profile?.supportPhone?.trim() || "",
     supportHoursText: profile?.supportHoursText?.trim() || "",
-    responseTimeCommitment: profile?.responseTimeCommitment?.trim() || "",
   };
 }
 
@@ -2010,13 +2004,10 @@ export function BrandDesignSystemPage() {
         rulesetVersion: COMPLIANCE_RULESET_VERSION,
         businessModels,
         legalBusinessName: normalizeComplianceOptionalText(complianceProfileForm.legalBusinessName),
-        operatingEntityName: normalizeComplianceOptionalText(complianceProfileForm.operatingEntityName),
         companyAddressText: normalizeComplianceOptionalText(complianceProfileForm.companyAddressText),
-        businessLicenseIdentifier: normalizeComplianceOptionalText(complianceProfileForm.businessLicenseIdentifier),
         supportEmail: normalizeComplianceOptionalText(complianceProfileForm.supportEmail),
         supportPhone: normalizeComplianceOptionalText(complianceProfileForm.supportPhone),
         supportHoursText: normalizeComplianceOptionalText(complianceProfileForm.supportHoursText),
-        responseTimeCommitment: normalizeComplianceOptionalText(complianceProfileForm.responseTimeCommitment),
         metadata: {},
       });
       setComplianceProfileForm(buildComplianceProfileFormState(saved, workspace?.name));
@@ -2953,14 +2944,6 @@ export function BrandDesignSystemPage() {
                   placeholder="The Honest Herbalist LLC"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Operating entity name</label>
-                <Input
-                  value={complianceProfileForm.operatingEntityName}
-                  onChange={(event) => handleComplianceProfileFieldChange("operatingEntityName", event.target.value)}
-                  placeholder="Aldrin Clement"
-                />
-              </div>
               <div className="space-y-1 md:col-span-2">
                 <label className="text-xs font-semibold text-content">Company address text</label>
                 <textarea
@@ -2972,14 +2955,6 @@ export function BrandDesignSystemPage() {
                     "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   )}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Business license ID</label>
-                <Input
-                  value={complianceProfileForm.businessLicenseIdentifier}
-                  onChange={(event) => handleComplianceProfileFieldChange("businessLicenseIdentifier", event.target.value)}
-                  placeholder="TX-1234567"
                 />
               </div>
               <div className="space-y-1">
@@ -3004,14 +2979,6 @@ export function BrandDesignSystemPage() {
                   value={complianceProfileForm.supportHoursText}
                   onChange={(event) => handleComplianceProfileFieldChange("supportHoursText", event.target.value)}
                   placeholder="Mon-Fri 9:00 AM-5:00 PM CST"
-                />
-              </div>
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-xs font-semibold text-content">Response time commitment</label>
-                <Input
-                  value={complianceProfileForm.responseTimeCommitment}
-                  onChange={(event) => handleComplianceProfileFieldChange("responseTimeCommitment", event.target.value)}
-                  placeholder="Within 2 business days"
                 />
               </div>
             </div>

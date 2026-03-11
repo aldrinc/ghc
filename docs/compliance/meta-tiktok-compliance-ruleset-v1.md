@@ -38,8 +38,6 @@ This ruleset is grounded in primary policy/help sources referenced in internal r
 - `returns_refunds_policy`
 - `shipping_policy`
 - `contact_support`
-- `company_information`
-- `subscription_terms_and_cancellation`
 
 ## Rule inventory
 
@@ -61,5 +59,5 @@ This ruleset is grounded in primary policy/help sources referenced in internal r
 ## Notes
 
 - This ruleset intentionally encodes only explicit/strongly-supported policy drivers from the listed sources.
-- For fields that are market-contingent (for example business-license disclosures), template placeholders are provided and must be completed only where legally applicable.
+- Business-license, ownership, and standalone subscription-policy fields are not part of the generated five-page policy set.
 - Any future policy revisions should create a new ruleset version rather than mutating this version in place.
