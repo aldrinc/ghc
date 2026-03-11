@@ -556,9 +556,163 @@ def test_normalize_sales_pdp_carousel_plan_unifies_bottom_banner_fields():
     assert {slide["ctaText"] for slide in normalized} == {"Get the handbook - $49"}
 
 
+def test_normalize_sales_pdp_carousel_plan_applies_required_strip_palette():
+    validated = funnel_testimonials._validate_sales_pdp_carousel_plan(
+        {
+            "slides": [
+                {
+                    "variantId": "standard_ugc",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#123456",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.8/5",
+                    "ratingDetailText": "Slide one detail",
+                    "ctaText": "Slide one CTA",
+                    "comments": [_carousel_comment("user_one", "Great fit for my routine.")],
+                    "backgroundPromptVars": {
+                        "product": "Product in hand",
+                        "subject": "Customer selfie",
+                        "scene": "Kitchen morning light",
+                        "extra": "Natural smartphone framing.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "qa_ugc",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#654321",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.7/5",
+                    "ratingDetailText": "Slide two detail",
+                    "ctaText": "Slide two CTA",
+                    "comments": [
+                        _carousel_comment("user_two", "Does it actually work or is it hype?"),
+                        _carousel_comment("trusted_reply", "It gives me a clearer process instead of shrugging."),
+                    ],
+                    "backgroundPromptVars": {
+                        "product": "Product bottle close-up",
+                        "subject": "Customer pointing to product",
+                        "scene": "Bedroom daylight",
+                        "extra": "Question-answer reaction vibe.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "bold_claim",
+                    "template": "pdp_bold_claim",
+                    "logoText": "Brand",
+                    "stripBgColor": "#1a3a2a",
+                    "stripTextColor": "#f5f0e8",
+                    "ratingValueText": "4.6/5",
+                    "ratingDetailText": "Slide three detail",
+                    "ctaText": "Slide three CTA",
+                    "comments": [_carousel_comment("user_three", "Best value in my stack.")],
+                    "backgroundPromptVars": {
+                        "product": "Product on countertop",
+                        "scene": "Clean tabletop",
+                        "extra": "Product-forward composition.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "personal_highlight",
+                    "template": "pdp_personal_highlight",
+                    "logoText": "Brand",
+                    "stripBgColor": "#5c3d1e",
+                    "stripTextColor": "#fdf6ec",
+                    "ratingValueText": "4.5/5",
+                    "ratingDetailText": "Slide four detail",
+                    "ctaText": "Slide four CTA",
+                    "comments": [_carousel_comment("user_four", "This is my keep-using-it product.")],
+                    "backgroundPromptVars": {
+                        "product": "Product with customer",
+                        "subject": "Customer hugging product",
+                        "scene": "Home office",
+                        "extra": "Personal milestone moment.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "dorm_selfie",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#4a3728",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.4/5",
+                    "ratingDetailText": "Slide five detail",
+                    "ctaText": "Slide five CTA",
+                    "comments": [_carousel_comment("user_five", "Dorm vibe test")],
+                    "backgroundPromptVars": {
+                        "product": "Product on desk",
+                        "subject": "Younger user selfie",
+                        "scene": "Messy dorm room",
+                        "extra": "Unpolished social selfie style.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+            ]
+        }
+    )
+
+    normalized = funnel_testimonials._normalize_sales_pdp_carousel_plan(
+        validated,
+        shared_banner_copy={
+            "ratingValueText": "4.9/5",
+            "ratingDetailText": "Rated by 2,243 readers",
+            "ctaText": "Get the handbook - $49",
+        },
+        required_strip_palette={
+            "stripBgColor": "#efece7",
+            "stripTextColor": "#0f2618",
+        },
+    )
+
+    assert {slide["stripBgColor"] for slide in normalized} == {"#efece7"}
+    assert {slide["stripTextColor"] for slide in normalized} == {"#0f2618"}
+
+
 def test_should_use_on_dark_logo_for_sales_pdp_strip_prefers_dark_surfaces():
     assert funnel_testimonials._should_use_on_dark_logo_for_sales_pdp_strip("#0f3b2e") is True
     assert funnel_testimonials._should_use_on_dark_logo_for_sales_pdp_strip("#f7efe4") is False
+
+
+def test_resolve_sales_pdp_required_strip_palette_uses_design_system_light_palette():
+    palette = funnel_testimonials._resolve_sales_pdp_required_strip_palette(
+        {
+            "brand": {
+                "logoAssetPublicId": "default-logo-public-id",
+            },
+            "cssVars": {
+                "--color-brand": "#0f2618",
+                "--badge-strip-bg": "#efece7",
+                "--wall-button-text": "var(--color-brand)",
+            },
+        }
+    )
+
+    assert palette == {
+        "stripBgColor": "#efece7",
+        "stripTextColor": "#0f2618",
+    }
+
+
+def test_resolve_sales_pdp_required_strip_palette_returns_none_when_on_dark_logo_exists():
+    palette = funnel_testimonials._resolve_sales_pdp_required_strip_palette(
+        {
+            "brand": {
+                "logoAssetPublicId": "default-logo-public-id",
+                "logoOnDarkAssetPublicId": "dark-logo-public-id",
+            },
+            "cssVars": {
+                "--color-brand": "#0f2618",
+                "--badge-strip-bg": "#efece7",
+            },
+        }
+    )
+
+    assert palette is None
 
 
 def test_resolve_sales_pdp_design_system_logo_selection_uses_on_dark_variant():

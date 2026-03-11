@@ -182,6 +182,7 @@ _SALES_PDP_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _SALES_PDP_SAMPLE_INPUT_PREFIX = "testimonial-renderer/samples/inputs/"
 _SALES_PDP_MAX_BACKGROUND_PROMPT_LENGTH = 6_000
 _SALES_PDP_MIN_REVIEWS = 75
+_CSS_VAR_FUNCTION_RE = re.compile(r"^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*(.+?)\s*)?\)$")
 
 
 def _clean_single_line(text: str) -> str:
@@ -2632,6 +2633,7 @@ def _build_sales_pdp_carousel_prompt(
     today: str,
     brand_name: str | None,
     shared_banner_copy: dict[str, str],
+    required_strip_palette: dict[str, str] | None = None,
 ) -> str:
     variant_lines = "\n".join(
         (
@@ -2642,6 +2644,15 @@ def _build_sales_pdp_carousel_prompt(
     )
     required_variant_ids = ", ".join(spec["variantId"] for spec in _SALES_PDP_CAROUSEL_VARIANTS)
     brand_hint = f"Brand hint: {brand_name}.\n" if isinstance(brand_name, str) and brand_name.strip() else ""
+    strip_palette_rules = ""
+    if required_strip_palette is not None:
+        strip_palette_rules = (
+            "- The design system only includes the default logo variant. "
+            "You MUST use these exact shared strip colors on every slide so the stored brand logo remains legible:\n"
+            f"  stripBgColor={required_strip_palette['stripBgColor']}\n"
+            f"  stripTextColor={required_strip_palette['stripTextColor']}\n"
+            "- Do not choose alternate strip colors, dark strip backgrounds, or near-black backgrounds.\n"
+        )
 
     return (
         "You are generating Sales PDP carousel card specs for one product.\n"
@@ -2668,6 +2679,7 @@ def _build_sales_pdp_carousel_prompt(
         "- For all non-QA variants, comments must contain exactly 1 item.\n"
         "- stripBgColor and stripTextColor must be valid hex colors (e.g. #0f3b2e, #ffffff).\n"
         "- The bottom strip is a shared product-level banner. Use the SAME stripBgColor and stripTextColor for all 5 slides.\n"
+        f"{strip_palette_rules}"
         "- The bottom strip copy is shared too. Use these exact values on every slide:\n"
         f"  ratingValueText={shared_banner_copy['ratingValueText']}\n"
         f"  ratingDetailText={shared_banner_copy['ratingDetailText']}\n"
@@ -3131,12 +3143,19 @@ def _normalize_sales_pdp_carousel_plan(
     plan: list[dict[str, Any]],
     *,
     shared_banner_copy: dict[str, str],
+    required_strip_palette: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     if not plan:
         raise TestimonialGenerationError("Sales PDP carousel plan must include at least one slide.")
 
-    canonical_strip_bg = plan[0]["stripBgColor"]
-    canonical_strip_text = plan[0]["stripTextColor"]
+    canonical_strip_bg = (
+        required_strip_palette["stripBgColor"] if required_strip_palette is not None else plan[0]["stripBgColor"]
+    )
+    canonical_strip_text = (
+        required_strip_palette["stripTextColor"]
+        if required_strip_palette is not None
+        else plan[0]["stripTextColor"]
+    )
     normalized: list[dict[str, Any]] = []
     for slide in plan:
         normalized_slide = dict(slide)
@@ -3237,12 +3256,110 @@ def _contrast_ratio_from_luminance(a: float, b: float) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _resolve_sales_pdp_css_var_value(*, css_vars: dict[str, Any], value: Any, stack: tuple[str, ...] = ()) -> str | None:
+    if isinstance(value, (int, float)):
+        return str(value)
+    if not isinstance(value, str):
+        return None
+
+    raw = value.strip()
+    match = _CSS_VAR_FUNCTION_RE.match(raw)
+    if not match:
+        return raw
+
+    ref_key = match.group(1)
+    fallback = match.group(2)
+    if ref_key in stack:
+        return None
+    ref_value = css_vars.get(ref_key)
+    if ref_value is None:
+        return fallback.strip() if isinstance(fallback, str) and fallback.strip() else None
+    return _resolve_sales_pdp_css_var_value(css_vars=css_vars, value=ref_value, stack=(*stack, ref_key))
+
+
+def _resolve_sales_pdp_hex_css_var(css_vars: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        raw = css_vars.get(key)
+        resolved = _resolve_sales_pdp_css_var_value(css_vars=css_vars, value=raw)
+        if isinstance(resolved, str) and _SALES_PDP_COLOR_RE.match(resolved.strip()):
+            return resolved.strip()
+    return None
+
+
+def _luminance_from_hex(color: str, *, field: str) -> float:
+    r, g, b = _sales_pdp_hex_to_rgb(color, field=field)
+    return _relative_luminance_srgb_local(r, g, b)
+
+
 def _should_use_on_dark_logo_for_sales_pdp_strip(strip_bg_color: str) -> bool:
     r, g, b = _sales_pdp_hex_to_rgb(strip_bg_color, field="stripBgColor")
     luminance = _relative_luminance_srgb_local(r, g, b)
     white_contrast = _contrast_ratio_from_luminance(1.0, luminance)
     black_contrast = _contrast_ratio_from_luminance(0.0, luminance)
     return white_contrast >= black_contrast
+
+
+def _has_sales_pdp_on_dark_logo(tokens: Any) -> bool:
+    if not isinstance(tokens, dict):
+        return False
+    brand = tokens.get("brand")
+    if not isinstance(brand, dict):
+        return False
+    raw = brand.get("logoOnDarkAssetPublicId")
+    return isinstance(raw, str) and bool(raw.strip())
+
+
+def _resolve_sales_pdp_required_strip_palette(tokens: Any) -> dict[str, str] | None:
+    if not isinstance(tokens, dict) or _has_sales_pdp_on_dark_logo(tokens):
+        return None
+
+    css_vars = tokens.get("cssVars")
+    if not isinstance(css_vars, dict):
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip palette because design system tokens.brand.logoOnDarkAssetPublicId is missing, but tokens.cssVars is unavailable."
+        )
+
+    strip_bg_color = _resolve_sales_pdp_hex_css_var(
+        css_vars,
+        "--badge-strip-bg",
+        "--pdp-surface-soft",
+        "--color-page-bg-secondary",
+        "--color-page-bg",
+        "--wall-card-bg",
+    )
+    if strip_bg_color is None:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip palette because design system tokens.brand.logoOnDarkAssetPublicId is missing, but no compatible strip background color was found in design system cssVars."
+        )
+    if _should_use_on_dark_logo_for_sales_pdp_strip(strip_bg_color):
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip background because design system tokens.brand.logoOnDarkAssetPublicId is missing, but the resolved strip background color is still dark."
+        )
+
+    strip_text_color = _resolve_sales_pdp_hex_css_var(
+        css_vars,
+        "--color-brand",
+        "--wall-button-text",
+        "--badge-text-color",
+        "--pdp-brand-strong",
+        "--color-text",
+    )
+    if strip_text_color is None:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires strip text colors from the design system, but no compatible strip text color was found in design system cssVars."
+        )
+
+    bg_luminance = _luminance_from_hex(strip_bg_color, field="stripBgColor")
+    text_luminance = _luminance_from_hex(strip_text_color, field="stripTextColor")
+    if _contrast_ratio_from_luminance(bg_luminance, text_luminance) < 4.5:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a readable light strip palette, but the resolved design system strip colors do not meet contrast requirements."
+        )
+
+    return {
+        "stripBgColor": strip_bg_color,
+        "stripTextColor": strip_text_color,
+    }
 
 
 def _resolve_sales_pdp_design_system_logo_selection(
@@ -3628,6 +3745,14 @@ def generate_sales_pdp_carousel_images(
     model_id = model or llm.default_model
     sales_pdp_image_model, sales_pdp_image_model_source = resolve_funnel_image_model_config()
     today = datetime.now(timezone.utc).date().isoformat()
+    design_system_tokens = resolve_design_system_tokens(
+        session=session,
+        org_id=org_id,
+        client_id=str(funnel.client_id),
+        funnel=funnel,
+        page=page,
+    )
+    required_strip_palette = _resolve_sales_pdp_required_strip_palette(design_system_tokens)
 
     ensure_within_budget("requesting Sales PDP carousel plan")
     _carousel_heartbeat("carousel_plan_requested", slot_count=expected_count)
@@ -3637,6 +3762,7 @@ def generate_sales_pdp_carousel_images(
         today=today,
         brand_name=brand_name,
         shared_banner_copy=shared_banner_copy,
+        required_strip_palette=required_strip_palette,
     )
 
     if isinstance(model_id, str) and model_id.lower().startswith("claude"):
@@ -3677,6 +3803,7 @@ def generate_sales_pdp_carousel_images(
     validated_plan = _normalize_sales_pdp_carousel_plan(
         _validate_sales_pdp_carousel_plan(raw_plan),
         shared_banner_copy=shared_banner_copy,
+        required_strip_palette=required_strip_palette,
     )
     if not validated_plan:
         raise TestimonialGenerationError("Sales PDP carousel plan returned no slides.")
