@@ -1,3 +1,6 @@
+from uuid import UUID
+
+from app.db.models import ClientUserPreference
 from app.services import compliance as compliance_service
 from app.services.compliance import RULESET_VERSION
 from app.routers import compliance as compliance_router
@@ -353,6 +356,51 @@ def test_sync_compliance_policy_pages_uses_workspace_name_for_brand(api_client, 
     page_html_by_key = observed["page_html_by_key"]  # type: ignore[assignment]
     assert "Workspace Brand Alpha" in page_html_by_key["privacy_policy"]  # type: ignore[index]
     assert "Do Not Use This Brand" not in page_html_by_key["privacy_policy"]  # type: ignore[index]
+
+
+def test_sync_compliance_policy_pages_uses_selected_storefront_domain_for_website_copy(
+    api_client, db_session, auth_context, monkeypatch
+):
+    client_id = _create_client(api_client, name="Custom Domain Workspace")
+    profile_payload = _sync_ready_profile_payload()
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
+    assert upsert_response.status_code == 200
+
+    db_session.add(
+        ClientUserPreference(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            user_external_id=auth_context.user_id,
+            selected_shop_domain="example.myshopify.com",
+            selected_shop_storefront_domain="thehonestherbalist.com",
+        )
+    )
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["page_html_by_key"] = {
+            page["pageKey"]: page["bodyHtml"] for page in pages
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={"pageKeys": ["privacy_policy"], "shopDomain": "example.myshopify.com"},
+    )
+    assert sync_response.status_code == 200
+
+    body = sync_response.json()
+    assert body["shopDomain"] == "example.myshopify.com"
+    assert body["storefrontDomain"] == "thehonestherbalist.com"
+    page_html_by_key = observed["page_html_by_key"]  # type: ignore[assignment]
+    assert "https://thehonestherbalist.com" in page_html_by_key["privacy_policy"]  # type: ignore[index]
 
 
 def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client, monkeypatch):

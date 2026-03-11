@@ -38,7 +38,11 @@ from app.services.compliance import (
     render_policy_template_markdown,
     render_theme_contact_page_body_html,
 )
-from app.services.shopify_connection import upsert_client_shopify_policy_pages
+from app.services.shopify_connection import (
+    normalize_shop_domain,
+    normalize_shop_storefront_domain,
+    upsert_client_shopify_policy_pages,
+)
 
 
 router = APIRouter(tags=["compliance"])
@@ -146,6 +150,50 @@ def _get_selected_shop_domain(*, session: Session, org_id: str, client_id: str, 
     if not isinstance(selected, str) or not selected.strip():
         return None
     return selected.strip().lower()
+
+
+def _get_selected_shop_storefront_domain(
+    *, session: Session, org_id: str, client_id: str, user_external_id: str
+) -> str | None:
+    pref = session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == user_external_id,
+        )
+    )
+    if not pref:
+        return None
+    selected = getattr(pref, "selected_shop_storefront_domain", None)
+    if not isinstance(selected, str) or not selected.strip():
+        return None
+    return selected.strip().lower()
+
+
+def _resolve_policy_storefront_domain(
+    *,
+    payload_shop_domain: str | None,
+    payload_storefront_domain: str | None,
+    selected_shop_domain: str | None,
+    selected_shop_storefront_domain: str | None,
+) -> str | None:
+    if isinstance(payload_storefront_domain, str) and payload_storefront_domain.strip():
+        return normalize_shop_storefront_domain(payload_storefront_domain)
+
+    if isinstance(payload_shop_domain, str) and payload_shop_domain.strip():
+        if (
+            isinstance(selected_shop_domain, str)
+            and selected_shop_domain.strip()
+            and isinstance(selected_shop_storefront_domain, str)
+            and selected_shop_storefront_domain.strip()
+            and normalize_shop_domain(payload_shop_domain) == selected_shop_domain
+        ):
+            return selected_shop_storefront_domain
+        return normalize_shop_storefront_domain(payload_shop_domain)
+
+    if isinstance(selected_shop_storefront_domain, str) and selected_shop_storefront_domain.strip():
+        return selected_shop_storefront_domain
+    return None
 
 
 def _profile_placeholder_values(
@@ -439,12 +487,24 @@ def sync_client_compliance_policy_pages_to_shopify(
         client_id=client_id,
         user_external_id=auth.user_id,
     )
+    selected_shop_storefront_domain = _get_selected_shop_storefront_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_storefront_domain = _resolve_policy_storefront_domain(
+        payload_shop_domain=payload.shopDomain,
+        payload_storefront_domain=payload.storefrontDomain,
+        selected_shop_domain=selected_shop_domain,
+        selected_shop_storefront_domain=selected_shop_storefront_domain,
+    )
 
     placeholders = _profile_placeholder_values(
         profile,
         workspace_name=workspace_name,
     )
-    website_url = _website_url_from_shop_domain(shop_domain=selected_shop_domain)
+    website_url = _website_url_from_shop_domain(shop_domain=effective_storefront_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url
     sync_pages_payload: list[dict[str, str]] = []
@@ -517,6 +577,7 @@ def sync_client_compliance_policy_pages_to_shopify(
     return ComplianceShopifyPolicySyncResponse(
         rulesetVersion=profile.ruleset_version,
         shopDomain=sync_payload["shopDomain"],
+        storefrontDomain=effective_storefront_domain,
         pages=response_pages,
         updatedProfileUrls=updated_profile_urls,
     )

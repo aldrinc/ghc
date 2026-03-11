@@ -296,6 +296,11 @@ def normalize_shop_domain(value: str) -> str:
     return _resolve_redirected_shop_domain(source_host=host, start_url=normalized_url)
 
 
+def normalize_shop_storefront_domain(value: str) -> str:
+    host, _ = _normalize_storefront_url(value)
+    return host
+
+
 def _normalize_currency_code(value: str) -> str:
     cleaned = value.strip().upper()
     if len(cleaned) != 3 or not cleaned.isalpha():

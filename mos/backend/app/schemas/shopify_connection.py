@@ -55,7 +55,9 @@ class ShopifyConnectionStatusResponse(BaseModel):
     ]
     message: str
     shopDomain: str | None = None
+    displayShopDomain: str | None = None
     shopDomains: list[str] = Field(default_factory=list)
+    displayShopDomains: list[str] = Field(default_factory=list)
     selectedShopDomain: str | None = None
     hasStorefrontAccessToken: bool = False
     missingScopes: list[str] = Field(default_factory=list)

@@ -147,6 +147,7 @@ class ComplianceShopifyPolicySyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     shopDomain: str | None = None
+    storefrontDomain: str | None = None
     pageKeys: list[str] = Field(default_factory=list)
     includeStronglyRecommended: bool = True
 
@@ -168,6 +169,7 @@ class ComplianceShopifyPolicySyncResponse(BaseModel):
 
     rulesetVersion: str
     shopDomain: str
+    storefrontDomain: str | None = None
     pages: list[ComplianceShopifyPolicySyncPageResponse] = Field(default_factory=list)
     updatedProfileUrls: dict[str, str] = Field(default_factory=dict)
 

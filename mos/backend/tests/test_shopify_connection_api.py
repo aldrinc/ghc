@@ -15,6 +15,7 @@ from app.db.enums import AssetSourceEnum, FunnelStatusEnum
 from app.db.models import (
     Asset,
     Client,
+    ClientUserPreference,
     Funnel,
     FunnelPage,
     Product,
@@ -1620,6 +1621,42 @@ def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
     assert response.json()["state"] == "ready"
 
 
+def test_get_shopify_status_returns_storefront_display_domains(
+    api_client, db_session, auth_context, monkeypatch
+):
+    client_id = _create_client(api_client)
+    db_session.add(
+        ClientUserPreference(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            user_external_id=auth_context.user_id,
+            selected_shop_domain="example.myshopify.com",
+            selected_shop_storefront_domain="thehonestherbalist.com",
+        )
+    )
+    db_session.commit()
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": ["example.myshopify.com"],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+
+    response = api_client.get(f"/clients/{client_id}/shopify/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["displayShopDomain"] == "thehonestherbalist.com"
+    assert body["displayShopDomains"] == ["thehonestherbalist.com"]
+
+
 def test_get_shopify_status_syncs_workspace_catalog_when_ready(api_client, monkeypatch):
     client_id = _create_client(api_client)
     observed: dict[str, str] = {}
@@ -1679,6 +1716,37 @@ def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
     assert observed == {"client_id": client_id, "shop_domain": "example.myshopify.com"}
     body = response.json()
     assert body["installUrl"].startswith("https://shopify-public.local/auth/install")
+
+
+def test_create_shopify_install_url_persists_storefront_domain_preference(
+    api_client, db_session, auth_context, monkeypatch
+):
+    client_id = _create_client(api_client)
+
+    def fake_build(*, client_id: str, shop_domain: str) -> dict[str, str]:
+        assert client_id
+        assert shop_domain == "https://thehonestherbalist.com"
+        return {
+            "installUrl": "https://shopify-public.local/auth/install?shop=example.myshopify.com&client_id=test",
+        }
+
+    monkeypatch.setattr(clients_router, "build_client_shopify_install_urls", fake_build)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/install-url",
+        json={"shopDomain": "https://thehonestherbalist.com"},
+    )
+
+    assert response.status_code == 200
+    pref = db_session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == UUID(auth_context.org_id),
+            ClientUserPreference.client_id == UUID(client_id),
+            ClientUserPreference.user_external_id == auth_context.user_id,
+        )
+    )
+    assert pref is not None
+    assert pref.selected_shop_storefront_domain == "thehonestherbalist.com"
 
 
 def test_update_shopify_installation_sets_token_and_returns_status(api_client, monkeypatch):

@@ -22,6 +22,7 @@ export type CompliancePolicyPageKey =
 
 export type ComplianceShopifyPolicySyncPayload = {
   shopDomain?: string;
+  storefrontDomain?: string;
   pageKeys?: CompliancePolicyPageKey[];
   includeStronglyRecommended?: boolean;
 };
@@ -39,6 +40,7 @@ export type ComplianceShopifyPolicySyncPage = {
 export type ComplianceShopifyPolicySyncResponse = {
   rulesetVersion: string;
   shopDomain: string;
+  storefrontDomain?: string | null;
   pages: ComplianceShopifyPolicySyncPage[];
   updatedProfileUrls: Record<string, string>;
 };
@@ -144,7 +146,9 @@ export function useSyncComplianceShopifyPolicyPages(clientId?: string) {
     onSuccess: (response) => {
       const count = response.pages.length;
       const suffix = count === 1 ? "" : "s";
-      toast.success(`Synced ${count} policy page${suffix} to ${response.shopDomain}`);
+      toast.success(
+        `Synced ${count} policy page${suffix} to ${response.storefrontDomain || response.shopDomain}`
+      );
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to sync compliance policy pages";
