@@ -1804,6 +1804,252 @@ def test_create_product_requires_variants():
         )
 
 
+def test_sync_product_updates_existing_variants_and_writes_source_payload():
+    client = ShopifyApiClient()
+    observed_metafield: dict[str, Any] = {}
+    get_product_calls = {"count": 0}
+
+    async def fake_get_product(*, shop_domain: str, access_token: str, product_gid: str):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "token"
+        assert product_gid == "gid://shopify/Product/999"
+        get_product_calls["count"] += 1
+        if get_product_calls["count"] == 1:
+            return {
+                "productGid": "gid://shopify/Product/999",
+                "title": "Sleep Drops",
+                "handle": "sleep-drops",
+                "status": "DRAFT",
+                "variants": [
+                    {
+                        "variantGid": "gid://shopify/ProductVariant/100",
+                        "title": "Starter",
+                        "priceCents": 4500,
+                        "currency": "USD",
+                        "compareAtPriceCents": None,
+                        "sku": None,
+                        "barcode": None,
+                        "taxable": True,
+                        "requiresShipping": True,
+                        "inventoryPolicy": None,
+                        "inventoryManagement": None,
+                        "inventoryQuantity": None,
+                        "optionValues": {"Title": "Starter"},
+                    },
+                    {
+                        "variantGid": "gid://shopify/ProductVariant/150",
+                        "title": "Legacy",
+                        "priceCents": 9900,
+                        "currency": "USD",
+                        "compareAtPriceCents": None,
+                        "sku": None,
+                        "barcode": None,
+                        "taxable": True,
+                        "requiresShipping": True,
+                        "inventoryPolicy": None,
+                        "inventoryManagement": None,
+                        "inventoryQuantity": None,
+                        "optionValues": {"Title": "Legacy"},
+                    },
+                ],
+            }
+        return {
+            "productGid": "gid://shopify/Product/999",
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/100",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Starter"},
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/200",
+                    "title": "Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Bundle"},
+                },
+            ],
+        }
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "mutation productSetSync" in query:
+            variables = payload.get("variables") or {}
+            assert variables["identifier"] == {"id": "gid://shopify/Product/999"}
+            assert variables["synchronous"] is True
+            product_input = variables["input"]
+            assert product_input["title"] == "Sleep Drops"
+            assert product_input["status"] == "ACTIVE"
+            assert product_input["productOptions"] == [
+                {
+                    "name": "Title",
+                    "values": [{"name": "Starter"}, {"name": "Bundle"}],
+                }
+            ]
+            assert product_input["variants"][0]["id"] == "gid://shopify/ProductVariant/100"
+            assert product_input["variants"][0]["price"] == "49.99"
+            assert product_input["variants"][1]["optionValues"] == [
+                {"optionName": "Title", "name": "Bundle"}
+            ]
+            return {
+                "productSet": {
+                    "product": {
+                        "id": "gid://shopify/Product/999",
+                        "title": "Sleep Drops",
+                        "handle": "sleep-drops",
+                        "status": "ACTIVE",
+                    },
+                    "userErrors": [],
+                }
+            }
+        if "mutation setMosProductSyncPayload" in query:
+            metafield = ((payload.get("variables") or {}).get("metafields") or [])[0]
+            observed_metafield.update(metafield)
+            serialized_value = json.loads(metafield["value"])
+            assert serialized_value["product"]["shopifyProductGid"] == "gid://shopify/Product/999"
+            assert serialized_value["variants"][0]["shopifyVariantGid"] == "gid://shopify/ProductVariant/100"
+            assert serialized_value["variants"][1]["shopifyVariantGid"] == "gid://shopify/ProductVariant/200"
+            assert serialized_value["offers"][0]["shopifyVariantGids"] == ["gid://shopify/ProductVariant/100"]
+            assert serialized_value["offers"][0]["basket"]["shopifyVariantGids"] == [
+                "gid://shopify/ProductVariant/100"
+            ]
+            return {
+                "metafieldsSet": {
+                    "metafields": [
+                        {
+                            "namespace": "mos",
+                            "key": "product_sync_payload",
+                            "type": "json",
+                        }
+                    ],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client.get_product = fake_get_product  # type: ignore[method-assign]
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_product(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            product_gid="gid://shopify/Product/999",
+            title="Sleep Drops",
+            status="ACTIVE",
+            variants=[
+                {
+                    "sourceVariantId": "mos-var-1",
+                    "variantGid": "gid://shopify/ProductVariant/100",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                },
+                {
+                    "sourceVariantId": "mos-var-2",
+                    "title": "Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                },
+            ],
+            source_of_truth_payload={
+                "product": {"id": "mos-product-1"},
+                "variants": [
+                    {"id": "mos-var-1", "title": "Starter"},
+                    {"id": "mos-var-2", "title": "Bundle"},
+                ],
+                "offers": [
+                    {
+                        "id": "offer-1",
+                        "variantIds": ["mos-var-1"],
+                        "basket": {"variantIds": ["mos-var-1"]},
+                    }
+                ],
+            },
+        )
+    )
+
+    assert result["productGid"] == "gid://shopify/Product/999"
+    assert result["createdVariantCount"] == 1
+    assert result["updatedVariantCount"] == 1
+    assert result["deletedVariantCount"] == 1
+    assert result["offerCount"] == 1
+    assert observed_metafield["namespace"] == "mos"
+    assert observed_metafield["key"] == "product_sync_payload"
+
+
+def test_sync_product_rejects_stale_variant_gid():
+    client = ShopifyApiClient()
+
+    async def fake_get_product(*, shop_domain: str, access_token: str, product_gid: str):
+        return {
+            "productGid": "gid://shopify/Product/999",
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "DRAFT",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/100",
+                    "title": "Starter",
+                    "priceCents": 4500,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Starter"},
+                }
+            ],
+        }
+
+    client.get_product = fake_get_product  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError, match="does not belong to the mapped Shopify product"):
+        asyncio.run(
+            client.sync_product(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                product_gid="gid://shopify/Product/999",
+                title="Sleep Drops",
+                variants=[
+                    {
+                        "sourceVariantId": "mos-var-1",
+                        "variantGid": "gid://shopify/ProductVariant/9999",
+                        "title": "Starter",
+                        "priceCents": 4999,
+                        "currency": "USD",
+                    }
+                ],
+                source_of_truth_payload={},
+            )
+        )
+
+
 def test_update_variant_updates_price_and_compare_at_price():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []

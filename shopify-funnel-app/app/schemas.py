@@ -195,6 +195,61 @@ class CreateCatalogProductResponse(BaseModel):
     variants: list[CreatedCatalogVariant]
 
 
+class SyncCatalogProductVariantRequest(BaseModel):
+    sourceVariantId: str = Field(min_length=1)
+    variantGid: str | None = None
+    title: str = Field(min_length=1)
+    priceCents: int = Field(ge=0)
+    currency: str = Field(min_length=3, max_length=3)
+    compareAtPriceCents: int | None = Field(default=None, ge=0)
+    sku: str | None = None
+    barcode: str | None = None
+    taxable: bool | None = None
+    requiresShipping: bool | None = None
+    inventoryPolicy: str | None = None
+    inventoryManagement: str | None = None
+    weight: float | None = Field(default=None, ge=0)
+    weightUnit: str | None = None
+
+
+class SyncCatalogProductRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    productGid: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    description: str | None = None
+    handle: str | None = None
+    vendor: str | None = None
+    productType: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    status: Literal["ACTIVE", "DRAFT"] = "DRAFT"
+    variants: list[SyncCatalogProductVariantRequest] = Field(min_length=1)
+    sourceOfTruthPayload: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "SyncCatalogProductRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class SyncCatalogProductResponse(BaseModel):
+    shopDomain: str
+    productGid: str
+    title: str
+    handle: str
+    status: str
+    createdVariantCount: int = Field(ge=0)
+    updatedVariantCount: int = Field(ge=0)
+    deletedVariantCount: int = Field(ge=0)
+    offerCount: int = Field(ge=0)
+    metafieldNamespace: str
+    metafieldKey: str
+    variants: list[CatalogProductVariant]
+
+
 class UpdateCatalogVariantRequest(BaseModel):
     clientId: str | None = None
     shopDomain: str | None = None

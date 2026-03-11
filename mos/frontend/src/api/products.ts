@@ -53,6 +53,21 @@ type ShopifyVariantSyncResponse = {
   variants: ShopifyCatalogVariant[];
 };
 
+type ShopifyProductSyncResponse = {
+  shopDomain: string;
+  productGid: string;
+  title: string;
+  handle: string;
+  status: string;
+  createdCount: number;
+  updatedCount: number;
+  deletedCount: number;
+  offerCount: number;
+  metafieldNamespace: string;
+  metafieldKey: string;
+  variants: ShopifyCatalogVariant[];
+};
+
 const defaultBaseUrl = resolveRequiredApiBaseUrl();
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
@@ -360,6 +375,26 @@ export function useSyncShopifyVariantsForProduct(productId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify variants";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncShopifyProductForProduct(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: { shopDomain?: string }) =>
+      post<ShopifyProductSyncResponse>(`/products/${productId}/shopify/sync`, payload || {}),
+    onSuccess: (response) => {
+      toast.success(
+        `Shopify product synced (${response.createdCount} created, ${response.updatedCount} updated, ${response.deletedCount} deleted)`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify product";
       toast.error(message);
     },
   });
