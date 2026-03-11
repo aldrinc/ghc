@@ -87,20 +87,6 @@ PY
 
 cd "$BACKEND_DIR"
 
-# Load root and backend env vars so LLM/Google creds are present for activities.
-if [ -f "$ROOT/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$ROOT/.env"
-  set +a
-fi
-if [ -f "$BACKEND_DIR/.env" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$BACKEND_DIR/.env"
-  set +a
-fi
-
 existing_worker_pid="$(matching_worker_pid)"
 if [ -n "$existing_worker_pid" ]; then
   echo "[worker] Temporal worker already running on task queue ${TASK_QUEUE} (pid ${existing_worker_pid})."
@@ -110,7 +96,6 @@ fi
 if [ ! -d ".venv" ] && ! command -v python3.11 >/dev/null 2>&1; then
   fail "python3.11 is required but not installed."
 fi
-
 if [ ! -d ".venv" ]; then
   echo "[worker] Creating Python 3.11 virtualenv..."
   python3.11 -m venv .venv
@@ -126,4 +111,5 @@ echo "[worker] Waiting for Temporal at ${TEMPORAL_ADDRESS}"
 wait_for_temporal
 
 echo "[worker] Starting Temporal worker on task queue ${TASK_QUEUE}"
-exec .venv/bin/python -m app.temporal.worker
+exec .venv/bin/python "$ROOT/scripts/run_with_backend_env.py" \
+  .venv/bin/python -m app.temporal.worker

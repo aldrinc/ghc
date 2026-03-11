@@ -128,6 +128,7 @@ from app.services.shopify_connection import (
     list_client_shopify_products,
     list_shopify_installations,
     normalize_shop_domain,
+    normalize_shop_storefront_domain,
     resolve_client_shopify_image_urls_to_files,
     set_client_shopify_storefront_token,
     sync_client_shopify_theme_brand,
@@ -335,10 +336,20 @@ _LOCAL_THEME_COLLECTION_BANNER_BOX_CLASS_REPLACEMENT = (
     'class="banner__box main-collection-banner__content md:text-{{ '
     'section.settings.text_alignment }} text-{{ section.settings.text_alignment_mobile }}"'
 )
+_LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET = 'class="breadcrumb"'
+_LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT = (
+    'class="breadcrumb main-collection-banner__breadcrumb"'
+)
 _LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET = (
     "\n"
-    "  #shopify-section-{{ section.id }} .main-collection-banner__content {\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__content,\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__content :is(a, li, .icon, .banner__title, .split-words, .single-word) {\n"
     "    color: rgb(var(--color-foreground));\n"
+    "  }\n"
+    "\n"
+    "  #shopify-section-{{ section.id }} .main-collection-banner__breadcrumb {\n"
+    "    font-family: var(--font-heading-family);\n"
+    "    font-style: var(--font-heading-style);\n"
     "  }\n"
 )
 _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
@@ -2490,6 +2501,21 @@ def _apply_local_theme_collection_banner_text_styling(
             1,
         )
 
+    if _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT not in updated_content:
+        if _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET not in updated_content:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline collection banner does not expose the "
+                    "expected breadcrumb wrapper required for text color synchronization."
+                ),
+            )
+        updated_content = updated_content.replace(
+            _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_SNIPPET,
+            _LOCAL_THEME_COLLECTION_BANNER_BREADCRUMB_CLASS_REPLACEMENT,
+            1,
+        )
+
     if _LOCAL_THEME_COLLECTION_BANNER_TEXT_COLOR_STYLE_SNIPPET not in updated_content:
         if "</style>" not in updated_content:
             raise HTTPException(
@@ -3701,6 +3727,127 @@ def _get_selected_shop_domain(
     if not isinstance(selected, str) or not selected.strip():
         return None
     return selected.strip().lower()
+
+
+def _get_selected_shop_storefront_domain(
+    *, session: Session, org_id: str, client_id: str, user_external_id: str
+) -> str | None:
+    pref = _get_client_user_pref(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+    )
+    if not pref:
+        return None
+    selected = getattr(pref, "selected_shop_storefront_domain", None)
+    if not isinstance(selected, str) or not selected.strip():
+        return None
+    return selected.strip().lower()
+
+
+def _set_selected_shop_storefront_domain(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    user_external_id: str,
+    storefront_domain: str | None,
+) -> None:
+    normalized_storefront_domain = None
+    if isinstance(storefront_domain, str) and storefront_domain.strip():
+        normalized_storefront_domain = normalize_shop_storefront_domain(storefront_domain)
+
+    pref = _get_client_user_pref(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+    )
+    if pref:
+        pref.selected_shop_storefront_domain = normalized_storefront_domain
+        pref.updated_at = func.now()
+        session.commit()
+        return
+
+    if normalized_storefront_domain is None:
+        return
+
+    session.add(
+        ClientUserPreference(
+            org_id=org_id,
+            client_id=client_id,
+            user_external_id=user_external_id,
+            selected_shop_storefront_domain=normalized_storefront_domain,
+        )
+    )
+    session.commit()
+
+
+def _build_shopify_display_domains(
+    *,
+    shop_domains: list[str],
+    resolved_shop_domain: str | None,
+    selected_shop_domain: str | None,
+    selected_shop_storefront_domain: str | None,
+) -> tuple[str | None, list[str]]:
+    display_by_shop_domain = {shop_domain: shop_domain for shop_domain in shop_domains}
+    if isinstance(selected_shop_storefront_domain, str) and selected_shop_storefront_domain.strip():
+        target_shop_domain = None
+        if (
+            isinstance(selected_shop_domain, str)
+            and selected_shop_domain.strip()
+            and selected_shop_domain in display_by_shop_domain
+        ):
+            target_shop_domain = selected_shop_domain
+        elif len(shop_domains) == 1:
+            target_shop_domain = shop_domains[0]
+
+        if target_shop_domain is not None:
+            display_by_shop_domain[target_shop_domain] = selected_shop_storefront_domain.strip().lower()
+
+    display_shop_domain = None
+    if isinstance(resolved_shop_domain, str) and resolved_shop_domain.strip():
+        display_shop_domain = display_by_shop_domain.get(
+            resolved_shop_domain.strip().lower(),
+            resolved_shop_domain.strip().lower(),
+        )
+
+    return display_shop_domain, [display_by_shop_domain[shop_domain] for shop_domain in shop_domains]
+
+
+def _get_shopify_connection_status_response_payload(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    user_external_id: str,
+) -> tuple[str | None, dict[str, Any]]:
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+    )
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=selected_shop_domain,
+    )
+    selected_shop_storefront_domain = _get_selected_shop_storefront_domain(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+    )
+    display_shop_domain, display_shop_domains = _build_shopify_display_domains(
+        shop_domains=status_payload.get("shopDomains", []),
+        resolved_shop_domain=status_payload.get("shopDomain"),
+        selected_shop_domain=selected_shop_domain,
+        selected_shop_storefront_domain=selected_shop_storefront_domain,
+    )
+    status_payload["displayShopDomain"] = display_shop_domain
+    status_payload["displayShopDomains"] = display_shop_domains
+    return selected_shop_domain, status_payload
 
 
 def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
@@ -7868,6 +8015,28 @@ def _website_url_from_shop_domain(*, shop_domain: str | None) -> str | None:
     return f"https://{cleaned}"
 
 
+def _resolve_policy_storefront_domain(
+    *,
+    shop_domain: str | None,
+    selected_shop_domain: str | None,
+    selected_shop_storefront_domain: str | None,
+) -> str | None:
+    if isinstance(shop_domain, str) and shop_domain.strip():
+        if (
+            isinstance(selected_shop_domain, str)
+            and selected_shop_domain.strip()
+            and isinstance(selected_shop_storefront_domain, str)
+            and selected_shop_storefront_domain.strip()
+            and normalize_shop_domain(shop_domain) == selected_shop_domain
+        ):
+            return selected_shop_storefront_domain
+        return normalize_shop_storefront_domain(shop_domain)
+
+    if isinstance(selected_shop_storefront_domain, str) and selected_shop_storefront_domain.strip():
+        return selected_shop_storefront_domain
+    return None
+
+
 def _compliance_profile_page_urls(
     *, profile: ClientComplianceProfile
 ) -> dict[str, str | None]:
@@ -8101,12 +8270,29 @@ def _sync_compliance_policy_pages_for_template_export(
     )
 
     effective_shop_domain = shop_domain
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    selected_shop_storefront_domain = _get_selected_shop_storefront_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_storefront_domain = _resolve_policy_storefront_domain(
+        shop_domain=effective_shop_domain,
+        selected_shop_domain=selected_shop_domain,
+        selected_shop_storefront_domain=selected_shop_storefront_domain,
+    )
 
     placeholders = _compliance_profile_placeholder_values(
         profile=profile,
         workspace_name=workspace_name,
     )
-    website_url = _website_url_from_shop_domain(shop_domain=effective_shop_domain)
+    website_url = _website_url_from_shop_domain(shop_domain=effective_storefront_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url
 
@@ -8216,6 +8402,7 @@ def _sync_compliance_policy_pages_for_template_export(
     return {
         "rulesetVersion": profile.ruleset_version,
         "shopDomain": sync_payload["shopDomain"],
+        "storefrontDomain": effective_storefront_domain,
         "pages": synced_pages,
         "updatedProfileUrls": updated_profile_urls,
         "renderedPages": rendered_pages_payload,
@@ -9541,15 +9728,11 @@ def get_client_shopify_status(
     session: Session = Depends(get_session),
 ):
     _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
-    selected_shop_domain = _get_selected_shop_domain(
+    _, status_payload = _get_shopify_connection_status_response_payload(
         session=session,
         org_id=auth.org_id,
         client_id=client_id,
         user_external_id=auth.user_id,
-    )
-    status_payload = get_client_shopify_connection_status(
-        client_id=client_id,
-        selected_shop_domain=selected_shop_domain,
     )
     resolved_shop_domain = status_payload.get("shopDomain")
     if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
@@ -9573,6 +9756,13 @@ def create_client_shopify_install_url(
     install_urls = build_client_shopify_install_urls(
         client_id=client_id, shop_domain=payload.shopDomain
     )
+    _set_selected_shop_storefront_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+        storefront_domain=payload.shopDomain,
+    )
     return ShopifyInstallUrlResponse(**install_urls)
 
 
@@ -9589,15 +9779,18 @@ def update_client_shopify_installation(
         shop_domain=payload.shopDomain,
         storefront_access_token=payload.storefrontAccessToken,
     )
-    selected_shop_domain = _get_selected_shop_domain(
+    _set_selected_shop_storefront_domain(
         session=session,
         org_id=auth.org_id,
         client_id=client_id,
         user_external_id=auth.user_id,
+        storefront_domain=payload.shopDomain,
     )
-    status_payload = get_client_shopify_connection_status(
+    _, status_payload = _get_shopify_connection_status_response_payload(
+        session=session,
+        org_id=auth.org_id,
         client_id=client_id,
-        selected_shop_domain=selected_shop_domain,
+        user_external_id=auth.user_id,
     )
     resolved_shop_domain = status_payload.get("shopDomain")
     if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
@@ -9625,15 +9818,18 @@ def auto_provision_client_shopify_installation_storefront_token(
         client_id=client_id,
         shop_domain=payload.shopDomain,
     )
-    selected_shop_domain = _get_selected_shop_domain(
+    _set_selected_shop_storefront_domain(
         session=session,
         org_id=auth.org_id,
         client_id=client_id,
         user_external_id=auth.user_id,
+        storefront_domain=payload.shopDomain,
     )
-    status_payload = get_client_shopify_connection_status(
+    _, status_payload = _get_shopify_connection_status_response_payload(
+        session=session,
+        org_id=auth.org_id,
         client_id=client_id,
-        selected_shop_domain=selected_shop_domain,
+        user_external_id=auth.user_id,
     )
     resolved_shop_domain = status_payload.get("shopDomain")
     if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
@@ -9667,18 +9863,23 @@ def disconnect_client_shopify_installation(
     if prefs_with_selected_shop:
         for pref in prefs_with_selected_shop:
             pref.selected_shop_domain = None
+            pref.selected_shop_storefront_domain = None
             pref.updated_at = func.now()
         session.commit()
+    else:
+        _set_selected_shop_storefront_domain(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            user_external_id=auth.user_id,
+            storefront_domain=None,
+        )
 
-    selected_shop_domain = _get_selected_shop_domain(
+    _, status_payload = _get_shopify_connection_status_response_payload(
         session=session,
         org_id=auth.org_id,
         client_id=client_id,
         user_external_id=auth.user_id,
-    )
-    status_payload = get_client_shopify_connection_status(
-        client_id=client_id,
-        selected_shop_domain=selected_shop_domain,
     )
     return ShopifyConnectionStatusResponse(**status_payload)
 
@@ -9718,6 +9919,7 @@ def set_client_shopify_default_shop(
     )
     if pref:
         pref.selected_shop_domain = normalized_shop
+        pref.selected_shop_storefront_domain = normalize_shop_storefront_domain(payload.shopDomain)
         pref.updated_at = func.now()
     else:
         session.add(
@@ -9726,13 +9928,16 @@ def set_client_shopify_default_shop(
                 client_id=client_id,
                 user_external_id=auth.user_id,
                 selected_shop_domain=normalized_shop,
+                selected_shop_storefront_domain=normalize_shop_storefront_domain(payload.shopDomain),
             )
         )
     session.commit()
 
-    status_payload = get_client_shopify_connection_status(
+    _, status_payload = _get_shopify_connection_status_response_payload(
+        session=session,
+        org_id=auth.org_id,
         client_id=client_id,
-        selected_shop_domain=normalized_shop,
+        user_external_id=auth.user_id,
     )
     return ShopifyConnectionStatusResponse(**status_payload)
 

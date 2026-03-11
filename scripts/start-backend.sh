@@ -60,4 +60,5 @@ echo "[backend] Installing/updating dependencies from pyproject.toml..."
 .venv/bin/pip install -e .
 
 echo "[backend] Starting uvicorn on http://0.0.0.0:${BACKEND_PORT}"
-exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --reload
+exec .venv/bin/python "$ROOT/scripts/run_with_backend_env.py" \
+  .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --reload

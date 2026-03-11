@@ -9,8 +9,6 @@ This catalog is implemented in `mos/backend/app/services/compliance.py` under `_
 - `returns_refunds_policy`
 - `shipping_policy`
 - `contact_support`
-- `company_information`
-- `subscription_terms_and_cancellation`
 
 ## API access
 
@@ -137,61 +135,11 @@ Required placeholders:
 
 - `contact_channels`
 - `support_hours`
-- `response_sla`
-- `order_help`
 - `business_address`
-- `policy_links`
 
 Required placeholders:
 
 - `support_email`
 - `support_phone`
 - `support_hours_text`
-- `response_time_commitment`
-- `support_order_help_links`
 - `company_address_text`
-
-### `company_information`
-
-- `legal_identity`
-- `address`
-- `brand_name`
-- `ownership`
-- `license`
-- `support_contact`
-
-Required placeholders:
-
-- `legal_business_name`
-- `company_address_text`
-- `brand_name`
-- `operating_entity_name`
-- `business_license_identifier`
-- `support_email`
-- `support_phone`
-
-### `subscription_terms_and_cancellation`
-
-- `included_features`
-- `plans`
-- `renewal`
-- `trial_terms`
-- `consent`
-- `cancellation`
-- `subscription_refunds`
-- `billing_support`
-- `effective_date`
-
-Required placeholders:
-
-- `legal_business_name`
-- `subscription_included_features`
-- `subscription_plan_table`
-- `subscription_auto_renew_terms`
-- `subscription_trial_terms`
-- `subscription_explicit_consent`
-- `cancellation_steps`
-- `subscription_refund_rules`
-- `subscription_billing_support`
-- `support_email`
-- `effective_date`

@@ -75,5 +75,6 @@ mos/backend/app/*.zip
 mos/backend/app/**/Archive.zip
 exports/
 testimonial-renderer/samples/output
+/template-prompt-outputs/all-templates-higgs-2026-03-11-003525-triggered/
 *.pid
 /.service-logs

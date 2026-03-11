@@ -776,13 +776,10 @@ function buildTextSlotReadableLabelMap(
 type ComplianceProfileFormState = {
   businessModelsCsv: string;
   legalBusinessName: string;
-  operatingEntityName: string;
   companyAddressText: string;
-  businessLicenseIdentifier: string;
   supportEmail: string;
   supportPhone: string;
   supportHoursText: string;
-  responseTimeCommitment: string;
 };
 
 const ALLOWED_COMPLIANCE_BUSINESS_MODELS: ComplianceBusinessModel[] = [
@@ -802,13 +799,10 @@ function buildComplianceProfileFormState(
   return {
     businessModelsCsv: businessModels.join(", "),
     legalBusinessName: profile?.legalBusinessName?.trim() || workspaceName?.trim() || "",
-    operatingEntityName: profile?.operatingEntityName?.trim() || "",
     companyAddressText: profile?.companyAddressText?.trim() || "",
-    businessLicenseIdentifier: profile?.businessLicenseIdentifier?.trim() || "",
     supportEmail: profile?.supportEmail?.trim() || "",
     supportPhone: profile?.supportPhone?.trim() || "",
     supportHoursText: profile?.supportHoursText?.trim() || "",
-    responseTimeCommitment: profile?.responseTimeCommitment?.trim() || "",
   };
 }
 
@@ -941,22 +935,52 @@ export function BrandDesignSystemPage() {
     [designSystems]
   );
   const shopDomainOptions = useMemo(() => {
-    const candidates = new Set<string>();
-    const addCandidate = (shopDomain: string | null | undefined) => {
+    const displayByShopDomain = new Map<string, string>();
+    const addCandidate = (
+      shopDomain: string | null | undefined,
+      displayShopDomain?: string | null | undefined
+    ) => {
       if (typeof shopDomain !== "string") return;
       const normalized = shopDomain.trim().toLowerCase();
       if (!normalized) return;
-      candidates.add(normalized);
+      const normalizedDisplay =
+        typeof displayShopDomain === "string" && displayShopDomain.trim()
+          ? displayShopDomain.trim().toLowerCase()
+          : normalized;
+      displayByShopDomain.set(normalized, normalizedDisplay);
     };
 
-    addCandidate(shopifyStatus?.selectedShopDomain);
-    addCandidate(shopifyStatus?.shopDomain);
-    (shopifyStatus?.shopDomains || []).forEach((shopDomain) => addCandidate(shopDomain));
+    (shopifyStatus?.shopDomains || []).forEach((shopDomain, index) =>
+      addCandidate(shopDomain, shopifyStatus?.displayShopDomains?.[index])
+    );
+    addCandidate(shopifyStatus?.selectedShopDomain, shopifyStatus?.selectedShopDomain);
+    addCandidate(shopifyStatus?.shopDomain, shopifyStatus?.displayShopDomain || shopifyStatus?.shopDomain);
 
-    return Array.from(candidates)
-      .sort((a, b) => a.localeCompare(b))
-      .map((shopDomain) => ({ label: shopDomain, value: shopDomain }));
-  }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain, shopifyStatus?.shopDomains]);
+    return Array.from(displayByShopDomain.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([shopDomain, storefrontDomain]) => ({
+        label: storefrontDomain,
+        storefrontDomain,
+        value: shopDomain,
+      }));
+  }, [
+    shopifyStatus?.displayShopDomain,
+    shopifyStatus?.displayShopDomains,
+    shopifyStatus?.selectedShopDomain,
+    shopifyStatus?.shopDomain,
+    shopifyStatus?.shopDomains,
+  ]);
+  const connectedShopDomains = useMemo(() => {
+    const displayShopDomains = (shopifyStatus?.displayShopDomains || [])
+      .map((shopDomain) => shopDomain.trim().toLowerCase())
+      .filter(Boolean);
+    if (displayShopDomains.length) return displayShopDomains;
+    return (shopifyStatus?.shopDomains || []).map((shopDomain) => shopDomain.trim().toLowerCase()).filter(Boolean);
+  }, [shopifyStatus?.displayShopDomains, shopifyStatus?.shopDomains]);
+  const selectedShopDomainOption = useMemo(
+    () => shopDomainOptions.find((option) => option.value === shopifySyncShopDomain) || null,
+    [shopDomainOptions, shopifySyncShopDomain]
+  );
   const hasShopifyConnectionTarget = shopDomainOptions.length > 0;
   const hasSavedComplianceProfile = Boolean(complianceProfile?.id);
   const shopifyState = shopifyStatus?.state || "error";
@@ -1980,13 +2004,10 @@ export function BrandDesignSystemPage() {
         rulesetVersion: COMPLIANCE_RULESET_VERSION,
         businessModels,
         legalBusinessName: normalizeComplianceOptionalText(complianceProfileForm.legalBusinessName),
-        operatingEntityName: normalizeComplianceOptionalText(complianceProfileForm.operatingEntityName),
         companyAddressText: normalizeComplianceOptionalText(complianceProfileForm.companyAddressText),
-        businessLicenseIdentifier: normalizeComplianceOptionalText(complianceProfileForm.businessLicenseIdentifier),
         supportEmail: normalizeComplianceOptionalText(complianceProfileForm.supportEmail),
         supportPhone: normalizeComplianceOptionalText(complianceProfileForm.supportPhone),
         supportHoursText: normalizeComplianceOptionalText(complianceProfileForm.supportHoursText),
-        responseTimeCommitment: normalizeComplianceOptionalText(complianceProfileForm.responseTimeCommitment),
         metadata: {},
       });
       setComplianceProfileForm(buildComplianceProfileFormState(saved, workspace?.name));
@@ -2061,7 +2082,12 @@ export function BrandDesignSystemPage() {
       toast.error("Save a compliance profile before generating policy pages.");
       return;
     }
-    const payload = shopifySyncShopDomain ? { shopDomain: shopifySyncShopDomain } : {};
+    const payload = shopifySyncShopDomain
+      ? {
+          shopDomain: shopifySyncShopDomain,
+          storefrontDomain: selectedShopDomainOption?.storefrontDomain || undefined,
+        }
+      : {};
     try {
       const response = await syncCompliancePolicyPages.mutateAsync(payload);
       setPolicySyncResult(response);
@@ -2265,8 +2291,8 @@ export function BrandDesignSystemPage() {
           {shopifyStatus?.missingScopes?.length ? (
             <div className="text-xs text-danger">Missing scopes: {shopifyStatus.missingScopes.join(", ")}</div>
           ) : null}
-          {shopifyStatus?.shopDomains?.length ? (
-            <div className="text-xs text-content-muted">Connected stores: {shopifyStatus.shopDomains.join(", ")}</div>
+          {connectedShopDomains.length ? (
+            <div className="text-xs text-content-muted">Connected stores: {connectedShopDomains.join(", ")}</div>
           ) : null}
           {shopifyState === "multiple_installations_conflict" && shopifyStatus?.shopDomains?.length ? (
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -2276,9 +2302,9 @@ export function BrandDesignSystemPage() {
                 onChange={(e) => setDefaultShopDomainDraft(e.target.value)}
                 disabled={setDefaultShop.isPending || disconnectShopifyInstallation.isPending}
               >
-                {shopifyStatus.shopDomains.map((shopDomain) => (
-                  <option key={shopDomain} value={shopDomain}>
-                    {shopDomain}
+                {shopDomainOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -2918,14 +2944,6 @@ export function BrandDesignSystemPage() {
                   placeholder="The Honest Herbalist LLC"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Operating entity name</label>
-                <Input
-                  value={complianceProfileForm.operatingEntityName}
-                  onChange={(event) => handleComplianceProfileFieldChange("operatingEntityName", event.target.value)}
-                  placeholder="Aldrin Clement"
-                />
-              </div>
               <div className="space-y-1 md:col-span-2">
                 <label className="text-xs font-semibold text-content">Company address text</label>
                 <textarea
@@ -2937,14 +2955,6 @@ export function BrandDesignSystemPage() {
                     "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   )}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Business license ID</label>
-                <Input
-                  value={complianceProfileForm.businessLicenseIdentifier}
-                  onChange={(event) => handleComplianceProfileFieldChange("businessLicenseIdentifier", event.target.value)}
-                  placeholder="TX-1234567"
                 />
               </div>
               <div className="space-y-1">
@@ -2971,21 +2981,17 @@ export function BrandDesignSystemPage() {
                   placeholder="Mon-Fri 9:00 AM-5:00 PM CST"
                 />
               </div>
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-xs font-semibold text-content">Response time commitment</label>
-                <Input
-                  value={complianceProfileForm.responseTimeCommitment}
-                  onChange={(event) => handleComplianceProfileFieldChange("responseTimeCommitment", event.target.value)}
-                  placeholder="Within 2 business days"
-                />
-              </div>
             </div>
           </div>
 
           {policySyncResult ? (
             <div className="space-y-2">
               <div className="text-xs text-content-muted">
-                Last sync: <span className="font-semibold text-content">{policySyncResult.shopDomain}</span> ·{" "}
+                Last sync:{" "}
+                <span className="font-semibold text-content">
+                  {policySyncResult.storefrontDomain || policySyncResult.shopDomain}
+                </span>{" "}
+                ·{" "}
                 <span className="font-semibold text-content">{policySyncResult.pages.length}</span> page(s)
               </div>
               <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">

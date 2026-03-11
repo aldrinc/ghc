@@ -26,7 +26,9 @@ export type ClientShopifyStatus = {
   state: ShopifyConnectionState;
   message: string;
   shopDomain?: string | null;
+  displayShopDomain?: string | null;
   shopDomains: string[];
+  displayShopDomains: string[];
   selectedShopDomain?: string | null;
   hasStorefrontAccessToken: boolean;
   missingScopes: string[];
