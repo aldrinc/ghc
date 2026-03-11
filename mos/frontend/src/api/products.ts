@@ -53,7 +53,7 @@ type ShopifyVariantSyncResponse = {
   variants: ShopifyCatalogVariant[];
 };
 
-type ShopifyProductSyncResponse = {
+export type ShopifyProductSyncResponse = {
   shopDomain: string;
   productGid: string;
   title: string;
@@ -143,6 +143,7 @@ export function useUpdateProduct(productId: string) {
       title?: string;
       description?: string | null;
       productType?: string | null;
+      publishedAt?: string | null;
       shopifyProductGid?: string | null;
       primaryBenefits?: string[] | null;
       featureBullets?: string[] | null;

@@ -459,6 +459,10 @@ def _build_shopify_create_variants_payload(*, variants: list[ProductVariant]) ->
     ]
 
 
+def _product_shopify_status_text(product: Product) -> str:
+    return "ACTIVE" if product.published_at is not None else "DRAFT"
+
+
 def _ensure_product_has_shopify_product_gid(
     *,
     session: Session,
@@ -484,7 +488,7 @@ def _ensure_product_has_shopify_product_gid(
         vendor=product.vendor,
         product_type=product.product_type,
         tags=list(product.tags or []),
-        status_text="ACTIVE" if product.published_at is not None else "DRAFT",
+        status_text=_product_shopify_status_text(product),
         variants=_build_shopify_create_variants_payload(variants=resolved_variants),
         shop_domain=resolved_shop_domain,
     )
@@ -754,7 +758,7 @@ def create_shopify_product_for_product(
         vendor=payload.vendor,
         product_type=payload.productType,
         tags=payload.tags,
-        status_text=payload.status,
+        status_text=_product_shopify_status_text(product),
         variants=[variant.model_dump() for variant in payload.variants],
         shop_domain=payload.shopDomain,
     )
@@ -1041,7 +1045,7 @@ def sync_shopify_product_for_product(
                     ),
                 ) from exc
 
-    status_text = "ACTIVE" if product.published_at is not None else "DRAFT"
+    status_text = _product_shopify_status_text(product)
     _ensure_product_has_shopify_product_gid(
         session=session,
         product=product,
@@ -1526,7 +1530,7 @@ def update_product(
         fields["tags"] = payload.tags
     if payload.templateSuffix is not None:
         fields["template_suffix"] = payload.templateSuffix
-    if payload.publishedAt is not None:
+    if "publishedAt" in fields_set:
         fields["published_at"] = payload.publishedAt
     if "shopifyProductGid" in fields_set:
         if payload.shopifyProductGid is None:
