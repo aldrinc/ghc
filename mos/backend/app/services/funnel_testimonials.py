@@ -8,8 +8,10 @@ import json
 import os
 import random
 import re
+import threading
 import time
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -62,6 +64,42 @@ def _heartbeat_activity_progress(*, phase: str, step: str, **fields: Any) -> Non
         temporal_activity.heartbeat(payload)
     except RuntimeError:
         return
+
+
+_FUNNEL_TESTIMONIAL_HEARTBEAT_INTERVAL_SECONDS = 20.0
+
+
+@contextmanager
+def _heartbeat_callback_loop(
+    *,
+    callback: Callable[[], None] | None,
+    interval_seconds: float | None = None,
+) -> Iterator[None]:
+    if callback is None:
+        yield
+        return
+    interval = (
+        float(interval_seconds)
+        if interval_seconds is not None
+        else float(_FUNNEL_TESTIMONIAL_HEARTBEAT_INTERVAL_SECONDS)
+    )
+    stop_event = threading.Event()
+
+    def _run() -> None:
+        while not stop_event.wait(interval):
+            callback()
+
+    thread = threading.Thread(
+        target=_run,
+        name="funnel-testimonials-heartbeat",
+        daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=max(1.0, interval))
 
 
 @dataclass
@@ -3755,7 +3793,10 @@ def generate_sales_pdp_carousel_images(
     required_strip_palette = _resolve_sales_pdp_required_strip_palette(design_system_tokens)
 
     ensure_within_budget("requesting Sales PDP carousel plan")
-    _carousel_heartbeat("carousel_plan_requested", slot_count=expected_count)
+    def _heartbeat_carousel_plan_requested() -> None:
+        _carousel_heartbeat("carousel_plan_requested", slot_count=expected_count)
+
+    _heartbeat_carousel_plan_requested()
     prompt = _build_sales_pdp_carousel_prompt(
         product_context=product_context,
         copy=copy_text,
@@ -3767,16 +3808,17 @@ def generate_sales_pdp_carousel_images(
 
     if isinstance(model_id, str) and model_id.lower().startswith("claude"):
         claude_max_tokens = int(max_tokens) if max_tokens else 8_000
-        resp = call_claude_structured_message(
-            model=model_id,
-            system=None,
-            user_content=[{"type": "text", "text": prompt}],
-            output_schema=_sales_pdp_carousel_output_schema(),
-            max_tokens=claude_max_tokens,
-            temperature=temperature,
-            http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
-            max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
-        )
+        with _heartbeat_callback_loop(callback=_heartbeat_carousel_plan_requested):
+            resp = call_claude_structured_message(
+                model=model_id,
+                system=None,
+                user_content=[{"type": "text", "text": prompt}],
+                output_schema=_sales_pdp_carousel_output_schema(),
+                max_tokens=claude_max_tokens,
+                temperature=temperature,
+                http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+                max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+            )
         parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
         if not isinstance(parsed_value, dict):
             raise TestimonialGenerationError("Claude structured Sales PDP carousel response was not a JSON object.")
@@ -3797,7 +3839,8 @@ def generate_sales_pdp_carousel_images(
                 },
             },
         )
-        raw = llm.generate_text(prompt, params=params)
+        with _heartbeat_callback_loop(callback=_heartbeat_carousel_plan_requested):
+            raw = llm.generate_text(prompt, params=params)
         raw_plan = _parse_json_object_response(raw, model_id=model_id, label="Sales PDP carousel")
 
     validated_plan = _normalize_sales_pdp_carousel_plan(
@@ -4130,16 +4173,31 @@ def _generate_validated_synthetic_testimonials(
     today = datetime.now(timezone.utc).date().isoformat()
     batch_size = 6
     validated_testimonials: list[dict[str, Any]] = []
+
+    latest_progress: tuple[str, dict[str, Any]] | None = None
+
+    def _emit_progress(step: str, details: dict[str, Any]) -> None:
+        nonlocal latest_progress
+        payload = dict(details)
+        latest_progress = (step, payload)
+        if progress_callback is not None:
+            progress_callback(step, payload)
+
+    def _replay_latest_progress() -> None:
+        if progress_callback is None or latest_progress is None:
+            return
+        step, payload = latest_progress
+        progress_callback(step, dict(payload))
+
     for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
         ensure_within_budget("generating testimonial identities")
-        if progress_callback is not None:
-            progress_callback(
-                "identity_attempt_started",
-                {
-                    "identity_attempt": identity_attempt,
-                    "requested_count": count,
-                },
-            )
+        _emit_progress(
+            "identity_attempt_started",
+            {
+                "identity_attempt": identity_attempt,
+                "requested_count": count,
+            },
+        )
         candidate_validated: list[dict[str, Any]] = []
         reserved_names: list[str] = []
         reserved_name_keys: set[str] = set()
@@ -4150,15 +4208,14 @@ def _generate_validated_synthetic_testimonials(
         for batch_idx, start in enumerate(range(0, count, batch_size)):
             ensure_within_budget("requesting testimonial LLM batches")
             batch_count = min(batch_size, count - start)
-            if progress_callback is not None:
-                progress_callback(
-                    "batch_requested",
-                    {
-                        "identity_attempt": identity_attempt,
-                        "batch_index": batch_idx + 1,
-                        "batch_count": batch_count,
-                    },
-                )
+            _emit_progress(
+                "batch_requested",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "batch_count": batch_count,
+                },
+            )
             prompt = _build_testimonial_prompt(
                 count=batch_count,
                 copy=copy_text,
@@ -4171,16 +4228,17 @@ def _generate_validated_synthetic_testimonials(
 
             parsed: dict[str, Any]
             if isinstance(model_id, str) and model_id.lower().startswith("claude"):
-                resp = call_claude_structured_message(
-                    model=model_id,
-                    system=None,
-                    user_content=[{"type": "text", "text": prompt}, *(claude_document_blocks or [])],
-                    output_schema=_testimonial_output_schema(batch_count),
-                    max_tokens=int(max_tokens) if max_tokens else 16_000,
-                    temperature=attempt_temperature,
-                    http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
-                    max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
-                )
+                with _heartbeat_callback_loop(callback=_replay_latest_progress):
+                    resp = call_claude_structured_message(
+                        model=model_id,
+                        system=None,
+                        user_content=[{"type": "text", "text": prompt}, *(claude_document_blocks or [])],
+                        output_schema=_testimonial_output_schema(batch_count),
+                        max_tokens=int(max_tokens) if max_tokens else 16_000,
+                        temperature=attempt_temperature,
+                        http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+                        max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                    )
                 parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
                 if not isinstance(parsed_value, dict):
                     raise TestimonialGenerationError(
@@ -4203,7 +4261,8 @@ def _generate_validated_synthetic_testimonials(
                         },
                     },
                 )
-                raw = llm.generate_text(prompt, params=params)
+                with _heartbeat_callback_loop(callback=_replay_latest_progress):
+                    raw = llm.generate_text(prompt, params=params)
                 parsed = _parse_testimonials_response(raw, model_id=model_id)
             batch_items = parsed.get("testimonials")
             if not isinstance(batch_items, list):
@@ -4214,15 +4273,14 @@ def _generate_validated_synthetic_testimonials(
                 raise TestimonialGenerationError(
                     f"Expected {batch_count} testimonials, received {len(batch_items)}."
                 )
-            if progress_callback is not None:
-                progress_callback(
-                    "batch_received",
-                    {
-                        "identity_attempt": identity_attempt,
-                        "batch_index": batch_idx + 1,
-                        "batch_count": len(batch_items),
-                    },
-                )
+            _emit_progress(
+                "batch_received",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "batch_count": len(batch_items),
+                },
+            )
 
             batch_validated: list[dict[str, Any]] = []
             for idx, raw in enumerate(batch_items):
@@ -4237,15 +4295,14 @@ def _generate_validated_synthetic_testimonials(
             if batch_validation_error is not None:
                 break
             candidate_validated.extend(batch_validated)
-            if progress_callback is not None:
-                progress_callback(
-                    "batch_validated",
-                    {
-                        "identity_attempt": identity_attempt,
-                        "batch_index": batch_idx + 1,
-                        "validated_count": len(batch_validated),
-                    },
-                )
+            _emit_progress(
+                "batch_validated",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "validated_count": len(batch_validated),
+                },
+            )
 
             for item in batch_validated:
                 primary = item.get("name")
@@ -4287,14 +4344,13 @@ def _generate_validated_synthetic_testimonials(
                 continue
 
         validated_testimonials = candidate_validated
-        if progress_callback is not None:
-            progress_callback(
-                "identity_attempt_completed",
-                {
-                    "identity_attempt": identity_attempt,
-                    "validated_count": len(candidate_validated),
-                },
-            )
+        _emit_progress(
+            "identity_attempt_completed",
+            {
+                "identity_attempt": identity_attempt,
+                "validated_count": len(candidate_validated),
+            },
+        )
         break
 
     if not validated_testimonials:
