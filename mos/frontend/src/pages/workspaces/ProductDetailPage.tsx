@@ -534,13 +534,13 @@ export function ProductDetailPage() {
       toast.error("Shopify must be connected and ready before syncing.");
       return;
     }
-    if (!hasMappedShopifyProduct) {
-      toast.error("Save a Shopify product GID before syncing.");
-      return;
-    }
     const response = await syncShopifyProduct.mutateAsync({
       shopDomain: shopifyStatus?.shopDomain || undefined,
     });
+    const syncedProductGid = String(response.productGid || "").trim();
+    if (syncedProductGid) {
+      setShopifyProductGidDraft(syncedProductGid);
+    }
     const variantTitles = (response.variants || [])
       .map((variant) => String(variant.title || "").trim())
       .filter((title) => Boolean(title));
@@ -897,24 +897,29 @@ export function ProductDetailPage() {
                   ) : null}
                 </div>
               ) : null}
-              {isShopifyReady && hasMappedShopifyProduct ? (
+              {isShopifyReady ? (
                 <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
                   <div className="text-xs text-content-muted">
-                    Shopify product is already mapped for this product. mOS will push product fields, variants, and
-                    offer basket metadata onto that Shopify product.
+                    {hasMappedShopifyProduct
+                      ? "Shopify product is already mapped for this product. mOS will push product fields, variants, and offer basket metadata onto that Shopify product."
+                      : "No Shopify product is mapped yet. mOS will create the Shopify product first, then push product fields, variants, and offer basket metadata."}
                   </div>
                   <Button
                     size="sm"
                     onClick={() => void handleSyncShopifyProduct()}
                     disabled={syncShopifyProduct.isPending}
                   >
-                    {syncShopifyProduct.isPending ? "Syncing…" : "Sync mOS to Shopify"}
+                    {syncShopifyProduct.isPending
+                      ? "Syncing…"
+                      : hasMappedShopifyProduct
+                        ? "Sync mOS to Shopify"
+                        : "Create + Sync mOS to Shopify"}
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={() => void handleSyncShopifyVariants()}
-                    disabled={syncShopifyVariants.isPending}
+                    disabled={!hasMappedShopifyProduct || syncShopifyVariants.isPending}
                   >
                     {syncShopifyVariants.isPending ? "Syncing…" : "Pull variants from Shopify"}
                   </Button>
