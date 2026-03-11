@@ -448,6 +448,17 @@ def _build_shopify_source_of_truth_payload(
     }
 
 
+def _build_shopify_create_variants_payload(*, variants: list[ProductVariant]) -> list[dict[str, object]]:
+    return [
+        {
+            "title": variant.title,
+            "priceCents": variant.price,
+            "currency": str(variant.currency or "").strip().upper(),
+        }
+        for variant in variants
+    ]
+
+
 def _get_client_user_pref(
     *,
     session: Session,
@@ -939,11 +950,6 @@ def sync_shopify_product_for_product(
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if not product.shopify_product_gid:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Product is not mapped to Shopify. Save a Shopify product GID first.",
-        )
 
     selected_shop_domain_pref = _get_client_user_pref(
         session=session,
@@ -994,6 +1000,23 @@ def sync_shopify_product_for_product(
                     ),
                 )
 
+    status_text = "ACTIVE" if product.published_at is not None else "DRAFT"
+    if not product.shopify_product_gid:
+        created = create_client_shopify_product(
+            client_id=str(product.client_id),
+            title=product.title,
+            description=product.description or "",
+            handle=product.handle,
+            vendor=product.vendor,
+            product_type=product.product_type,
+            tags=list(product.tags or []),
+            status_text=status_text,
+            variants=_build_shopify_create_variants_payload(variants=variants),
+            shop_domain=resolved_shop_domain,
+        )
+        product.shopify_product_gid = created["productGid"]
+        session.add(product)
+
     source_of_truth_payload = _build_shopify_source_of_truth_payload(
         product=product,
         variants=variants,
@@ -1033,7 +1056,7 @@ def sync_shopify_product_for_product(
             vendor=product.vendor,
             product_type=product.product_type,
             tags=list(product.tags or []),
-            status_text="ACTIVE" if product.published_at is not None else "DRAFT",
+            status_text=status_text,
             variants=sync_variants_payload,
             source_of_truth_payload=source_of_truth_payload,
             shop_domain=resolved_shop_domain,
