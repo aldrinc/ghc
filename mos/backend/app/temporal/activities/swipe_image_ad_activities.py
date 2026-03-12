@@ -68,6 +68,7 @@ _GEMINI_CLIENT: Any | None = None
 _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
 _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
+_SWIPE_GEMINI_TIMEOUT_SECONDS = max(1, int(os.getenv("SWIPE_GEMINI_TIMEOUT_SECONDS", "120")))
 
 
 def _load_swipe_product_image_profiles() -> Dict[str, bool]:
@@ -190,8 +191,45 @@ def _is_retryable_swipe_copy_gemini_error(exc: Exception, *, error_text: str) ->
         "internal error",
         "service unavailable",
         "deadline exceeded",
+        "timed out",
+        "timeout",
     )
     return any(marker in normalized for marker in retryable_markers)
+
+
+def _call_gemini_generate_content_with_retries(
+    *,
+    gemini_client: Any,
+    model: str,
+    contents: List[Any],
+    config: Any,
+    operation_name: str,
+    file_search_model_error_message: str,
+) -> Any:
+    for attempt in range(1, _SWIPE_COPY_GEMINI_MAX_ATTEMPTS + 1):
+        try:
+            return gemini_client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+        except Exception as exc:  # noqa: BLE001
+            error_text = str(exc)
+            if "File search tool is not enabled for this model" in error_text:
+                raise RuntimeError(file_search_model_error_message) from exc
+            if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
+                exc,
+                error_text=error_text,
+            ):
+                time.sleep(
+                    _resolve_swipe_copy_gemini_retry_delay_seconds(
+                        attempt=attempt,
+                        retry_after_raw=_extract_swipe_copy_gemini_retry_after(exc),
+                    )
+                )
+                continue
+            raise RuntimeError(f"{operation_name} failed with Gemini: {error_text}") from exc
+    raise RuntimeError(f"{operation_name} did not return a response.")
 
 
 def _extract_source_filename(source_url: str | None) -> str | None:
@@ -276,7 +314,10 @@ def _ensure_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
-    _GEMINI_CLIENT = genai.Client(api_key=api_key)
+    _GEMINI_CLIENT = genai.Client(
+        api_key=api_key,
+        http_options=genai_types.HttpOptions(timeout=_SWIPE_GEMINI_TIMEOUT_SECONDS),
+    )
     return _GEMINI_CLIENT
 
 
@@ -1998,36 +2039,17 @@ def _call_swipe_copy_gemini_json_message(
             config_kwargs["response_json_schema"] = response_schema.model_json_schema()
         else:
             config_kwargs["response_json_schema"] = response_schema
-    response = None
-    for attempt in range(1, _SWIPE_COPY_GEMINI_MAX_ATTEMPTS + 1):
-        try:
-            response = gemini_client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=genai_types.GenerateContentConfig(**config_kwargs),
-            )
-            break
-        except Exception as exc:  # noqa: BLE001
-            error_text = str(exc)
-            if "File search tool is not enabled for this model" in error_text:
-                raise RuntimeError(
-                    "Swipe Stage 1 copy generation model does not support Gemini File Search. "
-                    f"model={model}. Choose a Gemini model with File Search support for this workflow."
-                ) from exc
-            if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
-                exc,
-                error_text=error_text,
-            ):
-                time.sleep(
-                    _resolve_swipe_copy_gemini_retry_delay_seconds(
-                        attempt=attempt,
-                        retry_after_raw=_extract_swipe_copy_gemini_retry_after(exc),
-                    )
-                )
-                continue
-            raise RuntimeError(f"Swipe Stage 1 copy generation failed with Gemini: {error_text}") from exc
-    if response is None:
-        raise RuntimeError("Swipe Stage 1 copy generation did not return a response.")
+    response = _call_gemini_generate_content_with_retries(
+        gemini_client=gemini_client,
+        model=model,
+        contents=contents,
+        config=genai_types.GenerateContentConfig(**config_kwargs),
+        operation_name="Swipe Stage 1 copy generation",
+        file_search_model_error_message=(
+            "Swipe Stage 1 copy generation model does not support Gemini File Search. "
+            f"model={model}. Choose a Gemini model with File Search support for this workflow."
+        ),
+    )
 
     parsed = getattr(response, "parsed", None)
     if parsed is not None and hasattr(parsed, "model_dump"):
@@ -2786,24 +2808,24 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 trace_name="workflow.swipe_image_ad",
             ) as generation:
                 try:
-                    result = gemini_client.models.generate_content(
+                    result = _call_gemini_generate_content_with_retries(
+                        gemini_client=gemini_client,
                         model=model_name,
                         contents=contents,
                         config=generate_config,
+                        operation_name="Swipe prompt generation",
+                        file_search_model_error_message=(
+                            "Swipe prompt generation model does not support Gemini File Search. "
+                            f"model={model_name}. Choose a Gemini model with File Search support for this workflow."
+                        ),
                     )
                     raw_output = _extract_gemini_text(result)
                     if not raw_output:
                         raise RuntimeError("Gemini returned no text for swipe prompt generation")
                 except Exception as exc:  # noqa: BLE001
-                    error_text = str(exc)
-                    if "File search tool is not enabled for this model" in error_text:
-                        raise RuntimeError(
-                            "Swipe prompt generation model does not support Gemini File Search. "
-                            f"model={model_name}. Choose a Gemini model with File Search support for this workflow."
-                        ) from exc
                     raise RuntimeError(
                         "Swipe prompt generation failed with Gemini File Search context: "
-                        f"{error_text}"
+                        f"{exc}"
                     ) from exc
                 if generation is not None:
                     generation.update(
