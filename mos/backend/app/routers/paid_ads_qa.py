@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -493,6 +493,32 @@ def run_campaign_paid_ads_qa(
         ]
     )
     return _run_response(run, finding_records)
+
+
+@router.get("/campaigns/{campaign_id}/paid-ads-qa/runs", response_model=list[PaidAdsQaRunResponse])
+def list_campaign_paid_ads_qa_runs(
+    campaign_id: str,
+    limit: int = Query(default=10, ge=1, le=50),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = session.scalar(
+        select(Campaign).where(
+            Campaign.org_id == auth.org_id,
+            Campaign.id == campaign_id,
+        )
+    )
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    repo = PaidAdsQaRepository(session)
+    runs = repo.list_runs(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+        subject_type="campaign",
+        limit=limit,
+    )
+    return [_run_response(run, repo.list_findings(qa_run_id=str(run.id))) for run in runs]
 
 
 @router.get("/campaigns/{campaign_id}/paid-ads-qa/runs/{run_id}", response_model=PaidAdsQaRunResponse)
