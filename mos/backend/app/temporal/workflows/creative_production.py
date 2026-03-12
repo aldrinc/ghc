@@ -57,7 +57,7 @@ class CreativeProductionWorkflow:
                     "asset_brief_id": brief_id,
                     "workflow_run_id": input.workflow_run_id,
                 },
-                schedule_to_close_timeout=timedelta(minutes=20),
+                start_to_close_timeout=timedelta(hours=6),
             )
             created_ids = result.get("asset_ids") if isinstance(result, dict) else None
             if not isinstance(created_ids, list) or not created_ids:

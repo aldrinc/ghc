@@ -236,7 +236,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [lastWorkflowRunId, setLastWorkflowRunId] = useState<string | null>(null);
   const [lastPreparedAt, setLastPreparedAt] = useState<string | null>(null);
   const [autoRefreshUntil, setAutoRefreshUntil] = useState<number | null>(null);
-  const [latestGenerationOnly, setLatestGenerationOnly] = useState(false);
+  const [latestGenerationOnly, setLatestGenerationOnly] = useState(true);
 
   const assetBriefIds = useMemo(
     () => assetBriefs.map((brief) => brief.id).filter((briefId): briefId is string => Boolean(briefId)),
@@ -466,6 +466,11 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         }),
       }));
   }, [visiblePipeline]);
+
+  useEffect(() => {
+    if (!latestGenerationKey) return;
+    setLatestGenerationOnly(true);
+  }, [latestGenerationKey]);
 
   return (
     <div className="space-y-4">
