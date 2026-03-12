@@ -75,6 +75,62 @@ def _load_swipe_product_image_profiles() -> Dict[str, bool]:
     if _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE is not None:
         return _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE
 
+    configured_path = (os.getenv("SWIPE_PRODUCT_IMAGE_PROFILES_PATH") or "").strip()
+    if configured_path:
+        profile_path = Path(configured_path).expanduser().resolve()
+    else:
+        profile_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "swipe_profiles"
+            / "initial_swipe_product_image_profiles_v1.json"
+        )
+
+    if not profile_path.exists() or not profile_path.is_file():
+        raise RuntimeError(f"Swipe product image profiles file not found: {profile_path}")
+
+    try:
+        payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Failed to parse swipe product image profiles at {profile_path}: {exc}") from exc
+
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise RuntimeError(
+            "Swipe product image profiles must define an `entries` array "
+            f"(path={profile_path})."
+        )
+
+    profiles: Dict[str, bool] = {}
+    for idx, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                "Swipe product image profile entry must be an object "
+                f"(path={profile_path}, index={idx})."
+            )
+        filename_raw = entry.get("filename")
+        requires_raw = entry.get("requires_product_image")
+        if not isinstance(filename_raw, str) or not filename_raw.strip():
+            raise RuntimeError(
+                "Swipe product image profile entry is missing filename "
+                f"(path={profile_path}, index={idx})."
+            )
+        if not isinstance(requires_raw, bool):
+            raise RuntimeError(
+                "Swipe product image profile entry requires boolean requires_product_image "
+                f"(path={profile_path}, index={idx}, filename={filename_raw!r})."
+            )
+        key = filename_raw.strip().lower()
+        if key in profiles:
+            raise RuntimeError(
+                "Duplicate filename in swipe product image profiles "
+                f"(path={profile_path}, filename={filename_raw!r})."
+            )
+        profiles[key] = requires_raw
+
+    _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE = profiles
+    return profiles
+
 
 def _resolve_swipe_copy_gemini_retry_delay_seconds(*, attempt: int, retry_after_raw: str | None = None) -> float:
     if isinstance(retry_after_raw, str) and retry_after_raw.strip():
@@ -136,62 +192,6 @@ def _is_retryable_swipe_copy_gemini_error(exc: Exception, *, error_text: str) ->
         "deadline exceeded",
     )
     return any(marker in normalized for marker in retryable_markers)
-
-    configured_path = (os.getenv("SWIPE_PRODUCT_IMAGE_PROFILES_PATH") or "").strip()
-    if configured_path:
-        profile_path = Path(configured_path).expanduser().resolve()
-    else:
-        profile_path = (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "swipe_profiles"
-            / "initial_swipe_product_image_profiles_v1.json"
-        )
-
-    if not profile_path.exists() or not profile_path.is_file():
-        raise RuntimeError(f"Swipe product image profiles file not found: {profile_path}")
-
-    try:
-        payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(f"Failed to parse swipe product image profiles at {profile_path}: {exc}") from exc
-
-    entries = payload.get("entries")
-    if not isinstance(entries, list):
-        raise RuntimeError(
-            "Swipe product image profiles must define an `entries` array "
-            f"(path={profile_path})."
-        )
-
-    profiles: Dict[str, bool] = {}
-    for idx, entry in enumerate(entries):
-        if not isinstance(entry, dict):
-            raise RuntimeError(
-                "Swipe product image profile entry must be an object "
-                f"(path={profile_path}, index={idx})."
-            )
-        filename_raw = entry.get("filename")
-        requires_raw = entry.get("requires_product_image")
-        if not isinstance(filename_raw, str) or not filename_raw.strip():
-            raise RuntimeError(
-                "Swipe product image profile entry is missing filename "
-                f"(path={profile_path}, index={idx})."
-            )
-        if not isinstance(requires_raw, bool):
-            raise RuntimeError(
-                "Swipe product image profile entry requires boolean requires_product_image "
-                f"(path={profile_path}, index={idx}, filename={filename_raw!r})."
-            )
-        key = filename_raw.strip().lower()
-        if key in profiles:
-            raise RuntimeError(
-                "Duplicate filename in swipe product image profiles "
-                f"(path={profile_path}, filename={filename_raw!r})."
-            )
-        profiles[key] = requires_raw
-
-    _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE = profiles
-    return profiles
 
 
 def _extract_source_filename(source_url: str | None) -> str | None:

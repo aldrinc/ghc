@@ -690,6 +690,18 @@ def test_call_swipe_copy_gemini_json_message_raises_after_retry_budget_exhausted
     assert sleep_calls == [2.0]
 
 
+def test_load_swipe_product_image_profiles_reads_catalog(tmp_path, monkeypatch):
+    profile_path = tmp_path / "profiles.json"
+    profile_path.write_text(
+        '{"entries":[{"filename":"7.png","requires_product_image":true}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SWIPE_PRODUCT_IMAGE_PROFILES_PATH", str(profile_path))
+    monkeypatch.setattr(swipe_activity, "_SWIPE_PRODUCT_IMAGE_PROFILE_CACHE", None)
+
+    assert swipe_activity._load_swipe_product_image_profiles() == {"7.png": True}
+
+
 def test_generate_swipe_stage1_copy_pack_retries_when_meta_fields_missing(monkeypatch):
     retry_feedbacks: list[str | None] = []
     responses = iter(
