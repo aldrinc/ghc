@@ -1589,12 +1589,6 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                 </div>
                               )}
                             </div>
-                            <div className="mt-3 space-y-2">
-                              <div className="text-sm font-semibold text-content">{sourceLabel}</div>
-                              <div className="text-xs leading-5 text-content-muted">
-                                This is the swipe the system grounded the remix on before preparing any Meta creative spec.
-                              </div>
-                            </div>
                           </div>
 
                           <div className="rounded-xl border border-border bg-surface p-3">

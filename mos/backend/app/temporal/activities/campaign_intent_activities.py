@@ -19,6 +19,7 @@ from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Produ
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
@@ -764,8 +765,10 @@ def create_campaign_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("product_id is required to create a campaign")
     if not channels or not all(isinstance(ch, str) and ch.strip() for ch in channels):
         raise ValueError("channels must include at least one non-empty value.")
-    if not asset_brief_types or not all(isinstance(t, str) and t.strip() for t in asset_brief_types):
-        raise ValueError("asset_brief_types must include at least one non-empty value.")
+    asset_brief_types = normalize_required_asset_brief_types(
+        asset_brief_types,
+        field_name="asset_brief_types",
+    )
 
     with session_scope() as session:
         repo = CampaignsRepository(session)

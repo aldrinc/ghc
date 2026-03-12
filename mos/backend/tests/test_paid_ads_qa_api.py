@@ -104,6 +104,64 @@ def _mock_hydrated_graph_refresh(monkeypatch, *, overrides: dict | None = None) 
     )
 
 
+def _seed_campaign_ready_meta_objects(
+    *,
+    db_session,
+    client_id: str,
+    product_id: str,
+    campaign_id: str,
+) -> None:
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.qa_passed,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"kind": "creative"},
+        storage_key="creative/campaign-history.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={},
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    creative_spec = MetaCreativeSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        asset_id=asset.id,
+        name="Campaign QA History Creative",
+        primary_text="Compliant primary text.",
+        headline="Compliant headline",
+        description="Privacy Policy. Contact support@example.com",
+        call_to_action_type="Learn More",
+        destination_url="https://example.com/offer",
+        status="draft",
+        metadata_json={},
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        name="Campaign QA History Ad Set",
+        status="draft",
+        metadata_json={},
+    )
+    db_session.add_all([creative_spec, adset_spec])
+    db_session.commit()
+
+
 def test_paid_ads_ruleset_api_exposes_structured_rules(api_client) -> None:
     summary_resp = api_client.get("/paid-ads-qa/rulesets")
     assert summary_resp.status_code == 200
@@ -288,6 +346,70 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
     assert report_resp.status_code == 200
     assert "Paid Ads QA Report" in report_resp.text
     assert "META-COPY-002" in report_resp.text
+
+
+def test_meta_campaign_paid_ads_qa_lists_previous_runs(
+    api_client,
+    db_session,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="campaign-qa-history")
+    _mock_passthrough_graph_refresh(monkeypatch)
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert profile_resp.status_code == 200
+
+    report_path = tmp_path / "campaign-history-report.md"
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "write_report_file",
+        lambda **_kwargs: str(report_path),
+    )
+    monkeypatch.setattr(
+        paid_ads_qa_service,
+        "_landing_page_snapshot",
+        lambda url: {
+            "requestedUrl": url,
+            "finalUrl": url,
+            "statusCode": 200,
+            "bodyText": "Privacy Policy. Contact support@example.com",
+        },
+    )
+
+    _seed_campaign_ready_meta_objects(
+        db_session=db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+    )
+
+    first_run_resp = api_client.post(
+        f"/campaigns/{campaign_id}/paid-ads-qa/runs",
+        json={"platform": "meta", "rulesetVersion": RULESET_VERSION},
+    )
+    assert first_run_resp.status_code == 200
+    first_run = first_run_resp.json()
+
+    second_run_resp = api_client.post(
+        f"/campaigns/{campaign_id}/paid-ads-qa/runs",
+        json={"platform": "meta", "rulesetVersion": RULESET_VERSION, "reviewBaseUrl": "http://localhost:5275"},
+    )
+    assert second_run_resp.status_code == 200
+    second_run = second_run_resp.json()
+
+    list_resp = api_client.get(f"/campaigns/{campaign_id}/paid-ads-qa/runs")
+    assert list_resp.status_code == 200
+    runs = list_resp.json()
+
+    assert [run["id"] for run in runs] == [second_run["id"], first_run["id"]]
+    assert runs[0]["findings"] == []
+    assert runs[1]["findings"] == []
+    assert runs[0]["metadata"]["reviewBaseUrl"] == "http://localhost:5275"
+    assert runs[1]["metadata"]["reviewBaseUrl"] is None
 
 
 def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_base_url(

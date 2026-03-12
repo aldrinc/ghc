@@ -74,7 +74,6 @@ _DEFAULT_SWIPE_SOURCE_LABELS = [
     "7.png",
     "8.png",
     "9.png",
-    "_initial_swipe_contact_sheet.jpg",
     "big_text.jpg",
     "boss_babe.jpg",
     "brush.jpg",

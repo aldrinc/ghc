@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from app.temporal.activities.asset_activities import (
+    _DEFAULT_SWIPE_SOURCE_LABELS,
     _DefaultSwipeSource,
     _build_creative_generation_batch_id,
     _build_creative_generation_plan_items,
@@ -110,6 +111,10 @@ def test_extract_requirement_swipe_requires_product_image() -> None:
 
 def test_extract_source_filename_decodes_percent_encoded_swipe_labels() -> None:
     assert _extract_source_filename("http://127.0.0.1:8099/Static%20%231.png") == "Static #1.png"
+
+
+def test_default_swipe_source_labels_exclude_internal_contact_sheet() -> None:
+    assert "_initial_swipe_contact_sheet.jpg" not in _DEFAULT_SWIPE_SOURCE_LABELS
 
 
 def test_extract_swipe_requires_product_image_from_tags() -> None:
