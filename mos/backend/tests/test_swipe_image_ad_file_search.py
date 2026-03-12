@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -86,6 +87,56 @@ def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tup
     assert campaign_resp.status_code == 201
     campaign_id = campaign_resp.json()["id"]
     return client_id, product_id, campaign_id
+
+
+def test_ensure_gemini_client_uses_settings_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeHttpOptions:
+        def __init__(
+            self,
+            *,
+            timeout: int,
+            clientArgs: dict[str, object] | None = None,
+            asyncClientArgs: dict[str, object] | None = None,
+        ) -> None:
+            self.timeout = timeout
+            self.clientArgs = clientArgs
+            self.asyncClientArgs = asyncClientArgs
+            captured["timeout"] = timeout
+            captured["clientArgs"] = clientArgs
+            captured["asyncClientArgs"] = asyncClientArgs
+
+    class _FakeClient:
+        def __init__(self, *, api_key: str, http_options: object) -> None:
+            self.api_key = api_key
+            self.http_options = http_options
+            captured["api_key"] = api_key
+            captured["http_options"] = http_options
+
+    monkeypatch.setattr(swipe_activity, "_GEMINI_CLIENT", None)
+    monkeypatch.setattr(swipe_activity, "genai", SimpleNamespace(Client=_FakeClient))
+    monkeypatch.setattr(
+        swipe_activity,
+        "genai_types",
+        SimpleNamespace(HttpOptions=_FakeHttpOptions),
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(swipe_activity.settings, "SWIPE_GEMINI_TIMEOUT_SECONDS", 300)
+
+    client = swipe_activity._ensure_gemini_client()
+
+    assert isinstance(client, _FakeClient)
+    assert captured["api_key"] == "test-gemini-key"
+    assert captured["timeout"] == 300_000
+    sync_timeout = captured["clientArgs"]["timeout"]
+    async_timeout = captured["asyncClientArgs"]["timeout"]
+    assert isinstance(sync_timeout, httpx.Timeout)
+    assert sync_timeout.connect == 30.0
+    assert sync_timeout.read == 300.0
+    assert sync_timeout.write == 300.0
+    assert sync_timeout.pool == 300.0
+    assert async_timeout is sync_timeout
 
 
 def _fake_swipe_stage1_rag_docs() -> list[dict[str, object]]:

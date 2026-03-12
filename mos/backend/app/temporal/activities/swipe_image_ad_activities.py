@@ -68,7 +68,32 @@ _GEMINI_CLIENT: Any | None = None
 _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
 _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
-_SWIPE_GEMINI_TIMEOUT_SECONDS = max(1, int(os.getenv("SWIPE_GEMINI_TIMEOUT_SECONDS", "120")))
+
+
+def _resolve_swipe_gemini_timeout_seconds() -> int:
+    return max(1, int(settings.SWIPE_GEMINI_TIMEOUT_SECONDS or 300))
+
+
+def _build_swipe_gemini_http_timeout() -> httpx.Timeout:
+    timeout_seconds = float(_resolve_swipe_gemini_timeout_seconds())
+    connect_timeout_seconds = min(timeout_seconds, 30.0)
+    return httpx.Timeout(
+        timeout_seconds,
+        connect=connect_timeout_seconds,
+        read=timeout_seconds,
+        write=timeout_seconds,
+        pool=timeout_seconds,
+    )
+
+
+def _build_swipe_gemini_http_options() -> Any:
+    timeout_seconds = _resolve_swipe_gemini_timeout_seconds()
+    httpx_timeout = _build_swipe_gemini_http_timeout()
+    return genai_types.HttpOptions(
+        timeout=timeout_seconds * 1000,
+        clientArgs={"timeout": httpx_timeout},
+        asyncClientArgs={"timeout": httpx_timeout},
+    )
 
 
 def _load_swipe_product_image_profiles() -> Dict[str, bool]:
@@ -316,7 +341,7 @@ def _ensure_gemini_client():
         raise RuntimeError("GEMINI_API_KEY not configured")
     _GEMINI_CLIENT = genai.Client(
         api_key=api_key,
-        http_options=genai_types.HttpOptions(timeout=_SWIPE_GEMINI_TIMEOUT_SECONDS),
+        http_options=_build_swipe_gemini_http_options(),
     )
     return _GEMINI_CLIENT
 
