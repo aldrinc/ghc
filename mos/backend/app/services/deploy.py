@@ -1922,12 +1922,27 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, org_id: str) -> str:
-    org_component = _normalize_bunny_pull_zone_name_component(
-        value=org_id,
-        label="org_id",
+def _build_bunny_pull_zone_name(*, workspace_id: str) -> str:
+    workspace_component = _normalize_bunny_pull_zone_name_component(
+        value=workspace_id,
+        label="workspace_id",
     )
-    return org_component
+    return workspace_component
+
+
+def _extract_bunny_pull_zone_workspace_id(*, workload: dict[str, Any], workload_name: str) -> str:
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{workload_name}' source_ref must be an object for Bunny pull zone provisioning."
+        )
+
+    workspace_id = str(source_ref.get("client_id") or "").strip()
+    if not workspace_id:
+        raise DeployError(
+            f"Workload '{workload_name}' source_ref.client_id is required for Bunny pull zone provisioning."
+        )
+    return workspace_id
 
 
 def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
@@ -2277,8 +2292,8 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(org_id=org_id)
+def _ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(workspace_id=workspace_id)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     zone: dict[str, Any]
@@ -2379,6 +2394,7 @@ def configure_bunny_pull_zone_for_workload(
         raise DeployError(
             "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
         )
+    workspace_id = _extract_bunny_pull_zone_workspace_id(workload=workload, workload_name=workload_name)
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2398,7 +2414,7 @@ def configure_bunny_pull_zone_for_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=org_id,
+        workspace_id=workspace_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2454,6 +2470,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         raise DeployError(
             "Bunny pull zone provisioning from publish requires source_type 'funnel_artifact'."
         )
+    workspace_id = _extract_bunny_pull_zone_workspace_id(workload=workload, workload_name=workload_name)
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2470,7 +2487,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=org_id,
+        workspace_id=workspace_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(

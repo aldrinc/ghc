@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
+import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -137,7 +138,8 @@ export function FunnelDetailPage() {
   const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
   const funnelRouteSlug = shortUuidRouteToken(funnel?.id || "");
   const publicBase = funnelRouteSlug && productRouteSlug ? `/f/${productRouteSlug}/${funnelRouteSlug}` : null;
-  const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
+  const publicOrigin = resolveWindowShopHostedOrigin();
+  const mosPreviewUrl = publicBase ? resolveShopHostedUrl(publicBase, publicOrigin) : null;
   const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
   const entryArtifact = useMemo(() => {
     if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
@@ -529,10 +531,10 @@ export function FunnelDetailPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    if (!publicBase) return;
-                    navigator.clipboard.writeText(window.location.origin + publicBase);
+                    if (!mosPreviewUrl) return;
+                    navigator.clipboard.writeText(mosPreviewUrl);
                   }}
-                  disabled={!publicBase}
+                  disabled={!mosPreviewUrl}
                 >
                   Copy share link
                 </Button>
@@ -794,9 +796,14 @@ export function FunnelDetailPage() {
                           />
                         </div>
                         {publicBase ? (
-                          <Link to={`${publicBase}/${page.slug}`} target="_blank" className="text-xs text-content-muted hover:underline">
+                          <a
+                            href={resolveShopHostedUrl(`${publicBase}/${page.slug}`, publicOrigin) || `${publicBase}/${page.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-content-muted hover:underline"
+                          >
                             Open public
-                          </Link>
+                          </a>
                         ) : null}
                         <Button variant="secondary" size="sm" asChild>
                           <Link to={`/research/funnels/${funnel.id}/pages/${page.id}`}>Edit</Link>

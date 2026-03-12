@@ -6,6 +6,7 @@ import { CampaignPaidAdsQaCard } from "@/components/campaigns/CampaignPaidAdsQaC
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
+import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { AssetBrief } from "@/types/artifacts";
 import type { Campaign } from "@/types/common";
 import type { MetaPipelineAsset } from "@/types/meta";
@@ -32,11 +33,6 @@ function resolveAssetUrl(path?: string | null): string | null {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   return `${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function resolveReviewUrl(path?: string | null): string | null {
-  if (!path || typeof window === "undefined" || !window.location?.origin) return null;
-  return `${window.location.origin}${path}`;
 }
 
 function getErrorMessage(err: unknown) {
@@ -219,6 +215,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const queryClient = useQueryClient();
   const { post } = useApiClient();
   const { getConfig, listPipelineAssets } = useMetaApi();
+  const reviewBaseUrl = resolveWindowShopHostedOrigin();
 
   const [config, setConfig] = useState<{
     adAccountId: string;
@@ -590,8 +587,8 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                     const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
                     const creativeSpecSource = readString(creativeMetadata.source);
                     const reviewPaths = (creativeMetadata.reviewPaths || {}) as Record<string, string>;
-                    const preSalesUrl = resolveReviewUrl(reviewPaths["pre-sales"]);
-                    const salesUrl = resolveReviewUrl(reviewPaths["sales"]);
+                    const preSalesUrl = resolveShopHostedUrl(reviewPaths["pre-sales"], reviewBaseUrl);
+                    const salesUrl = resolveShopHostedUrl(reviewPaths["sales"], reviewBaseUrl);
                     const swipeCopyInputs = readRecord(item.asset.ai_metadata?.swipeCopyInputs);
                     const swipeAdMedia = readRecord(swipeCopyInputs?.adImageOrVideo);
                     const sourceUrl = resolveAssetUrl(
@@ -616,6 +613,8 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                     const swipeCandidateCta = readString(swipeCopyPack?.metaCta);
                     const previewMarkdown = readString(swipeCopyPack?.formattedVariationsMarkdown);
                     const previewVariation = readString(swipeCopyPack?.selectedVariation);
+                    const resolvedMetaDestinationUrl =
+                      resolveShopHostedUrl(metaDestinationUrl, reviewBaseUrl) || metaDestinationUrl;
                     const metaSpecPreparedFromSwipeCopy = creativeSpecSource === "campaign_meta_review_setup_swipe_copy";
                     const hasLegacyMetaSpec = Boolean(item.creative_spec?.id) && !metaSpecPreparedFromSwipeCopy;
                     const metaPreviewStatusLabel = item.creative_spec?.id
@@ -729,7 +728,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                 <CopyField label="Description" value={metaUploadDescription} />
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   <CopyField label="CTA Button" value={metaUploadCta} />
-                                  <CopyField label="Destination URL" value={metaDestinationUrl} />
+                                  <CopyField label="Destination URL" value={resolvedMetaDestinationUrl} />
                                 </div>
                               </div>
                             ) : (
@@ -747,7 +746,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                             headline={metaUploadHeadline}
                             description={metaUploadDescription}
                             cta={metaUploadCta}
-                            destinationUrl={metaDestinationUrl}
+                            destinationUrl={resolvedMetaDestinationUrl}
                             specReady={Boolean(item.creative_spec?.id)}
                             specSourceLabel={metaSpecPreparedFromSwipeCopy ? "Prepared from swipe copy" : metaPreviewStatusLabel}
                           />

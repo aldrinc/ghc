@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { Campaign } from "@/types/common";
 
 type CampaignPaidAdsQaCardProps = {
@@ -216,7 +217,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null);
 
-  const reviewBaseUrl = typeof window !== "undefined" && window.location?.origin ? window.location.origin : null;
+  const reviewBaseUrl = resolveWindowShopHostedOrigin();
 
   useEffect(() => {
     let cancelled = false;
