@@ -1659,9 +1659,175 @@ def _extract_first_json_object_from_text(text: str) -> Dict[str, Any]:
             depth -= 1
             if depth == 0:
                 candidate = text[start : idx + 1]
-                return json.loads(candidate)
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("Swipe Stage 1 copy response contained malformed JSON.") from exc
 
     raise RuntimeError("Swipe Stage 1 copy response contained malformed JSON.")
+
+
+def _repair_truncated_json(text: str) -> str | None:
+    stripped = text.rstrip()
+    if not stripped.startswith("{"):
+        return None
+
+    closing_stack: list[str] = []
+    in_string = False
+    escape = False
+    for char in stripped:
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            closing_stack.append("}")
+            continue
+        if char == "[":
+            closing_stack.append("]")
+            continue
+        if char in {"}", "]"}:
+            if not closing_stack or char != closing_stack[-1]:
+                return None
+            closing_stack.pop()
+
+    if in_string or not closing_stack:
+        return None
+    return stripped + "".join(reversed(closing_stack))
+
+
+def _strip_trailing_commas(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            out.append(ch)
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            continue
+
+        if ch in ("}", "]"):
+            j = len(out) - 1
+            while j >= 0 and out[j].isspace():
+                j -= 1
+            if j >= 0 and out[j] == ",":
+                out.pop(j)
+        out.append(ch)
+
+    return "".join(out)
+
+
+def _escape_unescaped_control_chars(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                out.append(ch)
+                escape = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+                out.append(ch)
+                continue
+            if ch == "\n":
+                out.append("\\n")
+                continue
+            if ch == "\r":
+                out.append("\\r")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ch == "\b":
+                out.append("\\b")
+                continue
+            if ch == "\f":
+                out.append("\\f")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+
+        if ch == '"':
+            in_string = True
+        out.append(ch)
+
+    return "".join(out)
+
+
+def _repair_json_text(text: str) -> str:
+    if not text:
+        return text
+    repaired = _strip_trailing_commas(text)
+    return _escape_unescaped_control_chars(repaired)
+
+
+def _parse_swipe_copy_json_object(text: str) -> Dict[str, Any]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def _add(candidate: str | None) -> None:
+        if not isinstance(candidate, str):
+            return
+        stripped = candidate.strip()
+        if not stripped or stripped in seen:
+            return
+        seen.add(stripped)
+        candidates.append(stripped)
+
+    raw = _strip_json_fence(text)
+    repaired = _repair_json_text(raw)
+    repaired_truncated = _repair_truncated_json(raw)
+    repaired_truncated_sanitized = _repair_truncated_json(repaired)
+
+    _add(raw)
+    _add(repaired)
+    _add(repaired_truncated)
+    _add(repaired_truncated_sanitized)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+
+        try:
+            parsed = _extract_first_json_object_from_text(candidate)
+        except RuntimeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+
+    raise RuntimeError("Swipe Stage 1 copy response did not contain a valid JSON object.")
 
 
 def _strip_json_fence(text: str) -> str:
@@ -1735,24 +1901,20 @@ def _call_swipe_copy_gemini_json_message(
         parsed = parsed.model_dump(mode="json", by_alias=True, exclude_none=False)
 
     text = _extract_gemini_text(response) or ""
-    text = _strip_json_fence(text)
     if parsed is None:
         try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            try:
-                parsed = _extract_first_json_object_from_text(text)
-            except RuntimeError as exc:
-                preview = text.strip()[:1200]
-                raise RuntimeError(
-                    "Swipe Stage 1 copy response was not valid JSON. "
-                    f"Raw response preview: {preview!r}"
-                ) from exc
+            parsed = _parse_swipe_copy_json_object(text)
+        except RuntimeError as exc:
+            preview = _strip_json_fence(text).strip()[:1200]
+            raise RuntimeError(
+                "Swipe Stage 1 copy response was not valid JSON. "
+                f"Raw response preview: {preview!r}"
+            ) from exc
     if not isinstance(parsed, dict):
         raise RuntimeError("Swipe Stage 1 copy generation returned a non-object JSON payload.")
     return {
         "parsed": parsed,
-        "text": text,
+        "text": _strip_json_fence(text),
         "stop_reason": _extract_gemini_finish_reason(response),
         "output_tokens": (_extract_gemini_usage_details(response) or {}).get("output"),
     }

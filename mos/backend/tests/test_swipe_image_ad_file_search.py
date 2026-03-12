@@ -428,6 +428,56 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert config.tools[0].file_search.file_search_store_names == ["fileSearchStores/context-store"]
 
 
+def test_call_swipe_copy_gemini_json_message_repairs_literal_newlines_in_json_strings(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1",
+  "formattedVariationsMarkdown": "```text
+**Variation 1**
+
+**Primary Text:** This keeps the blind-angle hook intact.
+**Headline:** Fix the routine bottleneck
+**Description:** Learn what changes the pattern
+**CTA:** Learn More
+```",
+  "metaPrimaryText": "Clinical proof and fast results with a compliant curiosity-led hook.",
+  "metaHeadline": "Fix the routine bottleneck",
+  "metaDescription": "Learn what changes the pattern",
+  "metaCta": "Learn More",
+  "claimsGuardrails": ["Do not promise medical outcomes."]
+}
+```"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1"
+    assert "Variation 1" in result["parsed"]["formattedVariationsMarkdown"]
+    assert result["parsed"]["metaHeadline"] == "Fix the routine bottleneck"
+    assert result["output_tokens"] == 222
+
+
 def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypatch):
     captured: dict[str, object] = {}
 

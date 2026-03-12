@@ -10,16 +10,12 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ASSET_BRIEF_TYPE_OPTIONS, DEFAULT_ASSET_BRIEF_TYPES, type AssetBriefType } from "@/lib/assetBriefTypes";
 import { cn } from "@/lib/utils";
 import type { Campaign } from "@/types/common";
 
 const CHANNEL_OPTIONS = [{ value: "facebook", label: "Facebook Ads" }];
-const ASSET_BRIEF_OPTIONS = [
-  { value: "image", label: "Image" },
-  { value: "video", label: "Video" },
-];
 const DEFAULT_CHANNELS = ["facebook"];
-const DEFAULT_ASSET_BRIEF_TYPES = ["image"];
 
 export function CampaignsPage() {
   const navigate = useNavigate();
@@ -31,7 +27,7 @@ export function CampaignsPage() {
   const [modalProductId, setModalProductId] = useState("");
   const [name, setName] = useState("");
   const [channels, setChannels] = useState<string[]>(DEFAULT_CHANNELS);
-  const [assetBriefTypes, setAssetBriefTypes] = useState<string[]>(DEFAULT_ASSET_BRIEF_TYPES);
+  const [assetBriefTypes, setAssetBriefTypes] = useState<AssetBriefType[]>(DEFAULT_ASSET_BRIEF_TYPES);
   const [banner, setBanner] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -334,7 +330,7 @@ export function CampaignsPage() {
             <div className="space-y-2">
               <label className="text-xs font-semibold text-content">Creative brief types</label>
               <div className="flex flex-wrap gap-3">
-                {ASSET_BRIEF_OPTIONS.map((option) => (
+                {ASSET_BRIEF_TYPE_OPTIONS.map((option) => (
                   <label key={option.value} className="flex items-center gap-2 text-sm text-content">
                     <input
                       type="checkbox"

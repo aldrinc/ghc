@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +11,11 @@ from app.db.base import session_scope
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
+from app.services.claude_files import ensure_uploaded_to_claude
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
+)
 
 
 def _coerce_uuid_string(value: Any, *, field_name: str) -> str | None:
@@ -37,6 +43,12 @@ def _require_string_list(value: Any, *, field_name: str) -> list[str]:
     if not normalized:
         raise RuntimeError(f"{field_name} must include at least one non-empty string.")
     return normalized
+
+
+def _require_dict(value: Any, *, field_name: str) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    raise RuntimeError(f"{field_name} must be an object.")
 
 
 def _build_experiment_spec_payload(
@@ -132,6 +144,115 @@ def _build_asset_brief_payload(
     return briefs
 
 
+def _build_launch_workspace_context_docs(
+    *,
+    campaign_id: str,
+    source_stage3: dict[str, Any],
+    source_offer: dict[str, Any],
+    source_copy: dict[str, Any],
+    source_copy_context: dict[str, Any],
+    strategy_sheet: dict[str, Any],
+    experiment_spec_payload: dict[str, Any],
+    asset_brief_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "doc_key": "strategy_v2_stage3",
+            "doc_title": "Strategy V2 Stage3",
+            "source_kind": "strategy_v2_stage3",
+            "payload": source_stage3,
+        },
+        {
+            "doc_key": "strategy_v2_offer",
+            "doc_title": "Strategy V2 Offer",
+            "source_kind": "strategy_v2_offer",
+            "payload": source_offer,
+        },
+        {
+            "doc_key": "strategy_v2_copy",
+            "doc_title": "Strategy V2 Copy",
+            "source_kind": "strategy_v2_copy",
+            "payload": source_copy,
+        },
+        {
+            "doc_key": "strategy_v2_copy_context",
+            "doc_title": "Strategy V2 Copy Context",
+            "source_kind": "strategy_v2_copy_context",
+            "payload": source_copy_context,
+        },
+        {
+            "doc_key": f"strategy_sheet:{campaign_id}",
+            "doc_title": "Strategy Sheet",
+            "source_kind": "strategy_sheet",
+            "payload": strategy_sheet,
+        },
+        {
+            "doc_key": f"experiment_specs:{campaign_id}",
+            "doc_title": "Experiment Specs",
+            "source_kind": "experiment_specs",
+            "payload": experiment_spec_payload,
+        },
+        {
+            "doc_key": f"asset_briefs:{campaign_id}",
+            "doc_title": "Asset Briefs",
+            "source_kind": "asset_briefs",
+            "payload": asset_brief_payload,
+        },
+    ]
+
+
+def _persist_launch_workspace_context_docs(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str,
+    docs: list[dict[str, Any]],
+    allow_claude_stub: bool,
+) -> None:
+    gemini_enabled = is_gemini_file_search_enabled()
+    for doc in docs:
+        payload = _require_dict(doc.get("payload"), field_name=f"{doc.get('doc_key')}.payload")
+        doc_key = _require_nonempty_string(doc.get("doc_key"), field_name="doc_key")
+        doc_title = _require_nonempty_string(doc.get("doc_title"), field_name=f"{doc_key}.doc_title")
+        source_kind = _require_nonempty_string(doc.get("source_kind"), field_name=f"{doc_key}.source_kind")
+        content_bytes = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        ensure_uploaded_to_claude(
+            org_id=org_id,
+            idea_workspace_id=campaign_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=doc_key,
+            doc_title=doc_title,
+            source_kind=source_kind,
+            step_key=None,
+            filename=f"{doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=content_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+            allow_stub=allow_claude_stub,
+        )
+        if gemini_enabled:
+            ensure_uploaded_to_gemini_file_search(
+                org_id=org_id,
+                idea_workspace_id=campaign_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                doc_key=doc_key,
+                doc_title=doc_title,
+                source_kind=source_kind,
+                step_key=None,
+                filename=f"{doc_key}.json",
+                mime_type="text/plain",
+                content_bytes=content_bytes,
+                drive_doc_id=None,
+                drive_url=None,
+            )
+
+
 @activity.defn(name="strategy_v2_launch.create_launch_artifacts")
 def create_strategy_v2_launch_artifacts_activity(params: dict[str, Any]) -> dict[str, Any]:
     org_id = _require_nonempty_string(params.get("org_id"), field_name="org_id")
@@ -150,12 +271,16 @@ def create_strategy_v2_launch_artifacts_activity(params: dict[str, Any]) -> dict
     )
     channels = _require_string_list(params.get("channels"), field_name="channels")
     asset_brief_types = _require_string_list(params.get("asset_brief_types"), field_name="asset_brief_types")
+    allow_claude_stub = bool(params.get("allow_claude_stub", False))
     strategy_v2_packet = params.get("strategy_v2_packet")
-    if not isinstance(strategy_v2_packet, dict):
-        raise RuntimeError("strategy_v2_packet must be an object.")
-    strategy_v2_copy_context = params.get("strategy_v2_copy_context")
-    if not isinstance(strategy_v2_copy_context, dict):
-        raise RuntimeError("strategy_v2_copy_context must be an object.")
+    strategy_v2_packet = _require_dict(strategy_v2_packet, field_name="strategy_v2_packet")
+    source_stage3 = _require_dict(params.get("source_stage3"), field_name="source_stage3")
+    source_offer = _require_dict(params.get("source_offer"), field_name="source_offer")
+    source_copy = _require_dict(params.get("source_copy"), field_name="source_copy")
+    strategy_v2_copy_context = _require_dict(
+        params.get("strategy_v2_copy_context"),
+        field_name="strategy_v2_copy_context",
+    )
 
     template_payloads = strategy_v2_packet.get("template_payloads")
     if not isinstance(template_payloads, dict):
@@ -214,6 +339,14 @@ def create_strategy_v2_launch_artifacts_activity(params: dict[str, Any]) -> dict
 
     created_by_user = params.get("created_by_user")
     created_by_user_value = created_by_user.strip() if isinstance(created_by_user, str) and created_by_user.strip() else None
+    experiment_artifact_payload = {
+        "experiment_specs": [experiment],
+        "strategy_v2_packet": strategy_v2_packet,
+        "strategy_v2_copy_context": strategy_v2_copy_context,
+    }
+    asset_brief_artifact_payload = {
+        "asset_briefs": asset_briefs,
+    }
 
     with session_scope() as session:
         artifacts_repo = ArtifactsRepository(session)
@@ -233,11 +366,7 @@ def create_strategy_v2_launch_artifacts_activity(params: dict[str, Any]) -> dict
             product_id=product_id,
             campaign_id=campaign_id,
             artifact_type=ArtifactTypeEnum.experiment_spec,
-            data={
-                "experiment_specs": [experiment],
-                "strategy_v2_packet": strategy_v2_packet,
-                "strategy_v2_copy_context": strategy_v2_copy_context,
-            },
+            data=experiment_artifact_payload,
             created_by_user=created_by_user_value,
         )
         experiment_spec_artifact_id = str(experiment_artifact.id)
@@ -247,12 +376,30 @@ def create_strategy_v2_launch_artifacts_activity(params: dict[str, Any]) -> dict
             product_id=product_id,
             campaign_id=campaign_id,
             artifact_type=ArtifactTypeEnum.asset_brief,
-            data={
-                "asset_briefs": asset_briefs,
-            },
+            data=asset_brief_artifact_payload,
             created_by_user=created_by_user_value,
         )
         asset_brief_artifact_id = str(asset_brief_artifact.id)
+
+    # Seed the campaign workspace immediately so downstream copy-pack generation
+    # can attach the canonical Strategy V2 context without a separate backfill step.
+    _persist_launch_workspace_context_docs(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        docs=_build_launch_workspace_context_docs(
+            campaign_id=campaign_id,
+            source_stage3=source_stage3,
+            source_offer=source_offer,
+            source_copy=source_copy,
+            source_copy_context=strategy_v2_copy_context,
+            strategy_sheet=strategy_sheet,
+            experiment_spec_payload=experiment_artifact_payload,
+            asset_brief_payload=asset_brief_artifact_payload,
+        ),
+        allow_claude_stub=allow_claude_stub,
+    )
 
     return {
         "strategy_sheet_artifact_id": strategy_sheet_artifact_id,

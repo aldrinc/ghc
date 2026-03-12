@@ -55,6 +55,7 @@ from app.schemas.common import ClientCreate
 from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
 from app.schemas.intent import CampaignIntentRequest
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.shopify_connection import (
     ShopifyThemeBrandAuditRequest,
     ShopifyThemeBrandAuditResponse,
@@ -11056,13 +11057,13 @@ async def start_campaign_intent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="channels must include at least one non-empty value.",
         )
-    if not payload.assetBriefTypes or not all(
-        isinstance(t, str) and t.strip() for t in payload.assetBriefTypes
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="assetBriefTypes must include at least one non-empty value.",
+    try:
+        asset_brief_types = normalize_required_asset_brief_types(
+            payload.assetBriefTypes,
+            field_name="assetBriefTypes",
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     strategy_v2_required = is_strategy_v2_enabled(
         session=session,
@@ -11108,7 +11109,7 @@ async def start_campaign_intent(
             product_id=product_id,
             campaign_name=payload.campaignName,
             channels=payload.channels,
-            asset_brief_types=payload.assetBriefTypes,
+            asset_brief_types=asset_brief_types,
             goal_description=payload.goalDescription,
             objective_type=payload.objectiveType,
             numeric_target=payload.numericTarget,
