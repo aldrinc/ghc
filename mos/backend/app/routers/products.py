@@ -272,6 +272,295 @@ def _load_product_offers_with_bonus_products(
     return [(offer, bonuses_by_offer_id.get(str(offer.id), [])) for offer in offers]
 
 
+def _apply_shopify_variant_sync_payload(
+    *,
+    session: Session,
+    product: Product,
+    shopify_product: dict[str, object],
+) -> tuple[int, int]:
+    shopify_variants = shopify_product.get("variants")
+    if not isinstance(shopify_variants, list):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify product payload is missing variants.",
+        )
+
+    existing_variants = session.scalars(
+        select(ProductVariant).where(ProductVariant.product_id == product.id)
+    ).all()
+    existing_by_external_id: dict[str, ProductVariant] = {}
+    existing_unmapped_by_title: dict[str, list[ProductVariant]] = {}
+    for variant in existing_variants:
+        if not isinstance(variant.external_price_id, str) or not variant.external_price_id.strip():
+            normalized_provider = _normalize_variant_provider(variant.provider)
+            if normalized_provider not in {None, "shopify"}:
+                continue
+            normalized_title = str(variant.title or "").strip().lower()
+            if normalized_title:
+                existing_unmapped_by_title.setdefault(normalized_title, []).append(variant)
+            continue
+        normalized_external_id = variant.external_price_id.strip()
+        if normalized_external_id in existing_by_external_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Cannot sync Shopify variants because duplicate externalPriceId mappings exist in MOS for this product: "
+                    f"{normalized_external_id}."
+                ),
+            )
+        existing_by_external_id[normalized_external_id] = variant
+
+    synced_at = datetime.now(timezone.utc)
+    created_count = 0
+    updated_count = 0
+    for raw_shopify_variant in shopify_variants:
+        if not isinstance(raw_shopify_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product payload contains an invalid variant object.",
+            )
+        variant_gid = raw_shopify_variant.get("variantGid")
+        variant_title = raw_shopify_variant.get("title")
+        variant_price_cents = raw_shopify_variant.get("priceCents")
+        variant_currency = raw_shopify_variant.get("currency")
+        variant_taxable = raw_shopify_variant.get("taxable")
+        variant_requires_shipping = raw_shopify_variant.get("requiresShipping")
+
+        if not isinstance(variant_gid, str) or not variant_gid.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product payload variant is missing variantGid.",
+            )
+        if not isinstance(variant_title, str) or not variant_title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product payload variant {variant_gid} is missing title.",
+            )
+        if not isinstance(variant_price_cents, int) or variant_price_cents < 0:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product payload variant {variant_gid} is missing a valid priceCents.",
+            )
+        if not isinstance(variant_currency, str) or len(variant_currency.strip()) != 3:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product payload variant {variant_gid} is missing a valid currency.",
+            )
+        if not isinstance(variant_taxable, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product payload variant {variant_gid} is missing taxable.",
+            )
+        if not isinstance(variant_requires_shipping, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product payload variant {variant_gid} is missing requiresShipping.",
+            )
+
+        option_values = raw_shopify_variant.get("optionValues") or {}
+        normalized_option_values = (
+            {key: value for key, value in option_values.items()} if isinstance(option_values, dict) and option_values else None
+        )
+        variant = existing_by_external_id.get(variant_gid.strip())
+        if variant is None:
+            normalized_title = variant_title.strip().lower()
+            title_matches = existing_unmapped_by_title.get(normalized_title) or []
+            if len(title_matches) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Cannot sync Shopify variants because multiple unmapped MOS variants share the title "
+                        f'"{variant_title}".'
+                    ),
+                )
+            if len(title_matches) == 1:
+                variant = title_matches[0]
+                existing_unmapped_by_title.pop(normalized_title, None)
+
+        if variant is not None:
+            variant.title = variant_title.strip()
+            variant.price = variant_price_cents
+            variant.currency = variant_currency.strip().lower()
+            variant.provider = "shopify"
+            variant.external_price_id = variant_gid.strip()
+            variant.compare_at_price = raw_shopify_variant.get("compareAtPriceCents")
+            variant.sku = raw_shopify_variant.get("sku")
+            variant.barcode = raw_shopify_variant.get("barcode")
+            variant.taxable = variant_taxable
+            variant.requires_shipping = variant_requires_shipping
+            variant.inventory_policy = raw_shopify_variant.get("inventoryPolicy")
+            variant.inventory_management = raw_shopify_variant.get("inventoryManagement")
+            variant.inventory_quantity = raw_shopify_variant.get("inventoryQuantity")
+            variant.option_values = normalized_option_values
+            variant.shopify_last_synced_at = synced_at
+            variant.shopify_last_sync_error = None
+            session.add(variant)
+            updated_count += 1
+            continue
+
+        session.add(
+            ProductVariant(
+                product_id=product.id,
+                title=variant_title.strip(),
+                price=variant_price_cents,
+                currency=variant_currency.strip().lower(),
+                provider="shopify",
+                external_price_id=variant_gid.strip(),
+                compare_at_price=raw_shopify_variant.get("compareAtPriceCents"),
+                sku=raw_shopify_variant.get("sku"),
+                barcode=raw_shopify_variant.get("barcode"),
+                taxable=variant_taxable,
+                requires_shipping=variant_requires_shipping,
+                inventory_policy=raw_shopify_variant.get("inventoryPolicy"),
+                inventory_management=raw_shopify_variant.get("inventoryManagement"),
+                inventory_quantity=raw_shopify_variant.get("inventoryQuantity"),
+                option_values=normalized_option_values,
+                shopify_last_synced_at=synced_at,
+                shopify_last_sync_error=None,
+            )
+        )
+        created_count += 1
+
+    return created_count, updated_count
+
+
+def _apply_created_shopify_variant_mappings(
+    *,
+    session: Session,
+    product: Product,
+    created_shopify_product: dict[str, object],
+    local_variants: list[ProductVariant],
+) -> None:
+    raw_created_variants = created_shopify_product.get("variants")
+    if not isinstance(raw_created_variants, list) or not raw_created_variants:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify product creation completed but did not return variants. "
+                "Cannot map created Shopify variants back into MOS."
+            ),
+        )
+
+    local_variants_by_title: dict[str, ProductVariant] = {}
+    for variant in local_variants:
+        normalized_title = str(variant.title or "").strip().lower()
+        if not normalized_title:
+            continue
+        if normalized_title in local_variants_by_title:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Cannot map created Shopify variants because multiple MOS variants share the title "
+                    f'"{variant.title}".'
+                ),
+            )
+        local_variants_by_title[normalized_title] = variant
+
+    synced_at = datetime.now(timezone.utc)
+    for raw_created_variant in raw_created_variants:
+        if not isinstance(raw_created_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product creation returned an invalid variant object.",
+            )
+        variant_gid = raw_created_variant.get("variantGid")
+        variant_title = raw_created_variant.get("title")
+        variant_price_cents = raw_created_variant.get("priceCents")
+        variant_currency = raw_created_variant.get("currency")
+        if not isinstance(variant_gid, str) or not variant_gid.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product creation returned a variant without variantGid.",
+            )
+        if not isinstance(variant_title, str) or not variant_title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify product creation returned variant {variant_gid} without title.",
+            )
+        matched_local_variant = local_variants_by_title.get(variant_title.strip().lower())
+        if matched_local_variant is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify product creation returned a variant that could not be mapped back to MOS: "
+                    f'"{variant_title}".'
+                ),
+            )
+        matched_local_variant.provider = "shopify"
+        matched_local_variant.external_price_id = variant_gid.strip()
+        if isinstance(variant_price_cents, int) and variant_price_cents >= 0:
+            matched_local_variant.price = variant_price_cents
+        if isinstance(variant_currency, str) and len(variant_currency.strip()) == 3:
+            matched_local_variant.currency = variant_currency.strip().lower()
+        matched_local_variant.shopify_last_synced_at = synced_at
+        matched_local_variant.shopify_last_sync_error = None
+        session.add(matched_local_variant)
+
+
+def _ensure_product_has_shopify_variant_mappings(
+    *,
+    session: Session,
+    product: Product,
+    resolved_shop_domain: str,
+) -> list[ProductVariant]:
+    variants_repo = ProductVariantsRepository(session)
+    variants = variants_repo.list_by_product(product_id=str(product.id))
+    if any(_is_shopify_managed_variant(variant) for variant in variants):
+        return variants
+
+    product_gid, created = _ensure_product_has_shopify_product_gid(
+        session=session,
+        product=product,
+        resolved_shop_domain=resolved_shop_domain,
+        variants=variants,
+    )
+    if created:
+        return variants
+
+    shopify_product = get_client_shopify_product(
+        client_id=str(product.client_id),
+        product_gid=product_gid,
+        shop_domain=resolved_shop_domain,
+    )
+    _apply_shopify_variant_sync_payload(
+        session=session,
+        product=product,
+        shopify_product=shopify_product,
+    )
+    return variants_repo.list_by_product(product_id=str(product.id))
+
+
+def _resolve_single_shopify_bonus_variant(
+    *,
+    session: Session,
+    product: Product,
+    resolved_shop_domain: str,
+) -> ProductVariant:
+    variants = _ensure_product_has_shopify_variant_mappings(
+        session=session,
+        product=product,
+        resolved_shop_domain=resolved_shop_domain,
+    )
+    eligible_variants = [variant for variant in variants if _is_shopify_managed_variant(variant)]
+    if not eligible_variants:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f'Bonus product "{product.title}" does not have a Shopify-mapped variant. '
+                "Sync the bonus product variants before using it in an offer."
+            ),
+        )
+    if len(eligible_variants) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f'Bonus product "{product.title}" must resolve to exactly one Shopify-mapped variant for automatic bonus checkout. '
+                f"Found {len(eligible_variants)}."
+            ),
+        )
+    return eligible_variants[0]
+
+
 def _validate_product_variants_for_shopify_sync(*, variants: list[ProductVariant]) -> None:
     if not variants:
         raise HTTPException(
@@ -372,14 +661,73 @@ def _validate_product_variants_for_shopify_sync(*, variants: list[ProductVariant
 
 def _build_shopify_source_of_truth_payload(
     *,
+    session: Session,
     product: Product,
     variants: list[ProductVariant],
     offers_with_bonuses: list[tuple[ProductOffer, list[tuple[ProductOfferBonus, Product]]]],
+    resolved_shop_domain: str,
 ) -> dict[str, object]:
     variants_by_offer_id: dict[str, list[ProductVariant]] = {}
     for variant in variants:
         if variant.offer_id:
             variants_by_offer_id.setdefault(str(variant.offer_id), []).append(variant)
+
+    serialized_offers: list[dict[str, object]] = []
+    for offer, bonuses in offers_with_bonuses:
+        offer_variants = variants_by_offer_id.get(str(offer.id), [])
+        serialized_bonus_products: list[dict[str, object]] = []
+        serialized_bonus_product_gids: list[str] = []
+        serialized_bonus_variant_gids: list[str] = []
+        for bonus, bonus_product in bonuses:
+            bonus_variant = _resolve_single_shopify_bonus_variant(
+                session=session,
+                product=bonus_product,
+                resolved_shop_domain=resolved_shop_domain,
+            )
+            bonus_product_gid = str(bonus_product.shopify_product_gid or "").strip()
+            if bonus_product_gid:
+                serialized_bonus_product_gids.append(bonus_product_gid)
+            serialized_bonus_variant_gids.append(str(bonus_variant.external_price_id or "").strip())
+            serialized_bonus_products.append(
+                {
+                    "id": str(bonus_product.id),
+                    "title": bonus_product.title,
+                    "description": bonus_product.description,
+                    "shopifyProductGid": bonus_product.shopify_product_gid,
+                    "position": bonus.position,
+                    "variantId": str(bonus_variant.id),
+                    "shopifyVariantGid": str(bonus_variant.external_price_id or "").strip(),
+                    "priceCents": bonus_variant.price,
+                    "currency": str(bonus_variant.currency or "").strip().upper(),
+                    "compareAtPriceCents": bonus_variant.compare_at_price,
+                }
+            )
+
+        serialized_offers.append(
+            {
+                "id": str(offer.id),
+                "name": offer.name,
+                "description": offer.description,
+                "businessModel": offer.business_model,
+                "differentiationBullets": list(offer.differentiation_bullets or []),
+                "guaranteeText": offer.guarantee_text,
+                "optionsSchema": offer.options_schema,
+                "variantIds": [str(variant.id) for variant in offer_variants],
+                "basket": {
+                    "primaryProductId": str(product.id),
+                    "primaryProductGid": product.shopify_product_gid,
+                    "variantIds": [str(variant.id) for variant in offer_variants],
+                    "shopifyVariantGids": [
+                        str(variant.external_price_id).strip()
+                        for variant in offer_variants
+                        if _is_shopify_managed_variant(variant)
+                    ],
+                    "bonusProducts": serialized_bonus_products,
+                    "bonusProductGids": serialized_bonus_product_gids,
+                    "bonusVariantGids": serialized_bonus_variant_gids,
+                },
+            }
+        )
 
     return {
         "source": "mos",
@@ -420,39 +768,7 @@ def _build_shopify_source_of_truth_payload(
             }
             for variant in variants
         ],
-        "offers": [
-            {
-                "id": str(offer.id),
-                "name": offer.name,
-                "description": offer.description,
-                "businessModel": offer.business_model,
-                "differentiationBullets": list(offer.differentiation_bullets or []),
-                "guaranteeText": offer.guarantee_text,
-                "optionsSchema": offer.options_schema,
-                "variantIds": [str(variant.id) for variant in variants_by_offer_id.get(str(offer.id), [])],
-                "basket": {
-                    "primaryProductId": str(product.id),
-                    "primaryProductGid": product.shopify_product_gid,
-                    "variantIds": [str(variant.id) for variant in variants_by_offer_id.get(str(offer.id), [])],
-                    "bonusProducts": [
-                        {
-                            "id": str(bonus_product.id),
-                            "title": bonus_product.title,
-                            "description": bonus_product.description,
-                            "shopifyProductGid": bonus_product.shopify_product_gid,
-                            "position": bonus.position,
-                        }
-                        for bonus, bonus_product in bonuses
-                    ],
-                    "bonusProductGids": [
-                        bonus_product.shopify_product_gid
-                        for bonus, bonus_product in bonuses
-                        if bonus_product.shopify_product_gid
-                    ],
-                },
-            }
-            for offer, bonuses in offers_with_bonuses
-        ],
+        "offers": serialized_offers,
     }
 
 
@@ -462,6 +778,32 @@ def _build_shopify_create_variants_payload(*, variants: list[ProductVariant]) ->
             "title": variant.title,
             "priceCents": variant.price,
             "currency": str(variant.currency or "").strip().upper(),
+        }
+        for variant in variants
+    ]
+
+
+def _build_shopify_sync_variants_payload(*, variants: list[ProductVariant]) -> list[dict[str, object]]:
+    return [
+        {
+            "sourceVariantId": str(variant.id),
+            "variantGid": (
+                variant.external_price_id.strip()
+                if _is_shopify_managed_variant(variant)
+                else None
+            ),
+            "title": variant.title,
+            "priceCents": variant.price,
+            "currency": str(variant.currency or "").strip().upper(),
+            "compareAtPriceCents": variant.compare_at_price,
+            "sku": variant.sku,
+            "barcode": variant.barcode,
+            "taxable": variant.taxable,
+            "requiresShipping": variant.requires_shipping,
+            "inventoryPolicy": variant.inventory_policy,
+            "inventoryManagement": variant.inventory_management,
+            "weight": float(variant.weight) if variant.weight is not None else None,
+            "weightUnit": variant.weight_unit,
         }
         for variant in variants
     ]
@@ -477,6 +819,7 @@ def _ensure_product_has_shopify_product_gid(
     product: Product,
     resolved_shop_domain: str,
     variants: list[ProductVariant] | None = None,
+    status_text_override: str | None = None,
 ) -> tuple[str, bool]:
     existing_product_gid = str(product.shopify_product_gid or "").strip()
     if existing_product_gid:
@@ -496,12 +839,18 @@ def _ensure_product_has_shopify_product_gid(
         vendor=product.vendor,
         product_type=product.product_type,
         tags=list(product.tags or []),
-        status_text=_product_shopify_status_text(product),
+        status_text=status_text_override or _product_shopify_status_text(product),
         variants=_build_shopify_create_variants_payload(variants=resolved_variants),
         shop_domain=resolved_shop_domain,
     )
     product.shopify_product_gid = created["productGid"]
     session.add(product)
+    _apply_created_shopify_variant_mappings(
+        session=session,
+        product=product,
+        created_shopify_product=created,
+        local_variants=resolved_variants,
+    )
     return created["productGid"], True
 
 
@@ -518,6 +867,77 @@ def _get_client_user_pref(
             ClientUserPreference.client_id == client_id,
             ClientUserPreference.user_external_id == user_external_id,
         )
+    )
+
+
+def _apply_shopify_sync_response_to_variants(
+    *,
+    session: Session,
+    variants: list[ProductVariant],
+    synced_variants: list[dict[str, object]],
+) -> None:
+    response_variants_by_title = {
+        str(item["title"]).strip().lower(): item for item in synced_variants
+    }
+    synced_at = datetime.now(timezone.utc)
+    for variant in variants:
+        variant.shopify_last_synced_at = synced_at
+        variant.shopify_last_sync_error = None
+        normalized_provider = _normalize_variant_provider(variant.provider)
+        if normalized_provider == "shopify" and variant.provider != normalized_provider:
+            variant.provider = normalized_provider
+        matched_variant = response_variants_by_title.get(str(variant.title or "").strip().lower())
+        if matched_variant is not None:
+            if normalized_provider == "shopify" and not _is_shopify_managed_variant(variant):
+                variant.external_price_id = matched_variant["variantGid"]
+            elif normalized_provider is None and not str(variant.external_price_id or "").strip():
+                variant.provider = "shopify"
+                variant.external_price_id = matched_variant["variantGid"]
+        session.add(variant)
+
+
+def _ensure_bonus_product_ready_for_automatic_checkout(
+    *,
+    session: Session,
+    product: Product,
+    resolved_shop_domain: str,
+) -> None:
+    variants_repo = ProductVariantsRepository(session)
+    variants = variants_repo.list_by_product(product_id=str(product.id))
+    _validate_product_variants_for_shopify_sync(variants=variants)
+    _ensure_product_has_shopify_product_gid(
+        session=session,
+        product=product,
+        resolved_shop_domain=resolved_shop_domain,
+        variants=variants,
+        status_text_override="ACTIVE",
+    )
+
+    source_of_truth_payload = _build_shopify_source_of_truth_payload(
+        session=session,
+        product=product,
+        variants=variants,
+        offers_with_bonuses=[],
+        resolved_shop_domain=resolved_shop_domain,
+    )
+    synced = sync_client_shopify_product(
+        client_id=str(product.client_id),
+        product_gid=product.shopify_product_gid,
+        title=product.title,
+        description=product.description or "",
+        handle=product.handle,
+        vendor=product.vendor,
+        product_type=product.product_type,
+        tags=list(product.tags or []),
+        status_text="ACTIVE",
+        variants=_build_shopify_sync_variants_payload(variants=variants),
+        source_of_truth_payload=source_of_truth_payload,
+        shop_domain=resolved_shop_domain,
+    )
+    _apply_shopify_sync_response_to_variants(
+        session=session,
+        variants=variants,
+        synced_variants=synced["variants"],
     )
 
 
@@ -901,100 +1321,11 @@ def sync_shopify_variants_for_product(
             ),
         )
 
-    existing_variants = session.scalars(
-        select(ProductVariant).where(ProductVariant.product_id == product.id)
-    ).all()
-    existing_by_external_id: dict[str, ProductVariant] = {}
-    existing_unmapped_by_title: dict[str, list[ProductVariant]] = {}
-    for variant in existing_variants:
-        if not isinstance(variant.external_price_id, str) or not variant.external_price_id.strip():
-            normalized_provider = _normalize_variant_provider(variant.provider)
-            if normalized_provider not in {None, "shopify"}:
-                continue
-            normalized_title = str(variant.title or "").strip().lower()
-            if normalized_title:
-                existing_unmapped_by_title.setdefault(normalized_title, []).append(variant)
-            continue
-        normalized_external_id = variant.external_price_id.strip()
-        if normalized_external_id in existing_by_external_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Cannot sync Shopify variants because duplicate externalPriceId mappings exist in MOS for this product: "
-                    f"{normalized_external_id}."
-                ),
-            )
-        existing_by_external_id[normalized_external_id] = variant
-
-    synced_at = datetime.now(timezone.utc)
-    created_count = 0
-    updated_count = 0
-    for shopify_variant in shopify_product["variants"]:
-        variant_gid = shopify_variant["variantGid"]
-        option_values = shopify_variant.get("optionValues") or {}
-        normalized_option_values = (
-            {key: value for key, value in option_values.items()} if option_values else None
-        )
-        variant = existing_by_external_id.get(variant_gid)
-        if variant is None:
-            normalized_title = str(shopify_variant["title"] or "").strip().lower()
-            title_matches = existing_unmapped_by_title.get(normalized_title) or []
-            if len(title_matches) > 1:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "Cannot sync Shopify variants because multiple unmapped MOS variants share the title "
-                        f'"{shopify_variant["title"]}".'
-                    ),
-                )
-            if len(title_matches) == 1:
-                variant = title_matches[0]
-                existing_unmapped_by_title.pop(normalized_title, None)
-
-        if variant is not None:
-            variant.title = shopify_variant["title"]
-            variant.price = shopify_variant["priceCents"]
-            variant.currency = shopify_variant["currency"].lower()
-            variant.provider = "shopify"
-            variant.external_price_id = variant_gid
-            variant.compare_at_price = shopify_variant.get("compareAtPriceCents")
-            variant.sku = shopify_variant.get("sku")
-            variant.barcode = shopify_variant.get("barcode")
-            variant.taxable = shopify_variant["taxable"]
-            variant.requires_shipping = shopify_variant["requiresShipping"]
-            variant.inventory_policy = shopify_variant.get("inventoryPolicy")
-            variant.inventory_management = shopify_variant.get("inventoryManagement")
-            variant.inventory_quantity = shopify_variant.get("inventoryQuantity")
-            variant.option_values = normalized_option_values
-            variant.shopify_last_synced_at = synced_at
-            variant.shopify_last_sync_error = None
-            session.add(variant)
-            updated_count += 1
-            continue
-
-        session.add(
-            ProductVariant(
-                product_id=product.id,
-                title=shopify_variant["title"],
-                price=shopify_variant["priceCents"],
-                currency=shopify_variant["currency"].lower(),
-                provider="shopify",
-                external_price_id=variant_gid,
-                compare_at_price=shopify_variant.get("compareAtPriceCents"),
-                sku=shopify_variant.get("sku"),
-                barcode=shopify_variant.get("barcode"),
-                taxable=shopify_variant["taxable"],
-                requires_shipping=shopify_variant["requiresShipping"],
-                inventory_policy=shopify_variant.get("inventoryPolicy"),
-                inventory_management=shopify_variant.get("inventoryManagement"),
-                inventory_quantity=shopify_variant.get("inventoryQuantity"),
-                option_values=normalized_option_values,
-                shopify_last_synced_at=synced_at,
-                shopify_last_sync_error=None,
-            )
-        )
-        created_count += 1
-
+    created_count, updated_count = _apply_shopify_variant_sync_payload(
+        session=session,
+        product=product,
+        shopify_product=shopify_product,
+    )
     session.commit()
     return ShopifyProductVariantSyncResponse(
         shopDomain=shopify_product["shopDomain"],
@@ -1060,7 +1391,7 @@ def sync_shopify_product_for_product(
     for offer, bonuses in offers_with_bonuses:
         for _bonus, bonus_product in bonuses:
             try:
-                _ensure_product_has_shopify_product_gid(
+                _ensure_bonus_product_ready_for_automatic_checkout(
                     session=session,
                     product=bonus_product,
                     resolved_shop_domain=resolved_shop_domain,
@@ -1084,33 +1415,13 @@ def sync_shopify_product_for_product(
     )
 
     source_of_truth_payload = _build_shopify_source_of_truth_payload(
+        session=session,
         product=product,
         variants=variants,
         offers_with_bonuses=offers_with_bonuses,
+        resolved_shop_domain=resolved_shop_domain,
     )
-    sync_variants_payload = [
-        {
-            "sourceVariantId": str(variant.id),
-            "variantGid": (
-                variant.external_price_id.strip()
-                if _is_shopify_managed_variant(variant)
-                else None
-            ),
-            "title": variant.title,
-            "priceCents": variant.price,
-            "currency": str(variant.currency or "").strip().upper(),
-            "compareAtPriceCents": variant.compare_at_price,
-            "sku": variant.sku,
-            "barcode": variant.barcode,
-            "taxable": variant.taxable,
-            "requiresShipping": variant.requires_shipping,
-            "inventoryPolicy": variant.inventory_policy,
-            "inventoryManagement": variant.inventory_management,
-            "weight": float(variant.weight) if variant.weight is not None else None,
-            "weightUnit": variant.weight_unit,
-        }
-        for variant in variants
-    ]
+    sync_variants_payload = _build_shopify_sync_variants_payload(variants=variants)
 
     try:
         synced = sync_client_shopify_product(
@@ -1135,24 +1446,11 @@ def sync_shopify_product_for_product(
         session.commit()
         raise
 
-    response_variants_by_title = {
-        str(item["title"]).strip().lower(): item for item in synced["variants"]
-    }
-    synced_at = datetime.now(timezone.utc)
-    for variant in variants:
-        variant.shopify_last_synced_at = synced_at
-        variant.shopify_last_sync_error = None
-        normalized_provider = _normalize_variant_provider(variant.provider)
-        if normalized_provider == "shopify" and variant.provider != normalized_provider:
-            variant.provider = normalized_provider
-        matched_variant = response_variants_by_title.get(str(variant.title or "").strip().lower())
-        if matched_variant is not None:
-            if normalized_provider == "shopify" and not _is_shopify_managed_variant(variant):
-                variant.external_price_id = matched_variant["variantGid"]
-            elif normalized_provider is None and not str(variant.external_price_id or "").strip():
-                variant.provider = "shopify"
-                variant.external_price_id = matched_variant["variantGid"]
-        session.add(variant)
+    _apply_shopify_sync_response_to_variants(
+        session=session,
+        variants=variants,
+        synced_variants=synced["variants"],
+    )
     session.commit()
 
     return ShopifyProductSyncResponse(

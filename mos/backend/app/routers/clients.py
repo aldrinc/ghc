@@ -379,13 +379,6 @@ _LOCAL_SHOPIFY_THEME_SLOT_SOURCE_FILENAMES: tuple[str, ...] = (
 _LOCAL_SHOPIFY_THEME_BASELINE_EXCLUDED_PREFIXES: tuple[str, ...] = (
     "mos-template-export/",
 )
-_LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES: dict[str, str] = {
-    "header": "a-header",
-    "footer": "a-footer",
-    "search-drawer": "a-search-drawer",
-    "multicolumn-with-icons": "a-multicolumn-with-icons",
-    "ss-footer-4": "a-ss-footer-4",
-}
 _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES: tuple[str, ...] = (
     "sections/header-group.json",
     "sections/footer-group.json",
@@ -1828,46 +1821,6 @@ def _apply_local_theme_section_group_import_compatibility(
     ordered_filenames: list[str],
     files_by_filename: dict[str, dict[str, str]],
 ) -> None:
-    for source_type, alias_type in (
-        _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.items()
-    ):
-        source_filename = f"sections/{source_type}.liquid"
-        source_entry = files_by_filename.get(source_filename)
-        source_content = (
-            source_entry.get("content") if isinstance(source_entry, dict) else None
-        )
-        if not isinstance(source_content, str) or not source_content.strip():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    "Local Shopify theme baseline is missing a required section file "
-                    "for ZIP import compatibility. "
-                    f"filename={source_filename}."
-                ),
-            )
-        alias_filename = f"sections/{alias_type}.liquid"
-        existing_alias_entry = files_by_filename.get(alias_filename)
-        if existing_alias_entry is None:
-            files_by_filename[alias_filename] = {
-                "filename": alias_filename,
-                "content": source_content,
-            }
-            ordered_filenames.append(alias_filename)
-        else:
-            existing_alias_content = existing_alias_entry.get("content")
-            if (
-                not isinstance(existing_alias_content, str)
-                or existing_alias_content != source_content
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Local Shopify theme baseline contains an unexpected section "
-                        "alias file for ZIP import compatibility. "
-                        f"filename={alias_filename}."
-                    ),
-                )
-
     for group_filename in _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES:
         group_entry = files_by_filename.get(group_filename)
         group_content = (

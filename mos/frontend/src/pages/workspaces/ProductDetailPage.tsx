@@ -179,6 +179,7 @@ export function ProductDetailPage() {
 
   const [variantTitle, setVariantTitle] = useState("");
   const [variantPrice, setVariantPrice] = useState("");
+  const [variantCompareAtPrice, setVariantCompareAtPrice] = useState("");
   const [variantCurrency, setVariantCurrency] = useState("usd");
   const [variantOfferId, setVariantOfferId] = useState("");
   const [variantProvider, setVariantProvider] = useState("stripe");
@@ -248,6 +249,7 @@ export function ProductDetailPage() {
   const resetVariantForm = () => {
     setVariantTitle("");
     setVariantPrice("");
+    setVariantCompareAtPrice("");
     setVariantCurrency("usd");
     setVariantOfferId("");
     setVariantProvider("stripe");
@@ -267,12 +269,18 @@ export function ProductDetailPage() {
     setEditingVariant(variant);
     setVariantTitle(variant.title || "");
     setVariantPrice(String(variant.price ?? ""));
+    setVariantCompareAtPrice(variant.compare_at_price == null ? "" : String(variant.compare_at_price));
     setVariantCurrency((variant.currency || "").toLowerCase());
     setVariantOfferId(variant.offer_id || "");
     setVariantProvider(variant.provider || "");
     setVariantExternalId(variant.external_price_id || "");
     setVariantOptionValues(variant.option_values ? JSON.stringify(variant.option_values, null, 2) : "");
     setIsVariantModalOpen(true);
+  };
+
+  const openProductWorkspace = (targetProductId: string) => {
+    const routeToken = shortUuidRouteToken(targetProductId) || targetProductId;
+    navigate(`/workspaces/products/${routeToken}`);
   };
 
   const resetOfferForm = () => {
@@ -318,6 +326,15 @@ export function ProductDetailPage() {
       toast.error("Currency is required.");
       return;
     }
+    const normalizedCompareAtPrice = variantCompareAtPrice.trim();
+    let compareAtPrice: number | null = null;
+    if (normalizedCompareAtPrice) {
+      compareAtPrice = Number(normalizedCompareAtPrice);
+      if (Number.isNaN(compareAtPrice) || compareAtPrice < 0) {
+        toast.error("Compare-at price cannot be negative.");
+        return;
+      }
+    }
     const normalizedProvider = normalizeVariantProvider(variantProvider);
     const normalizedExternalPriceId = variantExternalId.trim() || null;
     const normalizedOfferId = variantOfferId.trim() || null;
@@ -343,6 +360,7 @@ export function ProductDetailPage() {
       await createVariant.mutateAsync({
         title: normalizedTitle,
         price,
+        compareAtPrice: compareAtPrice ?? undefined,
         currency: normalizedCurrency,
         offerId: normalizedOfferId || undefined,
         provider: normalizedProvider || undefined,
@@ -362,6 +380,7 @@ export function ProductDetailPage() {
     const patchPayload: {
       title?: string;
       price?: number;
+      compareAtPrice?: number | null;
       currency?: string;
       offerId?: string | null;
       provider?: string | null;
@@ -371,6 +390,9 @@ export function ProductDetailPage() {
 
     if (normalizedTitle !== editingVariant.title) patchPayload.title = normalizedTitle;
     if (price !== editingVariant.price) patchPayload.price = price;
+    if (compareAtPrice !== (editingVariant.compare_at_price ?? null)) {
+      patchPayload.compareAtPrice = compareAtPrice;
+    }
     if (normalizedCurrency !== (editingVariant.currency || "").trim().toLowerCase()) {
       patchPayload.currency = normalizedCurrency;
     }
@@ -1225,15 +1247,27 @@ export function ProductDetailPage() {
                                     <div className="text-[11px] text-content-muted">
                                       {bonus.bonus_product.shopify_product_gid || "Will create in Shopify on next sync"}
                                     </div>
+                                    <div className="text-[11px] text-content-muted">
+                                      Open the bonus product to edit its variant price and compare-at value.
+                                    </div>
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => handleRemoveBonus(offer.id, bonus.bonus_product.id)}
-                                    disabled={removeOfferBonus.isPending}
-                                  >
-                                    Remove
-                                  </Button>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => openProductWorkspace(bonus.bonus_product.id)}
+                                    >
+                                      Open product
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => handleRemoveBonus(offer.id, bonus.bonus_product.id)}
+                                      disabled={removeOfferBonus.isPending}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -1319,6 +1353,7 @@ export function ProductDetailPage() {
                             <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
                             <div className="text-xs text-content-muted">
                               {variant.price} {variant.currency.toUpperCase()}
+                              {variant.compare_at_price != null ? ` · compare-at ${variant.compare_at_price}` : ""}
                               {variant.provider ? ` · ${variant.provider}` : ""}
                             </div>
                           </div>
@@ -1501,7 +1536,7 @@ export function ProductDetailPage() {
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-content">Price (cents)</label>
                 <Input
@@ -1509,6 +1544,14 @@ export function ProductDetailPage() {
                   value={variantPrice}
                   onChange={(e) => setVariantPrice(e.target.value)}
                   required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Compare-at / value (cents)</label>
+                <Input
+                  placeholder="1000"
+                  value={variantCompareAtPrice}
+                  onChange={(e) => setVariantCompareAtPrice(e.target.value)}
                 />
               </div>
               <div className="space-y-1">

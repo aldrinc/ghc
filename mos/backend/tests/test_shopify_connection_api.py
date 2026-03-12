@@ -940,11 +940,11 @@ def test_apply_local_theme_section_group_import_compatibility_rewrites_group_typ
         files_by_filename=files_by_filename,
     )
 
-    assert "sections/a-header.liquid" in files_by_filename
-    assert "sections/a-footer.liquid" in files_by_filename
-    assert "sections/a-search-drawer.liquid" in files_by_filename
-    assert "sections/a-multicolumn-with-icons.liquid" in files_by_filename
-    assert "sections/a-ss-footer-4.liquid" in files_by_filename
+    assert "sections/a-header.liquid" not in files_by_filename
+    assert "sections/a-footer.liquid" not in files_by_filename
+    assert "sections/a-search-drawer.liquid" not in files_by_filename
+    assert "sections/a-multicolumn-with-icons.liquid" not in files_by_filename
+    assert "sections/a-ss-footer-4.liquid" not in files_by_filename
 
     header_group = json.loads(files_by_filename["sections/header-group.json"]["content"])
     footer_group = json.loads(files_by_filename["sections/footer-group.json"]["content"])
@@ -2633,11 +2633,11 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     assert "templates/index.json" in namelist
     assert "templates/collection.json" in namelist
     assert "sections/footer-group.json" in namelist
-    assert "sections/a-header.liquid" in namelist
-    assert "sections/a-footer.liquid" in namelist
-    assert "sections/a-search-drawer.liquid" in namelist
-    assert "sections/a-multicolumn-with-icons.liquid" in namelist
-    assert "sections/a-ss-footer-4.liquid" in namelist
+    assert "sections/a-header.liquid" not in namelist
+    assert "sections/a-footer.liquid" not in namelist
+    assert "sections/a-search-drawer.liquid" not in namelist
+    assert "sections/a-multicolumn-with-icons.liquid" not in namelist
+    assert "sections/a-ss-footer-4.liquid" not in namelist
     assert "snippets/header-drawer.liquid" in namelist
     assert all(not entry.startswith("mos-template-export/") for entry in namelist)
     exported_workspace_css = archive.read(workspace_css_filename).decode("utf-8")
@@ -2707,7 +2707,6 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         archive.read("sections/footer-group.json").decode("utf-8")
     )
     exported_ss_footer_4 = archive.read("sections/ss-footer-4.liquid").decode("utf-8")
-    exported_a_ss_footer_4 = archive.read("sections/a-ss-footer-4.liquid").decode("utf-8")
     exported_header_group_template = json.loads(
         archive.read("sections/header-group.json").decode("utf-8")
     )
@@ -2763,8 +2762,6 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     )
     assert ".footer-tab-text-{{ section.id }} a," in exported_ss_footer_4
     assert "text-decoration: underline !important;" in exported_ss_footer_4
-    assert ".footer-tab-text-{{ section.id }} a," in exported_a_ss_footer_4
-    assert "text-decoration: underline !important;" in exported_a_ss_footer_4
     assert exported_header_group_template["sections"]["header"]["type"] == "header"
     assert (
         exported_overlay_group_template["sections"]["search-drawer"]["type"]

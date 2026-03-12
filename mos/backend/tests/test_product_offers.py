@@ -1058,6 +1058,15 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         title="Bonus Guide",
         shopify_product_gid="gid://shopify/Product/222",
     )
+    bonus_variant_resp = api_client.post(
+        f"/products/{bonus_product_id}/variants",
+        json={
+            "title": "Bonus Default",
+            "price": 1200,
+            "currency": "usd",
+        },
+    )
+    assert bonus_variant_resp.status_code == 201
 
     monkeypatch.setattr(products_router, "verify_shopify_product_exists", lambda **_: None)
 
@@ -1103,6 +1112,40 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         }
 
     observed: dict[str, object] = {}
+    expected_client_id = client_id
+
+    def fake_get_client_shopify_product(
+        *,
+        client_id: str,
+        product_gid: str,
+        shop_domain: str | None,
+    ):
+        assert client_id == expected_client_id
+        assert product_gid == "gid://shopify/Product/222"
+        return {
+            "shopDomain": shop_domain or "example.myshopify.com",
+            "productGid": "gid://shopify/Product/222",
+            "title": "Bonus Guide",
+            "handle": "bonus-guide",
+            "status": "DRAFT",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/223",
+                    "title": "Bonus Default",
+                    "priceCents": 1200,
+                    "currency": "USD",
+                    "compareAtPriceCents": 1500,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": False,
+                    "requiresShipping": False,
+                    "inventoryPolicy": None,
+                    "inventoryManagement": None,
+                    "inventoryQuantity": None,
+                    "optionValues": {"Title": "Bonus Default"},
+                }
+            ],
+        }
 
     def fake_sync_client_shopify_product(
         *,
@@ -1130,6 +1173,23 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         assert source_of_truth_payload["offers"][0]["variantIds"] == [bundle_variant_id]
         assert source_of_truth_payload["offers"][0]["basket"]["bonusProductGids"] == [
             "gid://shopify/Product/222"
+        ]
+        assert source_of_truth_payload["offers"][0]["basket"]["bonusVariantGids"] == [
+            "gid://shopify/ProductVariant/223"
+        ]
+        assert source_of_truth_payload["offers"][0]["basket"]["bonusProducts"] == [
+            {
+                "id": bonus_product_id,
+                "title": "Bonus Guide",
+                "description": None,
+                "shopifyProductGid": "gid://shopify/Product/222",
+                "position": 0,
+                "variantId": bonus_variant_resp.json()["id"],
+                "shopifyVariantGid": "gid://shopify/ProductVariant/223",
+                "priceCents": 1200,
+                "currency": "USD",
+                "compareAtPriceCents": 1500,
+            }
         ]
         return {
             "shopDomain": "example.myshopify.com",
@@ -1178,6 +1238,7 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_client_shopify_product)
     monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
 
     response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
@@ -1212,6 +1273,13 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
     }
     mega_variant = next(item for item in variants if item["title"] == "Mega Bundle")
     assert mega_variant["provider"] == "shopify"
+
+    bonus_detail_resp = api_client.get(f"/products/{bonus_product_id}")
+    assert bonus_detail_resp.status_code == 200
+    bonus_variants = bonus_detail_resp.json().get("variants") or []
+    assert len(bonus_variants) == 1
+    assert bonus_variants[0]["provider"] == "shopify"
+    assert bonus_variants[0]["external_price_id"] == "gid://shopify/ProductVariant/223"
 
 
 def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_client, monkeypatch, db_session):
@@ -1368,10 +1436,32 @@ def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_cl
     assert observed["sync_source_of_truth_payload"]["offers"][0]["basket"]["bonusProductGids"] == [
         "gid://shopify/Product/222"
     ]
+    assert observed["sync_source_of_truth_payload"]["offers"][0]["basket"]["bonusVariantGids"] == [
+        "gid://shopify/ProductVariant/223"
+    ]
+    assert observed["sync_source_of_truth_payload"]["offers"][0]["basket"]["bonusProducts"] == [
+        {
+            "id": bonus_product_id,
+            "title": "Bonus Guide",
+            "description": None,
+            "shopifyProductGid": "gid://shopify/Product/222",
+            "position": 0,
+            "variantId": bonus_variant_resp.json()["id"],
+            "shopifyVariantGid": "gid://shopify/ProductVariant/223",
+            "priceCents": 900,
+            "currency": "USD",
+            "compareAtPriceCents": None,
+        }
+    ]
 
     bonus_detail_resp = api_client.get(f"/products/{bonus_product_id}")
     assert bonus_detail_resp.status_code == 200
-    assert bonus_detail_resp.json()["shopify_product_gid"] == "gid://shopify/Product/222"
+    bonus_detail = bonus_detail_resp.json()
+    assert bonus_detail["shopify_product_gid"] == "gid://shopify/Product/222"
+    bonus_variants = bonus_detail.get("variants") or []
+    assert len(bonus_variants) == 1
+    assert bonus_variants[0]["provider"] == "shopify"
+    assert bonus_variants[0]["external_price_id"] == "gid://shopify/ProductVariant/223"
 
 
 def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(api_client, monkeypatch):
