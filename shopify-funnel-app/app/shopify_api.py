@@ -3514,8 +3514,8 @@ class ShopifyApiClient:
         return f"{_MOS_BONUS_DISCOUNT_KEY_PREFIX}:{offer_id}"
 
     @staticmethod
-    def _bonus_discount_title(*, offer_name: str | None, bonus_titles: list[str]) -> str:
-        title = "Free bonus gift"
+    def _bonus_discount_title(*, offer_description: str) -> str:
+        title = "Natural Remedies Handbook + Bonus Gifts"
         if len(title) <= _MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH:
             return title
         return title[:_MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH].rstrip()
@@ -3548,12 +3548,7 @@ class ShopifyApiClient:
                     status_code=400,
                 )
             offer_id = raw_offer_id.strip()
-            offer_name = raw_offer.get("name")
-            if offer_name is not None and not isinstance(offer_name, str):
-                raise ShopifyApiError(
-                    message=f"Offer {offer_id} has invalid name.",
-                    status_code=400,
-                )
+            offer_description = raw_offer.get("description")
 
             basket = raw_offer.get("basket")
             if basket is None:
@@ -3620,8 +3615,7 @@ class ShopifyApiClient:
                         "key": self._bonus_discount_key(offer_id=offer_id),
                         "offerId": offer_id,
                         "title": self._bonus_discount_title(
-                            offer_name=offer_name if isinstance(offer_name, str) else None,
-                            bonus_titles=bonus_titles,
+                            offer_description=str(offer_description or ""),
                         ),
                         "buyProductVariantGids": sorted(set(shopify_variant_gids)),
                         "bonusProductVariantGids": sorted(set(bonus_product_variant_gids)),
@@ -3648,7 +3642,7 @@ class ShopifyApiClient:
             if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
                 continue
             offer_id = raw_offer_id.strip()
-            offer_name = raw_offer.get("name") if isinstance(raw_offer.get("name"), str) else None
+            offer_description = raw_offer.get("description") if isinstance(raw_offer.get("description"), str) else None
             basket = raw_offer.get("basket")
             if not isinstance(basket, dict):
                 continue
@@ -3667,8 +3661,7 @@ class ShopifyApiClient:
                 key = self._bonus_discount_key(offer_id=offer_id)
                 record: dict[str, str] = {
                     "title": self._bonus_discount_title(
-                        offer_name=offer_name,
-                        bonus_titles=bonus_titles or [raw_bonus_title.strip()],
+                        offer_description=str(offer_description or raw_bonus_title.strip()),
                     )
                 }
                 if isinstance(automatic_discount, dict):

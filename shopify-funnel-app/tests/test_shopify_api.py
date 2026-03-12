@@ -2171,7 +2171,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
                     "automaticDiscountNode": {
                         "id": "gid://shopify/DiscountAutomaticNode/777",
                         "automaticDiscount": {
-                            "title": "Free bonus gift",
+                            "title": observed_discount_payload["title"],
                         },
                     },
                     "userErrors": [],
@@ -2235,6 +2235,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
                     {
                         "id": "offer-1",
                         "name": "Starter Pack",
+                        "description": "Use the Starter Pack description in checkout.",
                         "variantIds": ["mos-var-1"],
                         "basket": {
                             "variantIds": ["mos-var-1"],
@@ -2260,7 +2261,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     )
 
     assert result["productGid"] == "gid://shopify/Product/999"
-    assert observed_discount_payload["title"] == "Free bonus gift"
+    assert observed_discount_payload["title"] == "Natural Remedies Handbook + Bonus Gifts"
     assert observed_discount_payload["customerBuys"]["items"]["products"]["productVariantsToAdd"] == [
         "gid://shopify/ProductVariant/100"
     ]
@@ -2272,12 +2273,12 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     assert observed_discount_payload["customerGets"]["value"]["discountOnQuantity"]["quantity"] == "2"
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][0]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Free bonus gift",
+        "title": "Natural Remedies Handbook + Bonus Gifts",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][1]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Free bonus gift",
+        "title": "Natural Remedies Handbook + Bonus Gifts",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_published_product_gids == [

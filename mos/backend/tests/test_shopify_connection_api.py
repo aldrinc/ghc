@@ -777,6 +777,65 @@ def test_theme_export_zip_write_order_prioritizes_section_dependencies():
     )
 
 
+def test_build_local_shopify_theme_export_payload_uses_shopify_logo_in_settings():
+    payload = clients_router._build_local_shopify_theme_export_payload(
+        shop_domain="example.myshopify.com",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        settings_logo_url="shopify://shop_images/logo-1.png",
+        css_vars={
+            "--color-brand": "#123456",
+            "--color-page-bg-secondary": "#f4efe7",
+        },
+        font_urls=[],
+        data_theme="light",
+        component_image_urls={},
+        component_text_values={},
+        theme_id="local://themes/acme-workspace",
+        theme_name="Acme Workspace",
+        theme_role="MAIN",
+    )
+
+    files_by_filename = {
+        item["filename"]: item for item in payload["files"] if isinstance(item, dict)
+    }
+    settings_payload = json.loads(
+        files_by_filename["config/settings_data.json"]["content"]
+    )
+    assert settings_payload["current"]["logo"] == "shopify://shop_images/logo-1.png"
+    assert (
+        settings_payload["current"]["logo_mobile"]
+        == "shopify://shop_images/logo-1.png"
+    )
+
+    footer_group_payload = json.loads(
+        files_by_filename["sections/footer-group.json"]["content"]
+    )
+    footer_logo_values = [
+        section_payload["settings"]["logo"]
+        for section_payload in footer_group_payload["sections"].values()
+        if isinstance(section_payload, dict)
+        and isinstance(section_payload.get("settings"), dict)
+        and "logo" in section_payload["settings"]
+    ]
+    assert footer_logo_values == ["shopify://shop_images/logo-1.png"]
+
+    exported_layout = files_by_filename["layout/theme.liquid"]["content"]
+    assert (
+        '<meta name="mos-brand-logo-url" content="https://assets.example.com/public/assets/logo-1">'
+        in exported_layout
+    )
+    workspace_css_filename = clients_router._resolve_local_theme_workspace_css_filename(
+        layout_content=exported_layout
+    )
+    exported_workspace_css = files_by_filename[workspace_css_filename]["content"]
+    assert (
+        '--mos-brand-logo-url: "https://assets.example.com/public/assets/logo-1";'
+        in exported_workspace_css
+    )
+
+
 def test_list_local_theme_template_slots_skips_disabled_sections_and_blocks(monkeypatch):
     template_filename = "templates/index.json"
     template_payload = {

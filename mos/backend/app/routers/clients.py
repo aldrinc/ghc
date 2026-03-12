@@ -2654,15 +2654,16 @@ def _apply_local_theme_brand_logo_references(
     layout_filename: str,
     css_filename: str,
     logo_url: str,
+    settings_logo_url: str,
 ) -> None:
     logo_setting_paths = {
-        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo": logo_url,
-        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo_mobile": logo_url,
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo": settings_logo_url,
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo_mobile": settings_logo_url,
     }
     for footer_logo_setting_path in _resolve_local_theme_footer_logo_setting_paths(
         files_by_filename=files_by_filename
     ):
-        logo_setting_paths[footer_logo_setting_path] = logo_url
+        logo_setting_paths[footer_logo_setting_path] = settings_logo_url
     _apply_theme_template_setting_values_to_local_files(
         files_by_filename=files_by_filename,
         values_by_setting_path=logo_setting_paths,
@@ -2906,6 +2907,7 @@ def _build_local_shopify_theme_export_payload(
     workspace_name: str,
     brand_name: str,
     logo_url: str,
+    settings_logo_url: str,
     css_vars: dict[str, str],
     font_urls: list[str],
     data_theme: str,
@@ -2978,6 +2980,7 @@ def _build_local_shopify_theme_export_payload(
         layout_filename=layout_filename,
         css_filename=css_filename,
         logo_url=logo_url,
+        settings_logo_url=settings_logo_url,
     )
 
     _apply_theme_template_setting_values_to_local_files(
@@ -6580,6 +6583,28 @@ def _resolve_uploaded_template_logo_url_for_export(
     return draft_logo_url
 
 
+def _resolve_local_theme_export_settings_logo_url(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    shop_domain: str,
+    logo_public_id: str,
+    logo_url: str,
+) -> str:
+    normalized_logo_url = logo_url.strip()
+    if normalized_logo_url.startswith("shopify://"):
+        return normalized_logo_url
+    return _resolve_theme_template_logo_url_to_shopify_file_with_cache(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        shop_domain=shop_domain,
+        logo_public_id=logo_public_id,
+        current_logo_url=normalized_logo_url,
+    )
+
+
 def _resolve_latest_template_publish_design_system_snapshot(
     *,
     session: Session,
@@ -8459,11 +8484,20 @@ def _build_shopify_theme_template_export_zip_response(
         latest_logo_asset_public_id=_latest_logo_asset_public_id,
         latest_logo_url=latest_logo_url,
     )
+    resolved_export_settings_logo_url = _resolve_local_theme_export_settings_logo_url(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        shop_domain=draft_data.shopDomain,
+        logo_public_id=_latest_logo_asset_public_id,
+        logo_url=resolved_export_logo_url,
+    )
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
         brand_name=latest_brand_name,
         logo_url=resolved_export_logo_url,
+        settings_logo_url=resolved_export_settings_logo_url,
         css_vars=latest_css_vars,
         font_urls=latest_font_urls,
         data_theme=latest_data_theme,
