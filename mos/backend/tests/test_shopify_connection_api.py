@@ -282,7 +282,7 @@ def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab
             {
                 "sections": {
                     "ss_footer_4_9rJacA": {
-                        "type": "a-ss-footer-4",
+                        "type": "ss-footer-4",
                         "blocks": {
                             "tab_track": {
                                 "type": "tab",
@@ -310,7 +310,7 @@ def test_normalize_theme_export_text_file_content_updates_footer_contact_support
             {
                 "sections": {
                     "ss_footer_4_9rJacA": {
-                        "type": "a-ss-footer-4",
+                        "type": "ss-footer-4",
                         "blocks": {
                             "tab_refund": {
                                 "type": "tab",
@@ -950,11 +950,11 @@ def test_apply_local_theme_section_group_import_compatibility_rewrites_group_typ
     footer_group = json.loads(files_by_filename["sections/footer-group.json"]["content"])
     overlay_group = json.loads(files_by_filename["sections/overlay-group.json"]["content"])
 
-    assert header_group["sections"]["header"]["type"] == "a-header"
-    assert footer_group["sections"]["footer"]["type"] == "a-footer"
-    assert footer_group["sections"]["promo"]["type"] == "a-multicolumn-with-icons"
-    assert footer_group["sections"]["custom"]["type"] == "a-ss-footer-4"
-    assert overlay_group["sections"]["drawer"]["type"] == "a-search-drawer"
+    assert header_group["sections"]["header"]["type"] == "header"
+    assert footer_group["sections"]["footer"]["type"] == "footer"
+    assert footer_group["sections"]["promo"]["type"] == "multicolumn-with-icons"
+    assert footer_group["sections"]["custom"]["type"] == "ss-footer-4"
+    assert overlay_group["sections"]["drawer"]["type"] == "search-drawer"
 
 
 def test_apply_theme_template_setting_values_to_local_files_coerces_richtext_markup():
@@ -2738,9 +2738,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         ]
         == "#ffffff"
     )
-    assert (
-        exported_footer_group_template["sections"]["footer"]["type"] == "a-footer"
-    )
+    assert exported_footer_group_template["sections"]["footer"]["type"] == "footer"
     footer_blocks = exported_footer_group_template["sections"]["ss_footer_4_9rJacA"][
         "blocks"
     ]
@@ -2767,12 +2765,10 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     assert "text-decoration: underline !important;" in exported_ss_footer_4
     assert ".footer-tab-text-{{ section.id }} a," in exported_a_ss_footer_4
     assert "text-decoration: underline !important;" in exported_a_ss_footer_4
-    assert (
-        exported_header_group_template["sections"]["header"]["type"] == "a-header"
-    )
+    assert exported_header_group_template["sections"]["header"]["type"] == "header"
     assert (
         exported_overlay_group_template["sections"]["search-drawer"]["type"]
-        == "a-search-drawer"
+        == "search-drawer"
     )
 
     db_session.expire_all()

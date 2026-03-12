@@ -1895,24 +1895,6 @@ def _apply_local_theme_section_group_import_compatibility(
                     f"for ZIP import compatibility. filename={group_filename}."
                 ),
             )
-
-        for section_payload in sections.values():
-            if not isinstance(section_payload, dict):
-                continue
-            section_type = section_payload.get("type")
-            if not isinstance(section_type, str) or not section_type.strip():
-                continue
-            alias_type = _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.get(
-                section_type.strip()
-            )
-            if alias_type:
-                section_payload["type"] = alias_type
-
-        group_entry["content"] = json.dumps(
-            group_data,
-            indent=2,
-            sort_keys=True,
-        )
         group_entry.pop("contentBase64", None)
 
 
