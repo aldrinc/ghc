@@ -130,28 +130,46 @@ function normalizePreSalesBadges(
 ): ListicleConfig["badges"] {
   const standards = [
     {
+      iconSrc: "/assets/listicle-badge-reviews.svg",
       value: reviewCount.toLocaleString(),
       label: "5-Star Reviews",
-      iconAlt: "5 star reviews",
+      iconAlt: "Five star rating icon",
     },
     {
+      iconSrc: "/assets/listicle-badge-support.svg",
       value: "24/7",
       label: "Customer Support",
-      iconAlt: "24/7 customer support",
+      iconAlt: "Customer support headset icon",
     },
     {
+      iconSrc: "/assets/listicle-badge-trial.svg",
       value: undefined,
       label: "Risk Free Trial",
-      iconAlt: "Risk free trial",
+      iconAlt: "Shield check guarantee icon",
     },
   ] as const;
+  const legacyIconSrcs = new Set([
+    "/assets/5-stars-reviews-icon.webp",
+    "/assets/free-shipping-icon.webp",
+    "/assets/risk-free-icon.webp",
+  ]);
 
   return badges.slice(0, standards.length).map((badge, index) => {
     const standard = standards[index];
+    const iconAssetPublicId =
+      typeof badge.iconAssetPublicId === "string" ? badge.iconAssetPublicId.trim() : "";
+    const referenceAssetPublicId =
+      typeof badge.referenceAssetPublicId === "string" ? badge.referenceAssetPublicId.trim() : "";
+    const currentIconSrc = typeof badge.iconSrc === "string" ? badge.iconSrc.trim() : "";
+    const shouldReplaceIconSrc =
+      !iconAssetPublicId &&
+      !referenceAssetPublicId &&
+      (!currentIconSrc || legacyIconSrcs.has(currentIconSrc));
     const normalized = {
       ...badge,
       label: standard.label,
       iconAlt: standard.iconAlt,
+      ...(shouldReplaceIconSrc ? { iconSrc: standard.iconSrc } : {}),
     };
     if (standard.value) {
       return { ...normalized, value: standard.value };

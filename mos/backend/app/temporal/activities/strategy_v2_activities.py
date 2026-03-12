@@ -2199,6 +2199,7 @@ _PRE_SALES_TEMPLATE_LIMITS_INSTRUCTION = (
     "- hero.subtitle <= 140 chars (max 2 sentences)\n"
     "- hero.badges must be exactly 3 items: [<review count> 5-Star Reviews, 24/7 Customer Support, Risk Free Trial]\n"
     "- hero.badges[].value <= 24 chars when present\n"
+    "- hero.badges icon prompts must stay object-only; never use animals, paw prints, mascots, or character faces\n"
     "- reasons must include at least 5 items\n"
     "- reasons[].title <= 72 chars\n"
     "- reasons[].body <= 420 chars and MUST be 2-3 sentences (never 4+)\n"

@@ -2408,6 +2408,7 @@ _ICON_STYLE_PROMPT_TEMPLATE = (
     "Crisp vector graphics, dribbble aesthetic, professional UI asset. "
     "No text, no blur."
 )
+_ICON_NON_ANIMAL_DIRECTIVE = "No animals, no pets, no paw prints, no mascots, no character faces."
 _ICON_SUBJECT_PROMPT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)\bicon\s+of\s+([^.;\n]+)"),
     re.compile(r"(?i)\bicon\s*[:\-]\s*([^.;\n]+)"),
@@ -2446,6 +2447,60 @@ _ICON_GENERIC_SUBJECTS: frozenset[str] = frozenset(
         "ui",
         "ui asset",
     }
+)
+_ICON_SUBJECT_CANONICAL_MAP: tuple[tuple[frozenset[str], str, bool], ...] = (
+    (
+        frozenset(
+            {
+                "5 star reviews",
+                "5 star review",
+                "five star reviews",
+                "five star review",
+                "five star rating",
+                "star reviews",
+            }
+        ),
+        "five gold stars with sparkle accents",
+        True,
+    ),
+    (
+        frozenset(
+            {
+                "customer support",
+                "24 7 customer support",
+                "24 7 support",
+                "support headset",
+                "customer support headset icon",
+            }
+        ),
+        "customer support headset with 24/7 clock",
+        True,
+    ),
+    (
+        frozenset(
+            {
+                "risk free trial",
+                "risk free guarantee",
+                "risk free",
+                "shield check guarantee icon",
+                "90 day risk free trial",
+            }
+        ),
+        "shield with checkmark",
+        True,
+    ),
+    (
+        frozenset(
+            {
+                "free shipping",
+                "fast shipping",
+                "fast and free shipping",
+                "shipping",
+            }
+        ),
+        "delivery truck with motion lines",
+        True,
+    ),
 )
 
 
@@ -2858,6 +2913,24 @@ def _clean_icon_subject_text(value: Any) -> str | None:
     return cleaned
 
 
+def _normalize_icon_subject_key(value: str | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    lowered = value.lower()
+    normalized = re.sub(r"[^a-z0-9]+", " ", lowered)
+    normalized = re.sub(r"\s{2,}", " ", normalized).strip()
+    return normalized or None
+
+
+def _canonicalize_icon_subject(subject: str) -> tuple[str, bool]:
+    normalized_key = _normalize_icon_subject_key(subject)
+    if normalized_key:
+        for aliases, canonical_subject, forbid_animals in _ICON_SUBJECT_CANONICAL_MAP:
+            if normalized_key in aliases:
+                return canonical_subject, forbid_animals
+    return subject, False
+
+
 def _derive_icon_subject_from_metadata(obj: dict[str, Any]) -> str | None:
     for key in ("iconAlt", "alt", "label", "title"):
         subject = _clean_icon_subject_text(obj.get(key))
@@ -2887,7 +2960,14 @@ def _derive_icon_subject_from_prompt(prompt: str) -> str | None:
 
 
 def _build_styled_icon_prompt(*, subject: str) -> str:
-    return _ICON_STYLE_PROMPT_TEMPLATE.format(subject=subject)
+    canonical_subject, forbid_animals = _canonicalize_icon_subject(subject)
+    prompt = _ICON_STYLE_PROMPT_TEMPLATE.format(subject=canonical_subject)
+    if forbid_animals:
+        return prompt.replace(
+            "No text, no blur.",
+            f"{_ICON_NON_ANIMAL_DIRECTIVE} No text, no blur.",
+        )
+    return prompt
 
 
 def _normalize_icon_prompt(*, prompt: str, obj: dict[str, Any], path: str) -> str:
@@ -5159,6 +5239,7 @@ def generate_funnel_page_draft(
             "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
             "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
             "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+            "- For trust/support badge icons, keep the subject object-only: stars, a headset/clock, a shield/checkmark, or a shipping symbol. Never use animals, paw prints, mascots, or character faces.\n"
             "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
             "- Set referenceAssetPublicId only when intentionally basing generation on a known source image.\n"
             "- Allowed referenceAssetPublicId sources: attached image public ids, or product.primary_image.public_id from Product context when available.\n"
@@ -5927,6 +6008,7 @@ def stream_funnel_page_draft(
                     "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
                     "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
                     "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+                    "- For trust/support badge icons, keep the subject object-only: stars, a headset/clock, a shield/checkmark, or a shipping symbol. Never use animals, paw prints, mascots, or character faces.\n"
                     "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                     "- Set referenceAssetPublicId only when intentionally basing generation on a known source image.\n"
                     "- Allowed referenceAssetPublicId sources: attached image public ids, or product.primary_image.public_id from Product context when available.\n"

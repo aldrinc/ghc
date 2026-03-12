@@ -396,6 +396,7 @@ def render_copy_page_runtime_instruction(
             "(2) `{ value: '24/7', label: 'Customer Support' }`, "
             "(3) `{ label: 'Risk Free Trial' }`.\n"
             "- Every hero badge icon prompt must describe a distinct icon subject; do not repeat the same prompt.\n"
+            "- Hero badge icons must stay object-only. Use symbols like stars, a support headset/clock, or a shield/checkmark; never use animals, paw prints, mascots, or character faces.\n"
             "- `reasons` items require integer number + non-empty title/body + image object ({alt, optional prompt}).\n"
             "- `reasons[].image.prompt` must stay editorial and non-salesy. Before the marquee, do not depict the product, packaging, exact book cover, or any product reference image.\n"
             "- `reviews` requires at least 3 objects with non-empty `text` and `author` (optional `rating`, `verified`).\n"
