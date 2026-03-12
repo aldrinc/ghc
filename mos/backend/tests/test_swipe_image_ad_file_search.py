@@ -386,6 +386,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             "asset_brief_id": "asset-brief-1",
             "requirement_index": 0,
             "company_swipe_id": "swipe-1",
+            "creative_generation_batch_id": "batch-1",
+            "creative_generation_plan_artifact_id": "plan-artifact-1",
+            "creative_generation_plan_item_id": "plan-item-1",
+            "ad_copy_pack_artifact_id": "copy-artifact-1",
+            "ad_copy_pack_id": "copy-pack-1",
             "model": "models/gemini-2.5-flash",
             "count": 1,
             "aspect_ratio": "1:1",
@@ -422,6 +427,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert isinstance(extra_ai_metadata["swipePromptProductImageSizeBytes"], int)
     assert isinstance(extra_ai_metadata["swipePromptProductImageSha256"], str)
     assert len(extra_ai_metadata["swipePromptProductImageSha256"]) == 64
+    assert extra_ai_metadata["creativeGenerationBatchId"] == "batch-1"
+    assert extra_ai_metadata["creativeGenerationPlanArtifactId"] == "plan-artifact-1"
+    assert extra_ai_metadata["creativeGenerationPlanItemId"] == "plan-item-1"
+    assert extra_ai_metadata["adCopyPackArtifactId"] == "copy-artifact-1"
+    assert extra_ai_metadata["adCopyPackId"] == "copy-pack-1"
     config = captured["config"]
     assert hasattr(config, "tools")
     assert config.tools

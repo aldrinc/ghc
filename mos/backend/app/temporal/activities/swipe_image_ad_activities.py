@@ -141,6 +141,13 @@ def _extract_source_filename(source_url: str | None) -> str | None:
     return name
 
 
+def _optional_clean_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
 def _resolve_swipe_requires_product_image_policy(
     *,
     explicit_requires_product_image: bool | None,
@@ -2283,6 +2290,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     company_swipe_id: str | None = params.get("company_swipe_id")
     swipe_image_url: str | None = params.get("swipe_image_url")
+    creative_generation_batch_id = _optional_clean_string(params.get("creative_generation_batch_id"))
+    creative_generation_plan_artifact_id = _optional_clean_string(params.get("creative_generation_plan_artifact_id"))
+    creative_generation_plan_item_id = _optional_clean_string(params.get("creative_generation_plan_item_id"))
+    ad_copy_pack_artifact_id = _optional_clean_string(params.get("ad_copy_pack_artifact_id"))
+    ad_copy_pack_id = _optional_clean_string(params.get("ad_copy_pack_id"))
     swipe_requires_product_image_raw = params.get("swipe_requires_product_image")
     if swipe_requires_product_image_raw is None:
         swipe_requires_product_image: bool | None = None
@@ -2319,6 +2331,14 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     count = int(params.get("count") or 1)
     if count <= 0:
         raise ValueError("count must be >= 1 for swipe image ad generation.")
+    if creative_generation_plan_item_id and not creative_generation_batch_id:
+        raise ValueError(
+            "creative_generation_batch_id is required when creative_generation_plan_item_id is provided."
+        )
+    if creative_generation_plan_item_id and count != 1:
+        raise ValueError(
+            "creative_generation_plan_item_id requires count=1 for deterministic checkpointing."
+        )
     render_count = count
     render_max_attempts = int(os.getenv("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS", "3"))
     if render_max_attempts <= 0:
@@ -2815,6 +2835,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     if isinstance(ref.primary_url, str) and ref.primary_url.strip()
                 ],
             }
+            if creative_generation_batch_id:
+                extra_ai_metadata["creativeGenerationBatchId"] = creative_generation_batch_id
+            if creative_generation_plan_artifact_id:
+                extra_ai_metadata["creativeGenerationPlanArtifactId"] = creative_generation_plan_artifact_id
+            if creative_generation_plan_item_id:
+                extra_ai_metadata["creativeGenerationPlanItemId"] = creative_generation_plan_item_id
+            if ad_copy_pack_artifact_id:
+                extra_ai_metadata["adCopyPackArtifactId"] = ad_copy_pack_artifact_id
+            if ad_copy_pack_id:
+                extra_ai_metadata["adCopyPackId"] = ad_copy_pack_id
 
             local_asset_id = _create_generated_asset_from_url(
                 session=session,

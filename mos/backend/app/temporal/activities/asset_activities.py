@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Sequence
 from urllib.parse import unquote, urlparse
-from uuid import uuid4
 
 import httpx
 from PIL import Image
@@ -209,6 +208,93 @@ def _stable_idempotency_key(*parts: str) -> str:
     payload = "|".join(parts)
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return digest[:48]
+
+
+def _resolve_creative_generation_execution_key(*, workflow_run_id: str | None) -> str:
+    if isinstance(workflow_run_id, str) and workflow_run_id.strip():
+        return workflow_run_id.strip()
+
+    try:
+        info = activity.info()
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            "Creative generation checkpointing requires workflow_run_id or Temporal activity context."
+        ) from exc
+
+    workflow_id = str(getattr(info, "workflow_id", "") or "").strip()
+    run_id = str(getattr(info, "run_id", "") or "").strip()
+    if workflow_id and run_id:
+        return f"{workflow_id}:{run_id}"
+    if workflow_id:
+        return workflow_id
+
+    raise RuntimeError(
+        "Creative generation checkpointing requires workflow_run_id or Temporal activity context."
+    )
+
+
+def _build_creative_generation_batch_id(*, execution_key: str, asset_brief_id: str) -> str:
+    return _stable_idempotency_key(
+        "creative_generation_batch_v1",
+        execution_key,
+        asset_brief_id,
+    )
+
+
+def _summarize_exception_message(exc: BaseException, *, max_chars: int = 400) -> str:
+    prefix = type(exc).__name__
+    message = " ".join(str(exc).split())
+    if not message:
+        return prefix
+    summary = message if message.startswith(f"{prefix}:") else f"{prefix}: {message}"
+    if len(summary) <= max_chars:
+        return summary
+    return summary[: max_chars - 3].rstrip() + "..."
+
+
+def _existing_creative_generation_assets_by_plan_item(
+    *,
+    assets: Sequence[Any],
+    batch_id: str,
+    asset_brief_id: str,
+) -> dict[str, str]:
+    completed_assets: dict[str, str] = {}
+    for asset in assets:
+        metadata = getattr(asset, "ai_metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+        candidate_batch_id = str(metadata.get("creativeGenerationBatchId") or "").strip()
+        if candidate_batch_id != batch_id:
+            continue
+
+        candidate_brief_id = str(metadata.get("assetBriefId") or "").strip()
+        if not candidate_brief_id:
+            content = getattr(asset, "content", None)
+            if isinstance(content, dict):
+                candidate_brief_id = str(content.get("assetBriefId") or "").strip()
+        if candidate_brief_id != asset_brief_id:
+            continue
+
+        plan_item_id = str(metadata.get("creativeGenerationPlanItemId") or "").strip()
+        if not plan_item_id:
+            continue
+
+        asset_id = str(getattr(asset, "id", "") or "").strip()
+        if not asset_id:
+            raise RuntimeError(
+                "Creative generation checkpoint encountered an asset without an id "
+                f"(batch_id={batch_id}, plan_item_id={plan_item_id})."
+            )
+
+        existing_asset_id = completed_assets.get(plan_item_id)
+        if existing_asset_id and existing_asset_id != asset_id:
+            raise RuntimeError(
+                "Multiple generated assets found for the same creative generation plan item "
+                f"(batch_id={batch_id}, asset_brief_id={asset_brief_id}, plan_item_id={plan_item_id}, "
+                f"asset_ids={[existing_asset_id, asset_id]})."
+            )
+        completed_assets[plan_item_id] = asset_id
+    return completed_assets
 
 
 def _retention_expires_at(now: datetime | None = None) -> datetime:
@@ -744,12 +830,12 @@ def _create_creative_generation_plan_artifact(
     brief_artifact_id: str,
     brief: dict[str, Any],
     ad_copy_pack_artifact: Any,
+    batch_id: str,
 ) -> Any:
     artifacts_repo = ArtifactsRepository(session)
     source_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
     validated_copy_artifact = AdCopyPackArtifact.model_validate(source_payload)
     default_swipes = _resolve_default_swipe_sources(session=session, org_id=org_id)
-    batch_id = str(uuid4())
     copy_pack_ids_by_requirement = {
         item.requirement_index: item.id for item in validated_copy_artifact.copy_packs
     }
@@ -1385,6 +1471,11 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
         raise ValueError("product_id is required to generate assets for a brief.")
     if not isinstance(asset_brief_id, str) or not asset_brief_id.strip():
         raise ValueError("asset_brief_id is required to generate assets.")
+    execution_key = _resolve_creative_generation_execution_key(workflow_run_id=workflow_run_id)
+    batch_id = _build_creative_generation_batch_id(
+        execution_key=execution_key,
+        asset_brief_id=asset_brief_id,
+    )
 
     def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
         if not workflow_run_id:
@@ -1407,607 +1498,655 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
 
     creative_client: CreativeServiceClient | None = None
 
-    with session_scope() as session:
-        artifacts_repo = ArtifactsRepository(session)
-        assets_repo = AssetsRepository(session)
-        brief, brief_artifact_id = _extract_brief(
-            artifacts_repo=artifacts_repo,
-            org_id=org_id,
-            client_id=client_id,
-            campaign_id=campaign_id,
-            asset_brief_id=asset_brief_id,
-        )
+    try:
+        with session_scope() as session:
+            artifacts_repo = ArtifactsRepository(session)
+            assets_repo = AssetsRepository(session)
+            brief, brief_artifact_id = _extract_brief(
+                artifacts_repo=artifacts_repo,
+                org_id=org_id,
+                client_id=client_id,
+                campaign_id=campaign_id,
+                asset_brief_id=asset_brief_id,
+            )
 
-        funnel_id = _validate_brief_scope(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            campaign_id=campaign_id,
-            asset_brief_id=asset_brief_id,
-            brief=brief,
-        )
-
-        creative_concept = brief.get("creativeConcept")
-        if not isinstance(creative_concept, str) or not creative_concept.strip():
-            raise ValueError("Asset brief is missing creativeConcept.")
-
-        requirements_raw = brief.get("requirements") or []
-        if not isinstance(requirements_raw, list) or not requirements_raw:
-            raise ValueError("Asset brief has no requirements to generate assets from.")
-
-        requirements: list[dict[str, Any]] = []
-        for req in requirements_raw:
-            if not isinstance(req, dict):
-                raise ValueError("Asset brief requirements must be objects.")
-            requirements.append(req)
-
-        from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
-
-        requirement_allocations = _split_requirement_asset_counts(
-            requirements,
-            int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6),
-        )
-        variant_id = brief.get("variantId") or brief.get("variant_id")
-        constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str)]
-        tone_guidelines = [item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str)]
-        visual_guidelines = [item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str)]
-        selected_swipe_sources: list[dict[str, Any]] = []
-        for req in requirements:
-            explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
-            explicit_swipe_requires_product_image = _extract_requirement_swipe_requires_product_image(req)
-            if explicit_swipe_requires_product_image is not None and not (
-                explicit_company_swipe_id or explicit_swipe_image_url
-            ):
-                raise ValueError(
-                    "swipeRequiresProductImage/swipe_requires_product_image requires an explicit swipe source "
-                    "(companySwipeId/company_swipe_id or swipeImageUrl/swipe_image_url)."
-                )
-            normalized_format = _normalize_requirement_format(str(req.get("format") or ""))
-            if normalized_format == "image" and (explicit_company_swipe_id or explicit_swipe_image_url):
-                raise ValueError(
-                    "Image-ad requirements must not declare explicit swipe bindings in the asset brief. "
-                    "Swipe source binding is system-owned and comes from the curated default swipe set."
-                )
-
-        image_reference_asset_ids: list[str] = []
-        product_asset_urls: list[str] = []
-        video_reference_attachments: list[CreativeServiceVideoAttachmentIn] = []
-        retention_expires_at = _retention_expires_at()
-        created_asset_ids: list[str] = []
-        variant_cursor = 0
-        ad_copy_pack_artifact = _get_or_create_ad_copy_pack_artifact(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            asset_brief_id=asset_brief_id,
-            brief_artifact_id=brief_artifact_id,
-            brief=brief,
-        )
-        ad_copy_pack_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
-        ad_copy_pack = AdCopyPackArtifact.model_validate(ad_copy_pack_payload)
-        copy_pack_by_id = {item.id: item for item in ad_copy_pack.copy_packs}
-        creative_generation_plan_artifact = _create_creative_generation_plan_artifact(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            asset_brief_id=asset_brief_id,
-            brief_artifact_id=brief_artifact_id,
-            brief=brief,
-            ad_copy_pack_artifact=ad_copy_pack_artifact,
-        )
-        creative_generation_plan_payload = (
-            creative_generation_plan_artifact.data
-            if isinstance(creative_generation_plan_artifact.data, dict)
-            else {}
-        )
-        creative_generation_plan = CreativeGenerationPlanArtifact.model_validate(
-            creative_generation_plan_payload
-        )
-        plan_items_by_requirement: dict[int, list[CreativeGenerationPlanItem]] = {}
-        for item in creative_generation_plan.items:
-            plan_items_by_requirement.setdefault(item.requirement_index, []).append(item)
-
-        video_requirements_present = any(
-            _normalize_requirement_format(str(req.get("format") or "")) == "video" for req in requirements
-        )
-        if video_requirements_present:
-            try:
-                creative_client = CreativeServiceClient()
-            except CreativeServiceConfigError as exc:
-                raise RuntimeError(str(exc)) from exc
-
-            product_reference_assets = _select_product_reference_assets(
+            funnel_id = _validate_brief_scope(
                 session=session,
                 org_id=org_id,
-                product_id=product_id,
+                client_id=client_id,
+                campaign_id=campaign_id,
+                asset_brief_id=asset_brief_id,
+                brief=brief,
             )
-            design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
-            logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
-            logo_reference_asset: _ProductReferenceAsset | None = None
-            logo_remote_asset_id: str | None = None
-            if logo_public_id:
-                logo_reference_asset = _resolve_brand_logo_reference_asset(
+
+            creative_concept = brief.get("creativeConcept")
+            if not isinstance(creative_concept, str) or not creative_concept.strip():
+                raise ValueError("Asset brief is missing creativeConcept.")
+
+            requirements_raw = brief.get("requirements") or []
+            if not isinstance(requirements_raw, list) or not requirements_raw:
+                raise ValueError("Asset brief has no requirements to generate assets from.")
+
+            requirements: list[dict[str, Any]] = []
+            for req in requirements_raw:
+                if not isinstance(req, dict):
+                    raise ValueError("Asset brief requirements must be objects.")
+                requirements.append(req)
+
+            from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
+
+            requirement_allocations = _split_requirement_asset_counts(
+                requirements,
+                int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6),
+            )
+            variant_id = brief.get("variantId") or brief.get("variant_id")
+            constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str)]
+            tone_guidelines = [item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str)]
+            visual_guidelines = [item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str)]
+            selected_swipe_sources: list[dict[str, Any]] = []
+            for req in requirements:
+                explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
+                explicit_swipe_requires_product_image = _extract_requirement_swipe_requires_product_image(req)
+                if explicit_swipe_requires_product_image is not None and not (
+                    explicit_company_swipe_id or explicit_swipe_image_url
+                ):
+                    raise ValueError(
+                        "swipeRequiresProductImage/swipe_requires_product_image requires an explicit swipe source "
+                        "(companySwipeId/company_swipe_id or swipeImageUrl/swipe_image_url)."
+                    )
+                normalized_format = _normalize_requirement_format(str(req.get("format") or ""))
+                if normalized_format == "image" and (explicit_company_swipe_id or explicit_swipe_image_url):
+                    raise ValueError(
+                        "Image-ad requirements must not declare explicit swipe bindings in the asset brief. "
+                        "Swipe source binding is system-owned and comes from the curated default swipe set."
+                    )
+
+            image_reference_asset_ids: list[str] = []
+            product_asset_urls: list[str] = []
+            video_reference_attachments: list[CreativeServiceVideoAttachmentIn] = []
+            retention_expires_at = _retention_expires_at()
+            created_asset_ids: list[str] = []
+            variant_cursor = 0
+            ad_copy_pack_artifact = _get_or_create_ad_copy_pack_artifact(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                asset_brief_id=asset_brief_id,
+                brief_artifact_id=brief_artifact_id,
+                brief=brief,
+            )
+            ad_copy_pack_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
+            ad_copy_pack = AdCopyPackArtifact.model_validate(ad_copy_pack_payload)
+            copy_pack_by_id = {item.id: item for item in ad_copy_pack.copy_packs}
+            creative_generation_plan_artifact = _create_creative_generation_plan_artifact(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                asset_brief_id=asset_brief_id,
+                brief_artifact_id=brief_artifact_id,
+                brief=brief,
+                ad_copy_pack_artifact=ad_copy_pack_artifact,
+                batch_id=batch_id,
+            )
+            creative_generation_plan_payload = (
+                creative_generation_plan_artifact.data
+                if isinstance(creative_generation_plan_artifact.data, dict)
+                else {}
+            )
+            creative_generation_plan = CreativeGenerationPlanArtifact.model_validate(
+                creative_generation_plan_payload
+            )
+            plan_items_by_requirement: dict[int, list[CreativeGenerationPlanItem]] = {}
+            for item in creative_generation_plan.items:
+                plan_items_by_requirement.setdefault(item.requirement_index, []).append(item)
+            completed_image_plan_item_assets = _existing_creative_generation_assets_by_plan_item(
+                assets=assets_repo.list(
+                    org_id=org_id,
+                    campaign_id=campaign_id,
+                    product_id=product_id,
+                ),
+                batch_id=creative_generation_plan.batch_id,
+                asset_brief_id=asset_brief_id,
+            )
+
+            video_requirements_present = any(
+                _normalize_requirement_format(str(req.get("format") or "")) == "video" for req in requirements
+            )
+            if video_requirements_present:
+                try:
+                    creative_client = CreativeServiceClient()
+                except CreativeServiceConfigError as exc:
+                    raise RuntimeError(str(exc)) from exc
+
+                product_reference_assets = _select_product_reference_assets(
                     session=session,
                     org_id=org_id,
-                    logo_public_id=logo_public_id,
+                    product_id=product_id,
                 )
-                # Upload logo as a separate reference so the creative model can use it if desired.
-                logo_remote_asset_id = _ensure_remote_reference_asset_ids(
+
+                design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
+                logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
+                logo_reference_asset: _ProductReferenceAsset | None = None
+                logo_remote_asset_id: str | None = None
+                if logo_public_id:
+                    logo_reference_asset = _resolve_brand_logo_reference_asset(
+                        session=session,
+                        org_id=org_id,
+                        logo_public_id=logo_public_id,
+                    )
+                    # Upload logo as a separate reference so the creative model can use it if desired.
+                    logo_remote_asset_id = _ensure_remote_reference_asset_ids(
+                        session=session,
+                        org_id=org_id,
+                        creative_client=creative_client,
+                        references=[logo_reference_asset],
+                    )[0]
+                product_reference_remote_ids = _ensure_remote_reference_asset_ids(
                     session=session,
                     org_id=org_id,
                     creative_client=creative_client,
-                    references=[logo_reference_asset],
-                )[0]
-            product_reference_remote_ids = _ensure_remote_reference_asset_ids(
-                session=session,
-                org_id=org_id,
-                creative_client=creative_client,
-                references=product_reference_assets,
-            )
-            image_reference_asset_ids = list(product_reference_remote_ids)
-            if logo_remote_asset_id:
-                image_reference_asset_ids.append(logo_remote_asset_id)
-            product_asset_urls = [item.primary_url for item in product_reference_assets]
-            video_reference_attachments = [
-                CreativeServiceVideoAttachmentIn(
-                    asset_id=remote_asset_id,
-                    title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
-                    role="product_reference",
+                    references=product_reference_assets,
                 )
-                for idx, remote_asset_id in enumerate(product_reference_remote_ids)
-            ]
-            if logo_remote_asset_id and logo_reference_asset:
-                video_reference_attachments.append(
+                image_reference_asset_ids = list(product_reference_remote_ids)
+                if logo_remote_asset_id:
+                    image_reference_asset_ids.append(logo_remote_asset_id)
+                product_asset_urls = [item.primary_url for item in product_reference_assets]
+                video_reference_attachments = [
                     CreativeServiceVideoAttachmentIn(
-                        asset_id=logo_remote_asset_id,
-                        title=logo_reference_asset.title,
-                        role="brand_logo",
+                        asset_id=remote_asset_id,
+                        title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
+                        role="product_reference",
                     )
-                )
-
-        video_orchestrator = VideoAdsOrchestrator(client=creative_client) if creative_client else None
-
-        for requirement_index, req, allocation_count in requirement_allocations:
-            channel_id = req.get("channel") or "meta"
-            fmt = req.get("format") or "image"
-            if not isinstance(channel_id, str) or not channel_id.strip():
-                raise ValueError("Asset requirement channel must be a non-empty string.")
-            if not isinstance(fmt, str) or not fmt.strip():
-                raise ValueError("Asset requirement format must be a non-empty string.")
-
-            normalized_format = _normalize_requirement_format(fmt)
-            if normalized_format not in _SUPPORTED_FORMATS:
-                raise ValueError(
-                    f"Unsupported creative brief format '{fmt}'. Supported formats: {sorted(_SUPPORTED_FORMATS)}."
-                )
-
-            if normalized_format == "image":
-                plan_items = plan_items_by_requirement.get(requirement_index, [])
-                if not plan_items:
-                    raise RuntimeError(
-                        "Creative generation plan has no swipe execution items for image requirement "
-                        f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index})."
+                    for idx, remote_asset_id in enumerate(product_reference_remote_ids)
+                ]
+                if logo_remote_asset_id and logo_reference_asset:
+                    video_reference_attachments.append(
+                        CreativeServiceVideoAttachmentIn(
+                            asset_id=logo_remote_asset_id,
+                            title=logo_reference_asset.title,
+                            role="brand_logo",
+                        )
                     )
-                for plan_item in plan_items:
-                    copy_pack = copy_pack_by_id.get(plan_item.copy_pack_id)
-                    if copy_pack is None:
+
+            video_orchestrator = VideoAdsOrchestrator(client=creative_client) if creative_client else None
+
+            for requirement_index, req, allocation_count in requirement_allocations:
+                channel_id = req.get("channel") or "meta"
+                fmt = req.get("format") or "image"
+                if not isinstance(channel_id, str) or not channel_id.strip():
+                    raise ValueError("Asset requirement channel must be a non-empty string.")
+                if not isinstance(fmt, str) or not fmt.strip():
+                    raise ValueError("Asset requirement format must be a non-empty string.")
+
+                normalized_format = _normalize_requirement_format(fmt)
+                if normalized_format not in _SUPPORTED_FORMATS:
+                    raise ValueError(
+                        f"Unsupported creative brief format '{fmt}'. Supported formats: {sorted(_SUPPORTED_FORMATS)}."
+                    )
+
+                if normalized_format == "image":
+                    plan_items = plan_items_by_requirement.get(requirement_index, [])
+                    if not plan_items:
                         raise RuntimeError(
-                            "Creative generation plan references a missing ad copy pack item "
-                            f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                            f"copy_pack_id={plan_item.copy_pack_id})."
+                            "Creative generation plan has no swipe execution items for image requirement "
+                            f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index})."
                         )
-                    if not plan_item.company_swipe_id:
-                        raise RuntimeError(
-                            "Creative generation plan item is missing companySwipeId "
-                            f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
+                    for plan_item in plan_items:
+                        copy_pack = copy_pack_by_id.get(plan_item.copy_pack_id)
+                        if copy_pack is None:
+                            raise RuntimeError(
+                                "Creative generation plan references a missing ad copy pack item "
+                                f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                                f"copy_pack_id={plan_item.copy_pack_id})."
+                            )
+                        if not plan_item.company_swipe_id:
+                            raise RuntimeError(
+                                "Creative generation plan item is missing companySwipeId "
+                                f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
+                            )
+
+                        existing_asset_id = completed_image_plan_item_assets.get(plan_item.id)
+                        if existing_asset_id:
+                            created_asset_ids.append(existing_asset_id)
+                            selected_swipe_sources.append(
+                                {
+                                    "requirement_index": requirement_index,
+                                    "plan_item_id": plan_item.id,
+                                    "company_swipe_id": plan_item.company_swipe_id,
+                                    "swipe_source_label": plan_item.source_label,
+                                    "swipe_source_url": plan_item.source_media_url,
+                                    "swipe_requires_product_image": plan_item.product_image_policy,
+                                    "copy_pack_id": copy_pack.id,
+                                }
+                            )
+                            continue
+
+                        try:
+                            swipe_result = generate_swipe_image_ad_activity(
+                                {
+                                    "org_id": org_id,
+                                    "client_id": client_id,
+                                    "product_id": product_id,
+                                    "campaign_id": campaign_id,
+                                    "asset_brief_id": asset_brief_id,
+                                    "requirement_index": requirement_index,
+                                    "company_swipe_id": plan_item.company_swipe_id,
+                                    "swipe_source_url": plan_item.source_media_url,
+                                    "swipe_source_label": plan_item.source_label,
+                                    "swipe_requires_product_image": plan_item.product_image_policy,
+                                    "count": 1,
+                                    "workflow_run_id": workflow_run_id,
+                                    "creative_generation_batch_id": creative_generation_plan.batch_id,
+                                    "creative_generation_plan_artifact_id": str(creative_generation_plan_artifact.id),
+                                    "creative_generation_plan_item_id": plan_item.id,
+                                    "ad_copy_pack_artifact_id": str(ad_copy_pack_artifact.id),
+                                    "ad_copy_pack_id": copy_pack.id,
+                                },
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            error_summary = _summarize_exception_message(exc)
+                            raise RuntimeError(
+                                "Swipe image ad generation failed for planned execution item "
+                                f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                                f"plan_item_id={plan_item.id}, company_swipe_id={plan_item.company_swipe_id}, "
+                                f"source_label={plan_item.source_label}, error={error_summary})."
+                            ) from None
+
+                        generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
+                        if not isinstance(generated_ids, list) or len(generated_ids) != 1:
+                            raise RuntimeError(
+                                "Swipe image ad generation returned an invalid asset id list for planned execution item "
+                                f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id}, "
+                                f"returned={len(generated_ids) if isinstance(generated_ids, list) else 0})."
+                            )
+                        generated_asset_id = generated_ids[0]
+                        if not isinstance(generated_asset_id, str) or not generated_asset_id.strip():
+                            raise RuntimeError(
+                                "Swipe image ad generation returned an invalid asset id for planned execution item "
+                                f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
+                            )
+                        generated_asset = assets_repo.get(org_id=org_id, asset_id=generated_asset_id)
+                        if generated_asset is None:
+                            raise RuntimeError(
+                                "Generated swipe image asset could not be reloaded for provenance annotation "
+                                f"(asset_id={generated_asset_id}, asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
+                            )
+                        generated_ai_metadata = (
+                            dict(generated_asset.ai_metadata) if isinstance(generated_asset.ai_metadata, dict) else {}
                         )
-                    try:
-                        swipe_result = generate_swipe_image_ad_activity(
+                        generated_ai_metadata.update(
                             {
-                                "org_id": org_id,
-                                "client_id": client_id,
-                                "product_id": product_id,
-                                "campaign_id": campaign_id,
-                                "asset_brief_id": asset_brief_id,
+                                "creativeGenerationBatchId": creative_generation_plan.batch_id,
+                                "creativeGenerationPlanArtifactId": str(creative_generation_plan_artifact.id),
+                                "creativeGenerationPlanItemId": plan_item.id,
+                                "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+                                "adCopyPackId": copy_pack.id,
+                                "swipeSourceLabel": plan_item.source_label,
+                                "swipeSourceUrl": plan_item.source_media_url,
+                            }
+                        )
+                        assets_repo.update(
+                            org_id=org_id,
+                            asset_id=generated_asset_id,
+                            ai_metadata=generated_ai_metadata,
+                        )
+                        completed_image_plan_item_assets[plan_item.id] = generated_asset_id
+                        created_asset_ids.append(generated_asset_id)
+                        selected_swipe_sources.append(
+                            {
                                 "requirement_index": requirement_index,
+                                "plan_item_id": plan_item.id,
                                 "company_swipe_id": plan_item.company_swipe_id,
-                                "swipe_source_url": plan_item.source_media_url,
                                 "swipe_source_label": plan_item.source_label,
+                                "swipe_source_url": plan_item.source_media_url,
                                 "swipe_requires_product_image": plan_item.product_image_policy,
-                                "count": 1,
-                                "workflow_run_id": workflow_run_id,
-                            },
+                                "copy_pack_id": copy_pack.id,
+                            }
                         )
-                    except Exception as exc:  # noqa: BLE001
-                        raise RuntimeError(
-                            "Swipe image ad generation failed for planned execution item "
-                            f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                            f"plan_item_id={plan_item.id}, company_swipe_id={plan_item.company_swipe_id}, "
-                            f"source_label={plan_item.source_label}, error={exc})."
-                        ) from exc
+                    continue
 
-                    generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
-                    if not isinstance(generated_ids, list) or len(generated_ids) != 1:
-                        raise RuntimeError(
-                            "Swipe image ad generation returned an invalid asset id list for planned execution item "
-                            f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id}, "
-                            f"returned={len(generated_ids) if isinstance(generated_ids, list) else 0})."
+                elif normalized_format == "video":
+                    if video_orchestrator is None:
+                        raise RuntimeError("Video orchestration client was not initialized.")
+                    for _variant_offset in range(allocation_count):
+                        current_variant_index = variant_cursor
+                        variant_cursor += 1
+
+                        initial_message = build_initial_video_message(
+                            creative_concept=creative_concept,
+                            channel_id=channel_id,
+                            requirement=req,
+                            constraints=constraints,
+                            tone_guidelines=tone_guidelines,
+                            visual_guidelines=visual_guidelines,
+                            product_asset_urls=product_asset_urls,
                         )
-                    generated_asset_id = generated_ids[0]
-                    if not isinstance(generated_asset_id, str) or not generated_asset_id.strip():
-                        raise RuntimeError(
-                            "Swipe image ad generation returned an invalid asset id for planned execution item "
-                            f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
-                        )
-                    generated_asset = assets_repo.get(org_id=org_id, asset_id=generated_asset_id)
-                    if generated_asset is None:
-                        raise RuntimeError(
-                            "Generated swipe image asset could not be reloaded for provenance annotation "
-                            f"(asset_id={generated_asset_id}, asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
-                        )
-                    generated_ai_metadata = (
-                        dict(generated_asset.ai_metadata) if isinstance(generated_asset.ai_metadata, dict) else {}
-                    )
-                    generated_ai_metadata.update(
-                        {
-                            "creativeGenerationBatchId": creative_generation_plan.batch_id,
-                            "creativeGenerationPlanArtifactId": str(creative_generation_plan_artifact.id),
-                            "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
-                            "adCopyPackId": copy_pack.id,
-                            "swipeSourceLabel": plan_item.source_label,
-                            "swipeSourceUrl": plan_item.source_media_url,
-                        }
-                    )
-                    assets_repo.update(
-                        org_id=org_id,
-                        asset_id=generated_asset_id,
-                        ai_metadata=generated_ai_metadata,
-                    )
-                    created_asset_ids.append(generated_asset_id)
-                    selected_swipe_sources.append(
-                        {
+                        context_payload = {
+                            "asset_brief_id": asset_brief_id,
+                            "campaign_id": campaign_id,
+                            "client_id": client_id,
+                            "product_id": product_id,
+                            "variant_index": current_variant_index,
                             "requirement_index": requirement_index,
-                            "plan_item_id": plan_item.id,
-                            "company_swipe_id": plan_item.company_swipe_id,
-                            "swipe_source_label": plan_item.source_label,
-                            "swipe_source_url": plan_item.source_media_url,
-                            "swipe_requires_product_image": plan_item.product_image_policy,
-                            "copy_pack_id": copy_pack.id,
+                            "requirement": req,
+                            "creative_concept": creative_concept,
+                            "constraints": constraints,
+                            "tone_guidelines": tone_guidelines,
+                            "visual_guidelines": visual_guidelines,
+                            "product_asset_urls": product_asset_urls,
+                            "product_reference_asset_ids": image_reference_asset_ids,
                         }
-                    )
-                continue
 
-            elif normalized_format == "video":
-                if video_orchestrator is None:
-                    raise RuntimeError("Video orchestration client was not initialized.")
-                for _variant_offset in range(allocation_count):
-                    current_variant_index = variant_cursor
-                    variant_cursor += 1
-
-                    initial_message = build_initial_video_message(
-                        creative_concept=creative_concept,
-                        channel_id=channel_id,
-                        requirement=req,
-                        constraints=constraints,
-                        tone_guidelines=tone_guidelines,
-                        visual_guidelines=visual_guidelines,
-                        product_asset_urls=product_asset_urls,
-                    )
-                    context_payload = {
-                        "asset_brief_id": asset_brief_id,
-                        "campaign_id": campaign_id,
-                        "client_id": client_id,
-                        "product_id": product_id,
-                        "variant_index": current_variant_index,
-                        "requirement_index": requirement_index,
-                        "requirement": req,
-                        "creative_concept": creative_concept,
-                        "constraints": constraints,
-                        "tone_guidelines": tone_guidelines,
-                        "visual_guidelines": visual_guidelines,
-                        "product_asset_urls": product_asset_urls,
-                        "product_reference_asset_ids": image_reference_asset_ids,
-                    }
-
-                    session_key = _stable_idempotency_key(
-                        org_id,
-                        client_id,
-                        str(campaign_id or ""),
-                        asset_brief_id,
-                        "video_session",
-                        str(requirement_index),
-                        str(current_variant_index),
-                    )
-                    turn_prefix = _stable_idempotency_key(
-                        org_id,
-                        client_id,
-                        str(campaign_id or ""),
-                        asset_brief_id,
-                        "video_turn",
-                        str(requirement_index),
-                        str(current_variant_index),
-                    )
-                    existing_run = _get_existing_run_by_idempotency(session=session, idempotency_key=session_key)
-                    if existing_run:
-                        if existing_run.status != "succeeded":
-                            raise RuntimeError(
-                                f"Existing video run is not reusable for idempotency key {session_key}. "
-                                f"status={existing_run.status} error={existing_run.error_detail}"
-                            )
-                        existing_asset_ids = _existing_output_asset_ids(
-                            session=session,
-                            run_id=str(existing_run.id),
-                            output_kinds={"final_video"},
+                        session_key = _stable_idempotency_key(
+                            org_id,
+                            client_id,
+                            str(campaign_id or ""),
+                            asset_brief_id,
+                            "video_session",
+                            str(requirement_index),
+                            str(current_variant_index),
                         )
-                        if not existing_asset_ids:
-                            raise RuntimeError(
-                                f"Existing idempotent video run {existing_run.id} has no final_video local assets."
-                            )
-                        created_asset_ids.append(existing_asset_ids[0])
-                        _record_run_event(
-                            session=session,
-                            run_id=str(existing_run.id),
-                            retention_expires_at=existing_run.retention_expires_at,
-                            event_type="video.session.reused",
-                            status="succeeded",
-                            payload={"reason": "idempotent_replay", "asset_id": existing_asset_ids[0]},
+                        turn_prefix = _stable_idempotency_key(
+                            org_id,
+                            client_id,
+                            str(campaign_id or ""),
+                            asset_brief_id,
+                            "video_turn",
+                            str(requirement_index),
+                            str(current_variant_index),
                         )
-                        continue
-
-                    run = CreativeServiceRun(
-                        org_id=org_id,
-                        client_id=client_id,
-                        campaign_id=campaign_id,
-                        product_id=product_id,
-                        workflow_run_id=workflow_run_id,
-                        asset_brief_id=asset_brief_id,
-                        requirement_index=requirement_index,
-                        variant_index=current_variant_index,
-                        service_kind="video",
-                        operation_kind="video_session",
-                        status="queued",
-                        idempotency_key=session_key,
-                        request_payload={
-                            "title": f"{asset_brief_id}-variant-{current_variant_index}",
-                            "message": initial_message,
-                            "context": context_payload,
-                            "attachments": [attachment.model_dump(mode="json") for attachment in video_reference_attachments],
-                        },
-                        retention_expires_at=retention_expires_at,
-                    )
-                    session.add(run)
-                    session.commit()
-                    session.refresh(run)
-
-                    _record_run_event(
-                        session=session,
-                        run_id=str(run.id),
-                        retention_expires_at=retention_expires_at,
-                        event_type="video.session.queued",
-                        status="queued",
-                        payload=run.request_payload,
-                    )
-
-                    try:
-                        orchestrated = video_orchestrator.run_variant(
-                            title=f"{asset_brief_id}-variant-{current_variant_index}",
-                            initial_text=initial_message,
-                            context=context_payload,
-                            attachments=video_reference_attachments,
-                            session_idempotency_key=session_key,
-                            turn_idempotency_prefix=turn_prefix,
-                        )
-                    except VideoOrchestrationError as exc:
-                        run.status = "failed"
-                        run.error_detail = str(exc)
-                        run.remote_session_id = exc.session_id
-                        run.finished_at = datetime.now(timezone.utc)
-                        run.updated_at = datetime.now(timezone.utc)
-                        session.commit()
-
-                        if exc.turns:
-                            _upsert_turn_traces(
+                        existing_run = _get_existing_run_by_idempotency(session=session, idempotency_key=session_key)
+                        if existing_run:
+                            if existing_run.status != "succeeded":
+                                raise RuntimeError(
+                                    f"Existing video run is not reusable for idempotency key {session_key}. "
+                                    f"status={existing_run.status} error={existing_run.error_detail}"
+                                )
+                            existing_asset_ids = _existing_output_asset_ids(
                                 session=session,
-                                run_id=str(run.id),
-                                traces=exc.turns,
-                                retention_expires_at=retention_expires_at,
+                                run_id=str(existing_run.id),
+                                output_kinds={"final_video"},
                             )
-
-                        _record_run_event(
-                            session=session,
-                            run_id=str(run.id),
-                            retention_expires_at=retention_expires_at,
-                            event_type="video.session.failed",
-                            status="failed",
-                            payload={"error": str(exc), "session_id": exc.session_id},
-                        )
-                        raise RuntimeError(
-                            f"Video generation failed for brief {asset_brief_id} "
-                            f"(variant_index={current_variant_index}): {exc}"
-                        ) from exc
-                    except Exception as exc:  # noqa: BLE001
-                        run.status = "failed"
-                        run.error_detail = str(exc)
-                        run.finished_at = datetime.now(timezone.utc)
-                        run.updated_at = datetime.now(timezone.utc)
-                        session.commit()
-                        _record_run_event(
-                            session=session,
-                            run_id=str(run.id),
-                            retention_expires_at=retention_expires_at,
-                            event_type="video.session.failed",
-                            status="failed",
-                            payload={"error": str(exc), "session_id": run.remote_session_id},
-                        )
-                        raise RuntimeError(
-                            f"Video generation failed for brief {asset_brief_id} "
-                            f"(variant_index={current_variant_index}): {exc}"
-                        ) from exc
-
-                    turn_id_map = _upsert_turn_traces(
-                        session=session,
-                        run_id=str(run.id),
-                        traces=orchestrated.turns,
-                        retention_expires_at=retention_expires_at,
-                    )
-
-                    run.remote_session_id = orchestrated.session_id
-                    run.status = "succeeded"
-                    run.response_payload = orchestrated.result.model_dump(mode="json")
-                    run.started_at = orchestrated.turns[0].started_at if orchestrated.turns else datetime.now(timezone.utc)
-                    run.finished_at = datetime.now(timezone.utc)
-                    run.updated_at = datetime.now(timezone.utc)
-                    session.commit()
-
-                    _record_run_event(
-                        session=session,
-                        run_id=str(run.id),
-                        retention_expires_at=retention_expires_at,
-                        event_type="video.session.completed",
-                        status="succeeded",
-                        payload=orchestrated.result.model_dump(mode="json"),
-                    )
-
-                    try:
-                        final_video = orchestrated.result.final_video
-                        if not final_video or not final_video.primary_url:
-                            raise RuntimeError(
-                                f"Video result missing final_video.primary_url for brief {asset_brief_id} "
-                                f"(variant_index={current_variant_index}, session_id={orchestrated.session_id})"
+                            if not existing_asset_ids:
+                                raise RuntimeError(
+                                    f"Existing idempotent video run {existing_run.id} has no final_video local assets."
+                                )
+                            created_asset_ids.append(existing_asset_ids[0])
+                            _record_run_event(
+                                session=session,
+                                run_id=str(existing_run.id),
+                                retention_expires_at=existing_run.retention_expires_at,
+                                event_type="video.session.reused",
+                                status="succeeded",
+                                payload={"reason": "idempotent_replay", "asset_id": existing_asset_ids[0]},
                             )
+                            continue
 
-                        final_turn_id = turn_id_map.get(orchestrated.turns[-1].turn_id) if orchestrated.turns else None
-                        local_video_asset_id = _create_generated_asset_from_url(
-                            session=session,
+                        run = CreativeServiceRun(
                             org_id=org_id,
                             client_id=client_id,
                             campaign_id=campaign_id,
                             product_id=product_id,
-                            funnel_id=funnel_id,
-                            brief_artifact_id=brief_artifact_id,
+                            workflow_run_id=workflow_run_id,
                             asset_brief_id=asset_brief_id,
-                            variant_id=variant_id,
-                            variant_index=current_variant_index,
-                            channel_id=channel_id.strip(),
-                            fmt=fmt.strip(),
                             requirement_index=requirement_index,
-                            requirement=req,
-                            primary_url=final_video.primary_url,
-                            prompt=initial_message,
-                            source_kind="video_output",
-                            expected_asset_kind="video",
-                            retention_expires_at=retention_expires_at,
-                            extra_ai_metadata={
-                                "remoteSessionId": orchestrated.session_id,
-                                "remoteTurnIds": [trace.turn_id for trace in orchestrated.turns],
-                                "remoteAssetId": final_video.asset_id,
+                            variant_index=current_variant_index,
+                            service_kind="video",
+                            operation_kind="video_session",
+                            status="queued",
+                            idempotency_key=session_key,
+                            request_payload={
+                                "title": f"{asset_brief_id}-variant-{current_variant_index}",
+                                "message": initial_message,
+                                "context": context_payload,
+                                "attachments": [
+                                    attachment.model_dump(mode="json") for attachment in video_reference_attachments
+                                ],
                             },
-                            attach_to_product=True,
+                            retention_expires_at=retention_expires_at,
                         )
-                        created_asset_ids.append(local_video_asset_id)
-                        _record_output(
+                        session.add(run)
+                        session.commit()
+                        session.refresh(run)
+
+                        _record_run_event(
                             session=session,
                             run_id=str(run.id),
-                            turn_id=final_turn_id,
                             retention_expires_at=retention_expires_at,
-                            output_kind="final_video",
-                            output_index=current_variant_index,
-                            remote_asset_id=final_video.asset_id,
-                            primary_uri=final_video.primary_uri,
-                            primary_url=final_video.primary_url,
-                            prompt_used=final_video.prompt_used,
-                            local_asset_id=local_video_asset_id,
-                            metadata={"requirementIndex": requirement_index, "variantIndex": current_variant_index},
+                            event_type="video.session.queued",
+                            status="queued",
+                            payload=run.request_payload,
                         )
 
-                        pins = (orchestrated.result.project.pins if orchestrated.result.project else {}) or {}
-                        for pin_name, pin_value in pins.items():
-                            pin_url: str | None = None
-                            pin_uri: str | None = None
-                            pin_asset_id: str | None = None
+                        try:
+                            orchestrated = video_orchestrator.run_variant(
+                                title=f"{asset_brief_id}-variant-{current_variant_index}",
+                                initial_text=initial_message,
+                                context=context_payload,
+                                attachments=video_reference_attachments,
+                                session_idempotency_key=session_key,
+                                turn_idempotency_prefix=turn_prefix,
+                            )
+                        except VideoOrchestrationError as exc:
+                            run.status = "failed"
+                            run.error_detail = str(exc)
+                            run.remote_session_id = exc.session_id
+                            run.finished_at = datetime.now(timezone.utc)
+                            run.updated_at = datetime.now(timezone.utc)
+                            session.commit()
 
-                            if isinstance(pin_value, dict):
-                                raw_url = pin_value.get("primary_url")
-                                if isinstance(raw_url, str) and raw_url.strip():
-                                    pin_url = raw_url.strip()
-                                raw_uri = pin_value.get("primary_uri")
-                                if isinstance(raw_uri, str) and raw_uri.strip():
-                                    pin_uri = raw_uri.strip()
-                                raw_asset_id = pin_value.get("asset_id")
-                                if isinstance(raw_asset_id, str) and raw_asset_id.strip():
-                                    pin_asset_id = raw_asset_id.strip()
-                            elif isinstance(pin_value, str) and pin_value.startswith("http"):
-                                pin_url = pin_value
-
-                            local_pin_asset_id: str | None = None
-                            if pin_url:
-                                local_pin_asset_id = _create_generated_asset_from_url(
+                            if exc.turns:
+                                _upsert_turn_traces(
                                     session=session,
-                                    org_id=org_id,
-                                    client_id=client_id,
-                                    campaign_id=campaign_id,
-                                    product_id=product_id,
-                                    funnel_id=funnel_id,
-                                    brief_artifact_id=brief_artifact_id,
-                                    asset_brief_id=asset_brief_id,
-                                    variant_id=variant_id,
-                                    variant_index=None,
-                                    channel_id=channel_id.strip(),
-                                    fmt=fmt.strip(),
-                                    requirement_index=requirement_index,
-                                    requirement=req,
-                                    primary_url=pin_url,
-                                    prompt=initial_message,
-                                    source_kind=f"video_pin_{pin_name}",
-                                    expected_asset_kind=None,
+                                    run_id=str(run.id),
+                                    traces=exc.turns,
                                     retention_expires_at=retention_expires_at,
-                                    extra_ai_metadata={
-                                        "remoteSessionId": orchestrated.session_id,
-                                        "pinName": pin_name,
-                                    },
-                                    attach_to_product=False,
                                 )
 
+                            _record_run_event(
+                                session=session,
+                                run_id=str(run.id),
+                                retention_expires_at=retention_expires_at,
+                                event_type="video.session.failed",
+                                status="failed",
+                                payload={"error": str(exc), "session_id": exc.session_id},
+                            )
+                            raise RuntimeError(
+                                f"Video generation failed for brief {asset_brief_id} "
+                                f"(variant_index={current_variant_index}): {exc}"
+                            ) from exc
+                        except Exception as exc:  # noqa: BLE001
+                            run.status = "failed"
+                            run.error_detail = str(exc)
+                            run.finished_at = datetime.now(timezone.utc)
+                            run.updated_at = datetime.now(timezone.utc)
+                            session.commit()
+                            _record_run_event(
+                                session=session,
+                                run_id=str(run.id),
+                                retention_expires_at=retention_expires_at,
+                                event_type="video.session.failed",
+                                status="failed",
+                                payload={"error": str(exc), "session_id": run.remote_session_id},
+                            )
+                            raise RuntimeError(
+                                f"Video generation failed for brief {asset_brief_id} "
+                                f"(variant_index={current_variant_index}): {exc}"
+                            ) from exc
+
+                        turn_id_map = _upsert_turn_traces(
+                            session=session,
+                            run_id=str(run.id),
+                            traces=orchestrated.turns,
+                            retention_expires_at=retention_expires_at,
+                        )
+
+                        run.remote_session_id = orchestrated.session_id
+                        run.status = "succeeded"
+                        run.response_payload = orchestrated.result.model_dump(mode="json")
+                        run.started_at = (
+                            orchestrated.turns[0].started_at if orchestrated.turns else datetime.now(timezone.utc)
+                        )
+                        run.finished_at = datetime.now(timezone.utc)
+                        run.updated_at = datetime.now(timezone.utc)
+                        session.commit()
+
+                        _record_run_event(
+                            session=session,
+                            run_id=str(run.id),
+                            retention_expires_at=retention_expires_at,
+                            event_type="video.session.completed",
+                            status="succeeded",
+                            payload=orchestrated.result.model_dump(mode="json"),
+                        )
+
+                        try:
+                            final_video = orchestrated.result.final_video
+                            if not final_video or not final_video.primary_url:
+                                raise RuntimeError(
+                                    f"Video result missing final_video.primary_url for brief {asset_brief_id} "
+                                    f"(variant_index={current_variant_index}, session_id={orchestrated.session_id})"
+                                )
+
+                            final_turn_id = turn_id_map.get(orchestrated.turns[-1].turn_id) if orchestrated.turns else None
+                            local_video_asset_id = _create_generated_asset_from_url(
+                                session=session,
+                                org_id=org_id,
+                                client_id=client_id,
+                                campaign_id=campaign_id,
+                                product_id=product_id,
+                                funnel_id=funnel_id,
+                                brief_artifact_id=brief_artifact_id,
+                                asset_brief_id=asset_brief_id,
+                                variant_id=variant_id,
+                                variant_index=current_variant_index,
+                                channel_id=channel_id.strip(),
+                                fmt=fmt.strip(),
+                                requirement_index=requirement_index,
+                                requirement=req,
+                                primary_url=final_video.primary_url,
+                                prompt=initial_message,
+                                source_kind="video_output",
+                                expected_asset_kind="video",
+                                retention_expires_at=retention_expires_at,
+                                extra_ai_metadata={
+                                    "remoteSessionId": orchestrated.session_id,
+                                    "remoteTurnIds": [trace.turn_id for trace in orchestrated.turns],
+                                    "remoteAssetId": final_video.asset_id,
+                                },
+                                attach_to_product=True,
+                            )
+                            created_asset_ids.append(local_video_asset_id)
                             _record_output(
                                 session=session,
                                 run_id=str(run.id),
                                 turn_id=final_turn_id,
                                 retention_expires_at=retention_expires_at,
-                                output_kind=f"pin:{pin_name}",
-                                output_index=None,
-                                remote_asset_id=pin_asset_id,
-                                primary_uri=pin_uri,
-                                primary_url=pin_url,
-                                prompt_used=None,
-                                local_asset_id=local_pin_asset_id,
-                                metadata={"pinName": pin_name},
+                                output_kind="final_video",
+                                output_index=current_variant_index,
+                                remote_asset_id=final_video.asset_id,
+                                primary_uri=final_video.primary_uri,
+                                primary_url=final_video.primary_url,
+                                prompt_used=final_video.prompt_used,
+                                local_asset_id=local_video_asset_id,
+                                metadata={"requirementIndex": requirement_index, "variantIndex": current_variant_index},
                             )
-                    except Exception as exc:  # noqa: BLE001
-                        run.status = "failed"
-                        run.error_detail = str(exc)
-                        run.finished_at = datetime.now(timezone.utc)
-                        run.updated_at = datetime.now(timezone.utc)
-                        session.commit()
-                        _record_run_event(
-                            session=session,
-                            run_id=str(run.id),
-                            retention_expires_at=retention_expires_at,
-                            event_type="video.session.failed",
-                            status="failed",
-                            payload={"error": str(exc), "session_id": orchestrated.session_id},
-                        )
-                        raise
 
+                            pins = (orchestrated.result.project.pins if orchestrated.result.project else {}) or {}
+                            for pin_name, pin_value in pins.items():
+                                pin_url: str | None = None
+                                pin_uri: str | None = None
+                                pin_asset_id: str | None = None
+
+                                if isinstance(pin_value, dict):
+                                    raw_url = pin_value.get("primary_url")
+                                    if isinstance(raw_url, str) and raw_url.strip():
+                                        pin_url = raw_url.strip()
+                                    raw_uri = pin_value.get("primary_uri")
+                                    if isinstance(raw_uri, str) and raw_uri.strip():
+                                        pin_uri = raw_uri.strip()
+                                    raw_asset_id = pin_value.get("asset_id")
+                                    if isinstance(raw_asset_id, str) and raw_asset_id.strip():
+                                        pin_asset_id = raw_asset_id.strip()
+                                elif isinstance(pin_value, str) and pin_value.startswith("http"):
+                                    pin_url = pin_value
+
+                                local_pin_asset_id: str | None = None
+                                if pin_url:
+                                    local_pin_asset_id = _create_generated_asset_from_url(
+                                        session=session,
+                                        org_id=org_id,
+                                        client_id=client_id,
+                                        campaign_id=campaign_id,
+                                        product_id=product_id,
+                                        funnel_id=funnel_id,
+                                        brief_artifact_id=brief_artifact_id,
+                                        asset_brief_id=asset_brief_id,
+                                        variant_id=variant_id,
+                                        variant_index=None,
+                                        channel_id=channel_id.strip(),
+                                        fmt=fmt.strip(),
+                                        requirement_index=requirement_index,
+                                        requirement=req,
+                                        primary_url=pin_url,
+                                        prompt=initial_message,
+                                        source_kind=f"video_pin_{pin_name}",
+                                        expected_asset_kind=None,
+                                        retention_expires_at=retention_expires_at,
+                                        extra_ai_metadata={
+                                            "remoteSessionId": orchestrated.session_id,
+                                            "pinName": pin_name,
+                                        },
+                                        attach_to_product=False,
+                                    )
+
+                                _record_output(
+                                    session=session,
+                                    run_id=str(run.id),
+                                    turn_id=final_turn_id,
+                                    retention_expires_at=retention_expires_at,
+                                    output_kind=f"pin:{pin_name}",
+                                    output_index=None,
+                                    remote_asset_id=pin_asset_id,
+                                    primary_uri=pin_uri,
+                                    primary_url=pin_url,
+                                    prompt_used=None,
+                                    local_asset_id=local_pin_asset_id,
+                                    metadata={"pinName": pin_name},
+                                )
+                        except Exception as exc:  # noqa: BLE001
+                            run.status = "failed"
+                            run.error_detail = str(exc)
+                            run.finished_at = datetime.now(timezone.utc)
+                            run.updated_at = datetime.now(timezone.utc)
+                            session.commit()
+                            _record_run_event(
+                                session=session,
+                                run_id=str(run.id),
+                                retention_expires_at=retention_expires_at,
+                                event_type="video.session.failed",
+                                status="failed",
+                                payload={"error": str(exc), "session_id": orchestrated.session_id},
+                            )
+                            raise
+
+            log_activity(
+                "asset_generation",
+                "completed",
+                payload_out={"asset_brief_id": asset_brief_id, "asset_ids": created_asset_ids},
+            )
+            return {"asset_ids": created_asset_ids}
+    except Exception as exc:
         log_activity(
             "asset_generation",
-            "completed",
-            payload_out={"asset_brief_id": asset_brief_id, "asset_ids": created_asset_ids},
+            "failed",
+            error=_summarize_exception_message(exc),
         )
-        return {"asset_ids": created_asset_ids}
+        raise
 
 
 @activity.defn
