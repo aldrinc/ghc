@@ -159,6 +159,7 @@ class Settings(BaseSettings):
     CREATIVE_IMAGE_PLAN_ITEM_MAX_CONCURRENCY: int = 8
     CREATIVE_SERVICE_RETENTION_DAYS: int = 60
     CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT: int = 6
+    SWIPE_IMAGE_RENDER_MODEL: str = "gemini-3.1-flash-image-preview"
     IMAGE_RENDER_PROVIDER: str = "higgsfield"
     HIGGSFIELD_BASE_URL: str = "https://platform.higgsfield.ai"
     HF_KEY: str | None = None

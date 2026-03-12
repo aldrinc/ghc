@@ -25,14 +25,14 @@ from app.services.creative_service_client import (
 from app.services.media_storage import IMMUTABLE_CACHE_CONTROL, MediaStorage
 
 _ASPECT_RATIO_RE = re.compile(r"^\s*(\d+)\s*:\s*(\d+)\s*$")
-_DEFAULT_NANO_BANANA_MODEL = "models/gemini-2.5-flash-image"
+_DEFAULT_EMBEDDED_FREESTYLE_MODEL = "models/gemini-3.1-flash-image-preview"
 
 
 @dataclass
 class NanoBananaConfig:
     api_key: str
     base_url: str = "https://generativelanguage.googleapis.com"
-    model: str = _DEFAULT_NANO_BANANA_MODEL
+    model: str = _DEFAULT_EMBEDDED_FREESTYLE_MODEL
     request_timeout: float = 120.0
 
     @classmethod
@@ -361,7 +361,7 @@ class EmbeddedFreestyleImageRenderClient:
 def _resolve_model_id(model_id: str | None) -> str:
     cleaned = str(model_id or "").strip().lstrip("/")
     if not cleaned:
-        return _DEFAULT_NANO_BANANA_MODEL
+        return _DEFAULT_EMBEDDED_FREESTYLE_MODEL
     if cleaned.startswith("models/"):
         return cleaned
     if cleaned.startswith("gemini-"):
