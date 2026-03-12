@@ -22,6 +22,7 @@ from app.db.repositories.products import ProductsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.workflow_launches import (
     StrategyV2LaunchActionResponse,
     StrategyV2LaunchAdditionalAngleRequest,
@@ -470,6 +471,13 @@ def _normalize_required_string_list(*, value: list[str], field_name: str) -> lis
     if not normalized:
         raise HTTPException(status_code=400, detail=f"{field_name} must include at least one non-empty value.")
     return normalized
+
+
+def _normalize_required_asset_brief_types_or_400(*, value: list[str], field_name: str) -> list[str]:
+    try:
+        return normalize_required_asset_brief_types(value, field_name=field_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _strategy_v2_launch_record_to_payload(row: Any, *, launch_status: str | None = None) -> dict[str, Any]:
@@ -1446,7 +1454,7 @@ async def strategy_v2_launch_angle_campaign(
     effective_source_run = getattr(source_context, "source_run", source_run)
 
     channels = _normalize_required_string_list(value=body.channels, field_name="channels")
-    asset_brief_types = _normalize_required_string_list(
+    asset_brief_types = _normalize_required_asset_brief_types_or_400(
         value=body.asset_brief_types,
         field_name="assetBriefTypes",
     )
@@ -1625,9 +1633,9 @@ async def strategy_v2_launch_additional_ums(
         else _normalize_required_string_list(value=list(campaign.channels or []), field_name="campaign.channels")
     )
     asset_brief_types = (
-        _normalize_required_string_list(value=body.asset_brief_types, field_name="assetBriefTypes")
+        _normalize_required_asset_brief_types_or_400(value=body.asset_brief_types, field_name="assetBriefTypes")
         if body.asset_brief_types is not None
-        else _normalize_required_string_list(
+        else _normalize_required_asset_brief_types_or_400(
             value=list(campaign.asset_brief_types or []),
             field_name="campaign.asset_brief_types",
         )
@@ -1829,7 +1837,10 @@ async def strategy_v2_launch_additional_angle(
         )
 
     channels = _normalize_required_string_list(value=body.channels, field_name="channels")
-    asset_brief_types = _normalize_required_string_list(value=body.asset_brief_types, field_name="assetBriefTypes")
+    asset_brief_types = _normalize_required_asset_brief_types_or_400(
+        value=body.asset_brief_types,
+        field_name="assetBriefTypes",
+    )
     selected_angle_ids = _normalize_required_string_list(value=body.selected_angle_ids, field_name="selectedAngleIds")
     eligible_angle_ids = list_ranked_angle_ids(source_context.ranked_angle_candidates)
     invalid_angles = sorted(set(selected_angle_ids) - eligible_angle_ids)

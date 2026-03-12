@@ -20,6 +20,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
+from pydantic import ValidationError
 
 from app.config import settings
 from app.db.base import session_scope
@@ -65,6 +66,9 @@ from app.temporal.activities.asset_activities import (  # noqa: E402
 
 _GEMINI_CLIENT: Any | None = None
 _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
+_SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
+_SWIPE_GEMINI_TIMEOUT_SECONDS = max(1, int(os.getenv("SWIPE_GEMINI_TIMEOUT_SECONDS", "120")))
 
 
 def _load_swipe_product_image_profiles() -> Dict[str, bool]:
@@ -129,6 +133,105 @@ def _load_swipe_product_image_profiles() -> Dict[str, bool]:
     return profiles
 
 
+def _resolve_swipe_copy_gemini_retry_delay_seconds(*, attempt: int, retry_after_raw: str | None = None) -> float:
+    if isinstance(retry_after_raw, str) and retry_after_raw.strip():
+        try:
+            parsed_retry_after = float(retry_after_raw.strip())
+            if parsed_retry_after > 0:
+                return max(1.0, parsed_retry_after)
+        except ValueError:
+            pass
+    return min(30.0, max(1.0, float(2**attempt)))
+
+
+def _extract_swipe_copy_gemini_status_code(exc: Exception) -> int | None:
+    direct_status = getattr(exc, "status_code", None)
+    if isinstance(direct_status, int):
+        return direct_status
+    direct_code = getattr(exc, "code", None)
+    if isinstance(direct_code, int):
+        return direct_code
+    response = getattr(exc, "response", None)
+    response_status = getattr(response, "status_code", None)
+    if isinstance(response_status, int):
+        return response_status
+    message = str(exc)
+    match = re.search(r"\b(4\d{2}|5\d{2})\b", message)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_swipe_copy_gemini_retry_after(exc: Exception) -> str | None:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    getter = getattr(headers, "get", None)
+    if callable(getter):
+        value = getter("Retry-After")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _is_retryable_swipe_copy_gemini_error(exc: Exception, *, error_text: str) -> bool:
+    status_code = _extract_swipe_copy_gemini_status_code(exc)
+    if status_code in _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES:
+        return True
+    normalized = error_text.lower()
+    retryable_markers = (
+        "resource_exhausted",
+        "too many requests",
+        "temporarily unavailable",
+        "failed to embed content",
+        "internal error",
+        "service unavailable",
+        "deadline exceeded",
+        "timed out",
+        "timeout",
+    )
+    return any(marker in normalized for marker in retryable_markers)
+
+
+def _call_gemini_generate_content_with_retries(
+    *,
+    gemini_client: Any,
+    model: str,
+    contents: List[Any],
+    config: Any,
+    operation_name: str,
+    file_search_model_error_message: str,
+) -> Any:
+    for attempt in range(1, _SWIPE_COPY_GEMINI_MAX_ATTEMPTS + 1):
+        try:
+            return gemini_client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+        except Exception as exc:  # noqa: BLE001
+            error_text = str(exc)
+            if "File search tool is not enabled for this model" in error_text:
+                raise RuntimeError(file_search_model_error_message) from exc
+            if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
+                exc,
+                error_text=error_text,
+            ):
+                time.sleep(
+                    _resolve_swipe_copy_gemini_retry_delay_seconds(
+                        attempt=attempt,
+                        retry_after_raw=_extract_swipe_copy_gemini_retry_after(exc),
+                    )
+                )
+                continue
+            raise RuntimeError(f"{operation_name} failed with Gemini: {error_text}") from exc
+    raise RuntimeError(f"{operation_name} did not return a response.")
+
+
 def _extract_source_filename(source_url: str | None) -> str | None:
     if not isinstance(source_url, str) or not source_url.strip():
         return None
@@ -139,6 +242,42 @@ def _extract_source_filename(source_url: str | None) -> str | None:
     if not name:
         return None
     return name
+
+
+def _optional_clean_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _summarize_swipe_copy_validation_error(exc: ValidationError) -> str:
+    missing_fields: list[str] = []
+    other_messages: list[str] = []
+    meta_required_prefix = "Meta swipe copy pack is missing required fields:"
+
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error.get("loc") or [])
+        message = str(error.get("msg") or "").strip()
+        if location in {"metaPrimaryText", "metaHeadline", "metaDescription", "metaCta"}:
+            missing_fields.append(location)
+            continue
+        if meta_required_prefix in message:
+            suffix = message.split(meta_required_prefix, 1)[1].strip()
+            missing_fields.extend(part.strip() for part in suffix.split(",") if part.strip())
+            continue
+        if message:
+            other_messages.append(message)
+
+    if missing_fields:
+        ordered = ", ".join(dict.fromkeys(missing_fields))
+        return (
+            "The JSON object is missing required Meta fields: "
+            f"{ordered}. Return the complete JSON shape and populate every Meta field."
+        )
+    if other_messages:
+        return other_messages[0]
+    return "The JSON object did not satisfy the SwipeAdCopyPack schema. Return the complete required shape."
 
 
 def _resolve_swipe_requires_product_image_policy(
@@ -175,7 +314,10 @@ def _ensure_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
-    _GEMINI_CLIENT = genai.Client(api_key=api_key)
+    _GEMINI_CLIENT = genai.Client(
+        api_key=api_key,
+        http_options=genai_types.HttpOptions(timeout=_SWIPE_GEMINI_TIMEOUT_SECONDS),
+    )
     return _GEMINI_CLIENT
 
 
@@ -1659,9 +1801,186 @@ def _extract_first_json_object_from_text(text: str) -> Dict[str, Any]:
             depth -= 1
             if depth == 0:
                 candidate = text[start : idx + 1]
-                return json.loads(candidate)
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("Swipe Stage 1 copy response contained malformed JSON.") from exc
 
     raise RuntimeError("Swipe Stage 1 copy response contained malformed JSON.")
+
+
+def _repair_truncated_json(text: str) -> str | None:
+    stripped = text.rstrip()
+    if not stripped.startswith("{"):
+        return None
+
+    closing_stack: list[str] = []
+    in_string = False
+    escape = False
+    for char in stripped:
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            closing_stack.append("}")
+            continue
+        if char == "[":
+            closing_stack.append("]")
+            continue
+        if char in {"}", "]"}:
+            if not closing_stack or char != closing_stack[-1]:
+                return None
+            closing_stack.pop()
+
+    if not closing_stack:
+        return None
+
+    repaired = stripped
+    if in_string:
+        # Gemini sometimes truncates inside a JSON string. Close the open escape
+        # sequence/string, then close any remaining containers.
+        if escape:
+            repaired += "\\"
+        repaired += '"'
+
+    return repaired + "".join(reversed(closing_stack))
+
+
+def _strip_trailing_commas(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            out.append(ch)
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            continue
+
+        if ch in ("}", "]"):
+            j = len(out) - 1
+            while j >= 0 and out[j].isspace():
+                j -= 1
+            if j >= 0 and out[j] == ",":
+                out.pop(j)
+        out.append(ch)
+
+    return "".join(out)
+
+
+def _escape_unescaped_control_chars(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                if ch not in {'"', "\\", "/", "b", "f", "n", "r", "t", "u"} and out and out[-1] == "\\":
+                    out.pop()
+                out.append(ch)
+                escape = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+                out.append(ch)
+                continue
+            if ch == "\n":
+                out.append("\\n")
+                continue
+            if ch == "\r":
+                out.append("\\r")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ch == "\b":
+                out.append("\\b")
+                continue
+            if ch == "\f":
+                out.append("\\f")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+
+        if ch == '"':
+            in_string = True
+        out.append(ch)
+
+    return "".join(out)
+
+
+def _repair_json_text(text: str) -> str:
+    if not text:
+        return text
+    repaired = _strip_trailing_commas(text)
+    return _escape_unescaped_control_chars(repaired)
+
+
+def _parse_swipe_copy_json_object(text: str) -> Dict[str, Any]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def _add(candidate: str | None) -> None:
+        if not isinstance(candidate, str):
+            return
+        stripped = candidate.strip()
+        if not stripped or stripped in seen:
+            return
+        seen.add(stripped)
+        candidates.append(stripped)
+
+    raw = _strip_json_fence(text)
+    repaired = _repair_json_text(raw)
+    repaired_truncated = _repair_truncated_json(raw)
+    repaired_truncated_sanitized = _repair_truncated_json(repaired)
+
+    _add(raw)
+    _add(repaired)
+    _add(repaired_truncated)
+    _add(repaired_truncated_sanitized)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+
+        try:
+            parsed = _extract_first_json_object_from_text(candidate)
+        except RuntimeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+
+    raise RuntimeError("Swipe Stage 1 copy response did not contain a valid JSON object.")
 
 
 def _strip_json_fence(text: str) -> str:
@@ -1671,6 +1990,11 @@ def _strip_json_fence(text: str) -> str:
     match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", stripped, flags=re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
+    first_newline = stripped.find("\n")
+    if first_newline > 0:
+        fence_header = stripped[:first_newline].strip().lower()
+        if fence_header in {"```", "```json"}:
+            return stripped[first_newline + 1 :].lstrip()
     return stripped
 
 
@@ -1715,44 +2039,37 @@ def _call_swipe_copy_gemini_json_message(
             config_kwargs["response_json_schema"] = response_schema.model_json_schema()
         else:
             config_kwargs["response_json_schema"] = response_schema
-    try:
-        response = gemini_client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=genai_types.GenerateContentConfig(**config_kwargs),
-        )
-    except Exception as exc:  # noqa: BLE001
-        error_text = str(exc)
-        if "File search tool is not enabled for this model" in error_text:
-            raise RuntimeError(
-                "Swipe Stage 1 copy generation model does not support Gemini File Search. "
-                f"model={model}. Choose a Gemini model with File Search support for this workflow."
-            ) from exc
-        raise RuntimeError(f"Swipe Stage 1 copy generation failed with Gemini: {error_text}") from exc
+    response = _call_gemini_generate_content_with_retries(
+        gemini_client=gemini_client,
+        model=model,
+        contents=contents,
+        config=genai_types.GenerateContentConfig(**config_kwargs),
+        operation_name="Swipe Stage 1 copy generation",
+        file_search_model_error_message=(
+            "Swipe Stage 1 copy generation model does not support Gemini File Search. "
+            f"model={model}. Choose a Gemini model with File Search support for this workflow."
+        ),
+    )
 
     parsed = getattr(response, "parsed", None)
     if parsed is not None and hasattr(parsed, "model_dump"):
         parsed = parsed.model_dump(mode="json", by_alias=True, exclude_none=False)
 
     text = _extract_gemini_text(response) or ""
-    text = _strip_json_fence(text)
     if parsed is None:
         try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            try:
-                parsed = _extract_first_json_object_from_text(text)
-            except RuntimeError as exc:
-                preview = text.strip()[:1200]
-                raise RuntimeError(
-                    "Swipe Stage 1 copy response was not valid JSON. "
-                    f"Raw response preview: {preview!r}"
-                ) from exc
+            parsed = _parse_swipe_copy_json_object(text)
+        except RuntimeError as exc:
+            preview = _strip_json_fence(text).strip()[:1200]
+            raise RuntimeError(
+                "Swipe Stage 1 copy response was not valid JSON. "
+                f"Raw response preview: {preview!r}"
+            ) from exc
     if not isinstance(parsed, dict):
         raise RuntimeError("Swipe Stage 1 copy generation returned a non-object JSON payload.")
     return {
         "parsed": parsed,
-        "text": text,
+        "text": _strip_json_fence(text),
         "stop_reason": _extract_gemini_finish_reason(response),
         "output_tokens": (_extract_gemini_usage_details(response) or {}).get("output"),
     }
@@ -1946,7 +2263,16 @@ def _generate_swipe_stage1_copy_pack(
                 "destinationType": destination_type,
             }
         )
-        validated = SwipeAdCopyPack.model_validate(merged_payload)
+        try:
+            validated = SwipeAdCopyPack.model_validate(merged_payload)
+        except ValidationError as exc:
+            if attempt >= 5:
+                raise RuntimeError(_summarize_swipe_copy_validation_error(exc)) from exc
+            retry_feedback = (
+                _summarize_swipe_copy_validation_error(exc)
+                + " Preserve the same angle, but return the full valid JSON object."
+            )
+            continue
         try:
             _validate_swipe_copy_blind_angle_blackout(
                 copy_pack=validated,
@@ -2110,6 +2436,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     company_swipe_id: str | None = params.get("company_swipe_id")
     swipe_image_url: str | None = params.get("swipe_image_url")
+    creative_generation_batch_id = _optional_clean_string(params.get("creative_generation_batch_id"))
+    creative_generation_plan_artifact_id = _optional_clean_string(params.get("creative_generation_plan_artifact_id"))
+    creative_generation_plan_item_id = _optional_clean_string(params.get("creative_generation_plan_item_id"))
+    ad_copy_pack_artifact_id = _optional_clean_string(params.get("ad_copy_pack_artifact_id"))
+    ad_copy_pack_id = _optional_clean_string(params.get("ad_copy_pack_id"))
     swipe_requires_product_image_raw = params.get("swipe_requires_product_image")
     if swipe_requires_product_image_raw is None:
         swipe_requires_product_image: bool | None = None
@@ -2146,6 +2477,14 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     count = int(params.get("count") or 1)
     if count <= 0:
         raise ValueError("count must be >= 1 for swipe image ad generation.")
+    if creative_generation_plan_item_id and not creative_generation_batch_id:
+        raise ValueError(
+            "creative_generation_batch_id is required when creative_generation_plan_item_id is provided."
+        )
+    if creative_generation_plan_item_id and count != 1:
+        raise ValueError(
+            "creative_generation_plan_item_id requires count=1 for deterministic checkpointing."
+        )
     render_count = count
     render_max_attempts = int(os.getenv("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS", "3"))
     if render_max_attempts <= 0:
@@ -2469,24 +2808,24 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 trace_name="workflow.swipe_image_ad",
             ) as generation:
                 try:
-                    result = gemini_client.models.generate_content(
+                    result = _call_gemini_generate_content_with_retries(
+                        gemini_client=gemini_client,
                         model=model_name,
                         contents=contents,
                         config=generate_config,
+                        operation_name="Swipe prompt generation",
+                        file_search_model_error_message=(
+                            "Swipe prompt generation model does not support Gemini File Search. "
+                            f"model={model_name}. Choose a Gemini model with File Search support for this workflow."
+                        ),
                     )
                     raw_output = _extract_gemini_text(result)
                     if not raw_output:
                         raise RuntimeError("Gemini returned no text for swipe prompt generation")
                 except Exception as exc:  # noqa: BLE001
-                    error_text = str(exc)
-                    if "File search tool is not enabled for this model" in error_text:
-                        raise RuntimeError(
-                            "Swipe prompt generation model does not support Gemini File Search. "
-                            f"model={model_name}. Choose a Gemini model with File Search support for this workflow."
-                        ) from exc
                     raise RuntimeError(
                         "Swipe prompt generation failed with Gemini File Search context: "
-                        f"{error_text}"
+                        f"{exc}"
                     ) from exc
                 if generation is not None:
                     generation.update(
@@ -2642,6 +2981,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     if isinstance(ref.primary_url, str) and ref.primary_url.strip()
                 ],
             }
+            if creative_generation_batch_id:
+                extra_ai_metadata["creativeGenerationBatchId"] = creative_generation_batch_id
+            if creative_generation_plan_artifact_id:
+                extra_ai_metadata["creativeGenerationPlanArtifactId"] = creative_generation_plan_artifact_id
+            if creative_generation_plan_item_id:
+                extra_ai_metadata["creativeGenerationPlanItemId"] = creative_generation_plan_item_id
+            if ad_copy_pack_artifact_id:
+                extra_ai_metadata["adCopyPackArtifactId"] = ad_copy_pack_artifact_id
+            if ad_copy_pack_id:
+                extra_ai_metadata["adCopyPackId"] = ad_copy_pack_id
 
             local_asset_id = _create_generated_asset_from_url(
                 session=session,

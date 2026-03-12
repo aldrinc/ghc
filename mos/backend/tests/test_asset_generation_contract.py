@@ -1,6 +1,10 @@
+from types import SimpleNamespace
+
 from app.temporal.activities.asset_activities import (
     _DefaultSwipeSource,
+    _build_creative_generation_batch_id,
     _build_creative_generation_plan_items,
+    _existing_creative_generation_assets_by_plan_item,
     _extract_source_filename,
     _extract_requirement_swipe_source,
     _extract_requirement_swipe_requires_product_image,
@@ -8,6 +12,7 @@ from app.temporal.activities.asset_activities import (
     _extract_swipe_requires_product_image_from_tags,
     _normalize_requirement_format,
     _split_requirement_asset_counts,
+    _summarize_exception_message,
 )
 
 
@@ -194,3 +199,106 @@ def test_build_creative_generation_plan_items_errors_when_image_requirement_has_
         assert "missing_requirement_index=0" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected ValueError when an image requirement has no copy pack id.")
+
+
+def test_build_creative_generation_batch_id_is_stable_for_one_execution() -> None:
+    first = _build_creative_generation_batch_id(
+        execution_key="workflow-run-1",
+        asset_brief_id="brief-123",
+    )
+    second = _build_creative_generation_batch_id(
+        execution_key="workflow-run-1",
+        asset_brief_id="brief-123",
+    )
+    different = _build_creative_generation_batch_id(
+        execution_key="workflow-run-2",
+        asset_brief_id="brief-123",
+    )
+
+    assert first == second
+    assert first != different
+
+
+def test_existing_creative_generation_assets_by_plan_item_filters_by_batch_and_brief() -> None:
+    assets = [
+        SimpleNamespace(
+            id="asset-1",
+            ai_metadata={
+                "creativeGenerationBatchId": "batch-1",
+                "creativeGenerationPlanItemId": "plan-item-1",
+                "assetBriefId": "brief-1",
+            },
+            content={},
+        ),
+        SimpleNamespace(
+            id="asset-2",
+            ai_metadata={
+                "creativeGenerationBatchId": "batch-2",
+                "creativeGenerationPlanItemId": "plan-item-2",
+                "assetBriefId": "brief-1",
+            },
+            content={},
+        ),
+        SimpleNamespace(
+            id="asset-3",
+            ai_metadata={
+                "creativeGenerationBatchId": "batch-1",
+                "creativeGenerationPlanItemId": "plan-item-3",
+                "assetBriefId": "brief-2",
+            },
+            content={},
+        ),
+    ]
+
+    result = _existing_creative_generation_assets_by_plan_item(
+        assets=assets,
+        batch_id="batch-1",
+        asset_brief_id="brief-1",
+    )
+
+    assert result == {"plan-item-1": "asset-1"}
+
+
+def test_existing_creative_generation_assets_by_plan_item_errors_on_duplicates() -> None:
+    assets = [
+        SimpleNamespace(
+            id="asset-1",
+            ai_metadata={
+                "creativeGenerationBatchId": "batch-1",
+                "creativeGenerationPlanItemId": "plan-item-1",
+                "assetBriefId": "brief-1",
+            },
+            content={},
+        ),
+        SimpleNamespace(
+            id="asset-2",
+            ai_metadata={
+                "creativeGenerationBatchId": "batch-1",
+                "creativeGenerationPlanItemId": "plan-item-1",
+                "assetBriefId": "brief-1",
+            },
+            content={},
+        ),
+    ]
+
+    try:
+        _existing_creative_generation_assets_by_plan_item(
+            assets=assets,
+            batch_id="batch-1",
+            asset_brief_id="brief-1",
+        )
+    except RuntimeError as exc:
+        assert "Multiple generated assets found for the same creative generation plan item" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected RuntimeError for duplicate plan item assets")
+
+
+def test_summarize_exception_message_compacts_and_truncates() -> None:
+    summary = _summarize_exception_message(
+        RuntimeError("line one\nline two " + ("x" * 500)),
+        max_chars=80,
+    )
+
+    assert summary.startswith("RuntimeError: line one line two")
+    assert len(summary) <= 80
+    assert summary.endswith("...")

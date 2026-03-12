@@ -386,6 +386,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             "asset_brief_id": "asset-brief-1",
             "requirement_index": 0,
             "company_swipe_id": "swipe-1",
+            "creative_generation_batch_id": "batch-1",
+            "creative_generation_plan_artifact_id": "plan-artifact-1",
+            "creative_generation_plan_item_id": "plan-item-1",
+            "ad_copy_pack_artifact_id": "copy-artifact-1",
+            "ad_copy_pack_id": "copy-pack-1",
             "model": "models/gemini-2.5-flash",
             "count": 1,
             "aspect_ratio": "1:1",
@@ -422,10 +427,353 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert isinstance(extra_ai_metadata["swipePromptProductImageSizeBytes"], int)
     assert isinstance(extra_ai_metadata["swipePromptProductImageSha256"], str)
     assert len(extra_ai_metadata["swipePromptProductImageSha256"]) == 64
+    assert extra_ai_metadata["creativeGenerationBatchId"] == "batch-1"
+    assert extra_ai_metadata["creativeGenerationPlanArtifactId"] == "plan-artifact-1"
+    assert extra_ai_metadata["creativeGenerationPlanItemId"] == "plan-item-1"
+    assert extra_ai_metadata["adCopyPackArtifactId"] == "copy-artifact-1"
+    assert extra_ai_metadata["adCopyPackId"] == "copy-pack-1"
     config = captured["config"]
     assert hasattr(config, "tools")
     assert config.tools
     assert config.tools[0].file_search.file_search_store_names == ["fileSearchStores/context-store"]
+
+
+def test_call_swipe_copy_gemini_json_message_repairs_literal_newlines_in_json_strings(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1",
+  "formattedVariationsMarkdown": "```text
+**Variation 1**
+
+**Primary Text:** This keeps the blind-angle hook intact.
+**Headline:** Fix the routine bottleneck
+**Description:** Learn what changes the pattern
+**CTA:** Learn More
+```",
+  "metaPrimaryText": "Clinical proof and fast results with a compliant curiosity-led hook.",
+  "metaHeadline": "Fix the routine bottleneck",
+  "metaDescription": "Learn what changes the pattern",
+  "metaCta": "Learn More",
+  "claimsGuardrails": ["Do not promise medical outcomes."]
+}
+```"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1"
+    assert "Variation 1" in result["parsed"]["formattedVariationsMarkdown"]
+    assert result["parsed"]["metaHeadline"] == "Fix the routine bottleneck"
+    assert result["output_tokens"] == 222
+
+
+def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_strings(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1",
+  "formattedVariationsMarkdown": "```text
+**Variation 1**
+
+**Primary Text:** Read this before mixing supplements with prescriptions.
+```"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1"
+    assert "Read this before mixing" in result["parsed"]["formattedVariationsMarkdown"]
+    assert result["output_tokens"] == 222
+
+
+def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_with_opening_fence_only(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1: The Warning / Shocking Reveal",
+  "formattedVariationsMarkdown": "```text\\n**Variation 1: The Warning / Shocking Reveal**\\n\\n**Primary Text:** You see ads for natural remedies promising to turn back the clock.\\n\\nBut if you take daily prescriptions, mixing th"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1: The Warning / Shocking Reveal"
+    assert "mixing th" in result["parsed"]["formattedVariationsMarkdown"]
+    assert result["output_tokens"] == 222
+
+
+def test_call_swipe_copy_gemini_json_message_strips_invalid_apostrophe_escapes(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1",
+  "formattedVariationsMarkdown": "**Variation 1**\\nDon\\'t mix supplements blindly."
+}
+```"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["formattedVariationsMarkdown"] == "**Variation 1**\nDon't mix supplements blindly."
+    assert result["output_tokens"] == 222
+
+
+def test_call_swipe_copy_gemini_json_message_retries_retryable_gemini_errors(monkeypatch):
+    sleep_calls: list[float] = []
+
+    class _FakeGeminiError(Exception):
+        def __init__(self, message: str):
+            super().__init__(message)
+            self.status_code = 429
+            self.response = SimpleNamespace(headers={"Retry-After": "3"})
+
+    class _FakeModels:
+        def __init__(self):
+            self.calls = 0
+
+        def generate_content(self, *, model, contents, config):
+            self.calls += 1
+            if self.calls == 1:
+                raise _FakeGeminiError(
+                    "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Failed to embed content.'}}"
+                )
+            return SimpleNamespace(
+                parsed={
+                    "selectedVariation": "Variation 1",
+                    "formattedVariationsMarkdown": "```text\n**Variation 1**\n```",
+                    "metaPrimaryText": "Primary text",
+                    "metaHeadline": "Headline",
+                    "metaDescription": "Description",
+                    "metaCta": "Learn More",
+                    "claimsGuardrails": ["Do not promise medical outcomes."],
+                },
+                text="",
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+    monkeypatch.setattr(swipe_activity, "_SWIPE_COPY_GEMINI_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(swipe_activity.time, "sleep", lambda seconds: sleep_calls.append(seconds))
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["metaHeadline"] == "Headline"
+    assert result["output_tokens"] == 222
+    assert sleep_calls == [3.0]
+
+
+def test_call_swipe_copy_gemini_json_message_raises_after_retry_budget_exhausted(monkeypatch):
+    sleep_calls: list[float] = []
+
+    class _FakeGeminiError(Exception):
+        def __init__(self, message: str):
+            super().__init__(message)
+            self.status_code = 429
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            raise _FakeGeminiError(
+                "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Failed to embed content.'}}"
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+    monkeypatch.setattr(swipe_activity, "_SWIPE_COPY_GEMINI_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(swipe_activity.time, "sleep", lambda seconds: sleep_calls.append(seconds))
+
+    with pytest.raises(RuntimeError, match="Swipe Stage 1 copy generation failed with Gemini: 429 RESOURCE_EXHAUSTED"):
+        swipe_activity._call_swipe_copy_gemini_json_message(
+            model="models/gemini-2.5-flash",
+            system_instruction="Return JSON only.",
+            contents=["prompt"],
+            store_names=["fileSearchStores/context-store"],
+            max_tokens=2048,
+            temperature=0.2,
+            response_schema=None,
+        )
+
+    assert sleep_calls == [2.0]
+
+
+def test_load_swipe_product_image_profiles_reads_catalog(tmp_path, monkeypatch):
+    profile_path = tmp_path / "profiles.json"
+    profile_path.write_text(
+        '{"entries":[{"filename":"7.png","requires_product_image":true}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SWIPE_PRODUCT_IMAGE_PROFILES_PATH", str(profile_path))
+    monkeypatch.setattr(swipe_activity, "_SWIPE_PRODUCT_IMAGE_PROFILE_CACHE", None)
+
+    assert swipe_activity._load_swipe_product_image_profiles() == {"7.png": True}
+
+
+def test_generate_swipe_stage1_copy_pack_retries_when_meta_fields_missing(monkeypatch):
+    retry_feedbacks: list[str | None] = []
+    responses = iter(
+        [
+            {
+                "parsed": {
+                    "selectedVariation": "Variation 1",
+                    "formattedVariationsMarkdown": "```text\n**Variation 1**\n```",
+                    "claimsGuardrails": ["Do not promise medical outcomes."],
+                },
+                "text": "",
+                "stop_reason": "STOP",
+                "output_tokens": 111,
+            },
+            {
+                "parsed": _fake_swipe_copy_pack_parsed(angle="Clinical proof"),
+                "text": "",
+                "stop_reason": "STOP",
+                "output_tokens": 222,
+            },
+        ]
+    )
+
+    def _fake_build_prompt(*, retry_feedback=None, **_kwargs):
+        retry_feedbacks.append(retry_feedback)
+        return "prompt"
+
+    monkeypatch.setattr(swipe_activity, "_build_swipe_copy_stage1_prompt", _fake_build_prompt)
+    monkeypatch.setattr(swipe_activity, "_resolve_destination_type", lambda **_kwargs: "presell")
+    monkeypatch.setattr(
+        swipe_activity,
+        "_call_swipe_copy_gemini_json_message",
+        lambda **_kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_validate_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
+    )
+
+    validated, response, model = swipe_activity._generate_swipe_stage1_copy_pack(
+        session=object(),
+        brief={"id": "brief-1"},
+        requirement_index=0,
+        requirement={
+            "channel": "meta",
+            "format": "image",
+            "angle": "Clinical proof",
+            "hook": "Hidden issue",
+            "funnelStage": "mid",
+        },
+        copy_model="models/gemini-2.5-flash",
+        gemini_store_names=["fileSearchStores/context-store"],
+        swipe_bytes=b"image-bytes",
+        swipe_mime_type="image/png",
+        swipe_source_url="https://example.com/swipe.png",
+        swipe_source_label="10.png",
+        product_prompt_image_bytes=None,
+        product_prompt_image_mime_type=None,
+    )
+
+    assert validated.meta_primary_text == "Clinical proof with a compliant curiosity-led hook."
+    assert response["output_tokens"] == 222
+    assert model == "models/gemini-2.5-flash"
+    assert retry_feedbacks[0] is None
+    assert "missing required Meta fields" in (retry_feedbacks[1] or "")
+    assert "metaPrimaryText" in (retry_feedbacks[1] or "")
 
 
 def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypatch):

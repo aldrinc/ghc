@@ -18,6 +18,7 @@ from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
 from app.schemas.creative_generation import SwipeAdCopyPack
@@ -349,13 +350,13 @@ async def create_campaign(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="channels must include at least one non-empty value.",
         )
-    if not payload.asset_brief_types or not all(
-        isinstance(t, str) and t.strip() for t in payload.asset_brief_types
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="asset_brief_types must include at least one non-empty value.",
+    try:
+        asset_brief_types = normalize_required_asset_brief_types(
+            payload.asset_brief_types,
+            field_name="asset_brief_types",
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     product_repo = ProductsRepository(session)
     product = product_repo.get(org_id=auth.org_id, product_id=payload.product_id)
     if not product:
@@ -379,7 +380,7 @@ async def create_campaign(
         product_id=payload.product_id,
         name=payload.name,
         channels=payload.channels,
-        asset_brief_types=payload.asset_brief_types,
+        asset_brief_types=asset_brief_types,
         goal_description=payload.goal_description,
         objective_type=payload.objective_type,
         numeric_target=payload.numeric_target,

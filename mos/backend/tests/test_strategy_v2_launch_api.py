@@ -71,7 +71,7 @@ def _seed_strategy_v2_scope(db_session):
         product_id=product.id,
         name="Launch Campaign",
         channels=["meta"],
-        asset_brief_types=["static-image"],
+        asset_brief_types=["image"],
     )
     db_session.add(campaign)
     db_session.commit()
@@ -153,7 +153,7 @@ def test_launch_angle_campaign_uses_created_workflow_run_id(api_client, db_sessi
         f"/workflows/{source_run.id}/actions/strategy-v2/launch-angle-campaign",
         json={
             "channels": ["meta"],
-            "assetBriefTypes": ["static-image"],
+            "assetBriefTypes": ["image"],
             "experimentVariantPolicy": "angle_launch_standard_v1",
         },
     )
@@ -278,7 +278,7 @@ def test_launch_additional_angle_errors_when_idempotent_rows_span_multiple_launc
     db_session.refresh(launch_run_two)
 
     channels = ["meta"]
-    asset_brief_types = ["static-image"]
+    asset_brief_types = ["image"]
     launch_key_a02 = strategy_v2_launches.build_launch_key(
         source_strategy_v2_workflow_run_id=str(source_run.id),
         launch_type="additional_angle",
@@ -360,6 +360,28 @@ def test_launch_additional_angle_errors_when_idempotent_rows_span_multiple_launc
 
     assert response.status_code == 409, response.text
     assert "span multiple launch workflows" in response.json()["detail"]
+
+
+def test_launch_angle_campaign_rejects_unsupported_asset_brief_types(api_client, db_session, monkeypatch):
+    _, _, source_run, _ = _seed_strategy_v2_scope(db_session)
+
+    monkeypatch.setattr(
+        workflows_router,
+        "_load_source_context_or_409",
+        lambda **_kwargs: _fake_source_context(),
+    )
+
+    response = api_client.post(
+        f"/workflows/{source_run.id}/actions/strategy-v2/launch-angle-campaign",
+        json={
+            "channels": ["meta"],
+            "assetBriefTypes": ["static-image"],
+            "experimentVariantPolicy": "angle_launch_standard_v1",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "Supported values: image, video." in response.text
 
 
 def test_launch_source_context_resolves_canonical_run_for_continued_execution(db_session, monkeypatch):

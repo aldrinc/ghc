@@ -4,6 +4,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.asset_brief_types import (
+    normalize_optional_asset_brief_types,
+    normalize_required_asset_brief_types,
+)
+
 
 def _normalize_required_string_list(value: list[str], *, field_name: str) -> list[str]:
     if not isinstance(value, list) or not value:
@@ -53,7 +58,7 @@ class StrategyV2LaunchAngleCampaignRequest(BaseModel):
     @field_validator("asset_brief_types")
     @classmethod
     def _validate_asset_brief_types(cls, value: list[str]) -> list[str]:
-        return _normalize_required_string_list(value, field_name="assetBriefTypes")
+        return normalize_required_asset_brief_types(value, field_name="assetBriefTypes")
 
     @field_validator("experiment_variant_policy")
     @classmethod
@@ -116,7 +121,7 @@ class StrategyV2LaunchAdditionalUmsRequest(BaseModel):
     @field_validator("asset_brief_types")
     @classmethod
     def _validate_asset_brief_types(cls, value: list[str] | None) -> list[str] | None:
-        return _normalize_optional_string_list(value, field_name="assetBriefTypes")
+        return normalize_optional_asset_brief_types(value, field_name="assetBriefTypes")
 
 
 class StrategyV2LaunchAdditionalAngleRequest(BaseModel):
@@ -148,7 +153,7 @@ class StrategyV2LaunchAdditionalAngleRequest(BaseModel):
     @field_validator("asset_brief_types")
     @classmethod
     def _validate_asset_brief_types(cls, value: list[str]) -> list[str]:
-        return _normalize_required_string_list(value, field_name="assetBriefTypes")
+        return normalize_required_asset_brief_types(value, field_name="assetBriefTypes")
 
 
 class StrategyV2LaunchRecordResponse(BaseModel):
