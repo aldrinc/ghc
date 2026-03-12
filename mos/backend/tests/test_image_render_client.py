@@ -9,6 +9,7 @@ from app.services import image_render_client as image_render
 
 def test_get_image_render_provider_rejects_unknown_value(monkeypatch) -> None:
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "invalid_provider")
+    monkeypatch.setattr(image_render.settings, "SWIPE_IMAGE_RENDER_MODEL", "")
     monkeypatch.delenv("SWIPE_IMAGE_RENDER_MODEL", raising=False)
     monkeypatch.delenv("IMAGE_RENDER_MODEL", raising=False)
 
@@ -27,6 +28,15 @@ def test_get_image_render_provider_uses_higgsfield_for_nano_banana_models(monkey
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
 
     assert image_render.get_image_render_provider(model_id="nano-banana-pro") == "higgsfield"
+
+
+def test_get_image_render_provider_uses_settings_swipe_render_model_default(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "higgsfield")
+    monkeypatch.setattr(image_render.settings, "SWIPE_IMAGE_RENDER_MODEL", "gemini-3.1-flash-image-preview")
+    monkeypatch.delenv("SWIPE_IMAGE_RENDER_MODEL", raising=False)
+    monkeypatch.delenv("IMAGE_RENDER_MODEL", raising=False)
+
+    assert image_render.get_image_render_provider() == "creative_service"
 
 
 def test_build_image_render_client_returns_embedded_freestyle_for_creative_service_provider(monkeypatch) -> None:
@@ -131,6 +141,67 @@ def test_embedded_freestyle_create_image_ads_uses_local_reference_assets(monkeyp
     assert "Variation 2:" in captured_prompts[1]
     assert all("Aspect ratio: 1:1." in prompt for prompt in captured_prompts)
     assert len(uploaded_objects) == 2
+
+
+def test_embedded_freestyle_defaults_to_gemini_3_1_flash_image_preview(monkeypatch) -> None:
+    client = embedded_freestyle.EmbeddedFreestyleImageRenderClient()
+    captured_model_ids: list[str] = []
+
+    class _FakeStorage:
+        bucket = "media-bucket"
+
+        def build_key(self, *, sha256: str, ext: str, kind: str = "orig") -> str:
+            assert kind == "orig"
+            return f"orig/{sha256}.{ext.lstrip('.')}"
+
+        def object_exists(self, *, bucket: str, key: str) -> bool:
+            assert bucket == self.bucket
+            return False
+
+        def upload_bytes(
+            self,
+            *,
+            bucket: str,
+            key: str,
+            data: bytes,
+            content_type: str | None,
+            cache_control: str | None = None,
+            extra_metadata: dict[str, str] | None = None,
+        ) -> None:
+            del bucket, key, data, content_type, cache_control, extra_metadata
+
+        def presign_get(self, *, bucket: str, key: str, expires_in: int | None = None) -> str:
+            del expires_in
+            return f"https://cdn.example/{bucket}/{key}"
+
+    class _FakeNanoBananaClient:
+        def __init__(self, config=None) -> None:
+            assert config is not None
+            captured_model_ids.append(str(config.model))
+            self.config = config
+
+        def generate_image(self, *, prompt: str, reference_images=None, reference_text=None):
+            del prompt, reference_images, reference_text
+            captured_model_ids.append(str(self.config.model))
+            return b"generated-image", "image/png"
+
+    monkeypatch.setattr(embedded_freestyle, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(embedded_freestyle, "NanoBananaClient", _FakeNanoBananaClient)
+
+    job = client.create_image_ads(
+        payload=CreativeServiceImageAdsCreateIn(
+            prompt="Create an ad image",
+            count=1,
+        ),
+        idempotency_key="idem-default-render-model",
+    )
+
+    assert job.status == "succeeded"
+    assert job.model_id == "models/gemini-3.1-flash-image-preview"
+    assert captured_model_ids == [
+        "models/gemini-3.1-flash-image-preview",
+        "models/gemini-3.1-flash-image-preview",
+    ]
 
 
 def test_higgsfield_create_image_ads_uses_model_defaults(monkeypatch) -> None:

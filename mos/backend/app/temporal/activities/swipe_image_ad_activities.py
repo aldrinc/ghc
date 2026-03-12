@@ -2462,7 +2462,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "Set model/SWIPE_PROMPT_MODEL to a Gemini File Search-capable text model, and set "
             "render_model_id/SWIPE_IMAGE_RENDER_MODEL for the final image rendering step."
         )
-    requested_render_model_id = params.get("render_model_id") or os.getenv("SWIPE_IMAGE_RENDER_MODEL")
+    requested_render_model_id = (
+        params.get("render_model_id")
+        or os.getenv("SWIPE_IMAGE_RENDER_MODEL")
+        or settings.SWIPE_IMAGE_RENDER_MODEL
+    )
     render_model_id: str | None = None
     if requested_render_model_id is not None:
         if not isinstance(requested_render_model_id, str) or not requested_render_model_id.strip():

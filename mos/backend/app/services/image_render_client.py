@@ -66,7 +66,9 @@ def get_image_render_provider(*, model_id: str | None = None) -> str:
     inferred = _infer_image_render_provider_from_model(model_id)
     if inferred is None and model_id is None:
         inferred = _infer_image_render_provider_from_model(
-            os.getenv("SWIPE_IMAGE_RENDER_MODEL") or os.getenv("IMAGE_RENDER_MODEL")
+            os.getenv("SWIPE_IMAGE_RENDER_MODEL")
+            or os.getenv("IMAGE_RENDER_MODEL")
+            or settings.SWIPE_IMAGE_RENDER_MODEL
         )
     if inferred is not None:
         return inferred
