@@ -1698,9 +1698,18 @@ def _repair_truncated_json(text: str) -> str | None:
                 return None
             closing_stack.pop()
 
-    if in_string or not closing_stack:
+    if not closing_stack:
         return None
-    return stripped + "".join(reversed(closing_stack))
+
+    repaired = stripped
+    if in_string:
+        # Gemini sometimes truncates inside a JSON string. Close the open escape
+        # sequence/string, then close any remaining containers.
+        if escape:
+            repaired += "\\"
+        repaired += '"'
+
+    return repaired + "".join(reversed(closing_stack))
 
 
 def _strip_trailing_commas(text: str) -> str:
@@ -1743,6 +1752,8 @@ def _escape_unescaped_control_chars(text: str) -> str:
     for ch in text:
         if in_string:
             if escape:
+                if ch not in {'"', "\\", "/", "b", "f", "n", "r", "t", "u"} and out and out[-1] == "\\":
+                    out.pop()
                 out.append(ch)
                 escape = False
                 continue
