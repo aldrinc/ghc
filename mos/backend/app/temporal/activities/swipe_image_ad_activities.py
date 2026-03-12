@@ -1855,6 +1855,11 @@ def _strip_json_fence(text: str) -> str:
     match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", stripped, flags=re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
+    first_newline = stripped.find("\n")
+    if first_newline > 0:
+        fence_header = stripped[:first_newline].strip().lower()
+        if fence_header in {"```", "```json"}:
+            return stripped[first_newline + 1 :].lstrip()
     return stripped
 
 

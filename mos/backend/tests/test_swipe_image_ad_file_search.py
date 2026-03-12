@@ -527,6 +527,41 @@ def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_strings(monk
     assert result["output_tokens"] == 222
 
 
+def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_with_opening_fence_only(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1: The Warning / Shocking Reveal",
+  "formattedVariationsMarkdown": "```text\\n**Variation 1: The Warning / Shocking Reveal**\\n\\n**Primary Text:** You see ads for natural remedies promising to turn back the clock.\\n\\nBut if you take daily prescriptions, mixing th"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1: The Warning / Shocking Reveal"
+    assert "mixing th" in result["parsed"]["formattedVariationsMarkdown"]
+    assert result["output_tokens"] == 222
+
+
 def test_call_swipe_copy_gemini_json_message_strips_invalid_apostrophe_escapes(monkeypatch):
     raw_response = """```json
 {
