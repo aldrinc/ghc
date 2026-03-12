@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -223,6 +225,92 @@ def test_generate_assets_for_brief_activity_resumes_completed_image_plan_items(
     assert swipe_calls[0]["creative_generation_plan_item_id"] == "plan-item-2"
     assert installed["updated_assets"]["new-asset-2"]["ai_metadata"]["creativeGenerationPlanItemId"] == "plan-item-2"
     assert asset_by_id["new-asset-2"].ai_metadata["adCopyPackId"] == "copy-pack-1"
+
+
+def test_generate_assets_for_brief_activity_preserves_plan_order_with_parallel_swipes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_batch_id = asset_activities._build_creative_generation_batch_id(
+        execution_key="workflow-run-1",
+        asset_brief_id="brief-1",
+    )
+    monkeypatch.setattr(asset_activities.settings, "CREATIVE_IMAGE_PLAN_ITEM_MAX_CONCURRENCY", 2)
+
+    completion_order: list[str] = []
+    start_barrier = threading.Barrier(2)
+
+    def _parallel_swipe(params):
+        plan_item_id = str(params["creative_generation_plan_item_id"])
+        asset_id = "new-asset-1" if plan_item_id == "plan-item-1" else "new-asset-2"
+        start_barrier.wait(timeout=1)
+        if plan_item_id == "plan-item-1":
+            time.sleep(0.05)
+        asset_by_id[asset_id] = SimpleNamespace(
+            id=asset_id,
+            ai_metadata={"assetBriefId": "brief-1"},
+            content={"assetBriefId": "brief-1"},
+        )
+        completion_order.append(plan_item_id)
+        return {"asset_ids": [asset_id]}
+
+    installed = _install_image_generation_stubs(
+        monkeypatch,
+        plan_items=[
+            {
+                "id": "plan-item-1",
+                "batchId": expected_batch_id,
+                "assetBriefId": "brief-1",
+                "requirementIndex": 0,
+                "channel": "facebook",
+                "format": "image",
+                "funnelStage": "top-of-funnel",
+                "angle": "Angle",
+                "hook": "Hook",
+                "companySwipeId": "swipe-1",
+                "sourceLabel": "10.png",
+                "sourceMediaUrl": "https://example.com/10.png",
+                "copyPackId": "copy-pack-1",
+                "productImagePolicy": False,
+                "sourceSetKey": "default_initial_swipes_v1",
+            },
+            {
+                "id": "plan-item-2",
+                "batchId": expected_batch_id,
+                "assetBriefId": "brief-1",
+                "requirementIndex": 0,
+                "channel": "facebook",
+                "format": "image",
+                "funnelStage": "top-of-funnel",
+                "angle": "Angle",
+                "hook": "Hook",
+                "companySwipeId": "swipe-2",
+                "sourceLabel": "11.png",
+                "sourceMediaUrl": "https://example.com/11.png",
+                "copyPackId": "copy-pack-1",
+                "productImagePolicy": False,
+                "sourceSetKey": "default_initial_swipes_v1",
+            },
+        ],
+        existing_assets=[],
+        swipe_callable=_parallel_swipe,
+    )
+    asset_by_id = installed["asset_by_id"]
+
+    result = asset_activities.generate_assets_for_brief_activity(
+        {
+            "org_id": "org-1",
+            "client_id": "client-1",
+            "campaign_id": "campaign-1",
+            "product_id": "product-1",
+            "asset_brief_id": "brief-1",
+            "workflow_run_id": "workflow-run-1",
+        }
+    )
+
+    assert completion_order == ["plan-item-2", "plan-item-1"]
+    assert result["asset_ids"] == ["new-asset-1", "new-asset-2"]
+    assert installed["updated_assets"]["new-asset-1"]["ai_metadata"]["creativeGenerationPlanItemId"] == "plan-item-1"
+    assert installed["updated_assets"]["new-asset-2"]["ai_metadata"]["creativeGenerationPlanItemId"] == "plan-item-2"
 
 
 def test_generate_assets_for_brief_activity_compacts_swipe_generation_failures(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import io
 import json
@@ -120,6 +121,13 @@ class _DefaultSwipeSource:
     source_label: str
     source_media_url: str
     product_image_policy: bool | None
+
+
+@dataclass(frozen=True)
+class _ImagePlanItemExecution:
+    requirement_index: int
+    plan_item: CreativeGenerationPlanItem
+    copy_pack_id: str
 
 
 def _normalize_requirement_format(value: str) -> str:
@@ -295,6 +303,127 @@ def _existing_creative_generation_assets_by_plan_item(
             )
         completed_assets[plan_item_id] = asset_id
     return completed_assets
+
+
+def _resolve_creative_image_plan_item_max_concurrency(plan_item_count: int) -> int:
+    if plan_item_count <= 0:
+        raise ValueError("plan_item_count must be greater than zero.")
+    configured = int(settings.CREATIVE_IMAGE_PLAN_ITEM_MAX_CONCURRENCY or 0)
+    if configured <= 0:
+        raise ValueError("CREATIVE_IMAGE_PLAN_ITEM_MAX_CONCURRENCY must be greater than zero.")
+    return min(plan_item_count, configured)
+
+
+def _build_selected_swipe_source_entry(*, execution: _ImagePlanItemExecution) -> dict[str, Any]:
+    return {
+        "requirement_index": execution.requirement_index,
+        "plan_item_id": execution.plan_item.id,
+        "company_swipe_id": execution.plan_item.company_swipe_id,
+        "swipe_source_label": execution.plan_item.source_label,
+        "swipe_source_url": execution.plan_item.source_media_url,
+        "swipe_requires_product_image": execution.plan_item.product_image_policy,
+        "copy_pack_id": execution.copy_pack_id,
+    }
+
+
+def _generate_image_plan_item_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str | None,
+    asset_brief_id: str,
+    workflow_run_id: str | None,
+    creative_generation_batch_id: str,
+    creative_generation_plan_artifact_id: str,
+    ad_copy_pack_artifact_id: str,
+    execution: _ImagePlanItemExecution,
+) -> str:
+    from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
+
+    try:
+        swipe_result = generate_swipe_image_ad_activity(
+            {
+                "org_id": org_id,
+                "client_id": client_id,
+                "product_id": product_id,
+                "campaign_id": campaign_id,
+                "asset_brief_id": asset_brief_id,
+                "requirement_index": execution.requirement_index,
+                "company_swipe_id": execution.plan_item.company_swipe_id,
+                "swipe_source_url": execution.plan_item.source_media_url,
+                "swipe_source_label": execution.plan_item.source_label,
+                "swipe_requires_product_image": execution.plan_item.product_image_policy,
+                "count": 1,
+                "workflow_run_id": workflow_run_id,
+                "creative_generation_batch_id": creative_generation_batch_id,
+                "creative_generation_plan_artifact_id": creative_generation_plan_artifact_id,
+                "creative_generation_plan_item_id": execution.plan_item.id,
+                "ad_copy_pack_artifact_id": ad_copy_pack_artifact_id,
+                "ad_copy_pack_id": execution.copy_pack_id,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        error_summary = _summarize_exception_message(exc)
+        raise RuntimeError(
+            "Swipe image ad generation failed for planned execution item "
+            f"(asset_brief_id={asset_brief_id}, requirement_index={execution.requirement_index}, "
+            f"plan_item_id={execution.plan_item.id}, company_swipe_id={execution.plan_item.company_swipe_id}, "
+            f"source_label={execution.plan_item.source_label}, error={error_summary})."
+        ) from None
+
+    generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
+    if not isinstance(generated_ids, list) or len(generated_ids) != 1:
+        raise RuntimeError(
+            "Swipe image ad generation returned an invalid asset id list for planned execution item "
+            f"(asset_brief_id={asset_brief_id}, plan_item_id={execution.plan_item.id}, "
+            f"returned={len(generated_ids) if isinstance(generated_ids, list) else 0})."
+        )
+    generated_asset_id = generated_ids[0]
+    if not isinstance(generated_asset_id, str) or not generated_asset_id.strip():
+        raise RuntimeError(
+            "Swipe image ad generation returned an invalid asset id for planned execution item "
+            f"(asset_brief_id={asset_brief_id}, plan_item_id={execution.plan_item.id})."
+        )
+    return generated_asset_id
+
+
+def _annotate_generated_image_plan_item_asset(
+    *,
+    assets_repo: AssetsRepository,
+    org_id: str,
+    asset_brief_id: str,
+    creative_generation_batch_id: str,
+    creative_generation_plan_artifact_id: str,
+    ad_copy_pack_artifact_id: str,
+    execution: _ImagePlanItemExecution,
+    generated_asset_id: str,
+) -> None:
+    generated_asset = assets_repo.get(org_id=org_id, asset_id=generated_asset_id)
+    if generated_asset is None:
+        raise RuntimeError(
+            "Generated swipe image asset could not be reloaded for provenance annotation "
+            f"(asset_id={generated_asset_id}, asset_brief_id={asset_brief_id}, plan_item_id={execution.plan_item.id})."
+        )
+    generated_ai_metadata = (
+        dict(generated_asset.ai_metadata) if isinstance(generated_asset.ai_metadata, dict) else {}
+    )
+    generated_ai_metadata.update(
+        {
+            "creativeGenerationBatchId": creative_generation_batch_id,
+            "creativeGenerationPlanArtifactId": creative_generation_plan_artifact_id,
+            "creativeGenerationPlanItemId": execution.plan_item.id,
+            "adCopyPackArtifactId": ad_copy_pack_artifact_id,
+            "adCopyPackId": execution.copy_pack_id,
+            "swipeSourceLabel": execution.plan_item.source_label,
+            "swipeSourceUrl": execution.plan_item.source_media_url,
+        }
+    )
+    assets_repo.update(
+        org_id=org_id,
+        asset_id=generated_asset_id,
+        ai_metadata=generated_ai_metadata,
+    )
 
 
 def _retention_expires_at(now: datetime | None = None) -> datetime:
@@ -1533,8 +1662,6 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     raise ValueError("Asset brief requirements must be objects.")
                 requirements.append(req)
 
-            from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
-
             requirement_allocations = _split_requirement_asset_counts(
                 requirements,
                 int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6),
@@ -1695,6 +1822,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                             "Creative generation plan has no swipe execution items for image requirement "
                             f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index})."
                         )
+                    plan_executions: list[_ImagePlanItemExecution] = []
+                    existing_asset_ids_by_plan_item: dict[str, str] = {}
+                    pending_executions: list[_ImagePlanItemExecution] = []
                     for plan_item in plan_items:
                         copy_pack = copy_pack_by_id.get(plan_item.copy_pack_id)
                         if copy_pack is None:
@@ -1709,103 +1839,74 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
                             )
 
+                        execution = _ImagePlanItemExecution(
+                            requirement_index=requirement_index,
+                            plan_item=plan_item,
+                            copy_pack_id=copy_pack.id,
+                        )
+                        plan_executions.append(execution)
                         existing_asset_id = completed_image_plan_item_assets.get(plan_item.id)
                         if existing_asset_id:
-                            created_asset_ids.append(existing_asset_id)
-                            selected_swipe_sources.append(
-                                {
-                                    "requirement_index": requirement_index,
-                                    "plan_item_id": plan_item.id,
-                                    "company_swipe_id": plan_item.company_swipe_id,
-                                    "swipe_source_label": plan_item.source_label,
-                                    "swipe_source_url": plan_item.source_media_url,
-                                    "swipe_requires_product_image": plan_item.product_image_policy,
-                                    "copy_pack_id": copy_pack.id,
-                                }
-                            )
+                            existing_asset_ids_by_plan_item[plan_item.id] = existing_asset_id
                             continue
+                        pending_executions.append(execution)
 
-                        try:
-                            swipe_result = generate_swipe_image_ad_activity(
-                                {
-                                    "org_id": org_id,
-                                    "client_id": client_id,
-                                    "product_id": product_id,
-                                    "campaign_id": campaign_id,
-                                    "asset_brief_id": asset_brief_id,
-                                    "requirement_index": requirement_index,
-                                    "company_swipe_id": plan_item.company_swipe_id,
-                                    "swipe_source_url": plan_item.source_media_url,
-                                    "swipe_source_label": plan_item.source_label,
-                                    "swipe_requires_product_image": plan_item.product_image_policy,
-                                    "count": 1,
-                                    "workflow_run_id": workflow_run_id,
-                                    "creative_generation_batch_id": creative_generation_plan.batch_id,
-                                    "creative_generation_plan_artifact_id": str(creative_generation_plan_artifact.id),
-                                    "creative_generation_plan_item_id": plan_item.id,
-                                    "ad_copy_pack_artifact_id": str(ad_copy_pack_artifact.id),
-                                    "ad_copy_pack_id": copy_pack.id,
-                                },
-                            )
-                        except Exception as exc:  # noqa: BLE001
-                            error_summary = _summarize_exception_message(exc)
-                            raise RuntimeError(
-                                "Swipe image ad generation failed for planned execution item "
-                                f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                                f"plan_item_id={plan_item.id}, company_swipe_id={plan_item.company_swipe_id}, "
-                                f"source_label={plan_item.source_label}, error={error_summary})."
-                            ) from None
+                    generated_asset_ids_by_plan_item: dict[str, str] = {}
+                    generation_errors: list[str] = []
+                    if pending_executions:
+                        max_workers = _resolve_creative_image_plan_item_max_concurrency(len(pending_executions))
+                        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                            future_to_execution = {
+                                executor.submit(
+                                    _generate_image_plan_item_asset,
+                                    org_id=org_id,
+                                    client_id=client_id,
+                                    product_id=product_id,
+                                    campaign_id=campaign_id,
+                                    asset_brief_id=asset_brief_id,
+                                    workflow_run_id=workflow_run_id,
+                                    creative_generation_batch_id=creative_generation_plan.batch_id,
+                                    creative_generation_plan_artifact_id=str(creative_generation_plan_artifact.id),
+                                    ad_copy_pack_artifact_id=str(ad_copy_pack_artifact.id),
+                                    execution=execution,
+                                ): execution
+                                for execution in pending_executions
+                            }
+                            for future in as_completed(future_to_execution):
+                                execution = future_to_execution[future]
+                                try:
+                                    generated_asset_id = future.result()
+                                except Exception as exc:  # noqa: BLE001
+                                    generation_errors.append(_summarize_exception_message(exc, max_chars=900))
+                                    continue
+                                _annotate_generated_image_plan_item_asset(
+                                    assets_repo=assets_repo,
+                                    org_id=org_id,
+                                    asset_brief_id=asset_brief_id,
+                                    creative_generation_batch_id=creative_generation_plan.batch_id,
+                                    creative_generation_plan_artifact_id=str(creative_generation_plan_artifact.id),
+                                    ad_copy_pack_artifact_id=str(ad_copy_pack_artifact.id),
+                                    execution=execution,
+                                    generated_asset_id=generated_asset_id,
+                                )
+                                generated_asset_ids_by_plan_item[execution.plan_item.id] = generated_asset_id
+                                completed_image_plan_item_assets[execution.plan_item.id] = generated_asset_id
 
-                        generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
-                        if not isinstance(generated_ids, list) or len(generated_ids) != 1:
-                            raise RuntimeError(
-                                "Swipe image ad generation returned an invalid asset id list for planned execution item "
-                                f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id}, "
-                                f"returned={len(generated_ids) if isinstance(generated_ids, list) else 0})."
-                            )
-                        generated_asset_id = generated_ids[0]
-                        if not isinstance(generated_asset_id, str) or not generated_asset_id.strip():
-                            raise RuntimeError(
-                                "Swipe image ad generation returned an invalid asset id for planned execution item "
-                                f"(asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
-                            )
-                        generated_asset = assets_repo.get(org_id=org_id, asset_id=generated_asset_id)
-                        if generated_asset is None:
-                            raise RuntimeError(
-                                "Generated swipe image asset could not be reloaded for provenance annotation "
-                                f"(asset_id={generated_asset_id}, asset_brief_id={asset_brief_id}, plan_item_id={plan_item.id})."
-                            )
-                        generated_ai_metadata = (
-                            dict(generated_asset.ai_metadata) if isinstance(generated_asset.ai_metadata, dict) else {}
+                    for execution in plan_executions:
+                        asset_id = existing_asset_ids_by_plan_item.get(execution.plan_item.id) or generated_asset_ids_by_plan_item.get(
+                            execution.plan_item.id
                         )
-                        generated_ai_metadata.update(
-                            {
-                                "creativeGenerationBatchId": creative_generation_plan.batch_id,
-                                "creativeGenerationPlanArtifactId": str(creative_generation_plan_artifact.id),
-                                "creativeGenerationPlanItemId": plan_item.id,
-                                "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
-                                "adCopyPackId": copy_pack.id,
-                                "swipeSourceLabel": plan_item.source_label,
-                                "swipeSourceUrl": plan_item.source_media_url,
-                            }
-                        )
-                        assets_repo.update(
-                            org_id=org_id,
-                            asset_id=generated_asset_id,
-                            ai_metadata=generated_ai_metadata,
-                        )
-                        completed_image_plan_item_assets[plan_item.id] = generated_asset_id
-                        created_asset_ids.append(generated_asset_id)
-                        selected_swipe_sources.append(
-                            {
-                                "requirement_index": requirement_index,
-                                "plan_item_id": plan_item.id,
-                                "company_swipe_id": plan_item.company_swipe_id,
-                                "swipe_source_label": plan_item.source_label,
-                                "swipe_source_url": plan_item.source_media_url,
-                                "swipe_requires_product_image": plan_item.product_image_policy,
-                                "copy_pack_id": copy_pack.id,
-                            }
+                        if asset_id:
+                            created_asset_ids.append(asset_id)
+                            selected_swipe_sources.append(
+                                _build_selected_swipe_source_entry(execution=execution)
+                            )
+
+                    if generation_errors:
+                        if len(generation_errors) == 1:
+                            raise RuntimeError(generation_errors[0])
+                        raise RuntimeError(
+                            f"{generation_errors[0]} additional_failures={len(generation_errors) - 1}"
                         )
                     continue
 
