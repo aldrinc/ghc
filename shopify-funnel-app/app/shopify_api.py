@@ -3515,15 +3515,7 @@ class ShopifyApiClient:
 
     @staticmethod
     def _bonus_discount_title(*, offer_name: str | None, bonus_titles: list[str]) -> str:
-        cleaned_offer_name = (offer_name or "").strip()
-        if len(bonus_titles) == 1 and bonus_titles[0].strip():
-            bundle_label = f"Free {bonus_titles[0].strip()}"
-        else:
-            bundle_label = "Free bonus bundle"
-        if cleaned_offer_name:
-            title = f"{cleaned_offer_name}: {bundle_label}"
-        else:
-            title = f"Included offer: {bundle_label}"
+        title = "Free bonus gift"
         if len(title) <= _MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH:
             return title
         return title[:_MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH].rstrip()
@@ -4656,9 +4648,9 @@ class ShopifyApiClient:
             }
             for line in lines
         ]
-        existing_merchandise_ids = {line["merchandiseId"] for line in expanded_lines}
+        desired_display_lines = list(expanded_lines)
+        existing_merchandise_ids = {line["merchandiseId"] for line in desired_display_lines}
         product_source_payloads: dict[str, dict[str, Any] | None] = {}
-        bonus_lines_to_add: list[dict[str, Any]] = []
 
         for line in expanded_lines:
             merchandise_id = line["merchandiseId"]
@@ -4697,9 +4689,12 @@ class ShopifyApiClient:
                 if bonus_merchandise_id in existing_merchandise_ids:
                     continue
                 existing_merchandise_ids.add(bonus_merchandise_id)
-                bonus_lines_to_add.append(bonus_line)
+                desired_display_lines.append(bonus_line)
 
-        return expanded_lines + bonus_lines_to_add
+        # Shopify storefront carts render newly supplied lines in reverse insertion
+        # order, so we reverse the payload after appending bonuses to keep the
+        # purchased variants ahead of the free bonus lines in checkout.
+        return list(reversed(desired_display_lines))
 
     async def update_variant(
         self,

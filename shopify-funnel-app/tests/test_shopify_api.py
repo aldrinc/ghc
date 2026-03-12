@@ -2171,7 +2171,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
                     "automaticDiscountNode": {
                         "id": "gid://shopify/DiscountAutomaticNode/777",
                         "automaticDiscount": {
-                            "title": "Starter Pack: Free bonus bundle",
+                            "title": "Free bonus gift",
                         },
                     },
                     "userErrors": [],
@@ -2260,7 +2260,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     )
 
     assert result["productGid"] == "gid://shopify/Product/999"
-    assert observed_discount_payload["title"] == "Starter Pack: Free bonus bundle"
+    assert observed_discount_payload["title"] == "Free bonus gift"
     assert observed_discount_payload["customerBuys"]["items"]["products"]["productVariantsToAdd"] == [
         "gid://shopify/ProductVariant/100"
     ]
@@ -2272,12 +2272,12 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     assert observed_discount_payload["customerGets"]["value"]["discountOnQuantity"]["quantity"] == "2"
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][0]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Starter Pack: Free bonus bundle",
+        "title": "Free bonus gift",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][1]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Starter Pack: Free bonus bundle",
+        "title": "Free bonus gift",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_published_product_gids == [
@@ -2287,7 +2287,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     ]
 
 
-def test_expand_checkout_lines_with_offer_bonuses_appends_bonus_variants():
+def test_expand_checkout_lines_with_offer_bonuses_returns_shopify_input_order_for_variant_first_display():
     client = ShopifyApiClient()
 
     async def fake_resolve_variant_product_gid(
@@ -2342,8 +2342,101 @@ def test_expand_checkout_lines_with_offer_bonuses_appends_bonus_variants():
     )
 
     assert lines == [
-        {"merchandiseId": "gid://shopify/ProductVariant/100", "quantity": 1},
         {"merchandiseId": "gid://shopify/ProductVariant/444", "quantity": 1},
+        {"merchandiseId": "gid://shopify/ProductVariant/100", "quantity": 1},
+    ]
+
+
+def test_expand_checkout_lines_with_offer_bonuses_keeps_purchased_variants_ahead_of_bonus_lines():
+    client = ShopifyApiClient()
+
+    variant_to_product = {
+        "gid://shopify/ProductVariant/100": "gid://shopify/Product/999",
+        "gid://shopify/ProductVariant/200": "gid://shopify/Product/998",
+    }
+
+    async def fake_resolve_variant_product_gid(
+        *,
+        shop_domain: str,
+        access_token: str,
+        variant_gid: str,
+    ):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "token"
+        return variant_to_product[variant_gid]
+
+    async def fake_get_product(*, shop_domain: str, access_token: str, product_gid: str):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "token"
+        if product_gid == "gid://shopify/Product/999":
+            return {
+                "productGid": product_gid,
+                "title": "Sleep Drops",
+                "handle": "sleep-drops",
+                "status": "ACTIVE",
+                "sourceOfTruthPayload": {
+                    "offers": [
+                        {
+                            "id": "offer-1",
+                            "basket": {
+                                "shopifyVariantGids": ["gid://shopify/ProductVariant/100"],
+                                "bonusProducts": [
+                                    {
+                                        "id": "bonus-product-1",
+                                        "title": "Bonus Guide",
+                                        "shopifyVariantGid": "gid://shopify/ProductVariant/444",
+                                    }
+                                ],
+                            },
+                        }
+                    ]
+                },
+                "variants": [],
+            }
+        return {
+            "productGid": product_gid,
+            "title": "Focus Gummies",
+            "handle": "focus-gummies",
+            "status": "ACTIVE",
+            "sourceOfTruthPayload": {
+                "offers": [
+                    {
+                        "id": "offer-2",
+                        "basket": {
+                            "shopifyVariantGids": ["gid://shopify/ProductVariant/200"],
+                            "bonusProducts": [
+                                {
+                                    "id": "bonus-product-2",
+                                    "title": "Meal Planner",
+                                    "shopifyVariantGid": "gid://shopify/ProductVariant/555",
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            "variants": [],
+        }
+
+    client._resolve_variant_product_gid = fake_resolve_variant_product_gid  # type: ignore[method-assign]
+    client.get_product = fake_get_product  # type: ignore[method-assign]
+
+    lines = asyncio.run(
+        client.expand_checkout_lines_with_offer_bonuses(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            lines=[
+                {"merchandiseId": "gid://shopify/ProductVariant/100", "quantity": 1},
+                {"merchandiseId": "gid://shopify/ProductVariant/200", "quantity": 1},
+            ],
+        )
+    )
+
+    assert lines == [
+        {"merchandiseId": "gid://shopify/ProductVariant/555", "quantity": 1},
+        {"merchandiseId": "gid://shopify/ProductVariant/444", "quantity": 1},
+        {"merchandiseId": "gid://shopify/ProductVariant/200", "quantity": 1},
+        {"merchandiseId": "gid://shopify/ProductVariant/100", "quantity": 1},
     ]
 
 
