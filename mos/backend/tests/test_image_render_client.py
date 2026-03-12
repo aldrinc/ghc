@@ -41,6 +41,9 @@ def test_get_image_render_provider_uses_settings_swipe_render_model_default(monk
 
 def test_build_image_render_client_returns_embedded_freestyle_for_creative_service_provider(monkeypatch) -> None:
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
+    monkeypatch.setattr(image_render.settings, "SWIPE_IMAGE_RENDER_MODEL", "")
+    monkeypatch.delenv("SWIPE_IMAGE_RENDER_MODEL", raising=False)
+    monkeypatch.delenv("IMAGE_RENDER_MODEL", raising=False)
 
     client = image_render.build_image_render_client(org_id="org-123")
 

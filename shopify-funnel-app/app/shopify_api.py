@@ -396,6 +396,18 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (("color", "var(--color-brand)"),),
         ),
         (
+            '.main-collection-banner__content a, .main-collection-banner__content a:visited',
+            (("color", "inherit"),),
+        ),
+        (
+            '.main-collection-banner__content a .icon, .main-collection-banner__content a svg, .main-collection-banner__content a svg *',
+            (
+                ("color", "inherit"),
+                ("fill", "currentColor"),
+                ("stroke", "currentColor"),
+            ),
+        ),
+        (
             'header nav li, header .header__inline-menu li, header .list-menu--inline > li, #shopify-section-header nav li, #shopify-section-header .header__inline-menu li, #shopify-section-header .list-menu--inline > li',
             (
                 ("display", "flex"),
@@ -590,6 +602,17 @@ _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
   .collection .card-grid .card,
   .collection .card-grid .product-card {
     overflow: visible !important;
+  }
+}""",
+        """/* Keep the rotated image stack out of the left gutter in the
+   images-with-text-overlay section. */
+[id*="images-with-text-overlay"] .scrolled-images__main {
+  inset-inline-start: 68% !important;
+}
+
+@media screen and (min-width: 768px) {
+  [id*="images-with-text-overlay"] .scrolled-images__main {
+    inset-inline-start: 72% !important;
   }
 }""",
     ),
@@ -10182,6 +10205,32 @@ class ShopifyApiClient:
         return updated_content
 
     @classmethod
+    def _stabilize_product_card_vendor_markup(
+        cls,
+        *,
+        filename: str,
+        content: str,
+    ) -> str:
+        if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
+            return content
+
+        def replace_vendor_link(match: re.Match[str]) -> str:
+            class_name = match.group("class_name")
+            quote = match.group("quote")
+            return (
+                f"<span class={quote}{class_name}{quote}>"
+                "{{- product.vendor | escape -}}"
+                "</span>"
+            )
+
+        return re.sub(
+            r"\{\{\-\s*product\.vendor\s*\|\s*link_to_vendor\s*:\s*class:\s*"
+            r"(?P<quote>[\"'])(?P<class_name>.*?)(?P=quote)\s*\-\}\}",
+            replace_vendor_link,
+            content,
+        )
+
+    @classmethod
     def _strip_catalog_navigation_from_header_drawer(
         cls,
         *,
@@ -13113,6 +13162,10 @@ class ShopifyApiClient:
                             filename=filename,
                             content=normalized_content,
                         )
+                    )
+                    normalized_content = self._stabilize_product_card_vendor_markup(
+                        filename=filename,
+                        content=normalized_content,
                     )
                 if filename == _THEME_HEADER_DRAWER_FILENAME:
                     normalized_content = (

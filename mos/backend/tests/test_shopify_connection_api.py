@@ -2506,6 +2506,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     sales_page_path = _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2641,8 +2642,8 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -2849,6 +2850,7 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2968,8 +2970,8 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -3985,6 +3987,7 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -4072,8 +4075,8 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -4120,6 +4123,7 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
 
     db_session.add(
         Product(
@@ -4215,8 +4219,8 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -4259,6 +4263,7 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -4342,8 +4347,8 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     ):
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",

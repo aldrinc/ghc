@@ -737,6 +737,27 @@ def test_stabilize_product_card_inventory_language_english_labels():
     assert "Presque épuisé" not in updated
 
 
+def test_stabilize_product_card_vendor_markup_removes_vendor_link():
+    content = (
+        '<div class="product-card__top w-full">\n'
+        '  <span class="sr-only">{{ \'general.accessibility.vendor\' | t }}</span>\n'
+        '  {{- product.vendor | link_to_vendor : class: "caption reversed-link uppercase leading-none tracking-widest" -}}\n'
+        "</div>\n"
+    )
+
+    updated = ShopifyApiClient._stabilize_product_card_vendor_markup(
+        filename="snippets/product-card.liquid",
+        content=content,
+    )
+
+    assert "link_to_vendor" not in updated
+    assert '{{- product.vendor | escape -}}' in updated
+    assert (
+        '<span class="caption reversed-link uppercase leading-none tracking-widest">'
+        in updated
+    )
+
+
 def test_sync_theme_template_component_image_settings_creates_optional_leaf_paths():
     template_filename = "templates/collection.json"
     setting_path = (
@@ -3898,6 +3919,15 @@ def test_sync_theme_brand_updates_layout_and_css():
                 in css_content
             )
             assert (
+                '.main-collection-banner__content a, .main-collection-banner__content a:visited {'
+                in css_content
+            )
+            assert "color: inherit !important;" in css_content
+            assert (
+                '.main-collection-banner__content a .icon, .main-collection-banner__content a svg, .main-collection-banner__content a svg * {'
+                in css_content
+            )
+            assert (
                 "header nav li, header .header__inline-menu li, header .list-menu--inline > li, #shopify-section-header nav li, #shopify-section-header .header__inline-menu li, #shopify-section-header .list-menu--inline > li {"
                 in css_content
             )
@@ -3966,6 +3996,10 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert "scroll-snap-type: x mandatory !important;" in css_content
             assert ".slider--tablet .card-grid .card," in css_content
             assert "overflow: visible !important;" in css_content
+            assert '[id*="images-with-text-overlay"] .scrolled-images__main {' in css_content
+            assert "inset-inline-start: 68% !important;" in css_content
+            assert "@media screen and (min-width: 768px) {" in css_content
+            assert "inset-inline-start: 72% !important;" in css_content
             assert (
                 "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
                 in css_content
@@ -8089,6 +8123,10 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
                                 "body": {
                                     "__typename": "OnlineStoreThemeFileBodyText",
                                     "content": (
+                                        '<div class="product-card__top w-full">\n'
+                                        '<span class="sr-only">{{ \'general.accessibility.vendor\' | t }}</span>\n'
+                                        '{{- product.vendor | link_to_vendor : class: "caption reversed-link uppercase leading-none tracking-widest" -}}\n'
+                                        "</div>\n"
                                         '{%- liquid\n'
                                         'assign stock_class = "inventory--high"\n'
                                         'assign stock_text = "En stock"\n'
@@ -8165,6 +8203,8 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
         in exported_files["snippets/header-icons.liquid"]
     )
     assert "snippets/product-card.liquid" in exported_files
+    assert "link_to_vendor" not in exported_files["snippets/product-card.liquid"]
+    assert '{{- product.vendor | escape -}}' in exported_files["snippets/product-card.liquid"]
     assert "En stock" not in exported_files["snippets/product-card.liquid"]
     assert "Presque épuisé" not in exported_files["snippets/product-card.liquid"]
     assert 'assign stock_text = "In stock"' in exported_files["snippets/product-card.liquid"]

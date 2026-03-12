@@ -1162,6 +1162,33 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         status_text: str,
         shop_domain: str | None,
     ):
+        if product_gid == "gid://shopify/Product/222":
+            assert source_of_truth_payload["offers"] == []
+            return {
+                "shopDomain": "example.myshopify.com",
+                "productGid": "gid://shopify/Product/222",
+                "title": "Bonus Guide",
+                "handle": "bonus-guide",
+                "status": "ACTIVE",
+                "variants": [
+                    {
+                        "variantGid": "gid://shopify/ProductVariant/223",
+                        "title": "Bonus Default",
+                        "priceCents": 1200,
+                        "currency": "USD",
+                        "compareAtPriceCents": 1500,
+                        "sku": None,
+                        "barcode": None,
+                        "taxable": False,
+                        "requiresShipping": False,
+                        "inventoryPolicy": None,
+                        "inventoryManagement": None,
+                        "inventoryQuantity": None,
+                        "optionValues": {"Title": "Bonus Default"},
+                    }
+                ],
+            }
+
         observed["client_id"] = client_id
         observed["product_gid"] = product_gid
         observed["title"] = title
@@ -1188,7 +1215,7 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
                 "shopifyVariantGid": "gid://shopify/ProductVariant/223",
                 "priceCents": 1200,
                 "currency": "USD",
-                "compareAtPriceCents": 1500,
+                "compareAtPriceCents": None,
             }
         ]
         return {

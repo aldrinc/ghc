@@ -23,7 +23,7 @@ def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str,
             "product_id": product_id,
             "name": f"Campaign {suffix}",
             "channels": ["facebook"],
-            "asset_brief_types": ["image_ad"],
+            "asset_brief_types": ["image"],
         },
     )
     assert campaign_resp.status_code == 201
