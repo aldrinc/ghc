@@ -598,6 +598,80 @@ def test_call_swipe_copy_gemini_json_message_strips_invalid_apostrophe_escapes(m
     assert result["output_tokens"] == 222
 
 
+def test_generate_swipe_stage1_copy_pack_retries_when_meta_fields_missing(monkeypatch):
+    retry_feedbacks: list[str | None] = []
+    responses = iter(
+        [
+            {
+                "parsed": {
+                    "selectedVariation": "Variation 1",
+                    "formattedVariationsMarkdown": "```text\n**Variation 1**\n```",
+                    "claimsGuardrails": ["Do not promise medical outcomes."],
+                },
+                "text": "",
+                "stop_reason": "STOP",
+                "output_tokens": 111,
+            },
+            {
+                "parsed": _fake_swipe_copy_pack_parsed(angle="Clinical proof"),
+                "text": "",
+                "stop_reason": "STOP",
+                "output_tokens": 222,
+            },
+        ]
+    )
+
+    def _fake_build_prompt(*, retry_feedback=None, **_kwargs):
+        retry_feedbacks.append(retry_feedback)
+        return "prompt"
+
+    monkeypatch.setattr(swipe_activity, "_build_swipe_copy_stage1_prompt", _fake_build_prompt)
+    monkeypatch.setattr(swipe_activity, "_resolve_destination_type", lambda **_kwargs: "presell")
+    monkeypatch.setattr(
+        swipe_activity,
+        "_call_swipe_copy_gemini_json_message",
+        lambda **_kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_validate_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
+    )
+
+    validated, response, model = swipe_activity._generate_swipe_stage1_copy_pack(
+        session=object(),
+        brief={"id": "brief-1"},
+        requirement_index=0,
+        requirement={
+            "channel": "meta",
+            "format": "image",
+            "angle": "Clinical proof",
+            "hook": "Hidden issue",
+            "funnelStage": "mid",
+        },
+        copy_model="models/gemini-2.5-flash",
+        gemini_store_names=["fileSearchStores/context-store"],
+        swipe_bytes=b"image-bytes",
+        swipe_mime_type="image/png",
+        swipe_source_url="https://example.com/swipe.png",
+        swipe_source_label="10.png",
+        product_prompt_image_bytes=None,
+        product_prompt_image_mime_type=None,
+    )
+
+    assert validated.meta_primary_text == "Clinical proof with a compliant curiosity-led hook."
+    assert response["output_tokens"] == 222
+    assert model == "models/gemini-2.5-flash"
+    assert retry_feedbacks[0] is None
+    assert "missing required Meta fields" in (retry_feedbacks[1] or "")
+    assert "metaPrimaryText" in (retry_feedbacks[1] or "")
+
+
 def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypatch):
     captured: dict[str, object] = {}
 

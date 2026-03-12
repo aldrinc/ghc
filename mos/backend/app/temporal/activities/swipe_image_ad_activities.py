@@ -20,6 +20,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
+from pydantic import ValidationError
 
 from app.config import settings
 from app.db.base import session_scope
@@ -146,6 +147,35 @@ def _optional_clean_string(value: Any) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def _summarize_swipe_copy_validation_error(exc: ValidationError) -> str:
+    missing_fields: list[str] = []
+    other_messages: list[str] = []
+    meta_required_prefix = "Meta swipe copy pack is missing required fields:"
+
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error.get("loc") or [])
+        message = str(error.get("msg") or "").strip()
+        if location in {"metaPrimaryText", "metaHeadline", "metaDescription", "metaCta"}:
+            missing_fields.append(location)
+            continue
+        if meta_required_prefix in message:
+            suffix = message.split(meta_required_prefix, 1)[1].strip()
+            missing_fields.extend(part.strip() for part in suffix.split(",") if part.strip())
+            continue
+        if message:
+            other_messages.append(message)
+
+    if missing_fields:
+        ordered = ", ".join(dict.fromkeys(missing_fields))
+        return (
+            "The JSON object is missing required Meta fields: "
+            f"{ordered}. Return the complete JSON shape and populate every Meta field."
+        )
+    if other_messages:
+        return other_messages[0]
+    return "The JSON object did not satisfy the SwipeAdCopyPack schema. Return the complete required shape."
 
 
 def _resolve_swipe_requires_product_image_policy(
@@ -2131,7 +2161,16 @@ def _generate_swipe_stage1_copy_pack(
                 "destinationType": destination_type,
             }
         )
-        validated = SwipeAdCopyPack.model_validate(merged_payload)
+        try:
+            validated = SwipeAdCopyPack.model_validate(merged_payload)
+        except ValidationError as exc:
+            if attempt >= 5:
+                raise RuntimeError(_summarize_swipe_copy_validation_error(exc)) from exc
+            retry_feedback = (
+                _summarize_swipe_copy_validation_error(exc)
+                + " Preserve the same angle, but return the full valid JSON object."
+            )
+            continue
         try:
             _validate_swipe_copy_blind_angle_blackout(
                 copy_pack=validated,
