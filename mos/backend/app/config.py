@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     GEMINI_FILE_SEARCH_STORE_PREFIX: str = "mos"
     GEMINI_FILE_SEARCH_POLL_INTERVAL_SECONDS: float = 2.0
     GEMINI_FILE_SEARCH_POLL_TIMEOUT_SECONDS: float = 300.0
+    SWIPE_GEMINI_TIMEOUT_SECONDS: int = 300
     AGENTA_ENABLED: bool = False
     AGENTA_API_KEY: str | None = None
     AGENTA_HOST: str = "https://cloud.agenta.ai"

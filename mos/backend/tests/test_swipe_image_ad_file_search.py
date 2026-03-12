@@ -88,6 +88,38 @@ def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tup
     return client_id, product_id, campaign_id
 
 
+def test_ensure_gemini_client_uses_settings_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeHttpOptions:
+        def __init__(self, *, timeout: int) -> None:
+            self.timeout = timeout
+            captured["timeout"] = timeout
+
+    class _FakeClient:
+        def __init__(self, *, api_key: str, http_options: object) -> None:
+            self.api_key = api_key
+            self.http_options = http_options
+            captured["api_key"] = api_key
+            captured["http_options"] = http_options
+
+    monkeypatch.setattr(swipe_activity, "_GEMINI_CLIENT", None)
+    monkeypatch.setattr(swipe_activity, "genai", SimpleNamespace(Client=_FakeClient))
+    monkeypatch.setattr(
+        swipe_activity,
+        "genai_types",
+        SimpleNamespace(HttpOptions=_FakeHttpOptions),
+    )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(swipe_activity.settings, "SWIPE_GEMINI_TIMEOUT_SECONDS", 300)
+
+    client = swipe_activity._ensure_gemini_client()
+
+    assert isinstance(client, _FakeClient)
+    assert captured["api_key"] == "test-gemini-key"
+    assert captured["timeout"] == 300
+
+
 def _fake_swipe_stage1_rag_docs() -> list[dict[str, object]]:
     doc_keys = [
         "swipe_stage1_client_canon",
