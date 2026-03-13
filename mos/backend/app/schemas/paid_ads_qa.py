@@ -122,6 +122,15 @@ class PaidAdsPlatformProfileResponse(BaseModel):
     updatedAt: str
 
 
+class PaidAdsMetaTrackingRepairResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    funnelId: str
+    campaignId: str
+    clientId: str
+    profile: PaidAdsPlatformProfileResponse
+
+
 class PaidAdsQaRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

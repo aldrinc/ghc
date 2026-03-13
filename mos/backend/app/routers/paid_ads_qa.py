@@ -11,11 +11,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.models import Asset, Campaign, ClientUserPreference
+from app.db.models import Asset, Campaign, ClientUserPreference, Funnel
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.paid_ads_qa import (
+    PaidAdsMetaTrackingRepairResponse,
     PaidAdsPlatformProfileResponse,
     PaidAdsPlatformProfileUpsertRequest,
     PaidAdsQaFindingResponse,
@@ -33,6 +34,7 @@ from app.services.meta_review import (
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
+    activate_mos_meta_funnel_tracking_profile,
     clean_optional_text,
     derive_run_status,
     evaluate_meta_campaign,
@@ -59,6 +61,18 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     return client
 
 
+def _get_funnel_or_404(*, session: Session, org_id: str, funnel_id: str) -> Funnel:
+    funnel = session.scalar(
+        select(Funnel).where(
+            Funnel.org_id == org_id,
+            Funnel.id == funnel_id,
+        )
+    )
+    if not funnel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+    return funnel
+
+
 def _require_supported_ruleset(ruleset_version: str) -> str:
     try:
         get_ruleset(ruleset_version)
@@ -69,6 +83,14 @@ def _require_supported_ruleset(ruleset_version: str) -> str:
 
 def _filter_creative_specs_to_generation(*, creative_specs: list[Any], asset_ids: set[str]) -> list[Any]:
     return [spec for spec in creative_specs if getattr(spec, "asset_id", None) and str(spec.asset_id) in asset_ids]
+
+
+def _campaign_uses_meta_channel(channels: list[str] | None) -> bool:
+    for channel in channels or []:
+        normalized = clean_optional_text(channel)
+        if normalized and normalized.lower() in {"facebook", "instagram", "meta"}:
+            return True
+    return False
 
 
 def _selected_shop_storefront_domain(
@@ -439,6 +461,66 @@ def assess_paid_ads_platform_profile(
         ]
     )
     return _run_response(run, finding_records)
+
+
+@router.post(
+    "/funnels/{funnel_id}/paid-ads-qa/meta-tracking/repair",
+    response_model=PaidAdsMetaTrackingRepairResponse,
+)
+def repair_funnel_meta_tracking(
+    funnel_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    funnel = _get_funnel_or_404(session=session, org_id=auth.org_id, funnel_id=funnel_id)
+    if not funnel.campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta tracking repair requires a funnel that is attached to a campaign.",
+        )
+
+    campaign = session.scalar(
+        select(Campaign).where(
+            Campaign.org_id == auth.org_id,
+            Campaign.id == funnel.campaign_id,
+        )
+    )
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found for funnel")
+    if str(campaign.client_id) != str(funnel.client_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Funnel client does not match the parent campaign client.",
+        )
+    if not _campaign_uses_meta_channel(campaign.channels):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta tracking repair requires the funnel's campaign to target a Meta channel.",
+        )
+
+    repo = PaidAdsQaRepository(session)
+    profile_record = repo.get_platform_profile(org_id=auth.org_id, client_id=str(funnel.client_id), platform="meta")
+    profile_dict = _profile_dict(profile_record, platform="meta", client_id=str(funnel.client_id))
+    try:
+        configured_profile = activate_mos_meta_funnel_tracking_profile(
+            profile=profile_dict,
+            funnel_ids=[str(funnel.id)],
+            ruleset_version=RULESET_VERSION,
+        )
+    except MetaProfileRefreshError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    saved_profile = repo.upsert_platform_profile(
+        org_id=auth.org_id,
+        client_id=str(funnel.client_id),
+        **_profile_input_from_dict(configured_profile, platform="meta"),
+    )
+    return PaidAdsMetaTrackingRepairResponse(
+        funnelId=str(funnel.id),
+        campaignId=str(campaign.id),
+        clientId=str(funnel.client_id),
+        profile=PaidAdsPlatformProfileResponse(**_to_profile_payload(saved_profile)),
+    )
 
 
 @router.post("/campaigns/{campaign_id}/paid-ads-qa/runs", response_model=PaidAdsQaRunResponse)

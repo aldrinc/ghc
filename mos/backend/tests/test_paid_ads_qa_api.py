@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, MetaAdSetSpec, MetaCreativeSpec
+from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, Funnel, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import paid_ads_qa as paid_ads_qa_router
 from app.services import paid_ads_qa as paid_ads_qa_service
 from app.services.paid_ads_qa import LEGACY_RULESET_VERSION, RULESET_VERSION
@@ -346,6 +346,88 @@ def test_meta_platform_profile_assessment_refreshes_live_profile_and_persists_va
     assert profile["pageId"] == "123456"
     assert profile["adAccountId"] == "act_123456"
     assert profile["metadata"]["metaGraphValidation"]["lastValidatedAt"] == "2026-03-10T21:45:00+00:00"
+
+
+def test_repair_funnel_meta_tracking_updates_existing_funnel(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-tracking-repair")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Repair Funnel",
+        route_slug="repair-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    def _refresh(*, profile, ruleset_version):
+        metadata = dict(profile.get("metadata") or {})
+        metadata["metaGraphValidation"] = {
+            "apiVersion": "v-test",
+            "lastValidatedAt": "2026-03-13T10:15:00+00:00",
+            "validatedFields": ["pixelId", "dataSetId", "dataSetAssignedToAdAccount"],
+        }
+        return {
+            **profile,
+            "platform": "meta",
+            "rulesetVersion": ruleset_version,
+            "businessManagerId": "bm-123",
+            "pageId": "123456",
+            "pageName": "Meta Page",
+            "adAccountId": "act_123456",
+            "adAccountName": "Meta Account",
+            "paymentMethodType": "credit_card",
+            "paymentMethodStatus": "active",
+            "pixelId": "pixel-123",
+            "dataSetId": "dataset-123",
+            "dataSetAssignedToAdAccount": True,
+            "dataSetShopifyPartnerInstalled": False,
+            "dataSetDataSharingLevel": "standard",
+            "metadata": metadata,
+        }
+
+    monkeypatch.setattr(
+        paid_ads_qa_service,
+        "refresh_meta_platform_profile_from_graph",
+        _refresh,
+    )
+
+    repair_resp = api_client.post(f"/funnels/{funnel.id}/paid-ads-qa/meta-tracking/repair")
+    assert repair_resp.status_code == 200
+    repair_payload = repair_resp.json()
+    assert repair_payload["funnelId"] == str(funnel.id)
+    assert repair_payload["campaignId"] == campaign_id
+    assert repair_payload["clientId"] == client_id
+
+    profile = repair_payload["profile"]
+    assert profile["rulesetVersion"] == RULESET_VERSION
+    assert profile["trackingProvider"] == "mos"
+    assert profile["trackingUrlParameters"] == "utm_source=meta&utm_medium=paid"
+    assert profile["pixelId"] == "pixel-123"
+    assert profile["dataSetId"] == "dataset-123"
+
+    mos_meta_tracking = profile["metadata"]["mosMetaTracking"]
+    assert mos_meta_tracking["status"] == "active"
+    assert mos_meta_tracking["channel"] == "meta"
+    assert mos_meta_tracking["mode"] == "public_funnel_runtime"
+    assert mos_meta_tracking["pixelId"] == "pixel-123"
+    assert mos_meta_tracking["browserEvents"] == ["PageView", "InitiateCheckout"]
+    assert mos_meta_tracking["funnelIds"] == [str(funnel.id)]
+
+    profile_resp = api_client.get(f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile")
+    assert profile_resp.status_code == 200
+    persisted_profile = profile_resp.json()
+    assert persisted_profile["metadata"]["mosMetaTracking"]["funnelIds"] == [str(funnel.id)]
 
 
 def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
