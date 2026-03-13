@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 from uuid import uuid4
 
 import httpx
@@ -754,7 +754,86 @@ def _resolve_public_destination_url(value: str | None, *, review_base_url: str |
     return urljoin(f"{base.rstrip('/')}/", cleaned.lstrip("/"))
 
 
+def _extract_text_fragments(value: Any) -> list[str]:
+    fragments: list[str] = []
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned:
+            fragments.append(cleaned)
+        return fragments
+    if isinstance(value, dict):
+        for nested in value.values():
+            fragments.extend(_extract_text_fragments(nested))
+        return fragments
+    if isinstance(value, list):
+        for nested in value:
+            fragments.extend(_extract_text_fragments(nested))
+    return fragments
+
+
+def _parse_public_funnel_route(url: str) -> tuple[str, str, str | None] | None:
+    parsed = urlparse(url)
+    raw_segments = [unquote(segment).strip() for segment in parsed.path.split("/") if segment.strip()]
+    if len(raw_segments) >= 4 and raw_segments[0] == "f":
+        product_slug, funnel_slug = raw_segments[1], raw_segments[2]
+        page_slug = raw_segments[3] if len(raw_segments) >= 4 else None
+        return product_slug, funnel_slug, page_slug
+    if len(raw_segments) >= 3:
+        product_slug, funnel_slug, page_slug = raw_segments[0], raw_segments[1], raw_segments[2]
+        return product_slug, funnel_slug, page_slug
+    return None
+
+
+def _public_funnel_api_base_url() -> str | None:
+    return clean_optional_text(settings.DEPLOY_PUBLIC_API_BASE_URL)
+
+
+def _load_public_funnel_snapshot(url: str) -> dict[str, Any] | None:
+    route = _parse_public_funnel_route(url)
+    api_base_url = _public_funnel_api_base_url()
+    if route is None or not api_base_url:
+        return None
+
+    product_slug, funnel_slug, page_slug = route
+    with httpx.Client(follow_redirects=True, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS) as client:
+        resolved_page_slug = page_slug
+        if not resolved_page_slug:
+            meta_response = client.get(
+                f"{api_base_url.rstrip('/')}/public/funnels/{product_slug}/{funnel_slug}/meta"
+            )
+            meta_response.raise_for_status()
+            meta_payload = meta_response.json()
+            if not isinstance(meta_payload, dict):
+                raise httpx.DecodingError("Public funnel meta response must be a JSON object.")
+            resolved_page_slug = clean_optional_text(meta_payload.get("entrySlug"))
+            if not resolved_page_slug:
+                raise httpx.DecodingError("Public funnel meta response is missing entrySlug.")
+
+        page_response = client.get(
+            f"{api_base_url.rstrip('/')}/public/funnels/{product_slug}/{funnel_slug}/pages/{resolved_page_slug}"
+        )
+        page_response.raise_for_status()
+        page_payload = page_response.json()
+        if not isinstance(page_payload, dict):
+            raise httpx.DecodingError("Public funnel page response must be a JSON object.")
+
+    extracted_text = "\n".join(
+        _extract_text_fragments(page_payload.get("metadata"))
+        + _extract_text_fragments(page_payload.get("puckData"))
+    )
+    return {
+        "requestedUrl": url,
+        "finalUrl": url,
+        "statusCode": 200,
+        "bodyText": extracted_text[:50000],
+        "inspectionSource": "public_funnel_api",
+    }
+
+
 def _landing_page_snapshot(url: str) -> dict[str, Any]:
+    public_funnel_snapshot = _load_public_funnel_snapshot(url)
+    if public_funnel_snapshot is not None:
+        return public_funnel_snapshot
     with httpx.Client(follow_redirects=True, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS) as client:
         response = client.get(url)
     return {
@@ -762,6 +841,7 @@ def _landing_page_snapshot(url: str) -> dict[str, Any]:
         "finalUrl": str(response.url),
         "statusCode": response.status_code,
         "bodyText": response.text[:50000],
+        "inspectionSource": "http_fetch",
     }
 
 
