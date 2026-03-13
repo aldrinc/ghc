@@ -208,9 +208,12 @@ function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpse
 
 export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) {
   const { get, post, request } = useApiClient();
-  const [run, setRun] = useState<PaidAdsQaRun | null>(null);
+  const [runHistory, setRunHistory] = useState<PaidAdsQaRun[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runPending, setRunPending] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileFormState>(() => emptyProfileFormState());
   const [profileLoading, setProfileLoading] = useState(true);
   const [profilePending, setProfilePending] = useState(false);
@@ -252,6 +255,34 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
     };
   }, [campaign.client_id, get]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRunHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const runs = await get<PaidAdsQaRun[]>(`/campaigns/${campaign.id}/paid-ads-qa/runs`);
+        if (cancelled) return;
+        setRunHistory(runs);
+        setSelectedRunId((current) => {
+          if (current && runs.some((run) => run.id === current)) return current;
+          return runs[0]?.id || null;
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setHistoryError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    };
+
+    void loadRunHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, get]);
+
   const handleRunQa = async () => {
     setRunPending(true);
     setRunError(null);
@@ -261,7 +292,8 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
         reviewBaseUrl,
       });
-      setRun(response);
+      setRunHistory((current) => [response, ...current.filter((run) => run.id !== response.id)]);
+      setSelectedRunId(response.id);
     } catch (err) {
       setRunError(getErrorMessage(err));
     } finally {
@@ -299,6 +331,8 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
     }));
   };
 
+  const activeRun = runHistory.find((candidate) => candidate.id === selectedRunId) || runHistory[0] || null;
+
   return (
     <div className="border border-border bg-transparent p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -318,7 +352,11 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
 
       <div className="mt-2 space-y-1 text-sm text-content-muted">
         <div>Review base URL: {reviewBaseUrl || "Unavailable in this browser context."}</div>
-        {!run && !runError ? <div>No QA run recorded in this session yet.</div> : null}
+        {historyLoading ? <div>Loading previous QA runs…</div> : null}
+        {!historyLoading && !activeRun && !historyError && !runError ? (
+          <div>No QA runs recorded for this campaign yet.</div>
+        ) : null}
+        {historyError ? <div className="text-danger">{historyError}</div> : null}
         {runError ? <div className="text-danger">{runError}</div> : null}
       </div>
 
@@ -502,49 +540,90 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         </div>
       </details>
 
-      {run ? (
+      {runHistory.length ? (
+        <div className="mt-4 space-y-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Run history</div>
+          <div className="space-y-2">
+            {runHistory.map((historyRun) => {
+              const selected = historyRun.id === activeRun?.id;
+              return (
+                <button
+                  key={historyRun.id}
+                  type="button"
+                  onClick={() => setSelectedRunId(historyRun.id)}
+                  className={[
+                    "w-full rounded-lg border px-4 py-3 text-left transition",
+                    selected ? "border-accent/40 bg-accent/5" : "border-border bg-surface hover:bg-surface-2",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={runStatusTone(historyRun.status)}>
+                      {historyRun.status.replace(/_/g, " ")}
+                    </Badge>
+                    <Badge tone="neutral">Run {historyRun.id.slice(0, 8)}</Badge>
+                    <div className="text-sm text-content-muted">
+                      {formatDate(historyRun.completedAt || historyRun.createdAt)}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid gap-2 text-xs text-content-muted md:grid-cols-5">
+                    <div>Blockers {historyRun.blockerCount}</div>
+                    <div>High {historyRun.highCount}</div>
+                    <div>Medium {historyRun.mediumCount}</div>
+                    <div>Low {historyRun.lowCount}</div>
+                    <div>Manual {historyRun.needsManualReviewCount}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {activeRun ? (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={runStatusTone(run.status)}>Status {run.status.replaceAll("_", " ")}</Badge>
-            <Badge tone="neutral">Run {run.id.slice(0, 8)}</Badge>
-            <Badge tone="neutral">Completed {formatDate(run.completedAt || run.createdAt)}</Badge>
-            {readString(run.metadata.reviewBaseUrl) ? <Badge tone="neutral">{readString(run.metadata.reviewBaseUrl)}</Badge> : null}
+            <Badge tone={runStatusTone(activeRun.status)}>Status {activeRun.status.replace(/_/g, " ")}</Badge>
+            <Badge tone="neutral">Run {activeRun.id.slice(0, 8)}</Badge>
+            <Badge tone="neutral">Completed {formatDate(activeRun.completedAt || activeRun.createdAt)}</Badge>
+            {readString(activeRun.metadata.reviewBaseUrl) ? (
+              <Badge tone="neutral">{readString(activeRun.metadata.reviewBaseUrl)}</Badge>
+            ) : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-5">
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Blockers</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.blockerCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.blockerCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">High</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.highCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.highCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Medium</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.mediumCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.mediumCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Low</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.lowCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.lowCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Manual review</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.needsManualReviewCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.needsManualReviewCount}</div>
             </div>
           </div>
 
-          {!run.findings.length ? (
+          {!activeRun.findings.length ? (
             <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-content">
-              No findings. The current run passed the implemented Meta QA checks.
+              No findings. This run passed the implemented Meta QA checks.
             </div>
           ) : (
             <div className="space-y-3">
-              {run.findings.map((finding) => (
+              {activeRun.findings.map((finding) => (
                 <div key={finding.id} className="rounded-lg border border-border bg-surface px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={severityTone(finding.severity)}>{finding.severity}</Badge>
-                    <Badge tone={findingStatusTone(finding.status)}>{finding.status.replaceAll("_", " ")}</Badge>
+                    <Badge tone={findingStatusTone(finding.status)}>{finding.status.replace(/_/g, " ")}</Badge>
                     <div className="text-sm font-semibold text-content">{finding.ruleId}</div>
                     <div className="text-sm text-content">{finding.title}</div>
                   </div>
@@ -570,7 +649,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             </summary>
             <div className="border-t border-border py-4">
               <div className="max-h-[560px] overflow-auto">
-                <MarkdownViewer content={run.reportMarkdown} className="max-w-none px-4 sm:px-4" />
+                <MarkdownViewer content={activeRun.reportMarkdown} className="max-w-none px-4 sm:px-4" />
               </div>
             </div>
           </details>

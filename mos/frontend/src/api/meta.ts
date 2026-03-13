@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { useApiClient } from "./client";
 import type {
   MetaPipelineAsset,
+  MetaPublishSelection,
+  MetaPublishSelectionMutation,
   MetaRemoteResponse,
   MetaRemoteImage,
   MetaRemoteVideo,
@@ -29,7 +31,7 @@ type RemoteFilters = {
 };
 
 export function useMetaApi() {
-  const { get } = useApiClient();
+  const { get, request } = useApiClient();
 
   const getConfig = useCallback(
     () =>
@@ -103,6 +105,23 @@ export function useMetaApi() {
     [get],
   );
 
+  const listPublishSelections = useCallback(
+    (campaignId: string, generationKey: string) => {
+      const params = new URLSearchParams({ generationKey });
+      return get<MetaPublishSelection[]>(`/meta/campaigns/${campaignId}/publish-selections?${params.toString()}`);
+    },
+    [get],
+  );
+
+  const savePublishSelections = useCallback(
+    (campaignId: string, payload: { generationKey: string; decisions: MetaPublishSelectionMutation[] }) =>
+      request<MetaPublishSelection[]>(`/meta/campaigns/${campaignId}/publish-selections`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
   return {
     getConfig,
     listPipelineAssets,
@@ -112,5 +131,7 @@ export function useMetaApi() {
     listRemoteCampaigns,
     listRemoteAdSets,
     listRemoteAds,
+    listPublishSelections,
+    savePublishSelections,
   };
 }

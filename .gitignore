@@ -52,6 +52,7 @@ mos/backend/reports/
 # Local temp/output
 .tmp/
 mos/backend/.tmp/
+mos/backend/tmp/
 swipe/
 
 # Taskmaster

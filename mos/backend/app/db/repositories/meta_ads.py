@@ -12,6 +12,7 @@ from app.db.models import (
     MetaAssetUpload,
     MetaCampaign,
     MetaCreativeSpec,
+    MetaPublishSelection,
 )
 
 
@@ -194,3 +195,57 @@ class MetaAdsRepository:
         self.session.commit()
         self.session.refresh(record)
         return record
+
+    def list_publish_selections(
+        self,
+        *,
+        org_id: str,
+        campaign_id: str,
+        generation_key: str,
+    ) -> list[MetaPublishSelection]:
+        stmt = (
+            select(MetaPublishSelection)
+            .where(
+                MetaPublishSelection.org_id == org_id,
+                MetaPublishSelection.campaign_id == campaign_id,
+                MetaPublishSelection.generation_key == generation_key,
+            )
+            .order_by(MetaPublishSelection.created_at.asc(), MetaPublishSelection.asset_id.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def get_publish_selection(
+        self,
+        *,
+        org_id: str,
+        campaign_id: str,
+        generation_key: str,
+        asset_id: str,
+    ) -> Optional[MetaPublishSelection]:
+        stmt = select(MetaPublishSelection).where(
+            MetaPublishSelection.org_id == org_id,
+            MetaPublishSelection.campaign_id == campaign_id,
+            MetaPublishSelection.generation_key == generation_key,
+            MetaPublishSelection.asset_id == asset_id,
+        )
+        return self.session.scalars(stmt).first()
+
+    def create_publish_selection(self, **fields) -> MetaPublishSelection:
+        record = MetaPublishSelection(**fields)
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def update_publish_selection(self, record: MetaPublishSelection, **fields) -> MetaPublishSelection:
+        for key, value in fields.items():
+            setattr(record, key, value)
+        record.updated_at = datetime.now(timezone.utc)
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def delete_publish_selection(self, record: MetaPublishSelection) -> None:
+        self.session.delete(record)
+        self.session.commit()

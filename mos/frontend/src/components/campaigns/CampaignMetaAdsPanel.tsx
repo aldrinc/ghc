@@ -9,12 +9,18 @@ import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { AssetBrief } from "@/types/artifacts";
 import type { Campaign } from "@/types/common";
-import type { MetaPipelineAsset } from "@/types/meta";
+import type {
+  MetaPipelineAsset,
+  MetaPublishSelection,
+  MetaPublishSelectionDecision,
+} from "@/types/meta";
 
 type CampaignMetaAdsPanelProps = {
   campaign: Campaign;
   assetBriefs: AssetBrief[];
 };
+
+type MetaPackageView = "review" | "final";
 
 const apiBaseUrl = resolveRequiredApiBaseUrl();
 
@@ -211,10 +217,24 @@ function MetaFeedPreview({
   );
 }
 
+function publishDecisionTone(
+  decision: MetaPublishSelectionDecision | "undecided",
+): "neutral" | "accent" | "success" | "danger" {
+  if (decision === "included") return "success";
+  if (decision === "excluded") return "danger";
+  return "accent";
+}
+
+function publishDecisionLabel(decision?: MetaPublishSelectionDecision | null): string {
+  if (decision === "included") return "Included in final package";
+  if (decision === "excluded") return "Excluded from Meta";
+  return "Undecided";
+}
+
 export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsPanelProps) {
   const queryClient = useQueryClient();
   const { post } = useApiClient();
-  const { getConfig, listPipelineAssets } = useMetaApi();
+  const { getConfig, listPipelineAssets, listPublishSelections, savePublishSelections } = useMetaApi();
   const reviewBaseUrl = resolveWindowShopHostedOrigin();
 
   const [config, setConfig] = useState<{
@@ -234,6 +254,11 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [lastPreparedAt, setLastPreparedAt] = useState<string | null>(null);
   const [autoRefreshUntil, setAutoRefreshUntil] = useState<number | null>(null);
   const [latestGenerationOnly, setLatestGenerationOnly] = useState(true);
+  const [packageView, setPackageView] = useState<MetaPackageView>("review");
+  const [publishSelections, setPublishSelections] = useState<MetaPublishSelection[]>([]);
+  const [selectionLoading, setSelectionLoading] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const [selectionPendingAssetIds, setSelectionPendingAssetIds] = useState<string[]>([]);
 
   const assetBriefIds = useMemo(
     () => assetBriefs.map((brief) => brief.id).filter((briefId): briefId is string => Boolean(briefId)),
@@ -386,6 +411,10 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const latestGenerationSummary = generationSummaries[0] ?? null;
   const latestGenerationKey = latestGenerationSummary?.key ?? null;
   const latestGenerationBatchId = latestGenerationSummary?.kind === "batch" ? latestGenerationSummary.key.slice("batch:".length) : null;
+  const latestGenerationPipeline = useMemo(() => {
+    if (!latestGenerationKey) return [];
+    return pipeline.filter((item) => getGenerationGroup(item).key === latestGenerationKey);
+  }, [latestGenerationKey, pipeline]);
   const visiblePipeline = useMemo(() => {
     if (!latestGenerationOnly || !latestGenerationKey) return pipeline;
     return pipeline.filter((item) => getGenerationGroup(item).key === latestGenerationKey);
@@ -410,6 +439,24 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     if (latestGenerationOnly && latestGenerationKey) return visibleAssetBriefIds;
     return assetBriefIds;
   }, [assetBriefIds, latestGenerationKey, latestGenerationOnly, visibleAssetBriefIds]);
+  const selectionByAssetId = useMemo(
+    () => new Map(publishSelections.map((selection) => [selection.assetId, selection])),
+    [publishSelections],
+  );
+  const includedPackageItems = useMemo(
+    () =>
+      latestGenerationPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision === "included"),
+    [latestGenerationPipeline, selectionByAssetId],
+  );
+  const excludedPackageCount = useMemo(
+    () => latestGenerationPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision === "excluded").length,
+    [latestGenerationPipeline, selectionByAssetId],
+  );
+  const undecidedPackageCount = useMemo(
+    () => latestGenerationPipeline.length - includedPackageItems.length - excludedPackageCount,
+    [excludedPackageCount, includedPackageItems.length, latestGenerationPipeline.length],
+  );
+  const canManagePublishPackage = latestGenerationOnly && Boolean(latestGenerationKey);
   const groupedPipeline = useMemo(() => {
     const groups = new Map<
       number,
@@ -469,6 +516,57 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     setLatestGenerationOnly(true);
   }, [latestGenerationKey]);
 
+  useEffect(() => {
+    if (!latestGenerationKey) {
+      setPublishSelections([]);
+      setSelectionError(null);
+      setSelectionLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSelectionLoading(true);
+    setSelectionError(null);
+    listPublishSelections(campaign.id, latestGenerationKey)
+      .then((data) => {
+        if (cancelled) return;
+        setPublishSelections(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPublishSelections([]);
+        setSelectionError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSelectionLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, latestGenerationKey, listPublishSelections]);
+
+  const handleSetPublishDecision = useCallback(
+    async (assetId: string, decision: MetaPublishSelectionDecision | null) => {
+      if (!latestGenerationKey) return;
+      setSelectionError(null);
+      setSelectionPendingAssetIds((current) => (current.includes(assetId) ? current : [...current, assetId]));
+      try {
+        const nextSelections = await savePublishSelections(campaign.id, {
+          generationKey: latestGenerationKey,
+          decisions: [{ assetId, decision }],
+        });
+        setPublishSelections(nextSelections);
+      } catch (err) {
+        setSelectionError(getErrorMessage(err));
+      } finally {
+        setSelectionPendingAssetIds((current) => current.filter((currentAssetId) => currentAssetId !== assetId));
+      }
+    },
+    [campaign.id, latestGenerationKey, savePublishSelections],
+  );
+
   return (
     <div className="space-y-4">
       <div className="border border-border bg-transparent p-4">
@@ -476,7 +574,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div>
             <div className="text-base font-semibold text-content">Meta ads review</div>
             <div className="text-sm text-content-muted">
-              Internal draft setup only. Nothing on this tab publishes to Meta.
+              Review internal Meta specs, exclude unwanted creatives, and curate the final package before publish is wired.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
@@ -494,7 +592,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-7">
           <div className="rounded-lg border border-border bg-surface px-3 py-2">
             <div className="text-xs uppercase tracking-wide text-content-muted">Briefs</div>
             <div className="mt-1 text-lg font-semibold text-content">{assetBriefIds.length}</div>
@@ -510,6 +608,18 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div className="rounded-lg border border-border bg-surface px-3 py-2">
             <div className="text-xs uppercase tracking-wide text-content-muted">Ad set specs</div>
             <div className="mt-1 text-lg font-semibold text-content">{adsetSpecCount}</div>
+          </div>
+          <div className="rounded-lg border border-border bg-surface px-3 py-2">
+            <div className="text-xs uppercase tracking-wide text-content-muted">Included</div>
+            <div className="mt-1 text-lg font-semibold text-content">{includedPackageItems.length}</div>
+          </div>
+          <div className="rounded-lg border border-border bg-surface px-3 py-2">
+            <div className="text-xs uppercase tracking-wide text-content-muted">Excluded</div>
+            <div className="mt-1 text-lg font-semibold text-content">{excludedPackageCount}</div>
+          </div>
+          <div className="rounded-lg border border-border bg-surface px-3 py-2">
+            <div className="text-xs uppercase tracking-wide text-content-muted">Undecided</div>
+            <div className="mt-1 text-lg font-semibold text-content">{undecidedPackageCount}</div>
           </div>
         </div>
 
@@ -535,54 +645,219 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           ) : null}
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button
+            variant={packageView === "review" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setPackageView("review")}
+          >
+            Review candidates
+          </Button>
+          <Button
+            variant={packageView === "final" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => {
+              setLatestGenerationOnly(true);
+              setPackageView("final");
+            }}
+          >
+            Final Meta package ({includedPackageItems.length})
+          </Button>
+        </div>
+
         <div className="mt-2 space-y-1 text-sm text-content-muted">
           <div>Generate creatives runs the swipe-first remix flow and Stage 1 Gemini swipe copy generation for the current briefs.</div>
           <div>Prepare Meta review creates internal Meta creative specs from the selected asset's stored swipe copy pack.</div>
+          <div>Meta publish selection is generation-scoped. Only the latest generation can be added to the final package.</div>
           {lastWorkflowRunId ? <div>Latest creative workflow: <span className="font-mono">{lastWorkflowRunId}</span></div> : null}
           {lastPreparedAt ? <div>Latest Meta review prep: {formatDate(lastPreparedAt)}</div> : null}
           {autoRefreshUntil ? <div>Auto-refreshing this panel while creative generation completes.</div> : null}
           {!hasGeneratedAssets ? <div>Generate creatives first. Meta review stays disabled until campaign assets exist.</div> : null}
           {latestGenerationSummary ? <div>Visible generation focus: <span className="font-mono">{latestGenerationSummary.label}</span></div> : null}
           {hiddenLegacyCount ? <div>{hiddenLegacyCount} older or non-selected assets are currently hidden.</div> : null}
+          {!canManagePublishPackage ? (
+            <div className="text-warning">Switch back to latest generation only to manage the final Meta package.</div>
+          ) : null}
+          {selectionLoading ? <div>Loading saved Meta package decisions…</div> : null}
           {visibleMissingCreativeSpecCount ? (
             <div className="text-warning">{visibleMissingCreativeSpecCount} visible generated assets still need internal Meta specs.</div>
           ) : null}
           {generateError ? <div className="text-danger">{generateError}</div> : null}
           {prepareError ? <div className="text-danger">{prepareError}</div> : null}
+          {selectionError ? <div className="text-danger">{selectionError}</div> : null}
           {pipelineError ? <div className="text-danger">{pipelineError}</div> : null}
         </div>
       </div>
 
       <CampaignPaidAdsQaCard campaign={campaign} />
 
-      <div className="border border-border bg-transparent">
-        <div className="border-b border-border px-4 py-3">
-          <div className="text-base font-semibold text-content">Draft Meta-ready creatives</div>
-          <div className="text-sm text-content-muted">
-            Campaign assets, internal Meta creative specs, ad set specs, and funnel review links.
+      {packageView === "final" ? (
+        <div className="border border-border bg-transparent">
+          <div className="border-b border-border px-4 py-3">
+            <div className="text-base font-semibold text-content">Final Meta package</div>
+            <div className="text-sm text-content-muted">
+              Only the creatives below are currently slated for Meta publish. Excluded and undecided creatives are hidden.
+            </div>
           </div>
-        </div>
 
-        {pipelineLoading ? (
-          <div className="px-4 py-3 text-sm text-content-muted">Loading Meta campaign assets…</div>
-        ) : !visiblePipeline.length ? (
-          <div className="px-4 py-3 text-sm text-content-muted">
-            No campaign creative assets found yet. Generate creatives first.
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {groupedPipeline.map((group) => (
-              <div key={`requirement-${group.requirementIndex}`} className="space-y-4 px-4 py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold text-content">
-                    Requirement {group.requirementIndex >= 0 ? group.requirementIndex + 1 : "—"}: {group.title}
+          {selectionLoading ? (
+            <div className="px-4 py-3 text-sm text-content-muted">Loading final Meta package…</div>
+          ) : !latestGenerationKey ? (
+            <div className="px-4 py-3 text-sm text-content-muted">No latest generation is available yet.</div>
+          ) : !includedPackageItems.length ? (
+            <div className="space-y-2 px-4 py-3 text-sm text-content-muted">
+              <div>No creatives are included in the final Meta package yet.</div>
+              <div>Return to Review candidates and mark the latest-generation creatives you want to send to Meta.</div>
+            </div>
+          ) : (
+            <div className="space-y-4 px-4 py-4">
+              {includedPackageItems.map((item) => {
+                const assetUrl = resolveAssetUrl(item.asset.public_url);
+                const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
+                const creativeSpecSource = readString(creativeMetadata.source);
+                const reviewPaths = (creativeMetadata.reviewPaths || {}) as Record<string, string>;
+                const preSalesUrl = resolveShopHostedUrl(reviewPaths["pre-sales"], reviewBaseUrl);
+                const salesUrl = resolveShopHostedUrl(reviewPaths["sales"], reviewBaseUrl);
+                const metaUploadPrimaryText = readString(item.creative_spec?.primary_text);
+                const metaUploadHeadline = readString(item.creative_spec?.headline);
+                const metaUploadDescription = readString(item.creative_spec?.description);
+                const metaUploadCta = readString(item.creative_spec?.call_to_action_type);
+                const metaDestinationUrl = readString(item.creative_spec?.destination_url);
+                const resolvedMetaDestinationUrl =
+                  resolveShopHostedUrl(metaDestinationUrl, reviewBaseUrl) || metaDestinationUrl;
+                const generationGroup = getGenerationGroup(item);
+                const pendingSelection = selectionPendingAssetIds.includes(item.asset.id);
+                const metaSpecPreparedFromSwipeCopy = creativeSpecSource === "campaign_meta_review_setup_swipe_copy";
+                const hasReadySpec = Boolean(item.creative_spec?.id);
+
+                return (
+                  <div key={`final-package-${item.asset.id}`} className="space-y-4 rounded-xl border border-border bg-surface p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="text-sm font-semibold text-content">{item.creative_spec?.name || item.asset.public_id}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge tone="success">Included in final package</Badge>
+                          {hasReadySpec ? <Badge tone="success">Meta spec ready</Badge> : <Badge tone="danger">Meta spec missing</Badge>}
+                          {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Prepared from swipe copy</Badge> : null}
+                          <Badge tone="neutral">{generationGroup.label}</Badge>
+                          {item.experiment?.name ? <Badge tone="neutral">{item.experiment.name}</Badge> : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="destructive"
+                          size="xs"
+                          onClick={() => void handleSetPublishDecision(item.asset.id, "excluded")}
+                          disabled={pendingSelection}
+                        >
+                          {pendingSelection ? "Saving…" : "Remove from package"}
+                        </Button>
+                        {preSalesUrl ? (
+                          <a href={preSalesUrl} target="_blank" rel="noreferrer">
+                            <Button variant="secondary" size="xs">Open pre-sales</Button>
+                          </a>
+                        ) : null}
+                        {salesUrl ? (
+                          <a href={salesUrl} target="_blank" rel="noreferrer">
+                            <Button variant="secondary" size="xs">Open sales</Button>
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.1fr)]">
+                      <div className="rounded-xl border border-border bg-surface p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Final Creative Asset</div>
+                        <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface-2">
+                          {assetUrl ? (
+                            <img
+                              src={assetUrl}
+                              alt={item.asset.asset_kind || "Creative asset"}
+                              className="h-[320px] w-full object-contain"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-[320px] items-center justify-center px-4 text-sm text-content-muted">
+                              Generated remix preview missing.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-border bg-surface p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Exact Meta Upload Payload</div>
+                        {hasReadySpec ? (
+                          <div className="mt-3 space-y-3">
+                            <CopyField label="Primary Text" value={metaUploadPrimaryText} multiline />
+                            <CopyField label="Headline" value={metaUploadHeadline} />
+                            <CopyField label="Description" value={metaUploadDescription} />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <CopyField label="CTA Button" value={metaUploadCta} />
+                              <CopyField label="Destination URL" value={resolvedMetaDestinationUrl} />
+                            </div>
+                            <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-content-muted">
+                              {item.adset_specs?.length
+                                ? `Linked ad set specs: ${item.adset_specs.map((spec) => spec.name || spec.id).join(", ")}`
+                                : "No linked internal Meta ad set spec yet."}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-lg border border-dashed border-border bg-surface-2 px-4 py-4 text-sm leading-6 text-content-muted">
+                            This creative is included in the final package, but the upload-ready Meta spec is still missing.
+                          </div>
+                        )}
+                      </div>
+
+                      <MetaFeedPreview
+                        assetUrl={assetUrl}
+                        assetAlt={item.asset.asset_kind || "Creative asset"}
+                        primaryText={metaUploadPrimaryText}
+                        headline={metaUploadHeadline}
+                        description={metaUploadDescription}
+                        cta={metaUploadCta}
+                        destinationUrl={resolvedMetaDestinationUrl}
+                        specReady={hasReadySpec}
+                        specSourceLabel={hasReadySpec ? "Final Meta package" : "Spec missing"}
+                      />
+                    </div>
                   </div>
-                  {group.funnelStage ? <Badge tone="neutral">{group.funnelStage}</Badge> : null}
-                  <Badge tone="neutral">{group.items.length} swipe remixes</Badge>
-                </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
 
-                <div className="space-y-4">
-                  {group.items.map((item) => {
+      {packageView === "review" ? (
+        <div className="border border-border bg-transparent">
+          <div className="border-b border-border px-4 py-3">
+            <div className="text-base font-semibold text-content">Draft Meta-ready creatives</div>
+            <div className="text-sm text-content-muted">
+              Campaign assets, internal Meta creative specs, ad set specs, and funnel review links.
+            </div>
+          </div>
+
+          {pipelineLoading ? (
+            <div className="px-4 py-3 text-sm text-content-muted">Loading Meta campaign assets…</div>
+          ) : !visiblePipeline.length ? (
+            <div className="px-4 py-3 text-sm text-content-muted">
+              No campaign creative assets found yet. Generate creatives first.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {groupedPipeline.map((group) => (
+                <div key={`requirement-${group.requirementIndex}`} className="space-y-4 px-4 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-semibold text-content">
+                      Requirement {group.requirementIndex >= 0 ? group.requirementIndex + 1 : "—"}: {group.title}
+                    </div>
+                    {group.funnelStage ? <Badge tone="neutral">{group.funnelStage}</Badge> : null}
+                    <Badge tone="neutral">{group.items.length} swipe remixes</Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {group.items.map((item) => {
                     const assetUrl = resolveAssetUrl(item.asset.public_url);
                     const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
                     const creativeSpecSource = readString(creativeMetadata.source);
@@ -622,8 +897,12 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                         ? "Prepared Meta spec"
                         : "Legacy Meta spec"
                       : "Spec missing";
-                    return (
-                      <div key={item.asset.id} className="space-y-4 rounded-xl border border-border bg-surface p-4">
+                    const currentSelectionDecision = selectionByAssetId.get(item.asset.id)?.decision;
+                    const pendingSelection = selectionPendingAssetIds.includes(item.asset.id);
+                    const includeDisabled = !canManagePublishPackage || !item.creative_spec?.id || pendingSelection;
+                    const excludeDisabled = !canManagePublishPackage || pendingSelection;
+                      return (
+                        <div key={item.asset.id} className="space-y-4 rounded-xl border border-border bg-surface p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="space-y-2">
                             <div className="text-sm font-semibold text-content">{item.creative_spec?.name || item.asset.public_id}</div>
@@ -639,10 +918,47 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                               <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
                               <Badge tone="neutral">{generationGroup.label}</Badge>
                               {batchId ? <Badge tone="neutral">Batch {shortId(batchId, 5)}</Badge> : null}
+                              <Badge tone={publishDecisionTone(currentSelectionDecision || "undecided")}>
+                                {publishDecisionLabel(currentSelectionDecision)}
+                              </Badge>
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant={currentSelectionDecision === "included" ? "primary" : "secondary"}
+                              size="xs"
+                              onClick={() => void handleSetPublishDecision(item.asset.id, "included")}
+                              disabled={includeDisabled}
+                            >
+                              {pendingSelection && currentSelectionDecision !== "included"
+                                ? "Saving…"
+                                : currentSelectionDecision === "included"
+                                  ? "Included"
+                                  : "Include for Meta"}
+                            </Button>
+                            <Button
+                              variant={currentSelectionDecision === "excluded" ? "destructive" : "secondary"}
+                              size="xs"
+                              onClick={() => void handleSetPublishDecision(item.asset.id, "excluded")}
+                              disabled={excludeDisabled}
+                            >
+                              {pendingSelection && currentSelectionDecision !== "excluded"
+                                ? "Saving…"
+                                : currentSelectionDecision === "excluded"
+                                  ? "Excluded"
+                                  : "Exclude"}
+                            </Button>
+                            {currentSelectionDecision ? (
+                              <Button
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => void handleSetPublishDecision(item.asset.id, null)}
+                                disabled={!canManagePublishPackage || pendingSelection}
+                              >
+                                Reset
+                              </Button>
+                            ) : null}
                             {preSalesUrl ? (
                               <a href={preSalesUrl} target="_blank" rel="noreferrer">
                                 <Button variant="secondary" size="xs">Open pre-sales</Button>
@@ -710,6 +1026,11 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                               {metaSpecPreparedFromSwipeCopy ? <Badge tone="success">Copy linked</Badge> : null}
                               {hasLegacyMetaSpec ? <Badge tone="danger">Legacy copy source</Badge> : null}
                             </div>
+                            {!item.creative_spec?.id ? (
+                              <div className="mt-2 text-xs text-content-muted">
+                                Prepare Meta review before this creative can be included in the final package.
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="rounded-xl border border-border bg-surface p-3">
@@ -836,15 +1157,16 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

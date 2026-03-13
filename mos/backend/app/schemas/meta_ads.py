@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -143,3 +143,54 @@ class CampaignMetaReviewSetupRequest(BaseModel):
         if not isinstance(value, str) or not value.strip():
             raise ValueError("generationBatchId must be a non-empty string when provided.")
         return value.strip()
+
+
+MetaPublishSelectionDecision = Literal["included", "excluded"]
+
+
+class MetaPublishSelectionMutationRequest(BaseModel):
+    assetId: str
+    decision: MetaPublishSelectionDecision | None = None
+
+    @field_validator("assetId")
+    @classmethod
+    def _validate_asset_id(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("assetId must be a non-empty string.")
+        return value.strip()
+
+
+class CampaignMetaPublishSelectionsRequest(BaseModel):
+    generationKey: str
+    decisions: list[MetaPublishSelectionMutationRequest] = Field(default_factory=list)
+
+    @field_validator("generationKey")
+    @classmethod
+    def _validate_generation_key(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("generationKey must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("decisions")
+    @classmethod
+    def _validate_decisions(
+        cls,
+        value: list[MetaPublishSelectionMutationRequest],
+    ) -> list[MetaPublishSelectionMutationRequest]:
+        seen: set[str] = set()
+        for decision in value:
+            if decision.assetId in seen:
+                raise ValueError(f"Duplicate assetId '{decision.assetId}' is not allowed.")
+            seen.add(decision.assetId)
+        return value
+
+
+class MetaPublishSelectionResponse(BaseModel):
+    id: str
+    campaignId: str
+    assetId: str
+    generationKey: str
+    decision: MetaPublishSelectionDecision
+    decidedByUserId: str | None = None
+    createdAt: str
+    updatedAt: str

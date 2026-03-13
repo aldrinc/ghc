@@ -77,6 +77,24 @@ export type MetaCampaign = {
   created_at?: string;
 };
 
+export type MetaPublishSelectionDecision = "included" | "excluded";
+
+export type MetaPublishSelection = {
+  id: string;
+  campaignId: string;
+  assetId: string;
+  generationKey: string;
+  decision: MetaPublishSelectionDecision;
+  decidedByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaPublishSelectionMutation = {
+  assetId: string;
+  decision?: MetaPublishSelectionDecision | null;
+};
+
 export type MetaPipelineAsset = {
   asset: {
     id: string;

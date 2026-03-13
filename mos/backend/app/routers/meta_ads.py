@@ -38,9 +38,11 @@ from app.schemas.meta_ads import (
     MetaAdSetSpecCreateRequest,
     MetaAssetUploadRequest,
     MetaCampaignCreateRequest,
+    CampaignMetaPublishSelectionsRequest,
     MetaCreativeCreateRequest,
     MetaCreativePreviewRequest,
     MetaCreativeSpecCreateRequest,
+    MetaPublishSelectionResponse,
 )
 from app.services.image_metadata import (
     ImageMetadataSanitizationError,
@@ -181,6 +183,19 @@ def _meta_experiment_key(*, experiment_id: Optional[str], metadata_json: Any) ->
         if isinstance(raw, str) and raw.strip():
             return raw.strip()
     return None
+
+
+def _publish_selection_response(record: Any) -> MetaPublishSelectionResponse:
+    return MetaPublishSelectionResponse(
+        id=str(record.id),
+        campaignId=str(record.campaign_id),
+        assetId=str(record.asset_id),
+        generationKey=record.generation_key,
+        decision=record.decision,
+        decidedByUserId=record.decided_by_user_id,
+        createdAt=record.created_at.isoformat(),
+        updatedAt=record.updated_at.isoformat(),
+    )
 
 
 @router.post("/assets/{asset_id}/upload", status_code=status.HTTP_201_CREATED)
@@ -850,6 +865,104 @@ def list_meta_adset_specs(
         experiment_id=experimentId,
     )
     return jsonable_encoder(records)
+
+
+@router.get("/campaigns/{campaign_id}/publish-selections", response_model=list[MetaPublishSelectionResponse])
+def list_meta_publish_selections(
+    campaign_id: str,
+    generationKey: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    generation_key = generationKey.strip()
+    if not generation_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="generationKey is required.")
+
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    repo = MetaAdsRepository(session)
+    records = repo.list_publish_selections(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+        generation_key=generation_key,
+    )
+    return [_publish_selection_response(record) for record in records]
+
+
+@router.put("/campaigns/{campaign_id}/publish-selections", response_model=list[MetaPublishSelectionResponse])
+def update_meta_publish_selections(
+    campaign_id: str,
+    payload: CampaignMetaPublishSelectionsRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    repo = MetaAdsRepository(session)
+    asset_ids = [decision.assetId for decision in payload.decisions]
+    if asset_ids:
+        asset_rows = session.scalars(
+            select(Asset).where(
+                Asset.org_id == auth.org_id,
+                Asset.campaign_id == str(campaign.id),
+                Asset.id.in_(asset_ids),
+            )
+        ).all()
+        assets_by_id = {str(asset.id): asset for asset in asset_rows}
+        missing_asset_ids = sorted(set(asset_ids).difference(assets_by_id.keys()))
+        if missing_asset_ids:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "message": "Some campaign assets were not found for publish selection.",
+                    "missingAssetIds": missing_asset_ids,
+                },
+            )
+
+    existing_by_asset_id = {
+        str(record.asset_id): record
+        for record in repo.list_publish_selections(
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            generation_key=payload.generationKey,
+        )
+    }
+
+    for mutation in payload.decisions:
+        existing = existing_by_asset_id.get(mutation.assetId)
+        if mutation.decision is None:
+            if existing is not None:
+                repo.delete_publish_selection(existing)
+            continue
+        if existing is None:
+            repo.create_publish_selection(
+                org_id=auth.org_id,
+                campaign_id=str(campaign.id),
+                asset_id=mutation.assetId,
+                generation_key=payload.generationKey,
+                decision=mutation.decision,
+                decided_by_user_id=auth.user_id,
+                metadata_json={},
+            )
+            continue
+        repo.update_publish_selection(
+            existing,
+            decision=mutation.decision,
+            decided_by_user_id=auth.user_id,
+        )
+
+    records = repo.list_publish_selections(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+        generation_key=payload.generationKey,
+    )
+    return [_publish_selection_response(record) for record in records]
 
 
 @router.get("/pipeline/assets")

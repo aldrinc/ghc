@@ -1827,6 +1827,38 @@ class ClientComplianceProfile(Base):
     )
 
 
+class MetaPublishSelection(Base):
+    __tablename__ = "meta_publish_selections"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "campaign_id",
+            "generation_key",
+            "asset_id",
+            name="uq_meta_publish_selections_org_campaign_generation_asset",
+        ),
+        sa.Index("idx_meta_publish_selections_org_campaign_generation", "org_id", "campaign_id", "generation_key"),
+        sa.Index("idx_meta_publish_selections_org_asset", "org_id", "asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    generation_key: Mapped[str] = mapped_column(Text, nullable=False)
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    decided_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PaidAdsPlatformProfile(Base):
     __tablename__ = "paid_ads_platform_profiles"
     __table_args__ = (
