@@ -239,7 +239,7 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -447,7 +447,7 @@ def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exis
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -652,7 +652,7 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id], "generationBatchId": "batch-selected"},
+        json={"assetBriefIds": [brief_id], "generationBatchId": "batch-selected", "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -779,7 +779,7 @@ def test_campaign_meta_review_setup_normalizes_human_destination_labels(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
 
@@ -792,6 +792,174 @@ def test_campaign_meta_review_setup_normalizes_human_destination_labels(
     assert creative_spec is not None
     assert creative_spec.destination_url.endswith("/pre-sales")
     assert creative_spec.metadata_json["destinationPage"] == "pre-sales"
+
+
+def test_campaign_meta_review_setup_requires_explicit_funnel_for_multi_funnel_selection(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-multi-funnel")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    first_funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="First Meta Funnel",
+        route_slug="first-meta-funnel",
+    )
+    second_funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Second Meta Funnel",
+        route_slug="second-meta-funnel",
+    )
+    db_session.add_all([first_funnel, second_funnel])
+    db_session.commit()
+    db_session.refresh(first_funnel)
+    db_session.refresh(second_funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=first_funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=second_funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+        ]
+    )
+    db_session.commit()
+
+    first_brief_id = "brief-multi-funnel-first"
+    second_brief_id = "brief-multi-funnel-second"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": first_brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(first_funnel.id),
+                    "experimentId": "exp-multi-funnel-first",
+                    "variantId": "variant_multi_funnel_first",
+                    "variantName": "First Funnel Variant",
+                    "requirements": [{"channel": "facebook", "format": "image_ad", "funnelStage": "top-of-funnel"}],
+                },
+                {
+                    "id": second_brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(second_funnel.id),
+                    "experimentId": "exp-multi-funnel-second",
+                    "variantId": "variant_multi_funnel_second",
+                    "variantName": "Second Funnel Variant",
+                    "requirements": [{"channel": "facebook", "format": "image_ad", "funnelStage": "top-of-funnel"}],
+                },
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+    first_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=first_funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": first_brief_id},
+        storage_key="creative/meta-review-multi-funnel-first.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": first_brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-multi-funnel",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="First funnel angle.",
+                hook="First funnel hook.",
+                primary_text="First funnel primary text.",
+                headline="First funnel headline",
+                description="First funnel description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="first.png",
+                source_url="https://example.com/swipes/first.png",
+                angle_used="First funnel angle.",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    second_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=second_funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": second_brief_id},
+        storage_key="creative/meta-review-multi-funnel-second.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": second_brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-multi-funnel",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Second funnel angle.",
+                hook="Second funnel hook.",
+                primary_text="Second funnel primary text.",
+                headline="Second funnel headline",
+                description="Second funnel description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="second.png",
+                source_url="https://example.com/swipes/second.png",
+                angle_used="Second funnel angle.",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    db_session.add_all([first_asset, second_asset])
+    db_session.commit()
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [first_brief_id, second_brief_id]},
+    )
+    assert setup_resp.status_code == 409
+    assert setup_resp.json()["detail"] == {
+        "message": "Selected asset briefs span multiple funnels. Pick one funnel in the Meta ads tab before preparing review.",
+        "selectedAssetBriefIds": [first_brief_id, second_brief_id],
+        "availableFunnelIds": sorted([str(first_funnel.id), str(second_funnel.id)]),
+    }
 
 
 def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
@@ -903,7 +1071,7 @@ def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 409
     payload = setup_resp.json()["detail"]

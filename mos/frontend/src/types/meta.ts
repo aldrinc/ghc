@@ -134,6 +134,7 @@ export type MetaPublishPlanValidation = {
 
 export type MetaPublishRunRequest = {
   generationKey: string;
+  funnelId?: string | null;
   publishBaseUrl: string;
   campaignName: string;
   campaignObjective: string;

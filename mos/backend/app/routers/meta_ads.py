@@ -61,7 +61,12 @@ from app.services.image_metadata import (
 )
 from app.services.media_storage import MediaStorage
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
-from app.services.meta_review import asset_generation_key
+from app.services.meta_review import (
+    asset_funnel_id_from_briefs,
+    asset_generation_key,
+    collect_asset_funnel_ids,
+    load_campaign_asset_brief_map,
+)
 from app.services.meta_media_buying import (
     MetaCutRuleConfig,
     MetaEventMappings,
@@ -205,6 +210,7 @@ def _resolve_generation_assets(
     *,
     campaign: Campaign,
     generation_key: str,
+    funnel_id: str | None,
     auth: AuthContext,
     session: Session,
 ) -> list[Asset]:
@@ -212,7 +218,20 @@ def _resolve_generation_assets(
         org_id=auth.org_id,
         campaign_id=str(campaign.id),
     )
-    return [asset for asset in assets if _asset_generation_key(asset) == generation_key]
+    generation_assets = [asset for asset in assets if _asset_generation_key(asset) == generation_key]
+    if not funnel_id:
+        return generation_assets
+    brief_map = load_campaign_asset_brief_map(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        session=session,
+    )
+    return [
+        asset
+        for asset in generation_assets
+        if asset_funnel_id_from_briefs(asset, brief_map=brief_map) == funnel_id
+    ]
 
 
 def _publish_selection_response(record: Any) -> MetaPublishSelectionResponse:
@@ -298,11 +317,40 @@ def _validate_publish_plan(
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]]]:
     meta_repo = MetaAdsRepository(session)
-    generation_assets = _resolve_generation_assets(
+    all_generation_assets = _resolve_generation_assets(
         campaign=campaign,
         generation_key=payload.generationKey,
+        funnel_id=None,
         auth=auth,
         session=session,
+    )
+    brief_map = load_campaign_asset_brief_map(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        session=session,
+    )
+    generation_funnel_ids = collect_asset_funnel_ids(assets=all_generation_assets, brief_map=brief_map)
+    resolved_funnel_id = _clean_optional_text(payload.funnelId)
+
+    blockers: list[str] = []
+    if resolved_funnel_id is None and len(generation_funnel_ids) > 1:
+        blockers.append(
+            "Publish validation requires an explicit funnel when the selected generation spans multiple funnels."
+        )
+    if resolved_funnel_id and generation_funnel_ids and resolved_funnel_id not in generation_funnel_ids:
+        blockers.append("The requested funnel has no generated assets in the selected publish generation.")
+    if resolved_funnel_id is None and len(generation_funnel_ids) == 1:
+        resolved_funnel_id = next(iter(generation_funnel_ids))
+
+    generation_assets = (
+        [
+            asset
+            for asset in all_generation_assets
+            if asset_funnel_id_from_briefs(asset, brief_map=brief_map) == resolved_funnel_id
+        ]
+        if resolved_funnel_id
+        else all_generation_assets
     )
     excluded_asset_ids = {
         str(selection.asset_id)
@@ -314,10 +362,11 @@ def _validate_publish_plan(
         )
     }
     selected_assets = [asset for asset in generation_assets if str(asset.id) not in excluded_asset_ids]
-
-    blockers: list[str] = []
     if not generation_assets:
-        blockers.append("No campaign assets were found for this publish generation.")
+        if resolved_funnel_id:
+            blockers.append("No campaign assets were found for this funnel in the selected publish generation.")
+        else:
+            blockers.append("No campaign assets were found for this publish generation.")
     elif not selected_assets:
         blockers.append("All creatives are excluded from the final Meta package for this generation.")
 
@@ -1417,7 +1466,10 @@ def create_meta_publish_run(
         meta_campaign_id=None,
         created_by_user_id=auth.user_id,
         error_message=None,
-        metadata_json={"validation": validation_response.model_dump(mode="json")},
+        metadata_json={
+            "validation": validation_response.model_dump(mode="json"),
+            "funnelId": _clean_optional_text(payload.funnelId),
+        },
         completed_at=None,
     )
 

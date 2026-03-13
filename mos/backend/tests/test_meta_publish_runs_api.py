@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import io
+from uuid import uuid4
 
 from PIL import Image
 
-from app.db.enums import AssetSourceEnum, AssetStatusEnum
-from app.db.models import Asset, MetaAdSetSpec, MetaCreativeSpec
+from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
+from app.db.models import Artifact, Asset, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import meta_ads as meta_ads_router
 from app.services.paid_ads_qa import RULESET_VERSION
 
@@ -54,6 +55,7 @@ def _create_asset(
     campaign_id: str,
     batch_id: str,
     suffix: str,
+    asset_brief_id: str,
 ) -> Asset:
     content = _jpeg_bytes()
     asset = Asset(
@@ -74,12 +76,47 @@ def _create_asset(
         height=16,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": batch_id},
+        ai_metadata={"creativeGenerationBatchId": batch_id, "assetBriefId": asset_brief_id},
     )
     db_session.add(asset)
     db_session.commit()
     db_session.refresh(asset)
     return asset
+
+
+def _create_funnel_scoped_brief(
+    db_session,
+    *,
+    client_id: str,
+    campaign_id: str,
+    brief_id: str,
+    funnel_id: str,
+) -> None:
+    brief_artifact = Artifact(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": funnel_id,
+                    "experimentId": f"exp-{brief_id}",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
 
 
 def _create_meta_publish_inputs(
@@ -159,6 +196,15 @@ def _exclude_asset_from_publish(api_client, *, campaign_id: str, generation_key:
 
 def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-validate")
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-validate"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
     asset = _create_asset(
         db_session,
         client_id=client_id,
@@ -166,6 +212,7 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
         campaign_id=campaign_id,
         batch_id="latest-run",
         suffix="publish-validate",
+        asset_brief_id=brief_id,
     )
     _create_meta_publish_inputs(
         db_session,
@@ -180,6 +227,7 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
         f"/meta/campaigns/{campaign_id}/publish-plan/validate",
         json={
             "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
             "publishBaseUrl": "https://shop.thehonestherbalist.com",
             "campaignName": "Honest Herbalist Launch",
             "campaignObjective": "OUTCOME_SALES",
@@ -195,6 +243,15 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
 
 def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_client, db_session) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-all-excluded")
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-all-excluded"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
     asset = _create_asset(
         db_session,
         client_id=client_id,
@@ -202,6 +259,7 @@ def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_clie
         campaign_id=campaign_id,
         batch_id="latest-run",
         suffix="publish-all-excluded",
+        asset_brief_id=brief_id,
     )
     _create_meta_publish_inputs(
         db_session,
@@ -222,6 +280,7 @@ def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_clie
         f"/meta/campaigns/{campaign_id}/publish-plan/validate",
         json={
             "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
             "publishBaseUrl": "https://shop.thehonestherbalist.com",
             "campaignName": "Honest Herbalist Launch",
             "campaignObjective": "OUTCOME_SALES",
@@ -236,8 +295,83 @@ def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_clie
     assert payload["items"] == []
 
 
+def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-funnel-scope")
+    funnel_id = str(uuid4())
+    other_funnel_id = str(uuid4())
+    brief_id = "brief-publish-funnel-scope"
+    other_brief_id = "brief-publish-funnel-scope-other"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=other_brief_id,
+        funnel_id=other_funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-funnel-scope",
+        asset_brief_id=brief_id,
+    )
+    _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-funnel-scope-other",
+        asset_brief_id=other_brief_id,
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-funnel-scope",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["includedCount"] == 1
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["assetId"] == str(asset.id)
+
+
 def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_session, monkeypatch) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-run")
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-run"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
     asset = _create_asset(
         db_session,
         client_id=client_id,
@@ -245,6 +379,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         campaign_id=campaign_id,
         batch_id="latest-run",
         suffix="publish-run",
+        asset_brief_id=brief_id,
     )
     _create_meta_publish_inputs(
         db_session,
@@ -293,6 +428,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         f"/meta/campaigns/{campaign_id}/publish-runs",
         json={
             "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
             "publishBaseUrl": "https://shop.thehonestherbalist.com",
             "campaignName": "Honest Herbalist Launch",
             "campaignObjective": "OUTCOME_SALES",

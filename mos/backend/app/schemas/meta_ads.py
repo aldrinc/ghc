@@ -118,6 +118,7 @@ class MetaAdSetSpecCreateRequest(BaseModel):
 class CampaignMetaReviewSetupRequest(BaseModel):
     assetBriefIds: list[str] = Field(default_factory=list)
     generationBatchId: str | None = None
+    funnelId: str | None = None
 
     @field_validator("assetBriefIds")
     @classmethod
@@ -143,6 +144,15 @@ class CampaignMetaReviewSetupRequest(BaseModel):
             return None
         if not isinstance(value, str) or not value.strip():
             raise ValueError("generationBatchId must be a non-empty string when provided.")
+        return value.strip()
+
+    @field_validator("funnelId")
+    @classmethod
+    def _validate_funnel_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("funnelId must be a non-empty string when provided.")
         return value.strip()
 
 
@@ -215,6 +225,7 @@ class MetaAdSetSpecUpdateRequest(BaseModel):
 
 class MetaPublishRunRequest(BaseModel):
     generationKey: str
+    funnelId: str | None = None
     publishBaseUrl: str
     campaignName: str
     campaignObjective: str
@@ -226,6 +237,15 @@ class MetaPublishRunRequest(BaseModel):
     def _validate_publish_generation_key(cls, value: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError("generationKey must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("funnelId")
+    @classmethod
+    def _validate_publish_funnel_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("funnelId must be a non-empty string when provided.")
         return value.strip()
 
     @field_validator("publishBaseUrl")

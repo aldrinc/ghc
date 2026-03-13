@@ -23,7 +23,12 @@ from app.schemas.paid_ads_qa import (
     PaidAdsRulesetResponse,
     PaidAdsRulesetSummaryResponse,
 )
-from app.services.meta_review import select_assets_for_generation
+from app.services.meta_review import (
+    asset_funnel_id_from_briefs,
+    collect_asset_funnel_ids,
+    load_campaign_asset_brief_map,
+    select_assets_for_generation,
+)
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -424,6 +429,42 @@ def run_campaign_paid_ads_qa(
         campaign_ready_assets,
         generation_key=clean_optional_text(payload.generationKey),
     )
+    brief_map = load_campaign_asset_brief_map(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        session=session,
+    )
+    generation_funnel_ids = collect_asset_funnel_ids(assets=ready_assets, brief_map=brief_map)
+    requested_funnel_id = clean_optional_text(payload.funnelId)
+    if requested_funnel_id is None and len(generation_funnel_ids) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Meta QA requires an explicit funnel when the selected generation spans multiple funnels.",
+                "generationKey": selected_generation_key,
+                "availableFunnelIds": sorted(generation_funnel_ids),
+            },
+        )
+    if requested_funnel_id and generation_funnel_ids and requested_funnel_id not in generation_funnel_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "The requested funnel has no generated assets in the selected Meta QA generation.",
+                "generationKey": selected_generation_key,
+                "requestedFunnelId": requested_funnel_id,
+                "availableFunnelIds": sorted(generation_funnel_ids),
+            },
+        )
+    resolved_funnel_id = requested_funnel_id
+    if resolved_funnel_id is None and len(generation_funnel_ids) == 1:
+        resolved_funnel_id = next(iter(generation_funnel_ids))
+    if resolved_funnel_id:
+        ready_assets = [
+            asset
+            for asset in ready_assets
+            if asset_funnel_id_from_briefs(asset, brief_map=brief_map) == resolved_funnel_id
+        ]
     ready_asset_ids = {str(asset.id) for asset in ready_assets}
     creative_specs = _filter_creative_specs_to_generation(
         creative_specs=meta_repo.list_creative_specs(org_id=auth.org_id, campaign_id=str(campaign.id)),
@@ -441,6 +482,7 @@ def run_campaign_paid_ads_qa(
     assessment["metadata"]["generationKey"] = selected_generation_key
     assessment["metadata"]["requestedGenerationKey"] = clean_optional_text(payload.generationKey)
     assessment["metadata"]["generationAssetIds"] = sorted(ready_asset_ids)
+    assessment["metadata"]["funnelId"] = resolved_funnel_id
     summary = summarize_findings(assessment["findings"])
     status_value = derive_run_status(assessment["findings"])
     run_uuid = uuid4()

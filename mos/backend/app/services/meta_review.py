@@ -3,6 +3,11 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
+from sqlalchemy.orm import Session
+
+from app.db.enums import ArtifactTypeEnum
+from app.db.repositories.artifacts import ArtifactsRepository
+
 
 _DESTINATION_TOKEN_RE = re.compile(r"[^a-z0-9]+")
 _DESTINATION_ALIASES = {
@@ -33,6 +38,98 @@ def clean_optional_text(value: Any) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def load_campaign_asset_brief_map(
+    *,
+    org_id: str,
+    client_id: str,
+    campaign_id: str,
+    session: Session,
+) -> dict[str, dict]:
+    artifacts_repo = ArtifactsRepository(session)
+    brief_artifacts = artifacts_repo.list(
+        org_id=org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.asset_brief,
+        limit=200,
+    )
+    brief_map: dict[str, dict] = {}
+    for artifact in brief_artifacts:
+        data = artifact.data if isinstance(artifact.data, dict) else {}
+        briefs = data.get("asset_briefs") or data.get("assetBriefs") or []
+        if not isinstance(briefs, list):
+            continue
+        for brief in briefs:
+            if not isinstance(brief, dict):
+                continue
+            brief_id = clean_optional_text(brief.get("id"))
+            if brief_id and brief_id not in brief_map:
+                brief_map[brief_id] = brief
+    return brief_map
+
+
+def brief_funnel_id(brief: Any) -> str | None:
+    if not isinstance(brief, dict):
+        return None
+    return clean_optional_text(brief.get("funnelId"))
+
+
+def asset_brief_id(asset: Any) -> str | None:
+    metadata_json = asset.ai_metadata if isinstance(getattr(asset, "ai_metadata", None), dict) else {}
+    return clean_optional_text(metadata_json.get("assetBriefId"))
+
+
+def asset_funnel_id_from_briefs(
+    asset: Any,
+    *,
+    brief_map: dict[str, dict],
+) -> str | None:
+    brief_id = asset_brief_id(asset)
+    if not brief_id:
+        return None
+    return brief_funnel_id(brief_map.get(brief_id))
+
+
+def filter_assets_for_funnel_scope(
+    assets: Iterable[Any],
+    *,
+    brief_map: dict[str, dict],
+    funnel_id: str,
+) -> list[Any]:
+    cleaned_funnel_id = clean_optional_text(funnel_id)
+    if not cleaned_funnel_id:
+        return []
+    return [
+        asset
+        for asset in assets
+        if asset_funnel_id_from_briefs(asset, brief_map=brief_map) == cleaned_funnel_id
+    ]
+
+
+def collect_brief_funnel_ids(
+    *,
+    brief_map: dict[str, dict],
+    brief_ids: Iterable[str],
+) -> set[str]:
+    return {
+        funnel_id
+        for funnel_id in (brief_funnel_id(brief_map.get(brief_id)) for brief_id in brief_ids)
+        if funnel_id
+    }
+
+
+def collect_asset_funnel_ids(
+    *,
+    assets: Iterable[Any],
+    brief_map: dict[str, dict],
+) -> set[str]:
+    return {
+        funnel_id
+        for funnel_id in (asset_funnel_id_from_briefs(asset, brief_map=brief_map) for asset in assets)
+        if funnel_id
+    }
 
 
 def asset_generation_key(asset: Any) -> str:

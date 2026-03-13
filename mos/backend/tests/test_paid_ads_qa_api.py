@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
-from app.db.enums import AssetSourceEnum, AssetStatusEnum
-from app.db.models import Asset, Campaign, MetaAdSetSpec, MetaCreativeSpec
+from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
+from app.db.models import Artifact, Asset, Campaign, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import paid_ads_qa as paid_ads_qa_router
 from app.services import paid_ads_qa as paid_ads_qa_service
 from app.services.paid_ads_qa import RULESET_VERSION
@@ -106,15 +107,68 @@ def _mock_hydrated_graph_refresh(monkeypatch, *, overrides: dict | None = None) 
     )
 
 
+def _create_funnel_scoped_brief(
+    *,
+    db_session,
+    campaign: Campaign,
+    client_id: str,
+    brief_id: str,
+    funnel_id: str,
+) -> None:
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=str(campaign.id),
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": str(campaign.id),
+                    "clientId": client_id,
+                    "funnelId": funnel_id,
+                    "experimentId": f"exp-{brief_id}",
+                    "requirements": [{"channel": "facebook", "format": "image_ad"}],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+
 def _seed_campaign_ready_meta_objects(
     *,
     db_session,
     client_id: str,
     product_id: str,
     campaign_id: str,
+    brief_id: str = "brief-campaign-history",
+    funnel_id: str | None = None,
 ) -> None:
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
+    resolved_funnel_id = funnel_id or str(uuid4())
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": resolved_funnel_id,
+                    "experimentId": "exp-campaign-history",
+                    "requirements": [{"channel": "facebook", "format": "image_ad"}],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
 
     asset = Asset(
         org_id=campaign.org_id,
@@ -134,7 +188,7 @@ def _seed_campaign_ready_meta_objects(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={},
+        ai_metadata={"assetBriefId": brief_id},
     )
     db_session.add(asset)
     db_session.commit()
@@ -282,6 +336,15 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
+    funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
 
     asset = Asset(
         org_id=campaign.org_id,
@@ -301,7 +364,7 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={},
+        ai_metadata={"assetBriefId": brief_id},
     )
     db_session.add(asset)
     db_session.commit()
@@ -332,7 +395,7 @@ def test_meta_campaign_paid_ads_qa_evaluates_copy_and_landing_page(
 
     run_resp = api_client.post(
         f"/campaigns/{campaign_id}/paid-ads-qa/runs",
-        json={"platform": "meta", "rulesetVersion": RULESET_VERSION},
+        json={"platform": "meta", "rulesetVersion": RULESET_VERSION, "funnelId": funnel_id},
     )
     assert run_resp.status_code == 200
     run_payload = run_resp.json()
@@ -382,23 +445,30 @@ def test_meta_campaign_paid_ads_qa_lists_previous_runs(
         },
     )
 
+    funnel_id = str(uuid4())
     _seed_campaign_ready_meta_objects(
         db_session=db_session,
         client_id=client_id,
         product_id=product_id,
         campaign_id=campaign_id,
+        funnel_id=funnel_id,
     )
 
     first_run_resp = api_client.post(
         f"/campaigns/{campaign_id}/paid-ads-qa/runs",
-        json={"platform": "meta", "rulesetVersion": RULESET_VERSION},
+        json={"platform": "meta", "rulesetVersion": RULESET_VERSION, "funnelId": funnel_id},
     )
     assert first_run_resp.status_code == 200
     first_run = first_run_resp.json()
 
     second_run_resp = api_client.post(
         f"/campaigns/{campaign_id}/paid-ads-qa/runs",
-        json={"platform": "meta", "rulesetVersion": RULESET_VERSION, "reviewBaseUrl": "http://localhost:5275"},
+        json={
+            "platform": "meta",
+            "rulesetVersion": RULESET_VERSION,
+            "reviewBaseUrl": "http://localhost:5275",
+            "funnelId": funnel_id,
+        },
     )
     assert second_run_resp.status_code == 200
     second_run = second_run_resp.json()
@@ -448,6 +518,23 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
+    funnel_id = str(uuid4())
+    older_brief_id = "brief-campaign-qa-generation-older"
+    latest_brief_id = "brief-campaign-qa-generation-latest"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=older_brief_id,
+        funnel_id=funnel_id,
+    )
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=latest_brief_id,
+        funnel_id=funnel_id,
+    )
 
     older_asset = Asset(
         org_id=campaign.org_id,
@@ -467,7 +554,7 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-older"},
+        ai_metadata={"creativeGenerationBatchId": "batch-older", "assetBriefId": older_brief_id},
         created_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     latest_asset = Asset(
@@ -488,7 +575,7 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={"creativeGenerationBatchId": "batch-latest"},
+        ai_metadata={"creativeGenerationBatchId": "batch-latest", "assetBriefId": latest_brief_id},
         created_at=datetime.now(timezone.utc),
     )
     db_session.add_all([older_asset, latest_asset])
@@ -524,6 +611,7 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
             "platform": "meta",
             "rulesetVersion": RULESET_VERSION,
             "reviewBaseUrl": "http://localhost:5275",
+            "funnelId": funnel_id,
         },
     )
     assert run_resp.status_code == 200
@@ -531,6 +619,146 @@ def test_meta_campaign_paid_ads_qa_defaults_to_latest_generation_scope(
     assert run_payload["status"] == "passed"
     assert run_payload["metadata"]["generationKey"] == "batch:batch-latest"
     assert run_payload["metadata"]["readyAssetCount"] == 1
+    assert run_payload["findings"] == []
+
+
+def test_meta_campaign_paid_ads_qa_scopes_generation_to_requested_funnel(
+    api_client,
+    db_session,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="campaign-qa-funnel-scope")
+    _mock_passthrough_graph_refresh(monkeypatch)
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert profile_resp.status_code == 200
+
+    report_path = tmp_path / "campaign-funnel-scope-report.md"
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "write_report_file",
+        lambda **_kwargs: str(report_path),
+    )
+    monkeypatch.setattr(
+        paid_ads_qa_service,
+        "_landing_page_snapshot",
+        lambda url: {
+            "requestedUrl": url,
+            "finalUrl": url,
+            "statusCode": 200,
+            "bodyText": "Privacy Policy. Contact support@example.com",
+        },
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    funnel_id = str(uuid4())
+    other_funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa-funnel-scope"
+    other_brief_id = "brief-campaign-qa-funnel-scope-other"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=other_brief_id,
+        funnel_id=other_funnel_id,
+    )
+
+    scoped_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.qa_passed,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"kind": "creative"},
+        storage_key="creative/campaign-qa-funnel-scope.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={"creativeGenerationBatchId": "batch-funnel-scope", "assetBriefId": brief_id},
+        created_at=datetime.now(timezone.utc),
+    )
+    other_funnel_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.qa_passed,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"kind": "creative"},
+        storage_key="creative/campaign-qa-funnel-scope-other.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={"creativeGenerationBatchId": "batch-funnel-scope", "assetBriefId": other_brief_id},
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([scoped_asset, other_funnel_asset])
+    db_session.commit()
+    db_session.refresh(scoped_asset)
+
+    creative_spec = MetaCreativeSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        asset_id=scoped_asset.id,
+        name="Scoped Funnel Creative",
+        primary_text="Compliant scoped-funnel copy.",
+        headline="Scoped funnel headline",
+        description="Compliant scoped-funnel description.",
+        call_to_action_type="Learn More",
+        destination_url="https://example.com/offer",
+        status="draft",
+        metadata_json={},
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        name="Scoped Funnel Ad Set",
+        status="draft",
+        metadata_json={},
+    )
+    db_session.add_all([creative_spec, adset_spec])
+    db_session.commit()
+
+    run_resp = api_client.post(
+        f"/campaigns/{campaign_id}/paid-ads-qa/runs",
+        json={
+            "platform": "meta",
+            "rulesetVersion": RULESET_VERSION,
+            "reviewBaseUrl": "http://localhost:5275",
+            "generationKey": "batch:batch-funnel-scope",
+            "funnelId": funnel_id,
+        },
+    )
+    assert run_resp.status_code == 200
+    run_payload = run_resp.json()
+    assert run_payload["status"] == "passed"
+    assert run_payload["metadata"]["readyAssetCount"] == 1
+    assert run_payload["metadata"]["funnelId"] == funnel_id
     assert run_payload["findings"] == []
 
 
@@ -568,6 +796,15 @@ def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
+    funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa-relative"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
 
     asset = Asset(
         org_id=campaign.org_id,
@@ -587,7 +824,7 @@ def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={},
+        ai_metadata={"assetBriefId": brief_id},
     )
     db_session.add(asset)
     db_session.commit()
@@ -625,6 +862,7 @@ def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_
             "platform": "meta",
             "rulesetVersion": RULESET_VERSION,
             "reviewBaseUrl": "http://localhost:5275",
+            "funnelId": funnel_id,
         },
     )
     assert run_resp.status_code == 200
@@ -663,6 +901,15 @@ def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
+    funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa-live-refresh"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
 
     asset = Asset(
         org_id=campaign.org_id,
@@ -682,7 +929,7 @@ def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(
         height=1080,
         file_source="ai",
         file_status="ready",
-        ai_metadata={},
+        ai_metadata={"assetBriefId": brief_id},
     )
     db_session.add(asset)
     db_session.commit()
@@ -713,7 +960,7 @@ def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(
 
     run_resp = api_client.post(
         f"/campaigns/{campaign_id}/paid-ads-qa/runs",
-        json={"platform": "meta", "rulesetVersion": RULESET_VERSION},
+        json={"platform": "meta", "rulesetVersion": RULESET_VERSION, "funnelId": funnel_id},
     )
     assert run_resp.status_code == 200
     run_payload = run_resp.json()

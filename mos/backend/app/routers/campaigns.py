@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
-from app.db.enums import ArtifactTypeEnum, WorkflowStatusEnum
+from app.db.enums import WorkflowStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, WorkflowRun
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
@@ -27,6 +27,9 @@ from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdate
 from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
 from app.services.meta_review import (
     asset_generation_key,
+    brief_funnel_id,
+    collect_brief_funnel_ids,
+    load_campaign_asset_brief_map,
     normalize_meta_review_destination_page,
     resolve_meta_review_destination_url,
     select_assets_for_generation,
@@ -69,36 +72,6 @@ def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
         if member is not None:
             mapping[member] = internal_status
     return mapping
-
-
-def _load_campaign_asset_brief_map(
-    *,
-    org_id: str,
-    client_id: str,
-    campaign_id: str,
-    session: Session,
-) -> dict[str, dict]:
-    artifacts_repo = ArtifactsRepository(session)
-    brief_artifacts = artifacts_repo.list(
-        org_id=org_id,
-        client_id=client_id,
-        campaign_id=campaign_id,
-        artifact_type=ArtifactTypeEnum.asset_brief,
-        limit=200,
-    )
-    brief_map: dict[str, dict] = {}
-    for artifact in brief_artifacts:
-        data = artifact.data if isinstance(artifact.data, dict) else {}
-        briefs = data.get("asset_briefs") or data.get("assetBriefs") or []
-        if not isinstance(briefs, list):
-            continue
-        for brief in briefs:
-            if not isinstance(brief, dict):
-                continue
-            brief_id = brief.get("id")
-            if isinstance(brief_id, str) and brief_id.strip() and brief_id.strip() not in brief_map:
-                brief_map[brief_id.strip()] = brief
-    return brief_map
 
 
 def _select_assets_for_meta_review(
@@ -733,7 +706,7 @@ def setup_campaign_meta_review(
             detail="Campaign is missing a product_id. Attach a product before setting up Meta review.",
         )
 
-    brief_map = _load_campaign_asset_brief_map(
+    brief_map = load_campaign_asset_brief_map(
         org_id=auth.org_id,
         client_id=str(campaign.client_id),
         campaign_id=str(campaign.id),
@@ -753,6 +726,52 @@ def setup_campaign_meta_review(
             detail={
                 "message": "Some asset briefs were not found for this campaign.",
                 "missingAssetBriefIds": missing_brief_ids,
+            },
+        )
+    requested_funnel_id = brief_funnel_id({"funnelId": payload.funnelId}) if payload.funnelId else None
+    selected_brief_funnel_ids = collect_brief_funnel_ids(brief_map=brief_map, brief_ids=selected_brief_ids)
+    if not requested_funnel_id:
+        if not selected_brief_funnel_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Selected asset briefs are missing funnel scope. Meta review must run for one explicit funnel.",
+                    "selectedAssetBriefIds": selected_brief_ids,
+                },
+            )
+        if len(selected_brief_funnel_ids) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Selected asset briefs span multiple funnels. Pick one funnel in the Meta ads tab before preparing review.",
+                    "selectedAssetBriefIds": selected_brief_ids,
+                    "availableFunnelIds": sorted(selected_brief_funnel_ids),
+                },
+            )
+        requested_funnel_id = next(iter(selected_brief_funnel_ids))
+    missing_funnel_brief_ids = [
+        brief_id for brief_id in selected_brief_ids if not brief_funnel_id(brief_map.get(brief_id))
+    ]
+    if missing_funnel_brief_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Some selected asset briefs are missing funnelId. Meta review must run for one explicit funnel.",
+                "invalidAssetBriefIds": missing_funnel_brief_ids,
+            },
+        )
+    mismatched_funnel_brief_ids = [
+        brief_id
+        for brief_id in selected_brief_ids
+        if brief_funnel_id(brief_map.get(brief_id)) != requested_funnel_id
+    ]
+    if mismatched_funnel_brief_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Some selected asset briefs do not belong to the requested funnel.",
+                "requestedFunnelId": requested_funnel_id,
+                "invalidAssetBriefIds": mismatched_funnel_brief_ids,
             },
         )
 
@@ -787,17 +806,20 @@ def setup_campaign_meta_review(
             },
         )
 
-    funnel_ids = {
-        str(brief.get("funnelId")).strip()
-        for brief in (brief_map[brief_id] for brief_id in selected_brief_ids)
-        if isinstance(brief.get("funnelId"), str) and brief.get("funnelId").strip()
-    }
     review_paths_by_funnel_id = _resolve_funnel_review_paths(
         org_id=auth.org_id,
         product_id=str(campaign.product_id),
-        funnel_ids=funnel_ids,
+        funnel_ids={requested_funnel_id},
         session=session,
     )
+    if not review_paths_by_funnel_id.get(requested_funnel_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "The selected funnel has no review pages configured for Meta review.",
+                "funnelId": requested_funnel_id,
+            },
+        )
 
     meta_repo = MetaAdsRepository(session)
     existing_creative_specs = {
@@ -858,10 +880,7 @@ def setup_campaign_meta_review(
                 detail=f"Asset brief '{brief_id}' has no requirements.",
             )
 
-        review_paths = {}
-        raw_funnel_id = brief.get("funnelId")
-        if isinstance(raw_funnel_id, str) and raw_funnel_id.strip():
-            review_paths = review_paths_by_funnel_id.get(raw_funnel_id.strip(), {})
+        review_paths = review_paths_by_funnel_id.get(requested_funnel_id, {})
 
         for asset in assets_by_brief_id[brief_id]:
             metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
@@ -986,7 +1005,7 @@ def setup_campaign_meta_review(
                 "reviewPaths": review_paths,
                 "variantId": brief.get("variantId"),
                 "variantName": brief.get("variantName"),
-                "funnelId": raw_funnel_id,
+                "funnelId": requested_funnel_id,
                 "destinationPage": normalized_destination_page,
                 "angleUsed": angle_used.strip(),
             }
@@ -1030,6 +1049,7 @@ def setup_campaign_meta_review(
                         "assetId": str(asset.id),
                         "assetBriefId": brief_id,
                         "generationKey": asset_generation_key(asset),
+                        "funnelId": requested_funnel_id,
                         "destinationPage": destination_page.strip(),
                         "normalizedDestinationPage": normalized_destination_page,
                         "issues": asset_issues,

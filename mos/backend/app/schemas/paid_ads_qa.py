@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PaidAdsPlatformLiteral = Literal["meta", "tiktok"]
 PaidAdsSeverityLiteral = Literal["blocker", "high", "medium", "low"]
@@ -129,6 +129,16 @@ class PaidAdsQaRunRequest(BaseModel):
     rulesetVersion: str
     reviewBaseUrl: str | None = None
     generationKey: str | None = None
+    funnelId: str | None = None
+
+    @field_validator("funnelId")
+    @classmethod
+    def _validate_funnel_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("funnelId must be a non-empty string when provided.")
+        return value.strip()
 
 
 class PaidAdsQaFindingResponse(BaseModel):
