@@ -89,37 +89,37 @@ def test_meta_publish_selection_lifecycle_is_generation_scoped(api_client, db_se
         batch_id="latest-run",
         suffix="latest-2",
     )
+    older_campaign_asset = _create_asset(
+        db_session,
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="older-run",
+        suffix="older",
+    )
 
     save_resp = api_client.put(
         f"/meta/campaigns/{campaign_id}/publish-selections",
         json={
             "generationKey": batch_key,
-            "decisions": [
-                {"assetId": str(campaign_asset.id), "decision": "included"},
-                {"assetId": str(second_campaign_asset.id), "decision": "excluded"},
-            ],
+            "decisions": [{"assetId": str(second_campaign_asset.id), "decision": "excluded"}],
         },
     )
     assert save_resp.status_code == 200
     save_payload = save_resp.json()
-    assert {entry["assetId"]: entry["decision"] for entry in save_payload} == {
-        str(campaign_asset.id): "included",
-        str(second_campaign_asset.id): "excluded",
-    }
+    assert {entry["assetId"]: entry["decision"] for entry in save_payload} == {str(second_campaign_asset.id): "excluded"}
     assert {entry["decidedByUserId"] for entry in save_payload} == {"test-user"}
 
     list_resp = api_client.get(f"/meta/campaigns/{campaign_id}/publish-selections?generationKey={batch_key}")
     assert list_resp.status_code == 200
-    assert {entry["assetId"]: entry["decision"] for entry in list_resp.json()} == {
-        str(campaign_asset.id): "included",
-        str(second_campaign_asset.id): "excluded",
-    }
+    assert {entry["assetId"]: entry["decision"] for entry in list_resp.json()} == {str(second_campaign_asset.id): "excluded"}
 
     older_save_resp = api_client.put(
         f"/meta/campaigns/{campaign_id}/publish-selections",
         json={
             "generationKey": older_batch_key,
-            "decisions": [{"assetId": str(campaign_asset.id), "decision": "excluded"}],
+            "decisions": [{"assetId": str(older_campaign_asset.id), "decision": "excluded"}],
         },
     )
     assert older_save_resp.status_code == 200
@@ -128,10 +128,7 @@ def test_meta_publish_selection_lifecycle_is_generation_scoped(api_client, db_se
 
     list_latest_resp = api_client.get(f"/meta/campaigns/{campaign_id}/publish-selections?generationKey={batch_key}")
     assert list_latest_resp.status_code == 200
-    assert {entry["assetId"]: entry["decision"] for entry in list_latest_resp.json()} == {
-        str(campaign_asset.id): "included",
-        str(second_campaign_asset.id): "excluded",
-    }
+    assert {entry["assetId"]: entry["decision"] for entry in list_latest_resp.json()} == {str(second_campaign_asset.id): "excluded"}
 
     clear_resp = api_client.put(
         f"/meta/campaigns/{campaign_id}/publish-selections",
@@ -141,16 +138,51 @@ def test_meta_publish_selection_lifecycle_is_generation_scoped(api_client, db_se
         },
     )
     assert clear_resp.status_code == 200
-    clear_payload = clear_resp.json()
-    assert len(clear_payload) == 1
-    assert clear_payload[0]["campaignId"] == campaign_id
-    assert clear_payload[0]["assetId"] == str(campaign_asset.id)
-    assert clear_payload[0]["generationKey"] == batch_key
-    assert clear_payload[0]["decision"] == "included"
-    assert clear_payload[0]["decidedByUserId"] == "test-user"
-    assert clear_payload[0]["id"]
-    assert clear_payload[0]["createdAt"]
-    assert clear_payload[0]["updatedAt"]
+    assert clear_resp.json() == []
+
+    latest_after_clear_resp = api_client.get(f"/meta/campaigns/{campaign_id}/publish-selections?generationKey={batch_key}")
+    assert latest_after_clear_resp.status_code == 200
+    assert latest_after_clear_resp.json() == []
+
+    older_after_clear_resp = api_client.get(f"/meta/campaigns/{campaign_id}/publish-selections?generationKey={older_batch_key}")
+    assert older_after_clear_resp.status_code == 200
+    assert {entry["assetId"]: entry["decision"] for entry in older_after_clear_resp.json()} == {
+        str(older_campaign_asset.id): "excluded",
+    }
+
+    default_package_asset_ids = {
+        str(campaign_asset.id),
+        str(second_campaign_asset.id),
+    }
+    assert default_package_asset_ids - {entry["assetId"] for entry in latest_after_clear_resp.json()} == default_package_asset_ids
+
+
+def test_meta_publish_selection_rejects_assets_outside_generation(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-selection-generation")
+
+    wrong_generation_asset = _create_asset(
+        db_session,
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="older-run",
+        suffix="older",
+    )
+
+    response = api_client.put(
+        f"/meta/campaigns/{campaign_id}/publish-selections",
+        json={
+            "generationKey": "batch:latest-run",
+            "decisions": [{"assetId": str(wrong_generation_asset.id), "decision": "excluded"}],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "message": "Some campaign assets do not belong to the requested publish generation.",
+        "invalidAssetIds": [str(wrong_generation_asset.id)],
+    }
 
 
 def test_meta_publish_selection_rejects_assets_outside_campaign(api_client, db_session) -> None:
@@ -174,7 +206,7 @@ def test_meta_publish_selection_rejects_assets_outside_campaign(api_client, db_s
         f"/meta/campaigns/{campaign_id}/publish-selections",
         json={
             "generationKey": "batch:latest-run",
-            "decisions": [{"assetId": str(wrong_campaign_asset.id), "decision": "included"}],
+            "decisions": [{"assetId": str(wrong_campaign_asset.id), "decision": "excluded"}],
         },
     )
 
@@ -183,3 +215,26 @@ def test_meta_publish_selection_rejects_assets_outside_campaign(api_client, db_s
         "message": "Some campaign assets were not found for publish selection.",
         "missingAssetIds": [str(wrong_campaign_asset.id)],
     }
+
+
+def test_meta_publish_selection_rejects_explicit_include_decisions(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-selection-include")
+    campaign_asset = _create_asset(
+        db_session,
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="latest",
+    )
+
+    response = api_client.put(
+        f"/meta/campaigns/{campaign_id}/publish-selections",
+        json={
+            "generationKey": "batch:latest-run",
+            "decisions": [{"assetId": str(campaign_asset.id), "decision": "included"}],
+        },
+    )
+
+    assert response.status_code == 422

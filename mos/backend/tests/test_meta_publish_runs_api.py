@@ -146,12 +146,12 @@ def _upsert_meta_profile(api_client, *, client_id: str) -> None:
     assert response.status_code == 200
 
 
-def _include_asset_for_publish(api_client, *, campaign_id: str, generation_key: str, asset_id: str) -> None:
+def _exclude_asset_from_publish(api_client, *, campaign_id: str, generation_key: str, asset_id: str) -> None:
     response = api_client.put(
         f"/meta/campaigns/{campaign_id}/publish-selections",
         json={
             "generationKey": generation_key,
-            "decisions": [{"assetId": asset_id, "decision": "included"}],
+            "decisions": [{"assetId": asset_id, "decision": "excluded"}],
         },
     )
     assert response.status_code == 200
@@ -175,7 +175,43 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
         with_targeting=False,
     )
     _upsert_meta_profile(api_client, client_id=client_id)
-    _include_asset_for_publish(
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert "missing targeting" in payload["items"][0]["blockers"][0].lower()
+
+
+def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-all-excluded")
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-all-excluded",
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-all-excluded",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+    _exclude_asset_from_publish(
         api_client,
         campaign_id=campaign_id,
         generation_key="batch:latest-run",
@@ -195,8 +231,9 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
     assert response.status_code == 200
     payload = response.json()
     assert payload["ok"] is False
-    assert payload["items"][0]["status"] == "blocked"
-    assert "missing targeting" in payload["items"][0]["blockers"][0].lower()
+    assert payload["blockers"] == ["All creatives are excluded from the final Meta package for this generation."]
+    assert payload["includedCount"] == 0
+    assert payload["items"] == []
 
 
 def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_session, monkeypatch) -> None:
@@ -217,12 +254,6 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         with_targeting=True,
     )
     _upsert_meta_profile(api_client, client_id=client_id)
-    _include_asset_for_publish(
-        api_client,
-        campaign_id=campaign_id,
-        generation_key="batch:latest-run",
-        asset_id=str(asset.id),
-    )
 
     content = _jpeg_bytes()
 

@@ -250,17 +250,15 @@ function MetaFeedPreview({
 }
 
 function publishDecisionTone(
-  decision: MetaPublishSelectionDecision | "undecided",
+  decision?: MetaPublishSelectionDecision | null,
 ): "neutral" | "accent" | "success" | "danger" {
-  if (decision === "included") return "success";
   if (decision === "excluded") return "danger";
-  return "accent";
+  return "success";
 }
 
 function publishDecisionLabel(decision?: MetaPublishSelectionDecision | null): string {
-  if (decision === "included") return "Included in final package";
   if (decision === "excluded") return "Excluded from Meta";
-  return "Undecided";
+  return "Included by default";
 }
 
 function formatJsonInput(value: unknown): string {
@@ -575,16 +573,12 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   );
   const includedPackageItems = useMemo(
     () =>
-      latestGenerationPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision === "included"),
+      latestGenerationPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision !== "excluded"),
     [latestGenerationPipeline, selectionByAssetId],
   );
   const excludedPackageCount = useMemo(
     () => latestGenerationPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision === "excluded").length,
     [latestGenerationPipeline, selectionByAssetId],
-  );
-  const undecidedPackageCount = useMemo(
-    () => latestGenerationPipeline.length - includedPackageItems.length - excludedPackageCount,
-    [excludedPackageCount, includedPackageItems.length, latestGenerationPipeline.length],
   );
   const canManagePublishPackage = latestGenerationOnly && Boolean(latestGenerationKey);
   const includedAdSetSpecs = useMemo(() => {
@@ -933,10 +927,6 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
             <div className="text-xs uppercase tracking-wide text-content-muted">Excluded</div>
             <div className="mt-1 text-lg font-semibold text-content">{excludedPackageCount}</div>
           </div>
-          <div className="rounded-lg border border-border bg-surface px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-content-muted">Undecided</div>
-            <div className="mt-1 text-lg font-semibold text-content">{undecidedPackageCount}</div>
-          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -984,7 +974,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         <div className="mt-2 space-y-1 text-sm text-content-muted">
           <div>Generate creatives runs the swipe-first remix flow and Stage 1 Gemini swipe copy generation for the current briefs.</div>
           <div>Prepare Meta review creates internal Meta creative specs from the selected asset's stored swipe copy pack.</div>
-          <div>Meta publish selection is generation-scoped. Only the latest generation can be added to the final package.</div>
+          <div>Meta publish package scope is generation-scoped. Everything in the latest generation is included by default unless excluded.</div>
           {lastWorkflowRunId ? <div>Latest creative workflow: <span className="font-mono">{lastWorkflowRunId}</span></div> : null}
           {lastPreparedAt ? <div>Latest Meta review prep: {formatDate(lastPreparedAt)}</div> : null}
           {autoRefreshUntil ? <div>Auto-refreshing this panel while creative generation completes.</div> : null}
@@ -994,7 +984,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           {!canManagePublishPackage ? (
             <div className="text-warning">Switch back to latest generation only to manage the final Meta package.</div>
           ) : null}
-          {selectionLoading ? <div>Loading saved Meta package decisions…</div> : null}
+          {selectionLoading ? <div>Loading saved Meta package exclusions…</div> : null}
           {visibleMissingCreativeSpecCount ? (
             <div className="text-warning">{visibleMissingCreativeSpecCount} visible generated assets still need internal Meta specs.</div>
           ) : null}
@@ -1012,7 +1002,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div className="border-b border-border px-4 py-3">
             <div className="text-base font-semibold text-content">Final Meta package</div>
             <div className="text-sm text-content-muted">
-              Only the creatives below are currently slated for Meta publish. Excluded and undecided creatives are hidden.
+              Everything in the latest generation is included by default. Excluded creatives are hidden here.
             </div>
           </div>
 
@@ -1022,8 +1012,8 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
             <div className="px-4 py-3 text-sm text-content-muted">No latest generation is available yet.</div>
           ) : !includedPackageItems.length ? (
             <div className="space-y-2 px-4 py-3 text-sm text-content-muted">
-              <div>No creatives are included in the final Meta package yet.</div>
-              <div>Return to Review candidates and mark the latest-generation creatives you want to send to Meta.</div>
+              <div>All latest-generation creatives are currently excluded from the final Meta package.</div>
+              <div>Return to Review candidates and restore the creatives you want to send to Meta.</div>
             </div>
           ) : (
             <div className="space-y-4 px-4 py-4">
@@ -1067,7 +1057,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                           onClick={() => void handleSetPublishDecision(item.asset.id, "excluded")}
                           disabled={pendingSelection}
                         >
-                          {pendingSelection ? "Saving…" : "Remove from package"}
+                          {pendingSelection ? "Saving…" : "Exclude from package"}
                         </Button>
                         {preSalesUrl ? (
                           <a href={preSalesUrl} target="_blank" rel="noreferrer">
@@ -1120,7 +1110,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                           </div>
                         ) : (
                           <div className="mt-3 rounded-lg border border-dashed border-border bg-surface-2 px-4 py-4 text-sm leading-6 text-content-muted">
-                            This creative is included in the final package, but the upload-ready Meta spec is still missing.
+                            This creative is in the final package, but the upload-ready Meta spec is still missing.
                           </div>
                         )}
                       </div>
@@ -1497,9 +1487,10 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                         : "Legacy Meta spec"
                       : "Spec missing";
                     const currentSelectionDecision = selectionByAssetId.get(item.asset.id)?.decision;
+                    const isExcluded = currentSelectionDecision === "excluded";
                     const pendingSelection = selectionPendingAssetIds.includes(item.asset.id);
-                    const includeDisabled = !canManagePublishPackage || !item.creative_spec?.id || pendingSelection;
-                    const excludeDisabled = !canManagePublishPackage || pendingSelection;
+                    const publishDecision = isExcluded ? "excluded" : null;
+                    const selectionDisabled = !canManagePublishPackage || pendingSelection;
                       return (
                         <div key={item.asset.id} className="space-y-4 rounded-xl border border-border bg-surface p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1517,47 +1508,21 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                               <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
                               <Badge tone="neutral">{generationGroup.label}</Badge>
                               {batchId ? <Badge tone="neutral">Batch {shortId(batchId, 5)}</Badge> : null}
-                              <Badge tone={publishDecisionTone(currentSelectionDecision || "undecided")}>
-                                {publishDecisionLabel(currentSelectionDecision)}
+                              <Badge tone={publishDecisionTone(publishDecision)}>
+                                {publishDecisionLabel(publishDecision)}
                               </Badge>
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
                             <Button
-                              variant={currentSelectionDecision === "included" ? "primary" : "secondary"}
+                              variant={isExcluded ? "secondary" : "destructive"}
                               size="xs"
-                              onClick={() => void handleSetPublishDecision(item.asset.id, "included")}
-                              disabled={includeDisabled}
+                              onClick={() => void handleSetPublishDecision(item.asset.id, isExcluded ? null : "excluded")}
+                              disabled={selectionDisabled}
                             >
-                              {pendingSelection && currentSelectionDecision !== "included"
-                                ? "Saving…"
-                                : currentSelectionDecision === "included"
-                                  ? "Included"
-                                  : "Include for Meta"}
+                              {pendingSelection ? "Saving…" : isExcluded ? "Restore to package" : "Exclude from Meta"}
                             </Button>
-                            <Button
-                              variant={currentSelectionDecision === "excluded" ? "destructive" : "secondary"}
-                              size="xs"
-                              onClick={() => void handleSetPublishDecision(item.asset.id, "excluded")}
-                              disabled={excludeDisabled}
-                            >
-                              {pendingSelection && currentSelectionDecision !== "excluded"
-                                ? "Saving…"
-                                : currentSelectionDecision === "excluded"
-                                  ? "Excluded"
-                                  : "Exclude"}
-                            </Button>
-                            {currentSelectionDecision ? (
-                              <Button
-                                variant="secondary"
-                                size="xs"
-                                onClick={() => void handleSetPublishDecision(item.asset.id, null)}
-                                disabled={!canManagePublishPackage || pendingSelection}
-                              >
-                                Reset
-                              </Button>
-                            ) : null}
                             {preSalesUrl ? (
                               <a href={preSalesUrl} target="_blank" rel="noreferrer">
                                 <Button variant="secondary" size="xs">Open pre-sales</Button>
@@ -1621,7 +1586,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                             </div>
                             {!item.creative_spec?.id ? (
                               <div className="mt-2 text-xs text-content-muted">
-                                Prepare Meta review before this creative can be included in the final package.
+                                Prepare Meta review before this creative can be published to Meta.
                               </div>
                             ) : null}
                           </div>

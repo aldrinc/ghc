@@ -146,7 +146,7 @@ class CampaignMetaReviewSetupRequest(BaseModel):
         return value.strip()
 
 
-MetaPublishSelectionDecision = Literal["included", "excluded"]
+MetaPublishSelectionDecision = Literal["excluded"]
 
 
 class MetaPublishSelectionMutationRequest(BaseModel):

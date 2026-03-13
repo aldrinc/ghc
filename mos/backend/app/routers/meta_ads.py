@@ -196,6 +196,33 @@ def _meta_experiment_key(*, experiment_id: Optional[str], metadata_json: Any) ->
     return None
 
 
+def _asset_generation_key(asset: Asset) -> str:
+    metadata_json = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
+    batch_id = _clean_optional_text(metadata_json.get("creativeGenerationBatchId"))
+    if batch_id:
+        return f"batch:{batch_id}"
+
+    remote_job_id = _clean_optional_text(metadata_json.get("remoteJobId"))
+    if remote_job_id:
+        return f"remoteJob:{remote_job_id}"
+
+    return f"asset:{asset.id}"
+
+
+def _resolve_generation_assets(
+    *,
+    campaign: Campaign,
+    generation_key: str,
+    auth: AuthContext,
+    session: Session,
+) -> list[Asset]:
+    assets = AssetsRepository(session).list(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    return [asset for asset in assets if _asset_generation_key(asset) == generation_key]
+
+
 def _publish_selection_response(record: Any) -> MetaPublishSelectionResponse:
     return MetaPublishSelectionResponse(
         id=str(record.id),
@@ -279,19 +306,28 @@ def _validate_publish_plan(
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]]]:
     meta_repo = MetaAdsRepository(session)
-    selections = [
-        selection
+    generation_assets = _resolve_generation_assets(
+        campaign=campaign,
+        generation_key=payload.generationKey,
+        auth=auth,
+        session=session,
+    )
+    excluded_asset_ids = {
+        str(selection.asset_id)
         for selection in meta_repo.list_publish_selections(
             org_id=auth.org_id,
             campaign_id=str(campaign.id),
             generation_key=payload.generationKey,
+            decision="excluded",
         )
-        if selection.decision == "included"
-    ]
+    }
+    selected_assets = [asset for asset in generation_assets if str(asset.id) not in excluded_asset_ids]
 
     blockers: list[str] = []
-    if not selections:
-        blockers.append("No creatives are included in the final Meta package for this generation.")
+    if not generation_assets:
+        blockers.append("No campaign assets were found for this publish generation.")
+    elif not selected_assets:
+        blockers.append("All creatives are excluded from the final Meta package for this generation.")
 
     profile = PaidAdsQaRepository(session).get_platform_profile(
         org_id=auth.org_id,
@@ -303,7 +339,7 @@ def _validate_publish_plan(
     if not ad_account_id:
         blockers.append("Meta platform profile is missing adAccountId.")
 
-    asset_ids = [str(selection.asset_id) for selection in selections]
+    asset_ids = [str(asset.id) for asset in selected_assets]
     asset_rows = session.scalars(
         select(Asset).where(
             Asset.org_id == auth.org_id,
@@ -340,8 +376,8 @@ def _validate_publish_plan(
     resolved_items: list[dict[str, Any]] = []
     publish_domains: set[str] = set()
 
-    for selection in selections:
-        asset_id = str(selection.asset_id)
+    for asset in selected_assets:
+        asset_id = str(asset.id)
         item_blockers: list[str] = []
         asset = assets_by_id.get(asset_id)
         creative_spec = creative_specs_by_asset_id.get(asset_id)
@@ -349,9 +385,9 @@ def _validate_publish_plan(
         resolved_destination_url: str | None = None
 
         if asset is None:
-            item_blockers.append("Included asset was not found on this campaign.")
+            item_blockers.append("Final-package asset was not found on this campaign.")
         if creative_spec is None:
-            item_blockers.append("Included asset is missing a prepared Meta creative spec.")
+            item_blockers.append("Final-package asset is missing a prepared Meta creative spec.")
 
         if asset is not None and creative_spec is not None:
             experiment_key = (
@@ -364,9 +400,11 @@ def _validate_publish_plan(
             )
             linked_adset_specs = adset_spec_map.get(experiment_key, []) if experiment_key else []
             if not linked_adset_specs:
-                item_blockers.append("Included asset is missing a linked Meta ad set spec.")
+                item_blockers.append("Final-package asset is missing a linked Meta ad set spec.")
             elif len(linked_adset_specs) > 1:
-                item_blockers.append("Included asset resolves to multiple Meta ad set specs. Publish requires exactly one.")
+                item_blockers.append(
+                    "Final-package asset resolves to multiple Meta ad set specs. Publish requires exactly one."
+                )
             else:
                 adset_spec = linked_adset_specs[0]
                 if not _clean_optional_text(adset_spec.name):
@@ -386,7 +424,7 @@ def _validate_publish_plan(
 
             effective_page_id = _clean_optional_text(creative_spec.page_id) or profile_page_id
             if not effective_page_id:
-                item_blockers.append("Included asset is missing an effective Meta pageId.")
+                item_blockers.append("Final-package asset is missing an effective Meta pageId.")
 
             resolved_destination_url = _resolve_publish_destination_url(
                 destination_url=_clean_optional_text(creative_spec.destination_url),
@@ -424,13 +462,13 @@ def _validate_publish_plan(
             )
 
     if len(publish_domains) > 1:
-        blockers.append("Included creatives resolve to multiple publish domains. Use one launch domain per publish run.")
+        blockers.append("Final-package creatives resolve to multiple publish domains. Use one launch domain per publish run.")
 
     validation_response = MetaPublishPlanValidationResponse(
         campaignId=str(campaign.id),
         generationKey=payload.generationKey,
         ok=not blockers and all(item.status == "ok" for item in validation_items),
-        includedCount=len(selections),
+        includedCount=len(selected_assets),
         adsetCount=len({str(item["adset_spec"].id) for item in resolved_items}),
         publishBaseUrl=payload.publishBaseUrl,
         publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
@@ -1197,6 +1235,7 @@ def list_meta_publish_selections(
         org_id=auth.org_id,
         campaign_id=str(campaign.id),
         generation_key=generation_key,
+        decision="excluded",
     )
     return [_publish_selection_response(record) for record in records]
 
@@ -1231,6 +1270,17 @@ def update_meta_publish_selections(
                 detail={
                     "message": "Some campaign assets were not found for publish selection.",
                     "missingAssetIds": missing_asset_ids,
+                },
+            )
+        invalid_generation_asset_ids = [
+            asset_id for asset_id, asset in assets_by_id.items() if _asset_generation_key(asset) != payload.generationKey
+        ]
+        if invalid_generation_asset_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Some campaign assets do not belong to the requested publish generation.",
+                    "invalidAssetIds": sorted(invalid_generation_asset_ids),
                 },
             )
 
@@ -1270,6 +1320,7 @@ def update_meta_publish_selections(
         org_id=auth.org_id,
         campaign_id=str(campaign.id),
         generation_key=payload.generationKey,
+        decision="excluded",
     )
     return [_publish_selection_response(record) for record in records]
 

@@ -77,7 +77,7 @@ export type MetaCampaign = {
   created_at?: string;
 };
 
-export type MetaPublishSelectionDecision = "included" | "excluded";
+export type MetaPublishSelectionDecision = "excluded";
 
 export type MetaPublishSelection = {
   id: string;

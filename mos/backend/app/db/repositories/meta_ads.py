@@ -220,6 +220,7 @@ class MetaAdsRepository:
         org_id: str,
         campaign_id: str,
         generation_key: str,
+        decision: Optional[str] = None,
     ) -> list[MetaPublishSelection]:
         stmt = (
             select(MetaPublishSelection)
@@ -230,6 +231,8 @@ class MetaAdsRepository:
             )
             .order_by(MetaPublishSelection.created_at.asc(), MetaPublishSelection.asset_id.asc())
         )
+        if decision is not None:
+            stmt = stmt.where(MetaPublishSelection.decision == decision)
         return list(self.session.scalars(stmt).all())
 
     def get_publish_selection(
