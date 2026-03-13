@@ -48,9 +48,11 @@ coverage/
 # Local archives/artifacts
 clerk-clerk-js-*.tgz
 mos/backend/reports/
+mos/backend/artifact-downloads/
 
 # Local temp/output
 .tmp/
+tmp/
 mos/backend/.tmp/
 mos/backend/tmp/
 swipe/
