@@ -5,6 +5,7 @@ from app.services.swipe_prompt import (
     build_swipe_context_block,
     extract_new_image_prompt_from_markdown,
     inline_swipe_render_placeholders,
+    load_swipe_to_image_ad_prompt,
 )
 
 
@@ -59,6 +60,18 @@ def test_swipe_context_block_marks_missing_brief_values_as_unknown() -> None:
     assert "Constraints:\n- [UNKNOWN]" in block
     assert "Tone guidelines:\n- [UNKNOWN]" in block
     assert "Visual guidelines:\n- [UNKNOWN]" in block
+
+
+def test_swipe_to_image_prompt_preserves_visible_social_overlays() -> None:
+    prompt, _sha = load_swipe_to_image_ad_prompt()
+
+    assert "NATIVE UI / OVERLAY RULE" in prompt
+    assert "ASPECT RATIO / FRAMING RULE" in prompt
+    assert "just platform UI" in prompt
+    assert "usernames, handles, timestamps, likes, comments, captions" in prompt
+    assert "Do not write \"no digital text overlays\" unless the competitor swipe truly contains none." in prompt
+    assert "Do not center a narrow portrait post inside a wider square canvas" in prompt
+    assert "must explicitly say the composition stays portrait and edge-to-edge with no left/right gutter space" in prompt
 
 
 def test_extract_new_image_prompt_allows_placeholder_tokens_prior_to_inline() -> None:

@@ -613,6 +613,92 @@ def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_with_opening
     assert result["output_tokens"] == 222
 
 
+def test_call_swipe_copy_gemini_json_message_repairs_truncated_json_with_trailing_comma(monkeypatch):
+    raw_response = """```json
+{
+  "passes": false,
+  "violations": [
+    "Reveals the specific drug (gabapentin) and the exact nature of the safety gap."
+  ],
+"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=[],
+        max_tokens=2048,
+        temperature=0.0,
+        response_schema={
+            "type": "object",
+            "properties": {
+                "passes": {"type": "boolean"},
+                "violations": {"type": "array", "items": {"type": "string"}},
+                "retryFeedback": {"type": ["string", "null"]},
+            },
+            "required": ["passes", "violations", "retryFeedback"],
+        },
+    )
+
+    assert result["parsed"]["passes"] is False
+    assert result["parsed"]["violations"] == [
+        "Reveals the specific drug (gabapentin) and the exact nature of the safety gap."
+    ]
+    assert result["output_tokens"] == 222
+
+
+def test_call_swipe_copy_gemini_json_message_extracts_partial_payload_before_truncated_next_key(monkeypatch):
+    raw_response = """```json
+{
+  "selectedVariation": "Variation 1: The 'Deal With It' Warning",
+  "formattedVariationsMarkdown": "```text\\n**Variation 1: The 'Deal With It' Warning**\\n\\n**Primary Text:**\\nIf your doctor just told you to \\"deal with it\\" or handed you another prescription you didn't ask for, read this.\\n\\nSee why so many are using this to finally take back control.",
+  "metaPrim
+"""
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return SimpleNamespace(
+                parsed=None,
+                text=raw_response,
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["selectedVariation"] == "Variation 1: The 'Deal With It' Warning"
+    assert 'told you to "deal with it"' in result["parsed"]["formattedVariationsMarkdown"]
+    assert "metaPrimaryText" not in result["parsed"]
+    assert result["output_tokens"] == 222
+
+
 def test_call_swipe_copy_gemini_json_message_strips_invalid_apostrophe_escapes(monkeypatch):
     raw_response = """```json
 {
@@ -825,6 +911,91 @@ def test_generate_swipe_stage1_copy_pack_retries_when_meta_fields_missing(monkey
     assert retry_feedbacks[0] is None
     assert "missing required Meta fields" in (retry_feedbacks[1] or "")
     assert "metaPrimaryText" in (retry_feedbacks[1] or "")
+
+
+def test_generate_swipe_stage1_copy_pack_hydrates_meta_fields_from_selected_variation_markdown(monkeypatch):
+    retry_feedbacks: list[str | None] = []
+
+    def _fake_build_prompt(*, retry_feedback=None, **_kwargs):
+        retry_feedbacks.append(retry_feedback)
+        return "prompt"
+
+    monkeypatch.setattr(swipe_activity, "_build_swipe_copy_stage1_prompt", _fake_build_prompt)
+    monkeypatch.setattr(swipe_activity, "_resolve_destination_type", lambda **_kwargs: "presell")
+    monkeypatch.setattr(
+        swipe_activity,
+        "_call_swipe_copy_gemini_json_message",
+        lambda **_kwargs: {
+            "parsed": {
+                "selectedVariation": "Variation 1: The Dismissal Warning",
+                "formattedVariationsMarkdown": (
+                    "```text\n"
+                    "**Variation 1: The Dismissal Warning**\n\n"
+                    "**Primary Text:**\n"
+                    "They tell you to just suffer through the sleepless nights and hot flashes.\n\n"
+                    "Or worse, they hand you a heavy prescription without running a single test.\n\n"
+                    "But if you are looking for natural relief, there is a glaring safety gap they aren't warning you about.\n\n"
+                    "Discover the missing piece that finally puts you back in control.\n\n"
+                    "Tap below to see what they left out.\n\n"
+                    "**Headline:** The Missing Piece For Perimenopause Relief\n"
+                    "**Description:** Read the breaking reveal before it's gone.\n"
+                    "**CTA:** Learn More\n\n"
+                    "---\n\n"
+                    "**Variation 2: The Heavy Prescription Leak**\n"
+                    "```"
+                ),
+                "claimsGuardrails": ["Do not promise medical outcomes."],
+            },
+            "text": "",
+            "stop_reason": "STOP",
+            "output_tokens": 333,
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_validate_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
+    )
+
+    validated, response, model = swipe_activity._generate_swipe_stage1_copy_pack(
+        session=object(),
+        brief={"id": "brief-1"},
+        requirement_index=0,
+        requirement={
+            "channel": "facebook",
+            "format": "image_ad",
+            "angle": "Doctor-dismissal backlash",
+            "hook": "Hidden issue",
+            "funnelStage": "mid",
+        },
+        copy_model="models/gemini-2.5-flash",
+        gemini_store_names=["fileSearchStores/context-store"],
+        swipe_bytes=b"image-bytes",
+        swipe_mime_type="image/png",
+        swipe_source_url="https://example.com/swipe.png",
+        swipe_source_label="10.png",
+        product_prompt_image_bytes=None,
+        product_prompt_image_mime_type=None,
+    )
+
+    assert validated.meta_primary_text == (
+        "They tell you to just suffer through the sleepless nights and hot flashes.\n\n"
+        "Or worse, they hand you a heavy prescription without running a single test.\n\n"
+        "But if you are looking for natural relief, there is a glaring safety gap they aren't warning you about.\n\n"
+        "Discover the missing piece that finally puts you back in control.\n\n"
+        "Tap below to see what they left out."
+    )
+    assert validated.meta_headline == "The Missing Piece For Perimenopause Relief"
+    assert validated.meta_description == "Read the breaking reveal before it's gone."
+    assert validated.meta_cta == "Learn More"
+    assert response["output_tokens"] == 333
+    assert model == "models/gemini-2.5-flash"
+    assert retry_feedbacks == [None]
 
 
 def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypatch):

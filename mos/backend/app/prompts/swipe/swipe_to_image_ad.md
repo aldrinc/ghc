@@ -98,6 +98,8 @@ If unclear, say [UNKNOWN].
 2) ADAPT IT TO MY BRAND (keep vs swap)
 CRITICAL DESIGN PRESERVATION RULE: The competitor swipe's visual design is working — that is why it was swiped. Do NOT reinvent, reinterpret, or "clean up" the design. The original image's color palette, vibrancy, design language, layout composition, imagery style, lighting mood, and overall visual aesthetic must be faithfully preserved in the output prompt. The only elements that change are explicit branding assets and copy — everything else stays.
 KEEP (design DNA — non-negotiable): The original swipe's full visual identity — color palette, vibrancy/saturation, design language, layout zones, imagery style and subject matter, lighting mood, background treatment, texture, contrast levels, number and placement of badges/icons, overall look and feel. Reproduce these faithfully.
+NATIVE UI / OVERLAY RULE: If the competitor swipe is shown inside a visible social post, app screenshot, phone frame, tweet shell, browser chrome, lower-third, caption block, comment stack, engagement row, or other interface overlay, that shell is part of the design DNA and must be preserved. Treat usernames, avatars, verification badges, timestamps, likes, comments, reaction/share/save icons, caption text, borders, and app UI chrome as required layout zones when they are visible. Do not dismiss them as "just platform UI" and do not replace them with empty negative space.
+ASPECT RATIO / FRAMING RULE: If the competitor swipe is a tall portrait social screenshot or phone capture, preserve that portrait framing logic. The recreated post should fill the canvas edge-to-edge like a real phone screenshot or native portrait post. Do not center a narrow portrait post inside a wider square canvas, and do not invent left/right gutters, blurred sidebars, poster borders, or extra empty margins that are not present in the swipe.
 SWAP (branding assets only): Product becomes [PRODUCT], remove competitor logo/packaging and replace with [BRAND_LOGO]/[PRODUCT_PACKSHOT], apply brand copy. Do NOT let the brand swap alter the underlying design, color story, or visual energy of the original.
 Copy/claims: Only use readable competitor text OR explicit final copy text. Do NOT output placeholder tokens in the final image prompt.
 3) OUTPUT: NEW IMAGE IDEA (1:1)
@@ -108,6 +110,7 @@ Body:
 Equation line:
 CTA:
 Fine print:
+If the swipe includes social/app UI text, capture visible usernames, handles, timestamps, likes, comments, captions, and interface labels in the closest field above rather than omitting them.
 B) NEW IMAGE PROMPT (MUST BE MARKDOWN)
 Output the TEXT-TO-IMAGE PROMPT inside a Markdown fenced code block exactly like this:
 [ONE dense generation-ready prompt that recreates the same composition for [BRAND_NAME]]
@@ -116,10 +119,12 @@ Use a single fenced code block with language tag `text` (```text ... ```). Do no
 STRICT IMAGE PROMPT FORMATTING RULES:
 When writing the NEW IMAGE PROMPT, you must ALWAYS use the following structure inside the fenced code block:
 Visual Description First: Write a highly detailed description of the layout, lighting, photography style, colors, and composition. This description must be a faithful reproduction of the original swipe image's design DNA — match its color palette, vibrancy, saturation, lighting mood, background treatment, imagery subject matter, texture, and overall visual energy exactly. Do not generalize, soften, or reinterpret the original's aesthetic. If the swipe is warm and earthy, the prompt is warm and earthy. If it is clinical and high-contrast, the prompt is clinical and high-contrast. Mirror it.
-Typography Zones: Describe where the text goes, what font style to use, and what color it is, and include the exact final copy inline for each zone (headline, subhead, body, equation line, CTA, disclaimers, annotations) so stage-2 can render directly from this prompt with no extra mapping.
+Typography Zones: Describe where all text and interface chrome go, what font style to use, and what color it is, and include the exact final copy inline for each zone (headline, subhead, body, equation line, CTA, disclaimers, annotations, usernames, handles, timestamps, likes/comments counts, captions, comment snippets, reaction/share/save icons, and app UI labels) so stage-2 can render directly from this prompt with no extra mapping.
+If the competitor swipe includes native social/app/screenshot chrome, the NEW IMAGE PROMPT must explicitly recreate that overlay shell and its text hierarchy in the same locations. Do not write "no digital text overlays" unless the competitor swipe truly contains none.
+If the competitor swipe is portrait/tall, the NEW IMAGE PROMPT must explicitly say the composition stays portrait and edge-to-edge with no left/right gutter space.
 Do NOT include a "Placeholders" or "Placeholder Key" section.
 Do NOT output bracket placeholder tokens such as [HEADLINE], [SUBHEAD], [BODY], [CTA], [BRAND_LOGO], [PRODUCT_PACKSHOT], or [DISCLAIMER] anywhere in the final image prompt.
-Include in every prompt: background, product placement, badge placement, typography zones, lighting, camera feel, realism, clean negative space for text.
+Include in every prompt: background, product placement, badge placement, typography zones, overlay/UI zones when present, lighting, camera feel, realism, clean negative space for text, and framing/aspect-ratio fidelity.
 
 REALISM REQUIREMENTS (MANDATORY):
 1) Avatar realism (apply whenever the swipe includes a human subject):

@@ -276,6 +276,119 @@ def _optional_clean_string(value: Any) -> str | None:
     return cleaned or None
 
 
+def _strip_markdown_code_fence(value: str) -> str:
+    stripped = value.strip()
+    match = re.fullmatch(r"```[A-Za-z0-9_-]*\n(?P<body>.*)\n```", stripped, flags=re.DOTALL)
+    if match:
+        return match.group("body").strip()
+    return stripped
+
+
+def _normalize_swipe_variation_line(value: str) -> str:
+    stripped = value.strip()
+    if stripped.startswith("**") and stripped.endswith("**") and len(stripped) >= 4:
+        stripped = stripped[2:-2].strip()
+    return re.sub(r"\s+", " ", stripped).strip()
+
+
+def _extract_meta_fields_from_selected_variation_markdown(
+    *,
+    formatted_variations_markdown: str,
+    selected_variation: str,
+) -> Dict[str, str]:
+    body = _strip_markdown_code_fence(formatted_variations_markdown)
+    lines = body.splitlines()
+    selected_heading = _normalize_swipe_variation_line(selected_variation).lower()
+    if not selected_heading:
+        return {}
+
+    field_map = {
+        "primary text": "metaPrimaryText",
+        "headline": "metaHeadline",
+        "description": "metaDescription",
+        "cta": "metaCta",
+    }
+    extracted: Dict[str, List[str]] = {}
+    in_selected_block = False
+    current_field: str | None = None
+    field_start_pattern = re.compile(
+        r"^\s*(?:\*\*)?(Primary Text|Headline|Description|CTA):(?:\*\*)?\s*(.*)$",
+        flags=re.IGNORECASE,
+    )
+
+    for raw_line in lines:
+        normalized_line = _normalize_swipe_variation_line(raw_line)
+        lower_line = normalized_line.lower()
+
+        if lower_line.startswith("variation "):
+            if in_selected_block:
+                if lower_line != selected_heading:
+                    break
+            elif lower_line == selected_heading:
+                in_selected_block = True
+            continue
+
+        if not in_selected_block:
+            continue
+
+        if normalized_line == "---":
+            break
+
+        field_match = field_start_pattern.match(raw_line)
+        if field_match:
+            field_name = field_map[field_match.group(1).strip().lower()]
+            initial_value = field_match.group(2).strip()
+            extracted[field_name] = [initial_value] if initial_value else []
+            current_field = field_name
+            continue
+
+        if current_field is None:
+            continue
+
+        extracted[current_field].append(raw_line.rstrip())
+
+    normalized: Dict[str, str] = {}
+    for key, parts in extracted.items():
+        value = "\n".join(parts).strip()
+        if not value:
+            continue
+        if key == "metaPrimaryText":
+            normalized[key] = re.sub(r"\n{3,}", "\n\n", value)
+        else:
+            normalized[key] = re.sub(r"\s+", " ", value)
+    return normalized
+
+
+def _hydrate_missing_swipe_copy_platform_fields(*, parsed: Dict[str, Any], platform: str) -> Dict[str, Any]:
+    normalized_platform = (platform or "").strip().lower()
+    if normalized_platform != "meta":
+        return parsed
+
+    required_meta_keys = ("metaPrimaryText", "metaHeadline", "metaDescription", "metaCta")
+    missing_keys = [key for key in required_meta_keys if _optional_clean_string(parsed.get(key)) is None]
+    if not missing_keys:
+        return parsed
+
+    formatted_variations_markdown = _optional_clean_string(parsed.get("formattedVariationsMarkdown"))
+    selected_variation = _optional_clean_string(parsed.get("selectedVariation"))
+    if not formatted_variations_markdown or not selected_variation:
+        return parsed
+
+    inferred = _extract_meta_fields_from_selected_variation_markdown(
+        formatted_variations_markdown=formatted_variations_markdown,
+        selected_variation=selected_variation,
+    )
+    if not inferred:
+        return parsed
+
+    hydrated = dict(parsed)
+    for key in missing_keys:
+        inferred_value = _optional_clean_string(inferred.get(key))
+        if inferred_value is not None:
+            hydrated[key] = inferred_value
+    return hydrated
+
+
 def _summarize_swipe_copy_validation_error(exc: ValidationError) -> str:
     missing_fields: list[str] = []
     other_messages: list[str] = []
@@ -1967,6 +2080,80 @@ def _repair_json_text(text: str) -> str:
     return _escape_unescaped_control_chars(repaired)
 
 
+def _extract_partial_json_string_field(text: str, key: str) -> str | None:
+    pattern = f'"{key}"'
+    start = 0
+
+    while True:
+        field_idx = text.find(pattern, start)
+        if field_idx < 0:
+            return None
+        idx = field_idx + len(pattern)
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+        if idx >= len(text) or text[idx] != ":":
+            start = field_idx + len(pattern)
+            continue
+        idx += 1
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+        if idx >= len(text) or text[idx] != '"':
+            start = field_idx + len(pattern)
+            continue
+
+        idx += 1
+        raw_chars: list[str] = []
+        escape = False
+        terminated = False
+        while idx < len(text):
+            ch = text[idx]
+            if escape:
+                raw_chars.append(ch)
+                escape = False
+                idx += 1
+                continue
+            if ch == "\\":
+                raw_chars.append(ch)
+                escape = True
+                idx += 1
+                continue
+            if ch == '"':
+                terminated = True
+                break
+            raw_chars.append(ch)
+            idx += 1
+
+        candidate = '"' + "".join(raw_chars)
+        if not terminated and escape:
+            candidate += "\\"
+        candidate += '"'
+        try:
+            return json.loads(_repair_json_text(candidate))
+        except json.JSONDecodeError:
+            start = field_idx + len(pattern)
+
+
+def _extract_partial_swipe_copy_payload(text: str) -> Dict[str, Any] | None:
+    partial: Dict[str, Any] = {}
+    for key in (
+        "selectedVariation",
+        "formattedVariationsMarkdown",
+        "metaPrimaryText",
+        "metaHeadline",
+        "metaDescription",
+        "metaCta",
+        "tiktokCaption",
+        "tiktokOnScreenText",
+        "tiktokCta",
+    ):
+        value = _extract_partial_json_string_field(text, key)
+        if isinstance(value, str):
+            partial[key] = value
+    if "selectedVariation" in partial or "formattedVariationsMarkdown" in partial:
+        return partial
+    return None
+
+
 def _parse_swipe_copy_json_object(text: str) -> Dict[str, Any]:
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1983,12 +2170,22 @@ def _parse_swipe_copy_json_object(text: str) -> Dict[str, Any]:
     raw = _strip_json_fence(text)
     repaired = _repair_json_text(raw)
     repaired_truncated = _repair_truncated_json(raw)
-    repaired_truncated_sanitized = _repair_truncated_json(repaired)
+    repaired_truncated_sanitized = (
+        _repair_json_text(repaired_truncated) if isinstance(repaired_truncated, str) else None
+    )
+    repaired_then_truncated = _repair_truncated_json(repaired)
+    repaired_then_truncated_sanitized = (
+        _repair_json_text(repaired_then_truncated)
+        if isinstance(repaired_then_truncated, str)
+        else None
+    )
 
     _add(raw)
     _add(repaired)
     _add(repaired_truncated)
     _add(repaired_truncated_sanitized)
+    _add(repaired_then_truncated)
+    _add(repaired_then_truncated_sanitized)
 
     for candidate in candidates:
         try:
@@ -2004,6 +2201,10 @@ def _parse_swipe_copy_json_object(text: str) -> Dict[str, Any]:
             parsed = None
         if isinstance(parsed, dict):
             return parsed
+
+    partial = _extract_partial_swipe_copy_payload(raw)
+    if isinstance(partial, dict):
+        return partial
 
     raise RuntimeError("Swipe Stage 1 copy response did not contain a valid JSON object.")
 
@@ -2274,6 +2475,7 @@ def _generate_swipe_stage1_copy_pack(
         parsed = response.get("parsed")
         if not isinstance(parsed, dict):
             raise RuntimeError("Swipe Stage 1 copy generation returned a non-dict parsed payload.")
+        parsed = _hydrate_missing_swipe_copy_platform_fields(parsed=parsed, platform=platform)
 
         merged_payload = dict(parsed)
         merged_payload.update(
