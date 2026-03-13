@@ -6,8 +6,9 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
-from app.db.models import Campaign, Client, Product, ProductOffer, ProductVariant
+from app.db.models import Campaign, Client, PaidAdsPlatformProfile, Product, ProductOffer, ProductVariant
 from app.temporal.activities import campaign_intent_activities as cia
 from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
@@ -125,6 +126,85 @@ def test_collect_image_generation_errors_ignores_non_list_inputs():
         template_id=None,
     )
     assert errors == []
+
+
+def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_session, monkeypatch):
+    test_org_id = UUID("00000000-0000-0000-0000-000000000111")
+    client = Client(org_id=test_org_id, name="Meta Tracking Client", industry="Retail")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    campaign = Campaign(
+        org_id=test_org_id,
+        client_id=client.id,
+        name="Meta Tracking Campaign",
+        channels=["facebook"],
+        asset_brief_types=["image"],
+    )
+    db_session.add(campaign)
+    db_session.commit()
+    db_session.refresh(campaign)
+
+    observed: dict[str, object] = {}
+
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    def _activate_stub(*, profile, funnel_ids, ruleset_version):
+        observed["profile"] = profile
+        observed["funnel_ids"] = funnel_ids
+        observed["ruleset_version"] = ruleset_version
+        return {
+            "clientId": str(client.id),
+            "platform": "meta",
+            "rulesetVersion": ruleset_version,
+            "pixelId": "pixel-123",
+            "dataSetId": "dataset-123",
+            "dataSetAssignedToAdAccount": True,
+            "trackingProvider": "mos",
+            "trackingUrlParameters": "utm_source=meta&utm_medium=paid",
+            "metadata": {
+                "mosMetaTracking": {
+                    "status": "active",
+                    "channel": "meta",
+                    "mode": "public_funnel_runtime",
+                    "pixelId": "pixel-123",
+                    "funnelIds": funnel_ids,
+                    "browserEvents": ["PageView", "InitiateCheckout"],
+                    "internalEvents": ["page_view", "cta_click"],
+                }
+            },
+        }
+
+    monkeypatch.setattr(cia, "session_scope", _session_scope_override)
+    monkeypatch.setattr(cia, "activate_mos_meta_funnel_tracking_profile", _activate_stub)
+
+    result = cia.configure_generated_funnels_meta_tracking_activity(
+        {
+            "org_id": str(test_org_id),
+            "client_id": str(client.id),
+            "campaign_id": str(campaign.id),
+            "funnel_ids": ["funnel-a", "funnel-b"],
+        }
+    )
+
+    assert result["status"] == "configured"
+    assert observed["funnel_ids"] == ["funnel-a", "funnel-b"]
+
+    profile = db_session.scalars(
+        select(PaidAdsPlatformProfile).where(
+            PaidAdsPlatformProfile.org_id == test_org_id,
+            PaidAdsPlatformProfile.client_id == client.id,
+            PaidAdsPlatformProfile.platform == "meta",
+        )
+    ).first()
+    assert profile is not None
+    assert profile.ruleset_version == cia.PAID_ADS_RULESET_VERSION
+    assert profile.pixel_id == "pixel-123"
+    assert profile.tracking_provider == "mos"
+    assert profile.metadata_json["mosMetaTracking"]["funnelIds"] == ["funnel-a", "funnel-b"]
 
 
 def test_create_funnel_drafts_activity_uses_pinned_template_patch_for_legacy_presell_payload(

@@ -5,7 +5,7 @@ from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import paid_ads_qa as paid_ads_qa_router
 from app.services import paid_ads_qa as paid_ads_qa_service
-from app.services.paid_ads_qa import RULESET_VERSION
+from app.services.paid_ads_qa import LEGACY_RULESET_VERSION, RULESET_VERSION
 
 
 def _create_client(api_client, *, name: str = "Paid Ads QA Client") -> str:
@@ -240,8 +240,10 @@ def test_paid_ads_ruleset_api_exposes_structured_rules(api_client) -> None:
     summary_resp = api_client.get("/paid-ads-qa/rulesets")
     assert summary_resp.status_code == 200
     summary_payload = summary_resp.json()
-    assert summary_payload[0]["version"] == RULESET_VERSION
-    assert summary_payload[0]["ruleCount"] >= 10
+    summary_versions = {entry["version"] for entry in summary_payload}
+    assert LEGACY_RULESET_VERSION in summary_versions
+    assert RULESET_VERSION in summary_versions
+    assert all(entry["ruleCount"] >= 10 for entry in summary_payload)
 
     ruleset_resp = api_client.get(f"/paid-ads-qa/rulesets/{RULESET_VERSION}")
     assert ruleset_resp.status_code == 200
@@ -250,6 +252,32 @@ def test_paid_ads_ruleset_api_exposes_structured_rules(api_client) -> None:
     assert "META-ACCOUNT-001" in rule_ids
     assert "META-COPY-002" in rule_ids
     assert "TTK-ACCOUNT-001" in rule_ids
+
+
+def test_meta_platform_profile_v2_accepts_mos_runtime_tracking_for_account_008() -> None:
+    profile = _complete_meta_profile_payload()
+    profile["dataSetShopifyPartnerInstalled"] = False
+    profile["dataSetDataSharingLevel"] = "standard"
+    profile["trackingProvider"] = "mos"
+    profile["metadata"] = {
+        "mosMetaTracking": {
+            "status": "active",
+            "channel": "meta",
+            "mode": "public_funnel_runtime",
+            "pixelId": "pixel-123",
+            "browserEvents": ["PageView", "InitiateCheckout"],
+            "internalEvents": ["page_view", "cta_click"],
+        }
+    }
+
+    result = paid_ads_qa_service.evaluate_platform_profile(
+        platform="meta",
+        profile=profile,
+        ruleset_version=RULESET_VERSION,
+    )
+
+    failing_rule_ids = {finding["ruleId"] for finding in result["findings"]}
+    assert "META-ACCOUNT-008" not in failing_rule_ids
 
 
 def test_meta_platform_profile_assessment_returns_blockers(api_client, monkeypatch, tmp_path) -> None:

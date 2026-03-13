@@ -8,6 +8,7 @@ import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckCon
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const runtimeConfig = createFunnelPuckConfig();
@@ -209,6 +210,28 @@ function getUtmParams(): Record<string, string> {
   return utm;
 }
 
+function mapRuntimeEventToMetaPixel(
+  event: { eventType: string; props?: Record<string, unknown> },
+): { eventName: string; params?: Record<string, unknown> } | null {
+  if (event.eventType === "page_view") {
+    return { eventName: "PageView" };
+  }
+  if (event.eventType === "cta_click") {
+    const variantId = typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
+    if (variantId) {
+      return {
+        eventName: "InitiateCheckout",
+        params: {
+          content_ids: [variantId],
+          content_type: "product",
+          num_items: 1,
+        },
+      };
+    }
+  }
+  return null;
+}
+
 async function parsePublicError(resp: Response): Promise<string> {
   let raw: unknown;
   try {
@@ -315,6 +338,8 @@ export function PublicFunnelPage() {
 
   const trackEvent = async (event: { eventType: string; props?: Record<string, unknown> }) => {
     if (!page) return;
+    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    const mappedMetaEvent = mapRuntimeEventToMetaPixel(event);
     const payload = {
       events: [
         {
@@ -334,6 +359,9 @@ export function PublicFunnelPage() {
         },
       ],
     };
+    if (mappedMetaEvent) {
+      trackMetaPixelEvent(metaPixelId, mappedMetaEvent.eventName, mappedMetaEvent.params);
+    }
     try {
       await fetch(`${apiBaseUrl}/public/events`, {
         method: "POST",
@@ -367,6 +395,11 @@ export function PublicFunnelPage() {
       clearManagedFavicons();
     };
   }, [page]);
+
+  useEffect(() => {
+    const metaPixelId = page?.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    ensureMetaPixel(metaPixelId);
+  }, [page?.tracking?.metaPixelId, page?.tracking?.provider]);
 
   useEffect(() => {
     if (!page || !meta) return;

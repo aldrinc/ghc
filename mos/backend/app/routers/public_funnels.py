@@ -30,15 +30,18 @@ from app.db.repositories.funnels import (
     FunnelPublicRepository,
     FunnelsRepository,
 )
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.commerce import PublicCheckoutRequest
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.design_systems import resolve_design_system_tokens
+from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
 from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import normalize_route_token, require_product_route_slug
 from app.services.shopify_checkout import create_shopify_checkout
 
 router = APIRouter(prefix="/public", tags=["public"])
+_MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
 
 
 def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Funnel | None:
@@ -180,6 +183,34 @@ def _metadata_value(value: object, key: str) -> str:
     return text
 
 
+def _resolve_public_meta_tracking(*, session: Session, funnel: Funnel) -> dict[str, str] | None:
+    profile = PaidAdsQaRepository(session).get_platform_profile(
+        org_id=str(funnel.org_id),
+        client_id=str(funnel.client_id),
+        platform="meta",
+    )
+    if profile is None:
+        return None
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    mos_tracking = metadata.get(_MOS_META_TRACKING_METADATA_KEY)
+    if not isinstance(mos_tracking, dict):
+        return None
+    if normalize_tracking_provider(mos_tracking.get("status")) != "active":
+        return None
+    if normalize_tracking_provider(mos_tracking.get("mode")) != "public_funnel_runtime":
+        return None
+    if normalize_tracking_provider(mos_tracking.get("channel")) != "meta":
+        return None
+    pixel_id = clean_optional_text(mos_tracking.get("pixelId")) or clean_optional_text(profile.pixel_id)
+    if not pixel_id:
+        return None
+    return {
+        "provider": "meta",
+        "mode": "public_funnel_runtime",
+        "metaPixelId": pixel_id,
+    }
+
+
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     """
     For unpublished funnels, we treat "preview" pages as those with at least one saved version
@@ -312,6 +343,7 @@ def public_funnel_page(
             page=page,
             puck_data=version.puck_data,
         )
+        tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
             "productSlug": resolved_product_slug,
@@ -323,6 +355,7 @@ def public_funnel_page(
             "pageMap": page_map,
             "designSystemTokens": design_system_tokens,
             "metadata": metadata,
+            "tracking": tracking,
             "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
         }
 
@@ -359,6 +392,7 @@ def public_funnel_page(
         page=page,
         puck_data=version.puck_data,
     )
+    tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
         "productSlug": resolved_product_slug,
@@ -370,6 +404,7 @@ def public_funnel_page(
         "pageMap": page_map,
         "designSystemTokens": design_system_tokens,
         "metadata": metadata,
+        "tracking": tracking,
         "nextPageId": str(page.next_page_id) if page.next_page_id else None,
     }
 

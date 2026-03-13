@@ -61,6 +61,7 @@ from app.temporal.activities.experiment_activities import (
     create_asset_briefs_for_experiments_activity,
 )
 from app.temporal.activities.campaign_intent_activities import (
+    configure_generated_funnels_meta_tracking_activity,
     create_campaign_activity,
     create_funnel_drafts_activity,
     create_funnels_from_experiments_activity,
@@ -174,6 +175,7 @@ async def main() -> None:
             create_campaign_activity,
             create_funnel_drafts_activity,
             create_funnels_from_experiments_activity,
+            configure_generated_funnels_meta_tracking_activity,
             enrich_funnel_page_media_activity,
             generate_assets_for_brief_activity,
             persist_assets_activity,

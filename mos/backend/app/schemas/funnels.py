@@ -90,6 +90,11 @@ class PublicFunnelPageResponse(BaseModel):
         lang: str = "en"
         brandName: Optional[str] = None
 
+    class Tracking(BaseModel):
+        provider: str
+        mode: str
+        metaPixelId: Optional[str] = None
+
     productSlug: str
     funnelId: str
     publicationId: str
@@ -99,6 +104,7 @@ class PublicFunnelPageResponse(BaseModel):
     pageMap: dict[str, str]
     designSystemTokens: Optional[dict[str, Any]] = None
     metadata: Metadata
+    tracking: Optional[Tracking] = None
     nextPageId: Optional[str] = None
 
 

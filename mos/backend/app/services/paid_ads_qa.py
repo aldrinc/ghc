@@ -17,11 +17,18 @@ from app.services.meta_review import resolve_meta_review_destination_url
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
 
 
-RULESET_VERSION = "paid_ads_policy_ruleset_v1"
+LEGACY_RULESET_VERSION = "paid_ads_policy_ruleset_v1"
+RULESET_VERSION = "paid_ads_policy_ruleset_v2"
 _RULESET_DIR = Path(__file__).resolve().parents[1] / "static" / "paid_ads_policy_rules"
 _REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
 _HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 _HTTP_HEADERS = {"User-Agent": "MOS-PaidAdsQA/1.0"}
+_RULESET_FILES = {
+    LEGACY_RULESET_VERSION: "meta_tiktok_v1.json",
+    RULESET_VERSION: "meta_tiktok_v2.json",
+}
+_MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
+_DEFAULT_META_TRACKING_URL_PARAMETERS = "utm_source=meta&utm_medium=paid"
 
 _PRIVATE_INFO_RE = re.compile(
     r"\b(?:we know you(?:'re| are)?|you have|your (?:medical|health|credit|debt|diabetes|weight|age|skin)|"
@@ -58,28 +65,35 @@ class MetaProfileRefreshError(RuntimeError):
 
 
 def _ruleset_path(version: str) -> Path:
-    return _RULESET_DIR / "meta_tiktok_v1.json"
+    filename = _RULESET_FILES.get(version)
+    if not filename:
+        supported = "', '".join(_RULESET_FILES)
+        raise KeyError(
+            f"Unsupported ruleset version '{version}'. Supported versions: '{supported}'."
+        )
+    return _RULESET_DIR / filename
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def get_ruleset(version: str = RULESET_VERSION) -> dict[str, Any]:
-    if version != RULESET_VERSION:
-        raise KeyError(f"Unsupported ruleset version '{version}'. Supported version: '{RULESET_VERSION}'.")
     payload = json.loads(_ruleset_path(version).read_text(encoding="utf-8"))
     return payload
 
 
 def list_rulesets() -> list[dict[str, Any]]:
-    ruleset = get_ruleset()
-    return [
-        {
-            "version": ruleset["version"],
-            "effectiveDate": ruleset["effectiveDate"],
-            "description": ruleset["description"],
-            "sourceCount": len(ruleset.get("sources", [])),
-            "ruleCount": len(ruleset.get("rules", [])),
-        }
-    ]
+    summaries: list[dict[str, Any]] = []
+    for version in _RULESET_FILES:
+        ruleset = get_ruleset(version)
+        summaries.append(
+            {
+                "version": ruleset["version"],
+                "effectiveDate": ruleset["effectiveDate"],
+                "description": ruleset["description"],
+                "sourceCount": len(ruleset.get("sources", [])),
+                "ruleCount": len(ruleset.get("rules", [])),
+            }
+        )
+    return summaries
 
 
 def normalize_platform(platform: str) -> str:
@@ -187,6 +201,109 @@ def _iso_now() -> str:
 def _profile_metadata(profile: dict[str, Any]) -> dict[str, Any]:
     metadata = profile.get("metadata")
     return dict(metadata) if isinstance(metadata, dict) else {}
+
+
+def _ruleset_uses_mos_meta_tracking(version: str) -> bool:
+    return version != LEGACY_RULESET_VERSION
+
+
+def _normalize_string_list(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = clean_optional_text(value) if isinstance(value, str) else None
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    return normalized
+
+
+def _mos_meta_tracking_metadata(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = _profile_metadata(profile)
+    raw = metadata.get(_MOS_META_TRACKING_METADATA_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _meta_account_008_legacy_ready(profile: dict[str, Any]) -> bool:
+    return profile.get("dataSetShopifyPartnerInstalled") is True and normalize_tracking_provider(
+        profile.get("dataSetDataSharingLevel")
+    ) == "maximum"
+
+
+def _meta_account_008_mos_tracking_ready(profile: dict[str, Any]) -> bool:
+    metadata = _mos_meta_tracking_metadata(profile)
+    pixel_id = clean_optional_text(metadata.get("pixelId")) or clean_optional_text(profile.get("pixelId"))
+    status = normalize_tracking_provider(metadata.get("status"))
+    mode = normalize_tracking_provider(metadata.get("mode"))
+    channel = normalize_tracking_provider(metadata.get("channel"))
+    browser_events = _normalize_string_list(metadata.get("browserEvents"))
+    return (
+        bool(pixel_id)
+        and status == "active"
+        and mode == "public_funnel_runtime"
+        and channel == "meta"
+        and "pageview" in {item.replace("_", "").lower() for item in browser_events}
+        and "initiatecheckout" in {item.replace("_", "").lower() for item in browser_events}
+    )
+
+
+def activate_mos_meta_funnel_tracking_profile(
+    *,
+    profile: dict[str, Any],
+    funnel_ids: list[str],
+    ruleset_version: str = RULESET_VERSION,
+) -> dict[str, Any]:
+    refreshed = refresh_meta_platform_profile_from_graph(profile=profile, ruleset_version=ruleset_version)
+    pixel_id = clean_optional_text(refreshed.get("pixelId"))
+    data_set_id = clean_optional_text(refreshed.get("dataSetId"))
+    data_set_assigned = refreshed.get("dataSetAssignedToAdAccount")
+    if not pixel_id:
+        raise MetaProfileRefreshError(
+            "Meta funnel tracking automation requires a resolved pixelId. "
+            "Select a single Meta pixel/data set in MOS before generating funnels.",
+        )
+    if not data_set_id or data_set_assigned is not True:
+        raise MetaProfileRefreshError(
+            "Meta funnel tracking automation requires a Data Set that is assigned to the ad account.",
+        )
+
+    metadata = _profile_metadata(refreshed)
+    existing_tracking = _mos_meta_tracking_metadata(refreshed)
+    configured_funnel_ids = _normalize_string_list(existing_tracking.get("funnelIds"))
+    merged_funnel_ids = configured_funnel_ids[:]
+    seen_funnel_ids = set(configured_funnel_ids)
+    for funnel_id in funnel_ids:
+        cleaned = clean_optional_text(funnel_id)
+        if not cleaned or cleaned in seen_funnel_ids:
+            continue
+        seen_funnel_ids.add(cleaned)
+        merged_funnel_ids.append(cleaned)
+
+    metadata[_MOS_META_TRACKING_METADATA_KEY] = {
+        **existing_tracking,
+        "status": "active",
+        "channel": "meta",
+        "mode": "public_funnel_runtime",
+        "pixelId": pixel_id,
+        "dataSetId": data_set_id,
+        "browserEvents": ["PageView", "InitiateCheckout"],
+        "internalEvents": ["page_view", "cta_click"],
+        "funnelIds": merged_funnel_ids,
+        "enabledAt": existing_tracking.get("enabledAt") or _iso_now(),
+        "lastSyncedAt": _iso_now(),
+        "source": "campaign_funnel_generation",
+    }
+
+    refreshed["rulesetVersion"] = ruleset_version
+    refreshed["metadata"] = metadata
+    if not clean_optional_text(refreshed.get("trackingProvider")):
+        refreshed["trackingProvider"] = "mos"
+    if not clean_optional_text(refreshed.get("trackingUrlParameters")):
+        refreshed["trackingUrlParameters"] = _DEFAULT_META_TRACKING_URL_PARAMETERS
+    return refreshed
 
 
 def _graphql_candidate_source(profile_value: str | None, settings_value: str | None, *, settings_label: str) -> tuple[str | None, str | None]:
@@ -544,21 +661,32 @@ def evaluate_platform_profile(
                     },
                 )
             )
-        if profile.get("dataSetShopifyPartnerInstalled") is not True or normalize_tracking_provider(
-            profile.get("dataSetDataSharingLevel")
-        ) != "maximum":
+        legacy_meta_tracking_ready = _meta_account_008_legacy_ready(profile)
+        mos_meta_tracking_ready = _meta_account_008_mos_tracking_ready(profile)
+        if not legacy_meta_tracking_ready and (
+            not _ruleset_uses_mos_meta_tracking(ruleset_version) or not mos_meta_tracking_ready
+        ):
+            mos_tracking_metadata = _mos_meta_tracking_metadata(profile)
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
                     rule_id="META-ACCOUNT-008",
                     status="failed",
                     title="Data Set integration is incomplete",
-                    message="Meta Data Set should use the Shopify partner integration and Maximum data sharing.",
+                    message=(
+                        "Meta Data Set should use the Shopify partner integration and Maximum data sharing, "
+                        "or have MOS-managed funnel tracking automation active."
+                        if _ruleset_uses_mos_meta_tracking(ruleset_version)
+                        else "Meta Data Set should use the Shopify partner integration and Maximum data sharing."
+                    ),
                     artifact_type="platform_profile",
                     artifact_ref=artifact_ref,
                     evidence={
                         "dataSetShopifyPartnerInstalled": profile.get("dataSetShopifyPartnerInstalled"),
                         "dataSetDataSharingLevel": profile.get("dataSetDataSharingLevel"),
+                        "mosMetaTrackingStatus": mos_tracking_metadata.get("status"),
+                        "mosMetaTrackingMode": mos_tracking_metadata.get("mode"),
+                        "mosMetaTrackingPixelId": mos_tracking_metadata.get("pixelId"),
                     },
                 )
             )

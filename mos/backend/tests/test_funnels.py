@@ -7,8 +7,9 @@ from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
 from app.db.enums import FunnelDomainStatusEnum
-from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain, FunnelPage
+from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain, FunnelPage, PaidAdsPlatformProfile
 from app.db.repositories.funnels import FunnelsRepository
+from app.services.paid_ads_qa import RULESET_VERSION
 from app.services import deploy as deploy_service
 
 
@@ -405,6 +406,56 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     # Preview mode: pages with drafts are available on the internal preview URL even before publish.
     page2_preview = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{page2['slug']}")
     assert page2_preview.status_code == 200
+
+
+def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
+    api_client: TestClient,
+    db_session,
+):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Meta Tracking Funnel",
+    )
+
+    funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
+    assert funnel is not None
+
+    profile = PaidAdsPlatformProfile(
+        org_id=funnel.org_id,
+        client_id=funnel.client_id,
+        platform="meta",
+        ruleset_version=RULESET_VERSION,
+        pixel_id="pixel-123",
+        data_set_id="dataset-123",
+        data_set_assigned_to_ad_account=True,
+        tracking_provider="mos",
+        tracking_url_parameters="utm_source=meta&utm_medium=paid",
+        metadata_json={
+            "mosMetaTracking": {
+                "status": "active",
+                "channel": "meta",
+                "mode": "public_funnel_runtime",
+                "pixelId": "pixel-123",
+                "browserEvents": ["PageView", "InitiateCheckout"],
+                "internalEvents": ["page_view", "cta_click"],
+            }
+        },
+    )
+    db_session.add(profile)
+    db_session.commit()
+
+    page = db_session.scalars(
+        select(FunnelPage).where(FunnelPage.funnel_id == funnel.id).order_by(FunnelPage.created_at.asc())
+    ).first()
+    assert page is not None
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{page.slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"] == {
+        "provider": "meta",
+        "mode": "public_funnel_runtime",
+        "metaPixelId": "pixel-123",
+    }
 
 
 def test_public_funnel_commerce_requires_offers(api_client: TestClient):

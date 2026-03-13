@@ -8,7 +8,10 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from app.config import settings
-    from app.temporal.activities.campaign_intent_activities import create_funnels_from_experiments_activity
+    from app.temporal.activities.campaign_intent_activities import (
+        configure_generated_funnels_meta_tracking_activity,
+        create_funnels_from_experiments_activity,
+    )
     from app.temporal.activities.experiment_activities import (
         fetch_experiment_specs_activity,
         create_asset_briefs_for_experiments_activity,
@@ -307,6 +310,7 @@ class CampaignFunnelGenerationWorkflow:
                 )
 
         funnel_map: Dict[str, str] = {}
+        generated_funnel_ids: list[str] = []
         if isinstance(funnel_batch, dict):
             batch_items = funnel_batch.get("funnels") or []
             if isinstance(batch_items, list):
@@ -321,6 +325,19 @@ class CampaignFunnelGenerationWorkflow:
                     variant_id = item.get("variant_id")
                     if funnel_id and experiment_id and variant_id:
                         funnel_map[f"{experiment_id}:{variant_id}"] = funnel_id
+                    if funnel_id:
+                        generated_funnel_ids.append(str(funnel_id))
+
+        meta_tracking_setup = await workflow.execute_activity(
+            configure_generated_funnels_meta_tracking_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "funnel_ids": generated_funnel_ids,
+            },
+            schedule_to_close_timeout=timedelta(minutes=2),
+        )
 
         briefs_result = await workflow.execute_activity(
             create_asset_briefs_for_experiments_activity,
@@ -343,5 +360,6 @@ class CampaignFunnelGenerationWorkflow:
                 "mode": "async" if input.async_media_enrichment else "inline",
                 "workflows": media_enrichment_workflows,
             },
+            "meta_tracking_setup": meta_tracking_setup,
             "asset_briefs": briefs_result,
         }

@@ -18,6 +18,7 @@ from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnu
 from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
@@ -30,6 +31,13 @@ from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.product_types import canonical_product_type, is_book_product_type, product_type_matches
+from app.services.paid_ads_qa import (
+    RULESET_VERSION as PAID_ADS_RULESET_VERSION,
+    MetaProfileRefreshError,
+    activate_mos_meta_funnel_tracking_profile,
+    clean_optional_text,
+    normalize_tracking_provider,
+)
 from app.services.shopify_connection import get_client_shopify_connection_status, get_client_shopify_product
 from app.strategy_v2.downstream import load_strategy_v2_outputs
 from app.strategy_v2.template_bridge import (
@@ -114,6 +122,79 @@ def _activity_heartbeat_safe(payload: dict[str, Any]) -> None:
     except RuntimeError:
         # Unit tests execute these helpers outside a Temporal activity context.
         return
+
+
+def _campaign_uses_meta_channel(channels: list[str] | None) -> bool:
+    for channel in channels or []:
+        normalized = normalize_tracking_provider(channel)
+        if normalized in {"facebook", "instagram", "meta"}:
+            return True
+    return False
+
+
+def _meta_profile_dict_from_record(record: Any | None, *, client_id: str) -> dict[str, Any]:
+    if record is None:
+        return {
+            "clientId": client_id,
+            "platform": "meta",
+            "rulesetVersion": PAID_ADS_RULESET_VERSION,
+            "metadata": {},
+        }
+    return {
+        "clientId": str(record.client_id),
+        "platform": "meta",
+        "rulesetVersion": str(record.ruleset_version or PAID_ADS_RULESET_VERSION),
+        "businessManagerId": record.business_manager_id,
+        "businessManagerName": record.business_manager_name,
+        "pageId": record.page_id,
+        "pageName": record.page_name,
+        "adAccountId": record.ad_account_id,
+        "adAccountName": record.ad_account_name,
+        "paymentMethodType": record.payment_method_type,
+        "paymentMethodStatus": record.payment_method_status,
+        "pixelId": record.pixel_id,
+        "dataSetId": record.data_set_id,
+        "dataSetShopifyPartnerInstalled": record.data_set_shopify_partner_installed,
+        "dataSetDataSharingLevel": record.data_set_data_sharing_level,
+        "dataSetAssignedToAdAccount": record.data_set_assigned_to_ad_account,
+        "verifiedDomain": record.verified_domain,
+        "verifiedDomainStatus": record.verified_domain_status,
+        "attributionClickWindow": record.attribution_click_window,
+        "attributionViewWindow": record.attribution_view_window,
+        "viewThroughEnabled": record.view_through_enabled,
+        "trackingProvider": record.tracking_provider,
+        "trackingUrlParameters": record.tracking_url_parameters,
+        "metadata": record.metadata_json if isinstance(record.metadata_json, dict) else {},
+    }
+
+
+def _meta_profile_fields_from_dict(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = profile.get("metadata")
+    return {
+        "platform": "meta",
+        "ruleset_version": str(profile.get("rulesetVersion") or PAID_ADS_RULESET_VERSION),
+        "business_manager_id": clean_optional_text(profile.get("businessManagerId")),
+        "business_manager_name": clean_optional_text(profile.get("businessManagerName")),
+        "page_id": clean_optional_text(profile.get("pageId")),
+        "page_name": clean_optional_text(profile.get("pageName")),
+        "ad_account_id": clean_optional_text(profile.get("adAccountId")),
+        "ad_account_name": clean_optional_text(profile.get("adAccountName")),
+        "payment_method_type": normalize_tracking_provider(profile.get("paymentMethodType")),
+        "payment_method_status": clean_optional_text(profile.get("paymentMethodStatus")),
+        "pixel_id": clean_optional_text(profile.get("pixelId")),
+        "data_set_id": clean_optional_text(profile.get("dataSetId")),
+        "data_set_shopify_partner_installed": profile.get("dataSetShopifyPartnerInstalled"),
+        "data_set_data_sharing_level": normalize_tracking_provider(profile.get("dataSetDataSharingLevel")),
+        "data_set_assigned_to_ad_account": profile.get("dataSetAssignedToAdAccount"),
+        "verified_domain": clean_optional_text(profile.get("verifiedDomain")),
+        "verified_domain_status": normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+        "attribution_click_window": normalize_tracking_provider(profile.get("attributionClickWindow")),
+        "attribution_view_window": normalize_tracking_provider(profile.get("attributionViewWindow")),
+        "view_through_enabled": profile.get("viewThroughEnabled"),
+        "tracking_provider": normalize_tracking_provider(profile.get("trackingProvider")),
+        "tracking_url_parameters": clean_optional_text(profile.get("trackingUrlParameters")),
+        "metadata_json": metadata if isinstance(metadata, dict) else {},
+    }
 
 
 @contextmanager
@@ -1595,6 +1676,65 @@ def enrich_funnel_page_media_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         "generated_images": generated_images,
         "non_fatal_errors": image_errors,
         "agent_run_id": result.get("runId"),
+    }
+
+
+@activity.defn
+def configure_generated_funnels_meta_tracking_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    org_id = str(params.get("org_id") or "").strip()
+    client_id = str(params.get("client_id") or "").strip()
+    campaign_id = str(params.get("campaign_id") or "").strip()
+    funnel_ids = [
+        funnel_id
+        for raw_funnel_id in (params.get("funnel_ids") or [])
+        if isinstance(raw_funnel_id, str)
+        and (funnel_id := raw_funnel_id.strip())
+    ]
+
+    if not org_id:
+        raise ValueError("org_id is required to configure generated funnel Meta tracking.")
+    if not client_id:
+        raise ValueError("client_id is required to configure generated funnel Meta tracking.")
+    if not campaign_id:
+        raise ValueError("campaign_id is required to configure generated funnel Meta tracking.")
+    if not funnel_ids:
+        return {"status": "skipped", "reason": "no_generated_funnels"}
+
+    with session_scope() as session:
+        campaign = CampaignsRepository(session).get(org_id=org_id, campaign_id=campaign_id)
+        if campaign is None:
+            raise ValueError("Campaign not found while configuring generated funnel Meta tracking.")
+        if not _campaign_uses_meta_channel(campaign.channels):
+            return {"status": "skipped", "reason": "campaign_has_no_meta_channel"}
+
+        repo = PaidAdsQaRepository(session)
+        profile_record = repo.get_platform_profile(org_id=org_id, client_id=client_id, platform="meta")
+        profile_dict = _meta_profile_dict_from_record(profile_record, client_id=client_id)
+        try:
+            configured_profile = activate_mos_meta_funnel_tracking_profile(
+                profile=profile_dict,
+                funnel_ids=funnel_ids,
+                ruleset_version=PAID_ADS_RULESET_VERSION,
+            )
+        except MetaProfileRefreshError as exc:
+            raise ValueError(
+                "Meta funnel tracking automation failed. "
+                f"{exc}"
+            ) from exc
+
+        saved = repo.upsert_platform_profile(
+            org_id=org_id,
+            client_id=client_id,
+            **_meta_profile_fields_from_dict(configured_profile),
+        )
+
+    return {
+        "status": "configured",
+        "rulesetVersion": saved.ruleset_version,
+        "pixelId": saved.pixel_id,
+        "dataSetId": saved.data_set_id,
+        "trackingProvider": saved.tracking_provider,
+        "funnelCount": len(funnel_ids),
     }
 
 

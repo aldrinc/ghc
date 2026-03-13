@@ -1,4 +1,4 @@
-export const PAID_ADS_QA_RULESET_VERSION = "paid_ads_policy_ruleset_v1";
+export const PAID_ADS_QA_RULESET_VERSION = "paid_ads_policy_ruleset_v2";
 
 export type PaidAdsQaPlatform = "meta" | "tiktok";
 export type PaidAdsQaSeverity = "blocker" | "high" | "medium" | "low";

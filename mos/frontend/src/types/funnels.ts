@@ -85,6 +85,11 @@ export type PublicFunnelPage = {
     lang: string;
     brandName?: string | null;
   };
+  tracking?: {
+    provider: string;
+    mode: string;
+    metaPixelId?: string | null;
+  } | null;
   nextPageId?: string | null;
   redirectToSlug?: string;
 };
