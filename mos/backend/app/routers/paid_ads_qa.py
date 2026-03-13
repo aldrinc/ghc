@@ -59,6 +59,14 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     return client
 
 
+def _require_supported_ruleset(ruleset_version: str) -> str:
+    try:
+        get_ruleset(ruleset_version)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ruleset_version
+
+
 def _filter_creative_specs_to_generation(*, creative_specs: list[Any], asset_ids: set[str]) -> list[Any]:
     return [spec for spec in creative_specs if getattr(spec, "asset_id", None) and str(spec.asset_id) in asset_ids]
 
@@ -332,11 +340,7 @@ def upsert_paid_ads_platform_profile(
 ):
     normalized_platform = normalize_platform(platform)
     _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
-    if payload.rulesetVersion != RULESET_VERSION:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported rulesetVersion '{payload.rulesetVersion}'. Expected '{RULESET_VERSION}'.",
-        )
+    _require_supported_ruleset(payload.rulesetVersion)
     repo = PaidAdsQaRepository(session)
     profile = repo.upsert_platform_profile(
         org_id=auth.org_id,
@@ -445,11 +449,7 @@ def run_campaign_paid_ads_qa(
     session: Session = Depends(get_session),
 ):
     normalized_platform = normalize_platform(payload.platform)
-    if payload.rulesetVersion != RULESET_VERSION:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported rulesetVersion '{payload.rulesetVersion}'. Expected '{RULESET_VERSION}'.",
-        )
+    _require_supported_ruleset(payload.rulesetVersion)
     campaign = session.scalar(
         select(Campaign).where(
             Campaign.org_id == auth.org_id,

@@ -1768,7 +1768,8 @@ def list_meta_pipeline_assets(
 
     asset_ids = [str(asset.id) for asset in assets]
     campaign_ids = {str(asset.campaign_id) for asset in assets if asset.campaign_id}
-    experiment_ids = {str(asset.experiment_id) for asset in assets if asset.experiment_id}
+    experiment_keys = {str(asset.experiment_id) for asset in assets if asset.experiment_id}
+    internal_experiment_ids = set(experiment_keys)
 
     uploads = []
     if ad_account_id:
@@ -1823,7 +1824,8 @@ def list_meta_pipeline_assets(
         )
         if key
     }
-    experiment_ids.update(experiment_keys_from_specs)
+    experiment_keys.update(experiment_keys_from_specs)
+    internal_experiment_ids.update(str(spec.experiment_id) for spec in creative_specs if spec.experiment_id)
 
     adset_specs = []
     if campaignId:
@@ -1833,11 +1835,18 @@ def list_meta_pipeline_assets(
                 MetaAdSetSpec.campaign_id == campaignId,
             )
         ).all()
-    elif experiment_ids:
+    elif campaign_ids:
         adset_specs = session.scalars(
             select(MetaAdSetSpec).where(
                 MetaAdSetSpec.org_id == auth.org_id,
-                MetaAdSetSpec.experiment_id.in_(list(experiment_ids)),
+                MetaAdSetSpec.campaign_id.in_(list(campaign_ids)),
+            )
+        ).all()
+    elif internal_experiment_ids:
+        adset_specs = session.scalars(
+            select(MetaAdSetSpec).where(
+                MetaAdSetSpec.org_id == auth.org_id,
+                MetaAdSetSpec.experiment_id.in_(list(internal_experiment_ids)),
             )
         ).all()
     adset_spec_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
@@ -1860,7 +1869,7 @@ def list_meta_pipeline_assets(
     campaign_map = {str(campaign.id): campaign for campaign in campaigns}
 
     internal_experiment_ids: list[str] = []
-    for experiment_id in experiment_ids:
+    for experiment_id in internal_experiment_ids:
         try:
             internal_experiment_ids.append(str(UUID(experiment_id)))
         except (TypeError, ValueError):

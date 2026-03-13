@@ -275,6 +275,14 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
     assert row["adset_specs"][0]["metadata_json"]["experimentSpecId"] == "exp-A02-Interaction Triage Workflow"
 
+    library_pipeline_resp = api_client.get(f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&statuses=draft")
+    assert library_pipeline_resp.status_code == 200
+    library_pipeline = library_pipeline_resp.json()
+    assert len(library_pipeline) == 1
+    assert library_pipeline[0]["adset_specs"][0]["metadata_json"]["experimentSpecId"] == (
+        "exp-A02-Interaction Triage Workflow"
+    )
+
 
 def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exists(
     api_client,
