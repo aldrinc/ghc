@@ -582,7 +582,6 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
       {activeRun ? (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-<<<<<<< HEAD
             <Badge tone={runStatusTone(activeRun.status)}>Status {activeRun.status.replace(/_/g, " ")}</Badge>
             <Badge tone="neutral">Run {activeRun.id.slice(0, 8)}</Badge>
             <Badge tone="neutral">Completed {formatDate(activeRun.completedAt || activeRun.createdAt)}</Badge>
