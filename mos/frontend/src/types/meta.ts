@@ -95,6 +95,92 @@ export type MetaPublishSelectionMutation = {
   decision?: MetaPublishSelectionDecision | null;
 };
 
+export type MetaAdSetSpecUpdatePayload = {
+  name?: string | null;
+  optimizationGoal?: string | null;
+  billingEvent?: string | null;
+  targeting?: Record<string, unknown> | null;
+  placements?: Record<string, unknown> | null;
+  dailyBudget?: number | null;
+  lifetimeBudget?: number | null;
+  bidAmount?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  promotedObject?: Record<string, unknown> | null;
+  conversionDomain?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type MetaPublishPlanValidationItem = {
+  assetId: string;
+  creativeSpecId?: string | null;
+  adsetSpecId?: string | null;
+  resolvedDestinationUrl?: string | null;
+  status: "ok" | "blocked";
+  blockers: string[];
+};
+
+export type MetaPublishPlanValidation = {
+  campaignId: string;
+  generationKey: string;
+  ok: boolean;
+  includedCount: number;
+  adsetCount: number;
+  publishBaseUrl: string;
+  publishDomain?: string | null;
+  blockers: string[];
+  items: MetaPublishPlanValidationItem[];
+};
+
+export type MetaPublishRunRequest = {
+  generationKey: string;
+  publishBaseUrl: string;
+  campaignName: string;
+  campaignObjective: string;
+  buyingType?: string | null;
+  specialAdCategories?: string[];
+};
+
+export type MetaPublishRunItem = {
+  id: string;
+  assetId: string;
+  creativeSpecId?: string | null;
+  adsetSpecId?: string | null;
+  status: string;
+  resolvedDestinationUrl?: string | null;
+  metaAssetUploadId?: string | null;
+  metaCreativeId?: string | null;
+  metaAdSetId?: string | null;
+  metaAdId?: string | null;
+  errorMessage?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaPublishRun = {
+  id: string;
+  campaignId: string;
+  generationKey: string;
+  status: string;
+  campaignName: string;
+  campaignObjective: string;
+  buyingType?: string | null;
+  specialAdCategories: string[];
+  publishBaseUrl: string;
+  publishDomain?: string | null;
+  adAccountId?: string | null;
+  pageId?: string | null;
+  metaCampaignId?: string | null;
+  errorMessage?: string | null;
+  metadata: Record<string, unknown>;
+  items: MetaPublishRunItem[];
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+};
+
 export type MetaPipelineAsset = {
   asset: {
     id: string;

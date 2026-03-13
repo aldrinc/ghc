@@ -1,7 +1,12 @@
 import { useCallback } from "react";
 import { useApiClient } from "./client";
 import type {
+  MetaAdSetSpec,
+  MetaAdSetSpecUpdatePayload,
   MetaPipelineAsset,
+  MetaPublishPlanValidation,
+  MetaPublishRun,
+  MetaPublishRunRequest,
   MetaPublishSelection,
   MetaPublishSelectionMutation,
   MetaRemoteResponse,
@@ -122,6 +127,38 @@ export function useMetaApi() {
     [request],
   );
 
+  const updateAdSetSpec = useCallback(
+    (adsetSpecId: string, payload: MetaAdSetSpecUpdatePayload) =>
+      request<MetaAdSetSpec>(`/meta/specs/adsets/${adsetSpecId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
+  const validatePublishPlan = useCallback(
+    (campaignId: string, payload: MetaPublishRunRequest) =>
+      request<MetaPublishPlanValidation>(`/meta/campaigns/${campaignId}/publish-plan/validate`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
+  const listPublishRuns = useCallback(
+    (campaignId: string) => get<MetaPublishRun[]>(`/meta/campaigns/${campaignId}/publish-runs`),
+    [get],
+  );
+
+  const createPublishRun = useCallback(
+    (campaignId: string, payload: MetaPublishRunRequest) =>
+      request<MetaPublishRun>(`/meta/campaigns/${campaignId}/publish-runs`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
   return {
     getConfig,
     listPipelineAssets,
@@ -133,5 +170,9 @@ export function useMetaApi() {
     listRemoteAds,
     listPublishSelections,
     savePublishSelections,
+    updateAdSetSpec,
+    validatePublishPlan,
+    listPublishRuns,
+    createPublishRun,
   };
 }

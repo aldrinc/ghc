@@ -1859,6 +1859,81 @@ class MetaPublishSelection(Base):
     )
 
 
+class MetaPublishRun(Base):
+    __tablename__ = "meta_publish_runs"
+    __table_args__ = (
+        sa.Index("idx_meta_publish_runs_org_campaign", "org_id", "campaign_id"),
+        sa.Index("idx_meta_publish_runs_org_created", "org_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    generation_key: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
+    campaign_name: Mapped[str] = mapped_column(Text, nullable=False)
+    campaign_objective: Mapped[str] = mapped_column(Text, nullable=False)
+    buying_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    special_ad_categories_json: Mapped[list[str]] = mapped_column(
+        "special_ad_categories", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    publish_base_url: Mapped[str] = mapped_column(Text, nullable=False)
+    publish_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ad_account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_campaign_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MetaPublishRunItem(Base):
+    __tablename__ = "meta_publish_run_items"
+    __table_args__ = (
+        UniqueConstraint("publish_run_id", "asset_id", name="uq_meta_publish_run_items_run_asset"),
+        sa.Index("idx_meta_publish_run_items_org_run", "org_id", "publish_run_id"),
+        sa.Index("idx_meta_publish_run_items_org_asset", "org_id", "asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    publish_run_id: Mapped[str] = mapped_column(
+        ForeignKey("meta_publish_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    creative_spec_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_creative_specs.id", ondelete="SET NULL"), nullable=True
+    )
+    adset_spec_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_adset_specs.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    resolved_destination_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_asset_upload_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_creative_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_adset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_ad_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PaidAdsPlatformProfile(Base):
     __tablename__ = "paid_ads_platform_profiles"
     __table_args__ = (

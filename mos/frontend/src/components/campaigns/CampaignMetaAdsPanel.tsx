@@ -5,12 +5,17 @@ import { useMetaApi } from "@/api/meta";
 import { CampaignPaidAdsQaCard } from "@/components/campaigns/CampaignPaidAdsQaCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { AssetBrief } from "@/types/artifacts";
 import type { Campaign } from "@/types/common";
 import type {
+  MetaAdSetSpec,
   MetaPipelineAsset,
+  MetaPublishPlanValidation,
+  MetaPublishRun,
   MetaPublishSelection,
   MetaPublishSelectionDecision,
 } from "@/types/meta";
@@ -21,6 +26,29 @@ type CampaignMetaAdsPanelProps = {
 };
 
 type MetaPackageView = "review" | "final";
+
+type MetaPublishCampaignForm = {
+  publishBaseUrl: string;
+  campaignName: string;
+  campaignObjective: string;
+  buyingType: string;
+  specialAdCategories: string;
+};
+
+type MetaPublishAdSetForm = {
+  name: string;
+  optimizationGoal: string;
+  billingEvent: string;
+  targetingJson: string;
+  placementsJson: string;
+  dailyBudget: string;
+  lifetimeBudget: string;
+  bidAmount: string;
+  startTime: string;
+  endTime: string;
+  promotedObjectJson: string;
+  conversionDomain: string;
+};
 
 const apiBaseUrl = resolveRequiredApiBaseUrl();
 
@@ -43,7 +71,11 @@ function resolveAssetUrl(path?: string | null): string | null {
 
 function getErrorMessage(err: unknown) {
   if (typeof err === "string") return err;
-  if (err && typeof err === "object" && "message" in err) return (err as ApiError).message || "Request failed";
+  if (err && typeof err === "object" && "message" in err) {
+    const apiError = err as ApiError;
+    const detailMessage = (apiError.raw as { detail?: { message?: string } } | undefined)?.detail?.message;
+    return detailMessage || apiError.message || "Request failed";
+  }
   return "Request failed";
 }
 
@@ -231,10 +263,97 @@ function publishDecisionLabel(decision?: MetaPublishSelectionDecision | null): s
   return "Undecided";
 }
 
+function formatJsonInput(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+}
+
+function parseJsonObjectInput(value: string, label: string): Record<string, unknown> | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`${label} must be valid JSON.`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label} must be a JSON object.`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function parseIntegerInput(value: string, label: string): number | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  if (!/^-?\d+$/.test(cleaned)) {
+    throw new Error(`${label} must be a whole number.`);
+  }
+  return Number(cleaned);
+}
+
+function toLocalDateTimeValue(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function fromLocalDateTimeValue(value: string): string | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  const date = new Date(cleaned);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Date/time values must be valid.");
+  }
+  return date.toISOString();
+}
+
+function buildInitialPublishCampaignForm(reviewBaseUrl: string): MetaPublishCampaignForm {
+  return {
+    publishBaseUrl: reviewBaseUrl || "",
+    campaignName: "",
+    campaignObjective: "",
+    buyingType: "",
+    specialAdCategories: "",
+  };
+}
+
+function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
+  return {
+    name: spec.name || "",
+    optimizationGoal: spec.optimization_goal || "",
+    billingEvent: spec.billing_event || "",
+    targetingJson: formatJsonInput(spec.targeting),
+    placementsJson: formatJsonInput(spec.placements),
+    dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
+    lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
+    bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
+    startTime: toLocalDateTimeValue(spec.start_time),
+    endTime: toLocalDateTimeValue(spec.end_time),
+    promotedObjectJson: formatJsonInput(spec.promoted_object),
+    conversionDomain: spec.conversion_domain || "",
+  };
+}
+
 export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsPanelProps) {
   const queryClient = useQueryClient();
   const { post } = useApiClient();
-  const { getConfig, listPipelineAssets, listPublishSelections, savePublishSelections } = useMetaApi();
+  const {
+    getConfig,
+    listPipelineAssets,
+    listPublishSelections,
+    savePublishSelections,
+    updateAdSetSpec,
+    validatePublishPlan,
+    listPublishRuns,
+    createPublishRun,
+  } = useMetaApi();
   const reviewBaseUrl = resolveWindowShopHostedOrigin();
 
   const [config, setConfig] = useState<{
@@ -259,6 +378,17 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [selectionPendingAssetIds, setSelectionPendingAssetIds] = useState<string[]>([]);
+  const [publishCampaignForm, setPublishCampaignForm] = useState<MetaPublishCampaignForm>(() =>
+    buildInitialPublishCampaignForm(reviewBaseUrl),
+  );
+  const [publishAdSetForms, setPublishAdSetForms] = useState<Record<string, MetaPublishAdSetForm>>({});
+  const [publishFormError, setPublishFormError] = useState<string | null>(null);
+  const [publishValidation, setPublishValidation] = useState<MetaPublishPlanValidation | null>(null);
+  const [publishValidationPending, setPublishValidationPending] = useState(false);
+  const [publishPending, setPublishPending] = useState(false);
+  const [publishRuns, setPublishRuns] = useState<MetaPublishRun[]>([]);
+  const [publishRunsLoading, setPublishRunsLoading] = useState(false);
+  const [publishRunsError, setPublishRunsError] = useState<string | null>(null);
 
   const assetBriefIds = useMemo(
     () => assetBriefs.map((brief) => brief.id).filter((briefId): briefId is string => Boolean(briefId)),
@@ -457,6 +587,16 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     [excludedPackageCount, includedPackageItems.length, latestGenerationPipeline.length],
   );
   const canManagePublishPackage = latestGenerationOnly && Boolean(latestGenerationKey);
+  const includedAdSetSpecs = useMemo(() => {
+    const byId = new Map<string, MetaAdSetSpec>();
+    includedPackageItems.forEach((item) => {
+      (item.adset_specs || []).forEach((spec) => {
+        if (!spec.id || byId.has(spec.id)) return;
+        byId.set(spec.id, spec);
+      });
+    });
+    return Array.from(byId.values());
+  }, [includedPackageItems]);
   const groupedPipeline = useMemo(() => {
     const groups = new Map<
       number,
@@ -547,6 +687,47 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     };
   }, [campaign.id, latestGenerationKey, listPublishSelections]);
 
+  useEffect(() => {
+    setPublishCampaignForm((current) => {
+      if (current.publishBaseUrl) return current;
+      return { ...current, publishBaseUrl: reviewBaseUrl || "" };
+    });
+  }, [reviewBaseUrl]);
+
+  useEffect(() => {
+    setPublishAdSetForms((current) => {
+      const next: Record<string, MetaPublishAdSetForm> = {};
+      includedAdSetSpecs.forEach((spec) => {
+        next[spec.id] = current[spec.id] || buildAdSetForm(spec);
+      });
+      return next;
+    });
+  }, [includedAdSetSpecs]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPublishRunsLoading(true);
+    setPublishRunsError(null);
+    listPublishRuns(campaign.id)
+      .then((data) => {
+        if (cancelled) return;
+        setPublishRuns(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPublishRuns([]);
+        setPublishRunsError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setPublishRunsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, listPublishRuns]);
+
   const handleSetPublishDecision = useCallback(
     async (assetId: string, decision: MetaPublishSelectionDecision | null) => {
       if (!latestGenerationKey) return;
@@ -567,6 +748,141 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     [campaign.id, latestGenerationKey, savePublishSelections],
   );
 
+  const updatePublishCampaignField = useCallback(
+    <K extends keyof MetaPublishCampaignForm>(field: K, value: MetaPublishCampaignForm[K]) => {
+      setPublishCampaignForm((current) => ({ ...current, [field]: value }));
+    },
+    [],
+  );
+
+  const updatePublishAdSetField = useCallback(
+    <K extends keyof MetaPublishAdSetForm>(adsetSpecId: string, field: K, value: MetaPublishAdSetForm[K]) => {
+      setPublishAdSetForms((current) => ({
+        ...current,
+        [adsetSpecId]: {
+          ...(current[adsetSpecId] || buildAdSetForm(includedAdSetSpecs.find((spec) => spec.id === adsetSpecId) || ({
+            id: adsetSpecId,
+            name: "",
+            status: "draft",
+          } as MetaAdSetSpec))),
+          [field]: value,
+        },
+      }));
+    },
+    [includedAdSetSpecs],
+  );
+
+  const buildPublishRequestPayload = useCallback(() => {
+    if (!latestGenerationKey) {
+      throw new Error("No latest generation is selected for publish.");
+    }
+    return {
+      generationKey: latestGenerationKey,
+      publishBaseUrl: publishCampaignForm.publishBaseUrl.trim(),
+      campaignName: publishCampaignForm.campaignName.trim(),
+      campaignObjective: publishCampaignForm.campaignObjective.trim(),
+      buyingType: publishCampaignForm.buyingType.trim() || null,
+      specialAdCategories: publishCampaignForm.specialAdCategories
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    };
+  }, [latestGenerationKey, publishCampaignForm]);
+
+  const persistPublishAdSetConfigs = useCallback(async () => {
+    for (const spec of includedAdSetSpecs) {
+      const form = publishAdSetForms[spec.id] || buildAdSetForm(spec);
+      const payload = {
+        name: form.name.trim() || null,
+        optimizationGoal: form.optimizationGoal.trim() || null,
+        billingEvent: form.billingEvent.trim() || null,
+        targeting: parseJsonObjectInput(form.targetingJson, `${spec.name || spec.id} targeting`),
+        placements: parseJsonObjectInput(form.placementsJson, `${spec.name || spec.id} placements`),
+        dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
+        lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
+        bidAmount: parseIntegerInput(form.bidAmount, `${spec.name || spec.id} bid amount`),
+        startTime: fromLocalDateTimeValue(form.startTime),
+        endTime: fromLocalDateTimeValue(form.endTime),
+        promotedObject: parseJsonObjectInput(form.promotedObjectJson, `${spec.name || spec.id} promoted object`),
+        conversionDomain: form.conversionDomain.trim() || null,
+      };
+      await updateAdSetSpec(spec.id, payload);
+    }
+  }, [includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
+
+  const refreshPublishRuns = useCallback(async () => {
+    setPublishRunsLoading(true);
+    setPublishRunsError(null);
+    try {
+      const data = await listPublishRuns(campaign.id);
+      setPublishRuns(data);
+    } catch (err) {
+      setPublishRunsError(getErrorMessage(err));
+    } finally {
+      setPublishRunsLoading(false);
+    }
+  }, [campaign.id, listPublishRuns]);
+
+  const handleValidatePublishPlan = useCallback(async () => {
+    setPublishFormError(null);
+    setPublishValidation(null);
+    setPublishValidationPending(true);
+    try {
+      await persistPublishAdSetConfigs();
+      await refreshPipeline();
+      const validation = await validatePublishPlan(campaign.id, buildPublishRequestPayload());
+      setPublishValidation(validation);
+      await refreshPublishRuns();
+    } catch (err) {
+      setPublishFormError(getErrorMessage(err));
+      const apiError = err as ApiError;
+      const validation = readRecord((apiError.raw as { detail?: unknown } | undefined)?.detail)?.validation;
+      const validationRecord = readRecord(validation);
+      if (validationRecord) {
+        setPublishValidation(validationRecord as unknown as MetaPublishPlanValidation);
+      }
+    } finally {
+      setPublishValidationPending(false);
+    }
+  }, [
+    buildPublishRequestPayload,
+    campaign.id,
+    persistPublishAdSetConfigs,
+    refreshPipeline,
+    refreshPublishRuns,
+    validatePublishPlan,
+  ]);
+
+  const handlePublishToMeta = useCallback(async () => {
+    setPublishFormError(null);
+    setPublishPending(true);
+    try {
+      await persistPublishAdSetConfigs();
+      await refreshPipeline();
+      const run = await createPublishRun(campaign.id, buildPublishRequestPayload());
+      setPublishValidation((run.metadata.validation as MetaPublishPlanValidation | undefined) || null);
+      await refreshPublishRuns();
+    } catch (err) {
+      setPublishFormError(getErrorMessage(err));
+      const apiError = err as ApiError;
+      const validation = readRecord((apiError.raw as { detail?: unknown } | undefined)?.detail)?.validation;
+      const validationRecord = readRecord(validation);
+      if (validationRecord) {
+        setPublishValidation(validationRecord as unknown as MetaPublishPlanValidation);
+      }
+      await refreshPublishRuns();
+    } finally {
+      setPublishPending(false);
+    }
+  }, [
+    buildPublishRequestPayload,
+    campaign.id,
+    createPublishRun,
+    persistPublishAdSetConfigs,
+    refreshPipeline,
+    refreshPublishRuns,
+  ]);
+
   return (
     <div className="space-y-4">
       <div className="border border-border bg-transparent p-4">
@@ -574,7 +890,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div>
             <div className="text-base font-semibold text-content">Meta ads review</div>
             <div className="text-sm text-content-muted">
-              Review internal Meta specs, exclude unwanted creatives, and curate the final package before publish is wired.
+              Review internal Meta specs, exclude unwanted creatives, validate the final package, and publish paused to Meta.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
@@ -824,6 +1140,289 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                   </div>
                 );
               })}
+
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-base font-semibold text-content">Publish setup</div>
+                    <div className="text-sm text-content-muted">
+                      Save the campaign and ad set inputs below, validate the final package, then publish paused to Meta.
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => void handleValidatePublishPlan()} disabled={publishValidationPending || publishPending}>
+                      {publishValidationPending ? "Validating…" : "Validate publish plan"}
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => void handlePublishToMeta()} disabled={publishPending || publishValidationPending}>
+                      {publishPending ? "Publishing…" : "Publish paused to Meta"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Campaign Config</div>
+                    <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                      <label className="block space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Publish Base URL</div>
+                        <Input
+                          value={publishCampaignForm.publishBaseUrl}
+                          onChange={(event) => updatePublishCampaignField("publishBaseUrl", event.target.value)}
+                          placeholder="https://shop.thehonestherbalist.com"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Meta Campaign Name</div>
+                        <Input
+                          value={publishCampaignForm.campaignName}
+                          onChange={(event) => updatePublishCampaignField("campaignName", event.target.value)}
+                          placeholder="Honest Herbalist Launch"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Campaign Objective</div>
+                        <Input
+                          value={publishCampaignForm.campaignObjective}
+                          onChange={(event) => updatePublishCampaignField("campaignObjective", event.target.value)}
+                          placeholder="OUTCOME_SALES"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Buying Type</div>
+                        <Input
+                          value={publishCampaignForm.buyingType}
+                          onChange={(event) => updatePublishCampaignField("buyingType", event.target.value)}
+                          placeholder="Optional"
+                        />
+                      </label>
+                      <label className="block space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Special Ad Categories</div>
+                        <Input
+                          value={publishCampaignForm.specialAdCategories}
+                          onChange={(event) => updatePublishCampaignField("specialAdCategories", event.target.value)}
+                          placeholder="Comma-separated, or leave blank"
+                        />
+                      </label>
+                      <div className="rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
+                        This publish path creates the Meta campaign, ad sets, and ads in <span className="font-semibold text-content">PAUSED</span> status.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">Ad Set Specs</div>
+                    {includedAdSetSpecs.length ? (
+                      <div className="space-y-3">
+                        {includedAdSetSpecs.map((spec) => {
+                          const form = publishAdSetForms[spec.id] || buildAdSetForm(spec);
+                          return (
+                            <div key={`publish-adset-${spec.id}`} className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-semibold text-content">{spec.name || spec.id}</div>
+                                <Badge tone="neutral">{shortId(spec.id, 5)}</Badge>
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Name</div>
+                                  <Input value={form.name} onChange={(event) => updatePublishAdSetField(spec.id, "name", event.target.value)} />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Optimization Goal</div>
+                                  <Input
+                                    value={form.optimizationGoal}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "optimizationGoal", event.target.value)}
+                                    placeholder="OFFSITE_CONVERSIONS"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Billing Event</div>
+                                  <Input
+                                    value={form.billingEvent}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "billingEvent", event.target.value)}
+                                    placeholder="IMPRESSIONS"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Conversion Domain</div>
+                                  <Input
+                                    value={form.conversionDomain}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "conversionDomain", event.target.value)}
+                                    placeholder="Optional"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Daily Budget</div>
+                                  <Input
+                                    value={form.dailyBudget}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "dailyBudget", event.target.value)}
+                                    placeholder="Leave blank to use lifetime budget"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Lifetime Budget</div>
+                                  <Input
+                                    value={form.lifetimeBudget}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "lifetimeBudget", event.target.value)}
+                                    placeholder="Leave blank to use daily budget"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Bid Amount</div>
+                                  <Input
+                                    value={form.bidAmount}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "bidAmount", event.target.value)}
+                                    placeholder="Optional"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Start Time</div>
+                                  <Input
+                                    type="datetime-local"
+                                    value={form.startTime}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "startTime", event.target.value)}
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">End Time</div>
+                                  <Input
+                                    type="datetime-local"
+                                    value={form.endTime}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "endTime", event.target.value)}
+                                  />
+                                </label>
+                              </div>
+                              <label className="block space-y-1">
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Targeting JSON</div>
+                                <Textarea
+                                  value={form.targetingJson}
+                                  onChange={(event) => updatePublishAdSetField(spec.id, "targetingJson", event.target.value)}
+                                  placeholder='{"geo_locations":{"countries":["US"]}}'
+                                />
+                              </label>
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Placements JSON</div>
+                                  <Textarea
+                                    value={form.placementsJson}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "placementsJson", event.target.value)}
+                                    placeholder="Optional"
+                                  />
+                                </label>
+                                <label className="block space-y-1">
+                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Promoted Object JSON</div>
+                                  <Textarea
+                                    value={form.promotedObjectJson}
+                                    onChange={(event) => updatePublishAdSetField(spec.id, "promotedObjectJson", event.target.value)}
+                                    placeholder='{"pixel_id":"...","custom_event_type":"PURCHASE"}'
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border bg-surface-2 px-4 py-4 text-sm text-content-muted">
+                        Included creatives do not have linked Meta ad set specs yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {publishFormError ? <div className="mt-4 text-sm text-danger">{publishFormError}</div> : null}
+
+                {publishValidation ? (
+                  <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold text-content">Publish validation</div>
+                      <Badge tone={publishValidation.ok ? "success" : "danger"}>
+                        {publishValidation.ok ? "Ready to publish" : "Blocked"}
+                      </Badge>
+                      {publishValidation.publishDomain ? <Badge tone="neutral">{publishValidation.publishDomain}</Badge> : null}
+                    </div>
+                    {publishValidation.blockers.length ? (
+                      <div className="space-y-1 text-sm text-danger">
+                        {publishValidation.blockers.map((blocker) => (
+                          <div key={blocker}>{blocker}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="space-y-2">
+                      {publishValidation.items.map((validationItem) => (
+                        <div key={`publish-validation-${validationItem.assetId}`} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-content-muted">{shortId(validationItem.assetId, 5)}</span>
+                            <Badge tone={validationItem.status === "ok" ? "success" : "danger"}>
+                              {validationItem.status === "ok" ? "OK" : "Blocked"}
+                            </Badge>
+                            {validationItem.resolvedDestinationUrl ? (
+                              <span className="truncate text-content-muted">{validationItem.resolvedDestinationUrl}</span>
+                            ) : null}
+                          </div>
+                          {validationItem.blockers.length ? (
+                            <div className="mt-2 space-y-1 text-danger">
+                              {validationItem.blockers.map((blocker) => (
+                                <div key={`${validationItem.assetId}-${blocker}`}>{blocker}</div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="text-base font-semibold text-content">Publish history</div>
+                <div className="mt-1 text-sm text-content-muted">Stored Meta publish runs for this campaign.</div>
+                {publishRunsLoading ? (
+                  <div className="mt-3 text-sm text-content-muted">Loading publish runs…</div>
+                ) : publishRunsError ? (
+                  <div className="mt-3 text-sm text-danger">{publishRunsError}</div>
+                ) : !publishRuns.length ? (
+                  <div className="mt-3 text-sm text-content-muted">No Meta publish runs yet.</div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {publishRuns.map((run) => (
+                      <div key={`publish-run-${run.id}`} className="rounded-xl border border-border bg-surface-2 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="text-sm font-semibold text-content">{run.campaignName}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone={run.status === "published" ? "success" : run.status === "failed" ? "danger" : "accent"}>
+                                {run.status}
+                              </Badge>
+                              <Badge tone="neutral">{run.generationKey}</Badge>
+                              {run.metaCampaignId ? <Badge tone="neutral">Meta {shortId(run.metaCampaignId, 5)}</Badge> : null}
+                            </div>
+                          </div>
+                          <div className="text-xs text-content-muted">{formatDate(run.createdAt)}</div>
+                        </div>
+                        {run.errorMessage ? <div className="mt-2 text-sm text-danger">{run.errorMessage}</div> : null}
+                        <div className="mt-3 space-y-2">
+                          {run.items.map((runItem) => (
+                            <div key={`publish-run-item-${runItem.id}`} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-xs text-content-muted">{shortId(runItem.assetId, 5)}</span>
+                                <Badge tone={runItem.status === "published" ? "success" : runItem.status === "failed" ? "danger" : "accent"}>
+                                  {runItem.status}
+                                </Badge>
+                                {runItem.metaAdId ? <span className="text-content-muted">Ad {shortId(runItem.metaAdId, 5)}</span> : null}
+                                {runItem.metaCreativeId ? (
+                                  <span className="text-content-muted">Creative {shortId(runItem.metaCreativeId, 5)}</span>
+                                ) : null}
+                                {runItem.metaAdSetId ? <span className="text-content-muted">Ad set {shortId(runItem.metaAdSetId, 5)}</span> : null}
+                              </div>
+                              {runItem.errorMessage ? <div className="mt-2 text-danger">{runItem.errorMessage}</div> : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

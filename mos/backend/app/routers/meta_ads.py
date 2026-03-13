@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import mimetypes
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any, Optional
 from typing import Literal
+from urllib.parse import urljoin, urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -27,17 +29,26 @@ from app.db.models import (
     MetaAssetUpload,
     MetaCampaign,
     MetaCreativeSpec,
+    MetaPublishRun,
+    MetaPublishRunItem,
 )
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.experiments import ExperimentsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.meta_ads import (
     MetaAdCreateRequest,
     MetaAdSetCreateRequest,
     MetaAdSetSpecCreateRequest,
+    MetaAdSetSpecUpdateRequest,
     MetaAssetUploadRequest,
     MetaCampaignCreateRequest,
+    MetaPublishPlanValidationResponse,
+    MetaPublishPlanValidationItemResponse,
+    MetaPublishRunItemResponse,
+    MetaPublishRunRequest,
+    MetaPublishRunResponse,
     CampaignMetaPublishSelectionsRequest,
     MetaCreativeCreateRequest,
     MetaCreativePreviewRequest,
@@ -196,6 +207,237 @@ def _publish_selection_response(record: Any) -> MetaPublishSelectionResponse:
         createdAt=record.created_at.isoformat(),
         updatedAt=record.updated_at.isoformat(),
     )
+
+
+def _clean_optional_text(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _resolve_publish_destination_url(*, destination_url: str | None, publish_base_url: str) -> str | None:
+    cleaned = _clean_optional_text(destination_url)
+    if not cleaned:
+        return None
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        return cleaned
+    if cleaned.startswith("/"):
+        return urljoin(f"{publish_base_url.rstrip('/')}/", cleaned.lstrip("/"))
+    return None
+
+
+def _publish_run_item_response(record: MetaPublishRunItem) -> MetaPublishRunItemResponse:
+    return MetaPublishRunItemResponse(
+        id=str(record.id),
+        assetId=str(record.asset_id),
+        creativeSpecId=str(record.creative_spec_id) if record.creative_spec_id else None,
+        adsetSpecId=str(record.adset_spec_id) if record.adset_spec_id else None,
+        status=record.status,
+        resolvedDestinationUrl=record.resolved_destination_url,
+        metaAssetUploadId=record.meta_asset_upload_id,
+        metaCreativeId=record.meta_creative_id,
+        metaAdSetId=record.meta_adset_id,
+        metaAdId=record.meta_ad_id,
+        errorMessage=record.error_message,
+        metadata=record.metadata_json if isinstance(record.metadata_json, dict) else {},
+        createdAt=record.created_at.isoformat(),
+        updatedAt=record.updated_at.isoformat(),
+    )
+
+
+def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) -> MetaPublishRunResponse:
+    special_ad_categories = run.special_ad_categories_json if isinstance(run.special_ad_categories_json, list) else []
+    return MetaPublishRunResponse(
+        id=str(run.id),
+        campaignId=str(run.campaign_id),
+        generationKey=run.generation_key,
+        status=run.status,
+        campaignName=run.campaign_name,
+        campaignObjective=run.campaign_objective,
+        buyingType=run.buying_type,
+        specialAdCategories=[str(entry).strip() for entry in special_ad_categories if isinstance(entry, str) and entry.strip()],
+        publishBaseUrl=run.publish_base_url,
+        publishDomain=run.publish_domain,
+        adAccountId=run.ad_account_id,
+        pageId=run.page_id,
+        metaCampaignId=run.meta_campaign_id,
+        errorMessage=run.error_message,
+        metadata=run.metadata_json if isinstance(run.metadata_json, dict) else {},
+        items=[_publish_run_item_response(item) for item in items],
+        createdByUserId=run.created_by_user_id,
+        createdAt=run.created_at.isoformat(),
+        updatedAt=run.updated_at.isoformat(),
+        completedAt=run.completed_at.isoformat() if run.completed_at else None,
+    )
+
+
+def _validate_publish_plan(
+    *,
+    campaign: Campaign,
+    payload: MetaPublishRunRequest,
+    auth: AuthContext,
+    session: Session,
+) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]]]:
+    meta_repo = MetaAdsRepository(session)
+    selections = [
+        selection
+        for selection in meta_repo.list_publish_selections(
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            generation_key=payload.generationKey,
+        )
+        if selection.decision == "included"
+    ]
+
+    blockers: list[str] = []
+    if not selections:
+        blockers.append("No creatives are included in the final Meta package for this generation.")
+
+    profile = PaidAdsQaRepository(session).get_platform_profile(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        platform="meta",
+    )
+    ad_account_id = _clean_optional_text(getattr(profile, "ad_account_id", None))
+    profile_page_id = _clean_optional_text(getattr(profile, "page_id", None))
+    if not ad_account_id:
+        blockers.append("Meta platform profile is missing adAccountId.")
+
+    asset_ids = [str(selection.asset_id) for selection in selections]
+    asset_rows = session.scalars(
+        select(Asset).where(
+            Asset.org_id == auth.org_id,
+            Asset.campaign_id == str(campaign.id),
+            Asset.id.in_(asset_ids),
+        )
+    ).all()
+    assets_by_id = {str(asset.id): asset for asset in asset_rows}
+
+    creative_specs = session.scalars(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.org_id == auth.org_id,
+            MetaCreativeSpec.asset_id.in_(asset_ids),
+        )
+    ).all()
+    creative_specs_by_asset_id = {str(spec.asset_id): spec for spec in creative_specs}
+
+    adset_specs = session.scalars(
+        select(MetaAdSetSpec).where(
+            MetaAdSetSpec.org_id == auth.org_id,
+            MetaAdSetSpec.campaign_id == str(campaign.id),
+        )
+    ).all()
+    adset_spec_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
+    for spec in adset_specs:
+        experiment_key = _meta_experiment_key(
+            experiment_id=str(spec.experiment_id) if spec.experiment_id else None,
+            metadata_json=spec.metadata_json,
+        )
+        if experiment_key:
+            adset_spec_map[experiment_key].append(spec)
+
+    validation_items: list[MetaPublishPlanValidationItemResponse] = []
+    resolved_items: list[dict[str, Any]] = []
+    publish_domains: set[str] = set()
+
+    for selection in selections:
+        asset_id = str(selection.asset_id)
+        item_blockers: list[str] = []
+        asset = assets_by_id.get(asset_id)
+        creative_spec = creative_specs_by_asset_id.get(asset_id)
+        adset_spec: MetaAdSetSpec | None = None
+        resolved_destination_url: str | None = None
+
+        if asset is None:
+            item_blockers.append("Included asset was not found on this campaign.")
+        if creative_spec is None:
+            item_blockers.append("Included asset is missing a prepared Meta creative spec.")
+
+        if asset is not None and creative_spec is not None:
+            experiment_key = (
+                str(asset.experiment_id)
+                if asset.experiment_id
+                else _meta_experiment_key(
+                    experiment_id=str(creative_spec.experiment_id) if creative_spec.experiment_id else None,
+                    metadata_json=creative_spec.metadata_json,
+                )
+            )
+            linked_adset_specs = adset_spec_map.get(experiment_key, []) if experiment_key else []
+            if not linked_adset_specs:
+                item_blockers.append("Included asset is missing a linked Meta ad set spec.")
+            elif len(linked_adset_specs) > 1:
+                item_blockers.append("Included asset resolves to multiple Meta ad set specs. Publish requires exactly one.")
+            else:
+                adset_spec = linked_adset_specs[0]
+                if not _clean_optional_text(adset_spec.name):
+                    item_blockers.append("Linked Meta ad set spec is missing a name.")
+                if not _clean_optional_text(adset_spec.optimization_goal):
+                    item_blockers.append("Linked Meta ad set spec is missing optimizationGoal.")
+                if not _clean_optional_text(adset_spec.billing_event):
+                    item_blockers.append("Linked Meta ad set spec is missing billingEvent.")
+                if not isinstance(adset_spec.targeting, dict) or not adset_spec.targeting:
+                    item_blockers.append("Linked Meta ad set spec is missing targeting.")
+                if adset_spec.daily_budget is None and adset_spec.lifetime_budget is None:
+                    item_blockers.append("Linked Meta ad set spec must set either dailyBudget or lifetimeBudget.")
+                if adset_spec.daily_budget is not None and adset_spec.lifetime_budget is not None:
+                    item_blockers.append("Linked Meta ad set spec cannot set both dailyBudget and lifetimeBudget.")
+                if adset_spec.start_time and adset_spec.end_time and adset_spec.end_time <= adset_spec.start_time:
+                    item_blockers.append("Linked Meta ad set spec endTime must be after startTime.")
+
+            effective_page_id = _clean_optional_text(creative_spec.page_id) or profile_page_id
+            if not effective_page_id:
+                item_blockers.append("Included asset is missing an effective Meta pageId.")
+
+            resolved_destination_url = _resolve_publish_destination_url(
+                destination_url=_clean_optional_text(creative_spec.destination_url),
+                publish_base_url=payload.publishBaseUrl,
+            )
+            if not resolved_destination_url:
+                item_blockers.append(
+                    "Creative destination URL must be absolute or start with '/' so it can resolve against publishBaseUrl."
+                )
+            else:
+                destination_host = urlparse(resolved_destination_url).hostname
+                if destination_host:
+                    publish_domains.add(destination_host.lower())
+
+        validation_items.append(
+            MetaPublishPlanValidationItemResponse(
+                assetId=asset_id,
+                creativeSpecId=str(creative_spec.id) if creative_spec else None,
+                adsetSpecId=str(adset_spec.id) if adset_spec else None,
+                resolvedDestinationUrl=resolved_destination_url,
+                status="blocked" if item_blockers else "ok",
+                blockers=item_blockers,
+            )
+        )
+
+        if not item_blockers and asset is not None and creative_spec is not None and adset_spec is not None:
+            resolved_items.append(
+                {
+                    "asset": asset,
+                    "creative_spec": creative_spec,
+                    "adset_spec": adset_spec,
+                    "resolved_destination_url": resolved_destination_url,
+                    "effective_page_id": _clean_optional_text(creative_spec.page_id) or profile_page_id,
+                }
+            )
+
+    if len(publish_domains) > 1:
+        blockers.append("Included creatives resolve to multiple publish domains. Use one launch domain per publish run.")
+
+    validation_response = MetaPublishPlanValidationResponse(
+        campaignId=str(campaign.id),
+        generationKey=payload.generationKey,
+        ok=not blockers and all(item.status == "ok" for item in validation_items),
+        includedCount=len(selections),
+        adsetCount=len({str(item["adset_spec"].id) for item in resolved_items}),
+        publishBaseUrl=payload.publishBaseUrl,
+        publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
+        blockers=blockers,
+        items=validation_items,
+    )
+    return validation_response, resolved_items
 
 
 @router.post("/assets/{asset_id}/upload", status_code=status.HTTP_201_CREATED)
@@ -867,6 +1109,73 @@ def list_meta_adset_specs(
     return jsonable_encoder(records)
 
 
+@router.put("/specs/adsets/{adset_spec_id}")
+def update_meta_adset_spec(
+    adset_spec_id: str,
+    payload: MetaAdSetSpecUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = MetaAdsRepository(session)
+    record = repo.get_adset_spec(org_id=auth.org_id, adset_spec_id=adset_spec_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta ad set spec not found")
+
+    update_fields = payload.model_dump(exclude_unset=True)
+    if not update_fields:
+        return jsonable_encoder(record)
+
+    daily_budget = update_fields.get("dailyBudget", record.daily_budget)
+    lifetime_budget = update_fields.get("lifetimeBudget", record.lifetime_budget)
+    if daily_budget is not None and lifetime_budget is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide at most one of dailyBudget or lifetimeBudget.",
+        )
+
+    start_time = update_fields.get("startTime", record.start_time)
+    end_time = update_fields.get("endTime", record.end_time)
+    if start_time and end_time and end_time <= start_time:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="endTime must be after startTime.",
+        )
+
+    updated = repo.update_adset_spec(
+        record,
+        name=_clean_optional_text(update_fields["name"]) if "name" in update_fields else record.name,
+        optimization_goal=(
+            _clean_optional_text(update_fields["optimizationGoal"])
+            if "optimizationGoal" in update_fields
+            else record.optimization_goal
+        ),
+        billing_event=(
+            _clean_optional_text(update_fields["billingEvent"])
+            if "billingEvent" in update_fields
+            else record.billing_event
+        ),
+        targeting=update_fields["targeting"] if "targeting" in update_fields else record.targeting,
+        placements=update_fields["placements"] if "placements" in update_fields else record.placements,
+        daily_budget=daily_budget,
+        lifetime_budget=lifetime_budget,
+        bid_amount=update_fields["bidAmount"] if "bidAmount" in update_fields else record.bid_amount,
+        start_time=start_time,
+        end_time=end_time,
+        promoted_object=update_fields["promotedObject"] if "promotedObject" in update_fields else record.promoted_object,
+        conversion_domain=(
+            _clean_optional_text(update_fields["conversionDomain"])
+            if "conversionDomain" in update_fields
+            else record.conversion_domain
+        ),
+        metadata_json=(
+            update_fields["metadata"]
+            if "metadata" in update_fields and update_fields["metadata"] is not None
+            else record.metadata_json
+        ),
+    )
+    return jsonable_encoder(updated)
+
+
 @router.get("/campaigns/{campaign_id}/publish-selections", response_model=list[MetaPublishSelectionResponse])
 def list_meta_publish_selections(
     campaign_id: str,
@@ -963,6 +1272,312 @@ def update_meta_publish_selections(
         generation_key=payload.generationKey,
     )
     return [_publish_selection_response(record) for record in records]
+
+
+@router.post(
+    "/campaigns/{campaign_id}/publish-plan/validate",
+    response_model=MetaPublishPlanValidationResponse,
+)
+def validate_meta_publish_plan(
+    campaign_id: str,
+    payload: MetaPublishRunRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    validation_response, _resolved_items = _validate_publish_plan(
+        campaign=campaign,
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
+    return validation_response
+
+
+@router.get("/campaigns/{campaign_id}/publish-runs", response_model=list[MetaPublishRunResponse])
+def list_meta_publish_runs(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    repo = MetaAdsRepository(session)
+    runs = repo.list_publish_runs(org_id=auth.org_id, campaign_id=str(campaign.id))
+    return [
+        _publish_run_response(run, repo.list_publish_run_items(org_id=auth.org_id, publish_run_id=str(run.id)))
+        for run in runs
+    ]
+
+
+@router.post("/campaigns/{campaign_id}/publish-runs", response_model=MetaPublishRunResponse)
+def create_meta_publish_run(
+    campaign_id: str,
+    payload: MetaPublishRunRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    validation_response, resolved_items = _validate_publish_plan(
+        campaign=campaign,
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
+    if not validation_response.ok:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Publish plan is blocked.",
+                "validation": jsonable_encoder(validation_response),
+            },
+        )
+
+    profile = PaidAdsQaRepository(session).get_platform_profile(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        platform="meta",
+    )
+    ad_account_id = _clean_optional_text(getattr(profile, "ad_account_id", None))
+    page_id = _clean_optional_text(getattr(profile, "page_id", None))
+    if not ad_account_id or not page_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta platform profile must have adAccountId and pageId before publishing.",
+        )
+
+    repo = MetaAdsRepository(session)
+    run = repo.create_publish_run(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+        generation_key=payload.generationKey,
+        status="running",
+        campaign_name=payload.campaignName,
+        campaign_objective=payload.campaignObjective,
+        buying_type=payload.buyingType,
+        special_ad_categories_json=payload.specialAdCategories,
+        publish_base_url=payload.publishBaseUrl,
+        publish_domain=validation_response.publishDomain,
+        ad_account_id=ad_account_id,
+        page_id=page_id,
+        meta_campaign_id=None,
+        created_by_user_id=auth.user_id,
+        error_message=None,
+        metadata_json={"validation": validation_response.model_dump(mode="json")},
+        completed_at=None,
+    )
+
+    run_items_by_asset_id: dict[str, MetaPublishRunItem] = {}
+    for resolved in resolved_items:
+        asset = resolved["asset"]
+        creative_spec = resolved["creative_spec"]
+        adset_spec = resolved["adset_spec"]
+        run_item = repo.create_publish_run_item(
+            org_id=auth.org_id,
+            publish_run_id=str(run.id),
+            asset_id=str(asset.id),
+            creative_spec_id=str(creative_spec.id),
+            adset_spec_id=str(adset_spec.id),
+            status="pending",
+            resolved_destination_url=resolved["resolved_destination_url"],
+            meta_asset_upload_id=None,
+            meta_creative_id=None,
+            meta_adset_id=None,
+            meta_ad_id=None,
+            error_message=None,
+            metadata_json={
+                "assetPublicId": str(asset.public_id),
+                "creativeSpecName": creative_spec.name,
+                "adsetSpecName": adset_spec.name,
+            },
+        )
+        run_items_by_asset_id[str(asset.id)] = run_item
+
+    try:
+        created_campaign = create_meta_campaign(
+            MetaCampaignCreateRequest(
+                requestId=f"meta-publish-run:{run.id}:campaign",
+                adAccountId=ad_account_id,
+                campaignId=str(campaign.id),
+                name=payload.campaignName,
+                objective=payload.campaignObjective,
+                status="PAUSED",
+                specialAdCategories=payload.specialAdCategories,
+                buyingType=payload.buyingType,
+                isAdsetBudgetSharingEnabled=False,
+            ),
+            auth=auth,
+            session=session,
+        )
+        meta_campaign_id = _clean_optional_text(created_campaign.get("meta_campaign_id"))
+        run = repo.update_publish_run(
+            run,
+            meta_campaign_id=meta_campaign_id,
+            metadata_json={
+                **(run.metadata_json if isinstance(run.metadata_json, dict) else {}),
+                "campaign": created_campaign,
+            },
+        )
+
+        meta_adset_id_by_spec_id: dict[str, str] = {}
+        unique_adset_specs: dict[str, MetaAdSetSpec] = {}
+        for resolved in resolved_items:
+            unique_adset_specs[str(resolved["adset_spec"].id)] = resolved["adset_spec"]
+
+        for adset_spec_id, adset_spec in unique_adset_specs.items():
+            created_adset = create_meta_adset(
+                MetaAdSetCreateRequest(
+                    requestId=f"meta-publish-run:{run.id}:adset:{adset_spec_id}",
+                    adAccountId=ad_account_id,
+                    campaignId=meta_campaign_id or "",
+                    name=_clean_optional_text(adset_spec.name) or adset_spec_id,
+                    status="PAUSED",
+                    dailyBudget=adset_spec.daily_budget,
+                    lifetimeBudget=adset_spec.lifetime_budget,
+                    billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
+                    optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
+                    targeting=adset_spec.targeting or {},
+                    startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
+                    endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
+                    bidAmount=adset_spec.bid_amount,
+                    promotedObject=adset_spec.promoted_object,
+                    validateOnly=False,
+                ),
+                auth=auth,
+                session=session,
+            )
+            meta_adset_id = _clean_optional_text(created_adset.get("meta_adset_id"))
+            if not meta_adset_id:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Meta publish run did not receive a meta_adset_id for ad set spec {adset_spec_id}.",
+                )
+            meta_adset_id_by_spec_id[adset_spec_id] = meta_adset_id
+
+        for resolved in resolved_items:
+            asset = resolved["asset"]
+            creative_spec = resolved["creative_spec"]
+            adset_spec = resolved["adset_spec"]
+            run_item = run_items_by_asset_id[str(asset.id)]
+
+            uploaded_asset = upload_meta_asset(
+                str(asset.id),
+                MetaAssetUploadRequest(
+                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:upload",
+                    adAccountId=ad_account_id,
+                ),
+                auth=auth,
+                session=session,
+            )
+            created_creative = create_meta_creative(
+                MetaCreativeCreateRequest(
+                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:creative",
+                    adAccountId=ad_account_id,
+                    assetId=str(asset.id),
+                    name=_clean_optional_text(creative_spec.name) or str(asset.public_id),
+                    pageId=resolved["effective_page_id"],
+                    instagramActorId=_clean_optional_text(creative_spec.instagram_actor_id),
+                    linkUrl=resolved["resolved_destination_url"],
+                    message=_clean_optional_text(creative_spec.primary_text),
+                    headline=_clean_optional_text(creative_spec.headline),
+                    description=_clean_optional_text(creative_spec.description),
+                    callToActionType=_clean_optional_text(creative_spec.call_to_action_type),
+                    validateOnly=False,
+                ),
+                auth=auth,
+                session=session,
+            )
+            meta_creative_id = _clean_optional_text(created_creative.get("meta_creative_id"))
+            if not meta_creative_id:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Meta publish run did not receive a meta_creative_id for asset {asset.id}.",
+                )
+
+            created_ad = create_meta_ad(
+                MetaAdCreateRequest(
+                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:ad",
+                    adAccountId=ad_account_id,
+                    adsetId=meta_adset_id_by_spec_id[str(adset_spec.id)],
+                    creativeId=meta_creative_id,
+                    name=_clean_optional_text(creative_spec.name) or str(asset.public_id),
+                    status="PAUSED",
+                    trackingSpecs=None,
+                    conversionDomain=_clean_optional_text(adset_spec.conversion_domain),
+                    validateOnly=False,
+                ),
+                auth=auth,
+                session=session,
+            )
+            meta_ad_id = _clean_optional_text(created_ad.get("meta_ad_id"))
+            if not meta_ad_id:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Meta publish run did not receive a meta_ad_id for asset {asset.id}.",
+                )
+
+            updated_item = repo.update_publish_run_item(
+                run_item,
+                status="published",
+                meta_asset_upload_id=_clean_optional_text(uploaded_asset.get("id")),
+                meta_creative_id=meta_creative_id,
+                meta_adset_id=meta_adset_id_by_spec_id[str(adset_spec.id)],
+                meta_ad_id=meta_ad_id,
+                metadata_json={
+                    **(run_item.metadata_json if isinstance(run_item.metadata_json, dict) else {}),
+                    "upload": uploaded_asset,
+                    "creative": created_creative,
+                    "ad": created_ad,
+                },
+            )
+            run_items_by_asset_id[str(asset.id)] = updated_item
+
+        run = repo.update_publish_run(
+            run,
+            status="published",
+            completed_at=datetime.now(timezone.utc),
+        )
+    except HTTPException as exc:
+        error_message = exc.detail if isinstance(exc.detail, str) else jsonable_encoder(exc.detail)
+        run = repo.update_publish_run(
+            run,
+            status="failed",
+            error_message=error_message if isinstance(error_message, str) else str(error_message),
+            completed_at=datetime.now(timezone.utc),
+        )
+        for item in run_items_by_asset_id.values():
+            if item.status == "published":
+                continue
+            repo.update_publish_run_item(
+                item,
+                status="failed",
+                error_message=error_message if isinstance(error_message, str) else str(error_message),
+            )
+    except Exception as exc:  # noqa: BLE001
+        run = repo.update_publish_run(
+            run,
+            status="failed",
+            error_message=str(exc),
+            completed_at=datetime.now(timezone.utc),
+        )
+        for item in run_items_by_asset_id.values():
+            if item.status == "published":
+                continue
+            repo.update_publish_run_item(item, status="failed", error_message=str(exc))
+
+    items = repo.list_publish_run_items(org_id=auth.org_id, publish_run_id=str(run.id))
+    return _publish_run_response(run, items)
 
 
 @router.get("/pipeline/assets")

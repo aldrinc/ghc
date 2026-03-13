@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal, Optional
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -194,3 +195,145 @@ class MetaPublishSelectionResponse(BaseModel):
     decidedByUserId: str | None = None
     createdAt: str
     updatedAt: str
+
+
+class MetaAdSetSpecUpdateRequest(BaseModel):
+    name: str | None = None
+    optimizationGoal: str | None = None
+    billingEvent: str | None = None
+    targeting: dict[str, Any] | None = None
+    placements: dict[str, Any] | None = None
+    dailyBudget: int | None = None
+    lifetimeBudget: int | None = None
+    bidAmount: int | None = None
+    startTime: datetime | None = None
+    endTime: datetime | None = None
+    promotedObject: dict[str, Any] | None = None
+    conversionDomain: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class MetaPublishRunRequest(BaseModel):
+    generationKey: str
+    publishBaseUrl: str
+    campaignName: str
+    campaignObjective: str
+    buyingType: str | None = None
+    specialAdCategories: list[str] = Field(default_factory=list)
+
+    @field_validator("generationKey")
+    @classmethod
+    def _validate_publish_generation_key(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("generationKey must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("publishBaseUrl")
+    @classmethod
+    def _validate_publish_base_url(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("publishBaseUrl must be a non-empty string.")
+        cleaned = value.strip().rstrip("/")
+        parsed = urlparse(cleaned)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("publishBaseUrl must be an absolute http(s) URL.")
+        return cleaned
+
+    @field_validator("campaignName")
+    @classmethod
+    def _validate_campaign_name(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("campaignName must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("campaignObjective")
+    @classmethod
+    def _validate_campaign_objective(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("campaignObjective must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("buyingType")
+    @classmethod
+    def _validate_buying_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("buyingType must be a non-empty string when provided.")
+        return value.strip()
+
+    @field_validator("specialAdCategories")
+    @classmethod
+    def _validate_special_ad_categories(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                continue
+            normalized = entry.strip()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            cleaned.append(normalized)
+        return cleaned
+
+
+class MetaPublishPlanValidationItemResponse(BaseModel):
+    assetId: str
+    creativeSpecId: str | None = None
+    adsetSpecId: str | None = None
+    resolvedDestinationUrl: str | None = None
+    status: Literal["ok", "blocked"]
+    blockers: list[str] = Field(default_factory=list)
+
+
+class MetaPublishPlanValidationResponse(BaseModel):
+    campaignId: str
+    generationKey: str
+    ok: bool
+    includedCount: int
+    adsetCount: int
+    publishBaseUrl: str
+    publishDomain: str | None = None
+    blockers: list[str] = Field(default_factory=list)
+    items: list[MetaPublishPlanValidationItemResponse] = Field(default_factory=list)
+
+
+class MetaPublishRunItemResponse(BaseModel):
+    id: str
+    assetId: str
+    creativeSpecId: str | None = None
+    adsetSpecId: str | None = None
+    status: str
+    resolvedDestinationUrl: str | None = None
+    metaAssetUploadId: str | None = None
+    metaCreativeId: str | None = None
+    metaAdSetId: str | None = None
+    metaAdId: str | None = None
+    errorMessage: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    createdAt: str
+    updatedAt: str
+
+
+class MetaPublishRunResponse(BaseModel):
+    id: str
+    campaignId: str
+    generationKey: str
+    status: str
+    campaignName: str
+    campaignObjective: str
+    buyingType: str | None = None
+    specialAdCategories: list[str] = Field(default_factory=list)
+    publishBaseUrl: str
+    publishDomain: str | None = None
+    adAccountId: str | None = None
+    pageId: str | None = None
+    metaCampaignId: str | None = None
+    errorMessage: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    items: list[MetaPublishRunItemResponse] = Field(default_factory=list)
+    createdByUserId: str | None = None
+    createdAt: str
+    updatedAt: str
+    completedAt: str | None = None
