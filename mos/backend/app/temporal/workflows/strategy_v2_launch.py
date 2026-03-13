@@ -11,6 +11,7 @@ from temporalio.common import RetryPolicy
 with workflow.unsafe.imports_passed_through():
     from app.config import settings
     from app.temporal.activities.campaign_intent_activities import (
+        configure_generated_funnels_meta_tracking_activity,
         create_campaign_activity,
         create_funnels_from_experiments_activity,
     )
@@ -134,9 +135,15 @@ def _select_best_offer_variant(offer_variants_payload: dict[str, Any]) -> str:
 
 
 def _extract_funnel_id(funnels_result: dict[str, Any]) -> str | None:
+    funnel_ids = _extract_funnel_ids(funnels_result)
+    return funnel_ids[0] if funnel_ids else None
+
+
+def _extract_funnel_ids(funnels_result: dict[str, Any]) -> list[str]:
     rows = funnels_result.get("funnels")
     if not isinstance(rows, list):
-        return None
+        return []
+    funnel_ids: list[str] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -145,8 +152,28 @@ def _extract_funnel_id(funnels_result: dict[str, Any]) -> str | None:
             continue
         funnel_id = funnel.get("funnel_id")
         if isinstance(funnel_id, str) and funnel_id.strip():
-            return funnel_id.strip()
-    return None
+            funnel_ids.append(funnel_id.strip())
+    return funnel_ids
+
+
+async def _configure_meta_tracking_for_generated_funnels(
+    *,
+    org_id: str,
+    client_id: str,
+    campaign_id: str,
+    funnel_ids: list[str],
+) -> dict[str, Any]:
+    return await workflow.execute_activity(
+        configure_generated_funnels_meta_tracking_activity,
+        {
+            "org_id": org_id,
+            "client_id": client_id,
+            "campaign_id": campaign_id,
+            "funnel_ids": funnel_ids,
+        },
+        schedule_to_close_timeout=timedelta(minutes=2),
+        retry_policy=_RETRY_POLICY,
+    )
 
 
 def _extract_media_enrichment_jobs(funnels_result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -351,6 +378,9 @@ class StrategyV2AngleCampaignLaunchWorkflow:
             source_copy_context_artifact_id: str
             strategy_v2_packet: dict[str, Any]
             strategy_v2_copy_context: dict[str, Any]
+            source_stage3: dict[str, Any]
+            source_offer: dict[str, Any]
+            source_copy: dict[str, Any]
 
             if launch_type == "initial_angle":
                 strategy_v2_packet = _require_dict(
@@ -388,6 +418,18 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 source_copy_context_artifact_id = _require_nonempty_string(
                     launch_item.get("source_copy_context_artifact_id"),
                     field_name="launch_item.source_copy_context_artifact_id",
+                )
+                source_stage3 = _require_dict(
+                    launch_item.get("source_stage3"),
+                    field_name="launch_item.source_stage3",
+                )
+                source_offer = _require_dict(
+                    launch_item.get("source_offer"),
+                    field_name="launch_item.source_offer",
+                )
+                source_copy = _require_dict(
+                    launch_item.get("source_copy"),
+                    field_name="launch_item.source_copy",
                 )
             else:
                 stage1 = _require_dict(input.stage1, field_name="stage1")
@@ -646,38 +688,39 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 )
                 awareness_payload = stage3_result.get("awareness_matrix")
                 awareness_matrix_payload = awareness_payload if isinstance(awareness_payload, dict) else None
+                offer_payload = {
+                    "stage3": stage3_payload,
+                    "selected_variant": next(
+                        (
+                            variant
+                            for variant in variants
+                            if str(variant.get("variant_id")) == selected_variant_id
+                        ),
+                        {},
+                    ),
+                    "selected_variant_score": next(
+                        (
+                            row
+                            for row in _normalize_dict_rows(
+                                _require_dict(
+                                    offer_variants_payload.get("composite_results"),
+                                    field_name="offer_variants_output.composite_results",
+                                ).get("variants"),
+                                field_name="offer_variants_output.composite_results.variants",
+                            )
+                            if str(row.get("variant_id")) == selected_variant_id
+                        ),
+                        None,
+                    ),
+                    "decision": _build_offer_winner_decision(
+                        operator_user_id=input.operator_user_id,
+                        variant_id=selected_variant_id,
+                        variants=variants,
+                    ),
+                }
                 strategy_v2_packet = build_strategy_v2_downstream_packet(
                     stage3=stage3_payload,
-                    offer={
-                        "stage3": stage3_payload,
-                        "selected_variant": next(
-                            (
-                                variant
-                                for variant in variants
-                                if str(variant.get("variant_id")) == selected_variant_id
-                            ),
-                            {},
-                        ),
-                        "selected_variant_score": next(
-                            (
-                                row
-                                for row in _normalize_dict_rows(
-                                    _require_dict(
-                                        offer_variants_payload.get("composite_results"),
-                                        field_name="offer_variants_output.composite_results",
-                                    ).get("variants"),
-                                    field_name="offer_variants_output.composite_results.variants",
-                                )
-                                if str(row.get("variant_id")) == selected_variant_id
-                            ),
-                            None,
-                        ),
-                        "decision": _build_offer_winner_decision(
-                            operator_user_id=input.operator_user_id,
-                            variant_id=selected_variant_id,
-                            variants=variants,
-                        ),
-                    },
+                    offer=offer_payload,
                     copy=copy_payload,
                     copy_context=copy_context_payload,
                     awareness_angle_matrix=awareness_matrix_payload,
@@ -692,6 +735,9 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 if not isinstance(strategy_v2_packet, dict):
                     raise RuntimeError("Failed to build downstream packet for additional angle launch.")
                 strategy_v2_copy_context = copy_context_payload
+                source_stage3 = stage3_payload
+                source_offer = offer_payload
+                source_copy = copy_payload
 
             strategy_v2_packet["launch_metadata"] = {
                 "launch_type": launch_type,
@@ -736,9 +782,9 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                     "channels": input.channels,
                     "asset_brief_types": input.asset_brief_types,
                     "strategy_v2_packet": strategy_v2_packet,
-                    "source_stage3": source_context.source_stage3,
-                    "source_offer": source_context.source_offer,
-                    "source_copy": source_context.source_copy,
+                    "source_stage3": source_stage3,
+                    "source_offer": source_offer,
+                    "source_copy": source_copy,
                     "strategy_v2_copy_context": strategy_v2_copy_context,
                     "created_by_user": input.operator_user_id,
                 },
@@ -781,6 +827,12 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                 retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
+            await _configure_meta_tracking_for_generated_funnels(
+                org_id=input.org_id,
+                client_id=input.client_id,
+                campaign_id=campaign_id,
+                funnel_ids=_extract_funnel_ids(funnels_payload),
+            )
             media_jobs = _extract_media_enrichment_jobs(funnels_payload)
             if media_jobs:
                 media_enrichment_workflows.extend(
@@ -1049,38 +1101,39 @@ class StrategyV2AngleIterationWorkflow:
 
             awareness_payload = stage3_result.get("awareness_matrix")
             awareness_matrix_payload = awareness_payload if isinstance(awareness_payload, dict) else None
+            offer_payload = {
+                "stage3": stage3_payload,
+                "selected_variant": next(
+                    (
+                        variant
+                        for variant in variants
+                        if str(variant.get("variant_id")) == selected_variant_id
+                    ),
+                    {},
+                ),
+                "selected_variant_score": next(
+                    (
+                        row
+                        for row in _normalize_dict_rows(
+                            _require_dict(
+                                offer_variants_payload.get("composite_results"),
+                                field_name="offer_variants_output.composite_results",
+                            ).get("variants"),
+                            field_name="offer_variants_output.composite_results.variants",
+                        )
+                        if str(row.get("variant_id")) == selected_variant_id
+                    ),
+                    None,
+                ),
+                "decision": _build_offer_winner_decision(
+                    operator_user_id=input.operator_user_id,
+                    variant_id=selected_variant_id,
+                    variants=variants,
+                ),
+            }
             strategy_v2_packet = build_strategy_v2_downstream_packet(
                 stage3=stage3_payload,
-                offer={
-                    "stage3": stage3_payload,
-                    "selected_variant": next(
-                        (
-                            variant
-                            for variant in variants
-                            if str(variant.get("variant_id")) == selected_variant_id
-                        ),
-                        {},
-                    ),
-                    "selected_variant_score": next(
-                        (
-                            row
-                            for row in _normalize_dict_rows(
-                                _require_dict(
-                                    offer_variants_payload.get("composite_results"),
-                                    field_name="offer_variants_output.composite_results",
-                                ).get("variants"),
-                                field_name="offer_variants_output.composite_results.variants",
-                            )
-                            if str(row.get("variant_id")) == selected_variant_id
-                        ),
-                        None,
-                    ),
-                    "decision": _build_offer_winner_decision(
-                        operator_user_id=input.operator_user_id,
-                        variant_id=selected_variant_id,
-                        variants=variants,
-                    ),
-                },
+                offer=offer_payload,
                 copy=copy_payload,
                 copy_context=copy_context_payload,
                 awareness_angle_matrix=awareness_matrix_payload,
@@ -1163,6 +1216,12 @@ class StrategyV2AngleIterationWorkflow:
                 retry_policy=_FUNNEL_GENERATION_RETRY_POLICY,
             )
             funnels_payload = _require_dict(funnels_result, field_name="funnels_result")
+            await _configure_meta_tracking_for_generated_funnels(
+                org_id=input.org_id,
+                client_id=input.client_id,
+                campaign_id=input.campaign_id,
+                funnel_ids=_extract_funnel_ids(funnels_payload),
+            )
             media_jobs = _extract_media_enrichment_jobs(funnels_payload)
             if media_jobs:
                 media_enrichment_workflows.extend(
