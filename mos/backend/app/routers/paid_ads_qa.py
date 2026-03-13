@@ -11,11 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.models import Asset, Campaign, ClientUserPreference, Funnel
+from app.db.enums import FunnelDomainStatusEnum
+from app.db.models import Asset, Campaign, ClientUserPreference, Funnel, FunnelDomain
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.paid_ads_qa import (
+    PaidAdsDnsRecordResponse,
+    PaidAdsMetaDomainVerificationProvisionRequest,
+    PaidAdsMetaDomainVerificationProvisionResponse,
     PaidAdsMetaTrackingRepairResponse,
     PaidAdsPlatformProfileResponse,
     PaidAdsPlatformProfileUpsertRequest,
@@ -31,6 +35,7 @@ from app.services.meta_review import (
     load_campaign_asset_brief_map,
     select_assets_for_generation,
 )
+from app.services import namecheap_dns as namecheap_dns_service
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -52,6 +57,7 @@ from app.services.storefront_domains import normalize_absolute_origin, resolve_s
 
 
 router = APIRouter(tags=["paid-ads-qa"])
+_META_DOMAIN_VERIFICATION_METADATA_KEY = "metaDomainVerification"
 
 
 def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
@@ -71,6 +77,28 @@ def _get_funnel_or_404(*, session: Session, org_id: str, funnel_id: str) -> Funn
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     return funnel
+
+
+def _get_funnel_campaign_or_404(*, session: Session, org_id: str, funnel: Funnel) -> Campaign:
+    if not funnel.campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This operation requires a funnel that is attached to a campaign.",
+        )
+    campaign = session.scalar(
+        select(Campaign).where(
+            Campaign.org_id == org_id,
+            Campaign.id == funnel.campaign_id,
+        )
+    )
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found for funnel")
+    if str(campaign.client_id) != str(funnel.client_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Funnel client does not match the parent campaign client.",
+        )
+    return campaign
 
 
 def _require_supported_ruleset(ruleset_version: str) -> str:
@@ -111,6 +139,102 @@ def _selected_shop_storefront_domain(
         getattr(preference, "selected_shop_storefront_domain", None) if preference is not None else None
     )
     return resolve_shop_hosted_origin(selected)
+
+
+def _normalize_string_list(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = clean_optional_text(value) if isinstance(value, str) else None
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+    return out
+
+
+def _profile_metadata_dict(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = profile.get("metadata")
+    return dict(metadata) if isinstance(metadata, dict) else {}
+
+
+def _meta_domain_verification_metadata(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = _profile_metadata_dict(profile)
+    raw = metadata.get(_META_DOMAIN_VERIFICATION_METADATA_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _merge_string_list(existing_values: Any, values_to_add: list[str]) -> list[str]:
+    merged = _normalize_string_list(existing_values)
+    seen = set(merged)
+    for value in values_to_add:
+        cleaned = clean_optional_text(value)
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        merged.append(cleaned)
+    return merged
+
+
+def _normalize_hostname_candidate(value: str | None) -> str | None:
+    cleaned = clean_optional_text(value)
+    if not cleaned:
+        return None
+    candidate = cleaned
+    if "://" in candidate:
+        parsed = urlparse(candidate)
+        hostname = clean_optional_text(parsed.hostname)
+        return hostname.lower() if hostname else None
+    return candidate.lower().rstrip(".")
+
+
+def _resolve_funnel_verified_domain(
+    *,
+    session: Session,
+    auth: AuthContext,
+    funnel: Funnel,
+    profile: dict[str, Any],
+    requested_verified_domain: str | None,
+) -> str:
+    requested = _normalize_hostname_candidate(requested_verified_domain)
+    if requested:
+        return requested
+
+    funnel_domain = session.scalar(
+        select(FunnelDomain).where(
+            FunnelDomain.org_id == auth.org_id,
+            FunnelDomain.funnel_id == str(funnel.id),
+            FunnelDomain.status.in_([FunnelDomainStatusEnum.active, FunnelDomainStatusEnum.verified]),
+        )
+    )
+    if funnel_domain is not None:
+        hostname = _normalize_hostname_candidate(getattr(funnel_domain, "hostname", None))
+        if hostname:
+            return hostname
+
+    existing_profile_domain = _normalize_hostname_candidate(profile.get("verifiedDomain"))
+    if existing_profile_domain:
+        return existing_profile_domain
+
+    selected_storefront_origin = _selected_shop_storefront_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(funnel.client_id),
+        user_external_id=auth.user_id,
+    )
+    selected_storefront_host = _normalize_hostname_candidate(selected_storefront_origin)
+    if selected_storefront_host:
+        return selected_storefront_host
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "Meta domain verification requires a verified domain target. "
+            "Set the client's selected storefront domain or enter a verified domain explicitly."
+        ),
+    )
 
 
 def _resolve_review_base_url(
@@ -464,6 +588,93 @@ def assess_paid_ads_platform_profile(
 
 
 @router.post(
+    "/funnels/{funnel_id}/paid-ads-qa/meta-domain-verification/provision",
+    response_model=PaidAdsMetaDomainVerificationProvisionResponse,
+)
+def provision_meta_domain_verification_dns(
+    funnel_id: str,
+    payload: PaidAdsMetaDomainVerificationProvisionRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    funnel = _get_funnel_or_404(session=session, org_id=auth.org_id, funnel_id=funnel_id)
+    campaign = _get_funnel_campaign_or_404(session=session, org_id=auth.org_id, funnel=funnel)
+    if not _campaign_uses_meta_channel(campaign.channels):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta domain verification requires the funnel's campaign to target a Meta channel.",
+        )
+
+    repo = PaidAdsQaRepository(session)
+    profile_record = repo.get_platform_profile(org_id=auth.org_id, client_id=str(funnel.client_id), platform="meta")
+    profile_dict = _profile_dict(profile_record, platform="meta", client_id=str(funnel.client_id))
+    verified_domain = _resolve_funnel_verified_domain(
+        session=session,
+        auth=auth,
+        funnel=funnel,
+        profile=profile_dict,
+        requested_verified_domain=payload.verifiedDomain,
+    )
+
+    try:
+        dns_record = namecheap_dns_service.upsert_txt_record(
+            hostname=verified_domain,
+            value=payload.txtValue,
+            ttl=300,
+        )
+    except namecheap_dns_service.NamecheapDnsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    metadata = _profile_metadata_dict(profile_dict)
+    existing_meta_domain_verification = _meta_domain_verification_metadata(profile_dict)
+    metadata[_META_DOMAIN_VERIFICATION_METADATA_KEY] = {
+        **existing_meta_domain_verification,
+        "status": "dns_record_written",
+        "provider": dns_record["provider"],
+        "recordType": dns_record["recordType"],
+        "host": dns_record["host"],
+        "domain": dns_record["domain"],
+        "fqdn": dns_record["fqdn"],
+        "value": dns_record["value"],
+        "ttl": dns_record["ttl"],
+        "metaConfirmationRequired": True,
+        "funnelIds": _merge_string_list(existing_meta_domain_verification.get("funnelIds"), [str(funnel.id)]),
+        "provisionedAt": existing_meta_domain_verification.get("provisionedAt") or datetime.now(timezone.utc).isoformat(),
+        "lastSyncedAt": datetime.now(timezone.utc).isoformat(),
+        "source": "paid_ads_qa_meta_domain_verification",
+    }
+    profile_dict["rulesetVersion"] = RULESET_VERSION
+    profile_dict["verifiedDomain"] = verified_domain
+    if normalize_tracking_provider(profile_dict.get("verifiedDomainStatus")) != "verified":
+        profile_dict["verifiedDomainStatus"] = "pending"
+    profile_dict["metadata"] = metadata
+
+    saved_profile = repo.upsert_platform_profile(
+        org_id=auth.org_id,
+        client_id=str(funnel.client_id),
+        **_profile_input_from_dict(profile_dict, platform="meta"),
+    )
+    return PaidAdsMetaDomainVerificationProvisionResponse(
+        funnelId=str(funnel.id),
+        campaignId=str(campaign.id),
+        clientId=str(funnel.client_id),
+        verifiedDomain=str(saved_profile.verified_domain),
+        verifiedDomainStatus=saved_profile.verified_domain_status,
+        dnsRecord=PaidAdsDnsRecordResponse(
+            provider=dns_record["provider"],
+            recordType=dns_record["recordType"],
+            host=dns_record["host"],
+            domain=dns_record["domain"],
+            fqdn=dns_record["fqdn"],
+            value=dns_record["value"],
+            ttl=int(dns_record["ttl"]),
+            status=dns_record["status"],
+        ),
+        profile=PaidAdsPlatformProfileResponse(**_to_profile_payload(saved_profile)),
+    )
+
+
+@router.post(
     "/funnels/{funnel_id}/paid-ads-qa/meta-tracking/repair",
     response_model=PaidAdsMetaTrackingRepairResponse,
 )
@@ -473,25 +684,7 @@ def repair_funnel_meta_tracking(
     session: Session = Depends(get_session),
 ):
     funnel = _get_funnel_or_404(session=session, org_id=auth.org_id, funnel_id=funnel_id)
-    if not funnel.campaign_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Meta tracking repair requires a funnel that is attached to a campaign.",
-        )
-
-    campaign = session.scalar(
-        select(Campaign).where(
-            Campaign.org_id == auth.org_id,
-            Campaign.id == funnel.campaign_id,
-        )
-    )
-    if not campaign:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found for funnel")
-    if str(campaign.client_id) != str(funnel.client_id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Funnel client does not match the parent campaign client.",
-        )
+    campaign = _get_funnel_campaign_or_404(session=session, org_id=auth.org_id, funnel=funnel)
     if not _campaign_uses_meta_channel(campaign.channels):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

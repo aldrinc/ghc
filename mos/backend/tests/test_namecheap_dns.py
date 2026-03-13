@@ -109,6 +109,80 @@ def test_upsert_cname_record_errors_when_non_cname_conflict_exists(monkeypatch):
         )
 
 
+def test_upsert_txt_record_merges_existing_records_and_preserves_other_txt_values(monkeypatch):
+    monkeypatch.setattr(
+        namecheap_dns,
+        "_namecheap_request",
+        lambda *, command, params: _build_get_hosts_response(
+            host_entries=[
+                {"Name": "@", "Type": "TXT", "Address": "v=spf1 include:_spf.example.com ~all"},
+                {"Name": "shop", "Type": "TXT", "Address": "google-site-verification=abc123"},
+            ]
+        ),
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_set_hosts(*, sld: str, tld: str, records: list[dict[str, str]]) -> None:
+        captured["sld"] = sld
+        captured["tld"] = tld
+        captured["records"] = records
+
+    monkeypatch.setattr(namecheap_dns, "_set_hosts", _fake_set_hosts)
+
+    result = namecheap_dns.upsert_txt_record(
+        hostname="shop.example.com",
+        value="facebook-domain-verification=xyz789",
+    )
+
+    assert result == {
+        "provider": "namecheap",
+        "recordType": "TXT",
+        "host": "shop",
+        "domain": "example.com",
+        "fqdn": "shop.example.com",
+        "value": "facebook-domain-verification=xyz789",
+        "ttl": 300,
+        "status": "dns_record_written",
+    }
+    assert captured["sld"] == "example"
+    assert captured["tld"] == "com"
+    assert captured["records"] == [
+        {"Name": "@", "Type": "TXT", "Address": "v=spf1 include:_spf.example.com ~all", "TTL": "1800"},
+        {"Name": "shop", "Type": "TXT", "Address": "google-site-verification=abc123", "TTL": "1800"},
+        {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "300"},
+    ]
+
+
+def test_upsert_txt_record_is_idempotent_when_record_already_exists(monkeypatch):
+    monkeypatch.setattr(
+        namecheap_dns,
+        "_namecheap_request",
+        lambda *, command, params: _build_get_hosts_response(
+            host_entries=[
+                {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789"},
+            ]
+        ),
+    )
+
+    captured: dict[str, object] = {}
+
+    def _fake_set_hosts(*, sld: str, tld: str, records: list[dict[str, str]]) -> None:
+        captured["records"] = records
+
+    monkeypatch.setattr(namecheap_dns, "_set_hosts", _fake_set_hosts)
+
+    result = namecheap_dns.upsert_txt_record(
+        hostname="shop.example.com",
+        value="facebook-domain-verification=xyz789",
+    )
+
+    assert result["fqdn"] == "shop.example.com"
+    assert captured["records"] == [
+        {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "1800"},
+    ]
+
+
 def test_extract_get_hosts_result_requires_namecheap_dns_enabled():
     root = _build_get_hosts_response(host_entries=[], is_using_our_dns="false")
     with pytest.raises(namecheap_dns.NamecheapDnsError, match="not using Namecheap"):

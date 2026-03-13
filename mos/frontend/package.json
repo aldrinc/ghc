@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test:unit": "vitest run",
     "check:semantic-ui": "node scripts/check-semantic-ui.mjs",
     "build": "vite build",
     "preview": "vite preview",
@@ -41,6 +42,7 @@
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }

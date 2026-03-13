@@ -196,3 +196,97 @@ def test_repair_funnel_meta_tracking_rejects_non_meta_campaign() -> None:
         assert exc.detail == "Meta tracking repair requires the funnel's campaign to target a Meta channel."
     else:
         raise AssertionError("Expected Meta tracking repair to reject non-Meta campaigns")
+
+
+def test_provision_meta_domain_verification_dns_updates_profile(monkeypatch) -> None:
+    funnel = SimpleNamespace(
+        id="funnel-1",
+        org_id="org-1",
+        client_id="client-1",
+        campaign_id="campaign-1",
+    )
+    campaign = SimpleNamespace(
+        id="campaign-1",
+        org_id="org-1",
+        client_id="client-1",
+        channels=["facebook"],
+    )
+    fake_session = _FakeSession(funnel=funnel, campaign=campaign)
+
+    def _upsert_txt_record(*, hostname: str, value: str, ttl: int = 300):
+        assert hostname == "shop.example.com"
+        assert value == "facebook-domain-verification=xyz789"
+        assert ttl == 300
+        return {
+            "provider": "namecheap",
+            "recordType": "TXT",
+            "host": "shop",
+            "domain": "example.com",
+            "fqdn": "shop.example.com",
+            "value": "facebook-domain-verification=xyz789",
+            "ttl": 300,
+            "status": "dns_record_written",
+        }
+
+    monkeypatch.setattr(paid_ads_qa_router, "PaidAdsQaRepository", _FakeRepo)
+    monkeypatch.setattr(
+        paid_ads_qa_router.namecheap_dns_service,
+        "upsert_txt_record",
+        _upsert_txt_record,
+    )
+
+    response = paid_ads_qa_router.provision_meta_domain_verification_dns(
+        funnel_id="funnel-1",
+        payload=paid_ads_qa_router.PaidAdsMetaDomainVerificationProvisionRequest(
+            txtValue="facebook-domain-verification=xyz789",
+            verifiedDomain="shop.example.com",
+        ),
+        auth=AuthContext(user_id="user-1", org_id="org-1"),
+        session=fake_session,
+    )
+
+    assert response.funnelId == "funnel-1"
+    assert response.campaignId == "campaign-1"
+    assert response.clientId == "client-1"
+    assert response.verifiedDomain == "shop.example.com"
+    assert response.verifiedDomainStatus == "pending"
+    assert response.dnsRecord.status == "dns_record_written"
+    assert response.dnsRecord.fqdn == "shop.example.com"
+    assert response.profile.verifiedDomain == "shop.example.com"
+    assert response.profile.verifiedDomainStatus == "pending"
+    assert response.profile.metadata["metaDomainVerification"]["value"] == "facebook-domain-verification=xyz789"
+    assert response.profile.metadata["metaDomainVerification"]["funnelIds"] == ["funnel-1"]
+
+
+def test_provision_meta_domain_verification_dns_rejects_non_meta_campaign(monkeypatch) -> None:
+    funnel = SimpleNamespace(
+        id="funnel-1",
+        org_id="org-1",
+        client_id="client-1",
+        campaign_id="campaign-1",
+    )
+    campaign = SimpleNamespace(
+        id="campaign-1",
+        org_id="org-1",
+        client_id="client-1",
+        channels=["tiktok"],
+    )
+    fake_session = _FakeSession(funnel=funnel, campaign=campaign)
+
+    monkeypatch.setattr(paid_ads_qa_router, "PaidAdsQaRepository", _FakeRepo)
+
+    try:
+        paid_ads_qa_router.provision_meta_domain_verification_dns(
+            funnel_id="funnel-1",
+            payload=paid_ads_qa_router.PaidAdsMetaDomainVerificationProvisionRequest(
+                txtValue="facebook-domain-verification=xyz789",
+                verifiedDomain="shop.example.com",
+            ),
+            auth=AuthContext(user_id="user-1", org_id="org-1"),
+            session=fake_session,
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert exc.detail == "Meta domain verification requires the funnel's campaign to target a Meta channel."
+    else:
+        raise AssertionError("Expected Meta domain verification provisioning to reject non-Meta campaigns")

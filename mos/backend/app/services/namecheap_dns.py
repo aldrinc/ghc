@@ -112,6 +112,13 @@ def _normalize_cname_target(target_hostname: str) -> str:
     return value
 
 
+def _normalize_txt_value(value: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise NamecheapDnsError("TXT record value is required for Namecheap DNS provisioning.")
+    return cleaned
+
+
 def _namecheap_request(*, command: str, params: dict[str, str]) -> ET.Element:
     api_user = _read_required_setting("NAMECHEAP_API_USER")
     api_key = _read_required_setting("NAMECHEAP_API_KEY")
@@ -309,4 +316,49 @@ def upsert_cname_record(*, hostname: str, target_hostname: str) -> dict[str, Any
         "domain": apex_domain,
         "fqdn": apex_domain if host == "@" else f"{host}.{apex_domain}",
         "target": normalized_target,
+    }
+
+
+def upsert_txt_record(*, hostname: str, value: str, ttl: int = 300) -> dict[str, Any]:
+    sld, tld, host, apex_domain = _split_hostname_for_namecheap(hostname)
+    normalized_value = _normalize_txt_value(value)
+    normalized_ttl = str(int(ttl))
+
+    get_root = _namecheap_request(
+        command="namecheap.domains.dns.getHosts",
+        params={
+            "SLD": sld,
+            "TLD": tld,
+        },
+    )
+    get_result = _extract_get_hosts_result(root=get_root)
+    existing_records = _parse_host_records(get_hosts_result=get_result)
+
+    retained_records = existing_records[:]
+    if not any(
+        str(record.get("Name") or "").strip().lower() == host.lower()
+        and str(record.get("Type") or "").strip().upper() == "TXT"
+        and str(record.get("Address") or "").strip() == normalized_value
+        for record in existing_records
+    ):
+        retained_records.append(
+            {
+                "Name": host,
+                "Type": "TXT",
+                "Address": normalized_value,
+                "TTL": normalized_ttl,
+            }
+        )
+
+    _set_hosts(sld=sld, tld=tld, records=retained_records)
+
+    return {
+        "provider": "namecheap",
+        "recordType": "TXT",
+        "host": host,
+        "domain": apex_domain,
+        "fqdn": apex_domain if host == "@" else f"{host}.{apex_domain}",
+        "value": normalized_value,
+        "ttl": int(normalized_ttl),
+        "status": "dns_record_written",
     }

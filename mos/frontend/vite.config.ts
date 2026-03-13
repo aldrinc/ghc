@@ -4,6 +4,10 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"],
+  },
   optimizeDeps: {
     // These entrypoints are loaded through a runtime branch in src/main.tsx, so
     // tell Vite to pre-scan them instead of discovering them only on-demand.

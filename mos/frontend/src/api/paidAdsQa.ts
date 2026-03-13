@@ -82,6 +82,32 @@ export type PaidAdsPlatformProfileUpsertPayload = {
   metadata?: Record<string, unknown>;
 };
 
+export type PaidAdsDnsRecord = {
+  provider: string;
+  recordType: string;
+  host: string;
+  domain: string;
+  fqdn: string;
+  value: string;
+  ttl: number;
+  status: string;
+};
+
+export type PaidAdsMetaDomainVerificationProvisionPayload = {
+  txtValue: string;
+  verifiedDomain?: string;
+};
+
+export type PaidAdsMetaDomainVerificationProvisionResponse = {
+  funnelId: string;
+  campaignId: string;
+  clientId: string;
+  verifiedDomain: string;
+  verifiedDomainStatus?: string | null;
+  dnsRecord: PaidAdsDnsRecord;
+  profile: PaidAdsPlatformProfile;
+};
+
 export type PaidAdsQaRun = {
   id: string;
   orgId: string;

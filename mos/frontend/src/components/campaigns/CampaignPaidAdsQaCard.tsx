@@ -3,6 +3,7 @@ import { useApiClient, type ApiError } from "@/api/client";
 import { useClientShopifyStatus } from "@/api/clients";
 import {
   PAID_ADS_QA_RULESET_VERSION,
+  type PaidAdsMetaDomainVerificationProvisionResponse,
   type PaidAdsPlatformProfile,
   type PaidAdsPlatformProfileUpsertPayload,
   type PaidAdsQaFinding,
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { readMetaDomainVerification, resolveMetaVerifiedDomainCandidate } from "@/lib/metaDomainVerification";
 import { resolveConfiguredShopHostedOrigin, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { Campaign } from "@/types/common";
 
@@ -189,7 +191,10 @@ function buildProfileFormState(profile: PaidAdsPlatformProfile | null): ProfileF
   };
 }
 
-function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpsertPayload {
+function buildProfilePayload(
+  form: ProfileFormState,
+  metadata: Record<string, unknown>,
+): PaidAdsPlatformProfileUpsertPayload {
   return {
     rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
     businessManagerId: normalizeOptionalText(form.businessManagerId),
@@ -209,7 +214,7 @@ function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpse
     viewThroughEnabled: selectToBoolean(form.viewThroughEnabled),
     trackingProvider: normalizeOptionalText(form.trackingProvider),
     trackingUrlParameters: normalizeOptionalText(form.trackingUrlParameters),
-    metadata: {},
+    metadata,
   };
 }
 
@@ -235,6 +240,10 @@ export function CampaignPaidAdsQaCard({
   const [profilePending, setProfilePending] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null);
+  const [profileMetadata, setProfileMetadata] = useState<Record<string, unknown>>({});
+  const [metaDomainTxtValue, setMetaDomainTxtValue] = useState("");
+  const [metaDomainPending, setMetaDomainPending] = useState(false);
+  const [metaDomainError, setMetaDomainError] = useState<string | null>(null);
 
   const displayShopDomain = readString(shopifyStatusQuery.data?.displayShopDomain);
   const selectedShopDomain = displayShopDomain || readString(shopifyStatusQuery.data?.shopDomain);
@@ -255,12 +264,14 @@ export function CampaignPaidAdsQaCard({
         );
         if (cancelled) return;
         setProfileForm(buildProfileFormState(profile));
+        setProfileMetadata(profile.metadata || {});
         setProfileUpdatedAt(profile.updatedAt);
       } catch (err) {
         if (cancelled) return;
         const apiError = err as ApiError;
         if (apiError.status === 404) {
           setProfileForm(emptyProfileFormState());
+          setProfileMetadata({});
           setProfileUpdatedAt(null);
         } else {
           setProfileError(getErrorMessage(err));
@@ -336,10 +347,11 @@ export function CampaignPaidAdsQaCard({
         `/clients/${campaign.client_id}/paid-ads-qa/platforms/meta/profile`,
         {
           method: "PUT",
-          body: JSON.stringify(buildProfilePayload(profileForm)),
+          body: JSON.stringify(buildProfilePayload(profileForm, profileMetadata)),
         },
       );
       setProfileForm(buildProfileFormState(saved));
+      setProfileMetadata(saved.metadata || {});
       setProfileUpdatedAt(saved.updatedAt);
       toast.success("Meta QA profile saved");
     } catch (err) {
@@ -351,6 +363,47 @@ export function CampaignPaidAdsQaCard({
     }
   };
 
+  const handleProvisionMetaDomainDns = async () => {
+    if (!enabled || !funnelId) {
+      setMetaDomainError("Pick one funnel in the Meta ads tab before provisioning Meta domain verification.");
+      return;
+    }
+    const txtValue = metaDomainTxtValue.trim();
+    if (!txtValue) {
+      setMetaDomainError("Paste the Meta TXT value before provisioning DNS.");
+      return;
+    }
+    const verifiedDomain = resolveMetaVerifiedDomainCandidate(profileForm.verifiedDomain, reviewBaseUrl);
+    if (!verifiedDomain) {
+      setMetaDomainError("MOS could not resolve the funnel domain. Enter Verified domain first.");
+      return;
+    }
+    setMetaDomainPending(true);
+    setMetaDomainError(null);
+    try {
+      const response = await request<PaidAdsMetaDomainVerificationProvisionResponse>(
+        `/funnels/${funnelId}/paid-ads-qa/meta-domain-verification/provision`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            txtValue,
+            verifiedDomain,
+          }),
+        },
+      );
+      setProfileForm(buildProfileFormState(response.profile));
+      setProfileMetadata(response.profile.metadata || {});
+      setProfileUpdatedAt(response.profile.updatedAt);
+      toast.success(`Meta TXT record written in Namecheap for ${response.verifiedDomain}`);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setMetaDomainError(message);
+      toast.error(message);
+    } finally {
+      setMetaDomainPending(false);
+    }
+  };
+
   const updateField = <K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => {
     setProfileForm((current) => ({
       ...current,
@@ -359,6 +412,8 @@ export function CampaignPaidAdsQaCard({
   };
 
   const activeRun = runHistory.find((candidate) => candidate.id === selectedRunId) || runHistory[0] || null;
+  const metaDomainVerification = readMetaDomainVerification(profileMetadata);
+  const resolvedVerifiedDomain = resolveMetaVerifiedDomainCandidate(profileForm.verifiedDomain, reviewBaseUrl);
 
   return (
     <div className="border border-border bg-transparent p-4">
@@ -409,8 +464,57 @@ export function CampaignPaidAdsQaCard({
           </div>
 
           <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
-            Verified domain, attribution windows, view-through, data sharing, and tracking parameters are manual checklist fields.
-            Meta Graph refresh does not populate them for QA.
+            Verified domain status still requires confirmation in Meta. MOS can provision the Meta TXT record in Namecheap,
+            but Meta Graph refresh does not populate verified domain state for QA today.
+          </div>
+
+          <div className="mb-4 rounded-md border border-border bg-background px-3 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-content">Meta domain verification</div>
+                <div className="mt-1 text-xs text-content-muted">
+                  Paste the TXT value from Meta Business Settings - Domains. MOS will write it in Namecheap for the selected funnel domain.
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleProvisionMetaDomainDns}
+                disabled={profileLoading || profilePending || metaDomainPending || !enabled || !funnelId}
+              >
+                {metaDomainPending ? "Writing TXT…" : "Write TXT in Namecheap"}
+              </Button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Resolved domain</label>
+                <Input value={resolvedVerifiedDomain || ""} disabled placeholder="shop.example.com" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Meta TXT value</label>
+                <Input
+                  value={metaDomainTxtValue}
+                  onChange={(event) => setMetaDomainTxtValue(event.target.value)}
+                  placeholder="facebook-domain-verification=..."
+                  disabled={profileLoading || profilePending || metaDomainPending}
+                />
+              </div>
+            </div>
+
+            {metaDomainVerification ? (
+              <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-content-muted">
+                <div>Status: {metaDomainVerification.status || "unknown"}</div>
+                <div>Provider: {metaDomainVerification.provider || "unknown"}</div>
+                <div>Record: {metaDomainVerification.fqdn || resolvedVerifiedDomain || "unresolved"} TXT</div>
+                <div>Last synced: {formatDate(metaDomainVerification.lastSyncedAt)}</div>
+                {metaDomainVerification.metaConfirmationRequired ? (
+                  <div className="text-warning">Meta still requires a Verify click before `META-ACCOUNT-009` can pass.</div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {metaDomainError ? <div className="mt-3 text-sm text-danger">{metaDomainError}</div> : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

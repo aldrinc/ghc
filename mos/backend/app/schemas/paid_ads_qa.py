@@ -131,6 +131,53 @@ class PaidAdsMetaTrackingRepairResponse(BaseModel):
     profile: PaidAdsPlatformProfileResponse
 
 
+class PaidAdsMetaDomainVerificationProvisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    txtValue: str
+    verifiedDomain: str | None = None
+
+    @field_validator("txtValue")
+    @classmethod
+    def _validate_txt_value(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("txtValue must be a non-empty string.")
+        return value.strip()
+
+    @field_validator("verifiedDomain")
+    @classmethod
+    def _validate_verified_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class PaidAdsDnsRecordResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    recordType: str
+    host: str
+    domain: str
+    fqdn: str
+    value: str
+    ttl: int
+    status: str
+
+
+class PaidAdsMetaDomainVerificationProvisionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    funnelId: str
+    campaignId: str
+    clientId: str
+    verifiedDomain: str
+    verifiedDomainStatus: str | None = None
+    dnsRecord: PaidAdsDnsRecordResponse
+    profile: PaidAdsPlatformProfileResponse
+
+
 class PaidAdsQaRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
