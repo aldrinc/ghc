@@ -23,6 +23,7 @@ from app.schemas.paid_ads_qa import (
     PaidAdsRulesetResponse,
     PaidAdsRulesetSummaryResponse,
 )
+from app.services.meta_review import select_assets_for_generation
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -49,6 +50,10 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return client
+
+
+def _filter_creative_specs_to_generation(*, creative_specs: list[Any], asset_ids: set[str]) -> list[Any]:
+    return [spec for spec in creative_specs if getattr(spec, "asset_id", None) and str(spec.asset_id) in asset_ids]
 
 
 def _to_profile_payload(profile: Any) -> dict[str, Any]:
@@ -407,15 +412,23 @@ def run_campaign_paid_ads_qa(
         record=profile,
     )
     meta_repo = MetaAdsRepository(session)
-    creative_specs = meta_repo.list_creative_specs(org_id=auth.org_id, campaign_id=str(campaign.id))
     adset_specs = meta_repo.list_adset_specs(org_id=auth.org_id, campaign_id=str(campaign.id))
-    ready_assets = session.scalars(
+    campaign_ready_assets = session.scalars(
         select(Asset).where(
             Asset.org_id == auth.org_id,
             Asset.campaign_id == str(campaign.id),
             Asset.file_status == "ready",
         )
     ).all()
+    selected_generation_key, ready_assets = select_assets_for_generation(
+        campaign_ready_assets,
+        generation_key=clean_optional_text(payload.generationKey),
+    )
+    ready_asset_ids = {str(asset.id) for asset in ready_assets}
+    creative_specs = _filter_creative_specs_to_generation(
+        creative_specs=meta_repo.list_creative_specs(org_id=auth.org_id, campaign_id=str(campaign.id)),
+        asset_ids=ready_asset_ids,
+    )
     assessment = evaluate_meta_campaign(
         campaign=campaign,
         creative_specs=creative_specs,
@@ -425,6 +438,9 @@ def run_campaign_paid_ads_qa(
         review_base_url=clean_optional_text(payload.reviewBaseUrl),
         ruleset_version=RULESET_VERSION,
     )
+    assessment["metadata"]["generationKey"] = selected_generation_key
+    assessment["metadata"]["requestedGenerationKey"] = clean_optional_text(payload.generationKey)
+    assessment["metadata"]["generationAssetIds"] = sorted(ready_asset_ids)
     summary = summarize_findings(assessment["findings"])
     status_value = derive_run_status(assessment["findings"])
     run_uuid = uuid4()

@@ -61,6 +61,7 @@ from app.services.image_metadata import (
 )
 from app.services.media_storage import MediaStorage
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
+from app.services.meta_review import asset_generation_key
 from app.services.meta_media_buying import (
     MetaCutRuleConfig,
     MetaEventMappings,
@@ -197,16 +198,7 @@ def _meta_experiment_key(*, experiment_id: Optional[str], metadata_json: Any) ->
 
 
 def _asset_generation_key(asset: Asset) -> str:
-    metadata_json = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
-    batch_id = _clean_optional_text(metadata_json.get("creativeGenerationBatchId"))
-    if batch_id:
-        return f"batch:{batch_id}"
-
-    remote_job_id = _clean_optional_text(metadata_json.get("remoteJobId"))
-    if remote_job_id:
-        return f"remoteJob:{remote_job_id}"
-
-    return f"asset:{asset.id}"
+    return asset_generation_key(asset)
 
 
 def _resolve_generation_assets(

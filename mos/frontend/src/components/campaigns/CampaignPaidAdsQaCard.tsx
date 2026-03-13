@@ -18,6 +18,9 @@ import type { Campaign } from "@/types/common";
 
 type CampaignPaidAdsQaCardProps = {
   campaign: Campaign;
+  generationKey?: string | null;
+  generationLabel?: string | null;
+  reviewBaseUrl?: string | null;
 };
 
 type BooleanSelectValue = "" | "true" | "false";
@@ -206,7 +209,12 @@ function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpse
   };
 }
 
-export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) {
+export function CampaignPaidAdsQaCard({
+  campaign,
+  generationKey,
+  generationLabel,
+  reviewBaseUrl: reviewBaseUrlOverride,
+}: CampaignPaidAdsQaCardProps) {
   const { get, post, request } = useApiClient();
   const [runHistory, setRunHistory] = useState<PaidAdsQaRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -220,7 +228,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null);
 
-  const reviewBaseUrl = resolveWindowShopHostedOrigin();
+  const reviewBaseUrl = reviewBaseUrlOverride || resolveWindowShopHostedOrigin();
 
   useEffect(() => {
     let cancelled = false;
@@ -291,6 +299,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         platform: "meta",
         rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
         reviewBaseUrl,
+        generationKey: generationKey || undefined,
       });
       setRunHistory((current) => [response, ...current.filter((run) => run.id !== response.id)]);
       setSelectedRunId(response.id);
@@ -339,7 +348,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         <div>
           <div className="text-base font-semibold text-content">Meta paid ads QA</div>
           <div className="text-sm text-content-muted">
-            Runs readiness, copy, and destination checks for the current campaign. This does not publish anything.
+            Runs readiness, copy, and destination checks for the current latest Meta review generation. This does not publish anything.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -352,6 +361,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
 
       <div className="mt-2 space-y-1 text-sm text-content-muted">
         <div>Review base URL: {reviewBaseUrl || "Unavailable in this browser context."}</div>
+        {generationLabel ? <div>QA scope: {generationLabel}</div> : null}
         {historyLoading ? <div>Loading previous QA runs…</div> : null}
         {!historyLoading && !activeRun && !historyError && !runError ? (
           <div>No QA runs recorded for this campaign yet.</div>
@@ -376,6 +386,11 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             <Button variant="secondary" size="sm" onClick={handleSaveProfile} disabled={profileLoading || profilePending}>
               {profilePending ? "Saving…" : "Save profile"}
             </Button>
+          </div>
+
+          <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
+            Verified domain, attribution windows, view-through, data sharing, and tracking parameters are manual checklist fields.
+            Meta Graph refresh does not populate them for QA.
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -585,6 +600,9 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             <Badge tone={runStatusTone(activeRun.status)}>Status {activeRun.status.replace(/_/g, " ")}</Badge>
             <Badge tone="neutral">Run {activeRun.id.slice(0, 8)}</Badge>
             <Badge tone="neutral">Completed {formatDate(activeRun.completedAt || activeRun.createdAt)}</Badge>
+            {readString(activeRun.metadata.generationKey) ? (
+              <Badge tone="neutral">{readString(activeRun.metadata.generationKey)}</Badge>
+            ) : null}
             {readString(activeRun.metadata.reviewBaseUrl) ? (
               <Badge tone="neutral">{readString(activeRun.metadata.reviewBaseUrl)}</Badge>
             ) : null}

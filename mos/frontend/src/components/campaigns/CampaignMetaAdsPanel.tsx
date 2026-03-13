@@ -50,6 +50,19 @@ type MetaPublishAdSetForm = {
   conversionDomain: string;
 };
 
+type MetaReviewSetupIssue = {
+  assetId: string;
+  assetBriefId?: string | null;
+  generationKey?: string | null;
+  destinationPage?: string | null;
+  normalizedDestinationPage?: string | null;
+  issues: Array<{
+    ruleId?: string | null;
+    title?: string | null;
+    message?: string | null;
+  }>;
+};
+
 const apiBaseUrl = resolveRequiredApiBaseUrl();
 
 function formatDate(value?: string | null) {
@@ -367,6 +380,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [preparePending, setPreparePending] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [prepareIssues, setPrepareIssues] = useState<MetaReviewSetupIssue[]>([]);
   const [lastWorkflowRunId, setLastWorkflowRunId] = useState<string | null>(null);
   const [lastPreparedAt, setLastPreparedAt] = useState<string | null>(null);
   const [autoRefreshUntil, setAutoRefreshUntil] = useState<number | null>(null);
@@ -476,6 +490,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
   const handlePrepareMetaReview = async () => {
     setPrepareError(null);
+    setPrepareIssues([]);
     if (!prepareAssetBriefIds.length) {
       setPrepareError(
         latestGenerationOnly && latestGenerationSummary
@@ -492,8 +507,40 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           latestGenerationOnly && latestGenerationSummary?.kind === "batch" ? latestGenerationBatchId : undefined,
       });
       setLastPreparedAt(new Date().toISOString());
+      setPrepareIssues([]);
       await refreshPipeline();
     } catch (err) {
+      const apiError = err as ApiError;
+      const detail = readRecord((apiError.raw as { detail?: unknown } | undefined)?.detail);
+      const invalidAssets = Array.isArray(detail?.invalidAssets) ? detail.invalidAssets : [];
+      const parsedIssues: MetaReviewSetupIssue[] = invalidAssets
+        .map((entry) => {
+          const record = readRecord(entry);
+          if (!record) return null;
+          const issues = Array.isArray(record.issues)
+            ? record.issues
+                .map((issue) => {
+                  const issueRecord = readRecord(issue);
+                  if (!issueRecord) return null;
+                  return {
+                    ruleId: readString(issueRecord.ruleId),
+                    title: readString(issueRecord.title),
+                    message: readString(issueRecord.message),
+                  };
+                })
+                .filter((issue): issue is NonNullable<typeof issue> => Boolean(issue))
+            : [];
+          return {
+            assetId: readString(record.assetId) || "unknown",
+            assetBriefId: readString(record.assetBriefId),
+            generationKey: readString(record.generationKey),
+            destinationPage: readString(record.destinationPage),
+            normalizedDestinationPage: readString(record.normalizedDestinationPage),
+            issues,
+          };
+        })
+        .filter((entry): entry is MetaReviewSetupIssue => Boolean(entry));
+      setPrepareIssues(parsedIssues);
       setPrepareError(getErrorMessage(err));
     } finally {
       setPreparePending(false);
@@ -990,12 +1037,47 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           ) : null}
           {generateError ? <div className="text-danger">{generateError}</div> : null}
           {prepareError ? <div className="text-danger">{prepareError}</div> : null}
+          {prepareIssues.length ? (
+            <div className="space-y-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-3 text-sm text-danger">
+              <div className="font-semibold">Meta review prep blocked for {prepareIssues.length} asset(s).</div>
+              {prepareIssues.map((issue) => (
+                <div key={`prepare-issue-${issue.assetId}`} className="rounded-md border border-danger/20 bg-background px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-content-muted">{shortId(issue.assetId, 5)}</span>
+                    {issue.generationKey ? <Badge tone="neutral">{issue.generationKey}</Badge> : null}
+                    {issue.assetBriefId ? <Badge tone="neutral">{issue.assetBriefId}</Badge> : null}
+                  </div>
+                  {issue.destinationPage ? (
+                    <div className="mt-2 text-xs text-content-muted">
+                      Destination page: {issue.destinationPage}
+                      {issue.normalizedDestinationPage && issue.normalizedDestinationPage !== issue.destinationPage
+                        ? ` -> ${issue.normalizedDestinationPage}`
+                        : ""}
+                    </div>
+                  ) : null}
+                  <div className="mt-2 space-y-1">
+                    {issue.issues.map((assetIssue, index) => (
+                      <div key={`prepare-issue-${issue.assetId}-${assetIssue.ruleId || index}`}>
+                        {assetIssue.ruleId ? `${assetIssue.ruleId}: ` : ""}
+                        {assetIssue.message || assetIssue.title || "Meta review prep issue"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {selectionError ? <div className="text-danger">{selectionError}</div> : null}
           {pipelineError ? <div className="text-danger">{pipelineError}</div> : null}
         </div>
       </div>
 
-      <CampaignPaidAdsQaCard campaign={campaign} />
+      <CampaignPaidAdsQaCard
+        campaign={campaign}
+        generationKey={latestGenerationKey}
+        generationLabel={latestGenerationSummary?.label ?? null}
+        reviewBaseUrl={publishCampaignForm.publishBaseUrl || reviewBaseUrl}
+      />
 
       {packageView === "final" ? (
         <div className="border border-border bg-transparent">

@@ -25,6 +25,13 @@ from app.schemas.creative_generation import SwipeAdCopyPack
 from app.schemas.creative_production import CreativeProductionRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
 from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
+from app.services.meta_review import (
+    asset_generation_key,
+    normalize_meta_review_destination_page,
+    resolve_meta_review_destination_url,
+    select_assets_for_generation,
+)
+from app.services.paid_ads_qa import list_meta_copy_policy_issues
 from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.campaign_planning import CampaignPlanningInput, CampaignPlanningWorkflow
@@ -99,45 +106,10 @@ def _select_assets_for_meta_review(
     *,
     generation_batch_id: str | None = None,
 ) -> list[Asset]:
-    if generation_batch_id:
-        selected_assets = [
-            asset
-            for asset in assets
-            if isinstance(asset.ai_metadata, dict)
-            and isinstance(asset.ai_metadata.get("creativeGenerationBatchId"), str)
-            and asset.ai_metadata.get("creativeGenerationBatchId").strip() == generation_batch_id
-        ]
-        selected_assets.sort(key=lambda asset: getattr(asset, "created_at", None) or 0)
-        return selected_assets
-
-    latest_group_assets: dict[str, list[Asset]] = {}
-    latest_group_timestamps: dict[str, object] = {}
-
-    for asset in assets:
-        metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
-        batch_id = metadata.get("creativeGenerationBatchId")
-        remote_job_id = metadata.get("remoteJobId")
-        if isinstance(batch_id, str) and batch_id.strip():
-            group_key = f"batch:{batch_id.strip()}"
-        elif isinstance(remote_job_id, str) and remote_job_id.strip():
-            group_key = f"remoteJob:{remote_job_id.strip()}"
-        else:
-            group_key = f"asset:{asset.id}"
-        latest_group_assets.setdefault(group_key, []).append(asset)
-        created_at = getattr(asset, "created_at", None)
-        current_latest = latest_group_timestamps.get(group_key)
-        if current_latest is None or (created_at is not None and created_at > current_latest):
-            latest_group_timestamps[group_key] = created_at
-
-    if not latest_group_assets:
-        return assets
-
-    selected_group_key = max(
-        latest_group_assets.keys(),
-        key=lambda group_key: latest_group_timestamps.get(group_key) or 0,
+    _, selected_assets = select_assets_for_generation(
+        assets,
+        generation_batch_id=generation_batch_id,
     )
-    selected_assets = latest_group_assets[selected_group_key]
-    selected_assets.sort(key=lambda asset: getattr(asset, "created_at", None) or 0)
     return selected_assets
 
 
@@ -185,15 +157,7 @@ def _resolve_meta_review_destination_url(
     destination_page: str,
     review_paths: dict[str, str],
 ) -> str | None:
-    cleaned = destination_page.strip()
-    if not cleaned:
-        return None
-    if cleaned.startswith("/") or cleaned.startswith("http://") or cleaned.startswith("https://"):
-        return cleaned
-    candidate = review_paths.get(cleaned)
-    if isinstance(candidate, str) and candidate.strip():
-        return candidate.strip()
-    return None
+    return resolve_meta_review_destination_url(destination_page=destination_page, review_paths=review_paths)
 
 
 def _validate_planning_prereqs(
@@ -856,6 +820,9 @@ def setup_campaign_meta_review(
     reused_creative_spec_ids: list[str] = []
     created_adset_spec_ids: list[str] = []
     reused_adset_spec_ids: list[str] = []
+    prepared_creative_specs: list[dict[str, object]] = []
+    invalid_assets: list[dict[str, object]] = []
+    experiment_config_by_id: dict[str, dict[str, object]] = {}
 
     for brief_id in selected_brief_ids:
         brief = brief_map[brief_id]
@@ -866,28 +833,23 @@ def setup_campaign_meta_review(
                 detail=f"Asset brief '{brief_id}' is missing experimentId.",
             )
         experiment_id = experiment_id.strip()
-
-        adset_spec = existing_adset_specs_by_experiment.get(experiment_id)
-        if adset_spec is None:
-            new_adset_spec = meta_repo.create_adset_spec(
-                org_id=auth.org_id,
-                campaign_id=str(campaign.id),
-                name=brief.get("variantName") or brief.get("creativeConcept") or experiment_id,
-                status="draft",
-                metadata_json={
+        if experiment_id not in experiment_config_by_id:
+            experiment_config_by_id[experiment_id] = {
+                "name": brief.get("variantName") or brief.get("creativeConcept") or experiment_id,
+                "metadata_json": {
                     "source": "campaign_meta_review_setup",
                     "experimentSpecId": experiment_id,
                     "campaignGoalDescription": campaign.goal_description,
                     "campaignChannels": campaign.channels or [],
                     "variantId": brief.get("variantId"),
                     "variantName": brief.get("variantName"),
-                    "assetBriefIds": [candidate for candidate in selected_brief_ids if brief_map[candidate].get("experimentId") == experiment_id],
+                    "assetBriefIds": [
+                        candidate
+                        for candidate in selected_brief_ids
+                        if brief_map[candidate].get("experimentId") == experiment_id
+                    ],
                 },
-            )
-            existing_adset_specs_by_experiment[experiment_id] = new_adset_spec
-            created_adset_spec_ids.append(str(new_adset_spec.id))
-        else:
-            reused_adset_spec_ids.append(str(adset_spec.id))
+            }
 
         requirements = brief.get("requirements") or []
         if not isinstance(requirements, list) or not requirements:
@@ -989,6 +951,10 @@ def setup_campaign_meta_review(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.destinationPage.",
                 )
+            normalized_destination_page = normalize_meta_review_destination_page(
+                destination_page,
+                review_paths=review_paths,
+            ) or destination_page.strip()
             generation_batch_id = metadata.get("creativeGenerationBatchId")
             if isinstance(generation_batch_id, str):
                 generation_batch_id = generation_batch_id.strip() or None
@@ -1021,7 +987,7 @@ def setup_campaign_meta_review(
                 "variantId": brief.get("variantId"),
                 "variantName": brief.get("variantName"),
                 "funnelId": raw_funnel_id,
-                "destinationPage": destination_page.strip(),
+                "destinationPage": normalized_destination_page,
                 "angleUsed": angle_used.strip(),
             }
             desired_creative_spec_fields = {
@@ -1032,7 +998,7 @@ def setup_campaign_meta_review(
                 "description": swipe_copy_pack.meta_description,
                 "call_to_action_type": swipe_copy_pack.meta_cta,
                 "destination_url": _resolve_meta_review_destination_url(
-                    destination_page=destination_page,
+                    destination_page=normalized_destination_page,
                     review_paths=review_paths,
                 ),
                 "page_id": settings.META_PAGE_ID,
@@ -1040,29 +1006,97 @@ def setup_campaign_meta_review(
                 "status": "draft",
                 "metadata_json": desired_metadata_json,
             }
-
-            if existing_creative is None:
-                new_creative_spec = meta_repo.create_creative_spec(
-                    org_id=auth.org_id,
-                    asset_id=str(asset.id),
-                    **desired_creative_spec_fields,
+            spec_copy_issues = list_meta_copy_policy_issues(
+                {
+                    "primary_text": desired_creative_spec_fields["primary_text"],
+                    "headline": desired_creative_spec_fields["headline"],
+                    "description": desired_creative_spec_fields["description"],
+                }
+            )
+            destination_url = desired_creative_spec_fields["destination_url"]
+            asset_issues: list[dict[str, str]] = []
+            if not destination_url:
+                asset_issues.append(
+                    {
+                        "ruleId": "META-LP-001",
+                        "title": "Destination URL missing",
+                        "message": "The destination page could not be resolved to a funnel review path for this asset.",
+                    }
                 )
-                created_creative_spec_ids.append(str(new_creative_spec.id))
-                existing_creative_specs[str(asset.id)] = new_creative_spec
+            asset_issues.extend(spec_copy_issues)
+            if asset_issues:
+                invalid_assets.append(
+                    {
+                        "assetId": str(asset.id),
+                        "assetBriefId": brief_id,
+                        "generationKey": asset_generation_key(asset),
+                        "destinationPage": destination_page.strip(),
+                        "normalizedDestinationPage": normalized_destination_page,
+                        "issues": asset_issues,
+                    }
+                )
                 continue
 
-            requires_update = any(
-                (
-                    getattr(existing_creative, field_name) != expected_value
-                    for field_name, expected_value in desired_creative_spec_fields.items()
-                )
+            prepared_creative_specs.append(
+                {
+                    "asset_id": str(asset.id),
+                    "existing_creative": existing_creative,
+                    "desired_fields": desired_creative_spec_fields,
+                }
             )
-            if requires_update:
-                updated_creative_spec = meta_repo.update_creative_spec(existing_creative, **desired_creative_spec_fields)
-                updated_creative_spec_ids.append(str(updated_creative_spec.id))
-                existing_creative_specs[str(asset.id)] = updated_creative_spec
-            else:
-                reused_creative_spec_ids.append(str(existing_creative.id))
+
+    if invalid_assets:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Some generated assets cannot be prepared for Meta review until destination mapping or copy issues are fixed.",
+                "invalidAssets": invalid_assets,
+            },
+        )
+
+    for experiment_id in [brief_map[brief_id]["experimentId"].strip() for brief_id in selected_brief_ids]:
+        adset_spec = existing_adset_specs_by_experiment.get(experiment_id)
+        if adset_spec is None:
+            experiment_config = experiment_config_by_id[experiment_id]
+            new_adset_spec = meta_repo.create_adset_spec(
+                org_id=auth.org_id,
+                campaign_id=str(campaign.id),
+                name=str(experiment_config["name"]),
+                status="draft",
+                metadata_json=experiment_config["metadata_json"],
+            )
+            existing_adset_specs_by_experiment[experiment_id] = new_adset_spec
+            created_adset_spec_ids.append(str(new_adset_spec.id))
+        else:
+            reused_adset_spec_ids.append(str(adset_spec.id))
+
+    for prepared_creative in prepared_creative_specs:
+        asset_id = str(prepared_creative["asset_id"])
+        existing_creative = prepared_creative["existing_creative"]
+        desired_creative_spec_fields = prepared_creative["desired_fields"]
+
+        if existing_creative is None:
+            new_creative_spec = meta_repo.create_creative_spec(
+                org_id=auth.org_id,
+                asset_id=asset_id,
+                **desired_creative_spec_fields,
+            )
+            created_creative_spec_ids.append(str(new_creative_spec.id))
+            existing_creative_specs[asset_id] = new_creative_spec
+            continue
+
+        requires_update = any(
+            (
+                getattr(existing_creative, field_name) != expected_value
+                for field_name, expected_value in desired_creative_spec_fields.items()
+            )
+        )
+        if requires_update:
+            updated_creative_spec = meta_repo.update_creative_spec(existing_creative, **desired_creative_spec_fields)
+            updated_creative_spec_ids.append(str(updated_creative_spec.id))
+            existing_creative_specs[asset_id] = updated_creative_spec
+        else:
+            reused_creative_spec_ids.append(str(existing_creative.id))
 
     return {
         "campaignId": str(campaign.id),

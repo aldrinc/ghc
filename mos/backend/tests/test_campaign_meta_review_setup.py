@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
+
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage
+from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
 
 
 def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str, str]:
@@ -666,3 +668,260 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
     assert selected_row["creative_spec"] is not None
     assert selected_row["creative_spec"]["metadata_json"]["generationBatchId"] == "batch-selected"
     assert older_row["creative_spec"] is None
+
+
+def test_campaign_meta_review_setup_normalizes_human_destination_labels(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-human-destination")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Human Destination Funnel",
+        route_slug="meta-review-human-destination-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-human-destination"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-human-destination",
+                    "variantId": "variant_human_destination",
+                    "variantName": "Human Destination Variant",
+                    "creativeConcept": "Resolve human-readable destination labels.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Map the destination label correctly.",
+                            "angle": "Human-readable destination labels.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/meta-review-human-destination.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-human-destination",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Human-readable destination labels.",
+                hook="Map the destination label correctly.",
+                primary_text="Use the category label and still resolve the right page.",
+                headline="Destination labels should normalize",
+                description="Review setup should map the destination cleanly.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="12.png",
+                source_url="https://example.com/swipes/12.png",
+                angle_used="Human-readable destination labels.",
+                destination_page="Presales Listicle Page",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200
+
+    creative_spec = db_session.scalar(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.campaign_id == campaign_id,
+            MetaCreativeSpec.asset_id == asset.id,
+        )
+    )
+    assert creative_spec is not None
+    assert creative_spec.destination_url.endswith("/pre-sales")
+    assert creative_spec.metadata_json["destinationPage"] == "pre-sales"
+
+
+def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-preflight")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Preflight Funnel",
+        route_slug="meta-review-preflight-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-preflight"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-preflight",
+                    "variantId": "variant_preflight",
+                    "variantName": "Preflight Variant",
+                    "creativeConcept": "Reject invalid assets before writing specs.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Reject invalid destination and copy.",
+                            "angle": "Preflight validation.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/meta-review-preflight.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-preflight",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Preflight validation.",
+                hook="Reject invalid destination and copy.",
+                primary_text="We know you have diabetes before you click.",
+                headline="Private-info framing should block prep",
+                description="Preflight should stop this before QA.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="13.png",
+                source_url="https://example.com/swipes/13.png",
+                angle_used="Preflight validation.",
+                destination_page="Mystery Funnel Page",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 409
+    payload = setup_resp.json()["detail"]
+    assert payload["message"] == (
+        "Some generated assets cannot be prepared for Meta review until destination mapping or copy issues are fixed."
+    )
+    assert len(payload["invalidAssets"]) == 1
+    invalid_asset = payload["invalidAssets"][0]
+    assert invalid_asset["assetId"] == str(asset.id)
+    rule_ids = {issue["ruleId"] for issue in invalid_asset["issues"]}
+    assert "META-LP-001" in rule_ids
+    assert "META-COPY-002" in rule_ids
+
+    creative_specs = db_session.scalars(
+        select(MetaCreativeSpec).where(MetaCreativeSpec.campaign_id == campaign_id)
+    ).all()
+    adset_specs = db_session.scalars(
+        select(MetaAdSetSpec).where(MetaAdSetSpec.campaign_id == campaign_id)
+    ).all()
+    assert creative_specs == []
+    assert adset_specs == []

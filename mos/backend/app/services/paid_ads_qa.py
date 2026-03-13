@@ -13,6 +13,7 @@ from uuid import uuid4
 import httpx
 
 from app.config import settings
+from app.services.meta_review import resolve_meta_review_destination_url
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
 
 
@@ -704,6 +705,36 @@ def _combine_copy_fields(spec: dict[str, Any]) -> str:
     )
 
 
+def list_meta_copy_policy_issues(spec: dict[str, Any]) -> list[dict[str, str]]:
+    copy_blob = _combine_copy_fields(spec)
+    issues: list[dict[str, str]] = []
+    if _PRIVATE_INFO_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-002",
+                "title": "Copy appears to reference private information",
+                "message": "The Meta draft copy appears to ask for or imply knowledge of private user information.",
+            }
+        )
+    if _DISCRIMINATION_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-003",
+                "title": "Copy appears discriminatory",
+                "message": "The Meta draft copy appears to contain discriminatory or exclusionary language.",
+            }
+        )
+    if _NEGATIVE_SELF_PERCEPTION_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-005",
+                "title": "Negative self-perception language detected",
+                "message": "The Meta draft copy appears to use shaming or negative self-perception language.",
+            }
+        )
+    return issues
+
+
 def _looks_absolute_http_url(value: str | None) -> bool:
     if not value:
         return False
@@ -741,8 +772,12 @@ def _creative_spec_destination(spec: dict[str, Any]) -> tuple[str | None, str | 
         return direct, "stored_destination_url"
     destination_page = clean_optional_text(metadata.get("destinationPage"))
     review_paths = metadata.get("reviewPaths") if isinstance(metadata.get("reviewPaths"), dict) else {}
-    if destination_page and isinstance(review_paths.get(destination_page), str):
-        return clean_optional_text(review_paths.get(destination_page)), "review_path"
+    resolved_review_path = resolve_meta_review_destination_url(
+        destination_page=destination_page or "",
+        review_paths=review_paths,
+    )
+    if resolved_review_path:
+        return resolved_review_path, "review_path"
     if destination_page and (destination_page.startswith("/") or _looks_absolute_http_url(destination_page)):
         return destination_page, "destination_page"
     return None, None
@@ -837,7 +872,8 @@ def evaluate_meta_campaign(
         }
         artifact_ref = str(spec.id)
         copy_blob = _combine_copy_fields(spec_dict)
-        if _PRIVATE_INFO_RE.search(copy_blob):
+        copy_issues = list_meta_copy_policy_issues(spec_dict)
+        if any(issue["ruleId"] == "META-COPY-002" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
@@ -850,7 +886,7 @@ def evaluate_meta_campaign(
                     evidence={"copy": copy_blob},
                 )
             )
-        if _DISCRIMINATION_RE.search(copy_blob):
+        if any(issue["ruleId"] == "META-COPY-003" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
@@ -876,7 +912,7 @@ def evaluate_meta_campaign(
                     evidence={"copy": copy_blob},
                 )
             )
-        if _NEGATIVE_SELF_PERCEPTION_RE.search(copy_blob):
+        if any(issue["ruleId"] == "META-COPY-005" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,

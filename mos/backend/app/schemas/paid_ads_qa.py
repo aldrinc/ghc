@@ -128,6 +128,7 @@ class PaidAdsQaRunRequest(BaseModel):
     platform: PaidAdsPlatformLiteral = "meta"
     rulesetVersion: str
     reviewBaseUrl: str | None = None
+    generationKey: str | None = None
 
 
 class PaidAdsQaFindingResponse(BaseModel):
