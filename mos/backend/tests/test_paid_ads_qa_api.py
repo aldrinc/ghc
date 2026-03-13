@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, Campaign, MetaAdSetSpec, MetaCreativeSpec
+from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import paid_ads_qa as paid_ads_qa_router
 from app.services import paid_ads_qa as paid_ads_qa_service
 from app.services.paid_ads_qa import RULESET_VERSION
@@ -134,6 +134,24 @@ def _create_funnel_scoped_brief(
         },
     )
     db_session.add(brief_artifact)
+    db_session.commit()
+
+
+def _set_selected_storefront_domain(
+    *,
+    db_session,
+    campaign: Campaign,
+    client_id: str,
+    user_external_id: str = "test-user",
+    storefront_domain: str,
+) -> None:
+    preference = ClientUserPreference(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+        selected_shop_storefront_domain=storefront_domain,
+    )
+    db_session.add(preference)
     db_session.commit()
 
 
@@ -871,6 +889,217 @@ def test_meta_campaign_paid_ads_qa_resolves_relative_review_paths_with_explicit_
     assert run_payload["reportFilePath"] == str(report_path)
     assert run_payload["metadata"]["reviewBaseUrl"] == "http://localhost:5275"
     assert run_payload["findings"] == []
+
+
+def test_meta_campaign_paid_ads_qa_defaults_review_base_url_from_selected_storefront_domain(
+    api_client,
+    db_session,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="campaign-qa-storefront-default")
+    _mock_passthrough_graph_refresh(monkeypatch)
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert profile_resp.status_code == 200
+
+    report_path = tmp_path / "campaign-storefront-default-report.md"
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "write_report_file",
+        lambda **_kwargs: str(report_path),
+    )
+    captured_urls: list[str] = []
+
+    def _capture_snapshot(url: str):
+        captured_urls.append(url)
+        return {
+            "requestedUrl": url,
+            "finalUrl": url,
+            "statusCode": 200,
+            "bodyText": "Privacy Policy. Contact support@example.com",
+        }
+
+    monkeypatch.setattr(paid_ads_qa_service, "_landing_page_snapshot", _capture_snapshot)
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa-storefront-default"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    _set_selected_storefront_domain(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        storefront_domain="thehonestherbalist.com",
+    )
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.qa_passed,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"kind": "creative"},
+        storage_key="creative/campaign-qa-storefront-default.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={"assetBriefId": brief_id},
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    creative_spec = MetaCreativeSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        asset_id=asset.id,
+        name="Campaign QA Storefront Default Creative",
+        primary_text="Plain compliant copy.",
+        headline="Plain compliant headline",
+        description="Plain compliant description.",
+        call_to_action_type="Learn More",
+        destination_url=None,
+        status="draft",
+        metadata_json={
+            "destinationPage": "pre-sales",
+            "reviewPaths": {"pre-sales": "/f/example/funnel/pre-sales"},
+        },
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        name="Campaign QA Storefront Default Ad Set",
+        status="draft",
+        metadata_json={},
+    )
+    db_session.add_all([creative_spec, adset_spec])
+    db_session.commit()
+
+    run_resp = api_client.post(
+        f"/campaigns/{campaign_id}/paid-ads-qa/runs",
+        json={
+            "platform": "meta",
+            "rulesetVersion": RULESET_VERSION,
+            "funnelId": funnel_id,
+        },
+    )
+    assert run_resp.status_code == 200
+    run_payload = run_resp.json()
+    assert run_payload["status"] == "passed"
+    assert run_payload["metadata"]["reviewBaseUrl"] == "https://shop.thehonestherbalist.com"
+    assert captured_urls == ["https://shop.thehonestherbalist.com/f/example/funnel/pre-sales"]
+
+
+def test_meta_campaign_paid_ads_qa_rejects_mismatched_explicit_review_base_url(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="campaign-qa-storefront-mismatch")
+    _mock_passthrough_graph_refresh(monkeypatch)
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert profile_resp.status_code == 200
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    funnel_id = str(uuid4())
+    brief_id = "brief-campaign-qa-storefront-mismatch"
+    _create_funnel_scoped_brief(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    _set_selected_storefront_domain(
+        db_session=db_session,
+        campaign=campaign,
+        client_id=client_id,
+        storefront_domain="thehonestherbalist.com",
+    )
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.qa_passed,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"kind": "creative"},
+        storage_key="creative/campaign-qa-storefront-mismatch.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={"assetBriefId": brief_id},
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    creative_spec = MetaCreativeSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        asset_id=asset.id,
+        name="Campaign QA Storefront Mismatch Creative",
+        primary_text="Plain compliant copy.",
+        headline="Plain compliant headline",
+        description="Plain compliant description.",
+        call_to_action_type="Learn More",
+        destination_url="https://shop.thehonestherbalist.com/f/example/funnel/pre-sales",
+        status="draft",
+        metadata_json={},
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=campaign.org_id,
+        campaign_id=campaign.id,
+        name="Campaign QA Storefront Mismatch Ad Set",
+        status="draft",
+        metadata_json={},
+    )
+    db_session.add_all([creative_spec, adset_spec])
+    db_session.commit()
+
+    run_resp = api_client.post(
+        f"/campaigns/{campaign_id}/paid-ads-qa/runs",
+        json={
+            "platform": "meta",
+            "rulesetVersion": RULESET_VERSION,
+            "reviewBaseUrl": "https://shop.moshq.app",
+            "funnelId": funnel_id,
+        },
+    )
+    assert run_resp.status_code == 409
+    payload = run_resp.json()["detail"]
+    assert payload["reviewBaseUrl"] == "https://shop.moshq.app"
+    assert payload["expectedReviewBaseUrl"] == "https://shop.thehonestherbalist.com"
 
 
 def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(

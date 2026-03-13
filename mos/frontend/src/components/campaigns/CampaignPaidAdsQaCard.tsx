@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApiClient, type ApiError } from "@/api/client";
+import { useClientShopifyStatus } from "@/api/clients";
 import {
   PAID_ADS_QA_RULESET_VERSION,
   type PaidAdsPlatformProfile,
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
+import { resolveConfiguredShopHostedOrigin, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { Campaign } from "@/types/common";
 
 type CampaignPaidAdsQaCardProps = {
@@ -222,6 +223,7 @@ export function CampaignPaidAdsQaCard({
   reviewBaseUrl: reviewBaseUrlOverride,
 }: CampaignPaidAdsQaCardProps) {
   const { get, post, request } = useApiClient();
+  const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
   const [runHistory, setRunHistory] = useState<PaidAdsQaRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runPending, setRunPending] = useState(false);
@@ -234,7 +236,12 @@ export function CampaignPaidAdsQaCard({
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null);
 
-  const reviewBaseUrl = reviewBaseUrlOverride || resolveWindowShopHostedOrigin();
+  const displayShopDomain = readString(shopifyStatusQuery.data?.displayShopDomain);
+  const selectedShopDomain = displayShopDomain || readString(shopifyStatusQuery.data?.shopDomain);
+  const reviewBaseUrl =
+    reviewBaseUrlOverride ||
+    resolveConfiguredShopHostedOrigin(selectedShopDomain) ||
+    resolveWindowShopHostedOrigin();
 
   useEffect(() => {
     let cancelled = false;

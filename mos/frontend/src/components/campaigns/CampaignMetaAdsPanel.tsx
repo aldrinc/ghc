@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
+import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
 import { useMetaApi } from "@/api/meta";
 import { CampaignPaidAdsQaCard } from "@/components/campaigns/CampaignPaidAdsQaCard";
@@ -10,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
-import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
+import {
+  resolveConfiguredShopHostedOrigin,
+  resolveShopHostedUrl,
+  resolveWindowShopHostedOrigin,
+} from "@/lib/shopHostedFunnels";
 import type { AssetBrief } from "@/types/artifacts";
 import type { Campaign } from "@/types/common";
 import type { Funnel } from "@/types/funnels";
@@ -370,6 +375,7 @@ function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
 export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsPanelProps) {
   const queryClient = useQueryClient();
   const { post } = useApiClient();
+  const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
   const funnelsQuery = useFunnels({ campaignId: campaign.id });
   const {
     getConfig,
@@ -381,7 +387,16 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     listPublishRuns,
     createPublishRun,
   } = useMetaApi();
-  const reviewBaseUrl = resolveWindowShopHostedOrigin();
+  const browserReviewBaseUrl = resolveWindowShopHostedOrigin();
+  const storefrontDomain = useMemo(() => {
+    const displayDomain = readString(shopifyStatusQuery.data?.displayShopDomain);
+    if (displayDomain) return displayDomain;
+    const shopDomain = readString(shopifyStatusQuery.data?.shopDomain);
+    return shopDomain;
+  }, [shopifyStatusQuery.data?.displayShopDomain, shopifyStatusQuery.data?.shopDomain]);
+  const reviewBaseUrl = useMemo(() => {
+    return resolveConfiguredShopHostedOrigin(storefrontDomain) || browserReviewBaseUrl;
+  }, [browserReviewBaseUrl, storefrontDomain]);
 
   const [config, setConfig] = useState<{
     adAccountId: string;
@@ -829,10 +844,12 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
   useEffect(() => {
     setPublishCampaignForm((current) => {
-      if (current.publishBaseUrl) return current;
+      const cleanedCurrent = current.publishBaseUrl.trim();
+      const browserDefault = (browserReviewBaseUrl || "").trim();
+      if (cleanedCurrent && cleanedCurrent !== browserDefault) return current;
       return { ...current, publishBaseUrl: reviewBaseUrl || "" };
     });
-  }, [reviewBaseUrl]);
+  }, [browserReviewBaseUrl, reviewBaseUrl]);
 
   useEffect(() => {
     setPublishAdSetForms((current) => {
@@ -1218,7 +1235,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         funnelId={activeFunnelId}
         funnelLabel={activeFunnelLabel}
         enabled={canPrepareMetaReview}
-        reviewBaseUrl={publishCampaignForm.publishBaseUrl || reviewBaseUrl}
+        reviewBaseUrl={reviewBaseUrl}
       />
 
       {packageView === "final" ? (

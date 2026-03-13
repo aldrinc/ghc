@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.models import Asset, Campaign
+from app.db.models import Asset, Campaign, ClientUserPreference
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
@@ -45,6 +46,7 @@ from app.services.paid_ads_qa import (
     summarize_findings,
     write_report_file,
 )
+from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 
 router = APIRouter(tags=["paid-ads-qa"])
@@ -59,6 +61,60 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
 
 def _filter_creative_specs_to_generation(*, creative_specs: list[Any], asset_ids: set[str]) -> list[Any]:
     return [spec for spec in creative_specs if getattr(spec, "asset_id", None) and str(spec.asset_id) in asset_ids]
+
+
+def _selected_shop_storefront_domain(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    user_external_id: str,
+) -> str | None:
+    preference = session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == user_external_id,
+        )
+    )
+    selected = clean_optional_text(
+        getattr(preference, "selected_shop_storefront_domain", None) if preference is not None else None
+    )
+    return resolve_shop_hosted_origin(selected)
+
+
+def _resolve_review_base_url(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+    requested_review_base_url: str | None,
+) -> str | None:
+    expected_review_base_url = _selected_shop_storefront_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    provided_review_base_url = normalize_absolute_origin(requested_review_base_url)
+    if requested_review_base_url and provided_review_base_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reviewBaseUrl must be an absolute http(s) URL.",
+        )
+
+    if expected_review_base_url and provided_review_base_url and provided_review_base_url != expected_review_base_url:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Meta QA reviewBaseUrl must match the selected storefront host for this client.",
+                "reviewBaseUrl": provided_review_base_url,
+                "expectedReviewBaseUrl": expected_review_base_url,
+                "storefrontHostname": urlparse(expected_review_base_url).hostname,
+            },
+        )
+
+    return provided_review_base_url or expected_review_base_url
 
 
 def _to_profile_payload(profile: Any) -> dict[str, Any]:
@@ -407,6 +463,12 @@ def run_campaign_paid_ads_qa(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign-level paid ads QA is currently implemented for Meta only. Use platform profile assessment for TikTok readiness.",
         )
+    review_base_url = _resolve_review_base_url(
+        session=session,
+        auth=auth,
+        client_id=str(campaign.client_id),
+        requested_review_base_url=clean_optional_text(payload.reviewBaseUrl),
+    )
 
     repo = PaidAdsQaRepository(session)
     profile = repo.get_platform_profile(org_id=auth.org_id, client_id=str(campaign.client_id), platform="meta")
@@ -476,7 +538,7 @@ def run_campaign_paid_ads_qa(
         adset_specs=adset_specs,
         ready_assets=ready_assets,
         platform_profile=_profile_dict(profile, platform="meta", client_id=str(campaign.client_id)),
-        review_base_url=clean_optional_text(payload.reviewBaseUrl),
+        review_base_url=review_base_url,
         ruleset_version=RULESET_VERSION,
     )
     assessment["metadata"]["generationKey"] = selected_generation_key

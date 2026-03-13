@@ -22,6 +22,7 @@ from app.db.enums import AssetStatusEnum
 from app.db.models import (
     Asset,
     Campaign,
+    ClientUserPreference,
     Experiment,
     MetaAd,
     MetaAdCreative,
@@ -73,6 +74,7 @@ from app.services.meta_media_buying import (
     MetaInsightsConfig,
     build_management_plan,
 )
+from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 router = APIRouter(prefix="/meta", tags=["meta"])
 
@@ -253,6 +255,57 @@ def _clean_optional_text(value: Any) -> str | None:
     return None
 
 
+def _selected_shop_storefront_origin(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+) -> str | None:
+    preference = session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == auth.org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == auth.user_id,
+        )
+    )
+    selected = _clean_optional_text(
+        getattr(preference, "selected_shop_storefront_domain", None) if preference is not None else None
+    )
+    return resolve_shop_hosted_origin(selected)
+
+
+def _validated_publish_base_url(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+    publish_base_url: str,
+) -> str:
+    normalized_publish_base_url = normalize_absolute_origin(publish_base_url)
+    if normalized_publish_base_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="publishBaseUrl must be an absolute http(s) URL.",
+        )
+
+    expected_storefront_origin = _selected_shop_storefront_origin(
+        session=session,
+        auth=auth,
+        client_id=client_id,
+    )
+    if expected_storefront_origin and normalized_publish_base_url != expected_storefront_origin:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "publishBaseUrl must match the selected storefront host for this client.",
+                "publishBaseUrl": normalized_publish_base_url,
+                "expectedPublishBaseUrl": expected_storefront_origin,
+            },
+        )
+
+    return normalized_publish_base_url
+
+
 def _resolve_publish_destination_url(*, destination_url: str | None, publish_base_url: str) -> str | None:
     cleaned = _clean_optional_text(destination_url)
     if not cleaned:
@@ -316,6 +369,12 @@ def _validate_publish_plan(
     auth: AuthContext,
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]]]:
+    publish_base_url = _validated_publish_base_url(
+        session=session,
+        auth=auth,
+        client_id=str(campaign.client_id),
+        publish_base_url=payload.publishBaseUrl,
+    )
     meta_repo = MetaAdsRepository(session)
     all_generation_assets = _resolve_generation_assets(
         campaign=campaign,
@@ -469,7 +528,7 @@ def _validate_publish_plan(
 
             resolved_destination_url = _resolve_publish_destination_url(
                 destination_url=_clean_optional_text(creative_spec.destination_url),
-                publish_base_url=payload.publishBaseUrl,
+                publish_base_url=publish_base_url,
             )
             if not resolved_destination_url:
                 item_blockers.append(
@@ -511,7 +570,7 @@ def _validate_publish_plan(
         ok=not blockers and all(item.status == "ok" for item in validation_items),
         includedCount=len(selected_assets),
         adsetCount=len({str(item["adset_spec"].id) for item in resolved_items}),
-        publishBaseUrl=payload.publishBaseUrl,
+        publishBaseUrl=publish_base_url,
         publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
         blockers=blockers,
         items=validation_items,
@@ -1459,7 +1518,7 @@ def create_meta_publish_run(
         campaign_objective=payload.campaignObjective,
         buying_type=payload.buyingType,
         special_ad_categories_json=payload.specialAdCategories,
-        publish_base_url=payload.publishBaseUrl,
+        publish_base_url=validation_response.publishBaseUrl,
         publish_domain=validation_response.publishDomain,
         ad_account_id=ad_account_id,
         page_id=page_id,

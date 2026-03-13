@@ -6,7 +6,7 @@ from uuid import uuid4
 from PIL import Image
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, MetaAdSetSpec, MetaCreativeSpec
+from app.db.models import Artifact, Asset, ClientUserPreference, MetaAdSetSpec, MetaCreativeSpec
 from app.routers import meta_ads as meta_ads_router
 from app.services.paid_ads_qa import RULESET_VERSION
 
@@ -116,6 +116,23 @@ def _create_funnel_scoped_brief(
         },
     )
     db_session.add(brief_artifact)
+    db_session.commit()
+
+
+def _set_selected_storefront_domain(
+    db_session,
+    *,
+    client_id: str,
+    storefront_domain: str,
+    user_external_id: str = "test-user",
+) -> None:
+    preference = ClientUserPreference(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        user_external_id=user_external_id,
+        selected_shop_storefront_domain=storefront_domain,
+    )
+    db_session.add(preference)
     db_session.commit()
 
 
@@ -293,6 +310,57 @@ def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_clie
     assert payload["blockers"] == ["All creatives are excluded from the final Meta package for this generation."]
     assert payload["includedCount"] == 0
     assert payload["items"] == []
+
+
+def test_validate_meta_publish_plan_rejects_mismatched_storefront_host(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-storefront-mismatch")
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-storefront-mismatch"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    _set_selected_storefront_domain(
+        db_session,
+        client_id=client_id,
+        storefront_domain="thehonestherbalist.com",
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-storefront-mismatch",
+        asset_brief_id=brief_id,
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-storefront-mismatch",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.moshq.app",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 409
+    payload = response.json()["detail"]
+    assert payload["publishBaseUrl"] == "https://shop.moshq.app"
+    assert payload["expectedPublishBaseUrl"] == "https://shop.thehonestherbalist.com"
 
 
 def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_session) -> None:

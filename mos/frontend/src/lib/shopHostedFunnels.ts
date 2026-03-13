@@ -60,3 +60,11 @@ export function resolveWindowShopHostedOrigin(): string | null {
   if (typeof window === "undefined" || !window.location?.origin) return null;
   return resolveShopHostedOrigin(window.location.origin);
 }
+
+export function resolveConfiguredShopHostedOrigin(rawValue?: string | null): string | null {
+  if (!rawValue) return null;
+  const cleaned = rawValue.trim();
+  if (!cleaned) return null;
+  const candidate = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+  return resolveShopHostedOrigin(candidate);
+}
