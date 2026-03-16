@@ -36,6 +36,7 @@ from app.services.meta_review import (
     select_assets_for_generation,
 )
 from app.services import namecheap_dns as namecheap_dns_service
+from app.services.namecheap_dns import NamecheapDnsError
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -190,6 +191,16 @@ def _normalize_hostname_candidate(value: str | None) -> str | None:
     return candidate.lower().rstrip(".")
 
 
+def _normalize_meta_verified_domain(hostname: str) -> str:
+    try:
+        return namecheap_dns_service.apex_hostname(hostname)
+    except NamecheapDnsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Meta verified domain '{hostname}' is invalid: {exc}",
+        ) from exc
+
+
 def _resolve_funnel_verified_domain(
     *,
     session: Session,
@@ -200,7 +211,7 @@ def _resolve_funnel_verified_domain(
 ) -> str:
     requested = _normalize_hostname_candidate(requested_verified_domain)
     if requested:
-        return requested
+        return _normalize_meta_verified_domain(requested)
 
     funnel_domain = session.scalar(
         select(FunnelDomain).where(
@@ -212,11 +223,11 @@ def _resolve_funnel_verified_domain(
     if funnel_domain is not None:
         hostname = _normalize_hostname_candidate(getattr(funnel_domain, "hostname", None))
         if hostname:
-            return hostname
+            return _normalize_meta_verified_domain(hostname)
 
     existing_profile_domain = _normalize_hostname_candidate(profile.get("verifiedDomain"))
     if existing_profile_domain:
-        return existing_profile_domain
+        return _normalize_meta_verified_domain(existing_profile_domain)
 
     selected_storefront_origin = _selected_shop_storefront_domain(
         session=session,
@@ -226,13 +237,14 @@ def _resolve_funnel_verified_domain(
     )
     selected_storefront_host = _normalize_hostname_candidate(selected_storefront_origin)
     if selected_storefront_host:
-        return selected_storefront_host
+        return _normalize_meta_verified_domain(selected_storefront_host)
 
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail=(
             "Meta domain verification requires a verified domain target. "
-            "Set the client's selected storefront domain or enter a verified domain explicitly."
+            "Set the client's selected storefront domain or enter a verified domain explicitly. "
+            "MOS will provision the TXT record on the apex domain."
         ),
     )
 

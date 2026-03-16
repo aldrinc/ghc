@@ -44,6 +44,11 @@ def test_split_hostname_for_namecheap_supports_common_multi_part_tld():
     assert apex == "example.co.uk"
 
 
+def test_apex_hostname_strips_subdomains():
+    assert namecheap_dns.apex_hostname("shop.example.com") == "example.com"
+    assert namecheap_dns.apex_hostname("offer.shop.example.co.uk") == "example.co.uk"
+
+
 def test_upsert_cname_record_merges_records_and_replaces_existing_cname(monkeypatch):
     monkeypatch.setattr(
         namecheap_dns,
@@ -131,16 +136,16 @@ def test_upsert_txt_record_merges_existing_records_and_preserves_other_txt_value
     monkeypatch.setattr(namecheap_dns, "_set_hosts", _fake_set_hosts)
 
     result = namecheap_dns.upsert_txt_record(
-        hostname="shop.example.com",
+        hostname="example.com",
         value="facebook-domain-verification=xyz789",
     )
 
     assert result == {
         "provider": "namecheap",
         "recordType": "TXT",
-        "host": "shop",
+        "host": "@",
         "domain": "example.com",
-        "fqdn": "shop.example.com",
+        "fqdn": "example.com",
         "value": "facebook-domain-verification=xyz789",
         "ttl": 300,
         "status": "dns_record_written",
@@ -150,7 +155,7 @@ def test_upsert_txt_record_merges_existing_records_and_preserves_other_txt_value
     assert captured["records"] == [
         {"Name": "@", "Type": "TXT", "Address": "v=spf1 include:_spf.example.com ~all", "TTL": "1800"},
         {"Name": "shop", "Type": "TXT", "Address": "google-site-verification=abc123", "TTL": "1800"},
-        {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "300"},
+        {"Name": "@", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "300"},
     ]
 
 
@@ -160,7 +165,7 @@ def test_upsert_txt_record_is_idempotent_when_record_already_exists(monkeypatch)
         "_namecheap_request",
         lambda *, command, params: _build_get_hosts_response(
             host_entries=[
-                {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789"},
+                {"Name": "@", "Type": "TXT", "Address": "facebook-domain-verification=xyz789"},
             ]
         ),
     )
@@ -173,13 +178,13 @@ def test_upsert_txt_record_is_idempotent_when_record_already_exists(monkeypatch)
     monkeypatch.setattr(namecheap_dns, "_set_hosts", _fake_set_hosts)
 
     result = namecheap_dns.upsert_txt_record(
-        hostname="shop.example.com",
+        hostname="example.com",
         value="facebook-domain-verification=xyz789",
     )
 
-    assert result["fqdn"] == "shop.example.com"
+    assert result["fqdn"] == "example.com"
     assert captured["records"] == [
-        {"Name": "shop", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "1800"},
+        {"Name": "@", "Type": "TXT", "Address": "facebook-domain-verification=xyz789", "TTL": "1800"},
     ]
 
 

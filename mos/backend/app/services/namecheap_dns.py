@@ -119,6 +119,11 @@ def _normalize_txt_value(value: str) -> str:
     return cleaned
 
 
+def apex_hostname(hostname: str) -> str:
+    _, _, _, apex_domain = _split_hostname_for_namecheap(hostname)
+    return apex_domain
+
+
 def _namecheap_request(*, command: str, params: dict[str, str]) -> ET.Element:
     api_user = _read_required_setting("NAMECHEAP_API_USER")
     api_key = _read_required_setting("NAMECHEAP_API_KEY")

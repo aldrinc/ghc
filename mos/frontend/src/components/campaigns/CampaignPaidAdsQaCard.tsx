@@ -473,7 +473,7 @@ export function CampaignPaidAdsQaCard({
               <div>
                 <div className="text-sm font-semibold text-content">Meta domain verification</div>
                 <div className="mt-1 text-xs text-content-muted">
-                  Paste the TXT value from Meta Business Settings - Domains. MOS will write it in Namecheap for the selected funnel domain.
+                  Paste the TXT value from Meta Business Settings - Domains. MOS will write it in Namecheap on the apex domain for this funnel.
                 </div>
               </div>
               <Button
@@ -488,8 +488,8 @@ export function CampaignPaidAdsQaCard({
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Resolved domain</label>
-                <Input value={resolvedVerifiedDomain || ""} disabled placeholder="shop.example.com" />
+                <label className="text-xs font-semibold text-content">Resolved Meta domain</label>
+                <Input value={resolvedVerifiedDomain || ""} disabled placeholder="example.com" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-content">Meta TXT value</label>

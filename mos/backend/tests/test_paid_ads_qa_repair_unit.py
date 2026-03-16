@@ -214,15 +214,15 @@ def test_provision_meta_domain_verification_dns_updates_profile(monkeypatch) -> 
     fake_session = _FakeSession(funnel=funnel, campaign=campaign)
 
     def _upsert_txt_record(*, hostname: str, value: str, ttl: int = 300):
-        assert hostname == "shop.example.com"
+        assert hostname == "example.com"
         assert value == "facebook-domain-verification=xyz789"
         assert ttl == 300
         return {
             "provider": "namecheap",
             "recordType": "TXT",
-            "host": "shop",
+            "host": "@",
             "domain": "example.com",
-            "fqdn": "shop.example.com",
+            "fqdn": "example.com",
             "value": "facebook-domain-verification=xyz789",
             "ttl": 300,
             "status": "dns_record_written",
@@ -248,14 +248,15 @@ def test_provision_meta_domain_verification_dns_updates_profile(monkeypatch) -> 
     assert response.funnelId == "funnel-1"
     assert response.campaignId == "campaign-1"
     assert response.clientId == "client-1"
-    assert response.verifiedDomain == "shop.example.com"
+    assert response.verifiedDomain == "example.com"
     assert response.verifiedDomainStatus == "pending"
     assert response.dnsRecord.status == "dns_record_written"
-    assert response.dnsRecord.fqdn == "shop.example.com"
-    assert response.profile.verifiedDomain == "shop.example.com"
+    assert response.dnsRecord.fqdn == "example.com"
+    assert response.profile.verifiedDomain == "example.com"
     assert response.profile.verifiedDomainStatus == "pending"
     assert response.profile.metadata["metaDomainVerification"]["value"] == "facebook-domain-verification=xyz789"
     assert response.profile.metadata["metaDomainVerification"]["funnelIds"] == ["funnel-1"]
+    assert response.profile.metadata["metaDomainVerification"]["host"] == "@"
 
 
 def test_provision_meta_domain_verification_dns_rejects_non_meta_campaign(monkeypatch) -> None:

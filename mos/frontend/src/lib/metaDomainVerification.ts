@@ -1,5 +1,19 @@
 type UnknownRecord = Record<string, unknown>;
 
+const MULTI_PART_TLDS = new Set([
+  "ac.uk",
+  "co.jp",
+  "co.nz",
+  "co.uk",
+  "com.au",
+  "com.br",
+  "com.mx",
+  "gov.uk",
+  "net.au",
+  "org.au",
+  "org.uk",
+]);
+
 export type MetaDomainVerificationState = {
   status: string | null;
   provider: string | null;
@@ -32,11 +46,22 @@ function normalizeHostname(value: string | null | undefined): string | null {
   return cleaned.toLowerCase().replace(/\.$/, "");
 }
 
+function toApexHostname(value: string | null): string | null {
+  if (!value) return null;
+  const labels = value.split(".").filter(Boolean);
+  if (labels.length < 2) return value;
+  const suffix = labels.slice(-2).join(".");
+  if (labels.length >= 3 && MULTI_PART_TLDS.has(suffix)) {
+    return labels.slice(-3).join(".");
+  }
+  return labels.slice(-2).join(".");
+}
+
 export function resolveMetaVerifiedDomainCandidate(
   verifiedDomain?: string | null,
   reviewBaseUrl?: string | null,
 ): string | null {
-  return normalizeHostname(verifiedDomain) || normalizeHostname(reviewBaseUrl) || null;
+  return toApexHostname(normalizeHostname(verifiedDomain) || normalizeHostname(reviewBaseUrl) || null);
 }
 
 export function readMetaDomainVerification(

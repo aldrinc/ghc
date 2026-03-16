@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest";
 import { readMetaDomainVerification, resolveMetaVerifiedDomainCandidate } from "@/lib/metaDomainVerification";
 
 describe("resolveMetaVerifiedDomainCandidate", () => {
-  it("prefers an explicit verified domain", () => {
+  it("normalizes an explicit verified domain to the apex domain", () => {
     expect(resolveMetaVerifiedDomainCandidate("shop.thehonestherbalist.com", "https://example.com")).toBe(
-      "shop.thehonestherbalist.com",
+      "thehonestherbalist.com",
     );
   });
 
-  it("falls back to the review base URL hostname", () => {
+  it("normalizes the review base URL hostname to the apex domain", () => {
     expect(resolveMetaVerifiedDomainCandidate("", "https://shop.thehonestherbalist.com/products/tincture")).toBe(
-      "shop.thehonestherbalist.com",
+      "thehonestherbalist.com",
     );
   });
 });
@@ -24,9 +24,9 @@ describe("readMetaDomainVerification", () => {
           status: "dns_record_written",
           provider: "namecheap",
           recordType: "TXT",
-          host: "shop",
+          host: "@",
           domain: "example.com",
-          fqdn: "shop.example.com",
+          fqdn: "example.com",
           value: "facebook-domain-verification=xyz789",
           ttl: 300,
           metaConfirmationRequired: true,
@@ -39,9 +39,9 @@ describe("readMetaDomainVerification", () => {
       status: "dns_record_written",
       provider: "namecheap",
       recordType: "TXT",
-      host: "shop",
+      host: "@",
       domain: "example.com",
-      fqdn: "shop.example.com",
+      fqdn: "example.com",
       value: "facebook-domain-verification=xyz789",
       ttl: 300,
       metaConfirmationRequired: true,
