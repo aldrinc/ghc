@@ -8,7 +8,6 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-<<<<<<< HEAD
 from app.db.models import (
     Campaign,
     Client,
@@ -19,18 +18,6 @@ from app.db.models import (
     ProductOffer,
     ProductVariant,
 )
-=======
-from app.db.models import (
-    Campaign,
-    Client,
-    MetaAdAccountConnection,
-    MetaWorkspaceAdConfig,
-    Org,
-    Product,
-    ProductOffer,
-    ProductVariant,
-)
->>>>>>> origin/main
 from app.temporal.activities import campaign_intent_activities as cia
 from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
