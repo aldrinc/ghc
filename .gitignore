@@ -56,6 +56,8 @@ tmp/
 mos/backend/.tmp/
 mos/backend/tmp/
 swipe/
+template-image-workspace/output/*
+!template-image-workspace/output/.gitkeep
 
 # Taskmaster
 .taskmaster/

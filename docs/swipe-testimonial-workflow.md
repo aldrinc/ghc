@@ -31,10 +31,10 @@ Extract a zip into a template image directory:
 ```bash
 python3 scripts/swipe_testimonial_workflow.py prepare-templates \
   --zip /absolute/path/to/source-testimonials.zip \
-  --output-dir /absolute/path/to/repo/template-images
+  --output-dir /absolute/path/to/repo/template-image-workspace/assets
 ```
 
-`prepare-templates` strips a single enclosing folder from the zip when present, so the actual image files end up directly inside `template-images/`.
+`prepare-templates` strips a single enclosing folder from the zip when present, so the actual image files end up directly inside `template-image-workspace/assets/`.
 
 Inspect a live page and list image-like JSON pointers:
 
@@ -71,7 +71,7 @@ Top-level fields:
 - `templateImagesDir`: required. Absolute path to the extracted template image directory.
 - `generationDefaults`: required. Default swipe generation inputs used unless a placement overrides them.
 - `pages`: required. Array of page patch jobs.
-- `patchedOutputDir`: required only when any page uses `saveDraft=false`.
+- `patchedOutputDir`: required only when any page uses `saveDraft=false`. Put it under `template-image-workspace/output/` when you want local patched JSON files in the same consolidated workspace.
 - `sourceServeHost`: optional. Host used for the temporary file server that exposes the template files. Default `127.0.0.1`.
 - `sourceServePort`: optional. Port for the temporary file server. Default `0` (ephemeral).
 
@@ -166,9 +166,13 @@ If `slotPointer` resolves to the wrong object, the script will still patch that 
 
 The workflow expects template images to already exist in `templateImagesDir`. You can create that directory with `prepare-templates`.
 
-Use one canonical folder that contains the image files directly, for example:
+Use the consolidated repo workspace and keep the source image files directly under `assets/`, for example:
 
-- `/Users/auggieclement/Documents/GitHub/ghc/template-images`
+- `/Users/auggieclement/Documents/GitHub/ghc/template-image-workspace/assets`
+
+Keep generated run output under the sibling output folder, for example:
+
+- `/Users/auggieclement/Documents/GitHub/ghc/template-image-workspace/output`
 
 The run command serves those template images over a temporary local HTTP server so the MOS backend can fetch them as `swipeImageUrl` inputs.
 

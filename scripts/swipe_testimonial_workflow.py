@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Iterator
 
+from template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 _IMAGE_KEYS = {
@@ -803,8 +804,8 @@ def _build_parser() -> argparse.ArgumentParser:
     prepare_templates.add_argument("--zip", required=True, help="Path to the source zip archive.")
     prepare_templates.add_argument(
         "--output-dir",
-        required=True,
-        help="Directory where the template images should be extracted.",
+        default=str(TEMPLATE_IMAGE_ASSETS_DIR),
+        help=f"Directory where the template images should be extracted. Defaults to {TEMPLATE_IMAGE_ASSETS_DIR}.",
     )
     prepare_templates.set_defaults(func=_prepare_templates)
 

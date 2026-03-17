@@ -14,6 +14,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from template_image_workspace import (
+    REPO_ROOT,
+    TEMPLATE_IMAGE_ASSETS_DIR,
+    TEMPLATE_IMAGE_TRACE_OUTPUT_DIR,
+)
 from swipe_testimonial_workflow import (
     _JsonApiClient,
     _StaticServer,
@@ -27,9 +32,10 @@ from swipe_testimonial_workflow import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = REPO_ROOT
 BACKEND_ROOT = ROOT / "mos" / "backend"
-DEFAULT_TEMPLATE_DIR = ROOT / "template-images"
+DEFAULT_TEMPLATE_DIR = TEMPLATE_IMAGE_ASSETS_DIR
+DEFAULT_OUTPUT_ROOT = TEMPLATE_IMAGE_TRACE_OUTPUT_DIR
 REQUIRED_PROVIDER = "creative_service"
 _LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 
@@ -281,14 +287,22 @@ def _normalize_generation_payload(args: argparse.Namespace) -> dict[str, str | i
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the repo template-images directory through the existing swipe image creation workflow, "
-            "while requiring the mOS embedded creative_service render provider."
+            "Run the repo template-image-workspace/assets directory through the existing swipe image "
+            "creation workflow, while requiring the mOS embedded creative_service render provider."
         )
     )
     parser.add_argument("--mos-base-url", required=True)
     parser.add_argument("--auth-token-env", required=True)
-    parser.add_argument("--template-dir", default=str(DEFAULT_TEMPLATE_DIR))
-    parser.add_argument("--output-root", required=True)
+    parser.add_argument(
+        "--template-dir",
+        default=str(DEFAULT_TEMPLATE_DIR),
+        help=f"Template asset directory. Defaults to {DEFAULT_TEMPLATE_DIR}.",
+    )
+    parser.add_argument(
+        "--output-root",
+        default=str(DEFAULT_OUTPUT_ROOT),
+        help=f"Run output directory. Defaults to {DEFAULT_OUTPUT_ROOT}.",
+    )
     parser.add_argument("--client-id", required=True)
     parser.add_argument("--product-id", required=True)
     parser.add_argument("--campaign-id", required=True)
