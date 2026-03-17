@@ -93,6 +93,11 @@ Optional generation fields:
 
 `count` must be exactly `1`. This wrapper is slot-oriented and will error if you try to request multi-output generations.
 
+Instagram template behavior:
+
+- If a placement's resolved `templateFile` name includes `instagram` and that placement does not explicitly override `generation.aspectRatio`, the workflow automatically uses `9:16` for that placement.
+- Explicit `generation.aspectRatio` on a placement still wins.
+
 Each `pages[]` entry must include:
 
 - `funnelId`

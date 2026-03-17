@@ -791,6 +791,62 @@ def test_call_swipe_copy_gemini_json_message_retries_retryable_gemini_errors(mon
     assert sleep_calls == [3.0]
 
 
+def test_call_swipe_copy_gemini_json_message_uses_high_demand_backoff_for_503(monkeypatch):
+    sleep_calls: list[float] = []
+
+    class _FakeGeminiError(Exception):
+        def __init__(self, message: str):
+            super().__init__(message)
+            self.status_code = 503
+
+    class _FakeModels:
+        def __init__(self):
+            self.calls = 0
+
+        def generate_content(self, *, model, contents, config):
+            self.calls += 1
+            if self.calls == 1:
+                raise _FakeGeminiError(
+                    "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. "
+                    "Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+                )
+            return SimpleNamespace(
+                parsed={
+                    "selectedVariation": "Variation 1",
+                    "formattedVariationsMarkdown": "```text\n**Variation 1**\n```",
+                    "metaPrimaryText": "Primary text",
+                    "metaHeadline": "Headline",
+                    "metaDescription": "Description",
+                    "metaCta": "Learn More",
+                    "claimsGuardrails": ["Do not promise medical outcomes."],
+                },
+                text="",
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+    monkeypatch.setattr(swipe_activity, "_SWIPE_COPY_GEMINI_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(swipe_activity, "_SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE", None)
+    monkeypatch.setattr(swipe_activity.time, "sleep", lambda seconds: sleep_calls.append(seconds))
+
+    result = swipe_activity._call_swipe_copy_gemini_json_message(
+        model="models/gemini-2.5-flash",
+        system_instruction="Return JSON only.",
+        contents=["prompt"],
+        store_names=["fileSearchStores/context-store"],
+        max_tokens=2048,
+        temperature=0.2,
+        response_schema=None,
+    )
+
+    assert result["parsed"]["metaHeadline"] == "Headline"
+    assert sleep_calls == [15.0]
+
+
 def test_call_swipe_copy_gemini_json_message_raises_after_retry_budget_exhausted(monkeypatch):
     sleep_calls: list[float] = []
 

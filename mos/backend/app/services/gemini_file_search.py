@@ -159,6 +159,36 @@ def _poll_document_active(client, *, document_name: str, timeout_seconds: float)
         time.sleep(_POLL_INTERVAL_SECONDS)
 
 
+def _extract_error_status_code(exc: Exception) -> int | None:
+    direct_status = getattr(exc, "status_code", None)
+    if isinstance(direct_status, int):
+        return direct_status
+    response = getattr(exc, "response", None)
+    response_status = getattr(response, "status_code", None)
+    if isinstance(response_status, int):
+        return response_status
+    return None
+
+
+def _is_accessible_existing_document(client, *, document_name: str) -> bool:
+    try:
+        client.file_search_stores.documents.get(name=document_name)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        status_code = _extract_error_status_code(exc)
+        message = str(exc).lower()
+        if status_code in {403, 404} or "permission_denied" in message or "may not exist" in message:
+            logger.warning(
+                "Gemini File Search cached document is no longer accessible; recreating it. "
+                "document_name=%s status=%s error=%s",
+                document_name,
+                status_code,
+                exc,
+            )
+            return False
+        raise
+
+
 def ensure_uploaded_to_gemini_file_search(
     *,
     org_id: str,
@@ -195,9 +225,16 @@ def ensure_uploaded_to_gemini_file_search(
             and existing.status == GeminiContextFileStatusEnum.ready
             and getattr(existing, "gemini_document_name", None)
         ):
-            return str(existing.gemini_document_name)
+            existing_document_name = str(existing.gemini_document_name).strip()
+            if existing_document_name and _is_accessible_existing_document(
+                client,
+                document_name=existing_document_name,
+            ):
+                return existing_document_name
 
     store_name = str(getattr(existing, "gemini_store_name", "") or "").strip() if existing else ""
+    if existing and getattr(existing, "gemini_document_name", None) and store_name:
+        store_name = ""
     if not store_name:
         store = client.file_search_stores.create(
             config=genai_types.CreateFileSearchStoreConfig(
@@ -470,4 +507,3 @@ def generate_with_gemini_file_search(
         output_tokens=_extract_usage_output_tokens(response),
         citations=_extract_citations(response),
     )
-

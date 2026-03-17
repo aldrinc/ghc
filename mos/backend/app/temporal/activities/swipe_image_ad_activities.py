@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import threading
 import time
 import json
 from pathlib import Path
@@ -68,6 +69,7 @@ _GEMINI_CLIENT: Any | None = None
 _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
 _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
+_SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE: Tuple[int, threading.BoundedSemaphore] | None = None
 
 
 def _resolve_swipe_gemini_timeout_seconds() -> int:
@@ -158,7 +160,49 @@ def _load_swipe_product_image_profiles() -> Dict[str, bool]:
     return profiles
 
 
-def _resolve_swipe_copy_gemini_retry_delay_seconds(*, attempt: int, retry_after_raw: str | None = None) -> float:
+def _resolve_swipe_gemini_max_concurrency() -> int:
+    configured = os.getenv("SWIPE_GEMINI_MAX_CONCURRENCY", "2").strip()
+    try:
+        return max(1, int(configured))
+    except ValueError as exc:
+        raise RuntimeError(
+            "SWIPE_GEMINI_MAX_CONCURRENCY must be a positive integer when set."
+        ) from exc
+
+
+def _swipe_gemini_generate_content_semaphore() -> threading.BoundedSemaphore:
+    global _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE
+    configured = _resolve_swipe_gemini_max_concurrency()
+    current = _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE
+    if current is None or current[0] != configured:
+        _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE = (
+            configured,
+            threading.BoundedSemaphore(configured),
+        )
+    return _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE[1]
+
+
+def _has_swipe_copy_gemini_high_demand_signal(*, status_code: int | None, error_text: str) -> bool:
+    if status_code not in {429, 503}:
+        return False
+    normalized = error_text.lower()
+    high_demand_markers = (
+        "high demand",
+        "currently experiencing high demand",
+        "spikes in demand are usually temporary",
+        "status': 'unavailable'",
+        'status": "unavailable"',
+    )
+    return any(marker in normalized for marker in high_demand_markers)
+
+
+def _resolve_swipe_copy_gemini_retry_delay_seconds(
+    *,
+    attempt: int,
+    retry_after_raw: str | None = None,
+    status_code: int | None = None,
+    error_text: str = "",
+) -> float:
     if isinstance(retry_after_raw, str) and retry_after_raw.strip():
         try:
             parsed_retry_after = float(retry_after_raw.strip())
@@ -166,7 +210,10 @@ def _resolve_swipe_copy_gemini_retry_delay_seconds(*, attempt: int, retry_after_
                 return max(1.0, parsed_retry_after)
         except ValueError:
             pass
-    return min(30.0, max(1.0, float(2**attempt)))
+    delay_seconds = min(30.0, max(1.0, float(2**attempt)))
+    if _has_swipe_copy_gemini_high_demand_signal(status_code=status_code, error_text=error_text):
+        delay_seconds = max(delay_seconds, min(90.0, 15.0 * float(attempt)))
+    return delay_seconds
 
 
 def _extract_swipe_copy_gemini_status_code(exc: Exception) -> int | None:
@@ -231,17 +278,20 @@ def _call_gemini_generate_content_with_retries(
     operation_name: str,
     file_search_model_error_message: str,
 ) -> Any:
+    semaphore = _swipe_gemini_generate_content_semaphore()
     for attempt in range(1, _SWIPE_COPY_GEMINI_MAX_ATTEMPTS + 1):
         try:
-            return gemini_client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            )
+            with semaphore:
+                return gemini_client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                )
         except Exception as exc:  # noqa: BLE001
             error_text = str(exc)
             if "File search tool is not enabled for this model" in error_text:
                 raise RuntimeError(file_search_model_error_message) from exc
+            status_code = _extract_swipe_copy_gemini_status_code(exc)
             if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
                 exc,
                 error_text=error_text,
@@ -250,6 +300,8 @@ def _call_gemini_generate_content_with_retries(
                     _resolve_swipe_copy_gemini_retry_delay_seconds(
                         attempt=attempt,
                         retry_after_raw=_extract_swipe_copy_gemini_retry_after(exc),
+                        status_code=status_code,
+                        error_text=error_text,
                     )
                 )
                 continue

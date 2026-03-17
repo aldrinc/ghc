@@ -402,6 +402,13 @@ def _normalize_string_list(value: Any, field_name: str) -> list[str]:
     return normalized
 
 
+def _template_prefers_instagram_portrait_aspect_ratio(template_member: str) -> bool:
+    normalized = template_member.strip().replace("\\", "/").lower()
+    filename = Path(normalized).name
+    stem = Path(filename).stem
+    return "instagram" in stem
+
+
 def _merged_generation_payload(defaults: dict[str, Any], overrides: dict[str, Any] | None) -> dict[str, Any]:
     merged = dict(defaults)
     if overrides:
@@ -435,6 +442,19 @@ def _merged_generation_payload(defaults: dict[str, Any], overrides: dict[str, An
     if render_model_id is not None:
         payload["renderModelId"] = render_model_id
     return payload
+
+
+def _resolve_generation_for_template(
+    *,
+    generation_defaults: dict[str, Any],
+    generation_overrides: dict[str, Any] | None,
+    template_member: str,
+) -> dict[str, Any]:
+    generation = _merged_generation_payload(generation_defaults, generation_overrides)
+    if generation_overrides is None or "aspectRatio" not in generation_overrides:
+        if _template_prefers_instagram_portrait_aspect_ratio(template_member):
+            generation["aspectRatio"] = "9:16"
+    return generation
 
 
 def _swipe_generation_request_payload(generation: dict[str, Any], swipe_image_url: str) -> dict[str, Any]:
@@ -665,10 +685,14 @@ def _run_workflow(args: argparse.Namespace) -> int:
                         generation_overrides,
                         f"pages[{page_index}].placements[{placement_index}].generation",
                     )
-                generation = _merged_generation_payload(generation_defaults, generation_overrides)
                 template_member = _resolve_template_member(
                     template_files=template_files,
                     template_file=template_file,
+                )
+                generation = _resolve_generation_for_template(
+                    generation_defaults=generation_defaults,
+                    generation_overrides=generation_overrides,
+                    template_member=template_member,
                 )
                 template_url = f"{static_server.base_url}/{urllib.parse.quote(template_member)}"
                 payload = _swipe_generation_request_payload(generation, template_url)
@@ -730,6 +754,7 @@ def _run_workflow(args: argparse.Namespace) -> int:
                         "slotPointer": slot_pointer,
                         "templateFile": template_file,
                         "resolvedTemplateMember": generation_result["templateMember"],
+                        "aspectRatio": generation_result["generation"]["aspectRatio"],
                         "workflowRunId": generation_result["workflowRunId"],
                         "temporalWorkflowId": generation_result["temporalWorkflowId"],
                         "jobId": generation_result["jobId"],

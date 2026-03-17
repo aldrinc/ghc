@@ -4,6 +4,7 @@ import base64
 import concurrent.futures
 import copy
 import functools
+import http.server
 import io
 import json
 import mimetypes
@@ -13,11 +14,12 @@ import re
 import threading
 import time
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, cast
+from urllib.parse import quote
 from uuid import uuid4
 
 from PIL import Image
@@ -27,8 +29,9 @@ from temporalio import activity as temporal_activity
 
 from app.config import settings
 from app.db.base import SessionLocal
+from app.db.enums import ArtifactTypeEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
+from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
-from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import (
@@ -43,6 +46,7 @@ from app.services.funnel_metadata import normalize_public_page_metadata_for_cont
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
@@ -1432,6 +1436,51 @@ class _PreSalesSwipeTemplateReference:
     mime_type: str
 
 
+@dataclass(frozen=True)
+class _LoadedGeneratedTestimonialAsset:
+    asset: _GeneratedTestimonialAsset
+    ai_metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _PreSalesSwipeActivityResult:
+    generated_asset: _GeneratedTestimonialAsset
+    ai_metadata: dict[str, Any]
+    job_id: str
+
+
+class _LocalStaticServer:
+    def __init__(self, *, root: Path, host: str = "127.0.0.1", port: int = 0) -> None:
+        class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
+                return
+
+        handler = functools.partial(_QuietHandler, directory=str(root))
+        self._server = http.server.ThreadingHTTPServer((host, port), handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self.host = host
+        self.port = int(self._server.server_port)
+
+    def __enter__(self) -> "_LocalStaticServer":
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=5)
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+    def build_url(self, relative_path: str) -> str:
+        normalized = str(relative_path or "").strip().replace("\\", "/")
+        if not normalized:
+            raise TestimonialGenerationError("Template relative path is required to build a local source URL.")
+        return f"{self.base_url}/{quote(normalized, safe='/')}"
+
+
 _PRE_SALES_SLIDE_IMAGE_RE = re.compile(
     r"^pre_sales\.reviews\.slides\[(?P<slide_index>\d+)\]\.images\[(?P<image_index>\d+)\]$"
 )
@@ -1450,44 +1499,6 @@ _PRE_SALES_WALL_TEMPLATE_FILES: dict[tuple[int, int], tuple[str, str, str]] = {
     (1, 1): ("download_6_5f6be698-5d17-411b-84e0-941c3909e7cc.webp", "1:1", "facebook_dark_comment"),
     (2, 0): ("instagram_post_20250916_152108_via_10015_io.webp", "9:16", "instagram_selfie_car"),
     (2, 1): ("instagram_post_20250916_152858_via_10015_io.webp", "9:16", "instagram_selfie_home"),
-}
-_PRE_SALES_STYLE_FAMILY_INSTRUCTIONS: dict[str, str] = {
-    "facebook_comment_thread": (
-        "Create a native Facebook mobile comment-thread screenshot with stacked replies, tight edge-to-edge "
-        "cropping, crisp social UI text, and a believable lived-in screenshot feel."
-    ),
-    "twitter_mobile_post": (
-        "Create a native Twitter/X mobile post screenshot with a clean white interface, realistic avatar details, "
-        "and a continuous edge-to-edge social capture."
-    ),
-    "facebook_comment_single": (
-        "Create a tightly cropped native Facebook single-comment screenshot with one main comment bubble, reaction "
-        "count, and the familiar Like/Reply/time action row."
-    ),
-    "twitter_photo_collage": (
-        "Create a native Twitter/X post screenshot with a collage-style media block that still feels like a genuine "
-        "mobile social capture, not a designed poster."
-    ),
-    "dark_mode_comment": (
-        "Create a native dark-mode social comment screenshot with dense readable text, reaction icons, and the flat "
-        "2D app look preserved edge-to-edge."
-    ),
-    "instagram_ugc_product_demo": (
-        "Create a native Instagram mobile screen capture in portrait with the app chrome baked into the image, no "
-        "visible phone hardware, and a candid UGC product-demonstration feel."
-    ),
-    "facebook_dark_comment": (
-        "Create a native Facebook dark-mode comment screenshot with crisp white text on charcoal UI, believable "
-        "engagement counts, and no extra background outside the capture."
-    ),
-    "instagram_selfie_car": (
-        "Create a native Instagram mobile screen capture in portrait featuring a candid selfie-style main image with "
-        "the app interface integrated and edge-to-edge."
-    ),
-    "instagram_selfie_home": (
-        "Create a native Instagram mobile screen capture in portrait featuring a candid indoor selfie-style main "
-        "image with integrated UI and no side gutters."
-    ),
 }
 _PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = (
     Path(__file__).resolve().parents[4] / "template-image-workspace" / "assets"
@@ -1555,73 +1566,150 @@ def _load_pre_sales_swipe_template_reference(
     )
 
 
-def _build_pre_sales_swipe_render_prompt(
+def _resolve_pre_sales_swipe_asset_brief_id(
     *,
-    assignment: _PreSalesSwipeTemplateAssignment,
-    validated: dict[str, Any],
-    product_title: str,
-    render_label: str,
-    testimonial_role: str,
-    variation_direction: str,
+    session: Session,
+    org_id: str,
+    funnel: Funnel,
 ) -> str:
-    style_instruction = _PRE_SALES_STYLE_FAMILY_INSTRUCTIONS.get(
-        assignment.style_family,
-        "Create a native social screenshot that preserves the reference image layout and UI chrome.",
-    )
-    reply = validated.get("reply")
-    meta = validated.get("meta")
-    reply_name = ""
-    reply_text = ""
-    if isinstance(reply, dict):
-        reply_name = _clean_single_line(str(reply.get("name") or ""))
-        reply_text = _truncate(_clean_single_line(str(reply.get("text") or "")), limit=320)
-    location = ""
-    date_label = ""
-    if isinstance(meta, dict):
-        location = _clean_single_line(str(meta.get("location") or ""))
-        date_label = _clean_single_line(str(meta.get("date") or ""))
-    review_text = _truncate(_clean_single_line(str(validated.get("review") or "")), limit=700)
-    persona = _truncate(_clean_single_line(str(validated.get("persona") or "")), limit=260)
-    avatar_prompt = _truncate(_clean_single_line(str(validated.get("avatarPrompt") or "")), limit=260)
-    direction = _truncate(_clean_single_line(variation_direction or ""), limit=260)
-    verified_label = "verified buyer" if bool(validated.get("verified")) else "customer review"
-    rating = int(validated.get("rating") or 5)
-    customer_name = _clean_single_line(str(validated.get("name") or "Customer"))
+    campaign_id = str(funnel.campaign_id or "").strip()
+    if not campaign_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires funnel.campaign_id so it can reuse the campaign asset brief."
+        )
 
-    return (
-        f"{style_instruction}\n\n"
-        "Use the attached reference image as the exact design blueprint. Preserve the same platform chrome, "
-        "visual density, screenshot framing, typography hierarchy, lighting mood, and overall composition family "
-        "as the reference while creating a new distinct testimonial image.\n\n"
-        "Reference-preservation rules:\n"
-        "- Keep the output edge-to-edge with no extra side background, device bezel, or poster framing beyond the screenshot capture.\n"
-        "- Treat all visible social UI elements in the reference as part of the design DNA.\n"
-        "- The result must feel like a genuine screenshot or native social post, not a composited mockup.\n"
-        "- All visible text must be crisp and legible.\n"
-        "- Do not use placeholder text or lorem ipsum.\n"
-        "- Make this render visibly distinct from other slots that reuse the same template by changing the wording, person, micro-scene details, and supporting social proof while keeping the same layout family.\n\n"
-        "New testimonial content to render:\n"
-        f"- Product title: {product_title}\n"
-        f"- Customer name: {customer_name}\n"
-        f"- Review role: {testimonial_role}\n"
-        f"- Review text: {review_text}\n"
-        f"- Rating: {rating} out of 5\n"
-        f"- Verification state: {verified_label}\n"
-        f"- Persona guidance: {persona}\n"
-        f"- Avatar/identity guidance: {avatar_prompt}\n"
-        f"- Reply name: {reply_name or '[omit if not needed]'}\n"
-        f"- Reply text: {reply_text or '[omit if not needed]'}\n"
-        f"- Location cue: {location or '[optional]'}\n"
-        f"- Date cue: {date_label or '[optional]'}\n"
-        f"- Variation direction: {direction or '[use the testimonial content itself]'}\n"
-        f"- Slot variation key: {assignment.variation_key}\n"
-        f"- Internal slot label: {render_label}\n\n"
-        "Content rules:\n"
-        "- Keep claims realistic and educational. Do not add medical guarantees, impossible outcomes, or unsupported promises.\n"
-        "- If the reference image shows the product physically, adapt the product art so it reads as this product and fits the testimonial context.\n"
-        "- If the reference image is an Instagram screenshot, keep true portrait phone-screen proportions with the app UI baked into the image and no visible physical phone.\n"
-        "- If the reference image is a Facebook or Twitter/X screenshot, keep the UI shell flat, native, and continuous.\n"
-        f"- Target aspect ratio: {assignment.aspect_ratio}."
+    client_id = str(funnel.client_id or "").strip()
+    if not client_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires funnel.client_id to resolve the campaign asset brief."
+        )
+
+    experiment_spec_id = str(funnel.experiment_spec_id or "").strip()
+    artifacts = ArtifactsRepository(session).list(
+        org_id=org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.asset_brief,
+        limit=200,
+    )
+    if not artifacts:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering could not find any asset brief artifacts for the funnel campaign. "
+            f"campaign_id={campaign_id}"
+        )
+
+    matches: list[dict[str, str]] = []
+    seen_brief_ids: set[str] = set()
+    for artifact in artifacts:
+        payload = artifact.data if isinstance(artifact.data, dict) else {}
+        brief_entries = payload.get("asset_briefs") or payload.get("assetBriefs") or []
+        if not isinstance(brief_entries, list):
+            continue
+        for entry in brief_entries:
+            if not isinstance(entry, dict):
+                continue
+            brief_id = str(entry.get("id") or "").strip()
+            if not brief_id or brief_id in seen_brief_ids:
+                continue
+            entry_experiment_id = str(entry.get("experimentId") or "").strip()
+            if experiment_spec_id and entry_experiment_id != experiment_spec_id:
+                continue
+            requirements = entry.get("requirements")
+            if not isinstance(requirements, list) or len(requirements) != 1:
+                raise TestimonialGenerationError(
+                    "Pre-sales swipe testimonial rendering requires the selected asset brief to contain exactly 1 "
+                    f"requirement. brief_id={brief_id} requirement_count={len(requirements) if isinstance(requirements, list) else 'invalid'}"
+                )
+            matches.append(
+                {
+                    "brief_id": brief_id,
+                    "experiment_id": entry_experiment_id or "[missing]",
+                }
+            )
+            seen_brief_ids.add(brief_id)
+
+    if not matches:
+        if experiment_spec_id:
+            raise TestimonialGenerationError(
+                "Pre-sales swipe testimonial rendering could not find a campaign asset brief matching the funnel "
+                f"experiment spec. campaign_id={campaign_id} experiment_spec_id={experiment_spec_id}"
+            )
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering could not find any usable asset brief entries for the funnel campaign. "
+            f"campaign_id={campaign_id}"
+        )
+
+    if len(matches) != 1:
+        preview = ", ".join(
+            f"{row['brief_id']} (experimentId={row['experiment_id']})"
+            for row in matches[:5]
+        )
+        if len(matches) > 5:
+            preview += ", ..."
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires exactly one matching campaign asset brief. "
+            f"campaign_id={campaign_id} experiment_spec_id={experiment_spec_id or '[missing]'} matches={preview}"
+        )
+
+    return matches[0]["brief_id"]
+
+
+def _load_generated_testimonial_asset_record(asset_id: str) -> _LoadedGeneratedTestimonialAsset:
+    with SessionLocal() as thread_session:
+        asset = thread_session.get(Asset, asset_id)
+        if asset is None:
+            raise TestimonialGenerationError(f"Generated testimonial asset not found: {asset_id}")
+        return _LoadedGeneratedTestimonialAsset(
+            asset=_generated_testimonial_asset(asset),
+            ai_metadata=dict(asset.ai_metadata or {}),
+        )
+
+
+def _generate_pre_sales_swipe_testimonial_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str,
+    asset_brief_id: str,
+    template_url: str,
+    template_file: str,
+    aspect_ratio: str,
+) -> _PreSalesSwipeActivityResult:
+    result = generate_swipe_image_ad_activity(
+        {
+            "org_id": org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": campaign_id,
+            "asset_brief_id": asset_brief_id,
+            "requirement_index": 0,
+            "swipe_image_url": template_url,
+            "swipe_source_label": template_file,
+            "aspect_ratio": aspect_ratio,
+            "count": 1,
+        }
+    )
+    asset_ids = result.get("asset_ids")
+    if not isinstance(asset_ids, list) or len(asset_ids) != 1:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering expected exactly 1 generated asset from the swipe pipeline."
+        )
+    asset_id = str(asset_ids[0] or "").strip()
+    if not asset_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering received an empty asset id from the swipe pipeline."
+        )
+    job_id = str(result.get("job_id") or "").strip()
+    if not job_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering expected a non-empty job_id from the swipe pipeline."
+        )
+    asset_record = _load_generated_testimonial_asset_record(asset_id)
+    return _PreSalesSwipeActivityResult(
+        generated_asset=asset_record.asset,
+        ai_metadata=asset_record.ai_metadata,
+        job_id=job_id,
     )
 
 
@@ -2087,82 +2175,11 @@ def _collect_sales_pdp_carousel_slots(
     return slot_targets, contexts
 
 
-def _force_pre_sales_review_media_templates(puck_data: dict[str, Any]) -> None:
-    def update_reviews_config(reviews: dict[str, Any]) -> None:
-        slides = reviews.get("slides")
-        if not isinstance(slides, list) or not slides:
-            raise TestimonialGenerationError("Pre-sales reviews.slides must be a non-empty list.")
-        for idx, slide in enumerate(slides):
-            if not isinstance(slide, dict):
-                raise TestimonialGenerationError("Pre-sales reviews.slides must be objects.")
-            images = slide.get("images")
-            if not isinstance(images, list) or len(images) < 3:
-                raise TestimonialGenerationError(
-                    f"Pre-sales reviews.slides[{idx}].images must include 3 image objects."
-                )
-            for image in images:
-                if isinstance(image, dict):
-                    image["testimonialTemplate"] = "testimonial_media"
-
-    for obj in walk_json(puck_data):
-        if not isinstance(obj, dict):
-            continue
-        comp_type = obj.get("type")
-        if comp_type not in ("PreSalesReviews", "PreSalesTemplate"):
-            continue
-        props = obj.get("props")
-        if not isinstance(props, dict):
-            continue
-        config = props.get("config")
-        if isinstance(config, dict):
-            if comp_type == "PreSalesReviews":
-                update_reviews_config(config)
-            else:
-                reviews = config.get("reviews")
-                if isinstance(reviews, dict):
-                    update_reviews_config(reviews)
-        raw = props.get("configJson")
-        if isinstance(raw, str) and raw.strip():
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise TestimonialGenerationError(
-                    f"{comp_type}.configJson must be valid JSON: {exc}"
-                ) from exc
-            if isinstance(parsed, dict):
-                if comp_type == "PreSalesReviews":
-                    update_reviews_config(parsed)
-                else:
-                    reviews = parsed.get("reviews")
-                    if isinstance(reviews, dict):
-                        update_reviews_config(reviews)
-                props["configJson"] = json.dumps(parsed, ensure_ascii=False)
-
-
 def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: str) -> None:
     def assign_templates(images: list[dict[str, Any]]) -> None:
         templates = _wall_template_sequence(len(images))
         for image, template in zip(images, templates):
             image["testimonialTemplate"] = template
-
-    def update_pre_sales_wall(config: dict[str, Any]) -> None:
-        reviews_wall = config.get("reviewsWall") if "reviewsWall" in config else config
-        if not isinstance(reviews_wall, dict):
-            return
-        columns = reviews_wall.get("columns")
-        if not isinstance(columns, list):
-            return
-        images: list[dict[str, Any]] = []
-        for column in columns:
-            if not isinstance(column, list):
-                continue
-            for item in column:
-                if not isinstance(item, dict):
-                    continue
-                image = item.get("image")
-                if isinstance(image, dict):
-                    images.append(image)
-        assign_templates(images)
 
     def update_sales_wall(config: dict[str, Any]) -> None:
         review_wall = config.get("reviewWall") if "reviewWall" in config else config
@@ -2187,32 +2204,6 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
         props = obj.get("props")
         if not isinstance(props, dict):
             continue
-        if template_kind == "pre-sales-listicle" and comp_type in ("PreSalesReviewWall", "PreSalesTemplate"):
-            config = props.get("config")
-            if isinstance(config, dict):
-                if comp_type == "PreSalesReviewWall":
-                    update_pre_sales_wall(config)
-                else:
-                    reviews_wall = config.get("reviewsWall")
-                    if isinstance(reviews_wall, dict):
-                        update_pre_sales_wall({"reviewsWall": reviews_wall})
-            raw = props.get("configJson")
-            if isinstance(raw, str) and raw.strip():
-                try:
-                    parsed = json.loads(raw)
-                except json.JSONDecodeError as exc:
-                    raise TestimonialGenerationError(
-                        f"{comp_type}.configJson must be valid JSON: {exc}"
-                    ) from exc
-                if isinstance(parsed, dict):
-                    if comp_type == "PreSalesReviewWall":
-                        update_pre_sales_wall(parsed)
-                    else:
-                        reviews_wall = parsed.get("reviewsWall")
-                        if isinstance(reviews_wall, dict):
-                            update_pre_sales_wall({"reviewsWall": reviews_wall})
-                    props["configJson"] = json.dumps(parsed, ensure_ascii=False)
-
         if template_kind == "sales-pdp" and comp_type in ("SalesPdpReviewWall", "SalesPdpTemplate"):
             config = props.get("config")
             if isinstance(config, dict):
@@ -2238,6 +2229,11 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
                         if isinstance(review_wall, dict):
                             update_sales_wall({"reviewWall": review_wall})
                     props["configJson"] = json.dumps(parsed, ensure_ascii=False)
+
+
+def _prepare_testimonial_slot_templates(puck_data: dict[str, Any], template_kind: str) -> None:
+    if template_kind == "sales-pdp":
+        _apply_review_wall_template_mix(puck_data, template_kind)
 
 
 def _collect_sales_pdp_review_wall_images(groups: list[_TestimonialGroup]) -> list[dict[str, Any]]:
@@ -4739,9 +4735,7 @@ def generate_funnel_page_testimonials(
     else:
         raise TestimonialGenerationError(f"Template {resolved_template_id} is not supported for testimonials.")
 
-    if template_kind == "pre-sales-listicle":
-        _force_pre_sales_review_media_templates(base_puck)
-    _apply_review_wall_template_mix(base_puck, template_kind)
+    _prepare_testimonial_slot_templates(base_puck, template_kind)
 
     groups, contexts = _collect_testimonial_targets(base_puck, template_kind)
 
@@ -4859,12 +4853,29 @@ def generate_funnel_page_testimonials(
     )
 
     generated: list[dict[str, Any]] = []
-    try:
-        with ThreadedTestimonialRenderer(
+    pre_sales_swipe_asset_brief_id: str | None = None
+    pre_sales_template_server_context: Any = nullcontext()
+    if template_kind == "pre-sales-listicle":
+        pre_sales_swipe_asset_brief_id = _resolve_pre_sales_swipe_asset_brief_id(
+            session=session,
+            org_id=org_id,
+            funnel=funnel,
+        )
+        pre_sales_template_server_context = _LocalStaticServer(root=_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR)
+
+    renderer_context: Any = nullcontext()
+    if template_kind != "pre-sales-listicle":
+        renderer_context = ThreadedTestimonialRenderer(
             worker_count=1,
             response_timeout_ms=_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS,
-        ) as renderer:
+        )
+    try:
+        with pre_sales_template_server_context as pre_sales_template_server, renderer_context as renderer:
             def render_with_budget(render_payload: dict[str, Any], *, label: str) -> bytes:
+                if renderer is None:
+                    raise TestimonialGenerationError(
+                        "Renderer context is unavailable for non-swipe testimonial rendering."
+                    )
                 ensure_within_budget(f"rendering {label}")
                 _heartbeat("testimonial_render_requested", label=label)
                 timeout_ms = _TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS
@@ -4895,6 +4906,14 @@ def generate_funnel_page_testimonials(
                         group.context.dirty = True
 
                 if template_kind == "pre-sales-listicle":
+                    if pre_sales_swipe_asset_brief_id is None:
+                        raise TestimonialGenerationError(
+                            "Pre-sales swipe testimonial rendering did not resolve an asset brief id."
+                        )
+                    if pre_sales_template_server is None:
+                        raise TestimonialGenerationError(
+                            "Pre-sales swipe testimonial rendering requires a local template server."
+                        )
                     for render_index, render in enumerate(group.renders):
                         ensure_within_budget(f"rendering {render.label}")
                         _heartbeat(
@@ -4906,48 +4925,18 @@ def generate_funnel_page_testimonials(
                         template_reference = _load_pre_sales_swipe_template_reference(
                             assignment.template_file
                         )
-                        if group.slide is not None:
-                            media_prompts = validated.get("mediaPrompts")
-                            if not isinstance(media_prompts, list) or len(media_prompts) != len(group.renders):
-                                raise TestimonialGenerationError(
-                                    "Pre-sales swipe testimonial renders require exactly 3 mediaPrompts for each review slide."
-                                )
-                            variation_direction = _clean_single_line(str(media_prompts[render_index] or ""))
-                            testimonial_role = f"carousel slide {idx + 1} image {render_index + 1}"
-                        else:
-                            variation_direction = _clean_single_line(
-                                str(validated.get("heroImagePrompt") or validated.get("review") or "")
-                            )
-                            testimonial_role = "review wall card"
-                        render_prompt = _build_pre_sales_swipe_render_prompt(
-                            assignment=assignment,
-                            validated=validated,
-                            product_title=product_title,
-                            render_label=render.label,
-                            testimonial_role=testimonial_role,
-                            variation_direction=variation_direction,
-                        )
-                        rendered_asset = _generate_testimonial_image_asset(
+                        template_url = pre_sales_template_server.build_url(assignment.template_file)
+                        swipe_render_result = _generate_pre_sales_swipe_testimonial_asset(
                             org_id=org_id,
                             client_id=str(funnel.client_id),
-                            prompt=render_prompt,
+                            product_id=str(product.id),
+                            campaign_id=str(funnel.campaign_id),
+                            asset_brief_id=pre_sales_swipe_asset_brief_id,
+                            template_url=template_url,
+                            template_file=assignment.template_file,
                             aspect_ratio=assignment.aspect_ratio,
-                            usage_context={
-                                "kind": "pre_sales_swipe_testimonial_render",
-                                "funnelId": funnel_id,
-                                "pageId": page_id,
-                                "target": render.label,
-                                "templateFile": assignment.template_file,
-                                "styleFamily": assignment.style_family,
-                                "variationKey": assignment.variation_key,
-                            },
-                            reference_image_bytes=template_reference.content_bytes,
-                            reference_image_mime_type=template_reference.mime_type,
-                            funnel_id=funnel_id,
-                            product_id=str(funnel.product_id) if funnel.product_id else None,
-                            tags=["funnel", "testimonial", "pre_sales_swipe", assignment.style_family],
                         )
-                        render.image["assetPublicId"] = rendered_asset.public_id
+                        render.image["assetPublicId"] = swipe_render_result.generated_asset.public_id
                         if "alt" not in render.image or not render.image.get("alt"):
                             render.image["alt"] = f"Customer testimonial from {validated['name']}"
                         if render.context:
@@ -4955,15 +4944,38 @@ def generate_funnel_page_testimonials(
                         generated.append(
                             {
                                 "target": render.label,
-                                "publicId": rendered_asset.public_id,
-                                "assetId": rendered_asset.asset_id,
-                                "prompt": render_prompt,
+                                "publicId": swipe_render_result.generated_asset.public_id,
+                                "assetId": swipe_render_result.generated_asset.asset_id,
+                                "prompt": str(swipe_render_result.ai_metadata.get("promptUsed") or ""),
+                                "swipePromptMarkdown": str(
+                                    swipe_render_result.ai_metadata.get("swipePromptMarkdown") or ""
+                                ),
+                                "swipePromptInputText": str(
+                                    swipe_render_result.ai_metadata.get("swipePromptInputText") or ""
+                                ),
+                                "swipePromptExtractedRaw": str(
+                                    swipe_render_result.ai_metadata.get("swipePromptExtractedRaw") or ""
+                                ),
                                 "templateFile": assignment.template_file,
                                 "templatePath": str(template_reference.path),
+                                "templateUrl": template_url,
                                 "aspectRatio": assignment.aspect_ratio,
                                 "styleFamily": assignment.style_family,
                                 "variationKey": assignment.variation_key,
-                                "variationDirection": variation_direction,
+                                "assetBriefId": pre_sales_swipe_asset_brief_id,
+                                "jobId": swipe_render_result.job_id,
+                                "sourceUrl": str(
+                                    swipe_render_result.ai_metadata.get("swipeSourceUrl") or ""
+                                ),
+                                "promptModel": str(
+                                    swipe_render_result.ai_metadata.get("swipePromptModel") or ""
+                                ),
+                                "renderProvider": str(
+                                    swipe_render_result.ai_metadata.get("swipeRenderProvider") or ""
+                                ),
+                                "renderModelId": str(
+                                    swipe_render_result.ai_metadata.get("swipeRenderModelIdUsed") or ""
+                                ),
                             }
                         )
                         _heartbeat(

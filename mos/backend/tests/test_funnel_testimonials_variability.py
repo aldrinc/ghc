@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -1147,6 +1148,72 @@ def test_testimonial_generation_count_enforces_sales_pdp_minimum():
     )
 
 
+def test_prepare_testimonial_slot_templates_presales_is_noop():
+    puck_data = {
+        "content": [
+            {
+                "type": "PreSalesTemplate",
+                "props": {
+                    "config": {
+                        "reviews": {
+                            "slides": [
+                                {
+                                    "images": [
+                                        {"src": "/assets/slide-1.webp"},
+                                        {"src": "/assets/slide-2.webp"},
+                                        {"src": "/assets/slide-3.webp"},
+                                    ]
+                                }
+                            ]
+                        },
+                        "reviewsWall": {
+                            "columns": [
+                                [{"image": {"src": "/assets/wall-1.webp"}}],
+                                [{"image": {"src": "/assets/wall-2.webp"}}],
+                            ]
+                        },
+                    }
+                },
+            }
+        ]
+    }
+    original = json.loads(json.dumps(puck_data))
+
+    funnel_testimonials._prepare_testimonial_slot_templates(
+        puck_data,
+        template_kind="pre-sales-listicle",
+    )
+
+    assert puck_data == original
+
+
+def test_prepare_testimonial_slot_templates_sales_pdp_keeps_wall_mix_behavior():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpReviewWall",
+                "props": {
+                    "config": {
+                        "tiles": [
+                            {"image": {"src": "/assets/review-1.webp"}},
+                            {"image": {"src": "/assets/review-2.webp"}},
+                        ]
+                    }
+                },
+            }
+        ]
+    }
+
+    funnel_testimonials._prepare_testimonial_slot_templates(
+        puck_data,
+        template_kind="sales-pdp",
+    )
+
+    tiles = puck_data["content"][0]["props"]["config"]["tiles"]
+    assert tiles[0]["image"]["testimonialTemplate"] == "social_comment"
+    assert tiles[1]["image"]["testimonialTemplate"] == "review_card"
+
+
 def test_resolve_pre_sales_swipe_assignment_maps_all_supported_slot_families():
     carousel = funnel_testimonials._resolve_pre_sales_swipe_assignment(
         "pre_sales.reviews.slides[2].images[1]"
@@ -1164,48 +1231,144 @@ def test_resolve_pre_sales_swipe_assignment_maps_all_supported_slot_families():
     assert wall.style_family == "instagram_ugc_product_demo"
 
 
-def test_build_pre_sales_swipe_render_prompt_embeds_testimonial_content():
-    assignment = funnel_testimonials._resolve_pre_sales_swipe_assignment(
-        "pre_sales.reviewsWall.columns[2][1]"
-    )
-    validated = {
-        "name": "Sarah Jenkins",
-        "verified": True,
-        "rating": 5,
-        "review": "This handbook helped me stop second-guessing every herb interaction.",
-        "persona": "Medication-aware woman in her late 30s",
-        "avatarPrompt": "Natural selfie lighting and realistic skin texture",
-        "heroImagePrompt": "Warm indoor candid selfie with the handbook held close to camera",
-        "mediaPrompts": ["one", "two", "three"],
-        "reply": {
-            "name": "Elara Vance",
-            "persona": "Author",
-            "text": "So glad it helped you feel grounded again.",
-            "avatarPrompt": "Botanical brand avatar",
-            "time": "2d",
-            "reactionCount": 14,
-        },
-        "meta": {
-            "location": "Austin, TX",
-            "date": "2026-03-17",
-        },
-    }
+def test_resolve_pre_sales_swipe_asset_brief_id_matches_funnel_experiment(monkeypatch):
+    class _FakeArtifactsRepository:
+        def __init__(self, _session):
+            pass
 
-    prompt = funnel_testimonials._build_pre_sales_swipe_render_prompt(
-        assignment=assignment,
-        validated=validated,
-        product_title="The Honest Herbalist Handbook",
-        render_label="pre_sales.reviewsWall.columns[2][1]",
-        testimonial_role="review wall card",
-        variation_direction="Portrait selfie with the customer holding the spiral handbook close to her chest.",
+        def list(self, **_kwargs):
+            return [
+                SimpleNamespace(
+                    data={
+                        "asset_briefs": [
+                            {
+                                "id": "brief-other",
+                                "experimentId": "exp-other",
+                                "requirements": [{}],
+                            },
+                            {
+                                "id": "brief-match",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                        ]
+                    }
+                )
+            ]
+
+    monkeypatch.setattr(funnel_testimonials, "ArtifactsRepository", _FakeArtifactsRepository)
+
+    resolved = funnel_testimonials._resolve_pre_sales_swipe_asset_brief_id(
+        session=object(),
+        org_id="org-1",
+        funnel=SimpleNamespace(
+            campaign_id="campaign-1",
+            client_id="client-1",
+            experiment_spec_id="exp-A04",
+        ),
     )
 
-    assert "The Honest Herbalist Handbook" in prompt
-    assert "Sarah Jenkins" in prompt
-    assert "So glad it helped you feel grounded again." in prompt
-    assert "Austin, TX" in prompt
-    assert "9:16" in prompt
-    assert "instagram" in prompt.lower()
+    assert resolved == "brief-match"
+
+
+def test_resolve_pre_sales_swipe_asset_brief_id_errors_when_multiple_match(monkeypatch):
+    class _FakeArtifactsRepository:
+        def __init__(self, _session):
+            pass
+
+        def list(self, **_kwargs):
+            return [
+                SimpleNamespace(
+                    data={
+                        "asset_briefs": [
+                            {
+                                "id": "brief-a",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                            {
+                                "id": "brief-b",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                        ]
+                    }
+                )
+            ]
+
+    monkeypatch.setattr(funnel_testimonials, "ArtifactsRepository", _FakeArtifactsRepository)
+
+    with pytest.raises(
+        funnel_testimonials.TestimonialGenerationError,
+        match="exactly one matching campaign asset brief",
+    ):
+        funnel_testimonials._resolve_pre_sales_swipe_asset_brief_id(
+            session=object(),
+            org_id="org-1",
+            funnel=SimpleNamespace(
+                campaign_id="campaign-1",
+                client_id="client-1",
+                experiment_spec_id="exp-A04",
+            ),
+        )
+
+
+def test_generate_pre_sales_swipe_testimonial_asset_uses_shared_swipe_activity(monkeypatch):
+    swipe_calls: list[dict[str, object]] = []
+
+    def _fake_swipe_activity(params: dict[str, object]) -> dict[str, object]:
+        swipe_calls.append(params)
+        return {"asset_ids": ["asset-1"], "job_id": "job-1"}
+
+    def _fake_load_asset(asset_id: str) -> funnel_testimonials._LoadedGeneratedTestimonialAsset:
+        assert asset_id == "asset-1"
+        return funnel_testimonials._LoadedGeneratedTestimonialAsset(
+            asset=funnel_testimonials._GeneratedTestimonialAsset(
+                public_id="public-1",
+                asset_id="asset-1",
+                storage_key="storage-key",
+                content_type="image/png",
+            ),
+            ai_metadata={
+                "promptUsed": "render prompt",
+                "swipePromptMarkdown": "```text\\nrender prompt\\n```",
+                "swipePromptModel": "gemini-stage-1",
+                "swipeRenderProvider": "creative_service",
+                "swipeRenderModelIdUsed": "models/gemini-3.1-flash-image-preview",
+            },
+        )
+
+    monkeypatch.setattr(funnel_testimonials, "generate_swipe_image_ad_activity", _fake_swipe_activity)
+    monkeypatch.setattr(funnel_testimonials, "_load_generated_testimonial_asset_record", _fake_load_asset)
+
+    result = funnel_testimonials._generate_pre_sales_swipe_testimonial_asset(
+        org_id="org-1",
+        client_id="client-1",
+        product_id="product-1",
+        campaign_id="campaign-1",
+        asset_brief_id="brief-1",
+        template_url="http://127.0.0.1:9999/template.webp",
+        template_file="template.webp",
+        aspect_ratio="9:16",
+    )
+
+    assert swipe_calls == [
+        {
+            "org_id": "org-1",
+            "client_id": "client-1",
+            "product_id": "product-1",
+            "campaign_id": "campaign-1",
+            "asset_brief_id": "brief-1",
+            "requirement_index": 0,
+            "swipe_image_url": "http://127.0.0.1:9999/template.webp",
+            "swipe_source_label": "template.webp",
+            "aspect_ratio": "9:16",
+            "count": 1,
+        }
+    ]
+    assert result.generated_asset.public_id == "public-1"
+    assert result.job_id == "job-1"
+    assert result.ai_metadata["promptUsed"] == "render prompt"
 
 
 def test_sync_sales_pdp_guarantee_feed_images_updates_primary_guarantee_image():

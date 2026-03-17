@@ -66,12 +66,24 @@ def test_swipe_to_image_prompt_preserves_visible_social_overlays() -> None:
     prompt, _sha = load_swipe_to_image_ad_prompt()
 
     assert "NATIVE UI / OVERLAY RULE" in prompt
+    assert "SPATIAL FIDELITY RULE" in prompt
+    assert "INSTAGRAM SCREEN CAPTURE RULE" in prompt
     assert "ASPECT RATIO / FRAMING RULE" in prompt
     assert "just platform UI" in prompt
     assert "usernames, handles, timestamps, likes, comments, captions" in prompt
+    assert "exact spatial relationships, alignment, spacing, scale, margins, grouping, and reading order" in prompt
+    assert "Do not redistribute elements to fill unused space" in prompt
     assert "Do not write \"no digital text overlays\" unless the competitor swipe truly contains none." in prompt
+    assert "native Instagram mobile screen capture with phone-format portrait dimensions" in prompt
+    assert "\"overlaid on this image\"" in prompt
+    assert "Do not render a physical phone, phone bezel, device frame, hand holding a phone" in prompt
+    assert "no extra wall, room, table, or other scene background may exist outside the Instagram capture on the left or right" in prompt
+    assert "The left and right canvas edges must align to the Instagram screen-capture edges with no extra scene background beyond the capture" in prompt
+    assert "Do not invent app-level navigation chrome that is not visible in the competitor swipe" in prompt
+    assert "Do not introduce a bottom navigation bar, app-level header, story row, status bar, or other Instagram chrome unless that exact chrome is visible in the competitor swipe" in prompt
     assert "Do not center a narrow portrait post inside a wider square canvas" in prompt
     assert "must explicitly say the composition stays portrait and edge-to-edge with no left/right gutter space" in prompt
+    assert "relative placement, alignment, spacing, scale, and grouping of both major blocks and smaller UI/text clusters" in prompt
 
 
 def test_extract_new_image_prompt_allows_placeholder_tokens_prior_to_inline() -> None:
