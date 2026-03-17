@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
+<<<<<<< HEAD
 from app.db.models import (
     Campaign,
     Client,
@@ -18,6 +19,18 @@ from app.db.models import (
     ProductOffer,
     ProductVariant,
 )
+=======
+from app.db.models import (
+    Campaign,
+    Client,
+    MetaAdAccountConnection,
+    MetaWorkspaceAdConfig,
+    Org,
+    Product,
+    ProductOffer,
+    ProductVariant,
+)
+>>>>>>> origin/main
 from app.temporal.activities import campaign_intent_activities as cia
 from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
@@ -139,8 +152,10 @@ def test_collect_image_generation_errors_ignores_non_list_inputs():
 
 def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_session, monkeypatch):
     test_org_id = UUID("00000000-0000-0000-0000-000000000111")
-    db_session.add(Org(id=test_org_id, name="Meta Tracking Org"))
+    org = Org(id=test_org_id, name="Meta Tracking Org")
+    db_session.add(org)
     db_session.commit()
+    db_session.refresh(org)
     client = Client(org_id=test_org_id, name="Meta Tracking Client", industry="Retail")
     db_session.add(client)
     db_session.commit()
