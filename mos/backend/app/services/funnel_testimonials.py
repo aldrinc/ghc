@@ -3,8 +3,10 @@ from __future__ import annotations
 import base64
 import concurrent.futures
 import copy
+import functools
 import io
 import json
+import mimetypes
 import os
 import random
 import re
@@ -1413,6 +1415,214 @@ def _generate_testimonial_image_asset(
             tags=tags,
         )
         return _generated_testimonial_asset(asset)
+
+
+@dataclass(frozen=True)
+class _PreSalesSwipeTemplateAssignment:
+    template_file: str
+    aspect_ratio: str
+    style_family: str
+    variation_key: str
+
+
+@dataclass(frozen=True)
+class _PreSalesSwipeTemplateReference:
+    path: Path
+    content_bytes: bytes
+    mime_type: str
+
+
+_PRE_SALES_SLIDE_IMAGE_RE = re.compile(
+    r"^pre_sales\.reviews\.slides\[(?P<slide_index>\d+)\]\.images\[(?P<image_index>\d+)\]$"
+)
+_PRE_SALES_WALL_IMAGE_RE = re.compile(
+    r"^pre_sales\.reviewsWall\.columns\[(?P<column_index>\d+)\]\[(?P<row_index>\d+)\]$"
+)
+_PRE_SALES_CAROUSEL_TEMPLATE_FILES: tuple[tuple[str, str], ...] = (
+    ("17_fb_message_ad.jpg_source.jpg", "facebook_comment_thread"),
+    ("SCR-20260310-klev.png", "twitter_mobile_post"),
+    ("Screenshot_2025-09-16_180726.webp", "facebook_comment_single"),
+)
+_PRE_SALES_WALL_TEMPLATE_FILES: dict[tuple[int, int], tuple[str, str, str]] = {
+    (0, 0): ("download_5.webp", "1:1", "twitter_photo_collage"),
+    (0, 1): ("download_5_dd32708f-34eb-4156-86ab-e08d8dac2fe7.webp", "1:1", "dark_mode_comment"),
+    (1, 0): ("instagram_download_6.webp", "9:16", "instagram_ugc_product_demo"),
+    (1, 1): ("download_6_5f6be698-5d17-411b-84e0-941c3909e7cc.webp", "1:1", "facebook_dark_comment"),
+    (2, 0): ("instagram_post_20250916_152108_via_10015_io.webp", "9:16", "instagram_selfie_car"),
+    (2, 1): ("instagram_post_20250916_152858_via_10015_io.webp", "9:16", "instagram_selfie_home"),
+}
+_PRE_SALES_STYLE_FAMILY_INSTRUCTIONS: dict[str, str] = {
+    "facebook_comment_thread": (
+        "Create a native Facebook mobile comment-thread screenshot with stacked replies, tight edge-to-edge "
+        "cropping, crisp social UI text, and a believable lived-in screenshot feel."
+    ),
+    "twitter_mobile_post": (
+        "Create a native Twitter/X mobile post screenshot with a clean white interface, realistic avatar details, "
+        "and a continuous edge-to-edge social capture."
+    ),
+    "facebook_comment_single": (
+        "Create a tightly cropped native Facebook single-comment screenshot with one main comment bubble, reaction "
+        "count, and the familiar Like/Reply/time action row."
+    ),
+    "twitter_photo_collage": (
+        "Create a native Twitter/X post screenshot with a collage-style media block that still feels like a genuine "
+        "mobile social capture, not a designed poster."
+    ),
+    "dark_mode_comment": (
+        "Create a native dark-mode social comment screenshot with dense readable text, reaction icons, and the flat "
+        "2D app look preserved edge-to-edge."
+    ),
+    "instagram_ugc_product_demo": (
+        "Create a native Instagram mobile screen capture in portrait with the app chrome baked into the image, no "
+        "visible phone hardware, and a candid UGC product-demonstration feel."
+    ),
+    "facebook_dark_comment": (
+        "Create a native Facebook dark-mode comment screenshot with crisp white text on charcoal UI, believable "
+        "engagement counts, and no extra background outside the capture."
+    ),
+    "instagram_selfie_car": (
+        "Create a native Instagram mobile screen capture in portrait featuring a candid selfie-style main image with "
+        "the app interface integrated and edge-to-edge."
+    ),
+    "instagram_selfie_home": (
+        "Create a native Instagram mobile screen capture in portrait featuring a candid indoor selfie-style main "
+        "image with integrated UI and no side gutters."
+    ),
+}
+_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = (
+    Path(__file__).resolve().parents[4] / "template-image-workspace" / "assets"
+)
+
+
+def _resolve_pre_sales_swipe_assignment(render_label: str) -> _PreSalesSwipeTemplateAssignment:
+    slide_match = _PRE_SALES_SLIDE_IMAGE_RE.match(render_label)
+    if slide_match:
+        slide_index = int(slide_match.group("slide_index"))
+        image_index = int(slide_match.group("image_index"))
+        if image_index < 0 or image_index >= len(_PRE_SALES_CAROUSEL_TEMPLATE_FILES):
+            raise TestimonialGenerationError(
+                f"Unsupported pre-sales carousel image slot: {render_label}"
+            )
+        template_file, style_family = _PRE_SALES_CAROUSEL_TEMPLATE_FILES[image_index]
+        return _PreSalesSwipeTemplateAssignment(
+            template_file=template_file,
+            aspect_ratio="1:1",
+            style_family=style_family,
+            variation_key=f"slide-{slide_index + 1}-image-{image_index + 1}",
+        )
+
+    wall_match = _PRE_SALES_WALL_IMAGE_RE.match(render_label)
+    if wall_match:
+        column_index = int(wall_match.group("column_index"))
+        row_index = int(wall_match.group("row_index"))
+        resolved = _PRE_SALES_WALL_TEMPLATE_FILES.get((column_index, row_index))
+        if resolved is None:
+            raise TestimonialGenerationError(
+                f"Unsupported pre-sales review wall image slot: {render_label}"
+            )
+        template_file, aspect_ratio, style_family = resolved
+        return _PreSalesSwipeTemplateAssignment(
+            template_file=template_file,
+            aspect_ratio=aspect_ratio,
+            style_family=style_family,
+            variation_key=f"wall-column-{column_index + 1}-card-{row_index + 1}",
+        )
+
+    raise TestimonialGenerationError(
+        f"Unable to map pre-sales swipe template for testimonial slot: {render_label}"
+    )
+
+
+@functools.lru_cache(maxsize=None)
+def _load_pre_sales_swipe_template_reference(
+    template_file: str,
+) -> _PreSalesSwipeTemplateReference:
+    path = (_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR / template_file).resolve()
+    if not path.exists() or not path.is_file():
+        raise TestimonialGenerationError(
+            f"Pre-sales swipe template file not found: {path}"
+        )
+    content_bytes = path.read_bytes()
+    if not content_bytes:
+        raise TestimonialGenerationError(
+            f"Pre-sales swipe template file is empty: {path}"
+        )
+    mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return _PreSalesSwipeTemplateReference(
+        path=path,
+        content_bytes=content_bytes,
+        mime_type=mime_type,
+    )
+
+
+def _build_pre_sales_swipe_render_prompt(
+    *,
+    assignment: _PreSalesSwipeTemplateAssignment,
+    validated: dict[str, Any],
+    product_title: str,
+    render_label: str,
+    testimonial_role: str,
+    variation_direction: str,
+) -> str:
+    style_instruction = _PRE_SALES_STYLE_FAMILY_INSTRUCTIONS.get(
+        assignment.style_family,
+        "Create a native social screenshot that preserves the reference image layout and UI chrome.",
+    )
+    reply = validated.get("reply")
+    meta = validated.get("meta")
+    reply_name = ""
+    reply_text = ""
+    if isinstance(reply, dict):
+        reply_name = _clean_single_line(str(reply.get("name") or ""))
+        reply_text = _truncate(_clean_single_line(str(reply.get("text") or "")), limit=320)
+    location = ""
+    date_label = ""
+    if isinstance(meta, dict):
+        location = _clean_single_line(str(meta.get("location") or ""))
+        date_label = _clean_single_line(str(meta.get("date") or ""))
+    review_text = _truncate(_clean_single_line(str(validated.get("review") or "")), limit=700)
+    persona = _truncate(_clean_single_line(str(validated.get("persona") or "")), limit=260)
+    avatar_prompt = _truncate(_clean_single_line(str(validated.get("avatarPrompt") or "")), limit=260)
+    direction = _truncate(_clean_single_line(variation_direction or ""), limit=260)
+    verified_label = "verified buyer" if bool(validated.get("verified")) else "customer review"
+    rating = int(validated.get("rating") or 5)
+    customer_name = _clean_single_line(str(validated.get("name") or "Customer"))
+
+    return (
+        f"{style_instruction}\n\n"
+        "Use the attached reference image as the exact design blueprint. Preserve the same platform chrome, "
+        "visual density, screenshot framing, typography hierarchy, lighting mood, and overall composition family "
+        "as the reference while creating a new distinct testimonial image.\n\n"
+        "Reference-preservation rules:\n"
+        "- Keep the output edge-to-edge with no extra side background, device bezel, or poster framing beyond the screenshot capture.\n"
+        "- Treat all visible social UI elements in the reference as part of the design DNA.\n"
+        "- The result must feel like a genuine screenshot or native social post, not a composited mockup.\n"
+        "- All visible text must be crisp and legible.\n"
+        "- Do not use placeholder text or lorem ipsum.\n"
+        "- Make this render visibly distinct from other slots that reuse the same template by changing the wording, person, micro-scene details, and supporting social proof while keeping the same layout family.\n\n"
+        "New testimonial content to render:\n"
+        f"- Product title: {product_title}\n"
+        f"- Customer name: {customer_name}\n"
+        f"- Review role: {testimonial_role}\n"
+        f"- Review text: {review_text}\n"
+        f"- Rating: {rating} out of 5\n"
+        f"- Verification state: {verified_label}\n"
+        f"- Persona guidance: {persona}\n"
+        f"- Avatar/identity guidance: {avatar_prompt}\n"
+        f"- Reply name: {reply_name or '[omit if not needed]'}\n"
+        f"- Reply text: {reply_text or '[omit if not needed]'}\n"
+        f"- Location cue: {location or '[optional]'}\n"
+        f"- Date cue: {date_label or '[optional]'}\n"
+        f"- Variation direction: {direction or '[use the testimonial content itself]'}\n"
+        f"- Slot variation key: {assignment.variation_key}\n"
+        f"- Internal slot label: {render_label}\n\n"
+        "Content rules:\n"
+        "- Keep claims realistic and educational. Do not add medical guarantees, impossible outcomes, or unsupported promises.\n"
+        "- If the reference image shows the product physically, adapt the product art so it reads as this product and fits the testimonial context.\n"
+        "- If the reference image is an Instagram screenshot, keep true portrait phone-screen proportions with the app UI baked into the image and no visible physical phone.\n"
+        "- If the reference image is a Facebook or Twitter/X screenshot, keep the UI shell flat, native, and continuous.\n"
+        f"- Target aspect ratio: {assignment.aspect_ratio}."
+    )
 
 
 def generate_shopify_theme_testimonial_image_asset(
@@ -4553,6 +4763,7 @@ def generate_funnel_page_testimonials(
     )
     if not product:
         raise TestimonialGenerationError("Product context is required to generate testimonials.")
+    product_title = _clean_single_line(str(product.title or "")) or "the product"
 
     # Validate that the product has a primary image configured (required by business rules).
     product_primary_asset = _resolve_product_primary_image(
@@ -4682,6 +4893,85 @@ def generate_funnel_page_testimonials(
                     group.slide["verified"] = validated["verified"]
                     if group.context:
                         group.context.dirty = True
+
+                if template_kind == "pre-sales-listicle":
+                    for render_index, render in enumerate(group.renders):
+                        ensure_within_budget(f"rendering {render.label}")
+                        _heartbeat(
+                            "testimonial_render_started",
+                            group_index=idx + 1,
+                            label=render.label,
+                        )
+                        assignment = _resolve_pre_sales_swipe_assignment(render.label)
+                        template_reference = _load_pre_sales_swipe_template_reference(
+                            assignment.template_file
+                        )
+                        if group.slide is not None:
+                            media_prompts = validated.get("mediaPrompts")
+                            if not isinstance(media_prompts, list) or len(media_prompts) != len(group.renders):
+                                raise TestimonialGenerationError(
+                                    "Pre-sales swipe testimonial renders require exactly 3 mediaPrompts for each review slide."
+                                )
+                            variation_direction = _clean_single_line(str(media_prompts[render_index] or ""))
+                            testimonial_role = f"carousel slide {idx + 1} image {render_index + 1}"
+                        else:
+                            variation_direction = _clean_single_line(
+                                str(validated.get("heroImagePrompt") or validated.get("review") or "")
+                            )
+                            testimonial_role = "review wall card"
+                        render_prompt = _build_pre_sales_swipe_render_prompt(
+                            assignment=assignment,
+                            validated=validated,
+                            product_title=product_title,
+                            render_label=render.label,
+                            testimonial_role=testimonial_role,
+                            variation_direction=variation_direction,
+                        )
+                        rendered_asset = _generate_testimonial_image_asset(
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=render_prompt,
+                            aspect_ratio=assignment.aspect_ratio,
+                            usage_context={
+                                "kind": "pre_sales_swipe_testimonial_render",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                                "templateFile": assignment.template_file,
+                                "styleFamily": assignment.style_family,
+                                "variationKey": assignment.variation_key,
+                            },
+                            reference_image_bytes=template_reference.content_bytes,
+                            reference_image_mime_type=template_reference.mime_type,
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "pre_sales_swipe", assignment.style_family],
+                        )
+                        render.image["assetPublicId"] = rendered_asset.public_id
+                        if "alt" not in render.image or not render.image.get("alt"):
+                            render.image["alt"] = f"Customer testimonial from {validated['name']}"
+                        if render.context:
+                            render.context.dirty = True
+                        generated.append(
+                            {
+                                "target": render.label,
+                                "publicId": rendered_asset.public_id,
+                                "assetId": rendered_asset.asset_id,
+                                "prompt": render_prompt,
+                                "templateFile": assignment.template_file,
+                                "templatePath": str(template_reference.path),
+                                "aspectRatio": assignment.aspect_ratio,
+                                "styleFamily": assignment.style_family,
+                                "variationKey": assignment.variation_key,
+                                "variationDirection": variation_direction,
+                            }
+                        )
+                        _heartbeat(
+                            "testimonial_render_completed",
+                            group_index=idx + 1,
+                            label=render.label,
+                        )
+                    continue
 
                 media_targets = [
                     render for render in group.renders if render.template == "testimonial_media"

@@ -1147,6 +1147,67 @@ def test_testimonial_generation_count_enforces_sales_pdp_minimum():
     )
 
 
+def test_resolve_pre_sales_swipe_assignment_maps_all_supported_slot_families():
+    carousel = funnel_testimonials._resolve_pre_sales_swipe_assignment(
+        "pre_sales.reviews.slides[2].images[1]"
+    )
+    wall = funnel_testimonials._resolve_pre_sales_swipe_assignment(
+        "pre_sales.reviewsWall.columns[1][0]"
+    )
+
+    assert carousel.template_file == "SCR-20260310-klev.png"
+    assert carousel.aspect_ratio == "1:1"
+    assert carousel.variation_key == "slide-3-image-2"
+
+    assert wall.template_file == "instagram_download_6.webp"
+    assert wall.aspect_ratio == "9:16"
+    assert wall.style_family == "instagram_ugc_product_demo"
+
+
+def test_build_pre_sales_swipe_render_prompt_embeds_testimonial_content():
+    assignment = funnel_testimonials._resolve_pre_sales_swipe_assignment(
+        "pre_sales.reviewsWall.columns[2][1]"
+    )
+    validated = {
+        "name": "Sarah Jenkins",
+        "verified": True,
+        "rating": 5,
+        "review": "This handbook helped me stop second-guessing every herb interaction.",
+        "persona": "Medication-aware woman in her late 30s",
+        "avatarPrompt": "Natural selfie lighting and realistic skin texture",
+        "heroImagePrompt": "Warm indoor candid selfie with the handbook held close to camera",
+        "mediaPrompts": ["one", "two", "three"],
+        "reply": {
+            "name": "Elara Vance",
+            "persona": "Author",
+            "text": "So glad it helped you feel grounded again.",
+            "avatarPrompt": "Botanical brand avatar",
+            "time": "2d",
+            "reactionCount": 14,
+        },
+        "meta": {
+            "location": "Austin, TX",
+            "date": "2026-03-17",
+        },
+    }
+
+    prompt = funnel_testimonials._build_pre_sales_swipe_render_prompt(
+        assignment=assignment,
+        validated=validated,
+        product_title="The Honest Herbalist Handbook",
+        render_label="pre_sales.reviewsWall.columns[2][1]",
+        testimonial_role="review wall card",
+        variation_direction="Portrait selfie with the customer holding the spiral handbook close to her chest.",
+    )
+
+    assert "The Honest Herbalist Handbook" in prompt
+    assert "Sarah Jenkins" in prompt
+    assert "So glad it helped you feel grounded again." in prompt
+    assert "Austin, TX" in prompt
+    assert "9:16" in prompt
+    assert "instagram" in prompt.lower()
+
+
 def test_sync_sales_pdp_guarantee_feed_images_updates_primary_guarantee_image():
     puck_data = {
         "content": [
