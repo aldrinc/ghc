@@ -216,3 +216,27 @@ def test_swipe_template_testimonials_endpoint_rejects_multiple_image_requirement
 
     assert response.status_code == 409
     assert "Found indexes: [0, 1]." in response.json()["detail"]
+
+
+def test_swipe_generate_image_ad_endpoint_starts_workflow(api_client: TestClient, fake_temporal) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="SwipeDirect")
+
+    response = api_client.post(
+        "/swipes/generate-image-ad",
+        json={
+            "clientId": client_id,
+            "productId": product_id,
+            "campaignId": campaign_id,
+            "assetBriefId": "brief-1",
+            "requirementIndex": 0,
+            "swipeImageUrl": "https://example.com/swipe.png",
+            "aspectRatio": "1:1",
+            "count": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body.get("workflow_run_id"), str)
+    assert isinstance(body.get("temporal_workflow_id"), str)
+    assert fake_temporal.started

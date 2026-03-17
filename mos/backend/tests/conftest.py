@@ -31,6 +31,7 @@ from app.db.models import (
 from app.main import app
 from app.routers import campaigns as campaigns_router
 from app.routers import clients as clients_router
+from app.routers import swipes as swipes_router
 from app.routers import workflows as workflows_router
 
 
@@ -134,6 +135,7 @@ def fake_temporal(monkeypatch):
 
     monkeypatch.setattr(clients_router, "get_temporal_client", _get_temporal_client)
     monkeypatch.setattr(campaigns_router, "get_temporal_client", _get_temporal_client)
+    monkeypatch.setattr(swipes_router, "get_temporal_client", _get_temporal_client)
     monkeypatch.setattr(workflows_router, "get_temporal_client", _get_temporal_client)
     return client
 

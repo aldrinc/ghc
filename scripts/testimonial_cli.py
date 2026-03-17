@@ -18,6 +18,15 @@ if str(SCRIPT_DIR) not in sys.path:
 from lib.browser_session_auth import BrowserSessionAuth
 from lib.mos_api_client import MosApiClient
 
+TEMPLATE_IMAGES_DIR = SCRIPT_DIR.parent / "template-images"
+_SWIPE_ALLOWED_MIME_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/gif",
+}
+_SWIPE_IMAGE_REQUIREMENT_FORMATS = {"image", "image_ad", "image-ad"}
 
 PDP_VARIANT_ORDER = (
     "standard_ugc",
@@ -192,6 +201,236 @@ def _download_public_asset(
     return content_type
 
 
+def _normalize_requirement_format(value: str) -> str:
+    return value.strip().lower().replace("-", "_")
+
+
+def _resolve_pdp_page_id(
+    client: MosApiClient,
+    *,
+    funnel_id: str,
+    requested_page_id: str | None,
+) -> str:
+    if requested_page_id:
+        return requested_page_id
+
+    funnel_detail = _require_dict(
+        client.get_json(f"/funnels/{quote(funnel_id, safe='')}"),
+        "funnel detail",
+    )
+    pages = _require_list(funnel_detail.get("pages"), "funnel.pages")
+    eligible_pages: list[dict[str, Any]] = []
+    for raw_page in pages:
+        page = _require_dict(raw_page, "funnel.pages item")
+        page_slug = str(page.get("slug") or "").strip().lower()
+        template_id = str(page.get("templateId") or page.get("template_id") or "").strip().lower()
+        if page_slug == "sales" or template_id == "sales-pdp":
+            eligible_pages.append(page)
+
+    if not eligible_pages:
+        raise RuntimeError(
+            "Could not resolve a Sales PDP page for this funnel. "
+            "Expected exactly one page with slug 'sales' or templateId 'sales-pdp'."
+        )
+    if len(eligible_pages) != 1:
+        labels = []
+        for page in eligible_pages:
+            page_id = _require_string(page.get("id"), "eligible page id")
+            page_slug = str(page.get("slug") or "").strip() or "[missing slug]"
+            page_name = str(page.get("name") or "").strip() or "[missing name]"
+            labels.append(f"{page_id} ({page_name}, slug={page_slug})")
+        raise RuntimeError(
+            "Funnel has multiple eligible Sales PDP pages. "
+            "Pass --page-id explicitly. Candidates: " + ", ".join(labels)
+        )
+
+    return _require_string(eligible_pages[0].get("id"), "eligible sales page id")
+
+
+def _inject_pdp_page_context(
+    client: MosApiClient,
+    *,
+    funnel_id: str,
+    page_id: str,
+    payload: dict[str, Any],
+    page_source: str,
+) -> None:
+    if "currentPuckData" in payload or "draftVersionId" in payload:
+        return
+
+    page_detail = _require_dict(
+        client.get_json(f"/funnels/{quote(funnel_id, safe='')}/pages/{quote(page_id, safe='')}"),
+        "page detail",
+    )
+    version_key = "latestDraft" if page_source == "latest-draft" else "latestApproved"
+    raw_version = page_detail.get(version_key)
+    if not isinstance(raw_version, dict):
+        raise RuntimeError(
+            f"Resolved page does not have {version_key}. "
+            f"Provide --current-puck-data, --draft-version-id, or use --page-source {'latest-approved' if page_source == 'latest-draft' else 'latest-draft'}."
+        )
+    raw_puck_data = raw_version.get("puckData")
+    if raw_puck_data is None:
+        raw_puck_data = raw_version.get("puck_data")
+    payload["currentPuckData"] = _require_dict(raw_puck_data, f"{version_key}.puckData")
+
+
+def _load_campaign(client: MosApiClient, *, campaign_id: str) -> dict[str, Any]:
+    return _require_dict(
+        client.get_json(f"/campaigns/{quote(campaign_id, safe='')}"),
+        "campaign response",
+    )
+
+
+def _load_campaign_asset_brief(
+    client: MosApiClient,
+    *,
+    client_id: str,
+    campaign_id: str,
+    asset_brief_id: str,
+) -> dict[str, Any]:
+    query = urlencode(
+        {
+            "clientId": client_id,
+            "campaignId": campaign_id,
+            "type": "asset_brief",
+        }
+    )
+    artifacts = _require_list(client.get_json(f"/artifacts?{query}"), "asset brief artifacts")
+    for raw_artifact in artifacts:
+        artifact = _require_dict(raw_artifact, "artifact")
+        data = artifact.get("data")
+        if not isinstance(data, dict):
+            continue
+        briefs = data.get("asset_briefs") or data.get("assetBriefs") or []
+        if not isinstance(briefs, list):
+            continue
+        for raw_brief in briefs:
+            if not isinstance(raw_brief, dict):
+                continue
+            if str(raw_brief.get("id") or "").strip() == asset_brief_id:
+                return raw_brief
+    raise RuntimeError(f"Asset brief not found for campaign: {asset_brief_id}")
+
+
+def _resolve_swipe_image_requirements(brief: dict[str, Any]) -> list[dict[str, Any]]:
+    requirements = _require_list(brief.get("requirements"), "asset brief requirements")
+    image_requirements: list[dict[str, Any]] = []
+    for index, raw_requirement in enumerate(requirements):
+        requirement = _require_dict(raw_requirement, f"asset brief requirement[{index}]")
+        normalized_format = _normalize_requirement_format(str(requirement.get("format") or ""))
+        if normalized_format in _SWIPE_IMAGE_REQUIREMENT_FORMATS:
+            image_requirements.append(
+                {
+                    "index": index,
+                    "channel": str(requirement.get("channel") or "").strip() or f"channel-{index}",
+                    "requirement": requirement,
+                }
+            )
+    if not image_requirements:
+        raise RuntimeError("Asset brief has no image requirements.")
+    return image_requirements
+
+
+def _resolve_swipe_staging_page_id(client: MosApiClient, *, funnel_id: str) -> str:
+    funnel_detail = _require_dict(
+        client.get_json(f"/funnels/{quote(funnel_id, safe='')}"),
+        "funnel detail",
+    )
+    pages = _require_list(funnel_detail.get("pages"), "funnel.pages")
+    if len(pages) == 1:
+        page = _require_dict(pages[0], "funnel.pages item")
+        return _require_string(page.get("id"), "funnel page id")
+
+    eligible_pages: list[dict[str, Any]] = []
+    for raw_page in pages:
+        page = _require_dict(raw_page, "funnel.pages item")
+        page_slug = str(page.get("slug") or "").strip().lower()
+        template_id = str(page.get("templateId") or page.get("template_id") or "").strip().lower()
+        if page_slug == "sales" or template_id == "sales-pdp":
+            eligible_pages.append(page)
+
+    if len(eligible_pages) != 1:
+        labels: list[str] = []
+        for raw_page in pages:
+            page = _require_dict(raw_page, "funnel.pages item")
+            labels.append(
+                f"{_require_string(page.get('id'), 'funnel page id')} "
+                f"(slug={str(page.get('slug') or '').strip() or '[missing]'}, "
+                f"name={str(page.get('name') or '').strip() or '[missing]'})"
+            )
+        raise RuntimeError(
+            "Could not resolve a single staging page for swipe template uploads. "
+            "Expected exactly one sales page. Available pages: " + ", ".join(labels)
+        )
+
+    return _require_string(eligible_pages[0].get("id"), "sales page id")
+
+
+def _collect_local_template_image_paths() -> list[Path]:
+    if not TEMPLATE_IMAGES_DIR.exists():
+        raise RuntimeError(f"Template image directory does not exist: {TEMPLATE_IMAGES_DIR}")
+    if not TEMPLATE_IMAGES_DIR.is_dir():
+        raise RuntimeError(f"Template image path must be a directory: {TEMPLATE_IMAGES_DIR}")
+
+    paths: list[Path] = []
+    for path in sorted(TEMPLATE_IMAGES_DIR.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.name.startswith("."):
+            continue
+        content_type = mimetypes.guess_type(path.name)[0] or ""
+        if content_type not in _SWIPE_ALLOWED_MIME_TYPES:
+            raise RuntimeError(
+                f"Swipe template image has unsupported content type: {path.name} ({content_type or 'unknown'})"
+            )
+        paths.append(path)
+    if not paths:
+        raise RuntimeError(f"Template image directory is empty: {TEMPLATE_IMAGES_DIR}")
+    return paths
+
+
+def _stage_swipe_template_images(
+    client: MosApiClient,
+    *,
+    api_base_url: str,
+    funnel_id: str,
+    page_id: str,
+) -> list[dict[str, Any]]:
+    staged: list[dict[str, Any]] = []
+    for path in _collect_local_template_image_paths():
+        content = path.read_bytes()
+        if not content:
+            raise RuntimeError(f"Template image is empty: {path}")
+        content_type = mimetypes.guess_type(path.name)[0] or ""
+        response = _require_dict(
+            client.post_multipart_files(
+                f"/funnels/{quote(funnel_id, safe='')}/pages/{quote(page_id, safe='')}/ai/attachments",
+                field_name="files",
+                files=[{"filename": path.name, "content_type": content_type, "content": content}],
+            ),
+            "attachment upload response",
+        )
+        attachments = _require_list(response.get("attachments"), "attachments")
+        if len(attachments) != 1:
+            raise RuntimeError(f"Expected exactly one attachment result for {path.name}.")
+        attachment = _require_dict(attachments[0], "attachment")
+        public_path = _require_string(attachment.get("url"), "attachment.url")
+        staged_public_url = (
+            f"{api_base_url.rstrip('/')}{public_path}" if public_path.startswith("/") else public_path
+        )
+        staged.append(
+            {
+                "templateFile": path.relative_to(TEMPLATE_IMAGES_DIR).as_posix(),
+                "templateLabel": path.stem,
+                "stagedAssetId": _require_string(attachment.get("assetId"), "attachment.assetId"),
+                "stagedPublicId": _require_string(attachment.get("publicId"), "attachment.publicId"),
+                "stagedPublicUrl": staged_public_url,
+            }
+        )
+    return staged
+
+
 def _run_pdp_examples(args: argparse.Namespace) -> int:
     payload: dict[str, Any] = {}
     if args.draft_version_id:
@@ -208,6 +447,7 @@ def _run_pdp_examples(args: argparse.Namespace) -> int:
     if args.max_duration_seconds is not None:
         payload["maxDurationSeconds"] = args.max_duration_seconds
     payload["temperature"] = args.temperature
+    payload["templateId"] = "sales-pdp"
 
     output_dir = _prepare_output_dir("pdp-examples", args.output_dir)
     with BrowserSessionAuth(
@@ -216,9 +456,21 @@ def _run_pdp_examples(args: argparse.Namespace) -> int:
         profile_dir=Path(args.profile_dir),
     ) as auth:
         client = MosApiClient(base_url=args.api_base_url, auth=auth)
+        resolved_page_id = _resolve_pdp_page_id(
+            client,
+            funnel_id=args.funnel_id,
+            requested_page_id=args.page_id,
+        )
+        _inject_pdp_page_context(
+            client,
+            funnel_id=args.funnel_id,
+            page_id=resolved_page_id,
+            payload=payload,
+            page_source=args.page_source,
+        )
         response = _require_dict(
             client.post_json(
-                f"/funnels/{quote(args.funnel_id, safe='')}/pages/{quote(args.page_id, safe='')}/ai/sales-pdp-examples",
+                f"/funnels/{quote(args.funnel_id, safe='')}/pages/{quote(resolved_page_id, safe='')}/ai/sales-pdp-examples",
                 payload,
             ),
             "sales PDP response",
@@ -266,7 +518,8 @@ def _run_pdp_examples(args: argparse.Namespace) -> int:
         output_dir / "manifest.json",
         {
             "funnelId": args.funnel_id,
-            "pageId": args.page_id,
+            "pageId": resolved_page_id,
+            "pageSource": args.page_source,
             "draftVersionId": response.get("draftVersionId"),
             "outputDir": str(output_dir),
             "examples": manifest_rows,
@@ -277,17 +530,17 @@ def _run_pdp_examples(args: argparse.Namespace) -> int:
 
 
 def _run_swipe_template_testimonials(args: argparse.Namespace) -> int:
-    payload: dict[str, Any] = {
+    request_payload: dict[str, Any] = {
         "campaignId": args.campaign_id,
         "assetBriefId": args.asset_brief_id,
         "aspectRatio": args.aspect_ratio,
     }
     if args.model:
-        payload["model"] = args.model
+        request_payload["model"] = args.model
     if args.render_model_id:
-        payload["renderModelId"] = args.render_model_id
+        request_payload["renderModelId"] = args.render_model_id
     if args.max_output_tokens is not None:
-        payload["maxOutputTokens"] = args.max_output_tokens
+        request_payload["maxOutputTokens"] = args.max_output_tokens
 
     output_dir = _prepare_output_dir("swipe-template-testimonials", args.output_dir)
     with BrowserSessionAuth(
@@ -296,11 +549,76 @@ def _run_swipe_template_testimonials(args: argparse.Namespace) -> int:
         profile_dir=Path(args.profile_dir),
     ) as auth:
         client = MosApiClient(base_url=args.api_base_url, auth=auth)
-        response = _require_dict(
-            client.post_json("/swipes/generate-template-testimonials", payload),
-            "swipe template testimonials response",
+        campaign = _load_campaign(client, campaign_id=args.campaign_id)
+        client_id = _require_string(campaign.get("clientId") or campaign.get("client_id"), "campaign.clientId")
+        product_id = _require_string(campaign.get("productId") or campaign.get("product_id"), "campaign.productId")
+        brief = _load_campaign_asset_brief(
+            client,
+            client_id=client_id,
+            campaign_id=args.campaign_id,
+            asset_brief_id=args.asset_brief_id,
         )
-        template_runs = _require_list(response.get("templateRuns"), "templateRuns")
+        funnel_id = _require_string(brief.get("funnelId"), "asset brief funnelId")
+        staging_page_id = _resolve_swipe_staging_page_id(client, funnel_id=funnel_id)
+        image_requirements = _resolve_swipe_image_requirements(brief)
+        staged_templates = _stage_swipe_template_images(
+            client,
+            api_base_url=args.api_base_url,
+            funnel_id=funnel_id,
+            page_id=staging_page_id,
+        )
+
+        template_runs: list[dict[str, Any]] = []
+        for requirement_entry in image_requirements:
+            requirement_index = int(requirement_entry["index"])
+            channel = _require_string(requirement_entry.get("channel"), f"requirement[{requirement_index}].channel")
+            requirement = _require_dict(
+                requirement_entry.get("requirement"),
+                f"requirement[{requirement_index}]",
+            )
+            for staged in staged_templates:
+                workflow_payload: dict[str, Any] = {
+                    "clientId": client_id,
+                    "productId": product_id,
+                    "campaignId": args.campaign_id,
+                    "assetBriefId": args.asset_brief_id,
+                    "requirementIndex": requirement_index,
+                    "swipeImageUrl": _require_string(staged.get("stagedPublicUrl"), "stagedPublicUrl"),
+                    "aspectRatio": args.aspect_ratio,
+                    "count": 1,
+                }
+                if args.model:
+                    workflow_payload["model"] = args.model
+                if args.render_model_id:
+                    workflow_payload["renderModelId"] = args.render_model_id
+                if args.max_output_tokens is not None:
+                    workflow_payload["maxOutputTokens"] = args.max_output_tokens
+
+                started = _require_dict(
+                    client.post_json("/swipes/generate-image-ad", workflow_payload),
+                    "swipe image ad response",
+                )
+                template_runs.append(
+                    {
+                        "templateFile": _require_string(staged.get("templateFile"), "templateFile"),
+                        "templateLabel": _require_string(staged.get("templateLabel"), "templateLabel"),
+                        "stagedAssetId": _require_string(staged.get("stagedAssetId"), "stagedAssetId"),
+                        "stagedPublicId": _require_string(staged.get("stagedPublicId"), "stagedPublicId"),
+                        "stagedPublicUrl": _require_string(staged.get("stagedPublicUrl"), "stagedPublicUrl"),
+                        "workflowRunId": _require_string(
+                            started.get("workflowRunId") or started.get("workflow_run_id"),
+                            "workflowRunId",
+                        ),
+                        "temporalWorkflowId": _require_string(
+                            started.get("temporalWorkflowId") or started.get("temporal_workflow_id"),
+                            "temporalWorkflowId",
+                        ),
+                        "requirementIndex": requirement_index,
+                        "channel": channel,
+                        "requirement": requirement,
+                    }
+                )
+
         completed = _wait_for_workflows(
             client,
             template_runs=[_require_dict(item, "templateRuns item") for item in template_runs],
@@ -308,8 +626,8 @@ def _run_swipe_template_testimonials(args: argparse.Namespace) -> int:
         )
         asset_map = _resolve_assets_by_id(
             client,
-            campaign_id=_require_string(response.get("campaignId"), "campaignId"),
-            product_id=_require_string(response.get("productId"), "productId"),
+            campaign_id=args.campaign_id,
+            product_id=product_id,
             asset_ids={result["assetId"] for result in completed.values()},
         )
 
@@ -320,16 +638,27 @@ def _run_swipe_template_testimonials(args: argparse.Namespace) -> int:
             completed_result = _require_dict(completed.get(workflow_run_id), f"completed workflow {workflow_run_id}")
             asset_id = _require_string(completed_result.get("assetId"), f"asset id for {workflow_run_id}")
             asset_row = _require_dict(asset_map.get(asset_id), f"asset row for {asset_id}")
-            public_id = _require_string(asset_row.get("public_id"), f"public_id for {asset_id}")
+            public_id = _require_string(
+                asset_row.get("publicId") or asset_row.get("public_id"),
+                f"public_id for {asset_id}",
+            )
             template_label = _require_string(run.get("templateLabel"), "templateRuns.templateLabel")
-            ext = _content_extension(str(asset_row.get("content_type") or ""), default_ext=".png")
-            filename = f"{index:02d}-{template_label}-{public_id}{ext}"
+            requirement_index = int(run.get("requirementIndex"))
+            channel = _require_string(run.get("channel"), "templateRuns.channel")
+            ext = _content_extension(
+                str(asset_row.get("contentType") or asset_row.get("content_type") or ""),
+                default_ext=".png",
+            )
+            filename = f"{index:02d}-req{requirement_index}-{channel}-{template_label}-{public_id}{ext}"
             target_path = output_dir / filename
             downloaded_content_type = _download_public_asset(client, public_id=public_id, target_path=target_path)
             manifest_rows.append(
                 {
                     "templateFile": _require_string(run.get("templateFile"), "templateRuns.templateFile"),
                     "templateLabel": template_label,
+                    "requirementIndex": requirement_index,
+                    "channel": channel,
+                    "requirement": _require_dict(run.get("requirement"), "templateRuns.requirement"),
                     "workflowRunId": workflow_run_id,
                     "temporalWorkflowId": _require_string(
                         run.get("temporalWorkflowId"),
@@ -346,16 +675,17 @@ def _run_swipe_template_testimonials(args: argparse.Namespace) -> int:
                 }
             )
 
-    _write_json(output_dir / "request.json", payload)
-    _write_json(output_dir / "start-response.json", response)
+    _write_json(output_dir / "request.json", request_payload)
     _write_json(
         output_dir / "manifest.json",
         {
-            "campaignId": response.get("campaignId"),
-            "assetBriefId": response.get("assetBriefId"),
-            "clientId": response.get("clientId"),
-            "productId": response.get("productId"),
-            "requirementIndex": response.get("requirementIndex"),
+            "campaignId": args.campaign_id,
+            "assetBriefId": args.asset_brief_id,
+            "clientId": client_id,
+            "productId": product_id,
+            "briefFunnelId": funnel_id,
+            "stagingPageId": staging_page_id,
+            "imageRequirementIndexes": [entry["index"] for entry in image_requirements],
             "outputDir": str(output_dir),
             "results": manifest_rows,
         },
@@ -374,7 +704,13 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common_connection_args(pdp_generate)
     _add_common_auth_args(pdp_generate)
     pdp_generate.add_argument("--funnel-id", required=True)
-    pdp_generate.add_argument("--page-id", required=True)
+    pdp_generate.add_argument("--page-id")
+    pdp_generate.add_argument(
+        "--page-source",
+        choices=("latest-draft", "latest-approved"),
+        default="latest-draft",
+        help="Page version source used when --current-puck-data and --draft-version-id are not provided.",
+    )
     pdp_generate.add_argument("--draft-version-id")
     pdp_generate.add_argument("--current-puck-data")
     pdp_generate.add_argument("--model")

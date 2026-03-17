@@ -113,6 +113,7 @@ class WorkflowKindEnum(str, Enum):
     strategy_v2_angle_iteration = "strategy_v2_angle_iteration"
     campaign_planning = "campaign_planning"
     creative_production = "creative_production"
+    swipe_image_ad = "swipe_image_ad"
     experiment_cycle = "experiment_cycle"
     playbook_update = "playbook_update"
     test_campaign = "test_campaign"
