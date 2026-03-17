@@ -26,6 +26,7 @@ import type {
   MetaPublishRun,
   MetaPublishSelection,
   MetaPublishSelectionDecision,
+  MetaWorkspaceAdConfig,
 } from "@/types/meta";
 
 type CampaignMetaAdsPanelProps = {
@@ -378,10 +379,12 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
   const funnelsQuery = useFunnels({ campaignId: campaign.id });
   const {
-    getConfig,
+    getActiveConfig,
     listPipelineAssets,
+    listWorkspaceConfigs,
     listPublishSelections,
     savePublishSelections,
+    selectWorkspaceConfig,
     updateAdSetSpec,
     validatePublishPlan,
     listPublishRuns,
@@ -398,12 +401,10 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     return resolveConfiguredShopHostedOrigin(storefrontDomain) || browserReviewBaseUrl;
   }, [browserReviewBaseUrl, storefrontDomain]);
 
-  const [config, setConfig] = useState<{
-    adAccountId: string;
-    pageId?: string | null;
-    graphApiVersion?: string | null;
-  } | null>(null);
+  const [config, setConfig] = useState<MetaWorkspaceAdConfig | null>(null);
+  const [workspaceConfigs, setWorkspaceConfigs] = useState<MetaWorkspaceAdConfig[]>([]);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [configPending, setConfigPending] = useState(false);
   const [pipeline, setPipeline] = useState<MetaPipelineAsset[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
@@ -450,6 +451,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     try {
       const data = await listPipelineAssets({
         campaignId: campaign.id,
+        metaConfigId: config?.id || undefined,
       });
       setPipeline(data);
     } catch (err) {
@@ -458,29 +460,63 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     } finally {
       setPipelineLoading(false);
     }
-  }, [campaign.id, listPipelineAssets]);
+  }, [campaign.id, config?.id, listPipelineAssets]);
 
   useEffect(() => {
     let cancelled = false;
-    getConfig()
-      .then((data) => {
+
+    const loadConfigState = async () => {
+      try {
+        const configs = await listWorkspaceConfigs(campaign.client_id);
         if (cancelled) return;
-        setConfig({
-          adAccountId: data.adAccountId,
-          pageId: data.pageId,
-          graphApiVersion: data.graphApiVersion,
-        });
-        setConfigError(null);
-      })
-      .catch((err) => {
+        setWorkspaceConfigs(configs);
+        try {
+          const active = await getActiveConfig(campaign.client_id);
+          if (cancelled) return;
+          setConfig(active);
+          setConfigError(null);
+        } catch (err) {
+          if (cancelled) return;
+          setConfig(null);
+          setConfigError(getErrorMessage(err));
+        }
+      } catch (err) {
         if (cancelled) return;
+        setWorkspaceConfigs([]);
         setConfig(null);
         setConfigError(getErrorMessage(err));
-      });
+      }
+    };
+
+    void loadConfigState();
     return () => {
       cancelled = true;
     };
-  }, [getConfig]);
+  }, [campaign.client_id, getActiveConfig, listWorkspaceConfigs]);
+
+  const handleSelectConfig = useCallback(
+    async (nextConfigId: string) => {
+      if (!nextConfigId) return;
+      setConfigPending(true);
+      setConfigError(null);
+      try {
+        const active = await selectWorkspaceConfig(campaign.client_id, nextConfigId);
+        setConfig(active);
+        setWorkspaceConfigs((current) =>
+          current.map((entry) => ({
+            ...entry,
+            isDefault: entry.id === active.id,
+          })),
+        );
+        await refreshPipeline();
+      } catch (err) {
+        setConfigError(getErrorMessage(err));
+      } finally {
+        setConfigPending(false);
+      }
+    },
+    [campaign.client_id, refreshPipeline, selectWorkspaceConfig],
+  );
 
   useEffect(() => {
     void refreshPipeline();
@@ -939,6 +975,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     return {
       generationKey: latestGenerationKey,
       funnelId: activeFunnelId,
+      metaConfigId: config?.id || undefined,
       publishBaseUrl: publishCampaignForm.publishBaseUrl.trim(),
       campaignName: publishCampaignForm.campaignName.trim(),
       campaignObjective: publishCampaignForm.campaignObjective.trim(),
@@ -948,7 +985,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         .map((entry) => entry.trim())
         .filter(Boolean),
     };
-  }, [activeFunnelId, latestGenerationKey, publishCampaignForm]);
+  }, [activeFunnelId, config?.id, latestGenerationKey, publishCampaignForm]);
 
   const persistPublishAdSetConfigs = useCallback(async () => {
     for (const spec of includedAdSetSpecs) {
@@ -1054,18 +1091,36 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
               Review internal Meta specs, exclude unwanted creatives, validate the final package, and publish paused to Meta.
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
+          <div className="flex flex-col items-start gap-2 text-xs text-content-muted md:items-end">
+            {workspaceConfigs.length ? (
+              <div className="flex min-w-[240px] items-center gap-2">
+                <Select
+                  value={config?.id || ""}
+                  onValueChange={(value) => {
+                    void handleSelectConfig(value);
+                  }}
+                  options={workspaceConfigs.map((entry) => ({
+                    label: entry.isDefault ? `${entry.name} (Active)` : entry.name,
+                    value: entry.id,
+                  }))}
+                  disabled={configPending}
+                />
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
             {config ? (
               <>
-                <Badge tone="neutral">Ad account {shortId(config.adAccountId, 4)}</Badge>
+                <Badge tone="neutral">{config.name}</Badge>
+                <Badge tone="neutral">Ad account {shortId(config.connection.adAccountId, 4)}</Badge>
                 {config.pageId ? <Badge tone="neutral">Page {shortId(config.pageId, 4)}</Badge> : null}
-                {config.graphApiVersion ? <Badge tone="neutral">{config.graphApiVersion}</Badge> : null}
+                {config.connection.graphApiVersion ? <Badge tone="neutral">{config.connection.graphApiVersion}</Badge> : null}
               </>
             ) : configError ? (
               <span className="text-danger">{configError}</span>
             ) : (
               <span>Loading Meta config…</span>
             )}
+            </div>
           </div>
         </div>
 
@@ -1386,10 +1441,20 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => void handleValidatePublishPlan()} disabled={publishValidationPending || publishPending}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void handleValidatePublishPlan()}
+                      disabled={publishValidationPending || publishPending || !config}
+                    >
                       {publishValidationPending ? "Validating…" : "Validate publish plan"}
                     </Button>
-                    <Button variant="primary" size="sm" onClick={() => void handlePublishToMeta()} disabled={publishPending || publishValidationPending}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => void handlePublishToMeta()}
+                      disabled={publishPending || publishValidationPending || !config}
+                    >
                       {publishPending ? "Publishing…" : "Publish paused to Meta"}
                     </Button>
                   </div>

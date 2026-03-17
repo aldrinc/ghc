@@ -490,7 +490,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             return {"id": "meta_ad_123", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
-    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda: _FakeMetaClient())
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
 
     publish_response = api_client.post(
         f"/meta/campaigns/{campaign_id}/publish-runs",

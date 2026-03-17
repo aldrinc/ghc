@@ -14,6 +14,7 @@ from app.db.deps import get_session
 from app.db.enums import FunnelDomainStatusEnum
 from app.db.models import Asset, Campaign, ClientUserPreference, Funnel, FunnelDomain
 from app.db.repositories.clients import ClientsRepository
+from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.paid_ads_qa import (
@@ -37,6 +38,12 @@ from app.services.meta_review import (
 )
 from app.services import namecheap_dns as namecheap_dns_service
 from app.services.namecheap_dns import NamecheapDnsError
+from app.services.meta_account_configs import (
+    MetaWorkspaceConfigError,
+    merge_meta_profile,
+    meta_ads_client_for_connection,
+    resolve_workspace_config,
+)
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -383,22 +390,258 @@ def _profile_dict(record: Any | None, *, platform: str, client_id: str) -> dict[
     return _to_profile_payload(record)
 
 
-def _refresh_meta_profile(
+def _legacy_meta_profile_payload_from_workspace(
     *,
-    repo: PaidAdsQaRepository,
+    connection: Any,
+    workspace_config: Any,
+) -> dict[str, Any]:
+    merged = merge_meta_profile(connection=connection, workspace_config=workspace_config)
+    return {
+        "id": str(workspace_config.id),
+        "orgId": str(workspace_config.org_id),
+        "clientId": str(workspace_config.client_id),
+        "platform": "meta",
+        "rulesetVersion": str(merged.get("rulesetVersion") or RULESET_VERSION),
+        "businessManagerId": clean_optional_text(merged.get("businessManagerId")),
+        "businessManagerName": clean_optional_text(merged.get("businessManagerName")),
+        "pageId": clean_optional_text(merged.get("pageId")),
+        "pageName": clean_optional_text(merged.get("pageName")),
+        "adAccountId": clean_optional_text(merged.get("adAccountId")),
+        "adAccountName": clean_optional_text(merged.get("adAccountName")),
+        "paymentMethodType": normalize_tracking_provider(merged.get("paymentMethodType")),
+        "paymentMethodStatus": clean_optional_text(merged.get("paymentMethodStatus")),
+        "pixelId": clean_optional_text(merged.get("pixelId")),
+        "dataSetId": clean_optional_text(merged.get("dataSetId")),
+        "dataSetShopifyPartnerInstalled": merged.get("dataSetShopifyPartnerInstalled"),
+        "dataSetDataSharingLevel": normalize_tracking_provider(merged.get("dataSetDataSharingLevel")),
+        "dataSetAssignedToAdAccount": merged.get("dataSetAssignedToAdAccount"),
+        "verifiedDomain": clean_optional_text(merged.get("verifiedDomain")),
+        "verifiedDomainStatus": normalize_tracking_provider(merged.get("verifiedDomainStatus")),
+        "attributionClickWindow": normalize_tracking_provider(merged.get("attributionClickWindow")),
+        "attributionViewWindow": normalize_tracking_provider(merged.get("attributionViewWindow")),
+        "viewThroughEnabled": merged.get("viewThroughEnabled"),
+        "trackingProvider": normalize_tracking_provider(merged.get("trackingProvider")),
+        "trackingUrlParameters": clean_optional_text(merged.get("trackingUrlParameters")),
+        "metadata": merged.get("metadata") if isinstance(merged.get("metadata"), dict) else {},
+        "createdAt": workspace_config.created_at.isoformat(),
+        "updatedAt": workspace_config.updated_at.isoformat(),
+    }
+
+
+def _resolve_meta_workspace_profile_or_error(
+    *,
+    session: Session,
     org_id: str,
     client_id: str,
-    record: Any | None,
-) -> Any:
-    profile_dict = _profile_dict(record, platform="meta", client_id=client_id)
+) -> tuple[Any, Any, dict[str, Any]]:
+    repo = MetaAccountConfigsRepository(session)
+    configs = repo.list_workspace_configs(org_id=org_id, client_id=client_id)
+    if not configs:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paid ads platform profile not found")
     try:
-        refreshed = refresh_meta_platform_profile_from_graph(profile=profile_dict, ruleset_version=RULESET_VERSION)
+        resolved = resolve_workspace_config(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+        )
+    except MetaWorkspaceConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return (
+        resolved.connection,
+        resolved.workspace_config,
+        _legacy_meta_profile_payload_from_workspace(
+            connection=resolved.connection,
+            workspace_config=resolved.workspace_config,
+        ),
+    )
+
+
+def _meta_connection_metadata_from_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(profile.get("metadata") or {}) if isinstance(profile.get("metadata"), dict) else {}
+    connection_metadata = {
+        "paymentMethodType": normalize_tracking_provider(profile.get("paymentMethodType")),
+        "paymentMethodStatus": clean_optional_text(profile.get("paymentMethodStatus")),
+        "dataSetShopifyPartnerInstalled": profile.get("dataSetShopifyPartnerInstalled"),
+        "dataSetDataSharingLevel": normalize_tracking_provider(profile.get("dataSetDataSharingLevel")),
+        "dataSetAssignedToAdAccount": profile.get("dataSetAssignedToAdAccount"),
+    }
+    if isinstance(metadata.get("metaGraphValidation"), dict):
+        connection_metadata["metaGraphValidation"] = metadata["metaGraphValidation"]
+    return connection_metadata
+
+
+def _meta_workspace_metadata_from_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(profile.get("metadata") or {}) if isinstance(profile.get("metadata"), dict) else {}
+    metadata["rulesetVersion"] = str(profile.get("rulesetVersion") or RULESET_VERSION)
+    return metadata
+
+
+def _upsert_meta_workspace_profile(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    repo = MetaAccountConfigsRepository(session)
+    configs = repo.list_workspace_configs(org_id=auth.org_id, client_id=client_id, include_archived=True)
+    default_config = repo.get_default_workspace_config(org_id=auth.org_id, client_id=client_id)
+    requested_ad_account_id = clean_optional_text(profile.get("adAccountId"))
+    target_connection = (
+        repo.get_connection_by_ad_account_id(org_id=auth.org_id, ad_account_id=requested_ad_account_id)
+        if requested_ad_account_id
+        else None
+    )
+    attached_config_for_connection = next(
+        (
+            config
+            for config in configs
+            if target_connection is not None and str(config.meta_connection_id) == str(target_connection.id)
+        ),
+        None,
+    )
+
+    if target_connection is None:
+        candidate_config = default_config or (configs[0] if len(configs) == 1 else None)
+        if candidate_config is not None:
+            candidate_connection = repo.get_connection(
+                org_id=auth.org_id,
+                connection_id=str(candidate_config.meta_connection_id),
+            )
+            current_ad_account_id = clean_optional_text(
+                getattr(candidate_connection, "ad_account_id", None) if candidate_connection is not None else None
+            )
+            if requested_ad_account_id is None or current_ad_account_id in {None, requested_ad_account_id}:
+                target_connection = candidate_connection
+
+    connection_metadata = _meta_connection_metadata_from_profile(profile)
+    graph_validation = connection_metadata.get("metaGraphValidation")
+    graph_api_version = (
+        clean_optional_text((graph_validation or {}).get("apiVersion"))
+        if isinstance(graph_validation, dict)
+        else None
+    ) or "v24.0"
+
+    if target_connection is None:
+        target_connection = repo.create_connection(
+            org_id=auth.org_id,
+            name=clean_optional_text(profile.get("adAccountName")) or f"Meta connection for {client_id}",
+            ad_account_id=requested_ad_account_id,
+            ad_account_name=clean_optional_text(profile.get("adAccountName")),
+            business_manager_id=clean_optional_text(profile.get("businessManagerId")),
+            business_manager_name=clean_optional_text(profile.get("businessManagerName")),
+            graph_api_version=graph_api_version,
+            graph_api_base_url="https://graph.facebook.com",
+            credential_type="access_token",
+            credentials_encrypted=None,
+            credentials_last_updated_at=None,
+            token_expires_at=None,
+            status="active",
+            validation_status="pending",
+            last_validated_at=None,
+            last_validation_error=None,
+            metadata_json=connection_metadata,
+            created_by_user_id=auth.user_id,
+        )
+    else:
+        target_connection = repo.update_connection(
+            target_connection,
+            name=clean_optional_text(profile.get("adAccountName")) or target_connection.name,
+            ad_account_id=requested_ad_account_id or target_connection.ad_account_id,
+            ad_account_name=clean_optional_text(profile.get("adAccountName")),
+            business_manager_id=clean_optional_text(profile.get("businessManagerId")),
+            business_manager_name=clean_optional_text(profile.get("businessManagerName")),
+            graph_api_version=graph_api_version or target_connection.graph_api_version,
+            metadata_json=connection_metadata,
+        )
+
+    target_config = attached_config_for_connection
+    if target_config is None:
+        target_config = default_config or (configs[0] if len(configs) == 1 else None)
+
+    workspace_metadata = _meta_workspace_metadata_from_profile(profile)
+    repo.clear_default_workspace_config(org_id=auth.org_id, client_id=client_id)
+    if target_config is None:
+        target_config = repo.create_workspace_config(
+            org_id=auth.org_id,
+            client_id=client_id,
+            meta_connection_id=str(target_connection.id),
+            name=clean_optional_text(profile.get("adAccountName")) or "Meta workspace config",
+            is_default=True,
+            status="active",
+            page_id=clean_optional_text(profile.get("pageId")),
+            page_name=clean_optional_text(profile.get("pageName")),
+            instagram_actor_id=clean_optional_text(profile.get("instagramActorId")),
+            pixel_id=clean_optional_text(profile.get("pixelId")),
+            data_set_id=clean_optional_text(profile.get("dataSetId")),
+            verified_domain=clean_optional_text(profile.get("verifiedDomain")),
+            verified_domain_status=normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+            tracking_provider=normalize_tracking_provider(profile.get("trackingProvider")),
+            tracking_url_parameters=clean_optional_text(profile.get("trackingUrlParameters")),
+            attribution_click_window=normalize_tracking_provider(profile.get("attributionClickWindow")),
+            attribution_view_window=normalize_tracking_provider(profile.get("attributionViewWindow")),
+            view_through_enabled=profile.get("viewThroughEnabled"),
+            validation_status="pending",
+            last_validated_at=None,
+            last_validation_error=None,
+            metadata_json=workspace_metadata,
+            created_by_user_id=auth.user_id,
+        )
+    else:
+        target_config = repo.update_workspace_config(
+            target_config,
+            meta_connection_id=str(target_connection.id),
+            name=clean_optional_text(profile.get("adAccountName")) or target_config.name,
+            is_default=True,
+            page_id=clean_optional_text(profile.get("pageId")),
+            page_name=clean_optional_text(profile.get("pageName")),
+            instagram_actor_id=clean_optional_text(profile.get("instagramActorId")),
+            pixel_id=clean_optional_text(profile.get("pixelId")),
+            data_set_id=clean_optional_text(profile.get("dataSetId")),
+            verified_domain=clean_optional_text(profile.get("verifiedDomain")),
+            verified_domain_status=normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+            tracking_provider=normalize_tracking_provider(profile.get("trackingProvider")),
+            tracking_url_parameters=clean_optional_text(profile.get("trackingUrlParameters")),
+            attribution_click_window=normalize_tracking_provider(profile.get("attributionClickWindow")),
+            attribution_view_window=normalize_tracking_provider(profile.get("attributionViewWindow")),
+            view_through_enabled=profile.get("viewThroughEnabled"),
+            metadata_json=workspace_metadata,
+        )
+
+    return _legacy_meta_profile_payload_from_workspace(
+        connection=target_connection,
+        workspace_config=target_config,
+    )
+
+
+def _refresh_meta_profile(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+    connection: Any,
+    workspace_config: Any,
+) -> dict[str, Any]:
+    profile_dict = _legacy_meta_profile_payload_from_workspace(
+        connection=connection,
+        workspace_config=workspace_config,
+    )
+    try:
+        refreshed = refresh_meta_platform_profile_from_graph(
+            profile=profile_dict,
+            ruleset_version=RULESET_VERSION,
+            client=meta_ads_client_for_connection(connection),
+            api_version=connection.graph_api_version,
+        )
     except MetaProfileRefreshError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    return repo.upsert_platform_profile(
-        org_id=org_id,
+    except MetaWorkspaceConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return _upsert_meta_workspace_profile(
+        session=session,
+        auth=auth,
         client_id=client_id,
-        **_profile_input_from_dict(refreshed, platform="meta"),
+        profile=refreshed,
     )
 
 
@@ -478,6 +721,13 @@ def get_paid_ads_platform_profile(
 ):
     normalized_platform = normalize_platform(platform)
     _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    if normalized_platform == "meta":
+        _connection, _workspace_config, profile = _resolve_meta_workspace_profile_or_error(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+        )
+        return PaidAdsPlatformProfileResponse(**profile)
     repo = PaidAdsQaRepository(session)
     profile = repo.get_platform_profile(org_id=auth.org_id, client_id=client_id, platform=normalized_platform)
     if not profile:
@@ -499,6 +749,39 @@ def upsert_paid_ads_platform_profile(
     normalized_platform = normalize_platform(platform)
     _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     _require_supported_ruleset(payload.rulesetVersion)
+    if normalized_platform == "meta":
+        saved_profile = _upsert_meta_workspace_profile(
+            session=session,
+            auth=auth,
+            client_id=client_id,
+            profile={
+                "clientId": client_id,
+                "platform": "meta",
+                "rulesetVersion": payload.rulesetVersion,
+                "businessManagerId": payload.businessManagerId,
+                "businessManagerName": payload.businessManagerName,
+                "pageId": payload.pageId,
+                "pageName": payload.pageName,
+                "adAccountId": payload.adAccountId,
+                "adAccountName": payload.adAccountName,
+                "paymentMethodType": payload.paymentMethodType,
+                "paymentMethodStatus": payload.paymentMethodStatus,
+                "pixelId": payload.pixelId,
+                "dataSetId": payload.dataSetId,
+                "dataSetShopifyPartnerInstalled": payload.dataSetShopifyPartnerInstalled,
+                "dataSetDataSharingLevel": payload.dataSetDataSharingLevel,
+                "dataSetAssignedToAdAccount": payload.dataSetAssignedToAdAccount,
+                "verifiedDomain": payload.verifiedDomain,
+                "verifiedDomainStatus": payload.verifiedDomainStatus,
+                "attributionClickWindow": payload.attributionClickWindow,
+                "attributionViewWindow": payload.attributionViewWindow,
+                "viewThroughEnabled": payload.viewThroughEnabled,
+                "trackingProvider": payload.trackingProvider,
+                "trackingUrlParameters": payload.trackingUrlParameters,
+                "metadata": payload.metadata or {},
+            },
+        )
+        return PaidAdsPlatformProfileResponse(**saved_profile)
     repo = PaidAdsQaRepository(session)
     profile = repo.upsert_platform_profile(
         org_id=auth.org_id,
@@ -521,12 +804,25 @@ def assess_paid_ads_platform_profile(
     normalized_platform = normalize_platform(platform)
     _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     repo = PaidAdsQaRepository(session)
-    profile = repo.get_platform_profile(org_id=auth.org_id, client_id=client_id, platform=normalized_platform)
     if normalized_platform == "meta":
-        profile = _refresh_meta_profile(repo=repo, org_id=auth.org_id, client_id=client_id, record=profile)
+        connection, workspace_config, _profile = _resolve_meta_workspace_profile_or_error(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+        )
+        profile = _refresh_meta_profile(
+            session=session,
+            auth=auth,
+            client_id=client_id,
+            connection=connection,
+            workspace_config=workspace_config,
+        )
+    else:
+        profile_record = repo.get_platform_profile(org_id=auth.org_id, client_id=client_id, platform=normalized_platform)
+        profile = _profile_dict(profile_record, platform=normalized_platform, client_id=client_id)
     assessment = evaluate_platform_profile(
         platform=normalized_platform,
-        profile=_profile_dict(profile, platform=normalized_platform, client_id=client_id),
+        profile=profile,
         ruleset_version=RULESET_VERSION,
     )
     summary = summarize_findings(assessment["findings"])
@@ -617,9 +913,11 @@ def provision_meta_domain_verification_dns(
             detail="Meta domain verification requires the funnel's campaign to target a Meta channel.",
         )
 
-    repo = PaidAdsQaRepository(session)
-    profile_record = repo.get_platform_profile(org_id=auth.org_id, client_id=str(funnel.client_id), platform="meta")
-    profile_dict = _profile_dict(profile_record, platform="meta", client_id=str(funnel.client_id))
+    connection, workspace_config, profile_dict = _resolve_meta_workspace_profile_or_error(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(funnel.client_id),
+    )
     verified_domain = _resolve_funnel_verified_domain(
         session=session,
         auth=auth,
@@ -661,17 +959,18 @@ def provision_meta_domain_verification_dns(
         profile_dict["verifiedDomainStatus"] = "pending"
     profile_dict["metadata"] = metadata
 
-    saved_profile = repo.upsert_platform_profile(
-        org_id=auth.org_id,
+    saved_profile = _upsert_meta_workspace_profile(
+        session=session,
+        auth=auth,
         client_id=str(funnel.client_id),
-        **_profile_input_from_dict(profile_dict, platform="meta"),
+        profile=profile_dict,
     )
     return PaidAdsMetaDomainVerificationProvisionResponse(
         funnelId=str(funnel.id),
         campaignId=str(campaign.id),
         clientId=str(funnel.client_id),
-        verifiedDomain=str(saved_profile.verified_domain),
-        verifiedDomainStatus=saved_profile.verified_domain_status,
+        verifiedDomain=str(saved_profile["verifiedDomain"]),
+        verifiedDomainStatus=saved_profile["verifiedDomainStatus"],
         dnsRecord=PaidAdsDnsRecordResponse(
             provider=dns_record["provider"],
             recordType=dns_record["recordType"],
@@ -682,7 +981,7 @@ def provision_meta_domain_verification_dns(
             ttl=int(dns_record["ttl"]),
             status=dns_record["status"],
         ),
-        profile=PaidAdsPlatformProfileResponse(**_to_profile_payload(saved_profile)),
+        profile=PaidAdsPlatformProfileResponse(**saved_profile),
     )
 
 
@@ -703,28 +1002,35 @@ def repair_funnel_meta_tracking(
             detail="Meta tracking repair requires the funnel's campaign to target a Meta channel.",
         )
 
-    repo = PaidAdsQaRepository(session)
-    profile_record = repo.get_platform_profile(org_id=auth.org_id, client_id=str(funnel.client_id), platform="meta")
-    profile_dict = _profile_dict(profile_record, platform="meta", client_id=str(funnel.client_id))
+    connection, workspace_config, profile_dict = _resolve_meta_workspace_profile_or_error(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(funnel.client_id),
+    )
     try:
         configured_profile = activate_mos_meta_funnel_tracking_profile(
             profile=profile_dict,
             funnel_ids=[str(funnel.id)],
             ruleset_version=RULESET_VERSION,
+            client=meta_ads_client_for_connection(connection),
+            api_version=connection.graph_api_version,
         )
     except MetaProfileRefreshError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except MetaWorkspaceConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    saved_profile = repo.upsert_platform_profile(
-        org_id=auth.org_id,
+    saved_profile = _upsert_meta_workspace_profile(
+        session=session,
+        auth=auth,
         client_id=str(funnel.client_id),
-        **_profile_input_from_dict(configured_profile, platform="meta"),
+        profile=configured_profile,
     )
     return PaidAdsMetaTrackingRepairResponse(
         funnelId=str(funnel.id),
         campaignId=str(campaign.id),
         clientId=str(funnel.client_id),
-        profile=PaidAdsPlatformProfileResponse(**_to_profile_payload(saved_profile)),
+        profile=PaidAdsPlatformProfileResponse(**saved_profile),
     )
 
 
@@ -758,12 +1064,17 @@ def run_campaign_paid_ads_qa(
     )
 
     repo = PaidAdsQaRepository(session)
-    profile = repo.get_platform_profile(org_id=auth.org_id, client_id=str(campaign.client_id), platform="meta")
-    profile = _refresh_meta_profile(
-        repo=repo,
+    connection, workspace_config, _profile = _resolve_meta_workspace_profile_or_error(
+        session=session,
         org_id=auth.org_id,
         client_id=str(campaign.client_id),
-        record=profile,
+    )
+    profile = _refresh_meta_profile(
+        session=session,
+        auth=auth,
+        client_id=str(campaign.client_id),
+        connection=connection,
+        workspace_config=workspace_config,
     )
     meta_repo = MetaAdsRepository(session)
     adset_specs = meta_repo.list_adset_specs(org_id=auth.org_id, campaign_id=str(campaign.id))
@@ -824,7 +1135,7 @@ def run_campaign_paid_ads_qa(
         creative_specs=creative_specs,
         adset_specs=adset_specs,
         ready_assets=ready_assets,
-        platform_profile=_profile_dict(profile, platform="meta", client_id=str(campaign.client_id)),
+        platform_profile=profile,
         review_base_url=review_base_url,
         ruleset_version=RULESET_VERSION,
     )

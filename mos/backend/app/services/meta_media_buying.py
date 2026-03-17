@@ -363,6 +363,7 @@ def _compute_ad_metrics(
 
 def build_management_plan(
     *,
+    client: MetaAdsClient,
     ad_account_id: str,
     campaign_id: str,
     mode: str,
@@ -375,8 +376,6 @@ def build_management_plan(
         raise MetaMediaBuyingPlanError("mode must be plan_only or apply")
     if mode == "apply":
         raise MetaMediaBuyingPlanError("mode=apply is not implemented yet. Use mode=plan_only.")
-
-    client = MetaAdsClient.from_settings()
     try:
         campaign, adsets = fetch_meta_campaign_snapshot(client=client, campaign_id=campaign_id)
         rows = fetch_ad_level_insights(

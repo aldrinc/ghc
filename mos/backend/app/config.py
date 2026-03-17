@@ -142,6 +142,8 @@ class Settings(BaseSettings):
     SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS: float = 600.0
     SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE: int = 4
 
+    INTEGRATION_SECRETS_KEY: str | None = None
+
     META_GRAPH_API_VERSION: str | None = None
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
     META_ACCESS_TOKEN: str | None = None

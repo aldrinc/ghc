@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { useApiClient } from "./client";
 import type {
+  MetaAdAccountConnection,
+  MetaAdAccountConnectionUpsertPayload,
   MetaAdSetSpec,
   MetaAdSetSpecUpdatePayload,
   MetaPipelineAsset,
@@ -16,6 +18,8 @@ import type {
   MetaRemoteCampaign,
   MetaRemoteAdSet,
   MetaRemoteAd,
+  MetaWorkspaceAdConfig,
+  MetaWorkspaceAdConfigCreatePayload,
 } from "@/types/meta";
 
 type PipelineFilters = {
@@ -25,9 +29,12 @@ type PipelineFilters = {
   experimentId?: string;
   assetKind?: string;
   statuses?: string[];
+  metaConfigId?: string;
 };
 
 type RemoteFilters = {
+  clientId?: string;
+  metaConfigId?: string;
   adAccountId?: string;
   fields?: string;
   limit?: number;
@@ -38,15 +45,68 @@ type RemoteFilters = {
 export function useMetaApi() {
   const { get, request } = useApiClient();
 
-  const getConfig = useCallback(
-    () =>
-      get<{
-        adAccountId: string;
-        pageId?: string | null;
-        instagramActorId?: string | null;
-        graphApiVersion: string;
-      }>("/meta/config"),
+  const listConnections = useCallback(() => get<MetaAdAccountConnection[]>("/meta/connections"), [get]);
+
+  const createConnection = useCallback(
+    (payload: MetaAdAccountConnectionUpsertPayload) =>
+      request<MetaAdAccountConnection>("/meta/connections", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
+  const validateConnection = useCallback(
+    (connectionId: string) =>
+      request<MetaAdAccountConnection>(`/meta/connections/${connectionId}/validate`, {
+        method: "POST",
+      }),
+    [request],
+  );
+
+  const getActiveConfig = useCallback(
+    (clientId: string) => get<MetaWorkspaceAdConfig>(`/meta/clients/${clientId}/active-config`),
     [get],
+  );
+
+  const getConfig = useCallback(
+    (clientId: string, metaConfigId?: string) => {
+      const params = new URLSearchParams();
+      params.set("clientId", clientId);
+      if (metaConfigId) params.set("metaConfigId", metaConfigId);
+      return get<MetaWorkspaceAdConfig>(`/meta/config?${params.toString()}`);
+    },
+    [get],
+  );
+
+  const listWorkspaceConfigs = useCallback(
+    (clientId: string) => get<MetaWorkspaceAdConfig[]>(`/meta/clients/${clientId}/configs`),
+    [get],
+  );
+
+  const createWorkspaceConfig = useCallback(
+    (clientId: string, payload: MetaWorkspaceAdConfigCreatePayload) =>
+      request<MetaWorkspaceAdConfig>(`/meta/clients/${clientId}/configs`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
+  const selectWorkspaceConfig = useCallback(
+    (clientId: string, configId: string) =>
+      request<MetaWorkspaceAdConfig>(`/meta/clients/${clientId}/configs/${configId}/select`, {
+        method: "POST",
+      }),
+    [request],
+  );
+
+  const validateWorkspaceConfig = useCallback(
+    (clientId: string, configId: string) =>
+      request<MetaWorkspaceAdConfig>(`/meta/clients/${clientId}/configs/${configId}/validate`, {
+        method: "POST",
+      }),
+    [request],
   );
 
   const listPipelineAssets = useCallback(
@@ -57,6 +117,7 @@ export function useMetaApi() {
       if (filters.campaignId) params.set("campaignId", filters.campaignId);
       if (filters.experimentId) params.set("experimentId", filters.experimentId);
       if (filters.assetKind) params.set("assetKind", filters.assetKind);
+      if (filters.metaConfigId) params.set("metaConfigId", filters.metaConfigId);
       if (filters.statuses?.length) {
         filters.statuses.forEach((status) => params.append("statuses", status));
       }
@@ -68,6 +129,8 @@ export function useMetaApi() {
 
   const buildRemotePath = (base: string, filters: RemoteFilters = {}) => {
     const params = new URLSearchParams();
+    if (filters.clientId) params.set("clientId", filters.clientId);
+    if (filters.metaConfigId) params.set("metaConfigId", filters.metaConfigId);
     if (filters.adAccountId) params.set("adAccountId", filters.adAccountId);
     if (filters.fields) params.set("fields", filters.fields);
     if (typeof filters.limit === "number") params.set("limit", filters.limit.toString());
@@ -160,7 +223,15 @@ export function useMetaApi() {
   );
 
   return {
+    listConnections,
+    createConnection,
+    validateConnection,
+    getActiveConfig,
     getConfig,
+    listWorkspaceConfigs,
+    createWorkspaceConfig,
+    selectWorkspaceConfig,
+    validateWorkspaceConfig,
     listPipelineAssets,
     listRemoteImages,
     listRemoteVideos,

@@ -135,6 +135,7 @@ export type MetaPublishPlanValidation = {
 export type MetaPublishRunRequest = {
   generationKey: string;
   funnelId?: string | null;
+  metaConfigId?: string | null;
   publishBaseUrl: string;
   campaignName: string;
   campaignObjective: string;
@@ -170,6 +171,7 @@ export type MetaPublishRun = {
   specialAdCategories: string[];
   publishBaseUrl: string;
   publishDomain?: string | null;
+  metaConfigId?: string | null;
   adAccountId?: string | null;
   pageId?: string | null;
   metaCampaignId?: string | null;
@@ -210,6 +212,102 @@ export type MetaPipelineAsset = {
     ads?: MetaAd[];
     meta_campaign?: MetaCampaign | null;
   };
+};
+
+export type MetaConnectionWorkspaceUsage = {
+  clientId: string;
+  clientName: string;
+  configId: string;
+  configName: string;
+  isDefault: boolean;
+};
+
+export type MetaAdAccountConnection = {
+  id: string;
+  orgId: string;
+  name: string;
+  adAccountId?: string | null;
+  adAccountName?: string | null;
+  businessManagerId?: string | null;
+  businessManagerName?: string | null;
+  graphApiVersion: string;
+  graphApiBaseUrl: string;
+  credentialType: string;
+  hasCredentials: boolean;
+  tokenExpiresAt?: string | null;
+  status: string;
+  validationStatus: string;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+  metadata: Record<string, unknown>;
+  usedByWorkspaces: MetaConnectionWorkspaceUsage[];
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaWorkspaceAdConfig = {
+  id: string;
+  orgId: string;
+  clientId: string;
+  connectionId: string;
+  name: string;
+  isDefault: boolean;
+  status: string;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramActorId?: string | null;
+  pixelId?: string | null;
+  dataSetId?: string | null;
+  verifiedDomain?: string | null;
+  verifiedDomainStatus?: string | null;
+  trackingProvider?: string | null;
+  trackingUrlParameters?: string | null;
+  attributionClickWindow?: string | null;
+  attributionViewWindow?: string | null;
+  viewThroughEnabled?: boolean | null;
+  validationStatus: string;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+  metadata: Record<string, unknown>;
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  connection: MetaAdAccountConnection;
+};
+
+export type MetaAdAccountConnectionUpsertPayload = {
+  name: string;
+  adAccountId?: string | null;
+  adAccountName?: string | null;
+  businessManagerId?: string | null;
+  businessManagerName?: string | null;
+  graphApiVersion: string;
+  graphApiBaseUrl?: string;
+  accessToken?: string | null;
+  tokenExpiresAt?: string | null;
+  status?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type MetaWorkspaceAdConfigCreatePayload = {
+  connectionId: string;
+  name: string;
+  isDefault?: boolean;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramActorId?: string | null;
+  pixelId?: string | null;
+  dataSetId?: string | null;
+  verifiedDomain?: string | null;
+  verifiedDomainStatus?: string | null;
+  trackingProvider?: string | null;
+  trackingUrlParameters?: string | null;
+  attributionClickWindow?: string | null;
+  attributionViewWindow?: string | null;
+  viewThroughEnabled?: boolean | null;
+  status?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type MetaRemoteResponse<T> = {

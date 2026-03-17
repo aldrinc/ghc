@@ -7,6 +7,7 @@ from PIL import Image
 from app.db.enums import AssetSourceEnum, AssetStatusEnum
 from app.db.models import Asset
 from app.routers import meta_ads as meta_ads_router
+from app.services.paid_ads_qa import RULESET_VERSION
 
 
 def _jpeg_with_exif() -> bytes:
@@ -18,12 +19,26 @@ def _jpeg_with_exif() -> bytes:
     return output.getvalue()
 
 
+def _seed_meta_workspace_profile(api_client, *, client_id: str) -> None:
+    response = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json={
+            "rulesetVersion": RULESET_VERSION,
+            "pageId": "123456",
+            "adAccountId": "123456",
+            "metadata": {},
+        },
+    )
+    assert response.status_code == 200
+
+
 def test_upload_meta_asset_strips_metadata_before_meta_upload(
     api_client,
     db_session,
     seed_data,
     monkeypatch,
 ) -> None:
+    _seed_meta_workspace_profile(api_client, client_id=str(seed_data["client"].id))
     source_bytes = _jpeg_with_exif()
     with Image.open(io.BytesIO(source_bytes)) as image_before:
         assert len(image_before.getexif()) > 0
@@ -77,7 +92,7 @@ def test_upload_meta_asset_strips_metadata_before_meta_upload(
             return {"images": {filename: {"hash": "meta-hash-123"}}}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
-    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda: _FakeMetaClient())
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
 
     response = api_client.post(
         f"/meta/assets/{asset.id}/upload",
@@ -104,6 +119,7 @@ def test_upload_meta_asset_fails_when_image_bytes_are_invalid(
     seed_data,
     monkeypatch,
 ) -> None:
+    _seed_meta_workspace_profile(api_client, client_id=str(seed_data["client"].id))
     invalid_bytes = b"not-a-valid-image"
 
     asset = Asset(
@@ -140,7 +156,7 @@ def test_upload_meta_asset_fails_when_image_bytes_are_invalid(
             raise AssertionError(f"Meta upload should not run for invalid image bytes: {kwargs}")
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
-    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda: _FakeMetaClient())
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
 
     response = api_client.post(
         f"/meta/assets/{asset.id}/upload",

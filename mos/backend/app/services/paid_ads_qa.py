@@ -14,7 +14,7 @@ import httpx
 
 from app.config import settings
 from app.services.meta_review import resolve_meta_review_destination_url
-from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
+from app.services.meta_ads import MetaAdsClient, MetaAdsError
 
 
 LEGACY_RULESET_VERSION = "paid_ads_policy_ruleset_v1"
@@ -255,8 +255,15 @@ def activate_mos_meta_funnel_tracking_profile(
     profile: dict[str, Any],
     funnel_ids: list[str],
     ruleset_version: str = RULESET_VERSION,
+    client: MetaAdsClient | None = None,
+    api_version: str | None = None,
 ) -> dict[str, Any]:
-    refreshed = refresh_meta_platform_profile_from_graph(profile=profile, ruleset_version=ruleset_version)
+    refreshed = refresh_meta_platform_profile_from_graph(
+        profile=profile,
+        ruleset_version=ruleset_version,
+        client=client,
+        api_version=api_version,
+    )
     pixel_id = clean_optional_text(refreshed.get("pixelId"))
     data_set_id = clean_optional_text(refreshed.get("dataSetId"))
     data_set_assigned = refreshed.get("dataSetAssignedToAdAccount")
@@ -306,13 +313,10 @@ def activate_mos_meta_funnel_tracking_profile(
     return refreshed
 
 
-def _graphql_candidate_source(profile_value: str | None, settings_value: str | None, *, settings_label: str) -> tuple[str | None, str | None]:
+def _graphql_candidate_source(profile_value: str | None, *, profile_label: str) -> tuple[str | None, str | None]:
     cleaned_profile_value = clean_optional_text(profile_value)
     if cleaned_profile_value:
-        return cleaned_profile_value, "profile"
-    cleaned_settings_value = clean_optional_text(settings_value)
-    if cleaned_settings_value:
-        return cleaned_settings_value, settings_label
+        return cleaned_profile_value, profile_label
     return None, None
 
 
@@ -334,8 +338,7 @@ def _single_graph_node(
 def _fetch_meta_page(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple[dict[str, Any], str]:
     candidate_id, candidate_source = _graphql_candidate_source(
         profile.get("pageId"),
-        settings.META_PAGE_ID,
-        settings_label="settings.META_PAGE_ID",
+        profile_label="profile.pageId",
     )
     fields = "id,name,verification_status,link,business"
     if candidate_id:
@@ -355,8 +358,7 @@ def _fetch_meta_page(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple
 def _fetch_meta_ad_account(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple[dict[str, Any], str]:
     candidate_id, candidate_source = _graphql_candidate_source(
         profile.get("adAccountId"),
-        settings.META_AD_ACCOUNT_ID,
-        settings_label="settings.META_AD_ACCOUNT_ID",
+        profile_label="profile.adAccountId",
     )
     fields = "id,name,account_status,disable_reason,business,funding_source_details"
     if candidate_id:
@@ -433,15 +435,17 @@ def refresh_meta_platform_profile_from_graph(
     *,
     profile: dict[str, Any],
     ruleset_version: str = RULESET_VERSION,
+    client: MetaAdsClient | None = None,
+    api_version: str | None = None,
 ) -> dict[str, Any]:
     normalized_platform = normalize_platform(profile.get("platform") or "meta")
     if normalized_platform != "meta":
         return profile
 
-    try:
-        client = MetaAdsClient.from_settings()
-    except MetaAdsConfigError as exc:
-        raise MetaProfileRefreshError(str(exc), status_code=503) from exc
+    if client is None:
+        raise MetaProfileRefreshError(
+            "Meta Graph refresh requires a configured Meta ad account connection with credentials."
+        )
 
     page, page_source = _fetch_meta_page(client, profile=profile)
     ad_account, ad_account_source = _fetch_meta_ad_account(client, profile=profile)
@@ -462,7 +466,7 @@ def refresh_meta_platform_profile_from_graph(
     selected_pixel, pixel_source, pixel_warning = _pick_pixel_record(profile=profile, pixel_records=pixel_records)
     existing_metadata = _profile_metadata(profile)
     validation_metadata = {
-        "apiVersion": settings.META_GRAPH_API_VERSION,
+        "apiVersion": clean_optional_text(api_version) or client.api_version,
         "lastValidatedAt": _iso_now(),
         "validatedFields": [
             "pageId",

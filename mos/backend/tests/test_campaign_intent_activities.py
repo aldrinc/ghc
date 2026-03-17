@@ -8,7 +8,16 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from app.db.models import Campaign, Client, Org, PaidAdsPlatformProfile, Product, ProductOffer, ProductVariant
+from app.db.models import (
+    Campaign,
+    Client,
+    MetaAdAccountConnection,
+    MetaWorkspaceAdConfig,
+    Org,
+    Product,
+    ProductOffer,
+    ProductVariant,
+)
 from app.temporal.activities import campaign_intent_activities as cia
 from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
@@ -134,7 +143,6 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
     db_session.add(org)
     db_session.commit()
     db_session.refresh(org)
-
     client = Client(org_id=test_org_id, name="Meta Tracking Client", industry="Retail")
     db_session.add(client)
     db_session.commit()
@@ -151,13 +159,48 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
     db_session.commit()
     db_session.refresh(campaign)
 
+    connection = MetaAdAccountConnection(
+        org_id=test_org_id,
+        name="Meta Tracking Connection",
+        ad_account_id="act_123456",
+        ad_account_name="Meta Tracking Account",
+        graph_api_version="v24.0",
+        graph_api_base_url="https://graph.facebook.com",
+        credential_type="access_token",
+        credentials_encrypted="encrypted-token",
+        status="active",
+        validation_status="pending",
+        metadata_json={},
+        created_by_user_id="test-user",
+    )
+    db_session.add(connection)
+    db_session.commit()
+    db_session.refresh(connection)
+
+    workspace_config = MetaWorkspaceAdConfig(
+        org_id=test_org_id,
+        client_id=client.id,
+        meta_connection_id=connection.id,
+        name="Meta Tracking Workspace Config",
+        is_default=True,
+        status="active",
+        page_id="123456",
+        page_name="Meta Tracking Page",
+        validation_status="pending",
+        metadata_json={},
+        created_by_user_id="test-user",
+    )
+    db_session.add(workspace_config)
+    db_session.commit()
+    db_session.refresh(workspace_config)
+
     observed: dict[str, object] = {}
 
     @contextmanager
     def _session_scope_override():
         yield db_session
 
-    def _activate_stub(*, profile, funnel_ids, ruleset_version):
+    def _activate_stub(*, profile, funnel_ids, ruleset_version, **kwargs):
         observed["profile"] = profile
         observed["funnel_ids"] = funnel_ids
         observed["ruleset_version"] = ruleset_version
@@ -185,6 +228,7 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
 
     monkeypatch.setattr(cia, "session_scope", _session_scope_override)
     monkeypatch.setattr(cia, "activate_mos_meta_funnel_tracking_profile", _activate_stub)
+    monkeypatch.setattr(cia, "meta_ads_client_for_connection", lambda connection: object())
 
     result = cia.configure_generated_funnels_meta_tracking_activity(
         {
@@ -198,18 +242,12 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
     assert result["status"] == "configured"
     assert observed["funnel_ids"] == ["funnel-a", "funnel-b"]
 
-    profile = db_session.scalars(
-        select(PaidAdsPlatformProfile).where(
-            PaidAdsPlatformProfile.org_id == test_org_id,
-            PaidAdsPlatformProfile.client_id == client.id,
-            PaidAdsPlatformProfile.platform == "meta",
-        )
-    ).first()
-    assert profile is not None
-    assert profile.ruleset_version == cia.PAID_ADS_RULESET_VERSION
-    assert profile.pixel_id == "pixel-123"
-    assert profile.tracking_provider == "mos"
-    assert profile.metadata_json["mosMetaTracking"]["funnelIds"] == ["funnel-a", "funnel-b"]
+    db_session.refresh(workspace_config)
+    assert workspace_config.pixel_id == "pixel-123"
+    assert workspace_config.data_set_id == "dataset-123"
+    assert workspace_config.tracking_provider == "mos"
+    assert workspace_config.tracking_url_parameters == "utm_source=meta&utm_medium=paid"
+    assert workspace_config.metadata_json["mosMetaTracking"]["funnelIds"] == ["funnel-a", "funnel-b"]
 
 
 def test_create_funnel_drafts_activity_uses_pinned_template_patch_for_legacy_presell_payload(
