@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.swipe_image_ads import SwipeImageAdGenerateRequest
+from app.schemas.swipe_image_ads import (
+    SwipeImageAdGenerateRequest,
+    SwipeTemplateTestimonialsGenerateRequest,
+)
 
 
 def _base_payload() -> dict[str, object]:
@@ -45,3 +48,16 @@ def test_swipe_request_accepts_swipe_requires_product_image_flag() -> None:
 
     parsed = SwipeImageAdGenerateRequest.model_validate(payload)
     assert parsed.swipe_requires_product_image is False
+
+
+def test_swipe_template_request_rejects_image_model_for_stage_one() -> None:
+    payload = {
+        "campaignId": "00000000-0000-0000-0000-000000000033",
+        "assetBriefId": "asset-brief-1",
+        "model": "gemini-3-pro-image-preview",
+    }
+
+    with pytest.raises(ValidationError) as exc:
+        SwipeTemplateTestimonialsGenerateRequest.model_validate(payload)
+
+    assert "Use renderModelId for final image rendering models" in str(exc.value)
