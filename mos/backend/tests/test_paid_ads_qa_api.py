@@ -64,14 +64,14 @@ def _mock_passthrough_graph_refresh(monkeypatch) -> None:
     monkeypatch.setattr(
         paid_ads_qa_router,
         "refresh_meta_platform_profile_from_graph",
-        lambda *, profile, ruleset_version: profile,
+        lambda *, profile, ruleset_version, **kwargs: profile,
     )
 
 
 def _mock_hydrated_graph_refresh(monkeypatch, *, overrides: dict | None = None) -> None:
     overrides = overrides or {}
 
-    def _refresh(*, profile, ruleset_version):
+    def _refresh(*, profile, ruleset_version, **kwargs):
         refreshed = {
             **profile,
             **_complete_meta_profile_payload(),
@@ -370,7 +370,7 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
     db_session.commit()
     db_session.refresh(funnel)
 
-    def _refresh(*, profile, ruleset_version):
+    def _refresh(*, profile, ruleset_version, **kwargs):
         metadata = dict(profile.get("metadata") or {})
         metadata["metaGraphValidation"] = {
             "apiVersion": "v-test",

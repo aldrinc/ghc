@@ -12,6 +12,7 @@ from app.db.repositories.teardowns import TeardownsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
+from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
@@ -36,6 +37,7 @@ __all__ = [
     "ClaudeContextFilesRepository",
     "ClientComplianceProfilesRepository",
     "MetaAdsRepository",
+    "MetaAccountConfigsRepository",
     "PaidAdsQaRepository",
     "ResearchArtifactsRepository",
     "OrgDeployDomainsRepository",

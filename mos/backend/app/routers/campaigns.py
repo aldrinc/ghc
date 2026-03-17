@@ -34,6 +34,7 @@ from app.services.meta_review import (
     resolve_meta_review_destination_url,
     select_assets_for_generation,
 )
+from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_workspace_config
 from app.services.paid_ads_qa import list_meta_copy_policy_issues
 from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
@@ -705,6 +706,24 @@ def setup_campaign_meta_review(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing a product_id. Attach a product before setting up Meta review.",
         )
+    try:
+        meta_workspace_context = resolve_workspace_config(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(campaign.client_id),
+        )
+    except MetaWorkspaceConfigError:
+        meta_workspace_context = None
+    default_meta_page_id = (
+        getattr(meta_workspace_context.workspace_config, "page_id", None)
+        if meta_workspace_context is not None
+        else None
+    )
+    default_instagram_actor_id = (
+        getattr(meta_workspace_context.workspace_config, "instagram_actor_id", None)
+        if meta_workspace_context is not None
+        else None
+    )
 
     brief_map = load_campaign_asset_brief_map(
         org_id=auth.org_id,
@@ -1020,8 +1039,8 @@ def setup_campaign_meta_review(
                     destination_page=normalized_destination_page,
                     review_paths=review_paths,
                 ),
-                "page_id": settings.META_PAGE_ID,
-                "instagram_actor_id": settings.META_INSTAGRAM_ACTOR_ID,
+                "page_id": default_meta_page_id,
+                "instagram_actor_id": default_instagram_actor_id,
                 "status": "draft",
                 "metadata_json": desired_metadata_json,
             }

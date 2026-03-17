@@ -18,7 +18,7 @@ from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnu
 from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
-from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
+from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
@@ -37,6 +37,12 @@ from app.services.paid_ads_qa import (
     activate_mos_meta_funnel_tracking_profile,
     clean_optional_text,
     normalize_tracking_provider,
+)
+from app.services.meta_account_configs import (
+    MetaWorkspaceConfigError,
+    merge_meta_profile,
+    meta_ads_client_for_connection,
+    resolve_workspace_config,
 )
 from app.services.shopify_connection import get_client_shopify_connection_status, get_client_shopify_product
 from app.strategy_v2.downstream import load_strategy_v2_outputs
@@ -1707,30 +1713,83 @@ def configure_generated_funnels_meta_tracking_activity(params: Dict[str, Any]) -
         if not _campaign_uses_meta_channel(campaign.channels):
             return {"status": "skipped", "reason": "campaign_has_no_meta_channel"}
 
-        repo = PaidAdsQaRepository(session)
-        profile_record = repo.get_platform_profile(org_id=org_id, client_id=client_id, platform="meta")
-        profile_dict = _meta_profile_dict_from_record(profile_record, client_id=client_id)
+        try:
+            resolved = resolve_workspace_config(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+            )
+        except MetaWorkspaceConfigError as exc:
+            raise ValueError(f"Meta funnel tracking automation failed. {exc}") from exc
+
+        profile_dict = merge_meta_profile(
+            connection=resolved.connection,
+            workspace_config=resolved.workspace_config,
+        )
         try:
             configured_profile = activate_mos_meta_funnel_tracking_profile(
                 profile=profile_dict,
                 funnel_ids=funnel_ids,
                 ruleset_version=PAID_ADS_RULESET_VERSION,
+                client=meta_ads_client_for_connection(resolved.connection),
+                api_version=resolved.connection.graph_api_version,
             )
         except MetaProfileRefreshError as exc:
             raise ValueError(
                 "Meta funnel tracking automation failed. "
                 f"{exc}"
             ) from exc
+        except MetaWorkspaceConfigError as exc:
+            raise ValueError(f"Meta funnel tracking automation failed. {exc}") from exc
 
-        saved = repo.upsert_platform_profile(
-            org_id=org_id,
-            client_id=client_id,
-            **_meta_profile_fields_from_dict(configured_profile),
+        config_repo = MetaAccountConfigsRepository(session)
+        connection_metadata = (
+            dict(resolved.connection.metadata_json)
+            if isinstance(resolved.connection.metadata_json, dict)
+            else {}
+        )
+        metadata = configured_profile.get("metadata")
+        if isinstance(metadata, dict) and isinstance(metadata.get("metaGraphValidation"), dict):
+            connection_metadata["metaGraphValidation"] = metadata["metaGraphValidation"]
+
+        config_repo.update_connection(
+            resolved.connection,
+            metadata_json={
+                **connection_metadata,
+                "paymentMethodType": normalize_tracking_provider(configured_profile.get("paymentMethodType")),
+                "paymentMethodStatus": clean_optional_text(configured_profile.get("paymentMethodStatus")),
+                "dataSetShopifyPartnerInstalled": configured_profile.get("dataSetShopifyPartnerInstalled"),
+                "dataSetDataSharingLevel": normalize_tracking_provider(
+                    configured_profile.get("dataSetDataSharingLevel")
+                ),
+                "dataSetAssignedToAdAccount": configured_profile.get("dataSetAssignedToAdAccount"),
+            },
+        )
+        saved = config_repo.update_workspace_config(
+            resolved.workspace_config,
+            page_id=clean_optional_text(configured_profile.get("pageId")),
+            page_name=clean_optional_text(configured_profile.get("pageName")),
+            pixel_id=clean_optional_text(configured_profile.get("pixelId")),
+            data_set_id=clean_optional_text(configured_profile.get("dataSetId")),
+            verified_domain=clean_optional_text(configured_profile.get("verifiedDomain")),
+            verified_domain_status=normalize_tracking_provider(configured_profile.get("verifiedDomainStatus")),
+            tracking_provider=normalize_tracking_provider(configured_profile.get("trackingProvider")),
+            tracking_url_parameters=clean_optional_text(configured_profile.get("trackingUrlParameters")),
+            attribution_click_window=normalize_tracking_provider(configured_profile.get("attributionClickWindow")),
+            attribution_view_window=normalize_tracking_provider(configured_profile.get("attributionViewWindow")),
+            view_through_enabled=configured_profile.get("viewThroughEnabled"),
+            validation_status="valid",
+            last_validated_at=datetime.now(timezone.utc),
+            last_validation_error=None,
+            metadata_json=metadata if isinstance(metadata, dict) else {},
         )
 
     return {
         "status": "configured",
-        "rulesetVersion": saved.ruleset_version,
+        "rulesetVersion": (
+            saved.metadata_json.get("rulesetVersion") if isinstance(saved.metadata_json, dict) else None
+        )
+        or PAID_ADS_RULESET_VERSION,
         "pixelId": saved.pixel_id,
         "dataSetId": saved.data_set_id,
         "trackingProvider": saved.tracking_provider,
