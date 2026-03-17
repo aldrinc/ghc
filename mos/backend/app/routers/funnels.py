@@ -38,7 +38,9 @@ from app.schemas.funnels import (
     FunnelDuplicateRequest,
     FunnelPageAIGenerateRequest,
     FunnelPageCreateRequest,
+    FunnelPageSalesPdpExamplesGenerateRequest,
     FunnelPageSaveDraftRequest,
+    FunnelPageSalesPdpExamplesGenerateResponse,
     FunnelPageTestimonialGenerateRequest,
     FunnelPageUpdateRequest,
     FunnelPublishRequest,
@@ -60,6 +62,7 @@ from app.services.funnel_templates import apply_template_assets, get_funnel_temp
 from app.services.funnel_testimonials import (
     TestimonialGenerationError,
     TestimonialGenerationNotFoundError,
+    generate_sales_pdp_carousel_images,
 )
 from app.services.funnels import (
     create_funnel_upload_asset,
@@ -69,6 +72,14 @@ from app.services.funnels import (
 )
 
 router = APIRouter(prefix="/funnels", tags=["funnels"])
+
+_SALES_PDP_EXAMPLE_VARIANT_ORDER = (
+    "standard_ugc",
+    "qa_ugc",
+    "bold_claim",
+    "personal_highlight",
+    "dorm_selfie",
+)
 
 
 _AI_ATTACHMENT_MAX_COUNT = int(os.getenv("AI_ATTACHMENT_MAX_COUNT", "8"))
@@ -115,6 +126,37 @@ def _deploy_access_urls(*, server_names: list[str], https_enabled: bool) -> list
         return []
     scheme = "https" if https_enabled else "http"
     return [f"{scheme}://{hostname}/" for hostname in server_names]
+
+
+def _extract_sales_pdp_examples(generated: list[dict[str, object]]) -> list[dict[str, object]]:
+    expected = set(_SALES_PDP_EXAMPLE_VARIANT_ORDER)
+    examples_by_variant: dict[str, dict[str, object]] = {}
+
+    for item in generated:
+        if not isinstance(item, dict):
+            raise TestimonialGenerationError("Sales PDP carousel generation returned an invalid asset record.")
+        kind = str(item.get("kind") or "").strip()
+        if kind == "core_product_image":
+            continue
+        if kind != "generated_pdp_carousel":
+            raise TestimonialGenerationError(f"Unexpected Sales PDP carousel asset kind: {kind or '[missing]'}")
+        variant_id = str(item.get("variantId") or "").strip()
+        if variant_id not in expected:
+            raise TestimonialGenerationError(
+                f"Unexpected Sales PDP carousel variantId: {variant_id or '[missing]'}"
+            )
+        if variant_id in examples_by_variant:
+            raise TestimonialGenerationError(f"Duplicate Sales PDP carousel variantId: {variant_id}")
+        examples_by_variant[variant_id] = item
+
+    missing = [variant_id for variant_id in _SALES_PDP_EXAMPLE_VARIANT_ORDER if variant_id not in examples_by_variant]
+    if missing:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel generation did not return all 5 example variants. "
+            f"Missing: {', '.join(missing)}."
+        )
+
+    return [examples_by_variant[variant_id] for variant_id in _SALES_PDP_EXAMPLE_VARIANT_ORDER]
 
 
 def _validate_design_system(
@@ -1094,6 +1136,49 @@ def ai_generate_page_testimonials(
         "puckData": result.get("puckData") or {},
         "generatedTestimonials": result.get("generatedTestimonials") or [],
         **({"runId": result.get("runId")} if result.get("runId") else {}),
+    }
+
+
+@router.post(
+    "/{funnel_id}/pages/{page_id}/ai/sales-pdp-examples",
+    response_model=FunnelPageSalesPdpExamplesGenerateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def ai_generate_sales_pdp_examples(
+    funnel_id: str,
+    page_id: str,
+    payload: FunnelPageSalesPdpExamplesGenerateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    try:
+        version, puck_data, generated = generate_sales_pdp_carousel_images(
+            session=session,
+            org_id=auth.org_id,
+            user_id=auth.user_id,
+            funnel_id=funnel_id,
+            page_id=page_id,
+            draft_version_id=payload.draftVersionId,
+            current_puck_data=payload.currentPuckData,
+            template_id=payload.templateId,
+            idea_workspace_id=payload.ideaWorkspaceId,
+            model=payload.model,
+            temperature=payload.temperature,
+            max_tokens=payload.maxTokens,
+            max_duration_seconds=payload.maxDurationSeconds,
+        )
+        generated_examples = _extract_sales_pdp_examples(generated)
+    except TestimonialGenerationNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TestimonialGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    return {
+        "draftVersionId": str(version.id),
+        "puckData": puck_data or {},
+        "generatedPdpExamples": generated_examples,
     }
 
 
