@@ -103,6 +103,105 @@ class _FakeRepo:
         return _FakeRepo.saved_profile
 
 
+def _resolved_meta_workspace_profile():
+    now = datetime.now(timezone.utc)
+    connection = SimpleNamespace(
+        id="connection-1",
+        org_id="org-1",
+        name="Meta Connection",
+        ad_account_id="act_123456",
+        ad_account_name="Meta Account",
+        business_manager_id="bm-123",
+        business_manager_name="Meta Business",
+        graph_api_version="v24.0",
+        graph_api_base_url="https://graph.facebook.com",
+        status="active",
+        metadata_json={},
+        created_at=now,
+        updated_at=now,
+    )
+    workspace_config = SimpleNamespace(
+        id="config-1",
+        org_id="org-1",
+        client_id="client-1",
+        meta_connection_id="connection-1",
+        page_id="123456",
+        page_name="Meta Page",
+        pixel_id="pixel-123",
+        data_set_id="dataset-123",
+        verified_domain=None,
+        verified_domain_status=None,
+        tracking_provider="mos",
+        tracking_url_parameters="utm_source=meta&utm_medium=paid",
+        attribution_click_window=None,
+        attribution_view_window=None,
+        view_through_enabled=None,
+        metadata_json={},
+        created_at=now,
+        updated_at=now,
+    )
+    profile = {
+        "id": "config-1",
+        "orgId": "org-1",
+        "clientId": "client-1",
+        "platform": "meta",
+        "rulesetVersion": paid_ads_qa_router.RULESET_VERSION,
+        "businessManagerId": "bm-123",
+        "businessManagerName": "Meta Business",
+        "pageId": "123456",
+        "pageName": "Meta Page",
+        "adAccountId": "act_123456",
+        "adAccountName": "Meta Account",
+        "paymentMethodType": "credit_card",
+        "paymentMethodStatus": "active",
+        "pixelId": "pixel-123",
+        "dataSetId": "dataset-123",
+        "dataSetShopifyPartnerInstalled": False,
+        "dataSetDataSharingLevel": "standard",
+        "dataSetAssignedToAdAccount": True,
+        "trackingProvider": "mos",
+        "trackingUrlParameters": "utm_source=meta&utm_medium=paid",
+        "metadata": {},
+        "createdAt": now.isoformat(),
+        "updatedAt": now.isoformat(),
+    }
+    return connection, workspace_config, profile
+
+
+def _saved_workspace_profile(profile: dict[str, object]) -> dict[str, object]:
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "id": "config-1",
+        "orgId": "org-1",
+        "clientId": str(profile.get("clientId") or "client-1"),
+        "platform": "meta",
+        "rulesetVersion": str(profile.get("rulesetVersion") or paid_ads_qa_router.RULESET_VERSION),
+        "businessManagerId": profile.get("businessManagerId"),
+        "businessManagerName": profile.get("businessManagerName"),
+        "pageId": profile.get("pageId"),
+        "pageName": profile.get("pageName"),
+        "adAccountId": profile.get("adAccountId"),
+        "adAccountName": profile.get("adAccountName"),
+        "paymentMethodType": profile.get("paymentMethodType"),
+        "paymentMethodStatus": profile.get("paymentMethodStatus"),
+        "pixelId": profile.get("pixelId"),
+        "dataSetId": profile.get("dataSetId"),
+        "dataSetShopifyPartnerInstalled": profile.get("dataSetShopifyPartnerInstalled"),
+        "dataSetDataSharingLevel": profile.get("dataSetDataSharingLevel"),
+        "dataSetAssignedToAdAccount": profile.get("dataSetAssignedToAdAccount"),
+        "verifiedDomain": profile.get("verifiedDomain"),
+        "verifiedDomainStatus": profile.get("verifiedDomainStatus"),
+        "attributionClickWindow": profile.get("attributionClickWindow"),
+        "attributionViewWindow": profile.get("attributionViewWindow"),
+        "viewThroughEnabled": profile.get("viewThroughEnabled"),
+        "trackingProvider": profile.get("trackingProvider"),
+        "trackingUrlParameters": profile.get("trackingUrlParameters"),
+        "metadata": profile.get("metadata") if isinstance(profile.get("metadata"), dict) else {},
+        "createdAt": now,
+        "updatedAt": now,
+    }
+
+
 def test_repair_funnel_meta_tracking_updates_profile(monkeypatch) -> None:
     funnel = SimpleNamespace(
         id="funnel-1",
@@ -118,7 +217,7 @@ def test_repair_funnel_meta_tracking_updates_profile(monkeypatch) -> None:
     )
     fake_session = _FakeSession(funnel=funnel, campaign=campaign)
 
-    def _activate(*, profile, funnel_ids, ruleset_version):
+    def _activate(*, profile, funnel_ids, ruleset_version, **kwargs):
         assert profile["clientId"] == "client-1"
         assert funnel_ids == ["funnel-1"]
         assert ruleset_version == paid_ads_qa_router.RULESET_VERSION
@@ -153,7 +252,18 @@ def test_repair_funnel_meta_tracking_updates_profile(monkeypatch) -> None:
             },
         }
 
-    monkeypatch.setattr(paid_ads_qa_router, "PaidAdsQaRepository", _FakeRepo)
+    resolved_profile = _resolved_meta_workspace_profile()
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "_resolve_meta_workspace_profile_or_error",
+        lambda **kwargs: resolved_profile,
+    )
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "_upsert_meta_workspace_profile",
+        lambda **kwargs: _saved_workspace_profile(kwargs["profile"]),
+    )
+    monkeypatch.setattr(paid_ads_qa_router, "meta_ads_client_for_connection", lambda connection: object())
     monkeypatch.setattr(paid_ads_qa_router, "activate_mos_meta_funnel_tracking_profile", _activate)
 
     response = paid_ads_qa_router.repair_funnel_meta_tracking(
@@ -228,7 +338,17 @@ def test_provision_meta_domain_verification_dns_updates_profile(monkeypatch) -> 
             "status": "dns_record_written",
         }
 
-    monkeypatch.setattr(paid_ads_qa_router, "PaidAdsQaRepository", _FakeRepo)
+    resolved_profile = _resolved_meta_workspace_profile()
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "_resolve_meta_workspace_profile_or_error",
+        lambda **kwargs: resolved_profile,
+    )
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "_upsert_meta_workspace_profile",
+        lambda **kwargs: _saved_workspace_profile(kwargs["profile"]),
+    )
     monkeypatch.setattr(
         paid_ads_qa_router.namecheap_dns_service,
         "upsert_txt_record",

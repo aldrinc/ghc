@@ -60,7 +60,16 @@ def _complete_meta_profile_payload() -> dict:
     }
 
 
+def _mock_meta_ads_client(monkeypatch) -> None:
+    monkeypatch.setattr(
+        paid_ads_qa_router,
+        "meta_ads_client_for_connection",
+        lambda connection: object(),
+    )
+
+
 def _mock_passthrough_graph_refresh(monkeypatch) -> None:
+    _mock_meta_ads_client(monkeypatch)
     monkeypatch.setattr(
         paid_ads_qa_router,
         "refresh_meta_platform_profile_from_graph",
@@ -70,6 +79,7 @@ def _mock_passthrough_graph_refresh(monkeypatch) -> None:
 
 def _mock_hydrated_graph_refresh(monkeypatch, *, overrides: dict | None = None) -> None:
     overrides = overrides or {}
+    _mock_meta_ads_client(monkeypatch)
 
     def _refresh(*, profile, ruleset_version, **kwargs):
         refreshed = {
@@ -324,6 +334,11 @@ def test_meta_platform_profile_assessment_refreshes_live_profile_and_persists_va
 ) -> None:
     client_id = _create_client(api_client, name="Meta Profile Live Refresh")
     _mock_hydrated_graph_refresh(monkeypatch)
+    put_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert put_resp.status_code == 200
 
     report_path = tmp_path / "meta-profile-live-report.md"
     monkeypatch.setattr(
@@ -354,6 +369,17 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
     monkeypatch,
 ) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-tracking-repair")
+    _mock_meta_ads_client(monkeypatch)
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json={
+            "rulesetVersion": RULESET_VERSION,
+            "pageId": "123456",
+            "adAccountId": "act_123456",
+            "metadata": {},
+        },
+    )
+    assert profile_resp.status_code == 200
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
@@ -396,11 +422,7 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
             "metadata": metadata,
         }
 
-    monkeypatch.setattr(
-        paid_ads_qa_service,
-        "refresh_meta_platform_profile_from_graph",
-        _refresh,
-    )
+    monkeypatch.setattr(paid_ads_qa_service, "refresh_meta_platform_profile_from_graph", _refresh)
 
     repair_resp = api_client.post(f"/funnels/{funnel.id}/paid-ads-qa/meta-tracking/repair")
     assert repair_resp.status_code == 200
@@ -1384,6 +1406,11 @@ def test_meta_campaign_paid_ads_qa_refreshes_live_profile_before_scoring(
 ) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="campaign-qa-live-refresh")
     _mock_hydrated_graph_refresh(monkeypatch)
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json=_complete_meta_profile_payload(),
+    )
+    assert profile_resp.status_code == 200
 
     report_path = tmp_path / "campaign-live-refresh-report.md"
     monkeypatch.setattr(

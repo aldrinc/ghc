@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
+from app.services.paid_ads_qa import RULESET_VERSION
 
 
 def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str, str]:
@@ -29,6 +30,17 @@ def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str,
         },
     )
     assert campaign_resp.status_code == 201
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json={
+            "rulesetVersion": RULESET_VERSION,
+            "pageId": "123456",
+            "adAccountId": "act_123456",
+            "metadata": {},
+        },
+    )
+    assert profile_resp.status_code == 200
     return client_id, product_id, campaign_resp.json()["id"]
 
 
