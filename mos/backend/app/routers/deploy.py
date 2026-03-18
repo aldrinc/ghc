@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
+from app.db.repositories.org_deploy_domains import (
+    LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR,
+    OrgDeployDomainsRepository,
+)
 from app.services import deploy as deploy_service
 
 router = APIRouter(prefix="/deploy", tags=["deploy"])
@@ -50,7 +53,9 @@ class WorkloadDomainsResponse(BaseModel):
     plan_path: str
     workload_found: bool
     server_names: list[str]
-    org_server_names: list[str]
+    workspace_id: str
+    workspace_server_names: list[str]
+    workspace_scope_error: Optional[str] = None
     https: Optional[bool] = None
 
 
@@ -78,9 +83,9 @@ def _normalize_server_names(values: Any) -> list[str]:
     return normalized
 
 
-def _extract_org_server_names(workload: dict[str, Any]) -> list[str] | None:
-    if "org_server_names" in workload:
-        return _normalize_server_names(workload.get("org_server_names"))
+def _extract_workspace_server_names(workload: dict[str, Any]) -> list[str] | None:
+    if "workspace_server_names" in workload:
+        return _normalize_server_names(workload.get("workspace_server_names"))
     service_config = workload.get("service_config")
     if isinstance(service_config, dict) and "server_names" in service_config:
         return _normalize_server_names(service_config.get("server_names"))
@@ -127,9 +132,9 @@ async def patch_workload(
 ):
     _require_internal_proxy(request)
     try:
-        org_server_names = _extract_org_server_names(workload)
+        workspace_server_names = _extract_workspace_server_names(workload)
         workload_for_plan = dict(workload)
-        workload_for_plan.pop("org_server_names", None)
+        workload_for_plan.pop("workspace_server_names", None)
         if configure_bunny_pull_zone:
             service_config = workload_for_plan.get("service_config")
             if service_config is None:
@@ -153,25 +158,34 @@ async def patch_workload(
             create_if_missing=create_if_missing,
             in_place=in_place,
         )
+        workload_name = str(workload_for_plan.get("name") or "").strip()
+        if not workload_name:
+            raise deploy_service.DeployError("Workload patch must include a non-empty 'name' field.")
+        workspace_id = deploy_service.get_workload_workspace_id_from_plan(
+            workload_name=workload_name,
+            plan_path=result.get("updated_plan_path"),
+            instance_name=instance_name,
+        )
         if configure_bunny_pull_zone:
-            workload_name = str(workload_for_plan.get("name") or "").strip()
-            if not workload_name:
-                raise deploy_service.DeployError("Workload patch must include a non-empty 'name' field.")
             result["cdn"] = deploy_service.configure_bunny_pull_zone_for_workload(
-                org_id=auth.org_id,
+                client_id=workspace_id,
                 workload_name=workload_name,
                 plan_path=result.get("updated_plan_path"),
                 instance_name=instance_name,
                 requested_origin_ip=bunny_pull_zone_origin_ip,
-                server_names=(org_server_names or []),
+                server_names=(workspace_server_names or []),
             )
 
-        if org_server_names is not None:
+        if workspace_server_names is not None:
             repo = OrgDeployDomainsRepository(session)
-            repo.replace_hostnames(org_id=auth.org_id, hostnames=org_server_names)
+            repo.replace_hostnames(
+                org_id=auth.org_id,
+                client_id=workspace_id,
+                hostnames=workspace_server_names,
+            )
 
         return result
-    except deploy_service.DeployError as exc:
+    except (deploy_service.DeployError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
@@ -181,6 +195,7 @@ async def get_workload_domains(
     workload_name: str = Query(..., description="Workload name to locate inside the deploy plan"),
     plan_path: Optional[str] = Query(default=None),
     instance_name: Optional[str] = Query(default=None),
+    workspace_id: Optional[str] = Query(default=None),
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -191,13 +206,47 @@ async def get_workload_domains(
             plan_path=plan_path,
             instance_name=instance_name,
         )
-        org_server_names = OrgDeployDomainsRepository(session).list_hostnames(org_id=auth.org_id)
+        resolved_workspace_id = (
+            deploy_service.get_workload_workspace_id_from_plan(
+                workload_name=workload_name,
+                plan_path=result.get("plan_path"),
+                instance_name=instance_name,
+            )
+            if result.get("workload_found")
+            else None
+        )
+        requested_workspace_id = str(workspace_id or "").strip() or None
+        if requested_workspace_id and resolved_workspace_id and requested_workspace_id != resolved_workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Requested workspace_id '{requested_workspace_id}' does not match workload "
+                    f"workspace '{resolved_workspace_id}'."
+                ),
+            )
+        effective_workspace_id = requested_workspace_id or resolved_workspace_id
+        if not effective_workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="workspace_id is required when the workload is not yet present in the plan.",
+            )
+        repo = OrgDeployDomainsRepository(session)
+        workspace_server_names = repo.list_hostnames(
+            org_id=auth.org_id,
+            client_id=effective_workspace_id,
+            strict=False,
+        )
+        workspace_scope_error = None
+        if not workspace_server_names and repo.has_legacy_unscoped_hostnames(org_id=auth.org_id):
+            workspace_scope_error = LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR
         return {
             "workload_name": workload_name,
-            "org_server_names": org_server_names,
+            "workspace_id": effective_workspace_id,
+            "workspace_server_names": workspace_server_names,
+            "workspace_scope_error": workspace_scope_error,
             **result,
         }
-    except deploy_service.DeployError as exc:
+    except (deploy_service.DeployError, ValueError) as exc:
         message = str(exc)
         code = status.HTTP_404_NOT_FOUND if "No plan found" in message else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=message) from exc

@@ -149,6 +149,7 @@ export function FunnelDetailPage() {
 
   const deployDomains = useDeployWorkloadDomains({
     workloadName: deployWorkloadName,
+    workspaceId: funnel?.client_id || undefined,
     planPath: deployPlanPath || undefined,
     instanceName: deployInstanceName || undefined,
   });
@@ -166,10 +167,10 @@ export function FunnelDetailPage() {
   };
 
   const configuredDeployDomains = useMemo(() => {
-    const orgScoped = normalizeDeployDomainList(deployDomains.data?.org_server_names || []);
-    if (orgScoped.length) return orgScoped;
+    const workspaceScoped = normalizeDeployDomainList(deployDomains.data?.workspace_server_names || []);
+    if (workspaceScoped.length) return workspaceScoped;
     return normalizeDeployDomainList(deployDomains.data?.server_names || []);
-  }, [deployDomains.data?.org_server_names, deployDomains.data?.server_names]);
+  }, [deployDomains.data?.workspace_server_names, deployDomains.data?.server_names]);
 
   const deployedPathSuffix = useMemo(() => {
     if (!productRouteSlug || !funnelRouteSlug) return null;
@@ -301,7 +302,7 @@ export function FunnelDetailPage() {
     const workloadPayload: Record<string, unknown> = {
       name: deployWorkloadName,
       service_config: serviceConfig,
-      org_server_names: serverNames,
+      workspace_server_names: serverNames,
     };
     if (!createIfMissing && funnel?.client_id) {
       workloadPayload.source_ref = {
@@ -615,6 +616,11 @@ export function FunnelDetailPage() {
                           Workload is not in the plan yet. Saving will create it and apply these domains.
                         </div>
                       ) : null}
+                      {deployDomains.data?.workspace_scope_error ? (
+                        <div className="text-[11px] text-warning">
+                          {deployDomains.data.workspace_scope_error}
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-1">
                         {deployDomainsDraft.length ? (
                           deployDomainsDraft.map((hostname) => (
@@ -678,6 +684,8 @@ export function FunnelDetailPage() {
                         <span className="truncate text-danger">
                           {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
                         </span>
+                      ) : deployDomains.data?.workspace_scope_error ? (
+                        <span className="truncate text-warning">{deployDomains.data.workspace_scope_error}</span>
                       ) : deployDomains.data?.workload_found || configuredDeployDomains.length > 0 ? (
                         <>
                           {configuredDeployDomains.length ? (

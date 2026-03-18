@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from app.db.models import OrgDeployDomain
+from app.db.models import Client, OrgDeployDomain
 from app.services import deploy as deploy_service
 
 
@@ -42,7 +42,16 @@ def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_patch_workload_endpoint_persists_org_deploy_domains(api_client, db_session, monkeypatch):
+def test_patch_workload_endpoint_persists_workspace_deploy_domains(api_client, db_session, monkeypatch):
+    db_session.add(
+        Client(
+            id=UUID("00000000-0000-0000-0000-000000000123"),
+            org_id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="Workspace 123",
+        )
+    )
+    db_session.commit()
+
     def fake_patch_workload_in_plan(
         *,
         org_id: str,
@@ -67,20 +76,27 @@ def test_patch_workload_endpoint_persists_org_deploy_domains(api_client, db_sess
         }
 
     monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: "00000000-0000-0000-0000-000000000123",
+    )
 
     resp = api_client.post(
         "/deploy/plans/workloads?plan_path=/tmp/plan.json",
         json={
             "name": "brand-funnels-test",
+            "workspace_server_names": [
+                "Offers.Example.com",
+                "offers.example.com",
+                "  ",
+                "Landing.example.com",
+            ],
             "service_config": {
-                "server_names": [
-                    "Offers.Example.com",
-                    "offers.example.com",
-                    "  ",
-                    "Landing.example.com",
-                ],
+                "server_names": [],
                 "https": True,
             },
+            "source_ref": {"client_id": "00000000-0000-0000-0000-000000000123"},
         },
     )
     assert resp.status_code == 200
@@ -91,7 +107,17 @@ def test_patch_workload_endpoint_persists_org_deploy_domains(api_client, db_sess
     assert hostnames == ["landing.example.com", "offers.example.com"]
 
 
-def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_client, monkeypatch):
+def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_client, db_session, monkeypatch):
+    workspace_id = UUID("00000000-0000-0000-0000-000000000124")
+    db_session.add(
+        Client(
+            id=workspace_id,
+            org_id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="Workspace 124",
+        )
+    )
+    db_session.commit()
+
     captured: dict[str, object] = {}
 
     def fake_patch_workload_in_plan(
@@ -114,7 +140,7 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
 
     def fake_configure_bunny_pull_zone_for_workload(
         *,
-        org_id: str,
+        client_id: str,
         workload_name: str,
         plan_path: str | None,
         instance_name: str | None,
@@ -122,6 +148,7 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
         server_names: list[str] | None = None,
     ):
         captured["cdn_server_names"] = server_names
+        captured["client_id"] = client_id
         return {"provider": "bunny", "pull_zone": {"name": "workspace-123"}}
 
     monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
@@ -129,6 +156,11 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
         deploy_service,
         "configure_bunny_pull_zone_for_workload",
         fake_configure_bunny_pull_zone_for_workload,
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: str(workspace_id),
     )
 
     resp = api_client.post(
@@ -139,7 +171,8 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
                 "server_names": ["shop.example.com"],
                 "https": True,
             },
-            "org_server_names": ["shop.example.com"],
+            "workspace_server_names": ["shop.example.com"],
+            "source_ref": {"client_id": str(workspace_id)},
         },
     )
     assert resp.status_code == 200
@@ -147,20 +180,23 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
     workload_patch = captured["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False
-    assert "org_server_names" not in workload_patch
+    assert "workspace_server_names" not in workload_patch
     assert captured["cdn_server_names"] == ["shop.example.com"]
+    assert captured["client_id"] == str(workspace_id)
 
 
-def test_get_workload_domains_includes_org_server_names(
+def test_get_workload_domains_includes_workspace_server_names(
     api_client,
     db_session,
     auth_context,
     monkeypatch,
 ):
     org_id = UUID(auth_context.org_id)
+    client_id = UUID("00000000-0000-0000-0000-000000000123")
+    db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
     db_session.add_all(
         [
-            OrgDeployDomain(org_id=org_id, hostname="offers.example.com"),
+            OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"),
         ]
     )
     db_session.commit()
@@ -186,17 +222,57 @@ def test_get_workload_domains_includes_org_server_names(
         "get_workload_domains_from_plan",
         fake_get_workload_domains_from_plan,
     )
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: str(client_id),
+    )
 
-    resp = api_client.get("/deploy/plans/workloads/domains?workload_name=brand-funnels-test")
+    resp = api_client.get(
+        f"/deploy/plans/workloads/domains?workload_name=brand-funnels-test&workspace_id={client_id}"
+    )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["org_server_names"] == ["offers.example.com"]
+    assert body["workspace_server_names"] == ["offers.example.com"]
+    assert body["workspace_id"] == str(client_id)
     assert body["server_names"] == []
+
+
+def test_get_workload_domains_reports_legacy_org_scoped_domains(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = UUID("00000000-0000-0000-0000-000000000125")
+    db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
+    db_session.add(OrgDeployDomain(org_id=org_id, client_id=None, hostname="legacy.example.com"))
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_domains_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: {
+            "plan_path": "/tmp/plan.json",
+            "workload_found": False,
+            "server_names": [],
+            "https": False,
+        },
+    )
+
+    resp = api_client.get(
+        f"/deploy/plans/workloads/domains?workload_name=brand-funnels-test&workspace_id={client_id}"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["workspace_server_names"] == []
+    assert body["workspace_scope_error"]
 
 
 def test_build_bunny_pull_zone_name_uses_workspace_id():
     name = deploy_service._build_bunny_pull_zone_name(
-        workspace_id="Workspace_123",
+        client_id="Workspace_123",
     )
     assert name == "workspace-123"
 
@@ -271,7 +347,7 @@ def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
 
     monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
     zone = deploy_service._ensure_bunny_pull_zone(
-        workspace_id="workspace-123",
+        client_id="workspace-123",
         origin_url="http://46.225.124.104",
     )
     urls = deploy_service._extract_bunny_pull_zone_access_urls(zone)
@@ -558,8 +634,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -587,7 +663,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     )
 
     output = deploy_service.configure_bunny_pull_zone_for_workload(
-        org_id="workspace-123",
+        client_id="workspace-123",
         workload_name="brand-funnels-brand-abc",
         plan_path=str(plan_path),
         instance_name="mos-ghc-1",
@@ -600,7 +676,73 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     assert output["pull_zone"]["dnsTargetHostname"] == "workspace-123.b-cdn.net"
     assert isinstance(output["pull_zone"]["domainProvisioning"], list)
     assert captured == {
-        "workspace_id": "workspace-123",
+        "client_id": "workspace-123",
+        "origin_url": "http://46.225.124.104",
+    }
+
+
+def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {"client_id": "client-456"},
+                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "client-456",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "client-456.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+    monkeypatch.setattr(
+        deploy_service,
+        "_provision_bunny_custom_domains",
+        lambda *, bunny_zone, server_names, request_ssl: {
+            "dnsTargetHostname": "client-456.b-cdn.net",
+            "domains": [],
+            "pullZoneHostnames": ["client-456.b-cdn.net", *server_names],
+        },
+    )
+
+    output = deploy_service.configure_bunny_pull_zone_for_workload(
+        client_id="client-456",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+    )
+
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["name"] == "client-456"
+    assert captured == {
+        "client_id": "client-456",
         "origin_url": "http://46.225.124.104",
     }
 
@@ -635,8 +777,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -648,7 +790,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
     monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
 
     output = deploy_service.configure_bunny_pull_zone_for_workload(
-        org_id="workspace-123",
+        client_id="workspace-123",
         workload_name="brand-funnels-brand-abc",
         plan_path=str(plan_path),
         instance_name="mos-ghc-1",
@@ -660,7 +802,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
     assert output["pull_zone"]["accessUrls"] == ["https://workspace-123.b-cdn.net/"]
     assert output["pull_zone"]["workloadPort"] == 24123
     assert captured == {
-        "workspace_id": "workspace-123",
+        "client_id": "workspace-123",
         "origin_url": "http://46.225.124.104:24123",
     }
 
@@ -695,8 +837,8 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -708,7 +850,7 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
     monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
 
     output = deploy_service.configure_bunny_pull_zone_for_workload(
-        org_id="workspace-123",
+        client_id="workspace-123",
         workload_name="brand-funnels-brand-abc",
         plan_path=str(plan_path),
         instance_name="mos-ghc-1",
@@ -719,7 +861,7 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
     assert output["pull_zone"]["workloadPortPending"] is True
     assert output["pull_zone"]["workloadPortSource"] == "pending"
     assert captured == {
-        "workspace_id": "workspace-123",
+        "client_id": "workspace-123",
         "origin_url": "http://46.225.124.104",
     }
 
@@ -754,8 +896,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
 
     captured: dict[str, object] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -777,7 +919,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
     monkeypatch.setattr(deploy_service, "_provision_bunny_custom_domains", fake_provision)
 
     output = deploy_service.configure_bunny_pull_zone_for_workload(
-        org_id="workspace-123",
+        client_id="workspace-123",
         workload_name="brand-funnels-brand-abc",
         plan_path=str(plan_path),
         instance_name="mos-ghc-1",
@@ -785,13 +927,13 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
     )
     assert output["provider"] == "bunny"
     assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
-    assert captured["workspace_id"] == "workspace-123"
+    assert captured["client_id"] == "workspace-123"
     assert captured["origin_url"] == "http://46.225.124.104"
     assert captured["server_names"] == ["shop.example.com"]
     assert captured["request_ssl"] is False
 
 
-def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_id_missing(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_scope_mismatches(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -807,7 +949,7 @@ def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_id_missing
                                 {
                                     "name": "brand-funnels-brand-abc",
                                     "source_type": "funnel_artifact",
-                                    "source_ref": {},
+                                    "source_ref": {"client_id": "workspace-123"},
                                     "service_config": {"server_names": ["offers.example.com"], "https": True},
                                 }
                             ],
@@ -819,9 +961,9 @@ def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_id_missing
         encoding="utf-8",
     )
 
-    with pytest.raises(deploy_service.DeployError, match="source_ref\\.client_id is required"):
+    with pytest.raises(deploy_service.DeployError, match="belongs to workspace 'workspace-123'"):
         deploy_service.configure_bunny_pull_zone_for_workload(
-            org_id="org-123",
+            client_id="workspace-999",
             workload_name="brand-funnels-brand-abc",
             plan_path=str(plan_path),
             instance_name="mos-ghc-1",
@@ -879,8 +1021,8 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, client_id: str, origin_url: str):
+        captured["client_id"] = client_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -892,7 +1034,7 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
     monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
 
     output = deploy_service._reconcile_bunny_pull_zone_for_published_workload(
-        org_id="workspace-123",
+        client_id="workspace-123",
         workload_name="brand-funnels-brand-abc",
         plan_path=str(plan_path),
         instance_name="mos-ghc-1",
@@ -905,7 +1047,7 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
     assert output["pull_zone"]["workloadPortSource"] == "spec"
     assert output["pull_zone"]["workloadPortPending"] is False
     assert captured == {
-        "workspace_id": "workspace-123",
+        "client_id": "workspace-123",
         "origin_url": "http://46.225.124.104:24123",
     }
 
