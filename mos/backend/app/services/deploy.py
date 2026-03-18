@@ -1922,19 +1922,19 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, org_id: str) -> str:
+def _build_bunny_pull_zone_name(*, client_id: str) -> str:
     workspace_component = _normalize_bunny_pull_zone_name_component(
-        value=org_id,
-        label="org_id",
+        value=client_id,
+        label="client_id",
     )
     return workspace_component
 
 
-def _resolve_bunny_pull_zone_org_id(*, org_id: str) -> str:
-    resolved_org_id = str(org_id or "").strip()
-    if not resolved_org_id:
-        raise DeployError("org_id is required for Bunny pull zone provisioning.")
-    return resolved_org_id
+def _resolve_bunny_pull_zone_client_id(*, client_id: str) -> str:
+    resolved_client_id = str(client_id or "").strip()
+    if not resolved_client_id:
+        raise DeployError("client_id is required for Bunny pull zone provisioning.")
+    return resolved_client_id
 
 
 def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
@@ -2330,8 +2330,8 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(org_id=org_id)
+def _ensure_bunny_pull_zone(*, client_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(client_id=client_id)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     zone: dict[str, Any]
@@ -2412,9 +2412,47 @@ def _load_workload_from_plan(
     return matches[0], str(base_plan_path)
 
 
+def _resolve_workload_client_id(*, workload: dict[str, Any], workload_name: str) -> str:
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{workload_name}' source_ref must be an object to resolve the workspace-scoped deploy domain."
+        )
+
+    client_id = str(source_ref.get("client_id") or "").strip()
+    if client_id:
+        return client_id
+
+    artifact = source_ref.get("artifact")
+    if isinstance(artifact, dict):
+        meta = artifact.get("meta")
+        if isinstance(meta, dict):
+            meta_client_id = str(meta.get("clientId") or meta.get("client_id") or "").strip()
+            if meta_client_id:
+                return meta_client_id
+
+    raise DeployError(
+        f"Workload '{workload_name}' is missing source_ref.client_id and cannot resolve its workspace scope."
+    )
+
+
+def get_workload_workspace_id_from_plan(
+    *,
+    workload_name: str,
+    plan_path: str | None = None,
+    instance_name: str | None = None,
+) -> str:
+    workload, _resolved_plan_path = _load_workload_from_plan(
+        workload_name=workload_name,
+        plan_path=plan_path,
+        instance_name=instance_name,
+    )
+    return _resolve_workload_client_id(workload=workload, workload_name=workload_name)
+
+
 def configure_bunny_pull_zone_for_workload(
     *,
-    org_id: str,
+    client_id: str,
     workload_name: str,
     plan_path: str | None,
     instance_name: str | None,
@@ -2432,7 +2470,12 @@ def configure_bunny_pull_zone_for_workload(
         raise DeployError(
             "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
         )
-    resolved_org_id = _resolve_bunny_pull_zone_org_id(org_id=org_id)
+    workload_client_id = _resolve_workload_client_id(workload=workload, workload_name=workload_name)
+    resolved_client_id = _resolve_bunny_pull_zone_client_id(client_id=client_id)
+    if workload_client_id != resolved_client_id:
+        raise DeployError(
+            f"Workload '{workload_name}' belongs to workspace '{workload_client_id}', not '{resolved_client_id}'."
+        )
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2452,7 +2495,7 @@ def configure_bunny_pull_zone_for_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=resolved_org_id,
+        client_id=resolved_client_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2489,7 +2532,7 @@ def configure_bunny_pull_zone_for_workload(
 
 def _reconcile_bunny_pull_zone_for_published_workload(
     *,
-    org_id: str,
+    client_id: str,
     workload_name: str,
     plan_path: str | None,
     instance_name: str | None,
@@ -2508,7 +2551,12 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         raise DeployError(
             "Bunny pull zone provisioning from publish requires source_type 'funnel_artifact'."
         )
-    resolved_org_id = _resolve_bunny_pull_zone_org_id(org_id=org_id)
+    workload_client_id = _resolve_workload_client_id(workload=workload, workload_name=workload_name)
+    resolved_client_id = _resolve_bunny_pull_zone_client_id(client_id=client_id)
+    if workload_client_id != resolved_client_id:
+        raise DeployError(
+            f"Workload '{workload_name}' belongs to workspace '{workload_client_id}', not '{resolved_client_id}'."
+        )
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2525,7 +2573,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=resolved_org_id,
+        client_id=resolved_client_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2836,15 +2884,22 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     workload_name = str(workload_patch.get("name") or "").strip()
                     if not workload_name:
                         raise DeployError("Publish deploy workload patch is missing workload name.")
-                    org_server_names = OrgDeployDomainsRepository(session).list_hostnames(org_id=org_id)
-                    bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
+                    workload_client_id = _resolve_workload_client_id(
+                        workload=workload_patch,
+                        workload_name=workload_name,
+                    )
+                    workspace_server_names = OrgDeployDomainsRepository(session).list_hostnames(
                         org_id=org_id,
+                        client_id=workload_client_id,
+                    )
+                    bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
+                        client_id=workload_client_id,
                         workload_name=workload_name,
                         plan_path=patch_result.get("updated_plan_path"),
                         instance_name=deploy_request.get("instance_name"),
                         requested_origin_ip=deploy_request.get("bunny_pull_zone_origin_ip"),
                         require_port_when_no_domains=apply_plan_enabled,
-                        server_names=org_server_names,
+                        server_names=workspace_server_names,
                     )
                     bunny_pull_zone_payload = bunny_config.get("pull_zone")
                     if isinstance(bunny_pull_zone_payload, dict) and isinstance(
