@@ -15,6 +15,8 @@ class AdCopyPackItem(BaseModel):
     funnel_stage: str | None = Field(default=None, alias="funnelStage")
     angle: str | None = None
     hook: str | None = None
+    destination_type: str | None = Field(default=None, alias="destinationType")
+    destination_label: str | None = Field(default=None, alias="destinationLabel")
     creative_concept: str = Field(alias="creativeConcept")
     meta_primary_text: str = Field(alias="metaPrimaryText")
     meta_headline: str = Field(alias="metaHeadline")
@@ -30,6 +32,10 @@ class AdCopyPackArtifact(BaseModel):
     source_brief_artifact_id: str = Field(alias="sourceBriefArtifactId")
     source_brief_sha256: str = Field(alias="sourceBriefSha256")
     source_funnel_id: str | None = Field(default=None, alias="sourceFunnelId")
+    campaign_delivery_config_id: str | None = Field(default=None, alias="campaignDeliveryConfigId")
+    delivery_mode: str | None = Field(default=None, alias="deliveryMode")
+    destination_type: str | None = Field(default=None, alias="destinationType")
+    destination_label: str | None = Field(default=None, alias="destinationLabel")
     copy_packs: list[AdCopyPackItem] = Field(default_factory=list, alias="copyPacks")
 
 
@@ -45,6 +51,10 @@ class CreativeGenerationPlanItem(BaseModel):
     funnel_stage: str | None = Field(default=None, alias="funnelStage")
     angle: str | None = None
     hook: str | None = None
+    delivery_mode: str | None = Field(default=None, alias="deliveryMode")
+    destination_type: str | None = Field(default=None, alias="destinationType")
+    destination_label: str | None = Field(default=None, alias="destinationLabel")
+    campaign_delivery_config_id: str | None = Field(default=None, alias="campaignDeliveryConfigId")
     company_swipe_id: str = Field(alias="companySwipeId")
     source_label: str = Field(alias="sourceLabel")
     source_media_url: str = Field(alias="sourceMediaUrl")
@@ -139,6 +149,59 @@ class SwipeAdCopyPack(BaseModel):
                     "tiktokCta must be one of: " + ", ".join(sorted(_ALLOWED_TIKTOK_CTAS))
                 )
 
+        return self
+
+
+class SwipeCopyInputMedia(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_kind: str | None = Field(default=None, alias="sourceKind")
+    asset_type: str = Field(alias="assetType")
+    source_label: str | None = Field(default=None, alias="sourceLabel")
+    source_url: str = Field(alias="sourceUrl")
+    mime_type: str | None = Field(default=None, alias="mimeType")
+    storage_key: str | None = Field(default=None, alias="storageKey")
+    remote_asset_id: str | None = Field(default=None, alias="remoteAssetId")
+
+    @model_validator(mode="after")
+    def _validate_source(self) -> "SwipeCopyInputMedia":
+        if self.source_kind is not None and self.source_kind not in {"source_swipe", "rendered_output"}:
+            raise ValueError("sourceKind must be either 'source_swipe' or 'rendered_output' when provided.")
+        if not self.asset_type.strip():
+            raise ValueError("assetType must be a non-empty string.")
+        if not self.source_url.strip():
+            raise ValueError("sourceUrl must be a non-empty string.")
+        return self
+
+
+class SwipeCopySourceSwipeProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    company_swipe_id: str | None = Field(default=None, alias="companySwipeId")
+    source_label: str | None = Field(default=None, alias="sourceLabel")
+    source_url: str | None = Field(default=None, alias="sourceUrl")
+    mime_type: str | None = Field(default=None, alias="mimeType")
+
+
+class SwipeCopyInputs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    platform: str
+    ad_image_or_video: SwipeCopyInputMedia = Field(alias="adImageOrVideo")
+    angle_used: str = Field(alias="angleUsed")
+    destination_page: str = Field(alias="destinationPage")
+    ad_copy_pack_id: str | None = Field(default=None, alias="adCopyPackId")
+    ad_copy_pack_artifact_id: str | None = Field(default=None, alias="adCopyPackArtifactId")
+    source_swipe: SwipeCopySourceSwipeProvenance | None = Field(default=None, alias="sourceSwipe")
+
+    @model_validator(mode="after")
+    def _validate_required_fields(self) -> "SwipeCopyInputs":
+        if not self.platform.strip():
+            raise ValueError("platform must be a non-empty string.")
+        if not self.angle_used.strip():
+            raise ValueError("angleUsed must be a non-empty string.")
+        if not self.destination_page.strip():
+            raise ValueError("destinationPage must be a non-empty string.")
         return self
 
 

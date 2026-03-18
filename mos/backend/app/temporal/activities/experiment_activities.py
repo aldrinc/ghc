@@ -11,11 +11,16 @@ from temporalio import activity
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.base import session_scope
 from app.schemas.experiment_spec import ExperimentSpecSet
 from app.schemas.asset_brief import AssetBrief
 from app.strategy_v2.downstream import load_strategy_v2_outputs
+from app.services.campaign_destinations import (
+    destination_label_for_type,
+    destination_type_from_funnel_stage,
+)
 from app.services.claude_files import (
     CLAUDE_DEFAULT_MODEL,
     build_document_blocks,
@@ -255,6 +260,31 @@ def _find_unverified_claim_pattern(value: str) -> re.Pattern[str] | None:
             continue
         return pattern
     return None
+
+
+def _annotate_brief_destinations(*, brief: dict[str, Any], delivery_mode: str) -> None:
+    requirements = brief.get("requirements") or []
+    requirement_destinations: list[str] = []
+    if isinstance(requirements, list):
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                continue
+            destination_type = (
+                destination_type_from_funnel_stage(
+                    requirement.get("funnelStage") if isinstance(requirement.get("funnelStage"), str) else None
+                )
+                or "pre-sales"
+            )
+            requirement["destinationType"] = destination_type
+            requirement["destinationLabel"] = destination_label_for_type(destination_type)
+            requirement_destinations.append(destination_type)
+
+    destination_type = brief.get("destinationType")
+    if not isinstance(destination_type, str) or not destination_type.strip():
+        destination_type = requirement_destinations[0] if requirement_destinations else "pre-sales"
+    brief["deliveryMode"] = delivery_mode
+    brief["destinationType"] = destination_type
+    brief["destinationLabel"] = brief.get("destinationLabel") or destination_label_for_type(destination_type)
 
 
 def _load_metric(repo: ArtifactsRepository, org_id: str, client_id: str, product_id: str) -> Dict[str, Any]:
@@ -993,6 +1023,7 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
     campaign_channels: Optional[list[str]] = None
     asset_brief_types: Optional[list[str]] = None
     strategy_v2_packet_summary = "{}"
+    delivery_mode = "internal_funnel"
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
         # Funnel generation runs may use a fresh Temporal workflow id as idea_workspace_id.
@@ -1028,6 +1059,12 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
             if not campaign:
                 raise RuntimeError(f"Campaign not found for asset brief generation: {campaign_id}")
+            delivery_config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+                org_id=org_id,
+                campaign_id=campaign_id,
+            )
+            if delivery_config is not None:
+                delivery_mode = delivery_config.delivery_mode.value
             campaign_channels = [
                 str(ch).strip() for ch in (campaign.channels or []) if isinstance(ch, str) and ch.strip()
             ]
@@ -1275,6 +1312,7 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         if brief_id in seen_brief_ids:
             raise RuntimeError(f"Asset brief generation returned duplicate brief id: {brief_id}")
         seen_brief_ids.add(brief_id)
+        _annotate_brief_destinations(brief=brief, delivery_mode=delivery_mode)
         variant_id = brief.get("variantId") or brief.get("variant_id")
         if not variant_id:
             raise RuntimeError("Asset brief generation missing variantId.")
@@ -1294,6 +1332,9 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             experimentId=experiment_id,
             variantId=variant_id,
             funnelId=brief.get("funnelId"),
+            deliveryMode=brief.get("deliveryMode"),
+            destinationType=brief.get("destinationType"),
+            destinationLabel=brief.get("destinationLabel"),
             variantName=brief.get("variantName") or brief.get("variant_name"),
             creativeConcept=brief.get("creativeConcept"),
             requirements=brief.get("requirements") or [],  # type: ignore[arg-type]

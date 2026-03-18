@@ -8,6 +8,8 @@ class AssetRequirement(BaseModel):
     angle: Optional[str] = None
     hook: Optional[str] = None
     funnelStage: Optional[str] = None
+    destinationType: Optional[str] = None
+    destinationLabel: Optional[str] = None
 
 
 class AssetBrief(BaseModel):
@@ -17,6 +19,9 @@ class AssetBrief(BaseModel):
     experimentId: Optional[str] = None
     variantId: Optional[str] = None
     funnelId: Optional[str] = None
+    deliveryMode: Optional[str] = None
+    destinationType: Optional[str] = None
+    destinationLabel: Optional[str] = None
     variantName: Optional[str] = None
     creativeConcept: Optional[str] = None
     requirements: List[AssetRequirement] = []

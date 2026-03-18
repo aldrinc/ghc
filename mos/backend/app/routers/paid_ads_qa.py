@@ -13,6 +13,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
 from app.db.enums import FunnelDomainStatusEnum
 from app.db.models import Asset, Campaign, ClientUserPreference, Funnel, FunnelDomain
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
@@ -44,6 +45,7 @@ from app.services.meta_account_configs import (
     meta_ads_client_for_connection,
     resolve_workspace_config,
 )
+from app.services.campaign_destinations import campaign_delivery_snapshot
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -1103,9 +1105,16 @@ def run_campaign_paid_ads_qa(
         campaign_id=str(campaign.id),
         session=session,
     )
+    delivery_config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    is_external_delivery = bool(
+        delivery_config is not None and delivery_config.delivery_mode.value == "external_urls"
+    )
     generation_funnel_ids = collect_asset_funnel_ids(assets=ready_assets, brief_map=brief_map)
     requested_funnel_id = clean_optional_text(payload.funnelId)
-    if requested_funnel_id is None and len(generation_funnel_ids) > 1:
+    if not is_external_delivery and requested_funnel_id is None and len(generation_funnel_ids) > 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -1114,7 +1123,12 @@ def run_campaign_paid_ads_qa(
                 "availableFunnelIds": sorted(generation_funnel_ids),
             },
         )
-    if requested_funnel_id and generation_funnel_ids and requested_funnel_id not in generation_funnel_ids:
+    if (
+        not is_external_delivery
+        and requested_funnel_id
+        and generation_funnel_ids
+        and requested_funnel_id not in generation_funnel_ids
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -1124,8 +1138,8 @@ def run_campaign_paid_ads_qa(
                 "availableFunnelIds": sorted(generation_funnel_ids),
             },
         )
-    resolved_funnel_id = requested_funnel_id
-    if resolved_funnel_id is None and len(generation_funnel_ids) == 1:
+    resolved_funnel_id = None if is_external_delivery else requested_funnel_id
+    if not is_external_delivery and resolved_funnel_id is None and len(generation_funnel_ids) == 1:
         resolved_funnel_id = next(iter(generation_funnel_ids))
     if resolved_funnel_id:
         ready_assets = [
@@ -1151,6 +1165,8 @@ def run_campaign_paid_ads_qa(
     assessment["metadata"]["requestedGenerationKey"] = clean_optional_text(payload.generationKey)
     assessment["metadata"]["generationAssetIds"] = sorted(ready_asset_ids)
     assessment["metadata"]["funnelId"] = resolved_funnel_id
+    assessment["metadata"]["deliveryMode"] = delivery_config.delivery_mode.value if delivery_config is not None else None
+    assessment["metadata"]["campaignDelivery"] = campaign_delivery_snapshot(delivery_config)
     summary = summarize_findings(assessment["findings"])
     status_value = derive_run_status(assessment["findings"])
     run_uuid = uuid4()

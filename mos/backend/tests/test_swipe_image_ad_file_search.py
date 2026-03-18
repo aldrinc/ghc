@@ -89,6 +89,38 @@ def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tup
     return client_id, product_id, campaign_id
 
 
+def _fake_brief_scope() -> SimpleNamespace:
+    return SimpleNamespace(funnel_id=None, campaign_delivery_config=None)
+
+
+def _fake_linked_ad_copy_pack_context(*, angle: str = "Clinical proof") -> dict[str, object]:
+    return {
+        "artifactId": "copy-artifact-1",
+        "copyPackId": "copy-pack-1",
+        "copyPack": {
+            "id": "copy-pack-1",
+            "requirementIndex": 0,
+            "channel": "facebook",
+            "format": "image",
+            "funnelStage": "bottom-of-funnel",
+            "angle": angle,
+            "hook": angle,
+            "creativeConcept": "Concept",
+            "metaPrimaryText": "Baseline copy",
+            "metaHeadline": "Baseline headline",
+            "metaDescription": "Baseline description",
+            "claimsGuardrails": ["Do not promise medical outcomes."],
+        },
+    }
+
+
+def _part_data(part: object) -> bytes | None:
+    inline_data = getattr(part, "inline_data", None)
+    if inline_data is not None:
+        return getattr(inline_data, "data", None)
+    return getattr(part, "data", None)
+
+
 def test_ensure_gemini_client_uses_settings_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
@@ -274,6 +306,7 @@ def test_resolve_gemini_store_names_seeds_when_missing(api_client, db_session, a
 
 def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     captured: dict[str, object] = {}
+    captured_calls: list[dict[str, object]] = []
 
     @contextmanager
     def _fake_session_scope():
@@ -281,9 +314,7 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
 
     class _FakeModels:
         def generate_content(self, *, model, contents, config):
-            captured["model"] = model
-            captured["contents"] = contents
-            captured["config"] = config
+            captured_calls.append({"model": model, "contents": contents, "config": config})
             if len(contents) >= 2 and contents[1] == "Ad Image or Video asset:":
                 return SimpleNamespace(
                     parsed=_fake_swipe_copy_pack_parsed(angle="Clinical proof and fast results"),
@@ -373,7 +404,7 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
                 "brief-artifact-id",
         ),
     )
-    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: _fake_brief_scope())
     monkeypatch.setattr(
         swipe_activity,
         "_extract_brand_context",
@@ -388,6 +419,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
         swipe_activity,
         "_audit_swipe_copy_blind_angle_blackout",
         lambda **_kwargs: (True, None),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_linked_ad_copy_pack_context",
+        lambda **_kwargs: _fake_linked_ad_copy_pack_context(angle="Clinical proof and fast results"),
     )
     monkeypatch.setattr(
         swipe_activity,
@@ -414,7 +450,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     monkeypatch.setattr(
         swipe_activity,
         "_download_bytes",
-        lambda _url, *, max_bytes, timeout_seconds: (b"product-bytes", "image/png"),
+        lambda url, *, max_bytes, timeout_seconds: (
+            (b"product-bytes", "image/png")
+            if url == "https://example.com/product-1.png"
+            else (b"rendered-image-bytes", "image/png")
+        ),
     )
     monkeypatch.setattr(
         swipe_activity,
@@ -451,12 +491,13 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
 
     assert result["asset_ids"] == ["asset-1"]
     assert result["stores_attached"] == 1
-    assert captured["model"] == "gemini-2.5-flash"
+    assert len(captured_calls) == 2
+    assert captured_calls[0]["model"] == "gemini-2.5-flash"
     assert captured["creative_payload_count"] == 1
     assert captured["creative_payload_reference_asset_ids"] == ["local-product-asset-1"]
     assert captured["creative_payload_reference_image_urls"] == []
     assert captured["creative_payload_model_id"] == "models/gemini-3-pro-image-preview"
-    prompt_input = captured["contents"][0]
+    prompt_input = captured_calls[0]["contents"][0]
     assert isinstance(prompt_input, str)
     assert "Brand name: [BRAND_NAME]" in prompt_input
     assert "Product: [PRODUCT]" in prompt_input
@@ -464,8 +505,19 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert "Brand: Brand Name" in prompt_input
     assert "Angle: Clinical proof and fast results" in prompt_input
     assert "Competitor swipe image is attached as image input." in prompt_input
-    assert len(captured["contents"]) == 3
+    assert len(captured_calls[0]["contents"]) == 3
+    rendered_copy_prompt = captured_calls[1]["contents"][0]
+    assert isinstance(rendered_copy_prompt, str)
+    assert "The attached image is the final generated ad asset for this specific creative." in rendered_copy_prompt
+    assert "Requirement Copy Baseline" in rendered_copy_prompt
+    assert captured_calls[1]["contents"][1] == "Ad Image or Video asset:"
+    assert _part_data(captured_calls[1]["contents"][2]) == b"rendered-image-bytes"
     extra_ai_metadata = captured["extra_ai_metadata"]
+    assert extra_ai_metadata["swipeCopyPipelineVersion"] == 2
+    assert extra_ai_metadata["swipeCopyInputs"]["adImageOrVideo"]["sourceKind"] == "rendered_output"
+    assert extra_ai_metadata["swipeCopyInputs"]["adImageOrVideo"]["sourceUrl"] == "https://example.com/generated.png"
+    assert extra_ai_metadata["swipeCopyInputs"]["sourceSwipe"]["sourceUrl"] == "https://example.com/swipe.png"
+    assert "swipeCopyPromptText" in extra_ai_metadata
     assert extra_ai_metadata["swipePromptImageAttached"] is True
     assert extra_ai_metadata["swipePromptImageMimeType"] == "image/png"
     assert extra_ai_metadata["swipePromptImageSourceUrl"] == "https://example.com/swipe.png"
@@ -483,7 +535,7 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert extra_ai_metadata["creativeGenerationPlanItemId"] == "plan-item-1"
     assert extra_ai_metadata["adCopyPackArtifactId"] == "copy-artifact-1"
     assert extra_ai_metadata["adCopyPackId"] == "copy-pack-1"
-    config = captured["config"]
+    config = captured_calls[0]["config"]
     assert hasattr(config, "tools")
     assert config.tools
     assert config.tools[0].file_search.file_search_store_names == ["fileSearchStores/context-store"]
@@ -1147,7 +1199,7 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
                 "brief-artifact-id",
         ),
     )
-    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: _fake_brief_scope())
     monkeypatch.setattr(
         swipe_activity,
         "_extract_brand_context",
@@ -1165,6 +1217,11 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
     )
     monkeypatch.setattr(
         swipe_activity,
+        "_resolve_linked_ad_copy_pack_context",
+        lambda **_kwargs: _fake_linked_ad_copy_pack_context(),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
         "_select_product_reference_assets",
         lambda **_kwargs: (_ for _ in ()).throw(
             ValueError("No active source product images are available for creative generation references.")
@@ -1178,8 +1235,12 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
     monkeypatch.setattr(
         swipe_activity,
         "_download_bytes",
-        lambda _url, *, max_bytes, timeout_seconds: (_ for _ in ()).throw(
-            AssertionError("product reference image should not be downloaded when no product assets are present")
+        lambda url, *, max_bytes, timeout_seconds: (
+            (_ for _ in ()).throw(
+                AssertionError("product reference image should not be downloaded when no product assets are present")
+            )
+            if url != "https://example.com/generated.png"
+            else (b"rendered-image-bytes", "image/png")
         ),
     )
     monkeypatch.setattr(
@@ -1208,7 +1269,7 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
 
     assert result["asset_ids"] == ["asset-1"]
     assert captured["creative_payload_reference_image_urls"] == []
-    assert len(captured["contents"]) == 2
+    assert len(captured["contents"]) == 3
 
 
 def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false(monkeypatch):
@@ -1302,7 +1363,7 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
                 "brief-artifact-id",
         ),
     )
-    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: _fake_brief_scope())
     monkeypatch.setattr(
         swipe_activity,
         "_extract_brand_context",
@@ -1320,6 +1381,11 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
     )
     monkeypatch.setattr(
         swipe_activity,
+        "_resolve_linked_ad_copy_pack_context",
+        lambda **_kwargs: _fake_linked_ad_copy_pack_context(),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
         "_select_product_reference_assets",
         lambda **_kwargs: (_ for _ in ()).throw(
             AssertionError("product references should not be selected when swipe_requires_product_image=false")
@@ -1333,8 +1399,12 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
     monkeypatch.setattr(
         swipe_activity,
         "_download_bytes",
-        lambda _url, *, max_bytes, timeout_seconds: (_ for _ in ()).throw(
-            AssertionError("product image should not be downloaded when swipe_requires_product_image=false")
+        lambda url, *, max_bytes, timeout_seconds: (
+            (_ for _ in ()).throw(
+                AssertionError("product image should not be downloaded when swipe_requires_product_image=false")
+            )
+            if url != "https://example.com/generated.png"
+            else (b"rendered-image-bytes", "image/png")
         ),
     )
     monkeypatch.setattr(
@@ -1364,7 +1434,7 @@ def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false
 
     assert result["asset_ids"] == ["asset-1"]
     assert captured["creative_payload_reference_image_urls"] == []
-    assert len(captured["contents"]) == 2
+    assert len(captured["contents"]) == 3
 
 
 def test_generate_swipe_image_ad_activity_errors_when_policy_true_and_no_product_assets(monkeypatch):
@@ -1392,17 +1462,23 @@ def test_generate_swipe_image_ad_activity_errors_when_policy_true_and_no_product
         swipe_activity,
         "_extract_brief",
         lambda **_kwargs: (
-            {
-                "creativeConcept": "Concept",
-                "requirements": [{"channel": "meta", "format": "image"}],
-                "constraints": [],
-                "toneGuidelines": [],
-                "visualGuidelines": [],
-            },
+                {
+                    "creativeConcept": "Concept",
+                    "requirements": [
+                        {
+                            "channel": "meta",
+                            "format": "image",
+                            "destinationType": "sales",
+                        }
+                    ],
+                    "constraints": [],
+                    "toneGuidelines": [],
+                    "visualGuidelines": [],
+                },
             "brief-artifact-id",
         ),
     )
-    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: _fake_brief_scope())
     monkeypatch.setattr(
         swipe_activity,
         "_extract_brand_context",

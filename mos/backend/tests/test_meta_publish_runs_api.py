@@ -6,9 +6,10 @@ from uuid import uuid4
 from PIL import Image
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, ClientUserPreference, MetaAdSetSpec, MetaCreativeSpec
+from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, MetaAdSetSpec, MetaCampaign, MetaCreativeSpec
 from app.routers import meta_ads as meta_ads_router
 from app.services.paid_ads_qa import RULESET_VERSION
+from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 
 
 TEST_ORG_ID = "00000000-0000-0000-0000-000000000001"
@@ -21,7 +22,7 @@ def _jpeg_bytes() -> bytes:
     return output.getvalue()
 
 
-def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str, str]:
+def _create_campaign_with_product(api_client, *, suffix: str, db_session=None) -> tuple[str, str, str]:
     client_resp = api_client.post("/clients", json={"name": f"Client {suffix}", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -44,7 +45,16 @@ def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str,
         },
     )
     assert campaign_resp.status_code == 201
-    return client_id, product_id, campaign_resp.json()["id"]
+    campaign_id = campaign_resp.json()["id"]
+    if db_session is not None:
+        seed_ready_launch_context_for_campaign(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            launch_key=f"sv2-launch:test:{campaign_id}:{suffix}",
+        )
+    return client_id, product_id, campaign_id
 
 
 def _create_asset(
@@ -212,7 +222,11 @@ def _exclude_asset_from_publish(api_client, *, campaign_id: str, generation_key:
 
 
 def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-validate")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-validate",
+        db_session=db_session,
+    )
     funnel_id = str(uuid4())
     brief_id = "brief-publish-validate"
     _create_funnel_scoped_brief(
@@ -259,7 +273,11 @@ def test_validate_meta_publish_plan_reports_blockers(api_client, db_session) -> 
 
 
 def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_client, db_session) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-all-excluded")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-all-excluded",
+        db_session=db_session,
+    )
     funnel_id = str(uuid4())
     brief_id = "brief-publish-all-excluded"
     _create_funnel_scoped_brief(
@@ -313,7 +331,11 @@ def test_validate_meta_publish_plan_blocks_when_all_assets_are_excluded(api_clie
 
 
 def test_validate_meta_publish_plan_rejects_mismatched_storefront_host(api_client, db_session) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-storefront-mismatch")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-storefront-mismatch",
+        db_session=db_session,
+    )
     funnel_id = str(uuid4())
     brief_id = "brief-publish-storefront-mismatch"
     _create_funnel_scoped_brief(
@@ -364,7 +386,11 @@ def test_validate_meta_publish_plan_rejects_mismatched_storefront_host(api_clien
 
 
 def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_session) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-funnel-scope")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-funnel-scope",
+        db_session=db_session,
+    )
     funnel_id = str(uuid4())
     other_funnel_id = str(uuid4())
     brief_id = "brief-publish-funnel-scope"
@@ -430,7 +456,11 @@ def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_se
 
 
 def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_session, monkeypatch) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="publish-run")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-run",
+        db_session=db_session,
+    )
     funnel_id = str(uuid4())
     brief_id = "brief-publish-run"
     _create_funnel_scoped_brief(
@@ -521,3 +551,206 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert len(history_payload) == 1
     assert history_payload[0]["id"] == publish_payload["id"]
     assert history_payload[0]["items"][0]["metaAdId"] == "meta_ad_123"
+
+
+def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-external",
+        db_session=db_session,
+    )
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/pre-sale",
+            "salesUrl": "https://lp.example.com/offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_delivery = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_delivery.status_code == 200, validate_delivery.text
+
+    brief_id = "brief-publish-external"
+    brief_artifact = Artifact(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "experimentId": "exp-publish-external",
+                    "requirements": [{"channel": "facebook", "format": "image_ad"}],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-external",
+        asset_brief_id=brief_id,
+    )
+    creative_spec = MetaCreativeSpec(
+        org_id=TEST_ORG_ID,
+        asset_id=asset.id,
+        campaign_id=campaign_id,
+        name="External Publish Creative",
+        primary_text="Primary text",
+        headline="Headline",
+        description="Description",
+        call_to_action_type="LEARN_MORE",
+        destination_url="https://lp.example.com/pre-sale",
+        page_id="page_123",
+        instagram_actor_id=None,
+        status="draft",
+        metadata_json={
+            "experimentSpecId": "exp-publish-external",
+            "destinationSource": "campaign_delivery_config",
+            "resolvedDestinationUrl": "https://lp.example.com/pre-sale",
+        },
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign_id,
+        name="External Launch Ad Set",
+        status="draft",
+        optimization_goal="OFFSITE_CONVERSIONS",
+        billing_event="IMPRESSIONS",
+        targeting={"geo_locations": {"countries": ["US"]}},
+        placements={"publisher_platforms": ["facebook"]},
+        daily_budget=5000,
+        lifetime_budget=None,
+        bid_amount=None,
+        start_time=None,
+        end_time=None,
+        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+        conversion_domain="lp.example.com",
+        metadata_json={"experimentSpecId": "exp-publish-external"},
+    )
+    db_session.add(creative_spec)
+    db_session.add(adset_spec)
+    db_session.commit()
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "External Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["includedCount"] == 1
+    assert payload["items"][0]["resolvedDestinationUrl"] == "https://lp.example.com/pre-sale"
+    assert payload["publishDomain"] == "lp.example.com"
+
+
+def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, monkeypatch) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="management-apply",
+        db_session=db_session,
+    )
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    local_meta_campaign = MetaCampaign(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:campaign",
+        meta_campaign_id="meta_campaign_apply_123",
+        name="Managed Campaign",
+        objective="OUTCOME_SALES",
+        status="ACTIVE",
+        metadata_json={},
+    )
+    db_session.add(local_meta_campaign)
+    db_session.commit()
+
+    class _FakeManagementClient:
+        def get_object(self, *, object_id: str, fields: str):
+            _ = fields
+            if object_id == "meta_campaign_apply_123":
+                return {"id": object_id, "status": "ACTIVE", "daily_budget": "10000"}
+            return {"id": object_id, "status": "ACTIVE", "effective_status": "ACTIVE"}
+
+        def update_ad(self, *, ad_id: str, payload: dict[str, object]):
+            return {"id": ad_id, "status": payload["status"]}
+
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.MetaAdsClient.from_settings",
+        classmethod(lambda cls: _FakeManagementClient()),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
+        lambda **_kwargs: (
+            {"id": "meta_campaign_apply_123", "name": "Managed Campaign", "status": "ACTIVE"},
+            [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_ad_level_insights",
+        lambda **_kwargs: [
+            {
+                "ad_id": "meta_ad_123",
+                "ad_name": "Ad One",
+                "adset_id": "meta_adset_123",
+                "campaign_id": "meta_campaign_apply_123",
+                "impressions": "1000",
+                "spend": "65.00",
+                "cpm": "65.00",
+                "inline_link_clicks": "2",
+                "inline_link_click_ctr": "0.2",
+                "cost_per_inline_link_click": "32.50",
+                "actions": [],
+                "action_values": [],
+            }
+        ],
+    )
+
+    response = api_client.post(
+        "/meta/management/plan",
+        json={
+            "metaCampaignId": "meta_campaign_apply_123",
+            "adAccountId": "act_123456",
+            "mode": "apply",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "apply"
+    assert payload["actions"][0]["kind"] == "pause_ad"
+    assert payload["appliedActions"][0]["status"] == "applied"
+    assert payload["artifacts"]["metricsSnapshotArtifactId"]
+    assert payload["artifacts"]["recommendedActionsArtifactId"]
+    assert payload["artifacts"]["approvalDecisionArtifactId"]

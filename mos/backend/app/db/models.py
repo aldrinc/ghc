@@ -33,6 +33,8 @@ from app.db.enums import (
     AssetStatusEnum,
     BrandChannelVerificationStatusEnum,
     BrandRoleEnum,
+    CampaignDeliveryModeEnum,
+    CampaignDeliveryValidationStatusEnum,
     ProductBrandRelationshipSourceEnum,
     ProductBrandRelationshipTypeEnum,
     ClaudeContextFileStatusEnum,
@@ -305,6 +307,41 @@ class Campaign(Base):
     budget_min: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     budget_max: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CampaignDeliveryConfig(Base):
+    __tablename__ = "campaign_delivery_configs"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", name="uq_campaign_delivery_configs_campaign"),
+        sa.Index("idx_campaign_delivery_configs_org_campaign", "org_id", "campaign_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    delivery_mode: Mapped[CampaignDeliveryModeEnum] = mapped_column(
+        Enum(CampaignDeliveryModeEnum, name="campaign_delivery_mode"),
+        nullable=False,
+        server_default=CampaignDeliveryModeEnum.internal_funnel.value,
+    )
+    pre_sales_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sales_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    checkout_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    thank_you_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    validation_status: Mapped[CampaignDeliveryValidationStatusEnum] = mapped_column(
+        Enum(CampaignDeliveryValidationStatusEnum, name="campaign_delivery_validation_status"),
+        nullable=False,
+        server_default=CampaignDeliveryValidationStatusEnum.not_applicable.value,
+    )
+    validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

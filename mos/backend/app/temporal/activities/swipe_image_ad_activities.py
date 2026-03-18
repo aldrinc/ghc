@@ -33,11 +33,21 @@ from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.observability import LangfuseTraceContext, bind_langfuse_trace_context, start_langfuse_generation
-from app.schemas.creative_generation import SwipeAdCopyPack
+from app.schemas.creative_generation import (
+    AdCopyPackArtifact,
+    SwipeAdCopyPack,
+    SwipeCopyInputs,
+    SwipeCopySourceSwipeProvenance,
+)
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
 from app.services.creative_service_client import (
     CreativeServiceConfigError,
     CreativeServiceRequestError,
+)
+from app.services.campaign_destinations import (
+    campaign_delivery_snapshot,
+    requirement_destination_type,
+    resolve_campaign_delivery_destination,
 )
 from app.services.image_render_client import (
     build_image_render_client,
@@ -1598,7 +1608,21 @@ def _resolve_destination_type(
     session,
     funnel_id: str | None,
     funnel_stage: str | None,
+    destination_type_hint: str | None = None,
 ) -> str:
+    normalized_hint = requirement_destination_type(
+        brief={"destinationType": destination_type_hint} if destination_type_hint else {},
+        requirement=None,
+    ) if destination_type_hint else None
+    if normalized_hint == "pre-sales":
+        return "Presales Listicle Page"
+    if normalized_hint == "sales":
+        return "Sales Page"
+    if normalized_hint == "checkout":
+        return "Checkout Page"
+    if normalized_hint == "thank-you":
+        return "Thank You Page"
+
     normalized_stage = (funnel_stage or "").strip().lower()
     if not isinstance(funnel_id, str) or not funnel_id.strip():
         if normalized_stage in {"top-of-funnel", "top", "tof", "middle-of-funnel", "middle", "mid", "mof"}:
@@ -1817,6 +1841,251 @@ def _validate_swipe_copy_blind_angle_blackout(
             "Swipe Stage 1 copy leaked forbidden blind-angle terms into feed copy: "
             f"{preview}. Regenerate with a stronger curiosity gap."
         )
+
+
+def _basename_from_media_url(url: str | None, *, fallback: str) -> str:
+    if isinstance(url, str) and url.strip():
+        parsed = urlparse(url.strip())
+        candidate = Path(unquote(parsed.path)).name.strip()
+        if candidate:
+            return candidate
+    return fallback
+
+
+def _resolve_linked_ad_copy_pack_context(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str | None,
+    asset_brief_id: str,
+    requirement_index: int,
+    ad_copy_pack_artifact_id: str | None,
+    ad_copy_pack_id: str | None,
+) -> dict[str, Any]:
+    artifacts_repo = ArtifactsRepository(session)
+
+    artifact = None
+    if ad_copy_pack_artifact_id:
+        artifact = artifacts_repo.get(org_id=org_id, artifact_id=ad_copy_pack_artifact_id)
+        if artifact is None:
+            raise ValueError(
+                "Linked ad copy pack artifact was not found for swipe copy generation "
+                f"(artifact_id={ad_copy_pack_artifact_id})."
+            )
+    else:
+        if not campaign_id:
+            raise ValueError(
+                "campaign_id is required to resolve the linked ad copy pack artifact when "
+                "ad_copy_pack_artifact_id is not provided."
+            )
+        candidates = artifacts_repo.list(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            artifact_type=ArtifactTypeEnum.ad_copy_pack,
+            limit=50,
+        )
+        for candidate in candidates:
+            payload = candidate.data if isinstance(candidate.data, dict) else {}
+            if str(payload.get("assetBriefId") or "").strip() == asset_brief_id:
+                artifact = candidate
+                break
+        if artifact is None:
+            raise ValueError(
+                "No linked ad copy pack artifact could be resolved for swipe copy generation "
+                f"(asset_brief_id={asset_brief_id}, campaign_id={campaign_id})."
+            )
+
+    payload = artifact.data if isinstance(artifact.data, dict) else {}
+    validated_artifact = AdCopyPackArtifact.model_validate(payload)
+    if validated_artifact.asset_brief_id != asset_brief_id:
+        raise ValueError(
+            "Linked ad copy pack artifact does not match the active asset brief "
+            f"(artifact_id={artifact.id}, expected_asset_brief_id={asset_brief_id}, "
+            f"artifact_asset_brief_id={validated_artifact.asset_brief_id})."
+        )
+
+    if ad_copy_pack_id:
+        matched_item = next((item for item in validated_artifact.copy_packs if item.id == ad_copy_pack_id), None)
+        if matched_item is None:
+            raise ValueError(
+                "Linked ad copy pack item was not found in the linked artifact "
+                f"(artifact_id={artifact.id}, copy_pack_id={ad_copy_pack_id})."
+            )
+    else:
+        matches = [
+            item for item in validated_artifact.copy_packs if item.requirement_index == requirement_index
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                "Expected exactly one linked ad copy pack item for the active requirement "
+                f"(artifact_id={artifact.id}, requirement_index={requirement_index}, matches={len(matches)})."
+            )
+        matched_item = matches[0]
+
+    return {
+        "artifactId": str(artifact.id),
+        "copyPackId": matched_item.id,
+        "copyPack": matched_item.model_dump(mode="json", by_alias=True),
+    }
+
+
+def _build_rendered_asset_swipe_copy_prompt(
+    *,
+    brief: Dict[str, Any],
+    requirement_index: int,
+    requirement: Dict[str, Any],
+    platform: str,
+    destination_type: str,
+    ad_asset_type: str,
+    ad_mime_type: str,
+    ad_source_label: str | None,
+    ad_source_url: str,
+    linked_ad_copy_pack: dict[str, Any],
+    forbidden_terms: list[str],
+    retry_feedback: str | None = None,
+) -> str:
+    input_payload = {
+        "Platform": platform,
+        "Ad Image or Video": {
+            "sourceKind": "rendered_output",
+            "assetType": ad_asset_type,
+            "sourceLabel": ad_source_label,
+            "sourceUrl": ad_source_url,
+            "mimeType": ad_mime_type,
+            "attachedInlineToGemini": True,
+        },
+        "Angle Used": requirement.get("angle"),
+        "Destination Page": destination_type,
+        "Project Docs": {
+            "assetBriefId": brief.get("id"),
+            "campaignId": brief.get("campaignId"),
+            "funnelId": brief.get("funnelId"),
+            "variantId": brief.get("variantId"),
+            "variantName": brief.get("variantName"),
+            "creativeConcept": brief.get("creativeConcept"),
+            "constraints": brief.get("constraints") or [],
+            "toneGuidelines": brief.get("toneGuidelines") or [],
+            "visualGuidelines": brief.get("visualGuidelines") or [],
+        },
+        "Requirement Context": {
+            "requirementIndex": requirement_index,
+            "channel": requirement.get("channel"),
+            "format": requirement.get("format"),
+            "funnelStage": requirement.get("funnelStage"),
+            "hook": requirement.get("hook"),
+        },
+        "Requirement Copy Baseline": linked_ad_copy_pack,
+        "Blind Angle Forbidden Terms": forbidden_terms,
+    }
+
+    prompt = (
+        "ROLE:\n"
+        "You are an elite, top-tier Direct Response Copywriter and Media Buying Strategist specializing strictly "
+        "in Meta (Facebook/Instagram) and TikTok in-feed ads. Your expertise lies in analyzing visual ad creatives, "
+        "extracting their core psychological angles, and writing visceral ad copy designed with one singular goal: "
+        "maximizing Link Click-Through Rate (CTR).\n\n"
+        "OBJECTIVE:\n"
+        "Take the attached rendered ad creative, the declared destination page, the attached project documentation, "
+        "the requirement-level copy baseline, the specified Angle Used, and the target platform. Silently analyze "
+        "everything, then build three copy variations that stay locked to the exact same angle.\n\n"
+        "IMPORTANT CONTEXT:\n"
+        "The attached image is the final generated ad asset for this specific creative. It is not the original "
+        "competitor swipe. Use the rendered ad as the visual input for this copy task.\n\n"
+        "INPUTS YOU WILL RECEIVE:\n"
+        f"- Platform: {platform}\n"
+        f"- Ad Image or Video: attached rendered {ad_asset_type} asset ({ad_source_label or 'unlabeled asset'}, {ad_mime_type})\n"
+        f"- Angle Used: {requirement.get('angle')}\n"
+        f"- Destination Page: {destination_type}\n"
+        "- Requirement Copy Baseline: structured JSON grounded in the approved requirement-level ad copy pack.\n"
+        "- Project Docs: attached through Gemini File Search context.\n\n"
+        "HOW TO USE THE REQUIREMENT COPY BASELINE:\n"
+        "Use the requirement copy baseline to stay grounded in the intended product, offer, and positioning context. "
+        "Do not copy it verbatim if doing so would violate the blind-angle blackout rules.\n\n"
+        "THE SINGLE ANGLE CONSTRAINT:\n"
+        "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
+        "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
+        "same angle.\n\n"
+        "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
+        "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
+        "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "
+        "not use that exact mechanism language in the feed copy. Translate it into a blind curiosity gap using vague, "
+        "ominous references such as 'this', 'that one hidden detail', 'the fatal flaw', or 'the one thing'. Sell the "
+        "click, not the lesson.\n\n"
+        "BLACKOUT ENFORCEMENT:\n"
+        "The following words and phrases are banned from the ad copy because they reveal the angle. Do not use them in "
+        "variation titles, primary text, headlines, descriptions, captions, or on-screen text:\n"
+        f"{json.dumps(forbidden_terms, ensure_ascii=False)}\n\n"
+        "If you need to refer to the promised thing, use only blind nouns like 'this', 'the missing piece', "
+        "'the one detail', 'what they left out', or 'the thing nobody warns you about'. Never call it a guide, "
+        "check, checklist, process, workflow, method, step, screen, handbook, or question list.\n\n"
+        "THE SLIPPERY SLOPE RULE:\n"
+        "Never write block paragraphs. Each sentence in the primary text must be separated by a hard line break, "
+        "but the copy must still read as one cohesive escalation from hook to agitation to bridge to CTA.\n\n"
+        "PLATFORM RULES:\n"
+        "- Meta: Primary Text must stay short, narrative, and broken into 3-5 punchy lines. Headline must be "
+        "40-60 characters. Description must be a short urgency trigger. CTA must be one of Learn More, Shop Now, "
+        "Watch More, or Sign Up.\n"
+        "- TikTok: Caption must feel native and stay under 150 characters. Include 1-3 relevant hashtags. "
+        "On-screen text must be a visceral 1-2 sentence hook for the first 3 seconds. CTA must be Learn More or Shop Now.\n\n"
+        "GENERAL RULES:\n"
+        "- If the Destination Page is a listicle, do not use specific numbers in the copy or headline.\n"
+        "- Use plain, bar-stool language. Ban fluffy corporate words.\n"
+        "- Match the destination scent. If the Destination Page is a presell page, the copy should feel like "
+        "a warning, a leak, a breaking discovery, or a shocking reveal.\n"
+        "- Respect attached project constraints and compliance rules. If a project constraint conflicts with the "
+        "aggressive copy style, obey the constraint and stay as direct-response as the source materials allow.\n\n"
+        "STRUCTURED OUTPUT RULE:\n"
+        "Return valid JSON only. Do not wrap the JSON in prose. If you use a markdown fence, use a single ```json fence "
+        "that contains only the JSON object. Escape every newline inside string values as \\n. Put the exact requested "
+        "three-variation output inside `formattedVariationsMarkdown` as one markdown code block string. The code block "
+        "must contain exactly 3 variations and use the requested field labels. "
+        "Do not use literal double-quote characters inside any string value unless they are escaped. Prefer paraphrasing "
+        "quoted speech instead of quoting it.\n"
+        "Then populate the platform-specific selected variation fields in JSON:\n"
+        "- For Meta, fill `metaPrimaryText`, `metaHeadline`, `metaDescription`, and `metaCta` from the best single variation.\n"
+        "- For TikTok, fill `tiktokCaption`, `tiktokOnScreenText`, and `tiktokCta` from the best single variation.\n"
+        "- `selectedVariation` must name the winning variation exactly.\n"
+        "- `claimsGuardrails` must contain short, concrete publishing guardrails grounded in the attached docs.\n"
+        "- Do not output strategy notes or creative breakdown outside the JSON fields.\n\n"
+        "JSON SHAPE:\n"
+        "{\n"
+        '  "selectedVariation": "Variation 1: ...",\n'
+        '  "formattedVariationsMarkdown": "```text\\\\n**Variation 1: ...",\n'
+        '  "metaPrimaryText": "Sentence 1\\\\n\\\\nSentence 2...",\n'
+        '  "metaHeadline": "Headline here",\n'
+        '  "metaDescription": "Description here",\n'
+        '  "metaCta": "Learn More",\n'
+        '  "tiktokCaption": null,\n'
+        '  "tiktokOnScreenText": null,\n'
+        '  "tiktokCta": null,\n'
+        '  "claimsGuardrails": ["Guardrail 1", "Guardrail 2"]\n'
+        "}\n\n"
+        "OUTPUT LAYOUT TO MIRROR INSIDE formattedVariationsMarkdown:\n"
+        "```text\n"
+        "**Variation 1: [Target Angle - Approach]**\n\n"
+        "**Primary Text:** [Sentence 1]\n\n"
+        "[Sentence 2]\n\n"
+        "[Sentence 3]\n\n"
+        "[Sentence 4 if needed]\n\n"
+        "**Headline:** [Headline]\n"
+        "**Description:** [Description]\n"
+        "**CTA:** [Button]\n\n"
+        "---\n\n"
+        "**Variation 2: [Target Angle - Approach]**\n"
+        "...\n\n"
+        "---\n\n"
+        "**Variation 3: [Target Angle - Approach]**\n"
+        "...\n"
+        "```\n\n"
+    )
+    if isinstance(retry_feedback, str) and retry_feedback.strip():
+        prompt += f"RETRY CORRECTION:\n{retry_feedback}\n\n"
+    prompt += f"INPUT JSON:\n{json.dumps(input_payload, ensure_ascii=False, indent=2)}"
+    return prompt
 
 
 def _build_swipe_copy_stage1_prompt(
@@ -2478,6 +2747,15 @@ def _generate_swipe_stage1_copy_pack(
             if isinstance(requirement.get("funnelStage"), str) and requirement.get("funnelStage").strip()
             else None
         ),
+        destination_type_hint=(
+            str(requirement.get("destinationType")).strip()
+            if isinstance(requirement.get("destinationType"), str) and requirement.get("destinationType").strip()
+            else (
+                str(brief.get("destinationType")).strip()
+                if isinstance(brief.get("destinationType"), str) and brief.get("destinationType").strip()
+                else None
+            )
+        ),
     )
     retry_feedback: str | None = None
     last_response: Dict[str, Any] | None = None
@@ -2585,6 +2863,167 @@ def _generate_swipe_stage1_copy_pack(
         "Swipe Stage 1 copy generation exhausted retry attempts without producing a valid blind-angle-compliant output."
         if last_response is not None
         else "Swipe Stage 1 copy generation did not produce a response."
+    )
+
+
+def _generate_rendered_asset_swipe_copy_pack(
+    *,
+    session,
+    brief: Dict[str, Any],
+    requirement_index: int,
+    requirement: Dict[str, Any],
+    copy_model: str,
+    gemini_store_names: list[str],
+    rendered_ad_bytes: bytes,
+    rendered_ad_mime_type: str,
+    rendered_ad_source_url: str,
+    rendered_ad_source_label: str | None,
+    linked_ad_copy_pack: dict[str, Any],
+    product_prompt_image_bytes: bytes | None,
+    product_prompt_image_mime_type: str | None,
+) -> tuple[SwipeAdCopyPack, Dict[str, Any], str, str]:
+    channel_id = str(requirement.get("channel") or "").strip()
+    if not channel_id:
+        raise ValueError("Rendered-asset swipe copy generation requires a non-empty requirement channel.")
+    platform = _resolve_swipe_copy_platform(channel_id=channel_id)
+    rendered_ad_asset_type = _resolve_swipe_copy_asset_type(mime_type=rendered_ad_mime_type)
+    forbidden_terms = sorted(
+        {
+            *_GLOBAL_BLIND_ANGLE_REVEAL_TERMS,
+            *_collect_blind_angle_forbidden_terms(
+                requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
+                requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
+            ),
+        },
+        key=lambda item: (-len(item), item),
+    )
+    destination_type = _resolve_destination_type(
+        session=session,
+        funnel_id=str(brief.get("funnelId") or "").strip() or None,
+        funnel_stage=(
+            str(requirement.get("funnelStage")).strip()
+            if isinstance(requirement.get("funnelStage"), str) and requirement.get("funnelStage").strip()
+            else None
+        ),
+        destination_type_hint=(
+            str(requirement.get("destinationType")).strip()
+            if isinstance(requirement.get("destinationType"), str) and requirement.get("destinationType").strip()
+            else (
+                str(brief.get("destinationType")).strip()
+                if isinstance(brief.get("destinationType"), str) and brief.get("destinationType").strip()
+                else None
+            )
+        ),
+    )
+    retry_feedback: str | None = None
+    last_response: Dict[str, Any] | None = None
+    last_prompt: str | None = None
+    for attempt in range(1, 6):
+        prompt = _build_rendered_asset_swipe_copy_prompt(
+            brief=brief,
+            requirement_index=requirement_index,
+            requirement=requirement,
+            platform=platform,
+            destination_type=destination_type,
+            ad_asset_type=rendered_ad_asset_type,
+            ad_mime_type=rendered_ad_mime_type,
+            ad_source_label=rendered_ad_source_label,
+            ad_source_url=rendered_ad_source_url,
+            linked_ad_copy_pack=linked_ad_copy_pack,
+            forbidden_terms=forbidden_terms,
+            retry_feedback=retry_feedback,
+        )
+        last_prompt = prompt
+        contents: List[Any] = [
+            prompt,
+            "Ad Image or Video asset:",
+            genai_types.Part.from_bytes(data=rendered_ad_bytes, mime_type=rendered_ad_mime_type),
+        ]
+        if product_prompt_image_bytes is not None and product_prompt_image_mime_type is not None:
+            contents.extend(
+                [
+                    "Product reference image asset:",
+                    genai_types.Part.from_bytes(
+                        data=product_prompt_image_bytes,
+                        mime_type=product_prompt_image_mime_type,
+                    ),
+                ]
+            )
+        response = _call_swipe_copy_gemini_json_message(
+            model=copy_model,
+            system_instruction=(
+                "Generate swipe-specific direct response ad copy from the attached rendered ad asset. "
+                "Use the attached project documents and requirement copy baseline as the source of truth. "
+                "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
+                "Return JSON only."
+            ),
+            contents=contents,
+            store_names=gemini_store_names,
+            max_tokens=6000,
+            temperature=0.2,
+            response_schema=SwipeAdCopyPack,
+        )
+        last_response = response
+        parsed = response.get("parsed")
+        if not isinstance(parsed, dict):
+            raise RuntimeError("Rendered-asset swipe copy generation returned a non-dict parsed payload.")
+
+        merged_payload = dict(parsed)
+        merged_payload.update(
+            {
+                "platform": platform,
+                "requirementIndex": requirement_index,
+                "channel": str(requirement.get("channel") or ""),
+                "format": str(requirement.get("format") or ""),
+                "funnelStage": requirement.get("funnelStage"),
+                "angle": requirement.get("angle"),
+                "hook": requirement.get("hook"),
+                "destinationType": destination_type,
+            }
+        )
+        try:
+            validated = SwipeAdCopyPack.model_validate(merged_payload)
+        except ValidationError as exc:
+            if attempt >= 5:
+                raise RuntimeError(_summarize_swipe_copy_validation_error(exc)) from exc
+            retry_feedback = (
+                _summarize_swipe_copy_validation_error(exc)
+                + " Preserve the same angle, but return the full valid JSON object."
+            )
+            continue
+        try:
+            _validate_swipe_copy_blind_angle_blackout(
+                copy_pack=validated,
+                forbidden_terms=forbidden_terms,
+            )
+        except ValueError as exc:
+            if attempt >= 5:
+                raise RuntimeError(str(exc)) from exc
+            retry_feedback = (
+                f"{exc} Remove the banned terms entirely and rebuild all 3 variations around a blind curiosity gap."
+            )
+            continue
+        passes_audit, audit_feedback = _audit_swipe_copy_blind_angle_blackout(
+            copy_pack=validated,
+            angle=requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
+            hook=requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
+            forbidden_terms=forbidden_terms,
+            destination_type=destination_type,
+            model=copy_model,
+        )
+        if not passes_audit:
+            if attempt >= 5:
+                raise RuntimeError(audit_feedback or "Rendered-asset swipe copy failed the blackout audit.")
+            retry_feedback = audit_feedback or (
+                "The copy still reveals the solution or the angle mechanics. Remove those reveals and make the click "
+                "curiosity-driven."
+            )
+            continue
+        return validated, response, copy_model, prompt
+    raise RuntimeError(
+        "Rendered-asset swipe copy generation exhausted retry attempts without producing a valid blind-angle-compliant output."
+        if last_response is not None
+        else "Rendered-asset swipe copy generation did not produce a response."
     )
 
 
@@ -2823,7 +3262,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             campaign_id=campaign_id,
             asset_brief_id=asset_brief_id,
         )
-        funnel_id = _validate_brief_scope(
+        brief_scope = _validate_brief_scope(
             session=session,
             org_id=org_id,
             client_id=client_id,
@@ -2831,6 +3270,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             asset_brief_id=asset_brief_id,
             brief=brief,
         )
+        funnel_id = brief_scope.funnel_id
+        campaign_delivery_config = brief_scope.campaign_delivery_config
 
         requirements_raw = brief.get("requirements") or []
         if not isinstance(requirements_raw, list) or not requirements_raw:
@@ -2843,6 +3284,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         requirement = requirements_raw[requirement_index]
         if not isinstance(requirement, dict):
             raise ValueError("Asset brief requirement must be an object.")
+        destination_type_slug = requirement_destination_type(brief=brief, requirement=requirement)
+        destination_resolution = (
+            resolve_campaign_delivery_destination(
+                config=campaign_delivery_config,
+                destination_type=destination_type_slug,
+            )
+            if campaign_delivery_config is not None
+            else None
+        )
+        delivery_snapshot = campaign_delivery_snapshot(campaign_delivery_config)
 
         channel_id = (requirement.get("channel") or "meta").strip()
         fmt = (requirement.get("format") or "image").strip()
@@ -2981,55 +3432,17 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             funnel_id=funnel_id,
             asset_brief_artifact_id=brief_artifact_id,
         )
-        swipe_copy_pack, swipe_copy_response, swipe_copy_model = _generate_swipe_stage1_copy_pack(
+        linked_ad_copy_pack_context = _resolve_linked_ad_copy_pack_context(
             session=session,
-            brief=brief,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            asset_brief_id=asset_brief_id,
             requirement_index=requirement_index,
-            requirement=requirement,
-            copy_model=model_name,
-            gemini_store_names=gemini_store_names,
-            swipe_bytes=swipe_bytes,
-            swipe_mime_type=swipe_mime_type,
-            swipe_source_url=swipe_source_url,
-            swipe_source_label=swipe_source_label,
-            product_prompt_image_bytes=product_prompt_image_bytes,
-            product_prompt_image_mime_type=product_prompt_image_mime_type,
+            ad_copy_pack_artifact_id=ad_copy_pack_artifact_id,
+            ad_copy_pack_id=ad_copy_pack_id,
         )
-        swipe_copy_pack_payload = swipe_copy_pack.model_dump(mode="json", by_alias=True)
-        swipe_copy_prompt_sha256 = hashlib.sha256(
-            _build_swipe_copy_stage1_prompt(
-                brief=brief,
-                requirement_index=requirement_index,
-                requirement=requirement,
-                platform=swipe_copy_pack.platform,
-                destination_type=swipe_copy_pack.destination_type,
-                swipe_asset_type=_resolve_swipe_copy_asset_type(mime_type=swipe_mime_type),
-                swipe_mime_type=swipe_mime_type,
-                swipe_source_label=swipe_source_label,
-                swipe_source_url=swipe_source_url,
-                forbidden_terms=sorted(
-                    {
-                        *_GLOBAL_BLIND_ANGLE_REVEAL_TERMS,
-                        *_collect_blind_angle_forbidden_terms(
-                            requirement.get("angle") if isinstance(requirement.get("angle"), str) else None,
-                            requirement.get("hook") if isinstance(requirement.get("hook"), str) else None,
-                        ),
-                    },
-                    key=lambda item: (-len(item), item),
-                ),
-            ).encode("utf-8")
-        ).hexdigest()
-        swipe_copy_inputs = {
-            "platform": swipe_copy_pack.platform,
-            "adImageOrVideo": {
-                "assetType": _resolve_swipe_copy_asset_type(mime_type=swipe_mime_type),
-                "sourceLabel": swipe_source_label,
-                "sourceUrl": swipe_source_url,
-                "mimeType": swipe_mime_type,
-            },
-            "angleUsed": requirement.get("angle"),
-            "destinationPage": swipe_copy_pack.destination_type,
-        }
 
         # Run Gemini vision with File Search context to generate the generation-ready image prompt.
         gemini_client = _ensure_gemini_client()
@@ -3198,12 +3611,69 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
         retention_expires_at = _retention_expires_at()
         created_asset_ids: List[str] = []
+        swipe_copy_pack_payloads: list[dict[str, Any]] = []
 
         for local_index, output in enumerate(completed_job.outputs[:count]):
             if not output.primary_url:
                 raise RuntimeError(
                     f"Image generation output missing primary_url (job_id={completed_job.id}, output_index={local_index})"
                 )
+
+            rendered_ad_source_label = _basename_from_media_url(
+                output.primary_url,
+                fallback=f"rendered-output-{local_index + 1}",
+            )
+            rendered_ad_bytes, rendered_ad_mime_type = _download_bytes(
+                output.primary_url,
+                max_bytes=int(os.getenv("SWIPE_IMAGE_MAX_BYTES", str(18 * 1024 * 1024))),
+                timeout_seconds=float(os.getenv("SWIPE_IMAGE_DOWNLOAD_TIMEOUT", "30")),
+            )
+            rendered_ad_sha256 = hashlib.sha256(rendered_ad_bytes).hexdigest()
+            rendered_ad_size_bytes = len(rendered_ad_bytes)
+            (
+                swipe_copy_pack,
+                swipe_copy_response,
+                swipe_copy_model,
+                swipe_copy_prompt_text,
+            ) = _generate_rendered_asset_swipe_copy_pack(
+                session=session,
+                brief=brief,
+                requirement_index=requirement_index,
+                requirement=requirement,
+                copy_model=model_name,
+                gemini_store_names=gemini_store_names,
+                rendered_ad_bytes=rendered_ad_bytes,
+                rendered_ad_mime_type=rendered_ad_mime_type,
+                rendered_ad_source_url=output.primary_url,
+                rendered_ad_source_label=rendered_ad_source_label,
+                linked_ad_copy_pack=linked_ad_copy_pack_context["copyPack"],
+                product_prompt_image_bytes=product_prompt_image_bytes,
+                product_prompt_image_mime_type=product_prompt_image_mime_type,
+            )
+            swipe_copy_pack_payload = swipe_copy_pack.model_dump(mode="json", by_alias=True)
+            swipe_copy_pack_payloads.append(swipe_copy_pack_payload)
+            swipe_copy_prompt_sha256 = hashlib.sha256(swipe_copy_prompt_text.encode("utf-8")).hexdigest()
+            swipe_copy_inputs = SwipeCopyInputs(
+                platform=swipe_copy_pack.platform,
+                adImageOrVideo={
+                    "sourceKind": "rendered_output",
+                    "assetType": _resolve_swipe_copy_asset_type(mime_type=rendered_ad_mime_type),
+                    "sourceLabel": rendered_ad_source_label,
+                    "sourceUrl": output.primary_url,
+                    "mimeType": rendered_ad_mime_type,
+                    "remoteAssetId": output.asset_id,
+                },
+                angleUsed=str(requirement.get("angle") or ""),
+                destinationPage=swipe_copy_pack.destination_type,
+                adCopyPackId=linked_ad_copy_pack_context["copyPackId"],
+                adCopyPackArtifactId=linked_ad_copy_pack_context["artifactId"],
+                sourceSwipe=SwipeCopySourceSwipeProvenance(
+                    companySwipeId=company_swipe_id,
+                    sourceLabel=swipe_source_label,
+                    sourceUrl=swipe_source_url,
+                    mimeType=swipe_mime_type,
+                ).model_dump(mode="json", by_alias=True, exclude_none=True),
+            ).model_dump(mode="json", by_alias=True, exclude_none=True)
 
             extra_ai_metadata: Dict[str, Any] = {
                 "remoteJobId": completed_job.id,
@@ -3216,11 +3686,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeRenderModelIdRequested": requested_render_model_id,
                 "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
                 "swipeRenderProvider": render_provider,
+                "swipeCopyPipelineVersion": 2,
                 "swipeCopyPack": swipe_copy_pack_payload,
                 "swipeCopyModel": swipe_copy_model,
                 "swipeCopyRequestId": swipe_copy_response.get("request_id"),
                 "swipeCopyStopReason": swipe_copy_response.get("stop_reason"),
                 "swipeCopyOutputTokens": swipe_copy_response.get("output_tokens"),
+                "swipeCopyPromptText": swipe_copy_prompt_text,
                 "swipeCopyPromptSha256": swipe_copy_prompt_sha256,
                 "swipeCopyInputs": swipe_copy_inputs,
                 "swipeCopyGeminiStoreNames": gemini_store_names,
@@ -3249,6 +3721,30 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipePromptMarkdownPreview": raw_output[:4000],
                 "swipePromptExtractedRaw": extracted_image_prompt_raw,
                 "swipePromptInlinedPlaceholderMap": inlined_placeholder_map,
+                "renderedAdImageSourceUrl": output.primary_url,
+                "renderedAdImageSourceLabel": rendered_ad_source_label,
+                "renderedAdImageMimeType": rendered_ad_mime_type,
+                "renderedAdImageSizeBytes": rendered_ad_size_bytes,
+                "renderedAdImageSha256": rendered_ad_sha256,
+                "deliveryMode": (
+                    destination_resolution.delivery_mode.value
+                    if destination_resolution is not None
+                    else str(brief.get("deliveryMode") or "").strip() or None
+                ),
+                "destinationType": destination_type_slug,
+                "destinationLabel": (
+                    destination_resolution.destination_label if destination_resolution is not None else brief.get("destinationLabel")
+                ),
+                "resolvedDestinationUrl": (
+                    destination_resolution.resolved_url if destination_resolution is not None else None
+                ),
+                "destinationSource": (
+                    destination_resolution.source if destination_resolution is not None else "internal_funnel"
+                ),
+                "campaignDeliveryConfigId": (
+                    str(campaign_delivery_config.id) if campaign_delivery_config is not None else None
+                ),
+                "destinationValidationSnapshot": delivery_snapshot,
                 "swipeProductReferenceRenderAssetIds": product_reference_render_ids,
                 "swipeProductReferenceLocalAssetIds": [
                     reference.local_asset_id for reference in product_reference_assets
@@ -3270,10 +3766,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 extra_ai_metadata["creativeGenerationPlanArtifactId"] = creative_generation_plan_artifact_id
             if creative_generation_plan_item_id:
                 extra_ai_metadata["creativeGenerationPlanItemId"] = creative_generation_plan_item_id
-            if ad_copy_pack_artifact_id:
-                extra_ai_metadata["adCopyPackArtifactId"] = ad_copy_pack_artifact_id
-            if ad_copy_pack_id:
-                extra_ai_metadata["adCopyPackId"] = ad_copy_pack_id
+            extra_ai_metadata["adCopyPackArtifactId"] = linked_ad_copy_pack_context["artifactId"]
+            extra_ai_metadata["adCopyPackId"] = linked_ad_copy_pack_context["copyPackId"]
 
             local_asset_id = _create_generated_asset_from_url(
                 session=session,
@@ -3324,8 +3818,9 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_prompt_model": model_name,
             "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
             "swipe_render_provider": render_provider,
-            "swipe_copy_pack": swipe_copy_pack_payload,
-            "swipe_copy_model": swipe_copy_model,
+            "swipe_copy_pack": swipe_copy_pack_payloads[0] if swipe_copy_pack_payloads else None,
+            "swipe_copy_packs": swipe_copy_pack_payloads,
+            "swipe_copy_model": model_name,
             "stores_attached": len(gemini_store_names),
             "gemini_rag_doc_keys": gemini_rag_doc_keys,
             "gemini_rag_bundle_doc_keys": gemini_rag_bundle_doc_keys,
