@@ -27,6 +27,7 @@ from app.schemas.shopify_connection import (
     ShopifyThemeTemplateGenerateImagesRequest,
 )
 from app.services.shopify_connection import ShopifyInstallation
+from app.services.public_routing import require_product_route_slug
 from app.testimonial_renderer.validate import TestimonialRenderError as RendererError
 from sqlalchemy import select
 
@@ -210,9 +211,10 @@ def test_normalize_theme_export_text_file_content_rewrites_catalog_product_links
         sales_page_path=sales_page_path,
     )
 
-    assert normalized_content.count(f'href="{sales_page_path}"') == 3
+    assert normalized_content.count(f'href="{sales_page_path}"') == 4
     assert 'data-product-url="{{ product_url }}"' in normalized_content
-    assert '<a href="{{ product_url }}" class="swatch-overflow">+2</a>' in normalized_content
+    assert 'href="{{ product_url }}"' not in normalized_content
+    assert 'href="{{ product.url }}"' not in normalized_content
 
 
 def test_normalize_theme_export_text_file_content_rewrites_catalog_product_title_with_product_dot_url():
@@ -229,9 +231,87 @@ def test_normalize_theme_export_text_file_content_rewrites_catalog_product_title
         sales_page_path=sales_page_path,
     )
 
-    assert normalized_content.count(f'href="{sales_page_path}"') == 3
+    assert normalized_content.count(f'href="{sales_page_path}"') == 4
     assert f'<a href="{sales_page_path}" class="title">Product title</a>' in normalized_content
-    assert '<a href="{{ product_url }}" class="swatch-overflow">+2</a>' in normalized_content
+    assert 'href="{{ product_url }}"' not in normalized_content
+    assert 'href="{{ product.url }}"' not in normalized_content
+
+
+def test_resolve_theme_export_sales_page_path_prefers_selected_template_product(
+    api_client, db_session
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Older Product",
+        product_created_at=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        funnel_route_slug="older-funnel",
+        funnel_created_at=datetime(2026, 3, 11, tzinfo=timezone.utc),
+        page_slug="sales",
+    )
+    selected_product, _, _ = _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Selected Product",
+        product_created_at=datetime(2026, 3, 12, tzinfo=timezone.utc),
+        funnel_route_slug="selected-funnel",
+        funnel_created_at=datetime(2026, 3, 13, tzinfo=timezone.utc),
+        page_slug="sales",
+    )
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(org_id=str(client.org_id), user_id="test-user"),
+        session=db_session,
+        preferred_product_id=str(selected_product.id),
+    )
+
+    assert (
+        sales_page_path
+        == f"/f/{require_product_route_slug(product=selected_product)}/selected-funnel/sales"
+    )
+    assert warning is None
+
+
+def test_resolve_theme_export_sales_page_path_errors_when_selected_product_has_no_sales_page(
+    api_client, db_session
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Older Product",
+        product_created_at=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        funnel_route_slug="older-funnel",
+        funnel_created_at=datetime(2026, 3, 11, tzinfo=timezone.utc),
+        page_slug="sales",
+    )
+    selected_product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="Selected Product",
+        created_at=datetime(2026, 3, 12, tzinfo=timezone.utc),
+    )
+    db_session.add(selected_product)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        clients_router._resolve_theme_export_sales_page_path(
+            client_id=client_id,
+            auth=AuthContext(org_id=str(client.org_id), user_id="test-user"),
+            session=db_session,
+            preferred_product_id=str(selected_product.id),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "selected template product" in str(exc_info.value.detail)
 
 
 def test_normalize_theme_export_text_file_content_removes_rich_text_footer_color_override():
@@ -2737,8 +2817,9 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     exported_index_template = archive.read("templates/index.json").decode("utf-8")
     assert sales_page_path in exported_index_template
     exported_product_card = archive.read("snippets/product-card.liquid").decode("utf-8")
-    assert exported_product_card.count(f'href="{sales_page_path}"') == 3
+    assert exported_product_card.count(f'href="{sales_page_path}"') == 5
     assert 'data-product-url="{{ product_url }}"' in exported_product_card
+    assert "{{ product.url }}" not in exported_product_card
     exported_contact_template = json.loads(
         archive.read("templates/page.contact.json").decode("utf-8")
     )
@@ -4254,7 +4335,7 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
 
     archive = zipfile.ZipFile(io.BytesIO(response.content))
     product_card_content = archive.read("snippets/product-card.liquid").decode("utf-8")
-    assert product_card_content.count('href=""') == 3
+    assert product_card_content.count('href=""') == 5
 
 
 def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(

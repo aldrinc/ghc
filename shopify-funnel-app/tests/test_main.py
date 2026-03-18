@@ -343,11 +343,9 @@ def test_apply_shop_connection_defaults_only_ensures_catalog_route(monkeypatch):
         *,
         shop_domain: str,
         access_token: str,
-        sync_all_products: bool = True,
     ):
         observed["shop_domain"] = shop_domain
         observed["access_token"] = access_token
-        observed["sync_all_products"] = sync_all_products
         return {
             "collectionId": "gid://shopify/Collection/1",
             "collectionHandle": "all",
@@ -389,7 +387,6 @@ def test_apply_shop_connection_defaults_only_ensures_catalog_route(monkeypatch):
     assert observed == {
         "shop_domain": "example.myshopify.com",
         "access_token": "admin_access_token",
-        "sync_all_products": False,
         "normalized_shop_domain": "example.myshopify.com",
         "normalized_access_token": "admin_access_token",
     }
