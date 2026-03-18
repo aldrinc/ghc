@@ -104,6 +104,7 @@ export function MetaIntegrationPanel() {
     selectWorkspaceConfig,
     updateConnection,
     validateConnection,
+    validateWorkspaceConfig,
   } = useMetaApi();
   const [config, setConfig] = useState<MetaWorkspaceAdConfig | null>(null);
   const [workspaceConfigs, setWorkspaceConfigs] = useState<MetaWorkspaceAdConfig[]>([]);
@@ -396,6 +397,23 @@ export function MetaIntegrationPanel() {
     }
   };
 
+  const handleValidateActiveWorkspaceConfig = async () => {
+    if (!workspace?.id || !config?.id) return;
+    setConfigPending(true);
+    setConfigError(null);
+    try {
+      const validated = await validateWorkspaceConfig(workspace.id, config.id);
+      setConfig(validated);
+      setWorkspaceConfigs((current) =>
+        current.map((entry) => (entry.id === validated.id ? validated : entry)),
+      );
+    } catch (err) {
+      setConfigError((err as ApiError)?.message || "Failed to validate active Meta workspace config");
+    } finally {
+      setConfigPending(false);
+    }
+  };
+
   const inventoryFetcher = useMemo(() => {
     switch (inventoryTab) {
       case "videos":
@@ -480,6 +498,11 @@ export function MetaIntegrationPanel() {
               Connect org-wide Meta ad accounts once, then attach and select them per workspace.
             </div>
           </div>
+          {workspace && config ? (
+            <Button variant="secondary" size="sm" onClick={() => void handleValidateActiveWorkspaceConfig()} disabled={configPending}>
+              {configPending ? "Refreshing…" : "Refresh workspace config from Meta"}
+            </Button>
+          ) : null}
           {workspace ? (
             <div className="text-xs text-content-muted">Workspace: {workspace.name}</div>
           ) : (
@@ -509,7 +532,12 @@ export function MetaIntegrationPanel() {
                   <Badge tone="neutral">{config.name}</Badge>
                   <Badge tone="neutral">Ad Account {shortId(config.connection.adAccountId, 4)}</Badge>
                   {config.pageId ? <Badge tone="neutral">Page {shortId(config.pageId, 4)}</Badge> : null}
+                  {config.pixelId ? <Badge tone="neutral">Pixel {shortId(config.pixelId, 4)}</Badge> : null}
                   <Badge tone="neutral">{config.connection.graphApiVersion}</Badge>
+                  <Badge tone={config.validationStatus === "valid" ? "success" : "neutral"}>
+                    {config.validationStatus}
+                  </Badge>
+                  <span>Last synced: {formatDate(config.lastValidatedAt)}</span>
                 </>
               ) : configError ? (
                 <span className="text-danger">{configError}</span>

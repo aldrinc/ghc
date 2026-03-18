@@ -20,7 +20,11 @@ function matchesSearch(item: AdReviewItem, query: string): boolean {
   );
 }
 
-function applyFilters(items: AdReviewItem[], filters: CreativeFilterState): AdReviewItem[] {
+function applyFilters(
+  items: AdReviewItem[],
+  filters: CreativeFilterState,
+  violationFilterEnabled: boolean,
+): AdReviewItem[] {
   let result = items;
 
   if (filters.search) {
@@ -33,10 +37,12 @@ function applyFilters(items: AdReviewItem[], filters: CreativeFilterState): AdRe
     result = result.filter((item) => !item.specReady);
   }
 
-  if (filters.violationFilter === "has_violations") {
-    result = result.filter((item) => item.violations.total > 0);
-  } else if (filters.violationFilter === "clean") {
-    result = result.filter((item) => item.violations.total === 0);
+  if (violationFilterEnabled) {
+    if (filters.violationFilter === "has_violations") {
+      result = result.filter((item) => item.violations.total > 0);
+    } else if (filters.violationFilter === "clean") {
+      result = result.filter((item) => item.violations.total === 0);
+    }
   }
 
   if (filters.angleFilter !== "all") {
@@ -80,11 +86,13 @@ export function CreativeReviewGrid({
   selectedIds,
   onSelectionChange,
   onCardClick,
+  violationFilterEnabled = true,
 }: {
   items: AdReviewItem[];
   selectedIds: Set<string>;
   onSelectionChange: (next: Set<string>) => void;
   onCardClick: (item: AdReviewItem) => void;
+  violationFilterEnabled?: boolean;
 }) {
   const [filters, setFilters] = useState<CreativeFilterState>(DEFAULT_FILTER_STATE);
 
@@ -96,7 +104,10 @@ export function CreativeReviewGrid({
     return Array.from(seen).sort();
   }, [items]);
 
-  const filteredItems = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const filteredItems = useMemo(
+    () => applyFilters(items, filters, violationFilterEnabled),
+    [items, filters, violationFilterEnabled],
+  );
 
   const colsClass = useMemo(() => gridColumnsClass(filteredItems), [filteredItems]);
 
@@ -127,6 +138,7 @@ export function CreativeReviewGrid({
           angles={angles}
           totalCount={items.length}
           filteredCount={filteredItems.length}
+          violationFilterEnabled={violationFilterEnabled}
         />
         <label className="flex shrink-0 items-center gap-2 text-xs text-content-muted">
           <input

@@ -24,12 +24,14 @@ export function CreativeFilterBar({
   angles,
   totalCount,
   filteredCount,
+  violationFilterEnabled = true,
 }: {
   filters: CreativeFilterState;
   onChange: (next: CreativeFilterState) => void;
   angles: string[];
   totalCount: number;
   filteredCount: number;
+  violationFilterEnabled?: boolean;
 }) {
   const update = (partial: Partial<CreativeFilterState>) =>
     onChange({ ...filters, ...partial });
@@ -60,17 +62,23 @@ export function CreativeFilterBar({
       </select>
 
       {/* Violations */}
-      <select
-        className="h-8 rounded-md border border-border bg-surface px-2 text-xs text-content"
-        value={filters.violationFilter}
-        onChange={(e) =>
-          update({ violationFilter: e.target.value as CreativeFilterState["violationFilter"] })
-        }
-      >
-        <option value="all">All violations</option>
-        <option value="has_violations">Has issues</option>
-        <option value="clean">Clean</option>
-      </select>
+      {violationFilterEnabled ? (
+        <select
+          className="h-8 rounded-md border border-border bg-surface px-2 text-xs text-content"
+          value={filters.violationFilter}
+          onChange={(e) =>
+            update({ violationFilter: e.target.value as CreativeFilterState["violationFilter"] })
+          }
+        >
+          <option value="all">All violations</option>
+          <option value="has_violations">Has issues</option>
+          <option value="clean">Clean</option>
+        </select>
+      ) : (
+        <div className="flex h-8 items-center rounded-md border border-dashed border-border bg-surface px-2 text-xs text-content-muted">
+          Policy filter unavailable
+        </div>
+      )}
 
       {/* Angle filter */}
       {angles.length > 1 ? (

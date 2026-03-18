@@ -63,6 +63,20 @@ export const META_BILLING_EVENTS: SelectOption[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Website Conversion Events
+// ---------------------------------------------------------------------------
+
+export const META_CUSTOM_EVENT_TYPES: SelectOption[] = [
+  { label: "Purchase", value: "PURCHASE" },
+  { label: "Lead", value: "LEAD" },
+  { label: "Complete registration", value: "COMPLETE_REGISTRATION" },
+  { label: "Initiate checkout", value: "INITIATE_CHECKOUT" },
+  { label: "Add to cart", value: "ADD_TO_CART" },
+  { label: "View content", value: "VIEW_CONTENT" },
+  { label: "Subscribe", value: "SUBSCRIBE" },
+];
+
+// ---------------------------------------------------------------------------
 // Special Ad Categories
 // ---------------------------------------------------------------------------
 

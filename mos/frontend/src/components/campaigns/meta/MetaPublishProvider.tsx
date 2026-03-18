@@ -4,7 +4,9 @@ import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaignDelivery } from "@/api/campaigns";
 import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
+import type { PaidAdsQaRun } from "@/api/paidAdsQa";
 import { useMetaApi } from "@/api/meta";
+import { resolveMetaCreativeQaState } from "@/lib/metaCreativeQa";
 import {
   resolveConfiguredShopHostedOrigin,
   resolveShopHostedUrl,
@@ -50,6 +52,8 @@ export type MetaPublishAdSetForm = {
   bidAmount: string;
   startTime: string;
   endTime: string;
+  promotedPixelId: string;
+  promotedCustomEventType: string;
   promotedObjectJson: string;
   conversionDomain: string;
 };
@@ -208,9 +212,11 @@ export function fromLocalDateTimeValue(value: string): string | null {
 }
 
 export function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
+  const promotedObject = readRecord(spec.promoted_object);
+  const optimizationGoal = spec.optimization_goal || "OFFSITE_CONVERSIONS";
   return {
     name: spec.name || "",
-    optimizationGoal: spec.optimization_goal || "OFFSITE_CONVERSIONS",
+    optimizationGoal,
     billingEvent: spec.billing_event || "IMPRESSIONS",
     targetingJson: formatJsonInput(spec.targeting),
     placementsJson: formatJsonInput(spec.placements),
@@ -219,9 +225,44 @@ export function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
     bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
     startTime: toLocalDateTimeValue(spec.start_time),
     endTime: toLocalDateTimeValue(spec.end_time),
+    promotedPixelId: readString(promotedObject?.pixel_id) || "",
+    promotedCustomEventType: readString(promotedObject?.custom_event_type) || "",
     promotedObjectJson: formatJsonInput(spec.promoted_object),
     conversionDomain: spec.conversion_domain || "",
   };
+}
+
+function buildPromotedObjectPayload(
+  form: MetaPublishAdSetForm,
+  options: {
+    specLabel: string;
+    defaultPixelId?: string | null;
+  },
+): Record<string, unknown> | null {
+  const { specLabel, defaultPixelId } = options;
+  const existing = parseJsonObjectInput(form.promotedObjectJson, `${specLabel} promoted object`) || {};
+  const optimizationGoal = form.optimizationGoal.trim().toUpperCase();
+  const pixelId = form.promotedPixelId.trim() || readString(existing.pixel_id) || readString(defaultPixelId) || "";
+  const customEventType = form.promotedCustomEventType.trim() || readString(existing.custom_event_type) || "";
+
+  if (optimizationGoal === "OFFSITE_CONVERSIONS") {
+    if (!pixelId) {
+      throw new Error(
+        `${specLabel} needs a pixel ID for OFFSITE_CONVERSIONS. Validate the active Meta workspace config or enter the pixel ID explicitly.`,
+      );
+    }
+    if (!customEventType) {
+      throw new Error(`${specLabel} needs a conversion event for OFFSITE_CONVERSIONS.`);
+    }
+  }
+
+  const promotedObject: Record<string, unknown> = { ...existing };
+  if (pixelId) promotedObject.pixel_id = pixelId;
+  else delete promotedObject.pixel_id;
+  if (customEventType) promotedObject.custom_event_type = customEventType;
+  else delete promotedObject.custom_event_type;
+
+  return Object.keys(promotedObject).length ? promotedObject : null;
 }
 
 export function publishDecisionTone(
@@ -246,7 +287,15 @@ type MetaPublishContextValue = {
   assetBriefs: AssetBrief[];
 
   // Config
-  config: { adAccountId: string; pageId?: string | null; graphApiVersion?: string | null } | null;
+  config: {
+    adAccountId: string;
+    pageId?: string | null;
+    pixelId?: string | null;
+    graphApiVersion?: string | null;
+    validationStatus?: string | null;
+    lastValidatedAt?: string | null;
+    lastValidationError?: string | null;
+  } | null;
   configError: string | null;
 
   // Pipeline
@@ -313,6 +362,9 @@ type MetaPublishContextValue = {
   // Package
   canManagePublishPackage: boolean;
   canPrepareMetaReview: boolean;
+  creativeReviewQaRuns: PaidAdsQaRun[];
+  creativeQaFilteringEnabled: boolean;
+  creativeQaNotice: string | null;
   includedPackageItems: MetaPipelineAsset[];
   excludedPackageCount: number;
   includedAdSetSpecs: MetaAdSetSpec[];
@@ -369,7 +421,7 @@ export function MetaPublishProvider({
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
-  const { post } = useApiClient();
+  const { get, post } = useApiClient();
   const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
   const deliveryQuery = useCampaignDelivery(campaign.id);
   const funnelsQuery = useFunnels({ campaignId: campaign.id });
@@ -397,7 +449,15 @@ export function MetaPublishProvider({
   );
 
   // ---- State ----------------------------------------------------------------
-  const [config, setConfig] = useState<{ adAccountId: string; pageId?: string | null; graphApiVersion?: string | null } | null>(null);
+  const [config, setConfig] = useState<{
+    adAccountId: string;
+    pageId?: string | null;
+    pixelId?: string | null;
+    graphApiVersion?: string | null;
+    validationStatus?: string | null;
+    lastValidatedAt?: string | null;
+    lastValidationError?: string | null;
+  } | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [pipeline, setPipeline] = useState<MetaPipelineAsset[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(false);
@@ -417,6 +477,9 @@ export function MetaPublishProvider({
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [selectionPendingAssetIds, setSelectionPendingAssetIds] = useState<string[]>([]);
+  const [qaRuns, setQaRuns] = useState<PaidAdsQaRun[]>([]);
+  const [qaRunsLoading, setQaRunsLoading] = useState(false);
+  const [qaRunsError, setQaRunsError] = useState<string | null>(null);
   const [publishCampaignForm, setPublishCampaignForm] = useState<MetaPublishCampaignForm>(() => ({
     publishBaseUrl: reviewBaseUrl || "",
     campaignName: "",
@@ -476,7 +539,15 @@ export function MetaPublishProvider({
     getConfig(campaign.client_id)
       .then((data) => {
         if (cancelled) return;
-        setConfig({ adAccountId: data.adAccountId, pageId: data.pageId, graphApiVersion: data.graphApiVersion });
+        setConfig({
+          adAccountId: data.adAccountId,
+          pageId: data.pageId,
+          pixelId: data.pixelId,
+          graphApiVersion: data.graphApiVersion,
+          validationStatus: data.validationStatus,
+          lastValidatedAt: data.lastValidatedAt,
+          lastValidationError: data.lastValidationError,
+        });
         setConfigError(null);
       })
       .catch((err) => {
@@ -628,6 +699,18 @@ export function MetaPublishProvider({
 
   const canManagePublishPackage = latestGenerationOnly && Boolean(latestGenerationKey) && (!requiresFunnelScope || Boolean(activeFunnelId));
   const canPrepareMetaReview = latestGenerationOnly && Boolean(latestGenerationKey) && (!requiresFunnelScope || Boolean(activeFunnelId));
+  const creativeQaState = useMemo(
+    () =>
+      resolveMetaCreativeQaState({
+        runs: qaRuns,
+        generationKey: latestGenerationKey,
+        funnelId: activeFunnelId,
+        requiresFunnelScope,
+        qaRunsLoading,
+        qaRunsError,
+      }),
+    [activeFunnelId, latestGenerationKey, qaRuns, qaRunsError, qaRunsLoading, requiresFunnelScope],
+  );
 
   const includedAdSetSpecs = useMemo(() => {
     const byId = new Map<string, MetaAdSetSpec>();
@@ -703,6 +786,26 @@ export function MetaPublishProvider({
     setPublishValidation(null);
     setPublishFormError(null);
   }, [activeFunnelId, latestGenerationKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setQaRunsLoading(true);
+    setQaRunsError(null);
+    get<PaidAdsQaRun[]>(`/campaigns/${campaign.id}/paid-ads-qa/runs?limit=50`)
+      .then((data) => {
+        if (cancelled) return;
+        setQaRuns(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setQaRuns([]);
+        setQaRunsError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setQaRunsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [campaign.id, get]);
 
   useEffect(() => {
     if (!latestGenerationKey) {
@@ -887,11 +990,17 @@ export function MetaPublishProvider({
         bidAmount: parseIntegerInput(form.bidAmount, `${spec.name || spec.id} bid amount`),
         startTime: fromLocalDateTimeValue(form.startTime),
         endTime: fromLocalDateTimeValue(form.endTime),
-        promotedObject: parseJsonObjectInput(form.promotedObjectJson, `${spec.name || spec.id} promoted object`),
+        promotedObject: buildPromotedObjectPayload(form, {
+          specLabel: spec.name || spec.id,
+          defaultPixelId:
+            config?.validationStatus === "valid" && config?.lastValidatedAt
+              ? config.pixelId
+              : null,
+        }),
         conversionDomain: form.conversionDomain.trim() || null,
       });
     }
-  }, [includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
+  }, [config?.lastValidatedAt, config?.pixelId, config?.validationStatus, includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
 
   const refreshPublishRuns = useCallback(async () => {
     setPublishRunsLoading(true);
@@ -1007,6 +1116,9 @@ export function MetaPublishProvider({
       groupedPipeline,
       canManagePublishPackage,
       canPrepareMetaReview,
+      creativeReviewQaRuns: creativeQaState.reviewRuns,
+      creativeQaFilteringEnabled: creativeQaState.filteringEnabled,
+      creativeQaNotice: creativeQaState.notice,
       includedPackageItems,
       excludedPackageCount,
       includedAdSetSpecs,
@@ -1048,6 +1160,7 @@ export function MetaPublishProvider({
       visiblePipeline, latestGenerationScopedPipeline, hiddenLegacyCount, hiddenOtherFunnelCount,
       visibleMissingCreativeSpecCount, prepareAssetBriefIds, groupedPipeline,
       canManagePublishPackage, canPrepareMetaReview, includedPackageItems, excludedPackageCount,
+      creativeQaState,
       includedAdSetSpecs, publishSelections, selectionByAssetId, selectionLoading, selectionError, selectionPendingAssetIds,
       handleSetPublishDecision, publishCampaignForm, updatePublishCampaignField,
       publishAdSetForms, updatePublishAdSetField, publishFormError,

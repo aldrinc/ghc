@@ -14,6 +14,9 @@ export function MetaReviewPanel({ onAdvance }: { onAdvance?: () => void }) {
     assetBriefs,
     visiblePipeline,
     latestGenerationScopedPipeline,
+    creativeReviewQaRuns,
+    creativeQaFilteringEnabled,
+    creativeQaNotice,
     includedPackageItems,
     excludedPackageCount,
     selectionByAssetId,
@@ -50,7 +53,7 @@ export function MetaReviewPanel({ onAdvance }: { onAdvance?: () => void }) {
     pipelineAssets: activePipeline,
     publishSelections,
     assetBriefs,
-    qaRuns: [],
+    qaRuns: creativeReviewQaRuns,
     experimentNameById,
     variantNameById,
   });
@@ -157,12 +160,20 @@ export function MetaReviewPanel({ onAdvance }: { onAdvance?: () => void }) {
             : "No campaign creative assets found yet. Generate creatives first."}
         </div>
       ) : (
-        <CreativeReviewGrid
-          items={reviewItems}
-          selectedIds={selectedCardIds}
-          onSelectionChange={setSelectedCardIds}
-          onCardClick={handleCardClick}
-        />
+        <div className="space-y-3">
+          {creativeQaNotice ? (
+            <Callout variant="warning" size="sm">
+              {creativeQaNotice}
+            </Callout>
+          ) : null}
+          <CreativeReviewGrid
+            items={reviewItems}
+            selectedIds={selectedCardIds}
+            onSelectionChange={setSelectedCardIds}
+            onCardClick={handleCardClick}
+            violationFilterEnabled={creativeQaFilteringEnabled}
+          />
+        </div>
       )}
 
       {/* Detail slide-over */}

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Callout } from "@/components/ui/callout";
-import { useMetaPublishContext, buildAdSetForm, shortId } from "./MetaPublishProvider";
+import { useMetaPublishContext, buildAdSetForm, formatDate, shortId } from "./MetaPublishProvider";
 import { MetaPublishValidationResults } from "./MetaPublishValidationResults";
 import { MetaPublishHistoryPanel } from "./MetaPublishHistoryPanel";
 import { SelectWithCustom } from "./SelectWithCustom";
@@ -14,6 +14,7 @@ import {
   META_BUYING_TYPES,
   META_OPTIMIZATION_GOALS,
   META_BILLING_EVENTS,
+  META_CUSTOM_EVENT_TYPES,
 } from "@/lib/metaAdsConstants";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -34,6 +35,7 @@ export function MetaPublishConfigPanel() {
     latestGenerationKey,
     selectionLoading,
     includedAdSetSpecs,
+    config,
     publishCampaignForm,
     updatePublishCampaignField,
     publishAdSetForms,
@@ -45,6 +47,7 @@ export function MetaPublishConfigPanel() {
     handleValidatePublishPlan,
     handlePublishToMeta,
   } = useMetaPublishContext();
+  const hasValidatedWorkspacePixel = Boolean(config?.pixelId && config?.validationStatus === "valid" && config?.lastValidatedAt);
 
   if (selectionLoading) {
     return <div className="px-4 py-3 text-sm text-content-muted">Loading final Meta package…</div>;
@@ -132,10 +135,18 @@ export function MetaPublishConfigPanel() {
       {/* Ad set specs */}
       <section className="space-y-4">
         <div className="text-xs font-semibold uppercase tracking-wider text-content-muted">Ad Sets</div>
+        <Callout variant={hasValidatedWorkspacePixel ? "info" : "warning"} size="sm">
+          {hasValidatedWorkspacePixel
+            ? `Active workspace Meta config last synced from Meta on ${formatDate(config?.lastValidatedAt)}. If Pixel ID is left blank, mOS will use that validated pixel (${config?.pixelId}).`
+            : config?.validationStatus === "invalid"
+              ? `Active workspace Meta config validation is invalid${config?.lastValidationError ? `: ${config.lastValidationError}` : ""}. mOS will not auto-fill Pixel ID until the workspace config is revalidated.`
+              : "Active workspace Meta config has not been validated against Meta yet. mOS will not auto-fill Pixel ID until that validation runs."}
+        </Callout>
         {includedAdSetSpecs.length ? (
           <div className="space-y-5">
             {includedAdSetSpecs.map((spec) => {
               const form = publishAdSetForms[spec.id] || buildAdSetForm(spec);
+              const usesWebsiteConversions = form.optimizationGoal.trim().toUpperCase() === "OFFSITE_CONVERSIONS";
               return (
                 <div key={`publish-adset-${spec.id}`} className="space-y-3 rounded-lg border border-border p-4">
                   <div className="flex flex-wrap items-center gap-2">
@@ -192,14 +203,48 @@ export function MetaPublishConfigPanel() {
                       />
                       <Textarea value={form.targetingJson} onChange={(e) => updatePublishAdSetField(spec.id, "targetingJson", e.target.value)} placeholder='{"geo_locations":{"countries":["US"]}}' />
                     </div>
-                    <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-                      <Field label="Placements JSON">
-                        <Textarea value={form.placementsJson} onChange={(e) => updatePublishAdSetField(spec.id, "placementsJson", e.target.value)} placeholder="Optional" />
-                      </Field>
-                      <Field label="Promoted object JSON">
-                        <Textarea value={form.promotedObjectJson} onChange={(e) => updatePublishAdSetField(spec.id, "promotedObjectJson", e.target.value)} placeholder='{"pixel_id":"...","custom_event_type":"PURCHASE"}' />
-                      </Field>
-                    </div>
+                    <Callout variant="info" size="sm">
+                      Placements use Meta defaults in this publish flow. No marketer input is required here, and custom placement JSON is hidden until the publish path supports it.
+                    </Callout>
+                    {usesWebsiteConversions ? (
+                      <div className="space-y-3 rounded-md border border-border bg-surface-2 p-3">
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-content-muted">Website conversion settings</div>
+                          <div className="text-xs text-content-muted">
+                            mOS builds Meta&apos;s promoted object from these fields instead of asking for raw JSON.
+                          </div>
+                        </div>
+                        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                          <Field label="Pixel ID">
+                            <Input
+                              value={form.promotedPixelId}
+                              onChange={(e) => updatePublishAdSetField(spec.id, "promotedPixelId", e.target.value)}
+                              placeholder={hasValidatedWorkspacePixel ? (config?.pixelId || "Validated workspace pixel") : "Enter Pixel ID"}
+                            />
+                          </Field>
+                          <Field label="Conversion event">
+                            <SelectWithCustom
+                              options={META_CUSTOM_EVENT_TYPES}
+                              value={form.promotedCustomEventType}
+                              onValueChange={(v) => updatePublishAdSetField(spec.id, "promotedCustomEventType", v)}
+                              placeholder="Select event"
+                            />
+                          </Field>
+                        </div>
+                        <div className="text-xs text-content-muted">
+                          {hasValidatedWorkspacePixel
+                            ? `If Pixel ID is left blank, mOS will use the validated workspace pixel (${config?.pixelId}).`
+                            : "If Pixel ID is left blank, validation will fail until the workspace config is validated against Meta or a pixel ID is entered explicitly."}
+                        </div>
+                        <div className="text-xs text-content-muted">
+                          Conversion event is a saved mOS publish setting. It is not fetched from Meta, so it must already exist on the ad set spec or be chosen here explicitly.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-content-muted">
+                        Promoted object fields are hidden because this ad set is not optimizing for website conversions.
+                      </div>
+                    )}
                   </div>
                 </div>
               );
