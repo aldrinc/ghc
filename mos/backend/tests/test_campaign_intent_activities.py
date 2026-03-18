@@ -220,8 +220,24 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
                     "mode": "public_funnel_runtime",
                     "pixelId": "pixel-123",
                     "funnelIds": funnel_ids,
-                    "browserEvents": ["PageView", "InitiateCheckout"],
-                    "internalEvents": ["page_view", "cta_click"],
+                    "browserEvents": [
+                        "Entered Funnel",
+                        "PageView",
+                        "ViewContent",
+                        "PreSalesToSalesClick",
+                        "AddToCart",
+                        "Purchase",
+                    ],
+                    "internalEvents": [
+                        "Entered Funnel",
+                        "pre_sales_page_view",
+                        "pre_sales_to_sales_click",
+                        "sales_page_view",
+                        "sales_to_checkout_click",
+                        "checkout_started",
+                        "thank_you_page_view",
+                        "order_completed",
+                    ],
                 }
             },
         }

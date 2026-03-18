@@ -153,6 +153,24 @@ def _count_unique_sessions(
     return len(seen)
 
 
+def _count_unique_sessions_for_event_types(
+    *,
+    events: list[FunnelEvent],
+    page_id: str | None,
+    event_types: tuple[FunnelEventTypeEnum, ...],
+) -> int:
+    seen: set[str] = set()
+    for event in events:
+        if event.event_type not in event_types:
+            continue
+        if page_id is not None and str(event.page_id) != page_id:
+            continue
+        session_key = _coerce_session_key(event)
+        if session_key:
+            seen.add(session_key)
+    return len(seen)
+
+
 def _ratio_pct(*, numerator: int, denominator: int) -> float | None:
     if denominator <= 0:
         return None
@@ -328,27 +346,36 @@ def build_funnel_metrics_snapshot(
     )
 
     presell_page_view_sessions = (
-        _count_unique_sessions(
+        _count_unique_sessions_for_event_types(
             events=events,
             page_id=str(presell_page.id),
-            event_type=FunnelEventTypeEnum.page_view,
+            event_types=(
+                FunnelEventTypeEnum.pre_sales_page_view,
+                FunnelEventTypeEnum.page_view,
+            ),
         )
         if presell_page is not None
         else 0
     )
     presell_cta_click_sessions = (
-        _count_unique_sessions(
+        _count_unique_sessions_for_event_types(
             events=events,
             page_id=str(presell_page.id),
-            event_type=FunnelEventTypeEnum.cta_click,
+            event_types=(
+                FunnelEventTypeEnum.pre_sales_to_sales_click,
+                FunnelEventTypeEnum.cta_click,
+            ),
         )
         if presell_page is not None
         else 0
     )
-    sales_page_view_sessions = _count_unique_sessions(
+    sales_page_view_sessions = _count_unique_sessions_for_event_types(
         events=events,
         page_id=str(sales_page.id),
-        event_type=FunnelEventTypeEnum.page_view,
+        event_types=(
+            FunnelEventTypeEnum.sales_page_view,
+            FunnelEventTypeEnum.page_view,
+        ),
     )
     checkout_started_sessions = _count_unique_sessions(
         events=events,

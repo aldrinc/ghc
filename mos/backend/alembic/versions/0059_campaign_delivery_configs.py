@@ -24,7 +24,12 @@ def upgrade() -> None:
         """
         DO $$
         BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'campaign_delivery_mode') THEN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_type t
+                JOIN pg_namespace n ON n.oid = t.typnamespace
+                WHERE t.typname = 'campaign_delivery_mode' AND n.nspname = current_schema()
+            ) THEN
                 CREATE TYPE campaign_delivery_mode AS ENUM ('internal_funnel', 'external_urls');
             END IF;
         END
@@ -35,7 +40,12 @@ def upgrade() -> None:
         """
         DO $$
         BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'campaign_delivery_validation_status') THEN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_type t
+                JOIN pg_namespace n ON n.oid = t.typnamespace
+                WHERE t.typname = 'campaign_delivery_validation_status' AND n.nspname = current_schema()
+            ) THEN
                 CREATE TYPE campaign_delivery_validation_status AS ENUM (
                     'not_applicable',
                     'not_validated',

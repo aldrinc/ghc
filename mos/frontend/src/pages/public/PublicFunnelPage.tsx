@@ -15,7 +15,8 @@ import {
   pendingMetaPurchaseStorageKey,
   readPendingMetaPurchase,
 } from "@/lib/metaCheckout";
-import { mapRuntimeEventToMetaPixel } from "@/lib/metaFunnelEvents";
+import { pageViewEventForStage, type RuntimeTrackingEvent } from "@/lib/funnelTracking";
+import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
@@ -233,6 +234,31 @@ async function parsePublicError(resp: Response): Promise<string> {
   return resp.statusText || "Request failed";
 }
 
+function checkoutStatusFromLocation(): "success" | "cancel" | null {
+  const checkoutStatus = new URL(window.location.href).searchParams.get("checkout");
+  return checkoutStatus === "success" || checkoutStatus === "cancel" ? checkoutStatus : null;
+}
+
+function hasPaidEntryAttribution(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const clickIdKeys = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
+  for (const key of clickIdKeys) {
+    const value = params.get(key);
+    if (typeof value === "string" && value.trim()) {
+      return true;
+    }
+  }
+
+  const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+  for (const key of utmKeys) {
+    const value = params.get(key);
+    if (typeof value === "string" && value.trim()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function PublicFunnelPage() {
   const { productSlug: routeProductSlug, funnelSlug: routeFunnelSlug, slug: routeSlug } = useParams();
   const productSlug = routeProductSlug || undefined;
@@ -323,10 +349,10 @@ export function PublicFunnelPage() {
       });
   }, [bundleMode, effectiveSlug, funnelSlug, navigate, productSlug]);
 
-  const trackEvent = async (event: { eventType: string; props?: Record<string, unknown> }) => {
+  const trackEvent = async (event: RuntimeTrackingEvent) => {
     if (!page) return;
     const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
-    const mappedMetaEvent = mapRuntimeEventToMetaPixel(event);
+    const mappedMetaEvents = mapRuntimeEventToMetaPixelEvents(event);
     const payload = {
       events: [
         {
@@ -341,13 +367,19 @@ export function PublicFunnelPage() {
           props: {
             fromPageId: page.pageId,
             slug: page.slug,
+            pageStage: page.stage,
             ...event.props,
           },
         },
       ],
     };
-    if (mappedMetaEvent) {
-      trackMetaPixelEvent(metaPixelId, mappedMetaEvent.eventName, mappedMetaEvent.params);
+    for (const mappedMetaEvent of mappedMetaEvents) {
+      trackMetaPixelEvent(
+        metaPixelId,
+        mappedMetaEvent.eventName,
+        mappedMetaEvent.params,
+        mappedMetaEvent.method,
+      );
     }
     try {
       await fetch(`${apiBaseUrl}/public/events`, {
@@ -363,10 +395,25 @@ export function PublicFunnelPage() {
 
   useEffect(() => {
     if (!page) return;
+    if (page.stage === "sales" && checkoutStatusFromLocation()) return;
     if (sentPageViewRef.current === page.pageId) return;
     sentPageViewRef.current = page.pageId;
-    trackEvent({ eventType: "page_view" });
+    void trackEvent(pageViewEventForStage(page.stage, { pageStage: page.stage }));
   }, [page]);
+
+  useEffect(() => {
+    if (!page) return;
+    if (!hasPaidEntryAttribution()) return;
+    const key = `funnel_entered:${funnelSlug}:${sessionId}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    void trackEvent({
+      eventType: "Entered Funnel",
+      props: {
+        pageStage: page.stage,
+      },
+    });
+  }, [funnelSlug, page, sessionId]);
 
   useEffect(() => {
     if (!page) return;
@@ -391,9 +438,8 @@ export function PublicFunnelPage() {
   useEffect(() => {
     if (!page) return;
 
-    const url = new URL(window.location.href);
-    const checkoutStatus = url.searchParams.get("checkout");
-    if (checkoutStatus !== "success" && checkoutStatus !== "cancel") {
+    const checkoutStatus = checkoutStatusFromLocation();
+    if (!checkoutStatus) {
       return;
     }
 
@@ -409,10 +455,15 @@ export function PublicFunnelPage() {
 
     const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
     if (checkoutStatus === "success") {
-      if (pendingPurchase) {
+      void trackEvent(
+        pageViewEventForStage("thank_you", {
+          pageStage: "thank_you",
+          checkoutStatus,
+          provider: pendingPurchase?.provider || null,
+        }),
+      );
+      if (pendingPurchase?.provider === "stripe") {
         trackMetaPixelEvent(metaPixelId, "Purchase", buildPurchaseEventParams(pendingPurchase));
-      } else {
-        trackMetaPixelEvent(metaPixelId, "Purchase");
       }
     }
 
@@ -421,15 +472,6 @@ export function PublicFunnelPage() {
     }
     window.history.replaceState(window.history.state, "", clearCheckoutQueryParam(window.location.href));
   }, [funnelSlug, page, sessionId]);
-
-  useEffect(() => {
-    if (!page || !meta) return;
-    if (page.slug !== meta.entrySlug) return;
-    const key = `funnel_entered:${meta.funnelSlug}:${sessionId}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
-    trackEvent({ eventType: "funnel_enter" });
-  }, [meta, page, sessionId]);
 
   if (!productSlug || !funnelSlug) {
     return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Missing public funnel path.</div>;
@@ -454,8 +496,10 @@ export function PublicFunnelPage() {
           productSlug,
           funnelSlug,
           pageMap: page.pageMap,
+          pageStageMap: page.pageStageMap,
           bundleMode,
           entrySlug: meta?.entrySlug ?? null,
+          pageStage: page.stage,
           trackEvent,
           commerce,
           commerceError,

@@ -275,8 +275,24 @@ def test_meta_platform_profile_v2_accepts_mos_runtime_tracking_for_account_008()
             "channel": "meta",
             "mode": "public_funnel_runtime",
             "pixelId": "pixel-123",
-            "browserEvents": ["PageView", "InitiateCheckout"],
-            "internalEvents": ["page_view", "cta_click"],
+            "browserEvents": [
+                "Entered Funnel",
+                "PageView",
+                "ViewContent",
+                "PreSalesToSalesClick",
+                "AddToCart",
+                "Purchase",
+            ],
+            "internalEvents": [
+                "Entered Funnel",
+                "pre_sales_page_view",
+                "pre_sales_to_sales_click",
+                "sales_page_view",
+                "sales_to_checkout_click",
+                "checkout_started",
+                "thank_you_page_view",
+                "order_completed",
+            ],
         }
     }
 
@@ -443,7 +459,14 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
     assert mos_meta_tracking["channel"] == "meta"
     assert mos_meta_tracking["mode"] == "public_funnel_runtime"
     assert mos_meta_tracking["pixelId"] == "pixel-123"
-    assert mos_meta_tracking["browserEvents"] == ["PageView", "InitiateCheckout"]
+    assert mos_meta_tracking["browserEvents"] == [
+        "Entered Funnel",
+        "PageView",
+        "ViewContent",
+        "PreSalesToSalesClick",
+        "AddToCart",
+        "Purchase",
+    ]
     assert mos_meta_tracking["funnelIds"] == [str(funnel.id)]
 
     profile_resp = api_client.get(f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile")

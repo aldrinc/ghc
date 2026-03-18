@@ -14,6 +14,7 @@ declare global {
 
 const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
 const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+type MetaPixelMethod = "track" | "trackCustom";
 
 function ensureMetaPixelBootstrap() {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -73,14 +74,15 @@ export function trackMetaPixelEvent(
   pixelId: string | null | undefined,
   eventName: string,
   params?: Record<string, unknown>,
+  method: MetaPixelMethod = "track",
 ) {
   const resolvedPixelId = ensureMetaPixel(pixelId);
   if (!resolvedPixelId || typeof window === "undefined" || !window.fbq) {
     return;
   }
   if (params && Object.keys(params).length > 0) {
-    window.fbq("track", eventName, params);
+    window.fbq(method, eventName, params);
     return;
   }
-  window.fbq("track", eventName);
+  window.fbq(method, eventName);
 }

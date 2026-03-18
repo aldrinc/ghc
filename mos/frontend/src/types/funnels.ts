@@ -70,14 +70,18 @@ export type PublicFunnelMeta = {
   pages: { pageId: string; slug: string }[];
 };
 
+export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
+
 export type PublicFunnelPage = {
   productSlug: string;
   funnelId: string;
   publicationId: string;
   pageId: string;
   slug: string;
+  stage: PublicFunnelStage;
   puckData: unknown;
   pageMap: Record<string, string>;
+  pageStageMap: Record<string, PublicFunnelStage>;
   designSystemTokens?: DesignSystemTokens | null;
   metadata?: {
     title: string;
