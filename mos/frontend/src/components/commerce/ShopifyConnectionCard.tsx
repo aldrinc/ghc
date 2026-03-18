@@ -7,6 +7,7 @@ import type { ShopDomainOption } from "@/hooks/useShopifyConnection";
 
 type ShopifyConnectionCardProps = {
   workspaceId: string;
+  hasConfiguredShopifyAppCredentials: boolean;
   shopifyStatus: ReturnType<typeof import("@/hooks/useShopifyConnection").useShopifyConnection>["shopifyStatus"];
   isLoadingShopifyStatus: boolean;
   refetchShopifyStatus: () => void;
@@ -29,6 +30,7 @@ type ShopifyConnectionCardProps = {
 
 export function ShopifyConnectionCard({
   workspaceId,
+  hasConfiguredShopifyAppCredentials,
   shopifyStatus,
   isLoadingShopifyStatus,
   refetchShopifyStatus,
@@ -89,6 +91,10 @@ export function ShopifyConnectionCard({
   const handleConnectShopify = async () => {
     if (!workspaceId) {
       toast.error("Select a workspace before connecting Shopify.");
+      return;
+    }
+    if (!hasConfiguredShopifyAppCredentials) {
+      toast.error("Save Shopify app credentials before connecting a store.");
       return;
     }
     const nextDomain = shopifyShopDomainDraft.trim();
@@ -296,6 +302,11 @@ export function ShopifyConnectionCard({
       ) : (
         /* Not connected state */
         <div className="space-y-2">
+          {!hasConfiguredShopifyAppCredentials ? (
+            <div className="rounded-md border border-divider bg-surface-2 px-3 py-2 text-xs text-content-muted">
+              Save Shopify app credentials above before connecting a store.
+            </div>
+          ) : null}
           <div className="text-xs text-content-muted">
             Enter your Shopify store domain to connect.
           </div>
@@ -309,7 +320,12 @@ export function ShopifyConnectionCard({
             <Button
               size="sm"
               onClick={() => void handleConnectShopify()}
-              disabled={!workspaceId || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+              disabled={
+                !workspaceId ||
+                !hasConfiguredShopifyAppCredentials ||
+                !shopifyShopDomainDraft.trim() ||
+                isShopifyConnectionMutating
+              }
             >
               {createShopifyInstallUrl.isPending ? "Redirecting\u2026" : "Connect"}
             </Button>

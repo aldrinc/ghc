@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useDesignSystems } from "@/api/designSystems";
+import { useShopifyAppCredentials } from "@/hooks/useShopifyAppCredentials";
 import { useShopifyConnection } from "@/hooks/useShopifyConnection";
+import { ShopifyAppCredentialsCard } from "@/components/commerce/ShopifyAppCredentialsCard";
 import { ShopifyConnectionCard } from "@/components/commerce/ShopifyConnectionCard";
 import { ThemeTemplateWorkflowCard } from "@/components/commerce/ThemeTemplateWorkflowCard";
 import { CompliancePolicyCard } from "@/components/commerce/CompliancePolicyCard";
@@ -11,6 +13,7 @@ export function ShopifyTab() {
   const { workspace } = useWorkspace();
   const { product: activeWorkspaceProduct, products: workspaceProducts } = useProductContext();
   const { data: designSystems = [], isLoading: isLoadingDesignSystems } = useDesignSystems(workspace?.id);
+  const appCredentials = useShopifyAppCredentials(workspace?.id);
   const connection = useShopifyConnection(workspace?.id);
 
   const designSystemOptions = useMemo(
@@ -27,8 +30,23 @@ export function ShopifyTab() {
 
   return (
     <div className="space-y-4">
+      <ShopifyAppCredentialsCard
+        workspaceId={workspace.id}
+        shopifyAppApiKeyDraft={appCredentials.shopifyAppApiKeyDraft}
+        setShopifyAppApiKeyDraft={appCredentials.setShopifyAppApiKeyDraft}
+        shopifyAppApiSecretDraft={appCredentials.shopifyAppApiSecretDraft}
+        setShopifyAppApiSecretDraft={appCredentials.setShopifyAppApiSecretDraft}
+        hasConfiguredShopifyAppCredentials={appCredentials.hasConfiguredShopifyAppCredentials}
+        isLoadingShopifyAppCredentials={appCredentials.isLoadingShopifyAppCredentials}
+        shopifyAppCredentialsUpdatedAtLabel={appCredentials.shopifyAppCredentialsUpdatedAtLabel}
+        isShopifyAppCredentialsMutating={appCredentials.isShopifyAppCredentialsMutating}
+        hasShopifyConnectionTarget={connection.hasShopifyConnectionTarget}
+        onSave={appCredentials.handleSaveShopifyAppCredentials}
+      />
+
       <ShopifyConnectionCard
         workspaceId={workspace.id}
+        hasConfiguredShopifyAppCredentials={appCredentials.hasConfiguredShopifyAppCredentials}
         shopifyStatus={connection.shopifyStatus}
         isLoadingShopifyStatus={connection.isLoadingShopifyStatus}
         refetchShopifyStatus={connection.refetchShopifyStatus}

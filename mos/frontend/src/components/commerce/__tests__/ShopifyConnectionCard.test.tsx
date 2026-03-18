@@ -9,6 +9,7 @@ function makeMutation(overrides?: Record<string, unknown>) {
 
 const baseProps = {
   workspaceId: "ws-1",
+  hasConfiguredShopifyAppCredentials: true,
   shopifyStatus: null as any,
   isLoadingShopifyStatus: false,
   refetchShopifyStatus: vi.fn(),
@@ -41,6 +42,15 @@ describe("ShopifyConnectionCard", () => {
     render(<ShopifyConnectionCard {...baseProps} />);
     const btn = screen.getByRole("button", { name: /^connect$/i });
     expect(btn).toBeDisabled();
+  });
+
+  it("disables connect button until app credentials are configured", async () => {
+    const user = userEvent.setup();
+    render(<ShopifyConnectionCard {...baseProps} hasConfiguredShopifyAppCredentials={false} />);
+    const input = screen.getByPlaceholderText(/example-shop/);
+    await user.type(input, "test-store.myshopify.com");
+    expect(screen.getByText(/save shopify app credentials above/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^connect$/i })).toBeDisabled();
   });
 
   it("enables connect button after entering shop domain", async () => {
