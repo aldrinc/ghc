@@ -246,7 +246,7 @@ def test_repair_funnel_meta_tracking_updates_profile(monkeypatch) -> None:
                     "channel": "meta",
                     "mode": "public_funnel_runtime",
                     "pixelId": "pixel-123",
-                    "browserEvents": ["PageView", "InitiateCheckout"],
+                    "browserEvents": ["PageView", "ViewContent", "PreSalesToSalesClick", "AddToCart", "Purchase"],
                     "funnelIds": ["funnel-1"],
                 }
             },

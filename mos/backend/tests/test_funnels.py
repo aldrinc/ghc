@@ -436,8 +436,17 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
                 "channel": "meta",
                 "mode": "public_funnel_runtime",
                 "pixelId": "pixel-123",
-                "browserEvents": ["PageView", "InitiateCheckout"],
-                "internalEvents": ["page_view", "cta_click"],
+                "browserEvents": ["PageView", "ViewContent", "PreSalesToSalesClick", "AddToCart", "Purchase"],
+                "internalEvents": [
+                    "Entered Funnel",
+                    "pre_sales_page_view",
+                    "pre_sales_to_sales_click",
+                    "sales_page_view",
+                    "sales_to_checkout_click",
+                    "checkout_started",
+                    "thank_you_page_view",
+                    "order_completed",
+                ],
             }
         },
     )
@@ -456,6 +465,7 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
         "mode": "public_funnel_runtime",
         "metaPixelId": "pixel-123",
     }
+    assert public_page.json()["stage"] == "custom"
 
 
 def test_public_funnel_commerce_requires_offers(api_client: TestClient):

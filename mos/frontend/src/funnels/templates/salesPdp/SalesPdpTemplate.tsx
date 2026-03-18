@@ -35,6 +35,7 @@ import {
 } from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
+import { checkoutClickEventForStage } from "@/lib/funnelTracking";
 import { pendingMetaPurchaseStorageKey, writePendingMetaPurchase } from "@/lib/metaCheckout";
 
 export const salesPdpDefaults = defaults as {
@@ -1207,7 +1208,12 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       const checkoutCancelUrl = new URL(window.location.href);
       checkoutReturnUrl.searchParams.set("checkout", "success");
       checkoutCancelUrl.searchParams.set("checkout", "cancel");
-      runtime.trackEvent?.({ eventType: "cta_click", props: { variantId: variant.id } });
+      runtime.trackEvent?.(
+        checkoutClickEventForStage({
+          fromStage: runtime.pageStage || "custom",
+          props: { variantId: variant.id },
+        }),
+      );
       const response = await fetch(`${apiBaseUrl}/public/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

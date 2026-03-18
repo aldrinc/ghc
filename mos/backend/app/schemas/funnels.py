@@ -84,6 +84,8 @@ class PublicFunnelMetaResponse(BaseModel):
 
 
 class PublicFunnelPageResponse(BaseModel):
+    stage: str
+
     class Metadata(BaseModel):
         title: str
         description: str
@@ -102,6 +104,7 @@ class PublicFunnelPageResponse(BaseModel):
     slug: str
     puckData: dict[str, Any]
     pageMap: dict[str, str]
+    pageStageMap: dict[str, str]
     designSystemTokens: Optional[dict[str, Any]] = None
     metadata: Metadata
     tracking: Optional[Tracking] = None

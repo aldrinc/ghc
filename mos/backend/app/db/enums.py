@@ -244,8 +244,16 @@ class FunnelAssetStatusEnum(str, Enum):
 class FunnelEventTypeEnum(str, Enum):
     page_view = "page_view"
     cta_click = "cta_click"
-    funnel_enter = "funnel_enter"
+    funnel_enter = "Entered Funnel"
     funnel_exit = "funnel_exit"
+    pre_sales_page_view = "pre_sales_page_view"
+    sales_page_view = "sales_page_view"
+    checkout_page_view = "checkout_page_view"
+    thank_you_page_view = "thank_you_page_view"
+    custom_page_view = "custom_page_view"
+    pre_sales_to_sales_click = "pre_sales_to_sales_click"
+    sales_to_checkout_click = "sales_to_checkout_click"
+    custom_page_click = "custom_page_click"
     checkout_started = "checkout_started"
     order_completed = "order_completed"
 

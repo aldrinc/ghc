@@ -33,6 +33,7 @@ from app.db.repositories.funnels import (
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.commerce import PublicCheckoutRequest
 from app.schemas.funnels import PublicEventsIngestRequest
+from app.services.campaign_destinations import normalize_destination_type
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
 from app.services.funnel_metadata import build_public_page_metadata_for_context
@@ -42,6 +43,37 @@ from app.services.shopify_checkout import create_shopify_checkout
 
 router = APIRouter(prefix="/public", tags=["public"])
 _MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
+
+
+def _public_page_stage(*, slug: str | None = None, template_id: str | None = None, page_name: str | None = None) -> str:
+    normalized_template_id = clean_optional_text(template_id)
+    if normalized_template_id in {"pre-sales-listicle", "pre_sales_listicle"}:
+        return "pre_sales"
+    if normalized_template_id in {"sales-pdp", "sales_pdp"}:
+        return "sales"
+
+    normalized = normalize_destination_type(slug)
+    if normalized == "pre-sales":
+        return "pre_sales"
+    if normalized == "sales":
+        return "sales"
+    if normalized == "checkout":
+        return "checkout"
+    if normalized == "thank-you":
+        return "thank_you"
+
+    normalized_name = clean_optional_text(page_name)
+    if normalized_name:
+        lowered_name = normalized_name.lower()
+        if "pre-sales" in lowered_name or "presales" in lowered_name or "advertorial" in lowered_name:
+            return "pre_sales"
+        if "sales" in lowered_name or "pdp" in lowered_name or "product page" in lowered_name:
+            return "sales"
+        if "checkout" in lowered_name:
+            return "checkout"
+        if "thank" in lowered_name:
+            return "thank_you"
+    return "custom"
 
 
 def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Funnel | None:
@@ -370,9 +402,21 @@ def public_funnel_page(
         if not version:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page content not found")
 
-        page_map = {
-            str(item.page_id): item.slug_at_publish
-            for item in public_repo.list_publication_pages(publication_id=str(funnel.active_publication_id))
+        publication_pages = public_repo.list_publication_pages(publication_id=str(funnel.active_publication_id))
+        page_map = {str(item.page_id): item.slug_at_publish for item in publication_pages}
+        page_rows = {
+            str(item.id): item
+            for item in session.scalars(
+                select(FunnelPage).where(FunnelPage.id.in_([item.page_id for item in publication_pages]))
+            ).all()
+        }
+        page_stage_map = {
+            str(item.page_id): _public_page_stage(
+                slug=item.slug_at_publish,
+                template_id=page_rows.get(str(item.page_id)).template_id if page_rows.get(str(item.page_id)) else None,
+                page_name=page_rows.get(str(item.page_id)).name if page_rows.get(str(item.page_id)) else None,
+            )
+            for item in publication_pages
         }
         page = session.scalars(select(FunnelPage).where(FunnelPage.id == pp.page_id)).first()
         design_system_tokens = resolve_design_system_tokens(
@@ -397,8 +441,14 @@ def public_funnel_page(
             "publicationId": publication_id,
             "pageId": str(pp.page_id),
             "slug": pp.slug_at_publish,
+            "stage": _public_page_stage(
+                slug=pp.slug_at_publish,
+                template_id=page.template_id if page else None,
+                page_name=page.name if page else None,
+            ),
             "puckData": version.puck_data,
             "pageMap": page_map,
+            "pageStageMap": page_stage_map,
             "designSystemTokens": design_system_tokens,
             "metadata": metadata,
             "tracking": tracking,
@@ -424,6 +474,19 @@ def public_funnel_page(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page has no saved version")
 
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
+    preview_pages = session.scalars(
+        select(FunnelPage)
+        .where(FunnelPage.funnel_id == funnel.id)
+        .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+    ).all()
+    page_stage_map = {
+        str(item.id): _public_page_stage(
+            slug=item.slug,
+            template_id=item.template_id,
+            page_name=item.name,
+        )
+        for item in preview_pages
+    }
     design_system_tokens = resolve_design_system_tokens(
         session=session,
         org_id=str(funnel.org_id),
@@ -446,8 +509,14 @@ def public_funnel_page(
         "publicationId": publication_id,
         "pageId": str(page.id),
         "slug": page.slug,
+        "stage": _public_page_stage(
+            slug=page.slug,
+            template_id=page.template_id,
+            page_name=page.name,
+        ),
         "puckData": version.puck_data,
         "pageMap": page_map,
+        "pageStageMap": page_stage_map,
         "designSystemTokens": design_system_tokens,
         "metadata": metadata,
         "tracking": tracking,

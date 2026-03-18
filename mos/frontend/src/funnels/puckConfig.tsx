@@ -3,6 +3,11 @@ import type { Config } from "@measured/puck";
 import { Link } from "react-router-dom";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
+  navigationClickEventForStages,
+  resolvePublicFunnelStage,
+  type RuntimeTrackingEvent,
+} from "@/lib/funnelTracking";
+import {
   SalesPdpComparison,
   SalesPdpFaq,
   SalesPdpFooter,
@@ -35,6 +40,7 @@ import {
 } from "@/funnels/templates/preSalesListicle/PreSalesTemplate";
 import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
 import type { PublicFunnelCommerce } from "@/types/commerce";
+import type { PublicFunnelStage } from "@/types/funnels";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -43,9 +49,11 @@ type FunnelRuntimeContextValue = {
   productSlug: string;
   funnelSlug: string;
   pageMap: Record<string, string>;
+  pageStageMap: Record<string, PublicFunnelStage>;
   bundleMode?: boolean;
   entrySlug?: string | null;
-  trackEvent?: (event: { eventType: string; props?: Record<string, unknown> }) => void;
+  pageStage?: PublicFunnelStage;
+  trackEvent?: (event: RuntimeTrackingEvent) => void;
   commerce?: PublicFunnelCommerce | null;
   commerceError?: string | null;
   pageId?: string | null;
@@ -163,13 +171,22 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
 
   if (linkType === "funnelPage" && runtime && targetPageId) {
     const targetSlug = runtime.pageMap[targetPageId];
+    const targetStage = runtime.pageStageMap[targetPageId] || resolvePublicFunnelStage(targetSlug);
     const to = targetSlug ? resolveRuntimePagePath(runtime, targetSlug) : "#";
     return (
       <div className={wrapperClass}>
         <Link
           to={to}
           className={className}
-          onClick={() => runtime.trackEvent?.({ eventType: "cta_click", props: { targetPageId } })}
+          onClick={() =>
+            runtime.trackEvent?.(
+              navigationClickEventForStages({
+                fromStage: runtime.pageStage || "custom",
+                toStage: targetStage,
+                props: { targetPageId },
+              }),
+            )
+          }
         >
           {text}
         </Link>
@@ -194,13 +211,22 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
     if (!targetSlug) {
       throw new Error("Next page is not available in this funnel.");
     }
+    const targetStage = runtime.pageStageMap[runtime.nextPageId] || resolvePublicFunnelStage(targetSlug);
     const to = resolveRuntimePagePath(runtime, targetSlug);
     return (
       <div className={wrapperClass}>
         <Link
           to={to}
           className={className}
-          onClick={() => runtime.trackEvent?.({ eventType: "cta_click", props: { targetPageId: runtime.nextPageId } })}
+          onClick={() =>
+            runtime.trackEvent?.(
+              navigationClickEventForStages({
+                fromStage: runtime.pageStage || "custom",
+                toStage: targetStage,
+                props: { targetPageId: runtime.nextPageId },
+              }),
+            )
+          }
         >
           {text}
         </Link>
@@ -216,7 +242,15 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
           target="_blank"
           rel="noreferrer"
           className={className}
-          onClick={() => runtime?.trackEvent?.({ eventType: "cta_click", props: { href } })}
+          onClick={() =>
+            runtime?.trackEvent?.(
+              navigationClickEventForStages({
+                fromStage: runtime.pageStage || "custom",
+                toStage: resolvePublicFunnelStage(href),
+                props: { href },
+              }),
+            )
+          }
         >
           {text}
         </a>
