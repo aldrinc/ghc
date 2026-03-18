@@ -281,6 +281,7 @@ def test_creative_production_accepts_manual_creative_context_without_launch_line
     api_client,
     db_session,
     monkeypatch,
+    fake_temporal,
 ) -> None:
     client_id, _, campaign_id = _create_campaign_with_product(api_client, suffix="manual-produce")
 
@@ -349,3 +350,4 @@ def test_creative_production_accepts_manual_creative_context_without_launch_line
     payload = response.json()
     assert payload["workflow_run_id"]
     assert payload["temporal_workflow_id"]
+    assert fake_temporal.started
