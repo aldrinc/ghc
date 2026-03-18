@@ -1724,6 +1724,24 @@ async def orders_create_webhook(
         shopDomain=shop_domain,
         orderId=str(payload.get("id") or ""),
         orderName=payload.get("name"),
+        email=payload.get("email") or payload.get("contact_email"),
+        phone=payload.get("phone")
+        or (
+            payload.get("customer", {}).get("phone")
+            if isinstance(payload.get("customer"), dict)
+            else None
+        ),
+        browserIp=payload.get("browser_ip")
+        or (
+            payload.get("client_details", {}).get("browser_ip")
+            if isinstance(payload.get("client_details"), dict)
+            else None
+        ),
+        userAgent=(
+            payload.get("client_details", {}).get("user_agent")
+            if isinstance(payload.get("client_details"), dict)
+            else None
+        ),
         currency=payload.get("currency"),
         totalPrice=payload.get("total_price"),
         createdAt=payload.get("created_at"),

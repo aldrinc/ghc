@@ -5,7 +5,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -25,6 +25,7 @@ from app.schemas.shopify import (
     ShopifyComplianceWebhookPayload,
     ShopifyOrderWebhookPayload,
 )
+from app.services.meta_conversions import MetaConversionError, send_shopify_purchase_event
 
 router = APIRouter(prefix="/shopify", tags=["shopify"])
 logger = logging.getLogger(__name__)
@@ -155,7 +156,10 @@ def ingest_shopify_order_webhook(
 
     funnel = session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
     if not funnel:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found for webhook.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Funnel not found for webhook.",
+        )
 
     external_order_ref = f"shopify:{payload.shopDomain}:{payload.orderId}"
     existing = session.scalars(
@@ -163,6 +167,37 @@ def ingest_shopify_order_webhook(
     ).first()
     if existing:
         return {"received": True, "duplicate": True}
+
+    amount_cents = _price_to_cents(payload.totalPrice)
+    checkout_metadata = {
+        "provider": "shopify",
+        "shop_domain": payload.shopDomain,
+        "shopify_order_id": payload.orderId,
+        "shopify_order_name": payload.orderName,
+        "note_attributes": payload.noteAttributes,
+        "line_items": [item.model_dump(exclude_none=True) for item in payload.lineItems],
+    }
+    meta_conversion: dict[str, object] | None = None
+    try:
+        meta_conversion = send_shopify_purchase_event(
+            session=session,
+            funnel=funnel,
+            payload=payload,
+            external_order_ref=external_order_ref,
+            amount_cents=amount_cents,
+            currency=payload.currency,
+            quantity=quantity,
+            variant_id=price_point_id,
+            session_id=session_id,
+            visitor_id=visitor_id,
+        )
+    except MetaConversionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    if meta_conversion is not None:
+        checkout_metadata["meta_conversion"] = meta_conversion
 
     order = FunnelOrder(
         org_id=funnel.org_id,
@@ -174,18 +209,11 @@ def ingest_shopify_order_webhook(
         price_point_id=price_point_id,
         stripe_session_id=external_order_ref,
         stripe_payment_intent_id=None,
-        amount_cents=_price_to_cents(payload.totalPrice),
+        amount_cents=amount_cents,
         currency=payload.currency,
         quantity=quantity,
         selection=selection or None,
-        checkout_metadata={
-            "provider": "shopify",
-            "shop_domain": payload.shopDomain,
-            "shopify_order_id": payload.orderId,
-            "shopify_order_name": payload.orderName,
-            "note_attributes": payload.noteAttributes,
-            "line_items": [item.model_dump(exclude_none=True) for item in payload.lineItems],
-        },
+        checkout_metadata=checkout_metadata,
         status="completed",
         fulfillment_status="pending",
     )
@@ -213,8 +241,16 @@ def ingest_shopify_order_webhook(
                     "shop_domain": payload.shopDomain,
                     "shopify_order_id": payload.orderId,
                     "shopify_order_name": payload.orderName,
-                    "amount_cents": _price_to_cents(payload.totalPrice),
+                    "amount_cents": amount_cents,
                     "currency": payload.currency,
+                    **(
+                        {
+                            "meta_event_id": meta_conversion.get("eventId"),
+                            "meta_pixel_id": meta_conversion.get("pixelId"),
+                        }
+                        if meta_conversion is not None
+                        else {}
+                    ),
                 },
             )
         )

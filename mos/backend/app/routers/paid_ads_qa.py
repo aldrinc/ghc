@@ -59,6 +59,7 @@ from app.services.paid_ads_qa import (
     refresh_meta_platform_profile_from_graph,
     render_report_markdown,
     summarize_findings,
+    upsert_meta_platform_profile_from_profile,
     write_report_file,
 )
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
@@ -608,10 +609,17 @@ def _upsert_meta_workspace_profile(
             metadata_json=workspace_metadata,
         )
 
-    return _legacy_meta_profile_payload_from_workspace(
+    saved_profile = _legacy_meta_profile_payload_from_workspace(
         connection=target_connection,
         workspace_config=target_config,
     )
+    upsert_meta_platform_profile_from_profile(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        profile=saved_profile,
+    )
+    return saved_profile
 
 
 def _refresh_meta_profile(

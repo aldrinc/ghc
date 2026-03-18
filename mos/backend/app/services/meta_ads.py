@@ -250,6 +250,14 @@ class MetaAdsClient:
             after=after,
         )
 
+    def send_pixel_events(
+        self,
+        *,
+        pixel_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._request("POST", f"{pixel_id}/events", data=_encode_payload(payload))
+
     def list_ad_creatives(
         self,
         *,
