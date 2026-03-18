@@ -20,6 +20,12 @@ down_revision = "0058_meta_publish_runs"
 branch_labels = None
 depends_on = None
 
+jsonb = postgresql.JSONB(astext_type=sa.Text())
+
+
+def _typed_metadata_insert(sql: str) -> sa.TextClause:
+    return sa.text(sql).bindparams(sa.bindparam("metadata", type_=jsonb))
+
 
 def upgrade() -> None:
     uuid = postgresql.UUID(as_uuid=True)
@@ -50,7 +56,7 @@ def upgrade() -> None:
         sa.Column("last_validation_error", sa.Text(), nullable=True),
         sa.Column(
             "metadata",
-            postgresql.JSONB(astext_type=sa.Text()),
+            jsonb,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
@@ -100,7 +106,7 @@ def upgrade() -> None:
         sa.Column("last_validation_error", sa.Text(), nullable=True),
         sa.Column(
             "metadata",
-            postgresql.JSONB(astext_type=sa.Text()),
+            jsonb,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
@@ -311,7 +317,7 @@ def _backfill_meta_workspace_configs() -> None:
                 or (f"Meta account {ad_account_id}" if ad_account_id else "Meta account")
             )
             bind.execute(
-                sa.text(
+                _typed_metadata_insert(
                     """
                     INSERT INTO meta_ad_account_connections (
                         id,
@@ -377,7 +383,7 @@ def _backfill_meta_workspace_configs() -> None:
             connection_ids_by_key[connection_key] = connection_id
 
         bind.execute(
-            sa.text(
+            _typed_metadata_insert(
                 """
                 INSERT INTO meta_workspace_ad_configs (
                     id,
@@ -458,4 +464,3 @@ def _backfill_meta_workspace_configs() -> None:
                 "updated_at": profile["updated_at"] or datetime.now(timezone.utc),
             },
         )
-
