@@ -1528,12 +1528,17 @@ class ShopifyApiClient:
         self._timeout = settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS
 
     async def exchange_code_for_access_token(
-        self, *, shop_domain: str, code: str
+        self,
+        *,
+        shop_domain: str,
+        code: str,
+        app_api_key: str,
+        app_api_secret: str,
     ) -> tuple[str, str]:
         url = f"https://{shop_domain}/admin/oauth/access_token"
         payload = {
-            "client_id": settings.SHOPIFY_APP_API_KEY,
-            "client_secret": settings.SHOPIFY_APP_API_SECRET,
+            "client_id": app_api_key,
+            "client_secret": app_api_secret,
             "code": code,
         }
         response = await self._post_json(url=url, payload=payload)
@@ -2312,6 +2317,37 @@ class ShopifyApiClient:
             mutation_name="publishablePublish",
         )
 
+    async def _ensure_product_published_to_online_store(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_id: str,
+        status: str,
+    ) -> None:
+        normalized_status = status.strip().upper()
+        if normalized_status != "ACTIVE":
+            return
+
+        online_store_publication_id = await self._get_online_store_publication_id(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        is_published = await self._is_product_published_on_publication(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=product_id,
+            publication_id=online_store_publication_id,
+        )
+        if is_published:
+            return
+
+        await self._publish_product_to_publication(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=product_id,
+            publication_id=online_store_publication_id,
+        )
     async def _create_collection(
         self,
         *,
@@ -3329,10 +3365,11 @@ class ShopifyApiClient:
             access_token=access_token,
             product_gid=product_gid,
         )
-        await self.ensure_products_published_to_online_store(
+        await self._ensure_product_published_to_online_store(
             shop_domain=shop_domain,
             access_token=access_token,
-            product_gids=[product_gid],
+            product_id=product_gid,
+            status=product_status,
         )
 
         return {
@@ -4275,6 +4312,12 @@ class ShopifyApiClient:
             shop_domain=shop_domain,
             access_token=access_token,
             product_gid=cleaned_product_gid,
+        )
+        await self._ensure_product_published_to_online_store(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_id=cleaned_product_gid,
+            status=str(final_product.get("status") or ""),
         )
         final_variants = final_product.get("variants") or []
         if len(final_variants) != len(prepared_variants):

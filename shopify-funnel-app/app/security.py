@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import re
 from collections.abc import Sequence
+from typing import Any
 from urllib.parse import urlparse
 
 import jwt
@@ -26,7 +27,9 @@ def normalize_shop_domain(shop: str) -> str:
     return normalized
 
 
-def verify_oauth_hmac(query_items: Sequence[tuple[str, str]]) -> bool:
+def verify_oauth_hmac(
+    query_items: Sequence[tuple[str, str]], *, app_api_secret: str
+) -> bool:
     supplied_hmac = None
     filtered: list[tuple[str, str]] = []
     for key, value in query_items:
@@ -43,18 +46,23 @@ def verify_oauth_hmac(query_items: Sequence[tuple[str, str]]) -> bool:
     filtered.sort(key=lambda item: item[0])
     message = "&".join(f"{key}={value}" for key, value in filtered)
     digest = hmac.new(
-        settings.SHOPIFY_APP_API_SECRET.encode("utf-8"),
+        app_api_secret.encode("utf-8"),
         message.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(digest, supplied_hmac)
 
 
-def verify_webhook_hmac(*, body: bytes, supplied_hmac: str | None) -> bool:
+def verify_webhook_hmac(
+    *,
+    body: bytes,
+    supplied_hmac: str | None,
+    app_api_secret: str,
+) -> bool:
     if not supplied_hmac:
         return False
     digest = hmac.new(
-        settings.SHOPIFY_APP_API_SECRET.encode("utf-8"),
+        app_api_secret.encode("utf-8"),
         body,
         hashlib.sha256,
     ).digest()
@@ -78,7 +86,7 @@ def require_internal_api_token(
         )
 
 
-def require_shopify_session_shop_domain(
+def require_shopify_session_token(
     authorization: str | None = Header(default=None, alias="Authorization"),
 ) -> str:
     if not authorization or not authorization.startswith("Bearer "):
@@ -92,23 +100,10 @@ def require_shopify_session_shop_domain(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Shopify session token",
         )
+    return token
 
-    try:
-        claims = jwt.decode(
-            token,
-            settings.SHOPIFY_APP_API_SECRET,
-            algorithms=["HS256"],
-            audience=settings.SHOPIFY_APP_API_KEY,
-            options={
-                "require": ["aud", "exp", "nbf", "iss", "dest"],
-            },
-        )
-    except InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Shopify session token: {exc}",
-        ) from exc
 
+def _parse_destination_shop_domain(claims: dict[str, Any]) -> str:
     destination = claims.get("dest")
     if not isinstance(destination, str) or not destination.strip():
         raise HTTPException(
@@ -122,3 +117,60 @@ def require_shopify_session_shop_domain(
             detail="Shopify session token has invalid dest claim",
         )
     return normalize_shop_domain(parsed_destination.netloc)
+
+
+def extract_shop_domain_from_session_token(token: str) -> str:
+    try:
+        claims = jwt.decode(
+            token,
+            options={
+                "verify_signature": False,
+                "verify_exp": False,
+                "verify_nbf": False,
+                "verify_iat": False,
+                "verify_aud": False,
+                "verify_iss": False,
+            },
+        )
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Shopify session token: {exc}",
+        ) from exc
+    if not isinstance(claims, dict):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify session token payload is invalid",
+        )
+    return _parse_destination_shop_domain(claims)
+
+
+def verify_shopify_session_token(
+    *,
+    token: str,
+    app_api_key: str,
+    app_api_secret: str,
+) -> str:
+    try:
+        claims = jwt.decode(
+            token,
+            app_api_secret,
+            algorithms=["HS256"],
+            audience=app_api_key,
+            options={
+                "require": ["aud", "exp", "nbf", "iss", "dest"],
+            },
+        )
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Shopify session token: {exc}",
+        ) from exc
+
+    if not isinstance(claims, dict):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify session token payload is invalid",
+        )
+
+    return _parse_destination_shop_domain(claims)

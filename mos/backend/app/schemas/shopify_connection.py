@@ -18,6 +18,22 @@ class ShopifyInstallUrlResponse(BaseModel):
     installUrl: str
 
 
+class ShopifyAppCredentialsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    apiKey: str = Field(..., min_length=1)
+    apiSecret: str = Field(..., min_length=1)
+
+
+class ShopifyAppCredentialsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    apiKey: str | None = None
+    hasApiSecret: bool = False
+    isConfigured: bool = False
+    updatedAt: datetime | None = None
+
+
 class ShopifyInstallationUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

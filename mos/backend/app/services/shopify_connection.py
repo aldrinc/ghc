@@ -5,7 +5,7 @@ import binascii
 from dataclasses import dataclass
 import re
 from typing import Any
-from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from fastapi import HTTPException, status
@@ -3356,8 +3356,27 @@ def audit_client_shopify_theme_brand(
     }
 
 
-def build_client_shopify_install_url(*, client_id: str, shop_domain: str) -> str:
+def build_client_shopify_install_url(
+    *,
+    client_id: str,
+    shop_domain: str,
+    app_api_key: str,
+    app_api_secret: str,
+) -> str:
     normalized_shop = normalize_shop_domain(shop_domain)
+    normalized_app_api_key = app_api_key.strip()
+    normalized_app_api_secret = app_api_secret.strip()
+    if not normalized_app_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workspace Shopify app API key cannot be empty.",
+        )
+    if not normalized_app_api_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workspace Shopify app API secret cannot be empty.",
+        )
+
     installations = list_shopify_installations()
 
     for installation in installations:
@@ -3374,15 +3393,42 @@ def build_client_shopify_install_url(*, client_id: str, shop_domain: str) -> str
                 ),
             )
 
-    base_url, _ = _require_checkout_service_config()
-    query = urlencode({"shop": normalized_shop, "client_id": client_id})
-    return f"{base_url}/auth/install?{query}"
+    payload = _bridge_request(
+        method="POST",
+        path="/admin/oauth/install-url",
+        json_body={
+            "clientId": client_id,
+            "shopDomain": normalized_shop,
+            "appApiKey": normalized_app_api_key,
+            "appApiSecret": normalized_app_api_secret,
+        },
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid install-url payload.",
+        )
+    install_url = payload.get("installUrl")
+    if not isinstance(install_url, str) or not install_url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app did not return a valid installUrl.",
+        )
+    return install_url.strip()
 
 
-def build_client_shopify_install_urls(*, client_id: str, shop_domain: str) -> dict[str, str]:
+def build_client_shopify_install_urls(
+    *,
+    client_id: str,
+    shop_domain: str,
+    app_api_key: str,
+    app_api_secret: str,
+) -> dict[str, str]:
     install_url = build_client_shopify_install_url(
         client_id=client_id,
         shop_domain=shop_domain,
+        app_api_key=app_api_key,
+        app_api_secret=app_api_secret,
     )
     return {
         "installUrl": install_url,

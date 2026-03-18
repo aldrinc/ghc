@@ -1137,12 +1137,50 @@ def test_build_strategy_v2_testimonial_grounding_includes_voc_and_guardrails():
 
 
 def test_testimonial_generation_count_enforces_sales_pdp_minimum():
-    assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=12) == 75
+    assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=12) == 74
     assert funnel_testimonials._testimonial_generation_count(template_kind="sales-pdp", image_target_count=90) == 90
     assert (
         funnel_testimonials._testimonial_generation_count(
             template_kind="pre-sales-listicle",
             image_target_count=12,
+        )
+        == 12
+    )
+
+def test_resolve_testimonial_generation_count_caps_budgeted_sales_pdp_runs():
+    budgeted_floor = max(12, funnel_testimonials._SALES_PDP_BUDGETED_MIN_REVIEWS)
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=12,
+            max_duration_seconds=900,
+        )
+        == budgeted_floor
+    )
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=90,
+            max_duration_seconds=900,
+        )
+        == 90
+    )
+
+
+def test_resolve_testimonial_generation_count_keeps_non_budgeted_behavior():
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="sales-pdp",
+            image_target_count=12,
+            max_duration_seconds=None,
+        )
+        == 74
+    )
+    assert (
+        funnel_testimonials._resolve_testimonial_generation_count(
+            template_kind="pre-sales-listicle",
+            image_target_count=12,
+            max_duration_seconds=900,
         )
         == 12
     )
@@ -1369,7 +1407,6 @@ def test_generate_pre_sales_swipe_testimonial_asset_uses_shared_swipe_activity(m
     assert result.generated_asset.public_id == "public-1"
     assert result.job_id == "job-1"
     assert result.ai_metadata["promptUsed"] == "render prompt"
-
 
 def test_sync_sales_pdp_guarantee_feed_images_updates_primary_guarantee_image():
     puck_data = {

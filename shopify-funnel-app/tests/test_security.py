@@ -27,7 +27,7 @@ def test_verify_oauth_hmac_accepts_valid_signature():
     digest = _oauth_hmac(query_items, "test_secret")
     query_items.append(("hmac", digest))
 
-    assert verify_oauth_hmac(query_items)
+    assert verify_oauth_hmac(query_items, app_api_secret="test_secret")
 
 
 def test_verify_oauth_hmac_rejects_invalid_signature():
@@ -39,4 +39,4 @@ def test_verify_oauth_hmac_rejects_invalid_signature():
         ("hmac", "invalid"),
     ]
 
-    assert not verify_oauth_hmac(query_items)
+    assert not verify_oauth_hmac(query_items, app_api_secret="test_secret")
