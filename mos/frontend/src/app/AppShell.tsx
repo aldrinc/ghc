@@ -58,8 +58,10 @@ import {
   Target,
   MessageSquare,
   Package,
+  ShoppingBag,
 } from "lucide-react";
 import { appRoutes } from "./routes";
+import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
@@ -87,8 +89,9 @@ const WORKSPACE_NAV: NavSection = {
   label: "Workspace",
   items: [
     { title: "Overview", path: "/workspaces/overview", icon: LayoutDashboard },
-    { title: "Workflows", path: "/workflows", icon: ListChecks },
+    { title: "Workflows", path: "/strategy", icon: ListChecks },
     { title: "Brand", path: "/workspaces/brand", icon: Settings2 },
+    { title: "Commerce", path: "/commerce", icon: ShoppingBag },
     { title: "Products", path: "/workspaces/products", icon: Package },
   ],
 };
@@ -303,7 +306,7 @@ export function AppShell() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] rounded-lg"
                   align="start"
                   side={isMobile ? "bottom" : "right"}
                   sideOffset={6}
@@ -311,37 +314,43 @@ export function AppShell() {
                   <DropdownMenuLabel className="text-xs text-muted-foreground">
                     Workspaces
                   </DropdownMenuLabel>
-                  <DropdownMenuGroup className="max-h-72 overflow-y-auto">
-                    {isLoadingWorkspaces ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">Loading workspaces…</div>
-                    ) : isWorkspaceError ? (
-                      <div className="px-3 py-2 text-xs text-danger">
-                        {workspaceErrorMessage}
-                      </div>
-                    ) : clients.length ? (
-                      clients.map((client) => (
-                        <DropdownMenuItem
-                          key={client.id}
-                          className="gap-3"
-                          onClick={() => handleSelectWorkspace(client.id)}
-                        >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-md border border-sidebar-border bg-surface-2 text-sidebar-foreground text-sm font-semibold uppercase">
-                            {getWorkspaceInitial(client.name)}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-semibold leading-5">{client.name}</span>
-                            {client.industry ? (
-                              <span className="text-xs text-muted-foreground">{client.industry}</span>
-                            ) : null}
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        No workspaces yet. Start onboarding to create one.
-                      </div>
-                    )}
-                  </DropdownMenuGroup>
+                  {isLoadingWorkspaces ? (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Loading workspaces…</div>
+                  ) : isWorkspaceError ? (
+                    <div className="px-3 py-2 text-xs text-danger">
+                      {workspaceErrorMessage}
+                    </div>
+                  ) : clients.length ? (
+                    clients.map((client) => (
+                      <DropdownMenuItem
+                        key={client.id}
+                        className="gap-3"
+                        onClick={() => handleSelectWorkspace(client.id)}
+                      >
+                        <div className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-md border text-sm font-semibold uppercase",
+                          client.id === workspace?.id
+                            ? "border-accent bg-accent/10 text-accent"
+                            : "border-sidebar-border bg-surface-2 text-sidebar-foreground"
+                        )}>
+                          {getWorkspaceInitial(client.name)}
+                        </div>
+                        <div className="flex flex-1 flex-col">
+                          <span className="font-semibold leading-5">{client.name}</span>
+                          {client.industry ? (
+                            <span className="text-xs text-muted-foreground">{client.industry}</span>
+                          ) : null}
+                        </div>
+                        {client.id === workspace?.id ? (
+                          <BadgeCheck className="size-4 text-accent" />
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      No workspaces yet. Start onboarding to create one.
+                    </div>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="gap-3" onClick={handleCreateWorkspace}>
                     <Plus className="size-4" />

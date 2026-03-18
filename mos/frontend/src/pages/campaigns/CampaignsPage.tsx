@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ASSET_BRIEF_TYPE_OPTIONS, DEFAULT_ASSET_BRIEF_TYPES, type AssetBriefType } from "@/lib/assetBriefTypes";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Campaign } from "@/types/common";
 
 const CHANNEL_OPTIONS = [{ value: "facebook", label: "Facebook Ads" }];
@@ -32,6 +33,7 @@ export function CampaignsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: modalProducts = [], isLoading: isLoadingModalProducts } = useProducts(clientId || undefined);
 
   const clientLookup = useMemo(() => {
@@ -45,7 +47,7 @@ export function CampaignsPage() {
   const productLookup = useMemo(() => {
     const map: Record<string, string> = {};
     workspaceProducts.forEach((item) => {
-      map[item.id] = item.name;
+      map[item.id] = item.title;
     });
     return map;
   }, [workspaceProducts]);
@@ -83,6 +85,20 @@ export function CampaignsPage() {
       setModalProductId("");
     }
   }, [clientId]);
+
+  const filteredCampaigns = useMemo(() => {
+    if (!searchQuery.trim()) return campaigns;
+    const q = searchQuery.toLowerCase();
+    return campaigns.filter((c) => {
+      const clientName = clientLookup[c.client_id] || "";
+      const productName = productLookup[c.product_id || ""] || "";
+      return (
+        c.name.toLowerCase().includes(q) ||
+        clientName.toLowerCase().includes(q) ||
+        productName.toLowerCase().includes(q)
+      );
+    });
+  }, [campaigns, searchQuery, clientLookup, productLookup]);
 
   const resolvedClientId = workspace?.id || clientId;
   const resolvedProductId = workspace?.id ? product?.id : modalProductId;
@@ -183,19 +199,32 @@ export function CampaignsPage() {
             <div className="text-sm font-semibold text-content">Campaigns</div>
             <div className="text-xs text-content-muted">
               {workspace
-                ? `${campaigns.length} for ${workspace.name}${product?.title ? ` · ${product.title}` : ""}`
-                : `${campaigns.length} across all workspaces`}
+                ? `${filteredCampaigns.length} of ${campaigns.length} for ${workspace.name}${product?.title ? ` · ${product.title}` : ""}`
+                : `${filteredCampaigns.length} of ${campaigns.length} across all workspaces`}
             </div>
           </div>
-          <div className="text-xs text-content-muted">
-            Scope: {workspace ? `${workspace.name}${product?.title ? ` · ${product.title}` : ""}` : "All workspaces"}
-          </div>
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search campaigns…"
+            className="max-w-xs text-sm"
+          />
         </div>
         {isLoading ? (
-          <div className="p-4 text-sm text-content-muted">Loading campaigns…</div>
+          <div className="divide-y divide-border">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-8 w-16 rounded-md" />
+              </div>
+            ))}
+          </div>
         ) : (
           <ul className="divide-y divide-border">
-            {campaigns.map((c) => (
+            {filteredCampaigns.map((c) => (
               <li
                 key={c.id}
                 className="group cursor-pointer px-4 py-3 transition hover:bg-surface-hover"
@@ -225,8 +254,10 @@ export function CampaignsPage() {
                 </div>
               </li>
             ))}
-            {!campaigns.length && (
-              <li className="px-4 py-3 text-sm text-content-muted">No campaigns yet.</li>
+            {!filteredCampaigns.length && (
+              <li className="px-4 py-3 text-sm text-content-muted">
+                {searchQuery.trim() ? "No campaigns match your search." : "No campaigns yet."}
+              </li>
             )}
           </ul>
         )}

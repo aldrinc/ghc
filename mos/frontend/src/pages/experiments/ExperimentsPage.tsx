@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useLatestArtifact } from "@/api/artifacts";
@@ -33,9 +35,11 @@ export function ExperimentsPage() {
     return (
       <div className="space-y-4">
         <PageHeader title="Angles" description="Select a workspace to view angles." />
-        <div className="ds-card ds-card--md ds-card--empty text-center text-sm">
-          Choose a workspace from the sidebar.
-        </div>
+        <EmptyState
+          title="No workspace selected"
+          description="Choose a workspace to view angles."
+          actions={<InlineWorkspacePicker />}
+        />
       </div>
     );
   }
@@ -43,9 +47,7 @@ export function ExperimentsPage() {
     return (
       <div className="space-y-4">
         <PageHeader title="Angles" description="Select a product to view product-scoped angles." />
-        <div className="ds-card ds-card--md ds-card--empty text-center text-sm">
-          Choose a product from the header to view angle specs and briefs.
-        </div>
+        <EmptyState title="No product selected" description="Choose a product from the header to view angle specs and briefs." />
       </div>
     );
   }

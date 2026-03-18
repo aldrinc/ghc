@@ -637,7 +637,7 @@ export function WorkflowDetailPage() {
           <Menu>
             <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>Actions</MenuTrigger>
             <MenuContent>
-              <MenuItem onClick={() => navigate("/workflows")}>Open all workflows</MenuItem>
+              <MenuItem onClick={() => navigate("/strategy")}>Open all strategy runs</MenuItem>
               <MenuItem onClick={() => void refetch()}>Refresh now</MenuItem>
               {run?.id ? <MenuItem onClick={() => navigator.clipboard.writeText(run.id)}>Copy workflow ID</MenuItem> : null}
               {run?.status === "running" ? (
@@ -891,7 +891,7 @@ export function WorkflowDetailPage() {
                           <TableCell className="font-semibold text-content">Step {art.step_key}</TableCell>
                           <TableCell className="text-sm text-content-muted">{truncate(summary, 120)}</TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Link to={`/workflows/${workflowId}/research/${art.step_key}`} className="text-sm">
+                            <Link to={`/strategy/${workflowId}/research/${art.step_key}`} className="text-sm">
                               <Button variant="secondary" size="xs">View</Button>
                             </Link>
                             {isExternalDocUrl(art.doc_url) ? (
@@ -1248,7 +1248,7 @@ export function WorkflowDetailPage() {
                   <Callout variant="success" title="Launch workflow started">
                     Launch workflow run:{" "}
                     <Link
-                      to={`/workflows/${latestLaunchResponse.launch_workflow_run_id}`}
+                      to={`/strategy/${latestLaunchResponse.launch_workflow_run_id}`}
                       className="font-mono underline"
                     >
                       {latestLaunchResponse.launch_workflow_run_id}
@@ -1304,7 +1304,7 @@ export function WorkflowDetailPage() {
                               <TableCell>{formatDate(row.created_at)}</TableCell>
                               <TableCell>
                                 {row.launch_workflow_run_id ? (
-                                  <Link to={`/workflows/${row.launch_workflow_run_id}`} className="font-mono underline">
+                                  <Link to={`/strategy/${row.launch_workflow_run_id}`} className="font-mono underline">
                                     {row.launch_workflow_run_id}
                                   </Link>
                                 ) : (

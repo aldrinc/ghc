@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { CampaignMetaAdsPanel } from "@/components/campaigns/CampaignMetaAdsPanel";
+import { MetaPublishWorkspace } from "@/components/campaigns/meta";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaign, useCampaignStrategyV2Launches, useUpdateExperimentSpecs } from "@/api/campaigns";
@@ -737,7 +737,7 @@ export function CampaignDetailPage() {
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
-      navigate(`/workflows/${response.workflow_run_id}`);
+      navigate(`/strategy/${response.workflow_run_id}`);
     } catch (err) {
       setCreativeProductionError(`Failed to start creative production: ${getErrorMessage(err)}`);
     } finally {
@@ -1074,7 +1074,7 @@ export function CampaignDetailPage() {
                     variant="secondary"
                     size="xs"
                     className="mt-2"
-                    onClick={() => navigate(`/workflows/${latestWorkflow.id}`)}
+                    onClick={() => navigate(`/strategy/${latestWorkflow.id}`)}
                   >
                     Open workflow
                   </Button>
@@ -1163,7 +1163,7 @@ export function CampaignDetailPage() {
                         </TableCell>
                         <TableCell className="text-sm text-content-muted">{formatDate(wf.started_at)}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="secondary" size="xs" onClick={() => navigate(`/workflows/${wf.id}`)}>
+                          <Button variant="secondary" size="xs" onClick={() => navigate(`/strategy/${wf.id}`)}>
                             Open
                           </Button>
                         </TableCell>
@@ -1387,7 +1387,7 @@ export function CampaignDetailPage() {
                             variant="secondary"
                             size="xs"
                             className="mt-2"
-                            onClick={() => navigate(`/workflows/${latestFunnelWorkflow.id}`)}
+                            onClick={() => navigate(`/strategy/${latestFunnelWorkflow.id}`)}
                           >
                             Open workflow
                           </Button>
@@ -1859,9 +1859,7 @@ export function CampaignDetailPage() {
         </TabsContent>
 
         <TabsContent value="meta" flush>
-          <div className={READABILITY_MAX_WIDTH_CLASS}>
-            <CampaignMetaAdsPanel campaign={campaign} assetBriefs={assetBriefs} />
-          </div>
+          <MetaPublishWorkspace campaign={campaign} assetBriefs={assetBriefs} />
         </TabsContent>
       </Tabs>
 

@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { ErrorState } from "@/components/layout/ErrorState";
+import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -7,10 +10,12 @@ import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/com
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useClients } from "@/api/clients";
 import { useStopWorkflow, useWorkflows } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 type Filters = {
   status: string;
@@ -25,11 +30,35 @@ function formatDate(value: string) {
   return date.toLocaleString();
 }
 
+function formatKind(kind: string) {
+  return kind
+    .split("_")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+function formatElapsed(startedAt: string, finishedAt?: string | null) {
+  const start = new Date(startedAt).getTime();
+  if (Number.isNaN(start)) return "—";
+  const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  const seconds = Math.round((end - start) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
 export function WorkflowsPage() {
   const navigate = useNavigate();
-  const { data: workflows, isLoading } = useWorkflows();
+  const { workspace } = useWorkspace();
+  const { product, isLoading: isLoadingProduct } = useProductContext();
+  const workflowsEnabled = Boolean(workspace?.id && product?.id);
+  const { data: workflows, isLoading, isError, refetch } = useWorkflows(
+    workflowsEnabled ? { clientId: workspace.id, productId: product.id } : undefined,
+    { enabled: workflowsEnabled },
+  );
   const { data: clients } = useClients();
-  const { product } = useProductContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [stopId, setStopId] = useState<string | null>(null);
   const stopWorkflow = useStopWorkflow();
@@ -115,6 +144,40 @@ export function WorkflowsPage() {
     </div>
   );
 
+  if (!workspace) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Workflows" description="Select a workspace to view workflow runs." />
+        <EmptyState
+          title="No workspace selected"
+          description="Choose a workspace to view workflow runs."
+          actions={<InlineWorkspacePicker />}
+        />
+      </div>
+    );
+  }
+
+  if (isLoadingProduct && !product) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Workflows" description="Loading workflow runs for the active product." />
+        <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading workflows…</div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Workflows" description="Select a product to view product-scoped workflow runs." />
+        <EmptyState
+          title="No product selected"
+          description="Choose a product from the header to view workflow runs for that product."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -172,7 +235,27 @@ export function WorkflowsPage() {
         </div>
 
         {isLoading ? (
-          <div className="p-4 text-sm text-content-muted">Loading workflows…</div>
+          <div className="divide-y divide-border">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="ml-auto h-8 w-20 rounded-md" />
+              </div>
+            ))}
+          </div>
+        ) : isError ? (
+          <div className="p-4">
+            <ErrorState
+              title="Failed to load workflows"
+              message="Could not fetch workflow runs. Check your connection and try again."
+              onRetry={() => refetch()}
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <Table variant="ghost">
@@ -183,38 +266,40 @@ export function WorkflowsPage() {
                   <TableHeadCell>Workspace</TableHeadCell>
                   <TableHeadCell>Campaign</TableHeadCell>
                   <TableHeadCell>Started</TableHeadCell>
-                  <TableHeadCell>Current step</TableHeadCell>
+                  <TableHeadCell>Duration</TableHeadCell>
                   <TableHeadCell className="text-right">Actions</TableHeadCell>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredWorkflows.map((wf) => {
                   const clientName = wf.client_id ? clientLookup[wf.client_id] || wf.client_id : "—";
-                  const currentStep =
-                    wf.status === "running"
-                      ? "Running"
-                      : wf.status === "failed"
-                      ? "Failed"
-                      : wf.finished_at
-                      ? "Finished"
-                      : "—";
                   return (
                     <TableRow key={wf.id} hover>
-                      <TableCell className="font-semibold text-content">{wf.kind}</TableCell>
+                      <TableCell className="font-semibold text-content">{formatKind(wf.kind)}</TableCell>
                       <TableCell>
                         <StatusBadge status={wf.status} />
                       </TableCell>
                       <TableCell>{clientName}</TableCell>
-                      <TableCell>{wf.campaign_id || "—"}</TableCell>
+                      <TableCell>
+                        {wf.campaign_id ? (
+                          <button
+                            type="button"
+                            className="font-mono text-xs text-accent hover:underline"
+                            onClick={() => navigate(`/campaigns/${wf.campaign_id}`)}
+                          >
+                            {wf.campaign_id.slice(0, 8)}…
+                          </button>
+                        ) : "—"}
+                      </TableCell>
                       <TableCell className="text-xs text-content-muted">{formatDate(wf.started_at)}</TableCell>
-                      <TableCell className="text-xs text-content-muted">{currentStep}</TableCell>
+                      <TableCell className="text-xs text-content-muted">{formatElapsed(wf.started_at, wf.finished_at)}</TableCell>
                       <TableCell className="text-right">
                         <Menu>
                           <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>
                             Actions
                           </MenuTrigger>
                           <MenuContent>
-                            <MenuItem onClick={() => navigate(`/workflows/${wf.id}`)}>Open</MenuItem>
+                            <MenuItem onClick={() => navigate(`/strategy/${wf.id}`)}>Open</MenuItem>
                             <MenuItem onClick={() => setStopId(wf.id)}>Stop</MenuItem>
                             <MenuItem onClick={() => navigator.clipboard.writeText(wf.id)}>Copy ID</MenuItem>
                           </MenuContent>

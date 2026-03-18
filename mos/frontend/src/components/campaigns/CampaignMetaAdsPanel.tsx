@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
+import { useCampaignDelivery } from "@/api/campaigns";
 import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
 import { useMetaApi } from "@/api/meta";
@@ -377,6 +378,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const queryClient = useQueryClient();
   const { post } = useApiClient();
   const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
+  const deliveryQuery = useCampaignDelivery(campaign.id);
   const funnelsQuery = useFunnels({ campaignId: campaign.id });
   const {
     getActiveConfig,
@@ -424,7 +426,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [selectionPendingAssetIds, setSelectionPendingAssetIds] = useState<string[]>([]);
   const [publishCampaignForm, setPublishCampaignForm] = useState<MetaPublishCampaignForm>(() =>
-    buildInitialPublishCampaignForm(reviewBaseUrl),
+    buildInitialPublishCampaignForm(reviewBaseUrl || ""),
   );
   const [publishAdSetForms, setPublishAdSetForms] = useState<Record<string, MetaPublishAdSetForm>>({});
   const [publishFormError, setPublishFormError] = useState<string | null>(null);
@@ -444,6 +446,8 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     () => new Map((funnelsQuery.data || []).map((funnel) => [funnel.id, funnel])),
     [funnelsQuery.data],
   );
+  const isExternalDelivery = deliveryQuery.data?.deliveryMode === "external_urls";
+  const requiresFunnelScope = !isExternalDelivery;
 
   const refreshPipeline = useCallback(async () => {
     setPipelineLoading(true);
@@ -564,7 +568,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const handlePrepareMetaReview = async () => {
     setPrepareError(null);
     setPrepareIssues([]);
-    if (!activeFunnelId) {
+    if (requiresFunnelScope && !activeFunnelId) {
       setPrepareError("Pick one funnel in the Meta ads tab before preparing Meta review.");
       return;
     }
@@ -580,7 +584,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     try {
       await post(`/campaigns/${campaign.id}/meta/review-setup`, {
         assetBriefIds: prepareAssetBriefIds,
-        funnelId: activeFunnelId,
+        funnelId: requiresFunnelScope ? activeFunnelId : undefined,
         generationBatchId:
           latestGenerationOnly && latestGenerationSummary?.kind === "batch" ? latestGenerationBatchId : undefined,
       });
@@ -592,7 +596,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
       const detail = readRecord((apiError.raw as { detail?: unknown } | undefined)?.detail);
       const invalidAssets = Array.isArray(detail?.invalidAssets) ? detail.invalidAssets : [];
       const parsedIssues: MetaReviewSetupIssue[] = invalidAssets
-        .map((entry) => {
+        .map((entry): MetaReviewSetupIssue | null => {
           const record = readRecord(entry);
           if (!record) return null;
           const issues = Array.isArray(record.issues)
@@ -700,36 +704,40 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   );
   const activeFunnelId = selectedFunnelId || (latestGenerationFunnelIds.length === 1 ? latestGenerationFunnelIds[0] : null);
   const activeFunnel = activeFunnelId ? funnelById.get(activeFunnelId) || null : null;
-  const activeFunnelLabel = activeFunnelId ? formatFunnelLabel(activeFunnel, activeFunnelId) : null;
+  const activeFunnelLabel = isExternalDelivery
+    ? "External destinations"
+    : activeFunnelId
+      ? formatFunnelLabel(activeFunnel, activeFunnelId)
+      : null;
   const visiblePublishRuns = useMemo(() => {
-    if (!activeFunnelId) return publishRuns;
+    if (!requiresFunnelScope || !activeFunnelId) return publishRuns;
     return publishRuns.filter((run) => {
       const runFunnelId = readString(run.metadata?.funnelId);
       return !runFunnelId || runFunnelId === activeFunnelId;
     });
-  }, [activeFunnelId, publishRuns]);
+  }, [activeFunnelId, publishRuns, requiresFunnelScope]);
   const baseVisiblePipeline = useMemo(() => {
     if (!latestGenerationOnly || !latestGenerationKey) return pipeline;
     return pipeline.filter((item) => getGenerationGroup(item).key === latestGenerationKey);
   }, [latestGenerationKey, latestGenerationOnly, pipeline]);
   const visiblePipeline = useMemo(() => {
     if (!activeFunnelId) {
-      return latestGenerationFunnelIds.length > 1 ? [] : baseVisiblePipeline;
+      return requiresFunnelScope && latestGenerationFunnelIds.length > 1 ? [] : baseVisiblePipeline;
     }
     return baseVisiblePipeline.filter((item) => getPipelineItemFunnelId(item) === activeFunnelId);
-  }, [activeFunnelId, baseVisiblePipeline, getPipelineItemFunnelId, latestGenerationFunnelIds.length]);
+  }, [activeFunnelId, baseVisiblePipeline, getPipelineItemFunnelId, latestGenerationFunnelIds.length, requiresFunnelScope]);
   const latestGenerationScopedPipeline = useMemo(() => {
-    if (!activeFunnelId) return [];
+    if (!activeFunnelId) return requiresFunnelScope ? [] : latestGenerationPipeline;
     return latestGenerationPipeline.filter((item) => getPipelineItemFunnelId(item) === activeFunnelId);
-  }, [activeFunnelId, getPipelineItemFunnelId, latestGenerationPipeline]);
+  }, [activeFunnelId, getPipelineItemFunnelId, latestGenerationPipeline, requiresFunnelScope]);
   const hiddenLegacyCount = useMemo(() => {
     if (!latestGenerationOnly || !latestGenerationKey) return 0;
     return pipeline.length - baseVisiblePipeline.length;
   }, [baseVisiblePipeline.length, latestGenerationKey, latestGenerationOnly, pipeline.length]);
   const hiddenOtherFunnelCount = useMemo(() => {
-    if (!activeFunnelId) return 0;
+    if (!requiresFunnelScope || !activeFunnelId) return 0;
     return baseVisiblePipeline.length - visiblePipeline.length;
-  }, [activeFunnelId, baseVisiblePipeline.length, visiblePipeline.length]);
+  }, [activeFunnelId, baseVisiblePipeline.length, requiresFunnelScope, visiblePipeline.length]);
   const visibleMissingCreativeSpecCount = useMemo(
     () => visiblePipeline.filter((item) => !item.creative_spec?.id).length,
     [visiblePipeline],
@@ -757,8 +765,10 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     () => latestGenerationScopedPipeline.filter((item) => selectionByAssetId.get(item.asset.id)?.decision === "excluded").length,
     [latestGenerationScopedPipeline, selectionByAssetId],
   );
-  const canManagePublishPackage = latestGenerationOnly && Boolean(latestGenerationKey) && Boolean(activeFunnelId);
-  const canPrepareMetaReview = latestGenerationOnly && Boolean(latestGenerationKey) && Boolean(activeFunnelId);
+  const canManagePublishPackage =
+    latestGenerationOnly && Boolean(latestGenerationKey) && (!requiresFunnelScope || Boolean(activeFunnelId));
+  const canPrepareMetaReview =
+    latestGenerationOnly && Boolean(latestGenerationKey) && (!requiresFunnelScope || Boolean(activeFunnelId));
   const includedAdSetSpecs = useMemo(() => {
     const byId = new Map<string, MetaAdSetSpec>();
     includedPackageItems.forEach((item) => {
@@ -969,13 +979,13 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     if (!latestGenerationKey) {
       throw new Error("No latest generation is selected for publish.");
     }
-    if (!activeFunnelId) {
+    if (requiresFunnelScope && !activeFunnelId) {
       throw new Error("Pick one funnel before validating or publishing the Meta package.");
     }
     return {
       generationKey: latestGenerationKey,
-      funnelId: activeFunnelId,
       metaConfigId: config?.id || undefined,
+      funnelId: requiresFunnelScope ? activeFunnelId : null,
       publishBaseUrl: publishCampaignForm.publishBaseUrl.trim(),
       campaignName: publishCampaignForm.campaignName.trim(),
       campaignObjective: publishCampaignForm.campaignObjective.trim(),
@@ -985,7 +995,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         .map((entry) => entry.trim())
         .filter(Boolean),
     };
-  }, [activeFunnelId, config?.id, latestGenerationKey, publishCampaignForm]);
+  }, [activeFunnelId, config?.id, latestGenerationKey, publishCampaignForm, requiresFunnelScope]);
 
   const persistPublishAdSetConfigs = useCallback(async () => {
     for (const spec of includedAdSetSpecs) {
@@ -1175,21 +1185,30 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Meta funnel scope</label>
-            <Select
-              value={activeFunnelId || ""}
-              onValueChange={(value) => setSelectedFunnelId(readString(value))}
-              options={
-                funnelScopeOptions.length
-                  ? [{ label: "Select funnel", value: "" }, ...funnelScopeOptions]
-                  : [{ label: "No funnels in latest generation", value: "" }]
-              }
-              disabled={funnelScopeOptions.length <= 1}
-            />
+            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
+              {requiresFunnelScope ? "Meta funnel scope" : "Delivery scope"}
+            </label>
+            {requiresFunnelScope ? (
+              <Select
+                value={activeFunnelId || ""}
+                onValueChange={(value) => setSelectedFunnelId(readString(value))}
+                options={
+                  funnelScopeOptions.length
+                    ? [{ label: "Select funnel", value: "" }, ...funnelScopeOptions]
+                    : [{ label: "No funnels in latest generation", value: "" }]
+                }
+                disabled={funnelScopeOptions.length <= 1}
+              />
+            ) : (
+              <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-content">
+                External destination URLs
+              </div>
+            )}
           </div>
           <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-content-muted">
-            This Meta ads tab operates on one funnel at a time. Review prep, Meta QA, the final package, and publish all
-            use the selected funnel scope.
+            {requiresFunnelScope
+              ? "This Meta ads tab operates on one funnel at a time. Review prep, Meta QA, the final package, and publish all use the selected funnel scope."
+              : "This Meta ads tab uses the campaign's validated external destinations. Review prep, Meta QA, the final package, and publish all use the campaign delivery config."}
           </div>
         </div>
 
@@ -1215,31 +1234,45 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
         <div className="mt-2 space-y-1 text-sm text-content-muted">
           <div>Generate creatives runs the swipe-first remix flow and Stage 1 Gemini swipe copy generation for the current briefs.</div>
-          <div>Prepare Meta review creates internal Meta creative specs from the selected funnel's stored swipe copy packs.</div>
-          <div>Meta publish package scope is generation-scoped and funnel-scoped. Everything in the latest generation for the selected funnel is included by default unless excluded.</div>
+          <div>
+            {requiresFunnelScope
+              ? "Prepare Meta review creates internal Meta creative specs from the selected funnel's stored swipe copy packs."
+              : "Prepare Meta review creates Meta creative specs that point at the campaign's validated external destination URLs."}
+          </div>
+          <div>
+            {requiresFunnelScope
+              ? "Meta publish package scope is generation-scoped and funnel-scoped. Everything in the latest generation for the selected funnel is included by default unless excluded."
+              : "Meta publish package scope is generation-scoped. Everything in the latest generation is included by default unless excluded."}
+          </div>
           {lastWorkflowRunId ? <div>Latest creative workflow: <span className="font-mono">{lastWorkflowRunId}</span></div> : null}
           {lastPreparedAt ? <div>Latest Meta review prep: {formatDate(lastPreparedAt)}</div> : null}
           {autoRefreshUntil ? <div>Auto-refreshing this panel while creative generation completes.</div> : null}
           {!hasGeneratedAssets ? <div>Generate creatives first. Meta review stays disabled until campaign assets exist.</div> : null}
           {latestGenerationSummary ? <div>Visible generation focus: <span className="font-mono">{latestGenerationSummary.label}</span></div> : null}
-          {activeFunnelLabel ? <div>Funnel scope: <span className="font-mono">{activeFunnelLabel}</span></div> : null}
+          {activeFunnelLabel ? (
+            <div>{requiresFunnelScope ? "Funnel scope" : "Delivery scope"}: <span className="font-mono">{activeFunnelLabel}</span></div>
+          ) : null}
           {hiddenLegacyCount ? <div>{hiddenLegacyCount} older or non-selected assets are currently hidden.</div> : null}
           {hiddenOtherFunnelCount ? <div>{hiddenOtherFunnelCount} assets from other funnels are hidden by the current Meta funnel scope.</div> : null}
-          {latestGenerationFunnelIds.length > 1 && !activeFunnelId ? (
+          {requiresFunnelScope && latestGenerationFunnelIds.length > 1 && !activeFunnelId ? (
             <div className="text-warning">Pick one funnel to review the latest generation. Mixed-funnel Meta review is blocked.</div>
           ) : null}
-          {latestGenerationUnmappedCount ? (
+          {requiresFunnelScope && latestGenerationUnmappedCount ? (
             <div className="text-warning">
               {latestGenerationUnmappedCount} latest-generation assets are missing an explicit asset brief funnel mapping.
             </div>
           ) : null}
           {!canManagePublishPackage ? (
-            <div className="text-warning">Switch back to latest generation only and pick one funnel to manage the final Meta package.</div>
+            <div className="text-warning">
+              {requiresFunnelScope
+                ? "Switch back to latest generation only and pick one funnel to manage the final Meta package."
+                : "Switch back to latest generation only to manage the final Meta package."}
+            </div>
           ) : null}
-          {funnelScopeOptions.length > 1 && !canPrepareMetaReview ? (
+          {requiresFunnelScope && funnelScopeOptions.length > 1 && !canPrepareMetaReview ? (
             <div className="text-warning">Prepare Meta review is disabled until one funnel is selected for the latest generation.</div>
           ) : null}
-          {funnelScopeOptions.length <= 1 && funnelsQuery.isLoading ? <div>Loading funnel scope…</div> : null}
+          {requiresFunnelScope && funnelScopeOptions.length <= 1 && funnelsQuery.isLoading ? <div>Loading funnel scope…</div> : null}
           {funnelsQuery.error ? <div className="text-danger">{getErrorMessage(funnelsQuery.error)}</div> : null}
           {selectionLoading ? <div>Loading saved Meta package exclusions…</div> : null}
           {visibleMissingCreativeSpecCount ? (
@@ -1291,6 +1324,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         funnelLabel={activeFunnelLabel}
         enabled={canPrepareMetaReview}
         reviewBaseUrl={reviewBaseUrl}
+        requiresFunnelScope={requiresFunnelScope}
       />
 
       {packageView === "final" ? (
@@ -1298,7 +1332,9 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div className="border-b border-border px-4 py-3">
             <div className="text-base font-semibold text-content">Final Meta package</div>
             <div className="text-sm text-content-muted">
-              Everything in the latest generation for the selected funnel is included by default. Excluded creatives are hidden here.
+              {requiresFunnelScope
+                ? "Everything in the latest generation for the selected funnel is included by default. Excluded creatives are hidden here."
+                : "Everything in the latest generation is included by default. Excluded creatives are hidden here."}
             </div>
           </div>
 
@@ -1306,7 +1342,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
             <div className="px-4 py-3 text-sm text-content-muted">Loading final Meta package…</div>
           ) : !latestGenerationKey ? (
             <div className="px-4 py-3 text-sm text-content-muted">No latest generation is available yet.</div>
-          ) : !activeFunnelId ? (
+          ) : requiresFunnelScope && !activeFunnelId ? (
             <div className="px-4 py-3 text-sm text-content-muted">
               Pick one funnel above to see the final Meta package for this generation.
             </div>
@@ -1734,13 +1770,15 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           <div className="border-b border-border px-4 py-3">
             <div className="text-base font-semibold text-content">Draft Meta-ready creatives</div>
             <div className="text-sm text-content-muted">
-              Campaign assets, internal Meta creative specs, ad set specs, and funnel review links for the selected funnel.
+              {requiresFunnelScope
+                ? "Campaign assets, internal Meta creative specs, ad set specs, and funnel review links for the selected funnel."
+                : "Campaign assets, prepared Meta creative specs, ad set specs, and the resolved external destination URLs for this campaign."}
             </div>
           </div>
 
           {pipelineLoading ? (
             <div className="px-4 py-3 text-sm text-content-muted">Loading Meta campaign assets…</div>
-          ) : latestGenerationFunnelIds.length > 1 && !activeFunnelId ? (
+          ) : requiresFunnelScope && latestGenerationFunnelIds.length > 1 && !activeFunnelId ? (
             <div className="px-4 py-3 text-sm text-content-muted">
               Pick one funnel above before reviewing Meta-ready creatives for this generation.
             </div>
@@ -2011,7 +2049,9 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                               </div>
 
                               <div>
-                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Funnel review</div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
+                                  {requiresFunnelScope ? "Funnel review" : "Destination links"}
+                                </div>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {preSalesUrl ? (
                                     <a href={preSalesUrl} target="_blank" rel="noreferrer">
@@ -2024,7 +2064,11 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                     </a>
                                   ) : null}
                                   {!preSalesUrl && !salesUrl ? (
-                                    <div className="text-sm text-content-muted">No funnel review links on this creative spec yet.</div>
+                                    <div className="text-sm text-content-muted">
+                                      {requiresFunnelScope
+                                        ? "No funnel review links on this creative spec yet."
+                                        : "No destination links were resolved on this creative spec yet."}
+                                    </div>
                                   ) : null}
                                 </div>
                               </div>

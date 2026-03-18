@@ -27,6 +27,7 @@ type CampaignPaidAdsQaCardProps = {
   funnelLabel?: string | null;
   enabled?: boolean;
   reviewBaseUrl?: string | null;
+  requiresFunnelScope?: boolean;
 };
 
 type BooleanSelectValue = "" | "true" | "false";
@@ -226,6 +227,7 @@ export function CampaignPaidAdsQaCard({
   funnelLabel,
   enabled = true,
   reviewBaseUrl: reviewBaseUrlOverride,
+  requiresFunnelScope = true,
 }: CampaignPaidAdsQaCardProps) {
   const { get, post, request } = useApiClient();
   const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
@@ -316,7 +318,7 @@ export function CampaignPaidAdsQaCard({
   }, [campaign.id, get]);
 
   const handleRunQa = async () => {
-    if (!enabled || !funnelId) {
+    if (!enabled || (requiresFunnelScope && !funnelId)) {
       setRunError("Pick one funnel in the Meta ads tab before running Meta QA.");
       return;
     }
@@ -328,7 +330,7 @@ export function CampaignPaidAdsQaCard({
         rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
         reviewBaseUrl,
         generationKey: generationKey || undefined,
-        funnelId,
+        funnelId: requiresFunnelScope ? funnelId : undefined,
       });
       setRunHistory((current) => [response, ...current.filter((run) => run.id !== response.id)]);
       setSelectedRunId(response.id);
@@ -426,7 +428,12 @@ export function CampaignPaidAdsQaCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="neutral">{PAID_ADS_QA_RULESET_VERSION}</Badge>
-          <Button variant="secondary" size="sm" onClick={handleRunQa} disabled={runPending || !enabled || !funnelId}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRunQa}
+            disabled={runPending || !enabled || (requiresFunnelScope && !funnelId)}
+          >
             {runPending ? "Running QA…" : "Run Meta QA"}
           </Button>
         </div>
@@ -436,7 +443,9 @@ export function CampaignPaidAdsQaCard({
         <div>Review base URL: {reviewBaseUrl || "Unavailable in this browser context."}</div>
         {generationLabel ? <div>QA scope: {generationLabel}</div> : null}
         {funnelLabel ? <div>Funnel scope: {funnelLabel}</div> : null}
-        {!enabled || !funnelId ? <div className="text-warning">Meta QA is disabled until one funnel is selected in the Meta ads tab.</div> : null}
+        {!enabled || (requiresFunnelScope && !funnelId) ? (
+          <div className="text-warning">Meta QA is disabled until one funnel is selected in the Meta ads tab.</div>
+        ) : null}
         {historyLoading ? <div>Loading previous QA runs…</div> : null}
         {!historyLoading && !activeRun && !historyError && !runError ? (
           <div>No QA runs recorded for this campaign yet.</div>

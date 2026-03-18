@@ -10,7 +10,17 @@ import type {
 import type { AssetBriefType } from "@/lib/assetBriefTypes";
 import { toast } from "@/components/ui/toast";
 
-export function useWorkflows(filters?: { clientId?: string; productId?: string; campaignId?: string }) {
+type WorkflowFilters = {
+  clientId?: string;
+  productId?: string;
+  campaignId?: string;
+};
+
+type WorkflowQueryOptions = {
+  enabled?: boolean;
+};
+
+export function useWorkflows(filters?: WorkflowFilters, options?: WorkflowQueryOptions) {
   const { get } = useApiClient();
   const path = (() => {
     if (!filters) return "/workflows";
@@ -24,6 +34,7 @@ export function useWorkflows(filters?: { clientId?: string; productId?: string; 
   return useQuery<WorkflowRun[]>({
     queryKey: ["workflows", filters?.clientId ?? null, filters?.productId ?? null, filters?.campaignId ?? null],
     queryFn: () => get(path),
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -25,10 +25,20 @@ export function WorkspacesPage() {
   const [deleteStage, setDeleteStage] = useState<1 | 2>(1);
   const [confirmName, setConfirmName] = useState("");
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const sortedClients = useMemo(
     () => [...clients].sort((a, b) => a.name.localeCompare(b.name)),
     [clients]
   );
+
+  const filteredClients = useMemo(() => {
+    if (!searchQuery.trim()) return sortedClients;
+    const q = searchQuery.toLowerCase();
+    return sortedClients.filter(
+      (c) => c.name.toLowerCase().includes(q) || (c.industry || "").toLowerCase().includes(q),
+    );
+  }, [sortedClients, searchQuery]);
   const errorMessage = useMemo(() => {
     if (!error) return "Failed to load workspaces.";
     if (typeof error === "string") return error;
@@ -91,6 +101,13 @@ export function WorkspacesPage() {
             </p>
           </div>
 
+          <div className="flex items-center gap-3">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search workspaces…"
+              className="w-56 text-sm"
+            />
           <div className="inline-flex items-center gap-1 rounded-md border border-border bg-surface p-1 shadow-none">
             <button
               type="button"
@@ -119,6 +136,7 @@ export function WorkspacesPage() {
               List
             </button>
           </div>
+          </div>
         </div>
 
         {isLoading ? (
@@ -133,7 +151,7 @@ export function WorkspacesPage() {
               Retry
             </Button>
           </div>
-        ) : !sortedClients.length ? (
+        ) : !filteredClients.length && !searchQuery.trim() ? (
           <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center shadow-none">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-hover text-accent">
               <FolderPlus className="h-6 w-6" />
@@ -149,8 +167,13 @@ export function WorkspacesPage() {
               Start onboarding
             </button>
           </div>
+        ) : !filteredClients.length ? (
+          <div className="rounded-xl border border-border bg-surface p-6 text-center text-sm text-content-muted shadow-none">
+            No workspaces match "{searchQuery}".
+          </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {!searchQuery.trim() && (
             <button
               onClick={() => navigate("/workspaces/new")}
               className="group flex h-56 flex-col justify-between rounded-xl border border-dashed border-border bg-surface p-6 text-left transition hover:border-border-strong hover:bg-surface-hover"
@@ -163,8 +186,9 @@ export function WorkspacesPage() {
                 <span className="mt-1 block text-sm text-content-muted">Launch onboarding flow</span>
               </div>
             </button>
+            )}
 
-            {sortedClients.map((client) => (
+            {filteredClients.map((client) => (
               <div
                 key={client.id}
                 onClick={() => handleSelect(client.id)}
@@ -215,6 +239,7 @@ export function WorkspacesPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {!searchQuery.trim() && (
             <button
               onClick={() => navigate("/workspaces/new")}
               className="group flex w-full items-center justify-between rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-left transition hover:border-border-strong hover:bg-surface-hover"
@@ -230,8 +255,9 @@ export function WorkspacesPage() {
               </div>
               <ArrowRight className="h-4 w-4 text-content-muted transition group-hover:translate-x-1 group-hover:text-accent" />
             </button>
+            )}
 
-            {sortedClients.map((client) => (
+            {filteredClients.map((client) => (
               <div
                 key={client.id}
                 onClick={() => handleSelect(client.id)}

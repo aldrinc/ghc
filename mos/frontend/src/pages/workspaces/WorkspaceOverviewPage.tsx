@@ -4,6 +4,8 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { useWorkflows, useWorkflowDetail } from "@/api/workflows";
 import { useLatestArtifact } from "@/api/artifacts";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -84,9 +86,11 @@ export function WorkspaceOverviewPage() {
     return (
       <div className="space-y-4">
         <PageHeader title="Workspace overview" description="Select a workspace to view status and outputs." />
-        <div className="ds-card ds-card--md ds-card--empty text-center text-sm">
-          Choose a workspace from the sidebar or workspace list.
-        </div>
+        <EmptyState
+          title="No workspace selected"
+          description="Choose a workspace to view status and outputs."
+          actions={<InlineWorkspacePicker />}
+        />
       </div>
     );
   }
@@ -94,9 +98,7 @@ export function WorkspaceOverviewPage() {
     return (
       <div className="space-y-4">
         <PageHeader title="Workspace overview" description="Select a product to view product-scoped research." />
-        <div className="ds-card ds-card--md ds-card--empty text-center text-sm">
-          Choose a product from the header to view research and onboarding outputs.
-        </div>
+        <EmptyState title="No product selected" description="Choose a product from the header to view research and onboarding outputs." />
       </div>
     );
   }
@@ -110,7 +112,7 @@ export function WorkspaceOverviewPage() {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => navigate("/workflows")}>
+            <Button variant="secondary" size="sm" onClick={() => navigate("/strategy")}>
               View workflows
             </Button>
             <Button variant="primary" size="sm" onClick={() => navigate("/workspaces/new")}>
@@ -137,7 +139,7 @@ export function WorkspaceOverviewPage() {
                 variant="secondary"
                 size="xs"
                 className="mt-2"
-                onClick={() => navigate(`/workflows/${latestRun.id}`)}
+                onClick={() => navigate(`/strategy/${latestRun.id}`)}
               >
                 Open workflow
               </Button>
