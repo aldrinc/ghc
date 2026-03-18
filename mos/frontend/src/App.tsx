@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignInPage } from "@/pages/auth/SignInPage";
 import { Navigate, Route, Routes, BrowserRouter } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { DocumentsPage } from "@/pages/research/DocumentsPage";
@@ -18,13 +19,21 @@ import { WorkflowsPage } from "@/pages/workflows/WorkflowsPage";
 import { WorkflowDetailPage } from "@/pages/workflows/WorkflowDetailPage";
 import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
 import { CampaignsPage } from "@/pages/campaigns/CampaignsPage";
-import { CampaignDetailPage } from "@/pages/campaigns/CampaignDetailPage";
+import { CampaignLayout } from "@/pages/campaigns/CampaignLayout";
+import { CampaignOverviewTab } from "@/pages/campaigns/tabs/CampaignOverviewTab";
+import { CampaignStrategyTab } from "@/pages/campaigns/tabs/CampaignStrategyTab";
+import { CampaignAnglesTab } from "@/pages/campaigns/tabs/CampaignAnglesTab";
+import { CampaignCreativeTab } from "@/pages/campaigns/tabs/CampaignCreativeTab";
+import { CampaignDeliveryTab } from "@/pages/campaigns/tabs/CampaignDeliveryTab";
+import { CampaignPublishTab } from "@/pages/campaigns/tabs/CampaignPublishTab";
+import { PlatformPublishWorkspace } from "@/pages/campaigns/tabs/PlatformPublishWorkspace";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { ProductProvider } from "@/contexts/ProductContext";
 import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
 import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import { PublicFunnelRootRedirectPage } from "@/pages/public/PublicFunnelRootRedirectPage";
+import { CommercePage } from "@/pages/commerce/CommercePage";
 import { isStandaloneBundleMode } from "@/funnels/runtimeRouting";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -53,7 +62,7 @@ function App() {
         {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
         <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
         <Route path="/f/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
-        {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />}
+        {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignInPage />} />}
         {standaloneBundleMode ? null : (
           <Route
             path="/workspaces"
@@ -97,13 +106,31 @@ function App() {
             <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />
             <Route path="explore/ads" element={<Navigate to="/research?tab=ads" replace />} />
             <Route path="explore/brands" element={<Navigate to="/research?tab=brands" replace />} />
+            <Route path="commerce" element={<CommercePage />} />
             <Route path="creative-library" element={<CreativeLibraryPage />} />
             <Route path="claude-chat" element={<ClaudeChatPage />} />
-            <Route path="workflows" element={<WorkflowsPage />} />
-            <Route path="workflows/:workflowId" element={<WorkflowDetailPage />} />
-            <Route path="workflows/:workflowId/research/:stepKey" element={<ResearchDetailPage />} />
+            {/* Strategy runs (renamed from workflows) */}
+            <Route path="strategy" element={<WorkflowsPage />} />
+            <Route path="strategy/:workflowId" element={<WorkflowDetailPage />} />
+            <Route path="strategy/:workflowId/research/:stepKey" element={<ResearchDetailPage />} />
+            {/* Legacy workflow redirects */}
+            <Route path="workflows" element={<Navigate to="/strategy" replace />} />
+            <Route path="workflows/:workflowId" element={<Navigate to="/strategy" replace />} />
+            {/* Campaigns with layout shell */}
             <Route path="campaigns" element={<CampaignsPage />} />
-            <Route path="campaigns/:campaignId" element={<CampaignDetailPage />} />
+            <Route path="campaigns/:campaignId" element={<CampaignLayout />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<CampaignOverviewTab />} />
+              <Route path="strategy" element={<CampaignStrategyTab />} />
+              <Route path="angles" element={<CampaignAnglesTab />} />
+              <Route path="delivery" element={<CampaignDeliveryTab />} />
+              <Route path="creative" element={<CampaignCreativeTab />} />
+              <Route path="publish" element={<CampaignPublishTab />} />
+              <Route path="publish/:platformId" element={<PlatformPublishWorkspace />} />
+              {/* Legacy routes */}
+              <Route path="meta" element={<Navigate to="../publish/meta" replace />} />
+              <Route path="funnels" element={<Navigate to="../delivery" replace />} />
+            </Route>
           </Route>
         )}
         <Route path="*" element={<Navigate to={standaloneBundleMode ? "/" : "/workspaces"} replace />} />

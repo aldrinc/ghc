@@ -1,16 +1,59 @@
 name: Self Deploy
 
 on:
-  push:
-    branches: ["main"]
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
-  group: self-deploy-${{ github.ref }}
+  group: self-deploy-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.gate.outputs.should_deploy }}
+    steps:
+      - name: Check upstream CI/CD result
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ENABLE_PRODUCTION_CD: ${{ vars.ENABLE_PRODUCTION_CD }}
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          UPSTREAM_EVENT: ${{ github.event.workflow_run.event }}
+          UPSTREAM_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${UPSTREAM_EVENT}" != "push" ] || [ "${UPSTREAM_BRANCH}" != "main" ]; then
+            echo "Self Deploy ignores CI/CD runs from event=${UPSTREAM_EVENT} branch=${UPSTREAM_BRANCH}."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${ENABLE_PRODUCTION_CD}" != "true" ]; then
+            echo "ENABLE_PRODUCTION_CD is not true; skipping automatic production deploy."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${UPSTREAM_CONCLUSION}" != "success" ]; then
+            echo "Upstream CI/CD concluded with '${UPSTREAM_CONCLUSION}'. Production deploy is blocked." >&2
+            exit 1
+          fi
+
+          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+
   apply:
+    needs: gate
+    if: needs.gate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Validate required secrets

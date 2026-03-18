@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { EmptyState } from "@/components/layout/EmptyState";
+import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 
 export function FunnelsPage() {
   const navigate = useNavigate();
@@ -117,13 +119,13 @@ export function FunnelsPage() {
       />
 
       {!workspace ? (
-        <div className="ds-card ds-card--md text-sm text-content-muted">
-          No workspace selected. Pick a workspace from the sidebar to start building funnels.
-        </div>
+        <EmptyState
+          title="No workspace selected"
+          description="Choose a workspace to start building funnels."
+          actions={<InlineWorkspacePicker />}
+        />
       ) : !product ? (
-        <div className="ds-card ds-card--md text-sm text-content-muted">
-          Select a product from the header to view or create funnels.
-        </div>
+        <EmptyState title="No product selected" description="Choose a product from the header to view or create funnels." />
       ) : (
         <div className="ds-card ds-card--md p-0 shadow-none">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">

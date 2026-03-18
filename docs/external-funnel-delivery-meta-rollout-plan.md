@@ -17,21 +17,37 @@ Target operator flow:
 
 1. Create or open a campaign.
 2. Run foundational docs / Strategy V2 to completion.
-3. Choose a delivery mode for the campaign:
+3. Complete the required Strategy V2 decision gates and artifact approvals:
+   - foundational research proceed gate
+   - competitor asset confirmation
+   - angle selection
+   - UMP/UMS pair selection
+   - offer winner selection
+   - final copy approval
+4. Persist the campaign launch context and pinned downstream packet:
+   - selected angle
+   - angle docs and ranked candidates
+   - approved UMP/UMS pair
+   - approved offer
+   - approved copy
+   - copy context
+   - awareness-angle matrix
+   - template payloads
+5. Choose a delivery mode for the campaign:
    - `internal_funnel`
    - `external_urls`
-4. If `internal_funnel`:
+6. If `internal_funnel`:
    - Generate pre-sales and sales pages in MOS.
    - Optionally publish/deploy them.
-5. If `external_urls`:
+7. If `external_urls`:
    - Save canonical pre-sales URL.
    - Save canonical sales URL.
    - Optionally save checkout URL and thank-you URL.
    - Validate the URLs before downstream work begins.
-6. Generate asset briefs and run creative production.
-7. Prepare Meta review payloads and validate landing pages.
-8. Launch Meta assets, creatives, ad sets, campaigns, and ads.
-9. Run deterministic management and decision workflows for cut, scale, and review.
+8. Generate asset briefs and run creative production.
+9. Prepare Meta review payloads and validate landing pages.
+10. Launch Meta assets, creatives, ad sets, campaigns, and ads.
+11. Run deterministic management and decision workflows for cut, scale, and review.
 
 ## Guiding Principles
 
@@ -40,6 +56,111 @@ Target operator flow:
 - Do not add silent fallbacks. Missing or invalid destination configuration should fail with clear errors.
 - Keep internal funnels and external URLs as supported parallel modes rather than trying to fake one as the other.
 - Reuse the current creative, QA, and Meta prep pipeline wherever possible.
+
+## Required Upstream Strategy V2 Contract
+
+The external-delivery plan depends on more than a generic "Strategy V2 completed" status.
+Downstream creative generation and Meta preparation require specific artifacts, decisions, and lineage from the Strategy V2 flow.
+
+### A. Foundational context bundles that ads generation still needs
+
+The campaign creative path should continue to bundle and expose the higher-level strategy docs that already feed stage-one copy and asset generation:
+
+- `strategy_v2_stage0`
+- `strategy_v2_stage1`
+- `strategy_v2_stage2`
+- `strategy_v2_stage3`
+- `strategy_v2_awareness_angle_matrix`
+- `strategy_v2_offer`
+- `strategy_v2_copy_context`
+- `strategy_v2_copy`
+- campaign `strategy_sheet`
+- campaign `experiment_specs`
+- campaign `asset_briefs`
+
+These are already part of the creative-generation context design and should remain part of the plan.
+
+### B. Required operator decisions and workflow checkpoints
+
+The launch path in the repo is gated by explicit Strategy V2 decisions. The plan must require completion of these gates before downstream launch, creative, or Meta-specific automation can assume the campaign context is valid:
+
+- proceed foundational research
+- confirm competitor assets
+- select the winning angle
+- select the winning UMP/UMS pair
+- select the winning offer variant
+- approve final copy
+
+The current launch context loader also requires specific checkpoint lineage, especially:
+
+- `v2-06` angle synthesis and ranked angle candidates
+- `v2-08` offer pipeline and ranked UMP/UMS pairs
+- `v2-09` winner selection and artifact references
+- `v2-11` final copy approval
+
+Those checkpoint requirements should be explicit in the rollout plan rather than implied.
+
+### C. Minimum pinned launch packet that downstream systems need
+
+Before external URL delivery or Meta launch can proceed, the campaign should have a pinned downstream packet that includes at least:
+
+- selected angle id
+- selected angle name
+- selected angle evidence
+- ranked angle candidates / angle docs
+- angle run id
+- approved UMP
+- approved UMS
+- core promise
+- value stack summary
+- guarantee type
+- pricing rationale
+- approved offer winner
+- selected product offer id
+- approved copy artifact
+- approved copy headline
+- approved pre-sell markdown
+- approved sales page markdown
+- approved template payloads for:
+  - `pre-sales-listicle`
+  - `sales-pdp`
+- copy quality gate report
+- semantic gates
+- congruency output
+- copy context files
+- awareness-angle matrix
+- operator inputs required by downstream offer/ad generation:
+  - business model
+  - funnel position
+  - target platforms
+  - target regions
+  - existing proof assets
+  - brand voice notes
+
+### D. Supporting research and proof context that should remain accessible
+
+The delivery plan should also explicitly preserve access to supporting context that may be referenced by funnel generation, testimonial generation, proof selection, or ads QA:
+
+- competitor analysis
+- VOC observations
+- VOC scored outputs
+- proof asset candidates
+- stage1 payload and competitor URLs
+
+### E. Hard rule for downstream execution
+
+Creative generation, external delivery setup, Meta review setup, and Meta launch should all fail fast if the required pinned Strategy V2 context is missing, stale, or unapproved.
+
+This means the plan must treat the following as prerequisites, not optional enrichments:
+
+- angle docs
+- UMP/UMS decision
+- offer winner decision
+- final copy approval
+- copy context
+- awareness-angle matrix
+- template payloads
+- supporting proof and research references
 
 ## Current Repository Reality
 
@@ -232,6 +353,34 @@ Validation should perform:
 
 If validation fails, return a clear error payload. Do not silently accept and defer failure downstream.
 
+### Validation staleness and invalidation rule
+
+Delivery validation is scoped to the exact normalized delivery configuration.
+
+For `external_urls` campaigns:
+
+- validation pass/fail applies only to the normalized tuple of:
+  - `pre_sales_url`
+  - `sales_url`
+  - `checkout_url`
+  - `thank_you_url`
+- any change to delivery mode or any normalized URL value must:
+  - clear the previous validation result
+  - set `validation_status = not_validated`
+  - clear `validation_error`
+  - clear `validated_at`
+- the system must not reuse a prior successful validation after any destination change
+
+For `internal_funnel` campaigns:
+
+- validation status should be `not_applicable`
+- switching from `external_urls` back to `internal_funnel` should clear stored external URLs and any prior validation result
+
+Public URL rule:
+
+- only public absolute `http` or `https` URLs are valid for external delivery
+- reject localhost, loopback, private-network, and obvious intranet-style destinations
+
 ### Campaign create/update behavior
 
 Extend campaign DTOs so the delivery mode can be surfaced in the UI and API.
@@ -283,12 +432,89 @@ This keeps the current seam while making the external path first-class.
 
 ## Workflow Changes
 
+### 0. Upstream Strategy V2 prerequisites and pinned launch context
+
+This needs to be a named part of the delivery plan.
+
+Before campaign delivery mode, creative production, or Meta launch runs, the system should validate that the campaign has:
+
+- the foundational artifact set used by stage-one creative generation
+- required Strategy V2 checkpoints and decision lineage
+- a pinned downstream packet suitable for deterministic downstream execution
+
+Required launch-side checkpoint lineage:
+
+- `v2-06`
+- `v2-08`
+- `v2-09`
+- `v2-11`
+
+Required approved downstream artifacts:
+
+- `strategy_v2_stage3`
+- `strategy_v2_offer`
+- `strategy_v2_copy`
+- `strategy_v2_copy_context`
+- optionally `strategy_v2_awareness_angle_matrix` when present for the selected run
+
+Required approved decision state:
+
+- selected angle
+- selected UMP/UMS pair
+- selected offer winner
+- approved final copy
+
+Required packet fields that should be queryable and auditable from the campaign:
+
+- selected angle payload and ranked angle candidates
+- angle run id
+- stage3 UMP and UMS
+- offer winner payload
+- copy payload
+- copy template payloads
+- copy context payload
+- awareness-angle matrix payload
+- proof asset candidates and research support where available
+
+Recommendation:
+
+- add an explicit campaign-level "launch context readiness" check before allowing external delivery setup, creative generation, Meta review prep, or Meta launch
+- implement that readiness check by reusing `load_strategy_v2_source_context`, not by creating a second contract
+
+### Launch-context staleness rule
+
+The campaign launch context should be treated as a pinned artifact derived from the Strategy V2 source run lineage returned by `load_strategy_v2_source_context`.
+
+Staleness rule:
+
+- the pinned campaign launch-context artifact is valid only for the exact source lineage used to build it
+- if any required source provenance changes, the previous launch-context artifact becomes stale and a new artifact must be pinned before downstream execution continues
+
+Required provenance inputs for staleness:
+
+- source Strategy V2 workflow run id
+- approved copy artifact id
+- stage3 artifact id
+- offer artifact id
+- copy context artifact id
+- awareness-angle-matrix artifact id when present
+- required launch step payload lineage (`v2-06`, `v2-08`, `v2-09`, `v2-11`)
+
+Effectively:
+
+- any change in approved angle/copy/offer lineage invalidates the previously pinned launch packet
+- the system should persist a new campaign launch-context artifact rather than silently continuing on a stale packet
+
 ### 1. Foundational docs and Strategy V2
 
 No structural changes required.
 
 The current system already rebuilds campaign-scoped source-of-truth context from:
 
+- stage0
+- stage1
+- stage2
+- stage3
 - client canon
 - strategy stages
 - offer
@@ -299,6 +525,8 @@ The current system already rebuilds campaign-scoped source-of-truth context from
 - asset briefs
 
 The only required addition is to include delivery configuration in campaign-scoped context bundles so downstream steps can consume it consistently.
+
+In addition, the plan should explicitly state that the campaign workspace must expose the pinned Strategy V2 launch packet alongside those foundational docs so ads generation is grounded in the approved angle, UMP/UMS, offer, and copy decisions.
 
 ### 2. Internal funnel generation workflow
 
@@ -324,7 +552,6 @@ Proposed `AssetBrief` additions:
 
 - `deliveryMode`
 - `destinationType`
-- `destinationUrl`
 - `destinationLabel`
 - keep `funnelId` optional for internal mode
 
@@ -334,12 +561,13 @@ Recommended semantics:
   - `deliveryMode = internal_funnel`
   - `funnelId` may be set
   - `destinationType` can be `pre-sales` or `sales`
-  - `destinationUrl` may be omitted until review path resolution
+  - downstream resolution can map `destinationType` to internal review routing
 - external campaigns:
   - `deliveryMode = external_urls`
   - `funnelId = null`
   - `destinationType` required
-  - `destinationUrl` required
+  - actual destination URL should be resolved from the campaign delivery config downstream
+  - do not allow asset briefs to become a second canonical source of destination URLs in v1
 
 ### 4. Creative generation context and execution
 
@@ -498,6 +726,19 @@ Update it so:
 
 ## Detailed Backend Work Breakdown
 
+### Phase 0: Upstream artifact contract and launch-context readiness
+
+1. Define the minimum pinned Strategy V2 contract required for downstream campaign execution.
+2. Add a readiness check that validates required checkpoints, artifact refs, and approvals.
+3. Expose that readiness state at the campaign level in the API and UI.
+4. Ensure the pinned launch packet is persisted and queryable for all downstream flows.
+
+Acceptance criteria:
+
+- the system can explain exactly why a campaign is not ready for downstream execution
+- readiness explicitly checks angle selection, UMP/UMS selection, offer winner selection, and final copy approval
+- downstream flows do not start if the pinned Strategy V2 packet is incomplete
+
 ### Phase 1: Delivery config foundation
 
 1. Add DB enum and migration.
@@ -628,7 +869,7 @@ No existing funnel generation behavior should change for those campaigns.
 
 For pre-existing campaigns:
 
-- auto-create an internal default delivery config on read or via migration backfill
+- backfill an internal default delivery config via migration
 - do not infer external URLs from historical data
 
 ## Risks and Mitigations
@@ -664,29 +905,35 @@ Mitigation:
 - require deterministic request IDs and stored remote mappings
 - persist launch plan and launch execution state
 
-## Open Product Decisions
+## Resolved Decisions
 
-These decisions should be made before implementation starts:
+The following decisions are fixed for v1 and should be treated as implementation requirements:
 
-1. Are pre-sales and sales both always required for external campaigns, or can a campaign run with only one canonical destination?
-2. Should checkout URL be operator-managed now, or deferred until management/reporting needs it?
-3. Should external delivery support multiple destination variants per campaign, or only one canonical pre-sales and one canonical sales URL in v1?
-4. Should Meta launch be allowed only after destination validation passes, or can operators bypass with a manual override?
-5. Should external destination validation store fetched snapshots for audit, or only pass/fail status and error messages?
+1. Reuse `load_strategy_v2_source_context` as the canonical Strategy V2 launch-context contract.
+2. Treat pre-sales and sales as both required for `external_urls` campaigns.
+3. Keep checkout and thank-you URLs operator-managed but optional in v1.
+4. Support only one canonical pre-sales URL and one canonical sales URL per campaign in v1.
+5. Do not allow asset briefs to override campaign canonical destinations with literal URLs in v1.
+6. Require destination validation to pass before Meta launch; no manual bypass in v1.
+7. Accept only public absolute `http` or `https` destinations for external delivery validation.
+8. Store validation status, error message, and timestamp in v1; do not persist fetched HTML snapshots.
+9. Backfill default `internal_funnel` delivery configs in migration rather than creating them lazily on read.
 
 ## Recommended Build Order
 
 The fastest high-value sequence is:
 
-1. Delivery config foundation
-2. Creative pipeline decoupling
-3. Meta review and QA hardening
-4. Meta launch compiler
-5. Meta management apply mode
+1. Upstream artifact contract and launch-context readiness
+2. Delivery config foundation
+3. Creative pipeline decoupling
+4. Meta review and QA hardening
+5. Meta launch compiler
+6. Meta management apply mode
 
 This order gets the system to:
 
 - foundational docs
+- pinned angle / UMP / UMS / offer / copy context
 - external pre-sales and sales URLs
 - creative production
 - Meta-ready review and QA
@@ -698,12 +945,14 @@ before taking on the more complex launch-and-management automation.
 This initiative should be considered complete when:
 
 1. A campaign can explicitly choose `external_urls` delivery mode.
-2. Pre-sales and sales external URLs can be saved, validated, and surfaced in the UI.
-3. Asset briefs and creative production can run without any internal funnel rows.
-4. Prepared Meta creative specs carry canonical external destination URLs.
-5. Paid ads QA validates those external destinations successfully.
-6. Meta launch can create campaign objects from prepared specs.
-7. Meta management can compute and apply approved actions with audit history.
+2. A campaign exposes explicit readiness for downstream execution based on pinned Strategy V2 context.
+3. Angle docs, UMP/UMS decisions, offer winner, final copy approval, copy context, and template payloads are all queryable from the campaign launch context.
+4. Pre-sales and sales external URLs can be saved, validated, and surfaced in the UI.
+5. Asset briefs and creative production can run without any internal funnel rows.
+6. Prepared Meta creative specs carry canonical external destination URLs.
+7. Paid ads QA validates those external destinations successfully.
+8. Meta launch can create campaign objects from prepared specs.
+9. Meta management can compute and apply approved actions with audit history.
 
 ## Recommendation
 

@@ -124,6 +124,8 @@ def _build_asset_brief_payload(
                             else f"{angle_name} framed for launch intent"
                         ),
                         "funnelStage": "mid",
+                        "destinationType": "pre-sales",
+                        "destinationLabel": "Pre-Sales Landing Page",
                     }
                 )
         briefs.append(
@@ -132,6 +134,9 @@ def _build_asset_brief_payload(
                 "experimentId": experiment_id,
                 "variantId": variant_id,
                 "variantName": variant_name,
+                "deliveryMode": "internal_funnel",
+                "destinationType": "pre-sales",
+                "destinationLabel": "Pre-Sales Landing Page",
                 "creativeConcept": f"{angle_name} conversion creative",
                 "requirements": requirements,
                 "constraints": [

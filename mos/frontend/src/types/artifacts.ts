@@ -79,6 +79,9 @@ export interface AssetBrief {
   experimentId?: string | null;
   variantId?: string | null;
   funnelId?: string | null;
+  deliveryMode?: string | null;
+  destinationType?: string | null;
+  destinationLabel?: string | null;
   variantName?: string | null;
   creativeConcept?: string | null;
   requirements?: Array<{
@@ -87,6 +90,8 @@ export interface AssetBrief {
     angle?: string;
     hook?: string;
     funnelStage?: string;
+    destinationType?: string;
+    destinationLabel?: string;
   }>;
   toneGuidelines?: string[];
   constraints?: string[];

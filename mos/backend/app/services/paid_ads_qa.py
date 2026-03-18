@@ -1022,8 +1022,17 @@ def _landing_page_snapshot(url: str) -> dict[str, Any]:
 def _creative_spec_destination(spec: dict[str, Any]) -> tuple[str | None, str | None]:
     direct = clean_optional_text(spec.get("destination_url"))
     metadata = spec.get("metadata_json") if isinstance(spec.get("metadata_json"), dict) else {}
+    metadata_source = clean_optional_text(metadata.get("destinationSource"))
+    resolved_destination = clean_optional_text(metadata.get("resolvedDestinationUrl"))
+    if resolved_destination and metadata_source in {
+        "campaign_delivery_config",
+        "review_path",
+        "destination_page",
+        "stored_destination_url",
+    }:
+        return resolved_destination, metadata_source
     if direct:
-        return direct, "stored_destination_url"
+        return direct, metadata_source or "stored_destination_url"
     destination_page = clean_optional_text(metadata.get("destinationPage"))
     review_paths = metadata.get("reviewPaths") if isinstance(metadata.get("reviewPaths"), dict) else {}
     resolved_review_path = resolve_meta_review_destination_url(

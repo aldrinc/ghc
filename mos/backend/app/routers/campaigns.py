@@ -1,4 +1,5 @@
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -9,19 +10,32 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
-from app.db.enums import WorkflowStatusEnum
+from app.db.enums import ArtifactTypeEnum, CampaignDeliveryValidationStatusEnum, WorkflowStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, WorkflowRun
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
+from app.schemas.campaign_creative_context import (
+    CampaignCreativeContextProviderRequest,
+    CampaignCreativeContextProviderResponse,
+    CampaignCreativeContextReadinessResponse,
+    CampaignManualCreativeContextUpsertRequest,
+    CampaignManualCreativeContextUpsertResponse,
+)
+from app.schemas.campaign_delivery import (
+    CampaignDeliveryResponse,
+    CampaignDeliveryUpsertRequest,
+    CampaignDeliveryValidationResponse,
+)
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
-from app.schemas.creative_generation import SwipeAdCopyPack
+from app.schemas.creative_generation import SwipeAdCopyPack, SwipeCopyInputs
 from app.schemas.creative_production import CreativeProductionRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
 from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
@@ -35,6 +49,27 @@ from app.services.meta_review import (
     select_assets_for_generation,
 )
 from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_workspace_config
+from app.services.campaign_destinations import (
+    CampaignDestinationError,
+    campaign_delivery_destination_map,
+    campaign_delivery_snapshot,
+    requirement_destination_type,
+    require_valid_external_delivery,
+)
+from app.services.campaign_delivery import (
+    CampaignDeliveryConfigError,
+    CampaignDeliveryValidationError,
+    apply_normalized_delivery_update,
+    campaign_delivery_response_payload,
+    normalize_delivery_payload,
+    validate_campaign_delivery_config,
+    validation_response_payload,
+)
+from app.services.campaign_creative_context import (
+    ensure_campaign_creative_context_ready,
+    persist_manual_campaign_creative_context,
+    set_campaign_creative_context_provider,
+)
 from app.services.paid_ads_qa import list_meta_copy_policy_issues
 from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
@@ -132,6 +167,81 @@ def _resolve_meta_review_destination_url(
     review_paths: dict[str, str],
 ) -> str | None:
     return resolve_meta_review_destination_url(destination_page=destination_page, review_paths=review_paths)
+
+
+def _campaign_delivery_config_or_404(
+    *,
+    session: Session,
+    org_id: str,
+    campaign_id: str,
+):
+    config = _campaign_delivery_repo(session).get_by_campaign(org_id=org_id, campaign_id=campaign_id)
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign delivery config not found.",
+        )
+    return config
+
+
+def _require_campaign_creative_context_ready(
+    *,
+    session: Session,
+    org_id: str,
+    campaign_id: str,
+) -> None:
+    campaign = _get_campaign_or_404(session=session, org_id=org_id, campaign_id=campaign_id)
+    readiness = ensure_campaign_creative_context_ready(
+        session=session,
+        org_id=org_id,
+        campaign=campaign,
+    )
+    if not readiness["ready"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Campaign creative context is not ready for downstream execution.",
+                "creativeContextReadiness": readiness,
+            },
+        )
+
+
+def _resolve_meta_review_paths_for_campaign(
+    *,
+    campaign,
+    session: Session,
+    org_id: str,
+    funnel_id: str | None,
+):
+    delivery_config = _campaign_delivery_config_or_404(
+        session=session,
+        org_id=org_id,
+        campaign_id=str(campaign.id),
+    )
+    if delivery_config.delivery_mode.value == "external_urls":
+        try:
+            validated_config = require_valid_external_delivery(delivery_config)
+        except CampaignDestinationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": f"Campaign delivery config is not ready for external Meta review: {exc}",
+                    "delivery": campaign_delivery_snapshot(delivery_config),
+                },
+            ) from exc
+        return campaign_delivery_destination_map(validated_config), delivery_config
+    if not funnel_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta review for internal-funnel campaigns requires one explicit funnel.",
+        )
+    review_paths_by_funnel_id = _resolve_funnel_review_paths(
+        org_id=org_id,
+        product_id=str(campaign.product_id),
+        funnel_ids={funnel_id},
+        session=session,
+    )
+    return review_paths_by_funnel_id.get(funnel_id, {}), delivery_config
 
 
 def _validate_planning_prereqs(
@@ -261,6 +371,21 @@ async def _start_campaign_planning(
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _campaign_delivery_repo(session: Session) -> CampaignDeliveryConfigsRepository:
+    return CampaignDeliveryConfigsRepository(session)
+
+
+def _get_campaign_or_404(*, session: Session, org_id: str, campaign_id: str):
+    campaign = CampaignsRepository(session).get(org_id=org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    return campaign
+
+
 @router.get("")
 def list_campaigns(
     client_id: str | None = None,
@@ -327,6 +452,12 @@ async def create_campaign(
         budget_min=payload.budget_min,
         budget_max=payload.budget_max,
     )
+    _campaign_delivery_repo(session).create(
+        org_id=auth.org_id,
+        client_id=payload.client_id,
+        campaign_id=str(campaign.id),
+    )
+    session.refresh(campaign)
     if payload.start_planning:
         try:
             await _start_campaign_planning(
@@ -355,11 +486,180 @@ def get_campaign(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo = CampaignsRepository(session)
-    campaign = repo.get(org_id=auth.org_id, campaign_id=campaign_id)
-    if not campaign:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
     return jsonable_encoder(campaign)
+
+
+@router.get("/{campaign_id}/delivery")
+def get_campaign_delivery(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    config = _campaign_delivery_repo(session).get_by_campaign(org_id=auth.org_id, campaign_id=str(campaign.id))
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign delivery config is missing. Run the delivery-config backfill or recreate the campaign.",
+        )
+    payload = campaign_delivery_response_payload(config)
+    return CampaignDeliveryResponse.model_validate(payload).model_dump(mode="json")
+
+
+@router.put("/{campaign_id}/delivery")
+def upsert_campaign_delivery(
+    campaign_id: str,
+    payload: CampaignDeliveryUpsertRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    repo = _campaign_delivery_repo(session)
+    config = repo.get_by_campaign(org_id=auth.org_id, campaign_id=str(campaign.id))
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign delivery config is missing. Run the delivery-config backfill or recreate the campaign.",
+        )
+    try:
+        normalized = normalize_delivery_payload(
+            delivery_mode=payload.deliveryMode,
+            pre_sales_url=payload.preSalesUrl,
+            sales_url=payload.salesUrl,
+            checkout_url=payload.checkoutUrl,
+            thank_you_url=payload.thankYouUrl,
+        )
+    except CampaignDeliveryConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if normalized.delivery_mode.value == "external_urls":
+        _require_campaign_creative_context_ready(
+            session=session,
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+        )
+
+    fields = apply_normalized_delivery_update(config=config, normalized=normalized)
+    fields["updated_at"] = _utcnow()
+    config = repo.update(config, **fields)
+    response_payload = campaign_delivery_response_payload(config)
+    return CampaignDeliveryResponse.model_validate(response_payload).model_dump(mode="json")
+
+
+@router.post("/{campaign_id}/delivery/validate")
+def validate_campaign_delivery(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    repo = _campaign_delivery_repo(session)
+    config = repo.get_by_campaign(org_id=auth.org_id, campaign_id=str(campaign.id))
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign delivery config is missing. Run the delivery-config backfill or recreate the campaign.",
+        )
+    try:
+        results = validate_campaign_delivery_config(config)
+    except CampaignDeliveryConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except CampaignDeliveryValidationError as exc:
+        config = repo.update(
+            config,
+            validation_status=CampaignDeliveryValidationStatusEnum.invalid,
+            validation_error=str(exc),
+            validated_at=_utcnow(),
+            updated_at=_utcnow(),
+        )
+        response_payload = validation_response_payload(
+            config=config,
+            validation_status=config.validation_status,
+            validation_error=config.validation_error,
+            results=exc.results,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(mode="json"),
+        ) from exc
+
+    config = repo.update(
+        config,
+        validation_status=CampaignDeliveryValidationStatusEnum.valid,
+        validation_error=None,
+        validated_at=_utcnow(),
+        updated_at=_utcnow(),
+    )
+    response_payload = validation_response_payload(
+        config=config,
+        validation_status=config.validation_status,
+        validation_error=config.validation_error,
+        results=results,
+    )
+    return CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(mode="json")
+
+
+@router.get("/{campaign_id}/launch-context-readiness")
+def get_campaign_launch_context_readiness(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    payload = ensure_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+    )
+    return CampaignCreativeContextReadinessResponse.model_validate(payload).model_dump(mode="json")
+
+
+@router.put("/{campaign_id}/creative-context/provider")
+def update_campaign_creative_context_provider(
+    campaign_id: str,
+    payload: CampaignCreativeContextProviderRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    artifact = set_campaign_creative_context_provider(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+        provider=payload.provider,
+        created_by_user=auth.user_id,
+    )
+    return CampaignCreativeContextProviderResponse.model_validate(
+        {
+            "campaignId": str(campaign.id),
+            "provider": payload.provider.value,
+            "creativeContextArtifactId": str(artifact.id),
+            "checkedAt": artifact.created_at.isoformat() if artifact.created_at else _utcnow().isoformat(),
+        }
+    ).model_dump(mode="json")
+
+
+@router.post("/{campaign_id}/creative-context/loaded", status_code=status.HTTP_201_CREATED)
+def upsert_campaign_manual_creative_context(
+    campaign_id: str,
+    payload: CampaignManualCreativeContextUpsertRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign is missing a product_id. Attach a product before loading manual creative context.",
+        )
+    response_payload = persist_manual_campaign_creative_context(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+        payload=payload,
+        created_by_user=auth.user_id,
+    )
+    return CampaignManualCreativeContextUpsertResponse.model_validate(response_payload).model_dump(mode="json")
 
 
 @router.get("/{campaign_id}/strategy-v2-launches")
@@ -458,15 +758,6 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
-    try:
-        require_strategy_v2_outputs_if_enabled(
-            session=session,
-            org_id=auth.org_id,
-            client_id=str(campaign.client_id),
-            product_id=str(campaign.product_id),
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -607,6 +898,27 @@ async def start_creative_production(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing a product_id. Attach a product before starting creative production.",
         )
+    _require_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    delivery_config = _campaign_delivery_config_or_404(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    if delivery_config.delivery_mode.value == "external_urls":
+        try:
+            require_valid_external_delivery(delivery_config)
+        except CampaignDestinationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": f"Campaign delivery config is not ready for external creative production: {exc}",
+                    "delivery": campaign_delivery_snapshot(delivery_config),
+                },
+            ) from exc
 
     asset_brief_ids = payload.asset_brief_ids
     artifacts_repo = ArtifactsRepository(session)
@@ -747,52 +1059,86 @@ def setup_campaign_meta_review(
                 "missingAssetBriefIds": missing_brief_ids,
             },
         )
+    _require_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    delivery_config = _campaign_delivery_config_or_404(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    is_external_delivery = delivery_config.delivery_mode.value == "external_urls"
+    if is_external_delivery:
+        try:
+            require_valid_external_delivery(delivery_config)
+        except CampaignDestinationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": f"Campaign delivery config is not ready for external Meta review: {exc}",
+                    "delivery": campaign_delivery_snapshot(delivery_config),
+                },
+            ) from exc
     requested_funnel_id = brief_funnel_id({"funnelId": payload.funnelId}) if payload.funnelId else None
     selected_brief_funnel_ids = collect_brief_funnel_ids(brief_map=brief_map, brief_ids=selected_brief_ids)
-    if not requested_funnel_id:
-        if not selected_brief_funnel_ids:
+    if is_external_delivery:
+        if selected_brief_funnel_ids:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
-                    "message": "Selected asset briefs are missing funnel scope. Meta review must run for one explicit funnel.",
-                    "selectedAssetBriefIds": selected_brief_ids,
-                },
-            )
-        if len(selected_brief_funnel_ids) > 1:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "message": "Selected asset briefs span multiple funnels. Pick one funnel in the Meta ads tab before preparing review.",
+                    "message": "External-delivery Meta review does not accept funnel-scoped briefs in the selected set.",
                     "selectedAssetBriefIds": selected_brief_ids,
                     "availableFunnelIds": sorted(selected_brief_funnel_ids),
                 },
             )
-        requested_funnel_id = next(iter(selected_brief_funnel_ids))
-    missing_funnel_brief_ids = [
-        brief_id for brief_id in selected_brief_ids if not brief_funnel_id(brief_map.get(brief_id))
-    ]
-    if missing_funnel_brief_ids:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Some selected asset briefs are missing funnelId. Meta review must run for one explicit funnel.",
-                "invalidAssetBriefIds": missing_funnel_brief_ids,
-            },
-        )
-    mismatched_funnel_brief_ids = [
-        brief_id
-        for brief_id in selected_brief_ids
-        if brief_funnel_id(brief_map.get(brief_id)) != requested_funnel_id
-    ]
-    if mismatched_funnel_brief_ids:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Some selected asset briefs do not belong to the requested funnel.",
-                "requestedFunnelId": requested_funnel_id,
-                "invalidAssetBriefIds": mismatched_funnel_brief_ids,
-            },
-        )
+        requested_funnel_id = None
+    else:
+        if not requested_funnel_id:
+            if not selected_brief_funnel_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "message": "Selected asset briefs are missing funnel scope. Meta review must run for one explicit funnel.",
+                        "selectedAssetBriefIds": selected_brief_ids,
+                    },
+                )
+            if len(selected_brief_funnel_ids) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "message": "Selected asset briefs span multiple funnels. Pick one funnel in the Meta ads tab before preparing review.",
+                        "selectedAssetBriefIds": selected_brief_ids,
+                        "availableFunnelIds": sorted(selected_brief_funnel_ids),
+                    },
+                )
+            requested_funnel_id = next(iter(selected_brief_funnel_ids))
+        missing_funnel_brief_ids = [
+            brief_id for brief_id in selected_brief_ids if not brief_funnel_id(brief_map.get(brief_id))
+        ]
+        if missing_funnel_brief_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Some selected asset briefs are missing funnelId. Meta review must run for one explicit funnel.",
+                    "invalidAssetBriefIds": missing_funnel_brief_ids,
+                },
+            )
+        mismatched_funnel_brief_ids = [
+            brief_id
+            for brief_id in selected_brief_ids
+            if brief_funnel_id(brief_map.get(brief_id)) != requested_funnel_id
+        ]
+        if mismatched_funnel_brief_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Some selected asset briefs do not belong to the requested funnel.",
+                    "requestedFunnelId": requested_funnel_id,
+                    "invalidAssetBriefIds": mismatched_funnel_brief_ids,
+                },
+            )
 
     campaign_assets = session.scalars(
         select(Asset).where(
@@ -825,19 +1171,24 @@ def setup_campaign_meta_review(
             },
         )
 
-    review_paths_by_funnel_id = _resolve_funnel_review_paths(
-        org_id=auth.org_id,
-        product_id=str(campaign.product_id),
-        funnel_ids={requested_funnel_id},
+    review_paths, resolved_delivery_config = _resolve_meta_review_paths_for_campaign(
+        campaign=campaign,
         session=session,
+        org_id=auth.org_id,
+        funnel_id=requested_funnel_id,
     )
-    if not review_paths_by_funnel_id.get(requested_funnel_id):
+    if not review_paths:
+        if requested_funnel_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "The selected funnel has no review pages configured for Meta review.",
+                    "funnelId": requested_funnel_id,
+                },
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "The selected funnel has no review pages configured for Meta review.",
-                "funnelId": requested_funnel_id,
-            },
+            detail="Campaign delivery config did not resolve any destination URLs for Meta review.",
         )
 
     meta_repo = MetaAdsRepository(session)
@@ -899,8 +1250,6 @@ def setup_campaign_meta_review(
                 detail=f"Asset brief '{brief_id}' has no requirements.",
             )
 
-        review_paths = review_paths_by_funnel_id.get(requested_funnel_id, {})
-
         for asset in assets_by_brief_id[brief_id]:
             metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
             existing_creative = existing_creative_specs.get(str(asset.id))
@@ -951,48 +1300,55 @@ def setup_campaign_meta_review(
                     detail=f"Generated asset '{asset.id}' swipeCopyPack.platform must be 'Meta' for Meta review.",
                 )
 
-            swipe_copy_inputs = metadata.get("swipeCopyInputs")
-            if not isinstance(swipe_copy_inputs, dict):
+            swipe_copy_inputs_payload = metadata.get("swipeCopyInputs")
+            if not isinstance(swipe_copy_inputs_payload, dict):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Generated asset '{asset.id}' is missing ai_metadata.swipeCopyInputs.",
                 )
-            swipe_ad_media = swipe_copy_inputs.get("adImageOrVideo")
-            if not isinstance(swipe_ad_media, dict):
+            try:
+                swipe_copy_inputs = SwipeCopyInputs.model_validate(swipe_copy_inputs_payload)
+            except ValidationError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.adImageOrVideo.",
+                    detail=f"Generated asset '{asset.id}' has an invalid ai_metadata.swipeCopyInputs: {exc}",
                 )
-            swipe_source_label = swipe_ad_media.get("sourceLabel")
-            if not isinstance(swipe_source_label, str) or not swipe_source_label.strip():
+            if swipe_copy_inputs.ad_image_or_video.source_kind != "rendered_output":
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.adImageOrVideo.sourceLabel.",
+                    detail=(
+                        f"Generated asset '{asset.id}' swipeCopyInputs.adImageOrVideo.sourceKind must be "
+                        "'rendered_output' for Meta review."
+                    ),
                 )
-            swipe_source_label = swipe_source_label.strip()
-            swipe_source_media_url = swipe_ad_media.get("sourceUrl")
-            if not isinstance(swipe_source_media_url, str) or not swipe_source_media_url.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.adImageOrVideo.sourceUrl.",
-                )
-            swipe_source_media_url = swipe_source_media_url.strip()
-            angle_used = swipe_copy_inputs.get("angleUsed")
-            if not isinstance(angle_used, str) or not angle_used.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.angleUsed.",
-                )
-            destination_page = swipe_copy_inputs.get("destinationPage")
-            if not isinstance(destination_page, str) or not destination_page.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Generated asset '{asset.id}' is missing swipeCopyInputs.destinationPage.",
-                )
+            rendered_copy_image_label = (
+                swipe_copy_inputs.ad_image_or_video.source_label.strip()
+                if isinstance(swipe_copy_inputs.ad_image_or_video.source_label, str)
+                and swipe_copy_inputs.ad_image_or_video.source_label.strip()
+                else None
+            )
+            rendered_copy_image_url = swipe_copy_inputs.ad_image_or_video.source_url.strip()
+            swipe_source_label = (
+                swipe_copy_inputs.source_swipe.source_label.strip()
+                if swipe_copy_inputs.source_swipe
+                and isinstance(swipe_copy_inputs.source_swipe.source_label, str)
+                and swipe_copy_inputs.source_swipe.source_label.strip()
+                else None
+            )
+            swipe_source_media_url = (
+                swipe_copy_inputs.source_swipe.source_url.strip()
+                if swipe_copy_inputs.source_swipe
+                and isinstance(swipe_copy_inputs.source_swipe.source_url, str)
+                and swipe_copy_inputs.source_swipe.source_url.strip()
+                else None
+            )
+            angle_used = swipe_copy_inputs.angle_used
+            destination_page = swipe_copy_inputs.destination_page
             normalized_destination_page = normalize_meta_review_destination_page(
                 destination_page,
                 review_paths=review_paths,
             ) or destination_page.strip()
+            destination_type = requirement_destination_type(brief=brief, requirement=requirement)
             generation_batch_id = metadata.get("creativeGenerationBatchId")
             if isinstance(generation_batch_id, str):
                 generation_batch_id = generation_batch_id.strip() or None
@@ -1013,10 +1369,12 @@ def setup_campaign_meta_review(
                 "generationBatchId": generation_batch_id,
                 "swipeSourceLabel": swipe_source_label,
                 "swipeSourceMediaUrl": swipe_source_media_url,
+                "swipeCopyImageLabel": rendered_copy_image_label,
+                "swipeCopyImageUrl": rendered_copy_image_url,
                 "requirementIndex": requirement_index,
                 "requirement": requirement,
                 "swipeCopyPack": swipe_copy_pack.model_dump(mode="json", by_alias=True),
-                "swipeCopyInputs": jsonable_encoder(swipe_copy_inputs),
+                "swipeCopyInputs": jsonable_encoder(swipe_copy_inputs.model_dump(mode="json", by_alias=True)),
                 "swipeCopyModel": metadata.get("swipeCopyModel"),
                 "swipeCopyRequestId": metadata.get("swipeCopyRequestId"),
                 "swipeCopyStopReason": metadata.get("swipeCopyStopReason"),
@@ -1025,6 +1383,15 @@ def setup_campaign_meta_review(
                 "variantId": brief.get("variantId"),
                 "variantName": brief.get("variantName"),
                 "funnelId": requested_funnel_id,
+                "deliveryMode": resolved_delivery_config.delivery_mode.value,
+                "campaignDeliveryConfigId": str(resolved_delivery_config.id),
+                "campaignDelivery": campaign_delivery_snapshot(resolved_delivery_config),
+                "destinationSource": "campaign_delivery_config" if is_external_delivery else "review_path",
+                "resolvedDestinationUrl": _resolve_meta_review_destination_url(
+                    destination_page=normalized_destination_page,
+                    review_paths=review_paths,
+                ),
+                "destinationType": destination_type,
                 "destinationPage": normalized_destination_page,
                 "angleUsed": angle_used.strip(),
             }
@@ -1035,10 +1402,7 @@ def setup_campaign_meta_review(
                 "headline": swipe_copy_pack.meta_headline,
                 "description": swipe_copy_pack.meta_description,
                 "call_to_action_type": swipe_copy_pack.meta_cta,
-                "destination_url": _resolve_meta_review_destination_url(
-                    destination_page=normalized_destination_page,
-                    review_paths=review_paths,
-                ),
+                "destination_url": desired_metadata_json["resolvedDestinationUrl"],
                 "page_id": default_meta_page_id,
                 "instagram_actor_id": default_instagram_actor_id,
                 "status": "draft",

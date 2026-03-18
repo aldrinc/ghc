@@ -26,6 +26,18 @@ class CampaignStatusEnum(str, Enum):
     cancelled = "cancelled"
 
 
+class CampaignDeliveryModeEnum(str, Enum):
+    internal_funnel = "internal_funnel"
+    external_urls = "external_urls"
+
+
+class CampaignDeliveryValidationStatusEnum(str, Enum):
+    not_applicable = "not_applicable"
+    not_validated = "not_validated"
+    valid = "valid"
+    invalid = "invalid"
+
+
 class AdChannelEnum(str, Enum):
     META_ADS_LIBRARY = "META_ADS_LIBRARY"
     TIKTOK_CREATIVE_CENTER = "TIKTOK_CREATIVE_CENTER"
@@ -87,6 +99,11 @@ class ArtifactTypeEnum(str, Enum):
     metric_schema = "metric_schema"
     strategy_sheet = "strategy_sheet"
     experiment_spec = "experiment_spec"
+    campaign_loaded_angles = "campaign_loaded_angles"
+    campaign_loaded_offer = "campaign_loaded_offer"
+    campaign_loaded_copy = "campaign_loaded_copy"
+    campaign_loaded_copy_context = "campaign_loaded_copy_context"
+    campaign_creative_context = "campaign_creative_context"
     asset_brief = "asset_brief"
     ad_copy_pack = "ad_copy_pack"
     creative_generation_plan = "creative_generation_plan"
@@ -103,6 +120,12 @@ class ArtifactTypeEnum(str, Enum):
     strategy_v2_offer = "strategy_v2_offer"
     strategy_v2_copy = "strategy_v2_copy"
     strategy_v2_copy_context = "strategy_v2_copy_context"
+    strategy_v2_launch_context = "strategy_v2_launch_context"
+    meta_launch_plan = "meta_launch_plan"
+    meta_management_metrics_snapshot = "meta_management_metrics_snapshot"
+    meta_management_recommended_actions = "meta_management_recommended_actions"
+    meta_management_approval_decision = "meta_management_approval_decision"
+    meta_management_applied_action = "meta_management_applied_action"
 
 
 class WorkflowKindEnum(str, Enum):
@@ -223,6 +246,7 @@ class FunnelEventTypeEnum(str, Enum):
     cta_click = "cta_click"
     funnel_enter = "funnel_enter"
     funnel_exit = "funnel_exit"
+    checkout_started = "checkout_started"
     order_completed = "order_completed"
 
 

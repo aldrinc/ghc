@@ -157,6 +157,15 @@ class MetaAdsClient:
         path = f"{_normalize_ad_account_id(ad_account_id)}/ads"
         return self._request("POST", path, data=_encode_payload(payload))
 
+    def update_campaign(self, *, campaign_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", campaign_id, data=_encode_payload(payload))
+
+    def update_adset(self, *, adset_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", adset_id, data=_encode_payload(payload))
+
+    def update_ad(self, *, ad_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", ad_id, data=_encode_payload(payload))
+
     def get_creative_previews(
         self,
         *,

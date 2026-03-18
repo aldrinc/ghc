@@ -12,7 +12,7 @@ export const TabsList = forwardRef<HTMLDivElement, BaseTabs.List.Props>(function
     <BaseTabs.List
       ref={ref}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 p-1 shadow-sm",
+        "inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 p-1",
         className
       )}
       {...props}
@@ -37,21 +37,18 @@ export const TabsTrigger = forwardRef<HTMLButtonElement, BaseTabs.Tab.Props>(fun
 });
 
 type TabsContentProps = BaseTabs.Panel.Props & {
+  /** @deprecated TabsContent is now flush by default */
   flush?: boolean;
 };
 
 export const TabsContent = forwardRef<HTMLDivElement, TabsContentProps>(function TabsContent(
-  { className, flush = false, ...props },
+  { className, flush: _flush, ...props },
   ref
 ) {
   return (
     <BaseTabs.Panel
       ref={ref}
-      className={cn(
-        "mt-4",
-        flush ? "border-0 bg-transparent p-0 shadow-none" : "rounded-md border border-border bg-surface p-4 shadow-sm",
-        className
-      )}
+      className={cn("mt-4", className)}
       {...props}
     />
   );

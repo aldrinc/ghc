@@ -5,6 +5,8 @@ import type {
   MetaAdAccountConnectionUpsertPayload,
   MetaAdSetSpec,
   MetaAdSetSpecUpdatePayload,
+  MetaManagementPlan,
+  MetaManagementPlanRequest,
   MetaPipelineAsset,
   MetaPublishPlanValidation,
   MetaPublishRun,
@@ -222,6 +224,15 @@ export function useMetaApi() {
     [request],
   );
 
+  const planManagement = useCallback(
+    (payload: MetaManagementPlanRequest) =>
+      request<MetaManagementPlan>("/meta/management/plan", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
   return {
     listConnections,
     createConnection,
@@ -245,5 +256,6 @@ export function useMetaApi() {
     validatePublishPlan,
     listPublishRuns,
     createPublishRun,
+    planManagement,
   };
 }

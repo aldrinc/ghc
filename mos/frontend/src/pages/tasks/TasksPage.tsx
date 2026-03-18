@@ -41,7 +41,7 @@ export function TasksPage() {
               Showing running or failed workflows. Approvals are triggered from the workflow detail view.
             </div>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => navigate("/workflows")}>
+          <Button variant="secondary" size="sm" onClick={() => navigate("/strategy")}>
             View all workflows
           </Button>
         </div>
@@ -68,7 +68,7 @@ export function TasksPage() {
                     ) : null}
                     <div className="text-xs text-content-muted">Started: {wf.started_at}</div>
                   </div>
-                  <Button variant="primary" size="sm" onClick={() => navigate(`/workflows/${wf.id}`)}>
+                  <Button variant="primary" size="sm" onClick={() => navigate(`/strategy/${wf.id}`)}>
                     Review
                   </Button>
                 </li>

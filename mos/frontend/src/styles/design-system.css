@@ -5,7 +5,7 @@
     background-color: var(--panel);
     color: var(--text);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-1);
+    box-shadow: none;
     padding: var(--ds-card-padding);
   }
 

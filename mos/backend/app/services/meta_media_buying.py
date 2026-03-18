@@ -8,6 +8,11 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.meta_ads import MetaAdsClient, MetaAdsError
+from app.services.meta_management_benchmarks import (
+    MetaBenchmarkContext,
+    MetaBenchmarkEvaluation,
+    MetaFunnelMetricsSnapshot,
+)
 
 
 class MetaMediaBuyingPlanError(RuntimeError):
@@ -126,6 +131,18 @@ class MetaPlannedAction(BaseModel):
     metrics: dict[str, Any] = Field(default_factory=dict)
 
 
+class MetaAppliedAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    metaEntityId: str
+    status: str
+    requestPayload: dict[str, Any] = Field(default_factory=dict)
+    before: dict[str, Any] = Field(default_factory=dict)
+    after: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+
+
 class MetaManagementPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -137,7 +154,11 @@ class MetaManagementPlan(BaseModel):
     observedActionTypes: dict[str, list[str]] = Field(default_factory=dict)
     rows: list[MetaAdMetrics]
     actions: list[MetaPlannedAction]
+    appliedActions: list[MetaAppliedAction] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    benchmarkContext: MetaBenchmarkContext | None = None
+    funnelSnapshot: MetaFunnelMetricsSnapshot | None = None
+    benchmarkEvaluations: list[MetaBenchmarkEvaluation] = Field(default_factory=list)
 
 
 def _now_iso() -> str:
@@ -374,8 +395,7 @@ def build_management_plan(
 ) -> MetaManagementPlan:
     if mode not in {"plan_only", "apply"}:
         raise MetaMediaBuyingPlanError("mode must be plan_only or apply")
-    if mode == "apply":
-        raise MetaMediaBuyingPlanError("mode=apply is not implemented yet. Use mode=plan_only.")
+
     try:
         campaign, adsets = fetch_meta_campaign_snapshot(client=client, campaign_id=campaign_id)
         rows = fetch_ad_level_insights(
@@ -440,6 +460,55 @@ def build_management_plan(
     if not event_mappings.purchase_value_action_type:
         warnings.append("missing_event_mapping.purchase_value_action_type")
 
+    applied_actions: list[MetaAppliedAction] = []
+    if mode == "apply":
+        for action in actions:
+            request_payload: dict[str, Any]
+            before: dict[str, Any]
+            after: dict[str, Any] = {}
+            target_entity_id = action.metaAdId
+            try:
+                if action.kind == "pause_ad":
+                    before = client.get_object(object_id=action.metaAdId, fields="id,status,effective_status")
+                    request_payload = {"status": "PAUSED"}
+                    after = client.update_ad(ad_id=action.metaAdId, payload=request_payload)
+                elif action.kind == "adjust_campaign_budget":
+                    before = client.get_object(object_id=campaign_id, fields="id,daily_budget,lifetime_budget,status")
+                    request_payload = action.metrics.get("requestedChange") if isinstance(action.metrics, dict) else {}
+                    if not isinstance(request_payload, dict) or not request_payload:
+                        raise MetaMediaBuyingPlanError(
+                            "adjust_campaign_budget action is missing metrics.requestedChange payload."
+                        )
+                    target_entity_id = campaign_id
+                    after = client.update_campaign(campaign_id=campaign_id, payload=request_payload)
+                else:
+                    raise MetaMediaBuyingPlanError(f"Unsupported apply action kind: {action.kind}")
+            except MetaAdsError as exc:
+                applied_actions.append(
+                    MetaAppliedAction(
+                        kind=action.kind,
+                        metaEntityId=target_entity_id,
+                        status="failed",
+                        requestPayload=request_payload if "request_payload" in locals() else {},
+                        before=before if "before" in locals() and isinstance(before, dict) else {},
+                        after={},
+                        error=str(exc),
+                    )
+                )
+                continue
+
+            applied_actions.append(
+                MetaAppliedAction(
+                    kind=action.kind,
+                    metaEntityId=target_entity_id,
+                    status="applied",
+                    requestPayload=request_payload,
+                    before=before if isinstance(before, dict) else {},
+                    after=after if isinstance(after, dict) else {},
+                    error=None,
+                )
+            )
+
     return MetaManagementPlan(
         mode=mode,
         generatedAt=_now_iso(),
@@ -452,5 +521,6 @@ def build_management_plan(
         },
         rows=computed_rows,
         actions=actions,
+        appliedActions=applied_actions,
         warnings=warnings,
     )

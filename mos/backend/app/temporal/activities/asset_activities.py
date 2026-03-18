@@ -21,6 +21,7 @@ from app.config import settings
 from app.db.base import session_scope
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import (
+    CampaignDeliveryConfig,
     CreativeServiceEvent,
     CreativeServiceOutput,
     CreativeServiceRun,
@@ -29,6 +30,7 @@ from app.db.models import (
 )
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.assets import AssetsRepository
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
@@ -46,6 +48,16 @@ from app.services.claude_files import (
     call_claude_structured_message,
     ensure_uploaded_to_claude,
 )
+from app.services.campaign_destinations import (
+    CampaignDestinationError,
+    campaign_delivery_snapshot,
+    destination_label_for_type,
+    requirement_destination_label,
+    requirement_destination_type,
+    require_valid_external_delivery,
+    resolve_campaign_delivery_destination,
+)
+from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.creative_service_client import (
     CreativeServiceClient,
     CreativeServiceConfigError,
@@ -127,6 +139,12 @@ class _ImagePlanItemExecution:
     requirement_index: int
     plan_item: CreativeGenerationPlanItem
     copy_pack_id: str
+
+
+@dataclass(frozen=True)
+class _BriefExecutionScope:
+    funnel_id: str | None
+    campaign_delivery_config: CampaignDeliveryConfig | None
 
 
 def _normalize_requirement_format(value: str) -> str:
@@ -625,10 +643,25 @@ def _validate_brief_scope(
     campaign_id: str | None,
     asset_brief_id: str,
     brief: dict[str, Any],
-) -> str | None:
+) -> _BriefExecutionScope:
     funnel_id = brief.get("funnelId")
     if not funnel_id:
-        return None
+        if not campaign_id:
+            raise ValueError(
+                "Asset brief without funnelId requires a campaign scope so delivery configuration can be resolved."
+            )
+        config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+            org_id=org_id,
+            campaign_id=campaign_id,
+        )
+        try:
+            validated_config = require_valid_external_delivery(config)
+        except CampaignDestinationError as exc:
+            raise ValueError(f"Asset brief {asset_brief_id} cannot execute without a valid external delivery config: {exc}") from exc
+        return _BriefExecutionScope(
+            funnel_id=None,
+            campaign_delivery_config=validated_config,
+        )
 
     funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
     if not funnel:
@@ -637,7 +670,10 @@ def _validate_brief_scope(
         raise ValueError("Funnel must belong to the same client as the asset brief")
     if campaign_id and str(funnel.campaign_id) != str(campaign_id):
         raise ValueError("Funnel must belong to the same campaign as the asset brief")
-    return str(funnel_id)
+    return _BriefExecutionScope(
+        funnel_id=str(funnel_id),
+        campaign_delivery_config=None,
+    )
 
 
 def _pick_latest_context_file(files: Sequence[Any], *, doc_key: str):
@@ -698,6 +734,16 @@ def _select_copy_generation_context_files(
     product_id: str,
     campaign_id: str | None,
 ) -> list[Any]:
+    creative_context = load_campaign_creative_context(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=str(campaign_id or ""),
+    )
+    creative_context_provider = str(
+        getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2"
+    )
     context_files = ClaudeContextFilesRepository(session).list_for_generation_context(
         org_id=org_id,
         idea_workspace_id=idea_workspace_id,
@@ -706,30 +752,56 @@ def _select_copy_generation_context_files(
         campaign_id=campaign_id,
     )
     selected: list[Any] = []
-    for doc_key in (
+    doc_keys = [
         "client_canon_compact",
         "client_canon",
-        "strategy_v2_stage3",
-        "strategy_v2_offer",
-        "strategy_v2_copy",
-        "strategy_v2_copy_context",
         "metric_schema",
         f"strategy_sheet:{campaign_id or 'none'}",
         f"experiment_specs:{campaign_id or 'none'}",
         f"asset_briefs:{campaign_id or 'none'}",
-    ):
+    ]
+    if creative_context_provider == "manual":
+        doc_keys.extend(
+            [
+                "campaign_loaded_angles",
+                "campaign_loaded_offer",
+                "campaign_loaded_copy",
+                "campaign_loaded_copy_context",
+                "campaign_creative_context",
+            ]
+        )
+    else:
+        doc_keys.extend(
+            [
+                "strategy_v2_stage3",
+                "strategy_v2_offer",
+                "strategy_v2_copy",
+                "strategy_v2_copy_context",
+            ]
+        )
+    for doc_key in doc_keys:
         picked = _pick_latest_context_file(context_files, doc_key=doc_key)
         if picked is not None:
             selected.append(picked)
 
     if not any(
         (getattr(record, "doc_key", None) or "").startswith("client_canon")
-        or (getattr(record, "doc_key", None) or "") in {"strategy_v2_stage3", "strategy_v2_offer", "strategy_v2_copy", "strategy_v2_copy_context"}
+        or (getattr(record, "doc_key", None) or "") in {
+            "strategy_v2_stage3",
+            "strategy_v2_offer",
+            "strategy_v2_copy",
+            "strategy_v2_copy_context",
+            "campaign_loaded_angles",
+            "campaign_loaded_offer",
+            "campaign_loaded_copy",
+            "campaign_loaded_copy_context",
+            "campaign_creative_context",
+        }
         for record in selected
     ):
         raise RuntimeError(
             "Missing required copy-pack generation context files. "
-            "Expected client_canon* or Strategy V2 context artifacts in Claude workspace."
+            "Expected client_canon* or campaign creative context artifacts in Claude workspace."
         )
     return selected
 
@@ -741,6 +813,7 @@ def _build_ad_copy_pack_prompt(
 ) -> str:
     requirements_payload = []
     for requirement_index, requirement in image_requirements:
+        destination_type = requirement_destination_type(brief=brief, requirement=requirement)
         requirements_payload.append(
             {
                 "requirementIndex": requirement_index,
@@ -749,6 +822,8 @@ def _build_ad_copy_pack_prompt(
                 "funnelStage": requirement.get("funnelStage"),
                 "angle": requirement.get("angle"),
                 "hook": requirement.get("hook"),
+                "destinationType": destination_type,
+                "destinationLabel": requirement_destination_label(brief=brief, requirement=requirement),
             }
         )
 
@@ -758,6 +833,9 @@ def _build_ad_copy_pack_prompt(
             "campaignId": brief.get("campaignId"),
             "clientId": brief.get("clientId"),
             "funnelId": brief.get("funnelId"),
+            "deliveryMode": brief.get("deliveryMode"),
+            "destinationType": brief.get("destinationType"),
+            "destinationLabel": brief.get("destinationLabel"),
             "experimentId": brief.get("experimentId"),
             "variantId": brief.get("variantId"),
             "variantName": brief.get("variantName"),
@@ -771,7 +849,7 @@ def _build_ad_copy_pack_prompt(
 
     return (
         "Generate one ad copy pack for each image-ad requirement in the attached asset brief.\n"
-        "Use the attached strategy, offer, copy, copy-context, and experiment documents as the source of truth.\n"
+        "Use the attached campaign creative context, copy, and experiment documents as the source of truth.\n"
         "Do not invent claims, pricing, guarantees, or proof. If a detail is unsupported, keep the copy conservative.\n"
         "The copy pack will be reused across multiple swipe-source executions for the same requirement, so it must be platform-ready and brand-safe.\n\n"
         "Rules:\n"
@@ -844,6 +922,7 @@ def _get_or_create_ad_copy_pack_artifact(
     asset_brief_id: str,
     brief_artifact_id: str,
     brief: dict[str, Any],
+    campaign_delivery_config: CampaignDeliveryConfig | None,
 ) -> Any:
     image_requirements = [
         (idx, requirement)
@@ -917,13 +996,39 @@ def _get_or_create_ad_copy_pack_artifact(
             f"asset_brief_id={asset_brief_id} expected={expected_indexes} returned={seen_indexes}"
         )
 
+    destination_type = requirement_destination_type(brief=brief)
+    destination_label = requirement_destination_label(brief=brief)
+    image_requirements_by_index = {idx: requirement for idx, requirement in image_requirements}
+    copy_packs = []
+    for item in sorted(validated.copy_packs, key=lambda item: item.requirement_index):
+        requirement = image_requirements_by_index.get(item.requirement_index)
+        if requirement is None:
+            raise RuntimeError(
+                "Ad copy pack generation returned an unknown image requirement index. "
+                f"asset_brief_id={asset_brief_id} requirementIndex={item.requirement_index}"
+            )
+        payload = item.model_dump(mode="json", by_alias=True)
+        payload["destinationType"] = requirement_destination_type(
+            brief=brief,
+            requirement=requirement,
+        )
+        payload["destinationLabel"] = requirement_destination_label(
+            brief=brief,
+            requirement=requirement,
+        )
+        copy_packs.append(payload)
+
     artifact_payload = AdCopyPackArtifact(
         schemaVersion=_AD_COPY_PACK_SCHEMA_VERSION,
         assetBriefId=asset_brief_id,
         sourceBriefArtifactId=brief_artifact_id,
         sourceBriefSha256=source_brief_sha256,
         sourceFunnelId=str(brief.get("funnelId")).strip() if isinstance(brief.get("funnelId"), str) and brief.get("funnelId").strip() else None,
-        copyPacks=sorted(validated.copy_packs, key=lambda item: item.requirement_index),
+        campaignDeliveryConfigId=str(campaign_delivery_config.id) if campaign_delivery_config is not None else None,
+        deliveryMode=str(brief.get("deliveryMode") or "").strip() or None,
+        destinationType=destination_type,
+        destinationLabel=destination_label,
+        copyPacks=copy_packs,
     )
     artifact = artifacts_repo.insert(
         org_id=org_id,
@@ -959,6 +1064,7 @@ def _create_creative_generation_plan_artifact(
     brief: dict[str, Any],
     ad_copy_pack_artifact: Any,
     batch_id: str,
+    campaign_delivery_config: CampaignDeliveryConfig | None,
 ) -> Any:
     artifacts_repo = ArtifactsRepository(session)
     source_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
@@ -970,9 +1076,11 @@ def _create_creative_generation_plan_artifact(
     items = _build_creative_generation_plan_items(
         asset_brief_id=asset_brief_id,
         batch_id=batch_id,
+        brief=brief,
         requirements=brief.get("requirements") or [],
         default_swipes=default_swipes,
         copy_pack_ids_by_requirement=copy_pack_ids_by_requirement,
+        campaign_delivery_config=campaign_delivery_config,
     )
 
     if not items:
@@ -1003,9 +1111,11 @@ def _build_creative_generation_plan_items(
     *,
     asset_brief_id: str,
     batch_id: str,
+    brief: dict[str, Any],
     requirements: Sequence[Any],
     default_swipes: Sequence[_DefaultSwipeSource],
     copy_pack_ids_by_requirement: dict[int, str],
+    campaign_delivery_config: CampaignDeliveryConfig | None,
 ) -> list[CreativeGenerationPlanItem]:
     items: list[CreativeGenerationPlanItem] = []
     for requirement_index, requirement in enumerate(requirements):
@@ -1020,6 +1130,8 @@ def _build_creative_generation_plan_items(
                 "Creative generation plan requires an ad copy pack for every image requirement. "
                 f"asset_brief_id={asset_brief_id} missing_requirement_index={requirement_index}"
             )
+        destination_type = requirement_destination_type(brief=brief, requirement=requirement)
+        destination_label = requirement_destination_label(brief=brief, requirement=requirement)
         for source in default_swipes:
             items.append(
                 CreativeGenerationPlanItem(
@@ -1051,6 +1163,10 @@ def _build_creative_generation_plan_items(
                         if isinstance(requirement.get("hook"), str) and requirement.get("hook").strip()
                         else None
                     ),
+                    deliveryMode=str(brief.get("deliveryMode") or "").strip() or None,
+                    destinationType=destination_type,
+                    destinationLabel=destination_label,
+                    campaignDeliveryConfigId=str(campaign_delivery_config.id) if campaign_delivery_config is not None else None,
                     companySwipeId=source.company_swipe_id,
                     sourceLabel=source.source_label,
                     sourceMediaUrl=source.source_media_url,
@@ -1638,7 +1754,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 asset_brief_id=asset_brief_id,
             )
 
-            funnel_id = _validate_brief_scope(
+            brief_scope = _validate_brief_scope(
                 session=session,
                 org_id=org_id,
                 client_id=client_id,
@@ -1646,6 +1762,8 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 asset_brief_id=asset_brief_id,
                 brief=brief,
             )
+            funnel_id = brief_scope.funnel_id
+            campaign_delivery_config = brief_scope.campaign_delivery_config
 
             creative_concept = brief.get("creativeConcept")
             if not isinstance(creative_concept, str) or not creative_concept.strip():
@@ -1702,6 +1820,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 asset_brief_id=asset_brief_id,
                 brief_artifact_id=brief_artifact_id,
                 brief=brief,
+                campaign_delivery_config=campaign_delivery_config,
             )
             ad_copy_pack_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
             ad_copy_pack = AdCopyPackArtifact.model_validate(ad_copy_pack_payload)
@@ -1717,6 +1836,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 brief=brief,
                 ad_copy_pack_artifact=ad_copy_pack_artifact,
                 batch_id=batch_id,
+                campaign_delivery_config=campaign_delivery_config,
             )
             creative_generation_plan_payload = (
                 creative_generation_plan_artifact.data
@@ -2286,8 +2406,19 @@ def persist_assets_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError(f"Asset brief not found: {asset_brief_id}")
 
         funnel_id = brief.get("funnelId")
+        campaign_delivery_config = None
         if campaign_id and not funnel_id:
-            raise ValueError("Asset brief is missing funnelId; assign a funnel before generating assets.")
+            campaign_delivery_config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+                org_id=org_id,
+                campaign_id=campaign_id,
+            )
+            try:
+                require_valid_external_delivery(campaign_delivery_config)
+            except CampaignDestinationError as exc:
+                raise ValueError(
+                    "Asset brief is missing funnelId and campaign delivery is not launch-ready for external execution: "
+                    f"{exc}"
+                ) from exc
         if funnel_id:
             funnel = session.scalars(
                 select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)

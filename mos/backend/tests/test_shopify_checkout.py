@@ -6,10 +6,16 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 
 from app.config import settings
+from app.db.enums import FunnelEventTypeEnum, FunnelPageVersionStatusEnum, FunnelStatusEnum
 from app.db.models import (
     Client,
     Funnel,
+    FunnelEvent,
     FunnelOrder,
+    FunnelPage,
+    FunnelPageVersion,
+    FunnelPublication,
+    FunnelPublicationPage,
     MetaAdAccountConnection,
     MetaWorkspaceAdConfig,
     PaidAdsPlatformProfile,
@@ -140,6 +146,54 @@ def _seed_active_meta_tracking(*, db_session, seeded: dict[str, object], org_id:
     }
 
 
+def _publish_sales_page(*, db_session, funnel: Funnel) -> FunnelPage:
+    sales_page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales",
+        slug="offer",
+        template_id="sales-pdp",
+        ordering=1,
+    )
+    db_session.add(sales_page)
+    db_session.commit()
+    db_session.refresh(sales_page)
+
+    version = FunnelPageVersion(
+        page_id=sales_page.id,
+        status=FunnelPageVersionStatusEnum.approved,
+        puck_data={"root": {}},
+    )
+    db_session.add(version)
+    db_session.commit()
+    db_session.refresh(version)
+
+    publication = FunnelPublication(
+        funnel_id=funnel.id,
+        entry_page_id=sales_page.id,
+        created_by="test-user",
+    )
+    db_session.add(publication)
+    db_session.commit()
+    db_session.refresh(publication)
+
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication.id,
+            page_id=sales_page.id,
+            page_version_id=version.id,
+            slug_at_publish=sales_page.slug,
+            title_at_publish=sales_page.name,
+        )
+    )
+    funnel.entry_page_id = sales_page.id
+    funnel.active_publication_id = publication.id
+    funnel.status = FunnelStatusEnum.published
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(sales_page)
+    return sales_page
+
+
 def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_context, monkeypatch):
     seeded = _seed_shopify_funnel(
         db_session=db_session,
@@ -188,6 +242,57 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert metadata["funnel_id"] == str(seeded["funnel"].id)
     assert metadata["variant_id"] == str(seeded["variant"].id)
     assert metadata["offer_id"] == str(seeded["offer"].id)
+
+
+def test_public_checkout_persists_checkout_started_event(api_client, db_session, auth_context, monkeypatch):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    sales_page = _publish_sales_page(db_session=db_session, funnel=seeded["funnel"])
+
+    def fake_create_shopify_checkout(**_kwargs):
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/example-token",
+            "cartId": "gid://shopify/Cart/example",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "variantId": str(seeded["variant"].id),
+            "selection": {},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": str(sales_page.id),
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 200
+
+    event = db_session.scalars(
+        select(FunnelEvent).where(
+            FunnelEvent.funnel_id == seeded["funnel"].id,
+            FunnelEvent.event_type == FunnelEventTypeEnum.checkout_started,
+        )
+    ).first()
+    assert event is not None
+    assert event.publication_id == seeded["funnel"].active_publication_id
+    assert event.page_id == sales_page.id
+    assert event.visitor_id == "visitor_123"
+    assert event.session_id == "session_123"
+    assert event.utm == {"source": "test"}
+    assert event.props["provider"] == "shopify"
+    assert event.props["checkout_session_id"] == "gid://shopify/Cart/example"
+    assert event.props["variant_id"] == str(seeded["variant"].id)
 
 
 def test_public_checkout_routes_shopify_provider_with_stale_formatting(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import mimetypes
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -17,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.enums import AssetStatusEnum
+from app.db.enums import ArtifactTypeEnum, AssetStatusEnum
 from app.db.models import (
     Asset,
     Campaign,
@@ -35,6 +37,8 @@ from app.db.models import (
     MetaPublishRunItem,
     MetaWorkspaceAdConfig,
 )
+from app.db.repositories.artifacts import ArtifactsRepository
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.experiments import ExperimentsRepository
@@ -78,6 +82,7 @@ from app.services.meta_account_configs import (
     resolve_workspace_config,
     update_connection_credentials,
 )
+from app.services.campaign_destinations import campaign_delivery_snapshot
 from app.services.media_storage import MediaStorage
 from app.services.meta_ads import MetaAdsClient, MetaAdsError
 from app.services.meta_review import (
@@ -92,6 +97,10 @@ from app.services.meta_media_buying import (
     MetaInsightsConfig,
     build_management_plan,
 )
+from app.services.meta_management_benchmarks import (
+    MetaManagementBenchmarkError,
+    build_management_benchmark_payload,
+)
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -99,6 +108,7 @@ from app.services.paid_ads_qa import (
     refresh_meta_platform_profile_from_graph,
     upsert_meta_platform_profile_from_profile,
 )
+from app.services.campaign_creative_context import ensure_campaign_creative_context_ready
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -122,6 +132,7 @@ class MetaManagementPlanRequest(BaseModel):
     mode: Literal["plan_only", "apply"] = "plan_only"
     datePreset: str = "last_3d"
     includeRaw: bool = False
+    evaluateBenchmarks: bool = False
     cutRules: MetaCutRuleConfig | None = None
     eventMappings: _MetaEventMappingsRequest | None = None
 
@@ -835,6 +846,197 @@ def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) 
     )
 
 
+def _require_creative_context_ready(*, session: Session, auth: AuthContext, campaign_id: str) -> dict[str, Any]:
+    campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    readiness = ensure_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+    )
+    if not readiness["ready"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Campaign creative context is not ready for Meta launch.",
+                "creativeContextReadiness": readiness,
+            },
+        )
+    return readiness
+
+
+def _campaign_delivery_config_snapshot(*, session: Session, auth: AuthContext, campaign_id: str) -> dict[str, Any] | None:
+    config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+        org_id=auth.org_id,
+        campaign_id=campaign_id,
+    )
+    return campaign_delivery_snapshot(config)
+
+
+def _launch_plan_key(payload: dict[str, Any]) -> str:
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _build_launch_plan_payload(
+    *,
+    campaign: Campaign,
+    generation_key: str,
+    payload: MetaPublishRunRequest,
+    validation_response: MetaPublishPlanValidationResponse,
+    resolved_items: list[dict[str, Any]],
+    launch_context_readiness: dict[str, Any],
+    delivery_snapshot: dict[str, Any] | None,
+) -> dict[str, Any]:
+    items: list[dict[str, Any]] = []
+    for resolved in resolved_items:
+        creative_spec = resolved["creative_spec"]
+        adset_spec = resolved["adset_spec"]
+        asset = resolved["asset"]
+        items.append(
+            {
+                "assetId": str(asset.id),
+                "assetPublicId": str(asset.public_id),
+                "creativeSpecId": str(creative_spec.id),
+                "creativeSpecName": creative_spec.name,
+                "adsetSpecId": str(adset_spec.id),
+                "adsetSpecName": adset_spec.name,
+                "resolvedDestinationUrl": resolved["resolved_destination_url"],
+                "effectivePageId": resolved["effective_page_id"],
+                "creative": {
+                    "primaryText": creative_spec.primary_text,
+                    "headline": creative_spec.headline,
+                    "description": creative_spec.description,
+                    "callToActionType": creative_spec.call_to_action_type,
+                },
+                "adset": {
+                    "optimizationGoal": adset_spec.optimization_goal,
+                    "billingEvent": adset_spec.billing_event,
+                    "dailyBudget": adset_spec.daily_budget,
+                    "lifetimeBudget": adset_spec.lifetime_budget,
+                    "targeting": adset_spec.targeting,
+                    "placements": adset_spec.placements,
+                    "promotedObject": adset_spec.promoted_object,
+                    "conversionDomain": adset_spec.conversion_domain,
+                },
+            }
+        )
+    base_payload = {
+        "campaignId": str(campaign.id),
+        "generationKey": generation_key,
+        "funnelId": _clean_optional_text(payload.funnelId),
+        "publishBaseUrl": validation_response.publishBaseUrl,
+        "publishDomain": validation_response.publishDomain,
+        "campaignName": payload.campaignName,
+        "campaignObjective": payload.campaignObjective,
+        "buyingType": payload.buyingType,
+        "specialAdCategories": payload.specialAdCategories,
+        "launchContextReadiness": launch_context_readiness,
+        "campaignDelivery": delivery_snapshot,
+        "validation": validation_response.model_dump(mode="json"),
+        "items": items,
+    }
+    return {
+        **base_payload,
+        "launchPlanKey": _launch_plan_key(base_payload),
+    }
+
+
+def _persist_launch_plan_artifact(
+    *,
+    session: Session,
+    auth: AuthContext,
+    campaign: Campaign,
+    launch_plan_payload: dict[str, Any],
+) -> str:
+    artifact = ArtifactsRepository(session).insert(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id) if campaign.product_id else None,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.meta_launch_plan,
+        data=launch_plan_payload,
+        created_by_user=auth.user_id,
+    )
+    return str(artifact.id)
+
+
+def _persist_meta_management_artifacts(
+    *,
+    session: Session,
+    auth: AuthContext,
+    campaign: Campaign,
+    plan,
+) -> dict[str, str]:
+    artifacts_repo = ArtifactsRepository(session)
+    metrics_artifact = artifacts_repo.insert(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id) if campaign.product_id else None,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.meta_management_metrics_snapshot,
+        data={
+            "generatedAt": plan.generatedAt,
+            "window": plan.window,
+            "campaign": plan.campaign,
+            "adsets": plan.adsets,
+            "rows": [row.model_dump(mode="json") for row in plan.rows],
+            "observedActionTypes": plan.observedActionTypes,
+            "benchmarkContext": plan.benchmarkContext.model_dump(mode="json") if plan.benchmarkContext else None,
+            "funnelSnapshot": plan.funnelSnapshot.model_dump(mode="json") if plan.funnelSnapshot else None,
+            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
+        },
+        created_by_user=auth.user_id,
+    )
+    recommendations_artifact = artifacts_repo.insert(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id) if campaign.product_id else None,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.meta_management_recommended_actions,
+        data={
+            "generatedAt": plan.generatedAt,
+            "mode": plan.mode,
+            "actions": [action.model_dump(mode="json") for action in plan.actions],
+            "warnings": plan.warnings,
+            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
+        },
+        created_by_user=auth.user_id,
+    )
+    artifact_ids = {
+        "metricsSnapshotArtifactId": str(metrics_artifact.id),
+        "recommendedActionsArtifactId": str(recommendations_artifact.id),
+    }
+    if plan.mode == "apply":
+        approval_artifact = artifacts_repo.insert(
+            org_id=auth.org_id,
+            client_id=str(campaign.client_id),
+            product_id=str(campaign.product_id) if campaign.product_id else None,
+            campaign_id=str(campaign.id),
+            artifact_type=ArtifactTypeEnum.meta_management_approval_decision,
+            data={
+                "generatedAt": plan.generatedAt,
+                "approved": True,
+                "approvedByUserId": auth.user_id,
+                "approvedActionKinds": [action.kind for action in plan.actions],
+            },
+            created_by_user=auth.user_id,
+        )
+        artifact_ids["approvalDecisionArtifactId"] = str(approval_artifact.id)
+        for applied_action in plan.appliedActions:
+            artifacts_repo.insert(
+                org_id=auth.org_id,
+                client_id=str(campaign.client_id),
+                product_id=str(campaign.product_id) if campaign.product_id else None,
+                campaign_id=str(campaign.id),
+                artifact_type=ArtifactTypeEnum.meta_management_applied_action,
+                data=applied_action.model_dump(mode="json"),
+                created_by_user=auth.user_id,
+            )
+    return artifact_ids
+
+
 def _validate_publish_plan(
     *,
     campaign: Campaign,
@@ -842,11 +1044,23 @@ def _validate_publish_plan(
     auth: AuthContext,
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]], ResolvedMetaWorkspaceConfig]:
+    _require_creative_context_ready(
+        session=session,
+        auth=auth,
+        campaign_id=str(campaign.id),
+    )
     publish_base_url = _validated_publish_base_url(
         session=session,
         auth=auth,
         client_id=str(campaign.client_id),
         publish_base_url=payload.publishBaseUrl,
+    )
+    delivery_config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    is_external_delivery = bool(
+        delivery_config is not None and delivery_config.delivery_mode.value == "external_urls"
     )
     meta_repo = MetaAdsRepository(session)
     all_generation_assets = _resolve_generation_assets(
@@ -866,14 +1080,21 @@ def _validate_publish_plan(
     resolved_funnel_id = _clean_optional_text(payload.funnelId)
 
     blockers: list[str] = []
-    if resolved_funnel_id is None and len(generation_funnel_ids) > 1:
+    if not is_external_delivery and resolved_funnel_id is None and len(generation_funnel_ids) > 1:
         blockers.append(
             "Publish validation requires an explicit funnel when the selected generation spans multiple funnels."
         )
-    if resolved_funnel_id and generation_funnel_ids and resolved_funnel_id not in generation_funnel_ids:
+    if (
+        not is_external_delivery
+        and resolved_funnel_id
+        and generation_funnel_ids
+        and resolved_funnel_id not in generation_funnel_ids
+    ):
         blockers.append("The requested funnel has no generated assets in the selected publish generation.")
-    if resolved_funnel_id is None and len(generation_funnel_ids) == 1:
+    if not is_external_delivery and resolved_funnel_id is None and len(generation_funnel_ids) == 1:
         resolved_funnel_id = next(iter(generation_funnel_ids))
+    if is_external_delivery:
+        resolved_funnel_id = None
 
     generation_assets = (
         [
@@ -2238,7 +2459,59 @@ def plan_meta_management(
         event_mappings=event_mappings,
         include_raw=payload.includeRaw,
     )
-    return jsonable_encoder(plan)
+    repo = MetaAdsRepository(session)
+    local_meta_campaign = repo.get_campaign_by_meta_id(
+        org_id=auth.org_id,
+        ad_account_id=ad_account_id,
+        meta_campaign_id=payload.metaCampaignId,
+    )
+    campaign = None
+    if local_meta_campaign and local_meta_campaign.campaign_id:
+        campaigns_repo = CampaignsRepository(session)
+        campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=str(local_meta_campaign.campaign_id))
+    elif payload.mode == "apply" or payload.evaluateBenchmarks:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "A locally tracked published campaign is required before management artifacts "
+                "or benchmark evaluation can run."
+            ),
+        )
+
+    if payload.evaluateBenchmarks:
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Benchmark evaluation requires a locally tracked campaign record.",
+            )
+        try:
+            benchmark_context, funnel_snapshot, benchmark_evaluations = build_management_benchmark_payload(
+                session=session,
+                org_id=auth.org_id,
+                campaign=campaign,
+                meta_campaign_id=payload.metaCampaignId,
+                date_preset=payload.datePreset,
+                ad_rows=plan.rows,
+            )
+        except MetaManagementBenchmarkError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        plan = plan.model_copy(
+            update={
+                "benchmarkContext": benchmark_context,
+                "funnelSnapshot": funnel_snapshot,
+                "benchmarkEvaluations": benchmark_evaluations,
+            }
+        )
+
+    response_payload = jsonable_encoder(plan)
+    if campaign is not None:
+        response_payload["artifacts"] = _persist_meta_management_artifacts(
+            session=session,
+            auth=auth,
+            campaign=campaign,
+            plan=plan,
+        )
+    return response_payload
 
 
 @router.post("/specs/creatives", status_code=status.HTTP_201_CREATED)
@@ -2619,6 +2892,32 @@ def create_meta_publish_run(
                 "validation": jsonable_encoder(validation_response),
             },
         )
+    launch_context_readiness = _require_creative_context_ready(
+        session=session,
+        auth=auth,
+        campaign_id=str(campaign.id),
+    )
+    delivery_snapshot = _campaign_delivery_config_snapshot(
+        session=session,
+        auth=auth,
+        campaign_id=str(campaign.id),
+    )
+    launch_plan_payload = _build_launch_plan_payload(
+        campaign=campaign,
+        generation_key=payload.generationKey,
+        payload=payload,
+        validation_response=validation_response,
+        resolved_items=resolved_items,
+        launch_context_readiness=launch_context_readiness,
+        delivery_snapshot=delivery_snapshot,
+    )
+    launch_plan_artifact_id = _persist_launch_plan_artifact(
+        session=session,
+        auth=auth,
+        campaign=campaign,
+        launch_plan_payload=launch_plan_payload,
+    )
+    launch_plan_key = str(launch_plan_payload["launchPlanKey"])
 
     ad_account_id = _resolved_ad_account_id_for_context(resolved=resolved_meta_config)
     page_id = _require_meta_page_id(workspace_config=resolved_meta_config.workspace_config)
@@ -2644,6 +2943,9 @@ def create_meta_publish_run(
         metadata_json={
             "validation": validation_response.model_dump(mode="json"),
             "funnelId": _clean_optional_text(payload.funnelId),
+            "launchPlanArtifactId": launch_plan_artifact_id,
+            "launchPlanKey": launch_plan_key,
+            "campaignDelivery": delivery_snapshot,
         },
         completed_at=None,
     )
@@ -2677,7 +2979,7 @@ def create_meta_publish_run(
     try:
         created_campaign = _create_meta_campaign_internal(
             payload=MetaCampaignCreateRequest(
-                requestId=f"meta-publish-run:{run.id}:campaign",
+                requestId=f"meta-launch-plan:{launch_plan_key}:campaign",
                 adAccountId=ad_account_id,
                 metaConfigId=str(resolved_meta_config.workspace_config.id),
                 campaignId=str(campaign.id),
@@ -2710,7 +3012,7 @@ def create_meta_publish_run(
         for adset_spec_id, adset_spec in unique_adset_specs.items():
             created_adset = _create_meta_adset_internal(
                 payload=MetaAdSetCreateRequest(
-                    requestId=f"meta-publish-run:{run.id}:adset:{adset_spec_id}",
+                    requestId=f"meta-launch-plan:{launch_plan_key}:adset:{adset_spec_id}",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
                     campaignId=meta_campaign_id or "",
@@ -2748,7 +3050,7 @@ def create_meta_publish_run(
             uploaded_asset = _upload_meta_asset_internal(
                 asset_id=str(asset.id),
                 payload=MetaAssetUploadRequest(
-                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:upload",
+                    requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:upload",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
                 ),
@@ -2758,7 +3060,7 @@ def create_meta_publish_run(
             )
             created_creative = _create_meta_creative_internal(
                 payload=MetaCreativeCreateRequest(
-                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:creative",
+                    requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:creative",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
                     assetId=str(asset.id),
@@ -2785,7 +3087,7 @@ def create_meta_publish_run(
 
             created_ad = _create_meta_ad_internal(
                 payload=MetaAdCreateRequest(
-                    requestId=f"meta-publish-run:{run.id}:asset:{asset.id}:ad",
+                    requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:ad",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
                     adsetId=meta_adset_id_by_spec_id[str(adset_spec.id)],
