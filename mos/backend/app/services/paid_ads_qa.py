@@ -7,20 +7,31 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 from uuid import uuid4
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
+from app.db.models import PaidAdsPlatformProfile
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
+from app.services.meta_review import resolve_meta_review_destination_url
+from app.services.meta_ads import MetaAdsClient, MetaAdsError
 
 
-RULESET_VERSION = "paid_ads_policy_ruleset_v1"
+LEGACY_RULESET_VERSION = "paid_ads_policy_ruleset_v1"
+RULESET_VERSION = "paid_ads_policy_ruleset_v2"
 _RULESET_DIR = Path(__file__).resolve().parents[1] / "static" / "paid_ads_policy_rules"
 _REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
 _HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 _HTTP_HEADERS = {"User-Agent": "MOS-PaidAdsQA/1.0"}
+_RULESET_FILES = {
+    LEGACY_RULESET_VERSION: "meta_tiktok_v1.json",
+    RULESET_VERSION: "meta_tiktok_v2.json",
+}
+_MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
+_DEFAULT_META_TRACKING_URL_PARAMETERS = "utm_source=meta&utm_medium=paid"
 
 _PRIVATE_INFO_RE = re.compile(
     r"\b(?:we know you(?:'re| are)?|you have|your (?:medical|health|credit|debt|diabetes|weight|age|skin)|"
@@ -57,28 +68,35 @@ class MetaProfileRefreshError(RuntimeError):
 
 
 def _ruleset_path(version: str) -> Path:
-    return _RULESET_DIR / "meta_tiktok_v1.json"
+    filename = _RULESET_FILES.get(version)
+    if not filename:
+        supported = "', '".join(_RULESET_FILES)
+        raise KeyError(
+            f"Unsupported ruleset version '{version}'. Supported versions: '{supported}'."
+        )
+    return _RULESET_DIR / filename
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def get_ruleset(version: str = RULESET_VERSION) -> dict[str, Any]:
-    if version != RULESET_VERSION:
-        raise KeyError(f"Unsupported ruleset version '{version}'. Supported version: '{RULESET_VERSION}'.")
     payload = json.loads(_ruleset_path(version).read_text(encoding="utf-8"))
     return payload
 
 
 def list_rulesets() -> list[dict[str, Any]]:
-    ruleset = get_ruleset()
-    return [
-        {
-            "version": ruleset["version"],
-            "effectiveDate": ruleset["effectiveDate"],
-            "description": ruleset["description"],
-            "sourceCount": len(ruleset.get("sources", [])),
-            "ruleCount": len(ruleset.get("rules", [])),
-        }
-    ]
+    summaries: list[dict[str, Any]] = []
+    for version in _RULESET_FILES:
+        ruleset = get_ruleset(version)
+        summaries.append(
+            {
+                "version": ruleset["version"],
+                "effectiveDate": ruleset["effectiveDate"],
+                "description": ruleset["description"],
+                "sourceCount": len(ruleset.get("sources", [])),
+                "ruleCount": len(ruleset.get("rules", [])),
+            }
+        )
+    return summaries
 
 
 def normalize_platform(platform: str) -> str:
@@ -98,6 +116,45 @@ def clean_optional_text(value: str | None) -> str | None:
 def normalize_tracking_provider(value: str | None) -> str | None:
     cleaned = clean_optional_text(value)
     return cleaned.lower().replace(" ", "_") if cleaned else None
+
+
+def upsert_meta_platform_profile_from_profile(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    profile: dict[str, Any],
+) -> PaidAdsPlatformProfile:
+    metadata = profile.get("metadata")
+    profile_metadata = dict(metadata) if isinstance(metadata, dict) else {}
+    repo = PaidAdsQaRepository(session)
+    return repo.upsert_platform_profile(
+        org_id=org_id,
+        client_id=client_id,
+        platform="meta",
+        ruleset_version=str(profile.get("rulesetVersion") or RULESET_VERSION),
+        business_manager_id=clean_optional_text(profile.get("businessManagerId")),
+        business_manager_name=clean_optional_text(profile.get("businessManagerName")),
+        page_id=clean_optional_text(profile.get("pageId")),
+        page_name=clean_optional_text(profile.get("pageName")),
+        ad_account_id=clean_optional_text(profile.get("adAccountId")),
+        ad_account_name=clean_optional_text(profile.get("adAccountName")),
+        payment_method_type=normalize_tracking_provider(profile.get("paymentMethodType")),
+        payment_method_status=clean_optional_text(profile.get("paymentMethodStatus")),
+        pixel_id=clean_optional_text(profile.get("pixelId")),
+        data_set_id=clean_optional_text(profile.get("dataSetId")),
+        data_set_shopify_partner_installed=profile.get("dataSetShopifyPartnerInstalled"),
+        data_set_data_sharing_level=normalize_tracking_provider(profile.get("dataSetDataSharingLevel")),
+        data_set_assigned_to_ad_account=profile.get("dataSetAssignedToAdAccount"),
+        verified_domain=clean_optional_text(profile.get("verifiedDomain")),
+        verified_domain_status=normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+        attribution_click_window=normalize_tracking_provider(profile.get("attributionClickWindow")),
+        attribution_view_window=normalize_tracking_provider(profile.get("attributionViewWindow")),
+        view_through_enabled=profile.get("viewThroughEnabled"),
+        tracking_provider=normalize_tracking_provider(profile.get("trackingProvider")),
+        tracking_url_parameters=clean_optional_text(profile.get("trackingUrlParameters")),
+        metadata_json=profile_metadata,
+    )
 
 
 def rules_by_id(ruleset: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -188,13 +245,120 @@ def _profile_metadata(profile: dict[str, Any]) -> dict[str, Any]:
     return dict(metadata) if isinstance(metadata, dict) else {}
 
 
-def _graphql_candidate_source(profile_value: str | None, settings_value: str | None, *, settings_label: str) -> tuple[str | None, str | None]:
+def _ruleset_uses_mos_meta_tracking(version: str) -> bool:
+    return version != LEGACY_RULESET_VERSION
+
+
+def _normalize_string_list(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = clean_optional_text(value) if isinstance(value, str) else None
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    return normalized
+
+
+def _mos_meta_tracking_metadata(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = _profile_metadata(profile)
+    raw = metadata.get(_MOS_META_TRACKING_METADATA_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _meta_account_008_legacy_ready(profile: dict[str, Any]) -> bool:
+    return profile.get("dataSetShopifyPartnerInstalled") is True and normalize_tracking_provider(
+        profile.get("dataSetDataSharingLevel")
+    ) == "maximum"
+
+
+def _meta_account_008_mos_tracking_ready(profile: dict[str, Any]) -> bool:
+    metadata = _mos_meta_tracking_metadata(profile)
+    pixel_id = clean_optional_text(metadata.get("pixelId")) or clean_optional_text(profile.get("pixelId"))
+    status = normalize_tracking_provider(metadata.get("status"))
+    mode = normalize_tracking_provider(metadata.get("mode"))
+    channel = normalize_tracking_provider(metadata.get("channel"))
+    browser_events = _normalize_string_list(metadata.get("browserEvents"))
+    return (
+        bool(pixel_id)
+        and status == "active"
+        and mode == "public_funnel_runtime"
+        and channel == "meta"
+        and "pageview" in {item.replace("_", "").lower() for item in browser_events}
+        and "initiatecheckout" in {item.replace("_", "").lower() for item in browser_events}
+    )
+
+
+def activate_mos_meta_funnel_tracking_profile(
+    *,
+    profile: dict[str, Any],
+    funnel_ids: list[str],
+    ruleset_version: str = RULESET_VERSION,
+    client: MetaAdsClient | None = None,
+    api_version: str | None = None,
+) -> dict[str, Any]:
+    refreshed = refresh_meta_platform_profile_from_graph(
+        profile=profile,
+        ruleset_version=ruleset_version,
+        client=client,
+        api_version=api_version,
+    )
+    pixel_id = clean_optional_text(refreshed.get("pixelId"))
+    data_set_id = clean_optional_text(refreshed.get("dataSetId"))
+    data_set_assigned = refreshed.get("dataSetAssignedToAdAccount")
+    if not pixel_id:
+        raise MetaProfileRefreshError(
+            "Meta funnel tracking automation requires a resolved pixelId. "
+            "Select a single Meta pixel/data set in MOS before generating funnels.",
+        )
+    if not data_set_id or data_set_assigned is not True:
+        raise MetaProfileRefreshError(
+            "Meta funnel tracking automation requires a Data Set that is assigned to the ad account.",
+        )
+
+    metadata = _profile_metadata(refreshed)
+    existing_tracking = _mos_meta_tracking_metadata(refreshed)
+    configured_funnel_ids = _normalize_string_list(existing_tracking.get("funnelIds"))
+    merged_funnel_ids = configured_funnel_ids[:]
+    seen_funnel_ids = set(configured_funnel_ids)
+    for funnel_id in funnel_ids:
+        cleaned = clean_optional_text(funnel_id)
+        if not cleaned or cleaned in seen_funnel_ids:
+            continue
+        seen_funnel_ids.add(cleaned)
+        merged_funnel_ids.append(cleaned)
+
+    metadata[_MOS_META_TRACKING_METADATA_KEY] = {
+        **existing_tracking,
+        "status": "active",
+        "channel": "meta",
+        "mode": "public_funnel_runtime",
+        "pixelId": pixel_id,
+        "dataSetId": data_set_id,
+        "browserEvents": ["PageView", "InitiateCheckout"],
+        "internalEvents": ["page_view", "cta_click"],
+        "funnelIds": merged_funnel_ids,
+        "enabledAt": existing_tracking.get("enabledAt") or _iso_now(),
+        "lastSyncedAt": _iso_now(),
+        "source": "campaign_funnel_generation",
+    }
+
+    refreshed["rulesetVersion"] = ruleset_version
+    refreshed["metadata"] = metadata
+    if not clean_optional_text(refreshed.get("trackingProvider")):
+        refreshed["trackingProvider"] = "mos"
+    if not clean_optional_text(refreshed.get("trackingUrlParameters")):
+        refreshed["trackingUrlParameters"] = _DEFAULT_META_TRACKING_URL_PARAMETERS
+    return refreshed
+
+
+def _graphql_candidate_source(profile_value: str | None, *, profile_label: str) -> tuple[str | None, str | None]:
     cleaned_profile_value = clean_optional_text(profile_value)
     if cleaned_profile_value:
-        return cleaned_profile_value, "profile"
-    cleaned_settings_value = clean_optional_text(settings_value)
-    if cleaned_settings_value:
-        return cleaned_settings_value, settings_label
+        return cleaned_profile_value, profile_label
     return None, None
 
 
@@ -216,8 +380,7 @@ def _single_graph_node(
 def _fetch_meta_page(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple[dict[str, Any], str]:
     candidate_id, candidate_source = _graphql_candidate_source(
         profile.get("pageId"),
-        settings.META_PAGE_ID,
-        settings_label="settings.META_PAGE_ID",
+        profile_label="profile.pageId",
     )
     fields = "id,name,verification_status,link,business"
     if candidate_id:
@@ -237,8 +400,7 @@ def _fetch_meta_page(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple
 def _fetch_meta_ad_account(client: MetaAdsClient, *, profile: dict[str, Any]) -> tuple[dict[str, Any], str]:
     candidate_id, candidate_source = _graphql_candidate_source(
         profile.get("adAccountId"),
-        settings.META_AD_ACCOUNT_ID,
-        settings_label="settings.META_AD_ACCOUNT_ID",
+        profile_label="profile.adAccountId",
     )
     fields = "id,name,account_status,disable_reason,business,funding_source_details"
     if candidate_id:
@@ -315,15 +477,17 @@ def refresh_meta_platform_profile_from_graph(
     *,
     profile: dict[str, Any],
     ruleset_version: str = RULESET_VERSION,
+    client: MetaAdsClient | None = None,
+    api_version: str | None = None,
 ) -> dict[str, Any]:
     normalized_platform = normalize_platform(profile.get("platform") or "meta")
     if normalized_platform != "meta":
         return profile
 
-    try:
-        client = MetaAdsClient.from_settings()
-    except MetaAdsConfigError as exc:
-        raise MetaProfileRefreshError(str(exc), status_code=503) from exc
+    if client is None:
+        raise MetaProfileRefreshError(
+            "Meta Graph refresh requires a configured Meta ad account connection with credentials."
+        )
 
     page, page_source = _fetch_meta_page(client, profile=profile)
     ad_account, ad_account_source = _fetch_meta_ad_account(client, profile=profile)
@@ -344,7 +508,7 @@ def refresh_meta_platform_profile_from_graph(
     selected_pixel, pixel_source, pixel_warning = _pick_pixel_record(profile=profile, pixel_records=pixel_records)
     existing_metadata = _profile_metadata(profile)
     validation_metadata = {
-        "apiVersion": settings.META_GRAPH_API_VERSION,
+        "apiVersion": clean_optional_text(api_version) or client.api_version,
         "lastValidatedAt": _iso_now(),
         "validatedFields": [
             "pageId",
@@ -543,21 +707,32 @@ def evaluate_platform_profile(
                     },
                 )
             )
-        if profile.get("dataSetShopifyPartnerInstalled") is not True or normalize_tracking_provider(
-            profile.get("dataSetDataSharingLevel")
-        ) != "maximum":
+        legacy_meta_tracking_ready = _meta_account_008_legacy_ready(profile)
+        mos_meta_tracking_ready = _meta_account_008_mos_tracking_ready(profile)
+        if not legacy_meta_tracking_ready and (
+            not _ruleset_uses_mos_meta_tracking(ruleset_version) or not mos_meta_tracking_ready
+        ):
+            mos_tracking_metadata = _mos_meta_tracking_metadata(profile)
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
                     rule_id="META-ACCOUNT-008",
                     status="failed",
                     title="Data Set integration is incomplete",
-                    message="Meta Data Set should use the Shopify partner integration and Maximum data sharing.",
+                    message=(
+                        "Meta Data Set should use the Shopify partner integration and Maximum data sharing, "
+                        "or have MOS-managed funnel tracking automation active."
+                        if _ruleset_uses_mos_meta_tracking(ruleset_version)
+                        else "Meta Data Set should use the Shopify partner integration and Maximum data sharing."
+                    ),
                     artifact_type="platform_profile",
                     artifact_ref=artifact_ref,
                     evidence={
                         "dataSetShopifyPartnerInstalled": profile.get("dataSetShopifyPartnerInstalled"),
                         "dataSetDataSharingLevel": profile.get("dataSetDataSharingLevel"),
+                        "mosMetaTrackingStatus": mos_tracking_metadata.get("status"),
+                        "mosMetaTrackingMode": mos_tracking_metadata.get("mode"),
+                        "mosMetaTrackingPixelId": mos_tracking_metadata.get("pixelId"),
                     },
                 )
             )
@@ -704,6 +879,36 @@ def _combine_copy_fields(spec: dict[str, Any]) -> str:
     )
 
 
+def list_meta_copy_policy_issues(spec: dict[str, Any]) -> list[dict[str, str]]:
+    copy_blob = _combine_copy_fields(spec)
+    issues: list[dict[str, str]] = []
+    if _PRIVATE_INFO_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-002",
+                "title": "Copy appears to reference private information",
+                "message": "The Meta draft copy appears to ask for or imply knowledge of private user information.",
+            }
+        )
+    if _DISCRIMINATION_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-003",
+                "title": "Copy appears discriminatory",
+                "message": "The Meta draft copy appears to contain discriminatory or exclusionary language.",
+            }
+        )
+    if _NEGATIVE_SELF_PERCEPTION_RE.search(copy_blob):
+        issues.append(
+            {
+                "ruleId": "META-COPY-005",
+                "title": "Negative self-perception language detected",
+                "message": "The Meta draft copy appears to use shaming or negative self-perception language.",
+            }
+        )
+    return issues
+
+
 def _looks_absolute_http_url(value: str | None) -> bool:
     if not value:
         return False
@@ -723,7 +928,86 @@ def _resolve_public_destination_url(value: str | None, *, review_base_url: str |
     return urljoin(f"{base.rstrip('/')}/", cleaned.lstrip("/"))
 
 
+def _extract_text_fragments(value: Any) -> list[str]:
+    fragments: list[str] = []
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned:
+            fragments.append(cleaned)
+        return fragments
+    if isinstance(value, dict):
+        for nested in value.values():
+            fragments.extend(_extract_text_fragments(nested))
+        return fragments
+    if isinstance(value, list):
+        for nested in value:
+            fragments.extend(_extract_text_fragments(nested))
+    return fragments
+
+
+def _parse_public_funnel_route(url: str) -> tuple[str, str, str | None] | None:
+    parsed = urlparse(url)
+    raw_segments = [unquote(segment).strip() for segment in parsed.path.split("/") if segment.strip()]
+    if len(raw_segments) >= 4 and raw_segments[0] == "f":
+        product_slug, funnel_slug = raw_segments[1], raw_segments[2]
+        page_slug = raw_segments[3] if len(raw_segments) >= 4 else None
+        return product_slug, funnel_slug, page_slug
+    if len(raw_segments) >= 3:
+        product_slug, funnel_slug, page_slug = raw_segments[0], raw_segments[1], raw_segments[2]
+        return product_slug, funnel_slug, page_slug
+    return None
+
+
+def _public_funnel_api_base_url() -> str | None:
+    return clean_optional_text(settings.DEPLOY_PUBLIC_API_BASE_URL)
+
+
+def _load_public_funnel_snapshot(url: str) -> dict[str, Any] | None:
+    route = _parse_public_funnel_route(url)
+    api_base_url = _public_funnel_api_base_url()
+    if route is None or not api_base_url:
+        return None
+
+    product_slug, funnel_slug, page_slug = route
+    with httpx.Client(follow_redirects=True, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS) as client:
+        resolved_page_slug = page_slug
+        if not resolved_page_slug:
+            meta_response = client.get(
+                f"{api_base_url.rstrip('/')}/public/funnels/{product_slug}/{funnel_slug}/meta"
+            )
+            meta_response.raise_for_status()
+            meta_payload = meta_response.json()
+            if not isinstance(meta_payload, dict):
+                raise httpx.DecodingError("Public funnel meta response must be a JSON object.")
+            resolved_page_slug = clean_optional_text(meta_payload.get("entrySlug"))
+            if not resolved_page_slug:
+                raise httpx.DecodingError("Public funnel meta response is missing entrySlug.")
+
+        page_response = client.get(
+            f"{api_base_url.rstrip('/')}/public/funnels/{product_slug}/{funnel_slug}/pages/{resolved_page_slug}"
+        )
+        page_response.raise_for_status()
+        page_payload = page_response.json()
+        if not isinstance(page_payload, dict):
+            raise httpx.DecodingError("Public funnel page response must be a JSON object.")
+
+    extracted_text = "\n".join(
+        _extract_text_fragments(page_payload.get("metadata"))
+        + _extract_text_fragments(page_payload.get("puckData"))
+    )
+    return {
+        "requestedUrl": url,
+        "finalUrl": url,
+        "statusCode": 200,
+        "bodyText": extracted_text[:50000],
+        "inspectionSource": "public_funnel_api",
+    }
+
+
 def _landing_page_snapshot(url: str) -> dict[str, Any]:
+    public_funnel_snapshot = _load_public_funnel_snapshot(url)
+    if public_funnel_snapshot is not None:
+        return public_funnel_snapshot
     with httpx.Client(follow_redirects=True, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS) as client:
         response = client.get(url)
     return {
@@ -731,18 +1015,32 @@ def _landing_page_snapshot(url: str) -> dict[str, Any]:
         "finalUrl": str(response.url),
         "statusCode": response.status_code,
         "bodyText": response.text[:50000],
+        "inspectionSource": "http_fetch",
     }
 
 
 def _creative_spec_destination(spec: dict[str, Any]) -> tuple[str | None, str | None]:
     direct = clean_optional_text(spec.get("destination_url"))
     metadata = spec.get("metadata_json") if isinstance(spec.get("metadata_json"), dict) else {}
+    metadata_source = clean_optional_text(metadata.get("destinationSource"))
+    resolved_destination = clean_optional_text(metadata.get("resolvedDestinationUrl"))
+    if resolved_destination and metadata_source in {
+        "campaign_delivery_config",
+        "review_path",
+        "destination_page",
+        "stored_destination_url",
+    }:
+        return resolved_destination, metadata_source
     if direct:
-        return direct, "stored_destination_url"
+        return direct, metadata_source or "stored_destination_url"
     destination_page = clean_optional_text(metadata.get("destinationPage"))
     review_paths = metadata.get("reviewPaths") if isinstance(metadata.get("reviewPaths"), dict) else {}
-    if destination_page and isinstance(review_paths.get(destination_page), str):
-        return clean_optional_text(review_paths.get(destination_page)), "review_path"
+    resolved_review_path = resolve_meta_review_destination_url(
+        destination_page=destination_page or "",
+        review_paths=review_paths,
+    )
+    if resolved_review_path:
+        return resolved_review_path, "review_path"
     if destination_page and (destination_page.startswith("/") or _looks_absolute_http_url(destination_page)):
         return destination_page, "destination_page"
     return None, None
@@ -837,7 +1135,8 @@ def evaluate_meta_campaign(
         }
         artifact_ref = str(spec.id)
         copy_blob = _combine_copy_fields(spec_dict)
-        if _PRIVATE_INFO_RE.search(copy_blob):
+        copy_issues = list_meta_copy_policy_issues(spec_dict)
+        if any(issue["ruleId"] == "META-COPY-002" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
@@ -850,7 +1149,7 @@ def evaluate_meta_campaign(
                     evidence={"copy": copy_blob},
                 )
             )
-        if _DISCRIMINATION_RE.search(copy_blob):
+        if any(issue["ruleId"] == "META-COPY-003" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,
@@ -876,7 +1175,7 @@ def evaluate_meta_campaign(
                     evidence={"copy": copy_blob},
                 )
             )
-        if _NEGATIVE_SELF_PERCEPTION_RE.search(copy_blob):
+        if any(issue["ruleId"] == "META-COPY-005" for issue in copy_issues):
             findings.append(
                 _new_finding(
                     ruleset=ruleset,

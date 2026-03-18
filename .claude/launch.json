@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5275"],
+      "port": 5275,
+      "autoPort": false,
+      "cwd": "mos/frontend"
+    }
+  ]
+}

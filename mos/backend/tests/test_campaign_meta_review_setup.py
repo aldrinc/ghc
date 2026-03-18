@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
+
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage
+from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
+from app.services.paid_ads_qa import RULESET_VERSION
+from tests.helpers.manual_creative_context import manual_creative_context_payload
+from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 
 
-def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str, str]:
+def _create_campaign_with_product(api_client, *, suffix: str, db_session=None) -> tuple[str, str, str]:
     client_resp = api_client.post("/clients", json={"name": f"Client {suffix}", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -23,11 +28,31 @@ def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str,
             "product_id": product_id,
             "name": f"Campaign {suffix}",
             "channels": ["facebook"],
-            "asset_brief_types": ["image_ad"],
+            "asset_brief_types": ["image"],
         },
     )
     assert campaign_resp.status_code == 201
-    return client_id, product_id, campaign_resp.json()["id"]
+
+    profile_resp = api_client.put(
+        f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
+        json={
+            "rulesetVersion": RULESET_VERSION,
+            "pageId": "123456",
+            "adAccountId": "act_123456",
+            "metadata": {},
+        },
+    )
+    assert profile_resp.status_code == 200
+    campaign_id = campaign_resp.json()["id"]
+    if db_session is not None:
+        seed_ready_launch_context_for_campaign(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            launch_key=f"sv2-launch:test:{campaign_id}:{suffix}",
+        )
+    return client_id, product_id, campaign_id
 
 
 def _build_swipe_copy_pack(
@@ -73,15 +98,25 @@ def _build_swipe_copy_inputs(
     source_url: str,
     angle_used: str,
     destination_page: str = "pre-sales",
+    source_swipe_label: str | None = None,
+    source_swipe_url: str | None = None,
 ) -> dict[str, object]:
     return {
+        "platform": "Meta",
         "adImageOrVideo": {
+            "sourceKind": "rendered_output",
             "sourceLabel": source_label,
             "sourceUrl": source_url,
             "assetType": "image",
+            "mimeType": "image/png",
         },
         "angleUsed": angle_used,
         "destinationPage": destination_page,
+        "sourceSwipe": {
+            "sourceLabel": source_swipe_label or source_label,
+            "sourceUrl": source_swipe_url or source_url,
+            "mimeType": "image/png",
+        },
     }
 
 
@@ -89,7 +124,11 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     api_client,
     db_session,
 ) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review",
+        db_session=db_session,
+    )
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
@@ -237,7 +276,7 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -273,12 +312,307 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
     assert row["adset_specs"][0]["metadata_json"]["experimentSpecId"] == "exp-A02-Interaction Triage Workflow"
 
+    library_pipeline_resp = api_client.get(f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&statuses=draft")
+    assert library_pipeline_resp.status_code == 200
+    library_pipeline = library_pipeline_resp.json()
+    assert len(library_pipeline) == 1
+    assert library_pipeline[0]["adset_specs"][0]["metadata_json"]["experimentSpecId"] == (
+        "exp-A02-Interaction Triage Workflow"
+    )
+
+
+def test_campaign_meta_review_setup_uses_external_campaign_delivery_urls(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-external",
+        db_session=db_session,
+    )
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/pre-sale",
+            "salesUrl": "https://lp.example.com/offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_response = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_response.status_code == 200, validate_response.text
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    brief_id = "brief-exp-a02-external"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "destinationLabel": "Pre-Sales Landing Page",
+                    "experimentId": "exp-A02-External",
+                    "variantId": "variant_a",
+                    "variantName": "External Landing Page Variant",
+                    "creativeConcept": "Drive qualified clicks to the external pre-sales page.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Why operators click through the external page.",
+                            "angle": "External delivery without funnel coupling.",
+                            "destinationType": "pre-sales",
+                            "destinationLabel": "Pre-Sales Landing Page",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=None,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/test-meta-review-external.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-external",
+            "deliveryMode": "external_urls",
+            "destinationType": "pre-sales",
+            "resolvedDestinationUrl": "https://lp.example.com/pre-sale",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="External delivery without funnel coupling.",
+                hook="Why operators click through the external page.",
+                primary_text="Use the validated external landing page for paid traffic.",
+                headline="External destinations are launch-ready",
+                description="Creative spec should point at the canonical pre-sales URL.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="14.png",
+                source_url="https://example.com/swipes/14.png",
+                angle_used="External delivery without funnel coupling.",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200, setup_resp.text
+
+    creative_spec = db_session.scalar(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.campaign_id == campaign_id,
+            MetaCreativeSpec.asset_id == asset.id,
+        )
+    )
+    assert creative_spec is not None
+    assert creative_spec.destination_url == "https://lp.example.com/pre-sale"
+    assert creative_spec.metadata_json["destinationSource"] == "campaign_delivery_config"
+    assert creative_spec.metadata_json["campaignDelivery"]["deliveryMode"] == "external_urls"
+
+
+def test_campaign_meta_review_setup_supports_manual_creative_context_without_launch_lineage(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-manual",
+        db_session=None,
+    )
+
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_claude",
+        lambda **_kwargs: "claude-file-1",
+    )
+    monkeypatch.setattr("app.services.campaign_creative_context.is_gemini_file_search_enabled", lambda: False)
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_gemini_file_search",
+        lambda **_kwargs: None,
+    )
+
+    creative_context_response = api_client.post(
+        f"/campaigns/{campaign_id}/creative-context/loaded",
+        json=manual_creative_context_payload(campaign_id=campaign_id),
+    )
+    assert creative_context_response.status_code == 201, creative_context_response.text
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/manual-pre-sale",
+            "salesUrl": "https://lp.example.com/manual-offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_response = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_response.status_code == 200, validate_response.text
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    brief_id = "brief-exp-manual-external"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "destinationLabel": "Pre-Sales Landing Page",
+                    "experimentId": "exp-manual-1",
+                    "variantId": "var_angle",
+                    "variantName": "Structured angle",
+                    "creativeConcept": "Drive clicks with the manually loaded structured angle.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Show the decision path before the click.",
+                            "angle": "Structured relief path",
+                            "destinationType": "pre-sales",
+                            "destinationLabel": "Pre-Sales Landing Page",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=None,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/test-meta-review-manual.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-manual",
+            "deliveryMode": "external_urls",
+            "destinationType": "pre-sales",
+            "resolvedDestinationUrl": "https://lp.example.com/manual-pre-sale",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Structured relief path",
+                hook="Show the decision path before the click.",
+                primary_text="Walk buyers through the offer before they commit.",
+                headline="A clearer external decision path",
+                description="Manual creative context drives the published copy.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="21.png",
+                source_url="https://example.com/swipes/21.png",
+                angle_used="Structured relief path",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200, setup_resp.text
+
+    creative_spec = db_session.scalar(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.campaign_id == campaign_id,
+            MetaCreativeSpec.asset_id == asset.id,
+        )
+    )
+    assert creative_spec is not None
+    assert creative_spec.destination_url == "https://lp.example.com/manual-pre-sale"
+    assert creative_spec.metadata_json["destinationSource"] == "campaign_delivery_config"
+
 
 def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exists(
     api_client,
     db_session,
 ) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-latest-batch")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-latest-batch",
+        db_session=db_session,
+    )
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
@@ -445,7 +779,7 @@ def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exis
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id]},
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -466,7 +800,11 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
     api_client,
     db_session,
 ) -> None:
-    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-batch-scope")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-batch-scope",
+        db_session=db_session,
+    )
 
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
@@ -650,7 +988,7 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
 
     setup_resp = api_client.post(
         f"/campaigns/{campaign_id}/meta/review-setup",
-        json={"assetBriefIds": [brief_id], "generationBatchId": "batch-selected"},
+        json={"assetBriefIds": [brief_id], "generationBatchId": "batch-selected", "funnelId": str(funnel.id)},
     )
     assert setup_resp.status_code == 200
     setup_payload = setup_resp.json()
@@ -666,3 +1004,440 @@ def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
     assert selected_row["creative_spec"] is not None
     assert selected_row["creative_spec"]["metadata_json"]["generationBatchId"] == "batch-selected"
     assert older_row["creative_spec"] is None
+
+
+def test_campaign_meta_review_setup_normalizes_human_destination_labels(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-human-destination",
+        db_session=db_session,
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Human Destination Funnel",
+        route_slug="meta-review-human-destination-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-human-destination"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-human-destination",
+                    "variantId": "variant_human_destination",
+                    "variantName": "Human Destination Variant",
+                    "creativeConcept": "Resolve human-readable destination labels.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Map the destination label correctly.",
+                            "angle": "Human-readable destination labels.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/meta-review-human-destination.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-human-destination",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Human-readable destination labels.",
+                hook="Map the destination label correctly.",
+                primary_text="Use the category label and still resolve the right page.",
+                headline="Destination labels should normalize",
+                description="Review setup should map the destination cleanly.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="12.png",
+                source_url="https://example.com/swipes/12.png",
+                angle_used="Human-readable destination labels.",
+                destination_page="Presales Listicle Page",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
+    )
+    assert setup_resp.status_code == 200
+
+    creative_spec = db_session.scalar(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.campaign_id == campaign_id,
+            MetaCreativeSpec.asset_id == asset.id,
+        )
+    )
+    assert creative_spec is not None
+    assert creative_spec.destination_url.endswith("/pre-sales")
+    assert creative_spec.metadata_json["destinationPage"] == "pre-sales"
+
+
+def test_campaign_meta_review_setup_requires_explicit_funnel_for_multi_funnel_selection(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-multi-funnel",
+        db_session=db_session,
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    first_funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="First Meta Funnel",
+        route_slug="first-meta-funnel",
+    )
+    second_funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Second Meta Funnel",
+        route_slug="second-meta-funnel",
+    )
+    db_session.add_all([first_funnel, second_funnel])
+    db_session.commit()
+    db_session.refresh(first_funnel)
+    db_session.refresh(second_funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=first_funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=second_funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+        ]
+    )
+    db_session.commit()
+
+    first_brief_id = "brief-multi-funnel-first"
+    second_brief_id = "brief-multi-funnel-second"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": first_brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(first_funnel.id),
+                    "experimentId": "exp-multi-funnel-first",
+                    "variantId": "variant_multi_funnel_first",
+                    "variantName": "First Funnel Variant",
+                    "requirements": [{"channel": "facebook", "format": "image_ad", "funnelStage": "top-of-funnel"}],
+                },
+                {
+                    "id": second_brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(second_funnel.id),
+                    "experimentId": "exp-multi-funnel-second",
+                    "variantId": "variant_multi_funnel_second",
+                    "variantName": "Second Funnel Variant",
+                    "requirements": [{"channel": "facebook", "format": "image_ad", "funnelStage": "top-of-funnel"}],
+                },
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+    first_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=first_funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": first_brief_id},
+        storage_key="creative/meta-review-multi-funnel-first.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": first_brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-multi-funnel",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="First funnel angle.",
+                hook="First funnel hook.",
+                primary_text="First funnel primary text.",
+                headline="First funnel headline",
+                description="First funnel description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="first.png",
+                source_url="https://example.com/swipes/first.png",
+                angle_used="First funnel angle.",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    second_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=second_funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": second_brief_id},
+        storage_key="creative/meta-review-multi-funnel-second.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": second_brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-multi-funnel",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Second funnel angle.",
+                hook="Second funnel hook.",
+                primary_text="Second funnel primary text.",
+                headline="Second funnel headline",
+                description="Second funnel description",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="second.png",
+                source_url="https://example.com/swipes/second.png",
+                angle_used="Second funnel angle.",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    db_session.add_all([first_asset, second_asset])
+    db_session.commit()
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [first_brief_id, second_brief_id]},
+    )
+    assert setup_resp.status_code == 409
+    assert setup_resp.json()["detail"] == {
+        "message": "Selected asset briefs span multiple funnels. Pick one funnel in the Meta ads tab before preparing review.",
+        "selectedAssetBriefIds": [first_brief_id, second_brief_id],
+        "availableFunnelIds": sorted([str(first_funnel.id), str(second_funnel.id)]),
+    }
+
+
+def test_campaign_meta_review_setup_rejects_invalid_assets_before_writing_specs(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-preflight",
+        db_session=db_session,
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Preflight Funnel",
+        route_slug="meta-review-preflight-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-preflight"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-preflight",
+                    "variantId": "variant_preflight",
+                    "variantName": "Preflight Variant",
+                    "creativeConcept": "Reject invalid assets before writing specs.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Reject invalid destination and copy.",
+                            "angle": "Preflight validation.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/meta-review-preflight.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-preflight",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Preflight validation.",
+                hook="Reject invalid destination and copy.",
+                primary_text="We know you have diabetes before you click.",
+                headline="Private-info framing should block prep",
+                description="Preflight should stop this before QA.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="13.png",
+                source_url="https://example.com/swipes/13.png",
+                angle_used="Preflight validation.",
+                destination_page="Mystery Funnel Page",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id], "funnelId": str(funnel.id)},
+    )
+    assert setup_resp.status_code == 409
+    payload = setup_resp.json()["detail"]
+    assert payload["message"] == (
+        "Some generated assets cannot be prepared for Meta review until destination mapping or copy issues are fixed."
+    )
+    assert len(payload["invalidAssets"]) == 1
+    invalid_asset = payload["invalidAssets"][0]
+    assert invalid_asset["assetId"] == str(asset.id)
+    rule_ids = {issue["ruleId"] for issue in invalid_asset["issues"]}
+    assert "META-LP-001" in rule_ids
+    assert "META-COPY-002" in rule_ids
+
+    creative_specs = db_session.scalars(
+        select(MetaCreativeSpec).where(MetaCreativeSpec.campaign_id == campaign_id)
+    ).all()
+    adset_specs = db_session.scalars(
+        select(MetaAdSetSpec).where(MetaAdSetSpec.campaign_id == campaign_id)
+    ).all()
+    assert creative_specs == []
+    assert adset_specs == []

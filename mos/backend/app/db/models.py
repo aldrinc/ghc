@@ -33,6 +33,8 @@ from app.db.enums import (
     AssetStatusEnum,
     BrandChannelVerificationStatusEnum,
     BrandRoleEnum,
+    CampaignDeliveryModeEnum,
+    CampaignDeliveryValidationStatusEnum,
     ProductBrandRelationshipSourceEnum,
     ProductBrandRelationshipTypeEnum,
     ClaudeContextFileStatusEnum,
@@ -305,6 +307,41 @@ class Campaign(Base):
     budget_min: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     budget_max: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CampaignDeliveryConfig(Base):
+    __tablename__ = "campaign_delivery_configs"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", name="uq_campaign_delivery_configs_campaign"),
+        sa.Index("idx_campaign_delivery_configs_org_campaign", "org_id", "campaign_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    delivery_mode: Mapped[CampaignDeliveryModeEnum] = mapped_column(
+        Enum(CampaignDeliveryModeEnum, name="campaign_delivery_mode"),
+        nullable=False,
+        server_default=CampaignDeliveryModeEnum.internal_funnel.value,
+    )
+    pre_sales_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sales_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    checkout_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    thank_you_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    validation_status: Mapped[CampaignDeliveryValidationStatusEnum] = mapped_column(
+        Enum(CampaignDeliveryValidationStatusEnum, name="campaign_delivery_validation_status"),
+        nullable=False,
+        server_default=CampaignDeliveryValidationStatusEnum.not_applicable.value,
+    )
+    validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
@@ -1070,6 +1107,98 @@ class AssetPerformanceSnapshot(Base):
     )
 
 
+class MetaAdAccountConnection(Base):
+    __tablename__ = "meta_ad_account_connections"
+    __table_args__ = (
+        UniqueConstraint("org_id", "ad_account_id", name="uq_meta_ad_account_connections_org_account"),
+        sa.Index("idx_meta_ad_account_connections_org_status", "org_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    ad_account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ad_account_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_manager_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_manager_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    graph_api_version: Mapped[str] = mapped_column(Text, nullable=False)
+    graph_api_base_url: Mapped[str] = mapped_column(Text, nullable=False, server_default="https://graph.facebook.com")
+    credential_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="access_token")
+    credentials_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    credentials_last_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    validation_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MetaWorkspaceAdConfig(Base):
+    __tablename__ = "meta_workspace_ad_configs"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "meta_connection_id",
+            name="uq_meta_workspace_ad_configs_org_client_connection",
+        ),
+        sa.Index("idx_meta_workspace_ad_configs_org_client", "org_id", "client_id"),
+        sa.Index("idx_meta_workspace_ad_configs_org_connection", "org_id", "meta_connection_id"),
+        sa.Index(
+            "uq_meta_workspace_ad_configs_default",
+            "org_id",
+            "client_id",
+            unique=True,
+            postgresql_where=sa.text("is_default = true"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    meta_connection_id: Mapped[str] = mapped_column(
+        ForeignKey("meta_ad_account_connections.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    instagram_actor_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pixel_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_set_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verified_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verified_domain_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tracking_provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tracking_url_parameters: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attribution_click_window: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attribution_view_window: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    view_through_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    validation_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class MetaAssetUpload(Base):
     __tablename__ = "meta_asset_uploads"
     __table_args__ = (
@@ -1081,6 +1210,9 @@ class MetaAssetUpload(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
+    )
     ad_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
     media_type: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1107,6 +1239,9 @@ class MetaAdCreative(Base):
     asset_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
     )
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
+    )
     ad_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
     meta_creative_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1132,6 +1267,9 @@ class MetaCampaign(Base):
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
     )
     ad_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1160,6 +1298,9 @@ class MetaAdSet(Base):
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
     )
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
+    )
     ad_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
     meta_campaign_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1187,6 +1328,9 @@ class MetaAd(Base):
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
     )
     ad_account_id: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1836,6 +1980,116 @@ class ClientComplianceProfile(Base):
     company_information_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     subscription_terms_and_cancellation_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MetaPublishSelection(Base):
+    __tablename__ = "meta_publish_selections"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "campaign_id",
+            "generation_key",
+            "asset_id",
+            name="uq_meta_publish_selections_org_campaign_generation_asset",
+        ),
+        sa.Index("idx_meta_publish_selections_org_campaign_generation", "org_id", "campaign_id", "generation_key"),
+        sa.Index("idx_meta_publish_selections_org_asset", "org_id", "asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    generation_key: Mapped[str] = mapped_column(Text, nullable=False)
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    decided_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MetaPublishRun(Base):
+    __tablename__ = "meta_publish_runs"
+    __table_args__ = (
+        sa.Index("idx_meta_publish_runs_org_campaign", "org_id", "campaign_id"),
+        sa.Index("idx_meta_publish_runs_org_created", "org_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    generation_key: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
+    campaign_name: Mapped[str] = mapped_column(Text, nullable=False)
+    campaign_objective: Mapped[str] = mapped_column(Text, nullable=False)
+    buying_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    special_ad_categories_json: Mapped[list[str]] = mapped_column(
+        "special_ad_categories", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    publish_base_url: Mapped[str] = mapped_column(Text, nullable=False)
+    publish_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
+    )
+    ad_account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_campaign_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MetaPublishRunItem(Base):
+    __tablename__ = "meta_publish_run_items"
+    __table_args__ = (
+        UniqueConstraint("publish_run_id", "asset_id", name="uq_meta_publish_run_items_run_asset"),
+        sa.Index("idx_meta_publish_run_items_org_run", "org_id", "publish_run_id"),
+        sa.Index("idx_meta_publish_run_items_org_asset", "org_id", "asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    publish_run_id: Mapped[str] = mapped_column(
+        ForeignKey("meta_publish_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    creative_spec_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_creative_specs.id", ondelete="SET NULL"), nullable=True
+    )
+    adset_spec_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("meta_adset_specs.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    resolved_destination_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_asset_upload_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_creative_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_adset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_ad_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
     )

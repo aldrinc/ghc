@@ -62,6 +62,7 @@ from app.schemas.common import ClientCreate
 from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
 from app.schemas.intent import CampaignIntentRequest
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.schemas.shopify_connection import (
     ShopifyAppCredentialsResponse,
     ShopifyAppCredentialsUpdateRequest,
@@ -388,13 +389,6 @@ _LOCAL_SHOPIFY_THEME_SLOT_SOURCE_FILENAMES: tuple[str, ...] = (
 _LOCAL_SHOPIFY_THEME_BASELINE_EXCLUDED_PREFIXES: tuple[str, ...] = (
     "mos-template-export/",
 )
-_LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES: dict[str, str] = {
-    "header": "a-header",
-    "footer": "a-footer",
-    "search-drawer": "a-search-drawer",
-    "multicolumn-with-icons": "a-multicolumn-with-icons",
-    "ss-footer-4": "a-ss-footer-4",
-}
 _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES: tuple[str, ...] = (
     "sections/header-group.json",
     "sections/footer-group.json",
@@ -1837,46 +1831,6 @@ def _apply_local_theme_section_group_import_compatibility(
     ordered_filenames: list[str],
     files_by_filename: dict[str, dict[str, str]],
 ) -> None:
-    for source_type, alias_type in (
-        _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.items()
-    ):
-        source_filename = f"sections/{source_type}.liquid"
-        source_entry = files_by_filename.get(source_filename)
-        source_content = (
-            source_entry.get("content") if isinstance(source_entry, dict) else None
-        )
-        if not isinstance(source_content, str) or not source_content.strip():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    "Local Shopify theme baseline is missing a required section file "
-                    "for ZIP import compatibility. "
-                    f"filename={source_filename}."
-                ),
-            )
-        alias_filename = f"sections/{alias_type}.liquid"
-        existing_alias_entry = files_by_filename.get(alias_filename)
-        if existing_alias_entry is None:
-            files_by_filename[alias_filename] = {
-                "filename": alias_filename,
-                "content": source_content,
-            }
-            ordered_filenames.append(alias_filename)
-        else:
-            existing_alias_content = existing_alias_entry.get("content")
-            if (
-                not isinstance(existing_alias_content, str)
-                or existing_alias_content != source_content
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Local Shopify theme baseline contains an unexpected section "
-                        "alias file for ZIP import compatibility. "
-                        f"filename={alias_filename}."
-                    ),
-                )
-
     for group_filename in _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES:
         group_entry = files_by_filename.get(group_filename)
         group_content = (
@@ -1904,24 +1858,6 @@ def _apply_local_theme_section_group_import_compatibility(
                     f"for ZIP import compatibility. filename={group_filename}."
                 ),
             )
-
-        for section_payload in sections.values():
-            if not isinstance(section_payload, dict):
-                continue
-            section_type = section_payload.get("type")
-            if not isinstance(section_type, str) or not section_type.strip():
-                continue
-            alias_type = _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.get(
-                section_type.strip()
-            )
-            if alias_type:
-                section_payload["type"] = alias_type
-
-        group_entry["content"] = json.dumps(
-            group_data,
-            indent=2,
-            sort_keys=True,
-        )
         group_entry.pop("contentBase64", None)
 
 
@@ -2728,15 +2664,16 @@ def _apply_local_theme_brand_logo_references(
     layout_filename: str,
     css_filename: str,
     logo_url: str,
+    settings_logo_url: str,
 ) -> None:
     logo_setting_paths = {
-        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo": logo_url,
-        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo_mobile": logo_url,
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo": settings_logo_url,
+        f"{_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME}.current.logo_mobile": settings_logo_url,
     }
     for footer_logo_setting_path in _resolve_local_theme_footer_logo_setting_paths(
         files_by_filename=files_by_filename
     ):
-        logo_setting_paths[footer_logo_setting_path] = logo_url
+        logo_setting_paths[footer_logo_setting_path] = settings_logo_url
     _apply_theme_template_setting_values_to_local_files(
         files_by_filename=files_by_filename,
         values_by_setting_path=logo_setting_paths,
@@ -2980,6 +2917,7 @@ def _build_local_shopify_theme_export_payload(
     workspace_name: str,
     brand_name: str,
     logo_url: str,
+    settings_logo_url: str,
     css_vars: dict[str, str],
     font_urls: list[str],
     data_theme: str,
@@ -3052,6 +2990,7 @@ def _build_local_shopify_theme_export_payload(
         layout_filename=layout_filename,
         css_filename=css_filename,
         logo_url=logo_url,
+        settings_logo_url=settings_logo_url,
     )
 
     _apply_theme_template_setting_values_to_local_files(
@@ -6714,6 +6653,28 @@ def _resolve_uploaded_template_logo_url_for_export(
     return draft_logo_url
 
 
+def _resolve_local_theme_export_settings_logo_url(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    shop_domain: str,
+    logo_public_id: str,
+    logo_url: str,
+) -> str:
+    normalized_logo_url = logo_url.strip()
+    if normalized_logo_url.startswith("shopify://"):
+        return normalized_logo_url
+    return _resolve_theme_template_logo_url_to_shopify_file_with_cache(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        shop_domain=shop_domain,
+        logo_public_id=logo_public_id,
+        current_logo_url=normalized_logo_url,
+    )
+
+
 def _resolve_latest_template_publish_design_system_snapshot(
     *,
     session: Session,
@@ -8593,11 +8554,20 @@ def _build_shopify_theme_template_export_zip_response(
         latest_logo_asset_public_id=_latest_logo_asset_public_id,
         latest_logo_url=latest_logo_url,
     )
+    resolved_export_settings_logo_url = _resolve_local_theme_export_settings_logo_url(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        shop_domain=draft_data.shopDomain,
+        logo_public_id=_latest_logo_asset_public_id,
+        logo_url=resolved_export_logo_url,
+    )
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
         brand_name=latest_brand_name,
         logo_url=resolved_export_logo_url,
+        settings_logo_url=resolved_export_settings_logo_url,
         css_vars=latest_css_vars,
         font_urls=latest_font_urls,
         data_theme=latest_data_theme,
@@ -11263,13 +11233,13 @@ async def start_campaign_intent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="channels must include at least one non-empty value.",
         )
-    if not payload.assetBriefTypes or not all(
-        isinstance(t, str) and t.strip() for t in payload.assetBriefTypes
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="assetBriefTypes must include at least one non-empty value.",
+    try:
+        asset_brief_types = normalize_required_asset_brief_types(
+            payload.assetBriefTypes,
+            field_name="assetBriefTypes",
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     strategy_v2_required = is_strategy_v2_enabled(
         session=session,
@@ -11315,7 +11285,7 @@ async def start_campaign_intent(
             product_id=product_id,
             campaign_name=payload.campaignName,
             channels=payload.channels,
-            asset_brief_types=payload.assetBriefTypes,
+            asset_brief_types=asset_brief_types,
             goal_description=payload.goalDescription,
             objective_type=payload.objectiveType,
             numeric_target=payload.numericTarget,

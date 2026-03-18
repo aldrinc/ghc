@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useApiClient, type ApiError } from "@/api/client";
+import { useClientShopifyStatus } from "@/api/clients";
 import {
   PAID_ADS_QA_RULESET_VERSION,
+  type PaidAdsMetaDomainVerificationProvisionResponse,
   type PaidAdsPlatformProfile,
   type PaidAdsPlatformProfileUpsertPayload,
   type PaidAdsQaFinding,
@@ -13,10 +15,19 @@ import { Input } from "@/components/ui/input";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { readMetaDomainVerification, resolveMetaVerifiedDomainCandidate } from "@/lib/metaDomainVerification";
+import { resolveConfiguredShopHostedOrigin, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import type { Campaign } from "@/types/common";
 
 type CampaignPaidAdsQaCardProps = {
   campaign: Campaign;
+  generationKey?: string | null;
+  generationLabel?: string | null;
+  funnelId?: string | null;
+  funnelLabel?: string | null;
+  enabled?: boolean;
+  reviewBaseUrl?: string | null;
+  requiresFunnelScope?: boolean;
 };
 
 type BooleanSelectValue = "" | "true" | "false";
@@ -39,6 +50,15 @@ type ProfileFormState = {
   viewThroughEnabled: BooleanSelectValue;
   trackingProvider: string;
   trackingUrlParameters: string;
+  adLinkCtrMin: string;
+  adLinkCtrGood: string;
+  presellCtrTarget: string;
+  salesPdpPurchaseCvrMin: string;
+  salesPdpPurchaseCvrGood: string;
+  checkoutCvrTarget: string;
+  atcTarget30AndBelow: string;
+  atcTarget97To126: string;
+  atcTarget127Plus: string;
 };
 
 const BOOLEAN_OPTIONS: SelectOption[] = [
@@ -85,6 +105,119 @@ const VIEW_WINDOW_OPTIONS: SelectOption[] = [
   { label: "1d", value: "1d" },
   { label: "0d", value: "0d" },
 ];
+
+const META_MANAGEMENT_BENCHMARKS_KEY = "metaManagementBenchmarks";
+
+const DEFAULT_META_MANAGEMENT_BENCHMARKS = {
+  adLinkCtrPct: { minimum: 1.5, good: 2.5 },
+  presellCtrPct: { target: 30 },
+  salesPdpPurchaseCvrPct: { minimum: 3, good: 5 },
+  checkoutCvrPct: { target: 30 },
+  salesPdpAtcPctPriceBands: {
+    atcTarget30AndBelow: 15,
+    atcTarget97To126: 10,
+    atcTarget127Plus: 7,
+  },
+} as const;
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatBenchmarkNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
+}
+
+function parseRequiredNumber(value: string, label: string): number {
+  const parsed = Number(value.trim());
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${label} must be a valid number.`);
+  }
+  return parsed;
+}
+
+function buildMetaManagementBenchmarkMetadata(form: ProfileFormState): Record<string, unknown> {
+  return {
+    version: 1,
+    adLinkCtrPct: {
+      minimum: parseRequiredNumber(form.adLinkCtrMin, "Ad link CTR minimum"),
+      good: parseRequiredNumber(form.adLinkCtrGood, "Ad link CTR good"),
+    },
+    presellCtrPct: {
+      target: parseRequiredNumber(form.presellCtrTarget, "Advertorial / listicle CTR target"),
+    },
+    salesPdpPurchaseCvrPct: {
+      minimum: parseRequiredNumber(form.salesPdpPurchaseCvrMin, "Sales PDP conversion minimum"),
+      good: parseRequiredNumber(form.salesPdpPurchaseCvrGood, "Sales PDP conversion good"),
+    },
+    checkoutCvrPct: {
+      target: parseRequiredNumber(form.checkoutCvrTarget, "Checkout conversion target"),
+    },
+    salesPdpAtcPctPriceBands: [
+      {
+        id: "entry_30",
+        label: "$30 and below",
+        maxPrice: 30,
+        target: parseRequiredNumber(form.atcTarget30AndBelow, "$30 and below ATC target"),
+      },
+      {
+        id: "core_97_126",
+        label: "$97-$126.99",
+        minPrice: 97,
+        maxPrice: 126.99,
+        target: parseRequiredNumber(form.atcTarget97To126, "$97-$126.99 ATC target"),
+      },
+      {
+        id: "premium_127_plus",
+        label: "$127+",
+        minPrice: 127,
+        target: parseRequiredNumber(form.atcTarget127Plus, "$127+ ATC target"),
+      },
+    ],
+  };
+}
+
+function readMetaManagementBenchmarkForm(metadata: Record<string, unknown> | null | undefined) {
+  const root: Record<string, unknown> = metadata && typeof metadata === "object" ? metadata : {};
+  const benchmarks =
+    root[META_MANAGEMENT_BENCHMARKS_KEY] && typeof root[META_MANAGEMENT_BENCHMARKS_KEY] === "object"
+      ? (root[META_MANAGEMENT_BENCHMARKS_KEY] as Record<string, unknown>)
+      : {};
+  const adLinkCtr = benchmarks.adLinkCtrPct as Record<string, unknown> | undefined;
+  const presellCtr = benchmarks.presellCtrPct as Record<string, unknown> | undefined;
+  const salesPdpPurchaseCvr = benchmarks.salesPdpPurchaseCvrPct as Record<string, unknown> | undefined;
+  const checkoutCvr = benchmarks.checkoutCvrPct as Record<string, unknown> | undefined;
+  const atcBands = Array.isArray(benchmarks.salesPdpAtcPctPriceBands)
+    ? benchmarks.salesPdpAtcPctPriceBands
+    : [];
+  const bandById = new Map<string, Record<string, unknown>>(
+    atcBands
+      .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+      .map((entry) => [String(entry.id || ""), entry]),
+  );
+
+  return {
+    adLinkCtrMin: formatBenchmarkNumber(readNumber(adLinkCtr?.minimum) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.minimum),
+    adLinkCtrGood: formatBenchmarkNumber(readNumber(adLinkCtr?.good) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.good),
+    presellCtrTarget: formatBenchmarkNumber(readNumber(presellCtr?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.presellCtrPct.target),
+    salesPdpPurchaseCvrMin: formatBenchmarkNumber(
+      readNumber(salesPdpPurchaseCvr?.minimum) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.minimum,
+    ),
+    salesPdpPurchaseCvrGood: formatBenchmarkNumber(
+      readNumber(salesPdpPurchaseCvr?.good) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.good,
+    ),
+    checkoutCvrTarget: formatBenchmarkNumber(readNumber(checkoutCvr?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.checkoutCvrPct.target),
+    atcTarget30AndBelow: formatBenchmarkNumber(
+      readNumber(bandById.get("entry_30")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget30AndBelow,
+    ),
+    atcTarget97To126: formatBenchmarkNumber(
+      readNumber(bandById.get("core_97_126")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget97To126,
+    ),
+    atcTarget127Plus: formatBenchmarkNumber(
+      readNumber(bandById.get("premium_127_plus")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget127Plus,
+    ),
+  };
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -138,6 +271,15 @@ function emptyProfileFormState(): ProfileFormState {
     viewThroughEnabled: "",
     trackingProvider: "",
     trackingUrlParameters: "",
+    adLinkCtrMin: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.minimum),
+    adLinkCtrGood: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.good),
+    presellCtrTarget: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.presellCtrPct.target),
+    salesPdpPurchaseCvrMin: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.minimum),
+    salesPdpPurchaseCvrGood: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.good),
+    checkoutCvrTarget: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.checkoutCvrPct.target),
+    atcTarget30AndBelow: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget30AndBelow),
+    atcTarget97To126: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget97To126),
+    atcTarget127Plus: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget127Plus),
   };
 }
 
@@ -160,6 +302,7 @@ function normalizeOptionalText(value: string): string | undefined {
 
 function buildProfileFormState(profile: PaidAdsPlatformProfile | null): ProfileFormState {
   if (!profile) return emptyProfileFormState();
+  const benchmarkForm = readMetaManagementBenchmarkForm(profile.metadata);
   return {
     businessManagerId: profile.businessManagerId || "",
     pageId: profile.pageId || "",
@@ -178,10 +321,26 @@ function buildProfileFormState(profile: PaidAdsPlatformProfile | null): ProfileF
     viewThroughEnabled: booleanToSelect(profile.viewThroughEnabled),
     trackingProvider: profile.trackingProvider || "",
     trackingUrlParameters: profile.trackingUrlParameters || "",
+    adLinkCtrMin: benchmarkForm.adLinkCtrMin,
+    adLinkCtrGood: benchmarkForm.adLinkCtrGood,
+    presellCtrTarget: benchmarkForm.presellCtrTarget,
+    salesPdpPurchaseCvrMin: benchmarkForm.salesPdpPurchaseCvrMin,
+    salesPdpPurchaseCvrGood: benchmarkForm.salesPdpPurchaseCvrGood,
+    checkoutCvrTarget: benchmarkForm.checkoutCvrTarget,
+    atcTarget30AndBelow: benchmarkForm.atcTarget30AndBelow,
+    atcTarget97To126: benchmarkForm.atcTarget97To126,
+    atcTarget127Plus: benchmarkForm.atcTarget127Plus,
   };
 }
 
-function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpsertPayload {
+function buildProfilePayload(
+  form: ProfileFormState,
+  metadata: Record<string, unknown>,
+): PaidAdsPlatformProfileUpsertPayload {
+  const nextMetadata = {
+    ...metadata,
+    [META_MANAGEMENT_BENCHMARKS_KEY]: buildMetaManagementBenchmarkMetadata(form),
+  };
   return {
     rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
     businessManagerId: normalizeOptionalText(form.businessManagerId),
@@ -201,22 +360,44 @@ function buildProfilePayload(form: ProfileFormState): PaidAdsPlatformProfileUpse
     viewThroughEnabled: selectToBoolean(form.viewThroughEnabled),
     trackingProvider: normalizeOptionalText(form.trackingProvider),
     trackingUrlParameters: normalizeOptionalText(form.trackingUrlParameters),
-    metadata: {},
+    metadata: nextMetadata,
   };
 }
 
-export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) {
+export function CampaignPaidAdsQaCard({
+  campaign,
+  generationKey,
+  generationLabel,
+  funnelId,
+  funnelLabel,
+  enabled = true,
+  reviewBaseUrl: reviewBaseUrlOverride,
+  requiresFunnelScope = true,
+}: CampaignPaidAdsQaCardProps) {
   const { get, post, request } = useApiClient();
-  const [run, setRun] = useState<PaidAdsQaRun | null>(null);
+  const shopifyStatusQuery = useClientShopifyStatus(campaign.client_id);
+  const [runHistory, setRunHistory] = useState<PaidAdsQaRun[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runPending, setRunPending] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileFormState>(() => emptyProfileFormState());
   const [profileLoading, setProfileLoading] = useState(true);
   const [profilePending, setProfilePending] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null);
+  const [profileMetadata, setProfileMetadata] = useState<Record<string, unknown>>({});
+  const [metaDomainTxtValue, setMetaDomainTxtValue] = useState("");
+  const [metaDomainPending, setMetaDomainPending] = useState(false);
+  const [metaDomainError, setMetaDomainError] = useState<string | null>(null);
 
-  const reviewBaseUrl = typeof window !== "undefined" && window.location?.origin ? window.location.origin : null;
+  const displayShopDomain = readString(shopifyStatusQuery.data?.displayShopDomain);
+  const selectedShopDomain = displayShopDomain || readString(shopifyStatusQuery.data?.shopDomain);
+  const reviewBaseUrl =
+    reviewBaseUrlOverride ||
+    resolveConfiguredShopHostedOrigin(selectedShopDomain) ||
+    resolveWindowShopHostedOrigin();
 
   useEffect(() => {
     let cancelled = false;
@@ -230,12 +411,14 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         );
         if (cancelled) return;
         setProfileForm(buildProfileFormState(profile));
+        setProfileMetadata(profile.metadata || {});
         setProfileUpdatedAt(profile.updatedAt);
       } catch (err) {
         if (cancelled) return;
         const apiError = err as ApiError;
         if (apiError.status === 404) {
           setProfileForm(emptyProfileFormState());
+          setProfileMetadata({});
           setProfileUpdatedAt(null);
         } else {
           setProfileError(getErrorMessage(err));
@@ -251,7 +434,39 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
     };
   }, [campaign.client_id, get]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRunHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const runs = await get<PaidAdsQaRun[]>(`/campaigns/${campaign.id}/paid-ads-qa/runs`);
+        if (cancelled) return;
+        setRunHistory(runs);
+        setSelectedRunId((current) => {
+          if (current && runs.some((run) => run.id === current)) return current;
+          return runs[0]?.id || null;
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setHistoryError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    };
+
+    void loadRunHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, get]);
+
   const handleRunQa = async () => {
+    if (!enabled || (requiresFunnelScope && !funnelId)) {
+      setRunError("Pick one funnel in the Meta ads tab before running Meta QA.");
+      return;
+    }
     setRunPending(true);
     setRunError(null);
     try {
@@ -259,8 +474,11 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         platform: "meta",
         rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
         reviewBaseUrl,
+        generationKey: generationKey || undefined,
+        funnelId: requiresFunnelScope ? funnelId : undefined,
       });
-      setRun(response);
+      setRunHistory((current) => [response, ...current.filter((run) => run.id !== response.id)]);
+      setSelectedRunId(response.id);
     } catch (err) {
       setRunError(getErrorMessage(err));
     } finally {
@@ -276,10 +494,11 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
         `/clients/${campaign.client_id}/paid-ads-qa/platforms/meta/profile`,
         {
           method: "PUT",
-          body: JSON.stringify(buildProfilePayload(profileForm)),
+          body: JSON.stringify(buildProfilePayload(profileForm, profileMetadata)),
         },
       );
       setProfileForm(buildProfileFormState(saved));
+      setProfileMetadata(saved.metadata || {});
       setProfileUpdatedAt(saved.updatedAt);
       toast.success("Meta QA profile saved");
     } catch (err) {
@@ -291,6 +510,47 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
     }
   };
 
+  const handleProvisionMetaDomainDns = async () => {
+    if (!enabled || !funnelId) {
+      setMetaDomainError("Pick one funnel in the Meta ads tab before provisioning Meta domain verification.");
+      return;
+    }
+    const txtValue = metaDomainTxtValue.trim();
+    if (!txtValue) {
+      setMetaDomainError("Paste the Meta TXT value before provisioning DNS.");
+      return;
+    }
+    const verifiedDomain = resolveMetaVerifiedDomainCandidate(profileForm.verifiedDomain, reviewBaseUrl);
+    if (!verifiedDomain) {
+      setMetaDomainError("MOS could not resolve the funnel domain. Enter Verified domain first.");
+      return;
+    }
+    setMetaDomainPending(true);
+    setMetaDomainError(null);
+    try {
+      const response = await request<PaidAdsMetaDomainVerificationProvisionResponse>(
+        `/funnels/${funnelId}/paid-ads-qa/meta-domain-verification/provision`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            txtValue,
+            verifiedDomain,
+          }),
+        },
+      );
+      setProfileForm(buildProfileFormState(response.profile));
+      setProfileMetadata(response.profile.metadata || {});
+      setProfileUpdatedAt(response.profile.updatedAt);
+      toast.success(`Meta TXT record written in Namecheap for ${response.verifiedDomain}`);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      setMetaDomainError(message);
+      toast.error(message);
+    } finally {
+      setMetaDomainPending(false);
+    }
+  };
+
   const updateField = <K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => {
     setProfileForm((current) => ({
       ...current,
@@ -298,18 +558,27 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
     }));
   };
 
+  const activeRun = runHistory.find((candidate) => candidate.id === selectedRunId) || runHistory[0] || null;
+  const metaDomainVerification = readMetaDomainVerification(profileMetadata);
+  const resolvedVerifiedDomain = resolveMetaVerifiedDomainCandidate(profileForm.verifiedDomain, reviewBaseUrl);
+
   return (
     <div className="border border-border bg-transparent p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-base font-semibold text-content">Meta paid ads QA</div>
           <div className="text-sm text-content-muted">
-            Runs readiness, copy, and destination checks for the current campaign. This does not publish anything.
+            Runs readiness, copy, and destination checks for the current latest Meta review generation. This does not publish anything.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="neutral">{PAID_ADS_QA_RULESET_VERSION}</Badge>
-          <Button variant="secondary" size="sm" onClick={handleRunQa} disabled={runPending}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRunQa}
+            disabled={runPending || !enabled || (requiresFunnelScope && !funnelId)}
+          >
             {runPending ? "Running QA…" : "Run Meta QA"}
           </Button>
         </div>
@@ -317,7 +586,16 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
 
       <div className="mt-2 space-y-1 text-sm text-content-muted">
         <div>Review base URL: {reviewBaseUrl || "Unavailable in this browser context."}</div>
-        {!run && !runError ? <div>No QA run recorded in this session yet.</div> : null}
+        {generationLabel ? <div>QA scope: {generationLabel}</div> : null}
+        {funnelLabel ? <div>Funnel scope: {funnelLabel}</div> : null}
+        {!enabled || (requiresFunnelScope && !funnelId) ? (
+          <div className="text-warning">Meta QA is disabled until one funnel is selected in the Meta ads tab.</div>
+        ) : null}
+        {historyLoading ? <div>Loading previous QA runs…</div> : null}
+        {!historyLoading && !activeRun && !historyError && !runError ? (
+          <div>No QA runs recorded for this campaign yet.</div>
+        ) : null}
+        {historyError ? <div className="text-danger">{historyError}</div> : null}
         {runError ? <div className="text-danger">{runError}</div> : null}
       </div>
 
@@ -337,6 +615,60 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             <Button variant="secondary" size="sm" onClick={handleSaveProfile} disabled={profileLoading || profilePending}>
               {profilePending ? "Saving…" : "Save profile"}
             </Button>
+          </div>
+
+          <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
+            Verified domain status still requires confirmation in Meta. MOS can provision the Meta TXT record in Namecheap,
+            but Meta Graph refresh does not populate verified domain state for QA today.
+          </div>
+
+          <div className="mb-4 rounded-md border border-border bg-background px-3 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-content">Meta domain verification</div>
+                <div className="mt-1 text-xs text-content-muted">
+                  Paste the TXT value from Meta Business Settings - Domains. MOS will write it in Namecheap on the apex domain for this funnel.
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleProvisionMetaDomainDns}
+                disabled={profileLoading || profilePending || metaDomainPending || !enabled || !funnelId}
+              >
+                {metaDomainPending ? "Writing TXT…" : "Write TXT in Namecheap"}
+              </Button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Resolved Meta domain</label>
+                <Input value={resolvedVerifiedDomain || ""} disabled placeholder="example.com" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Meta TXT value</label>
+                <Input
+                  value={metaDomainTxtValue}
+                  onChange={(event) => setMetaDomainTxtValue(event.target.value)}
+                  placeholder="facebook-domain-verification=..."
+                  disabled={profileLoading || profilePending || metaDomainPending}
+                />
+              </div>
+            </div>
+
+            {metaDomainVerification ? (
+              <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-content-muted">
+                <div>Status: {metaDomainVerification.status || "unknown"}</div>
+                <div>Provider: {metaDomainVerification.provider || "unknown"}</div>
+                <div>Record: {metaDomainVerification.fqdn || resolvedVerifiedDomain || "unresolved"} TXT</div>
+                <div>Last synced: {formatDate(metaDomainVerification.lastSyncedAt)}</div>
+                {metaDomainVerification.metaConfirmationRequired ? (
+                  <div className="text-warning">Meta still requires a Verify click before `META-ACCOUNT-009` can pass.</div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {metaDomainError ? <div className="mt-3 text-sm text-danger">{metaDomainError}</div> : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -497,53 +829,189 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             </div>
           </div>
 
+          <div className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
+            Meta management benchmarks power the post-publish Manage phase. Thresholds are stored in the Meta paid ads
+            profile metadata and used without fallback remapping.
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="text-sm font-semibold text-content">Management benchmarks</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Ad link CTR minimum (%)</label>
+                <Input
+                  value={profileForm.adLinkCtrMin}
+                  onChange={(event) => updateField("adLinkCtrMin", event.target.value)}
+                  placeholder="1.5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Ad link CTR good (%)</label>
+                <Input
+                  value={profileForm.adLinkCtrGood}
+                  onChange={(event) => updateField("adLinkCtrGood", event.target.value)}
+                  placeholder="2.5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Advertorial / listicle CTR target (%)</label>
+                <Input
+                  value={profileForm.presellCtrTarget}
+                  onChange={(event) => updateField("presellCtrTarget", event.target.value)}
+                  placeholder="30"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Sales PDP CVR minimum (%)</label>
+                <Input
+                  value={profileForm.salesPdpPurchaseCvrMin}
+                  onChange={(event) => updateField("salesPdpPurchaseCvrMin", event.target.value)}
+                  placeholder="3"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Sales PDP CVR good (%)</label>
+                <Input
+                  value={profileForm.salesPdpPurchaseCvrGood}
+                  onChange={(event) => updateField("salesPdpPurchaseCvrGood", event.target.value)}
+                  placeholder="5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Checkout CVR target (%)</label>
+                <Input
+                  value={profileForm.checkoutCvrTarget}
+                  onChange={(event) => updateField("checkoutCvrTarget", event.target.value)}
+                  placeholder="30"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$30 and below ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget30AndBelow}
+                  onChange={(event) => updateField("atcTarget30AndBelow", event.target.value)}
+                  placeholder="15"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$97-$126.99 ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget97To126}
+                  onChange={(event) => updateField("atcTarget97To126", event.target.value)}
+                  placeholder="10"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$127+ ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget127Plus}
+                  onChange={(event) => updateField("atcTarget127Plus", event.target.value)}
+                  placeholder="7"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+            </div>
+          </div>
+
           {profileError ? <div className="mt-3 text-sm text-danger">{profileError}</div> : null}
         </div>
       </details>
 
-      {run ? (
+      {runHistory.length ? (
+        <div className="mt-4 space-y-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Run history</div>
+          <div className="space-y-2">
+            {runHistory.map((historyRun) => {
+              const selected = historyRun.id === activeRun?.id;
+              return (
+                <button
+                  key={historyRun.id}
+                  type="button"
+                  onClick={() => setSelectedRunId(historyRun.id)}
+                  className={[
+                    "w-full rounded-lg border px-4 py-3 text-left transition",
+                    selected ? "border-accent/40 bg-accent/5" : "border-border bg-surface hover:bg-surface-2",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={runStatusTone(historyRun.status)}>
+                        {historyRun.status.replace(/_/g, " ")}
+                      </Badge>
+                    <Badge tone="neutral">Run {historyRun.id.slice(0, 8)}</Badge>
+                    <div className="text-sm text-content-muted">
+                      {formatDate(historyRun.completedAt || historyRun.createdAt)}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid gap-2 text-xs text-content-muted md:grid-cols-5">
+                    <div>Blockers {historyRun.blockerCount}</div>
+                    <div>High {historyRun.highCount}</div>
+                    <div>Medium {historyRun.mediumCount}</div>
+                    <div>Low {historyRun.lowCount}</div>
+                    <div>Manual {historyRun.needsManualReviewCount}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {activeRun ? (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={runStatusTone(run.status)}>Status {run.status.replaceAll("_", " ")}</Badge>
-            <Badge tone="neutral">Run {run.id.slice(0, 8)}</Badge>
-            <Badge tone="neutral">Completed {formatDate(run.completedAt || run.createdAt)}</Badge>
-            {readString(run.metadata.reviewBaseUrl) ? <Badge tone="neutral">{readString(run.metadata.reviewBaseUrl)}</Badge> : null}
+            <Badge tone={runStatusTone(activeRun.status)}>Status {activeRun.status.replace(/_/g, " ")}</Badge>
+            <Badge tone="neutral">Run {activeRun.id.slice(0, 8)}</Badge>
+            <Badge tone="neutral">Completed {formatDate(activeRun.completedAt || activeRun.createdAt)}</Badge>
+            {readString(activeRun.metadata.generationKey) ? (
+              <Badge tone="neutral">{readString(activeRun.metadata.generationKey)}</Badge>
+            ) : null}
+            {readString(activeRun.metadata.reviewBaseUrl) ? (
+              <Badge tone="neutral">{readString(activeRun.metadata.reviewBaseUrl)}</Badge>
+            ) : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-5">
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Blockers</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.blockerCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.blockerCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">High</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.highCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.highCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Medium</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.mediumCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.mediumCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Low</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.lowCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.lowCount}</div>
             </div>
             <div className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-xs uppercase tracking-wide text-content-muted">Manual review</div>
-              <div className="mt-1 text-lg font-semibold text-content">{run.needsManualReviewCount}</div>
+              <div className="mt-1 text-lg font-semibold text-content">{activeRun.needsManualReviewCount}</div>
             </div>
           </div>
 
-          {!run.findings.length ? (
+          {!activeRun.findings.length ? (
             <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-content">
-              No findings. The current run passed the implemented Meta QA checks.
+              No findings. This run passed the implemented Meta QA checks.
             </div>
           ) : (
             <div className="space-y-3">
-              {run.findings.map((finding) => (
+              {activeRun.findings.map((finding) => (
                 <div key={finding.id} className="rounded-lg border border-border bg-surface px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={severityTone(finding.severity)}>{finding.severity}</Badge>
-                    <Badge tone={findingStatusTone(finding.status)}>{finding.status.replaceAll("_", " ")}</Badge>
+                    <Badge tone={findingStatusTone(finding.status)}>{finding.status.replace(/_/g, " ")}</Badge>
                     <div className="text-sm font-semibold text-content">{finding.ruleId}</div>
                     <div className="text-sm text-content">{finding.title}</div>
                   </div>
@@ -569,7 +1037,7 @@ export function CampaignPaidAdsQaCard({ campaign }: CampaignPaidAdsQaCardProps) 
             </summary>
             <div className="border-t border-border py-4">
               <div className="max-h-[560px] overflow-auto">
-                <MarkdownViewer content={run.reportMarkdown} className="max-w-none px-4 sm:px-4" />
+                <MarkdownViewer content={activeRun.reportMarkdown} className="max-w-none px-4 sm:px-4" />
               </div>
             </div>
           </details>

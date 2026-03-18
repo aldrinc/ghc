@@ -600,6 +600,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
                 "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
                 "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+                "- For trust/support badge icons, keep the subject object-only: stars, a headset/clock, a shield/checkmark, or a shipping symbol. Never use animals, paw prints, mascots, or character faces.\n"
                 "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                 "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
                 "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n"

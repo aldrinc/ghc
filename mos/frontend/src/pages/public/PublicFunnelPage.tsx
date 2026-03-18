@@ -8,6 +8,15 @@ import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckCon
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import {
+  buildPurchaseEventParams,
+  clearCheckoutQueryParam,
+  clearPendingMetaPurchase,
+  pendingMetaPurchaseStorageKey,
+  readPendingMetaPurchase,
+} from "@/lib/metaCheckout";
+import { mapRuntimeEventToMetaPixel } from "@/lib/metaFunnelEvents";
+import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const runtimeConfig = createFunnelPuckConfig();
@@ -236,6 +245,7 @@ export function PublicFunnelPage() {
   const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
+  const handledCheckoutReturnRef = useRef<string | null>(null);
   const effectiveSlug = routeSlug || undefined;
 
   const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
@@ -315,6 +325,8 @@ export function PublicFunnelPage() {
 
   const trackEvent = async (event: { eventType: string; props?: Record<string, unknown> }) => {
     if (!page) return;
+    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    const mappedMetaEvent = mapRuntimeEventToMetaPixel(event);
     const payload = {
       events: [
         {
@@ -334,6 +346,9 @@ export function PublicFunnelPage() {
         },
       ],
     };
+    if (mappedMetaEvent) {
+      trackMetaPixelEvent(metaPixelId, mappedMetaEvent.eventName, mappedMetaEvent.params);
+    }
     try {
       await fetch(`${apiBaseUrl}/public/events`, {
         method: "POST",
@@ -367,6 +382,45 @@ export function PublicFunnelPage() {
       clearManagedFavicons();
     };
   }, [page]);
+
+  useEffect(() => {
+    const metaPixelId = page?.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    ensureMetaPixel(metaPixelId);
+  }, [page?.tracking?.metaPixelId, page?.tracking?.provider]);
+
+  useEffect(() => {
+    if (!page) return;
+
+    const url = new URL(window.location.href);
+    const checkoutStatus = url.searchParams.get("checkout");
+    if (checkoutStatus !== "success" && checkoutStatus !== "cancel") {
+      return;
+    }
+
+    const pendingPurchaseKey = pendingMetaPurchaseStorageKey(sessionId, funnelSlug);
+    const pendingPurchase = pendingPurchaseKey ? readPendingMetaPurchase(sessionStorage, pendingPurchaseKey) : null;
+    const checkoutMarker = pendingPurchase
+      ? `${checkoutStatus}:${pendingPurchase.createdAt}`
+      : `${checkoutStatus}:${sessionId}:${page.pageId}`;
+    if (handledCheckoutReturnRef.current === checkoutMarker) {
+      return;
+    }
+    handledCheckoutReturnRef.current = checkoutMarker;
+
+    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    if (checkoutStatus === "success") {
+      if (pendingPurchase) {
+        trackMetaPixelEvent(metaPixelId, "Purchase", buildPurchaseEventParams(pendingPurchase));
+      } else {
+        trackMetaPixelEvent(metaPixelId, "Purchase");
+      }
+    }
+
+    if (pendingPurchaseKey) {
+      clearPendingMetaPurchase(sessionStorage, pendingPurchaseKey);
+    }
+    window.history.replaceState(window.history.state, "", clearCheckoutQueryParam(window.location.href));
+  }, [funnelSlug, page, sessionId]);
 
   useEffect(() => {
     if (!page || !meta) return;

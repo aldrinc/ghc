@@ -321,10 +321,57 @@ def test_icon_prompt_normalization_uses_context_subject_for_pre_sales_badge():
     )
 
     badge = puck_data["content"][0]["props"]["config"]["badges"][0]
-    assert badge["prompt"].startswith(funnel_ai._ICON_STYLE_PROMPT_TEMPLATE.format(subject="Free shipping"))
+    assert badge["prompt"].startswith(
+        funnel_ai._ICON_STYLE_PROMPT_TEMPLATE.format(subject="delivery truck with motion lines").replace(
+            "No text, no blur.",
+            f"{funnel_ai._ICON_NON_ANIMAL_DIRECTIVE} No text, no blur.",
+        )
+    )
+    assert funnel_ai._ICON_NON_ANIMAL_DIRECTIVE in badge["prompt"]
     assert "Use this exact brand color palette for the icon:" in badge["prompt"]
     assert "#061a70" in badge["prompt"]
     assert badge["aspectRatio"] == "1:1"
+
+
+def test_icon_prompt_normalization_maps_review_badge_to_non_animal_subject():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "PreSalesHero",
+                "props": {
+                    "id": "hero",
+                    "config": {
+                        "hero": {"title": "Title", "subtitle": "Subtitle"},
+                        "badges": [
+                            {
+                                "iconSrc": "/assets/5-stars-reviews-icon.webp",
+                                "iconAlt": "5 star reviews",
+                                "label": "5-STAR REVIEWS",
+                                "prompt": "Trust badge icon with stars and paw",
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    funnel_ai._ensure_flat_vector_icon_prompts(
+        puck_data=puck_data,
+        config_contexts=[],
+        design_system_tokens=_icon_design_tokens(),
+    )
+
+    badge = puck_data["content"][0]["props"]["config"]["badges"][0]
+    assert badge["prompt"].startswith(
+        funnel_ai._ICON_STYLE_PROMPT_TEMPLATE.format(subject="five gold stars with sparkle accents").replace(
+            "No text, no blur.",
+            f"{funnel_ai._ICON_NON_ANIMAL_DIRECTIVE} No text, no blur.",
+        )
+    )
+    assert funnel_ai._ICON_NON_ANIMAL_DIRECTIVE in badge["prompt"]
 
 
 def test_icon_prompt_normalization_uses_context_subject_for_free_gifts_overlay():

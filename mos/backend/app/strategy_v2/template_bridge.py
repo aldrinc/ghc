@@ -57,19 +57,19 @@ _PRE_SALES_REVIEW_COUNT_MAX = 15000
 _PRE_SALES_STANDARD_BADGES: tuple[dict[str, str], ...] = (
     {
         "label": "5-Star Reviews",
-        "icon_alt": "5 star reviews",
-        "icon_prompt": "icon of 5 star reviews",
+        "icon_alt": "Five star rating icon",
+        "icon_prompt": "icon of five gold stars with sparkle accents",
     },
     {
         "value": "24/7",
         "label": "Customer Support",
-        "icon_alt": "24/7 customer support",
-        "icon_prompt": "icon of 24/7 customer support",
+        "icon_alt": "Customer support headset icon",
+        "icon_prompt": "icon of a customer support headset with a 24/7 clock",
     },
     {
         "label": "Risk Free Trial",
-        "icon_alt": "risk free trial",
-        "icon_prompt": "icon of risk free trial",
+        "icon_alt": "Shield check guarantee icon",
+        "icon_prompt": "icon of a shield with checkmark",
     },
 )
 

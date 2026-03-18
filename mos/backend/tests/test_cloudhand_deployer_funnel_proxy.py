@@ -288,7 +288,7 @@ def test_remove_workload_cleans_service_nginx_and_app_dir():
     assert ("/opt/apps/honest-herbalist", True) in removed
 
 
-def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
+def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     app = _artifact_app()
     deployer, uploaded, commands = _stub_deployer()
 
@@ -298,12 +298,12 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     assert "listen 24123;" in conf
     assert "server_name _;" in conf
     assert "return 302 /f/" not in conf
-    assert "location = /api/public/checkout" in conf
-    assert "location ^~ /api/public/events" in conf
-    assert "location ^~ /api/public/assets/ {" in conf
+    assert "location ^~ /api/ {" in conf
+    assert "proxy_pass https://moshq.app/api/;" in conf
     assert "location ^~ /public/assets/ {" in conf
-    assert "location ^~ /api/public/funnels/ {" in conf
-    assert "try_files $uri.json =404;" in conf
+    assert "proxy_pass https://moshq.app/api/public/assets/;" in conf
+    assert "Checkout is unavailable in standalone artifact mode." not in conf
+    assert "try_files $uri.json =404;" not in conf
     assert "try_files $uri /index.html;" in conf
 
     meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/meta.json"

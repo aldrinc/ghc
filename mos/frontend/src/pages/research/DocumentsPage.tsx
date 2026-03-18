@@ -244,8 +244,8 @@ export function DocumentsPage() {
               description="Start a workflow for this workspace to generate research documents."
             />
             <div className="flex justify-center">
-              <Button variant="secondary" size="sm" onClick={() => navigate("/workflows")}>
-                View workflows
+              <Button variant="secondary" size="sm" onClick={() => navigate("/strategy")}>
+                View strategy runs
               </Button>
             </div>
           </div>
@@ -260,7 +260,7 @@ export function DocumentsPage() {
               }
             />
             <div className="flex justify-center">
-              <Button variant="secondary" size="sm" onClick={() => navigate(`/workflows/${latestWorkflow.id}`)}>
+              <Button variant="secondary" size="sm" onClick={() => navigate(`/strategy/${latestWorkflow.id}`)}>
                 View workflow
               </Button>
             </div>
@@ -272,7 +272,7 @@ export function DocumentsPage() {
                 <div className="text-sm font-semibold text-content">Research documents</div>
                 <div className="text-xs text-content-muted">Open workflow-backed research detail pages.</div>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => navigate(`/workflows/${latestWorkflow.id}`)}>
+              <Button variant="secondary" size="sm" onClick={() => navigate(`/strategy/${latestWorkflow.id}`)}>
                 View workflow
               </Button>
             </div>
@@ -291,7 +291,7 @@ export function DocumentsPage() {
                       key={row.key}
                       hover
                       className="cursor-pointer"
-                      onClick={() => navigate(`/workflows/${row.workflowId}/research/${row.stepKey}`)}
+                      onClick={() => navigate(`/strategy/${row.workflowId}/research/${row.stepKey}`)}
                     >
                       <TableCell className="font-semibold text-content">
                         <div className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export function DocumentsPage() {
                           size="xs"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/workflows/${row.workflowId}/research/${row.stepKey}`);
+                            navigate(`/strategy/${row.workflowId}/research/${row.stepKey}`);
                           }}
                         >
                           View

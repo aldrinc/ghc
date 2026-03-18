@@ -1,5 +1,7 @@
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 
 
 class ClientCreate(BaseModel):
@@ -22,6 +24,11 @@ class CampaignCreate(BaseModel):
     timeframe_days: Optional[int] = None
     budget_min: Optional[float] = None
     budget_max: Optional[float] = None
+
+    @field_validator("asset_brief_types")
+    @classmethod
+    def _validate_asset_brief_types(cls, value: List[str]) -> List[str]:
+        return normalize_required_asset_brief_types(value, field_name="asset_brief_types")
 
 
 class UserCreate(BaseModel):

@@ -1,3 +1,6 @@
+import json
+import time
+
 import pytest
 from app.services import funnel_testimonials
 
@@ -138,3 +141,45 @@ def test_non_user_prompt_requires_no_people():
     assert "NO PEOPLE POLICY" in prompt
     assert "absolutely no humans" in prompt
     assert "TEXT POLICY: absolutely no visible text in the image." in prompt
+
+
+def test_generate_validated_synthetic_testimonials_replays_progress_while_llm_blocks(monkeypatch):
+    class _FakeLLM:
+        default_model = "gpt-5.2-2025-12-11"
+
+        def generate_text(self, prompt, params):  # noqa: ANN001
+            time.sleep(0.05)
+            return json.dumps(
+                {
+                    "testimonials": [
+                        _testimonial(
+                            name="Marcus Chen",
+                            persona="Busy parent seeking easier routines.",
+                            reply_name="Dana Flores",
+                            reply_persona="Friend comparing evening routines.",
+                        )
+                    ]
+                }
+            )
+
+    monkeypatch.setattr(funnel_testimonials, "LLMClient", lambda: _FakeLLM())
+    monkeypatch.setattr(
+        funnel_testimonials,
+        "_FUNNEL_TESTIMONIAL_HEARTBEAT_INTERVAL_SECONDS",
+        0.01,
+    )
+
+    progress_events: list[tuple[str, dict[str, object]]] = []
+    testimonials, model_id = funnel_testimonials._generate_validated_synthetic_testimonials(
+        count=1,
+        copy_text="Clinician-grade herbal guidance without the fluff.",
+        product_context="A product that helps users screen herb-drug interactions.",
+        uniqueness_scope="funnel:testimonials",
+        progress_callback=lambda step, details: progress_events.append((step, dict(details))),
+    )
+
+    assert model_id == "gpt-5.2-2025-12-11"
+    assert len(testimonials) == 1
+    batch_requested = [event for event in progress_events if event[0] == "batch_requested"]
+    assert len(batch_requested) >= 2
+    assert any(event[0] == "batch_received" for event in progress_events)

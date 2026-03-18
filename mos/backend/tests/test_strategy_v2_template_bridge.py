@@ -1003,7 +1003,7 @@ def test_template_payload_patch_operations_apply_to_presales_template() -> None:
     floating_cta = next(item for item in children if item.get("type") == "PreSalesFloatingCta")
     assert hero["props"]["config"]["badges"][0]["value"]
     assert hero["props"]["config"]["badges"][0]["label"] == "5-Star Reviews"
-    assert hero["props"]["config"]["badges"][0]["prompt"] == "icon of 5 star reviews"
+    assert hero["props"]["config"]["badges"][0]["prompt"] == "icon of five gold stars with sparkle accents"
     assert hero["props"]["config"]["badges"][1]["value"] == "24/7"
     assert hero["props"]["config"]["badges"][1]["label"] == "Customer Support"
     assert hero["props"]["config"]["badges"][2]["label"] == "Risk Free Trial"

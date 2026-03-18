@@ -90,6 +90,11 @@ class PublicFunnelPageResponse(BaseModel):
         lang: str = "en"
         brandName: Optional[str] = None
 
+    class Tracking(BaseModel):
+        provider: str
+        mode: str
+        metaPixelId: Optional[str] = None
+
     productSlug: str
     funnelId: str
     publicationId: str
@@ -99,6 +104,7 @@ class PublicFunnelPageResponse(BaseModel):
     pageMap: dict[str, str]
     designSystemTokens: Optional[dict[str, Any]] = None
     metadata: Metadata
+    tracking: Optional[Tracking] = None
     nextPageId: Optional[str] = None
 
 
@@ -191,6 +197,23 @@ class FunnelPageTestimonialGenerateResponse(BaseModel):
     draftVersionId: str
     puckData: dict[str, Any]
     generatedTestimonials: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class FunnelPageSalesPdpExamplesGenerateRequest(BaseModel):
+    draftVersionId: Optional[str] = None
+    currentPuckData: Optional[dict[str, Any]] = None
+    templateId: Optional[str] = None
+    ideaWorkspaceId: Optional[str] = None
+    model: Optional[str] = None
+    temperature: float = 0.3
+    maxTokens: Optional[int] = None
+    maxDurationSeconds: Optional[int] = None
+
+
+class FunnelPageSalesPdpExamplesGenerateResponse(BaseModel):
+    draftVersionId: str
+    puckData: dict[str, Any]
+    generatedPdpExamples: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class FunnelTemplateSummary(BaseModel):

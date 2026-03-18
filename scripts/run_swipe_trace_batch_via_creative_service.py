@@ -20,8 +20,13 @@ from typing import Any
 
 from playwright.sync_api import BrowserContext, Page, sync_playwright
 
+from template_image_workspace import (
+    REPO_ROOT,
+    TEMPLATE_IMAGE_ASSETS_DIR,
+    TEMPLATE_IMAGE_CREATIVE_PROXY_OUTPUT_DIR,
+)
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = REPO_ROOT
 BACKEND_VENV_PYTHON = ROOT / "mos" / "backend" / ".venv" / "bin" / "python"
 RUN_WITH_ENV = ROOT / "scripts" / "run_with_backend_env.py"
 RUN_BATCH = ROOT / "scripts" / "run_swipe_trace_batch.py"
@@ -34,8 +39,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--cookie-export", required=True)
     parser.add_argument("--ui-url", required=True)
     parser.add_argument("--creative-base-url", required=True)
-    parser.add_argument("--template-dir", required=True)
-    parser.add_argument("--output-root", required=True)
+    parser.add_argument(
+        "--template-dir",
+        default=str(TEMPLATE_IMAGE_ASSETS_DIR),
+        help=f"Template asset directory. Defaults to {TEMPLATE_IMAGE_ASSETS_DIR}.",
+    )
+    parser.add_argument(
+        "--output-root",
+        default=str(TEMPLATE_IMAGE_CREATIVE_PROXY_OUTPUT_DIR),
+        help=f"Run output directory. Defaults to {TEMPLATE_IMAGE_CREATIVE_PROXY_OUTPUT_DIR}.",
+    )
     parser.add_argument("--org-id", required=True)
     parser.add_argument("--client-id", required=True)
     parser.add_argument("--product-id", required=True)

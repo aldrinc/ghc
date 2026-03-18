@@ -77,6 +77,113 @@ export type MetaCampaign = {
   created_at?: string;
 };
 
+export type MetaPublishSelectionDecision = "excluded";
+
+export type MetaPublishSelection = {
+  id: string;
+  campaignId: string;
+  assetId: string;
+  generationKey: string;
+  decision: MetaPublishSelectionDecision;
+  decidedByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaPublishSelectionMutation = {
+  assetId: string;
+  decision?: MetaPublishSelectionDecision | null;
+};
+
+export type MetaAdSetSpecUpdatePayload = {
+  name?: string | null;
+  optimizationGoal?: string | null;
+  billingEvent?: string | null;
+  targeting?: Record<string, unknown> | null;
+  placements?: Record<string, unknown> | null;
+  dailyBudget?: number | null;
+  lifetimeBudget?: number | null;
+  bidAmount?: number | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  promotedObject?: Record<string, unknown> | null;
+  conversionDomain?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type MetaPublishPlanValidationItem = {
+  assetId: string;
+  creativeSpecId?: string | null;
+  adsetSpecId?: string | null;
+  resolvedDestinationUrl?: string | null;
+  status: "ok" | "blocked";
+  blockers: string[];
+};
+
+export type MetaPublishPlanValidation = {
+  campaignId: string;
+  generationKey: string;
+  ok: boolean;
+  includedCount: number;
+  adsetCount: number;
+  publishBaseUrl: string;
+  publishDomain?: string | null;
+  blockers: string[];
+  items: MetaPublishPlanValidationItem[];
+};
+
+export type MetaPublishRunRequest = {
+  generationKey: string;
+  funnelId?: string | null;
+  metaConfigId?: string | null;
+  publishBaseUrl: string;
+  campaignName: string;
+  campaignObjective: string;
+  buyingType?: string | null;
+  specialAdCategories?: string[];
+};
+
+export type MetaPublishRunItem = {
+  id: string;
+  assetId: string;
+  creativeSpecId?: string | null;
+  adsetSpecId?: string | null;
+  status: string;
+  resolvedDestinationUrl?: string | null;
+  metaAssetUploadId?: string | null;
+  metaCreativeId?: string | null;
+  metaAdSetId?: string | null;
+  metaAdId?: string | null;
+  errorMessage?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaPublishRun = {
+  id: string;
+  campaignId: string;
+  generationKey: string;
+  status: string;
+  campaignName: string;
+  campaignObjective: string;
+  buyingType?: string | null;
+  specialAdCategories: string[];
+  publishBaseUrl: string;
+  publishDomain?: string | null;
+  metaConfigId?: string | null;
+  adAccountId?: string | null;
+  pageId?: string | null;
+  metaCampaignId?: string | null;
+  errorMessage?: string | null;
+  metadata: Record<string, unknown>;
+  items: MetaPublishRunItem[];
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+};
+
 export type MetaPipelineAsset = {
   asset: {
     id: string;
@@ -104,6 +211,241 @@ export type MetaPipelineAsset = {
     creatives?: MetaAdCreative[];
     ads?: MetaAd[];
     meta_campaign?: MetaCampaign | null;
+  };
+};
+
+export type MetaConnectionWorkspaceUsage = {
+  clientId: string;
+  clientName: string;
+  configId: string;
+  configName: string;
+  isDefault: boolean;
+};
+
+export type MetaAdAccountConnection = {
+  id: string;
+  orgId: string;
+  name: string;
+  adAccountId?: string | null;
+  adAccountName?: string | null;
+  businessManagerId?: string | null;
+  businessManagerName?: string | null;
+  graphApiVersion: string;
+  graphApiBaseUrl: string;
+  credentialType: string;
+  hasCredentials: boolean;
+  tokenExpiresAt?: string | null;
+  status: string;
+  validationStatus: string;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+  metadata: Record<string, unknown>;
+  usedByWorkspaces: MetaConnectionWorkspaceUsage[];
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MetaWorkspaceAdConfig = {
+  id: string;
+  orgId: string;
+  clientId: string;
+  connectionId: string;
+  name: string;
+  isDefault: boolean;
+  status: string;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramActorId?: string | null;
+  pixelId?: string | null;
+  dataSetId?: string | null;
+  verifiedDomain?: string | null;
+  verifiedDomainStatus?: string | null;
+  trackingProvider?: string | null;
+  trackingUrlParameters?: string | null;
+  attributionClickWindow?: string | null;
+  attributionViewWindow?: string | null;
+  viewThroughEnabled?: boolean | null;
+  validationStatus: string;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+  metadata: Record<string, unknown>;
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  connection: MetaAdAccountConnection;
+};
+
+export type MetaAdAccountConnectionUpsertPayload = {
+  name: string;
+  adAccountId?: string | null;
+  adAccountName?: string | null;
+  businessManagerId?: string | null;
+  businessManagerName?: string | null;
+  graphApiVersion: string;
+  graphApiBaseUrl?: string;
+  accessToken?: string | null;
+  tokenExpiresAt?: string | null;
+  status?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type MetaWorkspaceAdConfigCreatePayload = {
+  connectionId: string;
+  name: string;
+  isDefault?: boolean;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramActorId?: string | null;
+  pixelId?: string | null;
+  dataSetId?: string | null;
+  verifiedDomain?: string | null;
+  verifiedDomainStatus?: string | null;
+  trackingProvider?: string | null;
+  trackingUrlParameters?: string | null;
+  attributionClickWindow?: string | null;
+  attributionViewWindow?: string | null;
+  viewThroughEnabled?: boolean | null;
+  status?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type MetaManagementPlanRequest = {
+  metaCampaignId: string;
+  clientId?: string | null;
+  metaConfigId?: string | null;
+  mode?: "plan_only" | "apply";
+  datePreset?: string;
+  includeRaw?: boolean;
+  evaluateBenchmarks?: boolean;
+  cutRules?: {
+    minSpend?: number;
+    maxCpm?: number;
+    minLinkCtr?: number;
+    maxLinkCpc?: number;
+  } | null;
+  eventMappings?: {
+    contentViewActionType?: string;
+    addToCartActionType?: string;
+    purchaseActionType?: string;
+    purchaseValueActionType?: string;
+  } | null;
+};
+
+export type MetaManagementAdMetrics = {
+  adId: string;
+  adName: string;
+  adsetId?: string | null;
+  campaignId?: string | null;
+  impressions: number;
+  spend: number;
+  cpm: number;
+  frequency?: number | null;
+  inlineLinkClicks?: number | null;
+  linkCtrPct?: number | null;
+  linkCpc?: number | null;
+  hookRatePct?: number | null;
+  holdRatePct?: number | null;
+  atcRatioPct?: number | null;
+  purchaseRatioPct?: number | null;
+  aov?: number | null;
+  raw: Record<string, unknown>;
+  warnings: string[];
+};
+
+export type MetaManagementPlannedAction = {
+  kind: string;
+  metaAdId: string;
+  reason: string;
+  triggeredRules: string[];
+  metrics: Record<string, unknown>;
+};
+
+export type MetaManagementAppliedAction = {
+  kind: string;
+  metaEntityId: string;
+  status: string;
+  requestPayload: Record<string, unknown>;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  error?: string | null;
+};
+
+export type MetaManagementBenchmarkContext = {
+  clientId: string;
+  campaignId: string;
+  metaCampaignId: string;
+  datePreset: string;
+  funnelId: string;
+  publicationId: string;
+  deliveryMode: string;
+  profileId: string;
+  priceCents?: number | null;
+  priceDollars?: number | null;
+  atcPriceBandId?: string | null;
+  atcPriceBandLabel?: string | null;
+  priceResolutionError?: string | null;
+  profileUpdatedAt?: string | null;
+};
+
+export type MetaManagementFunnelSnapshot = {
+  startedAt: string;
+  endedAt: string;
+  presellPageId?: string | null;
+  salesPageId: string;
+  presellPageViewSessions: number;
+  presellCtaClickSessions: number;
+  salesPageViewSessions: number;
+  checkoutStartedSessions: number;
+  orderCompletedSessions: number;
+  presellCtrPct?: number | null;
+  salesPdpAtcPct?: number | null;
+  salesPdpPurchaseCvrPct?: number | null;
+  checkoutCvrPct?: number | null;
+};
+
+export type MetaManagementBenchmarkEvaluationStatus =
+  | "below_target"
+  | "on_target"
+  | "good"
+  | "insufficient_data"
+  | "unavailable"
+  | "not_applicable";
+
+export type MetaManagementBenchmarkEvaluation = {
+  metricId: string;
+  label: string;
+  scope: string;
+  status: MetaManagementBenchmarkEvaluationStatus;
+  value?: number | null;
+  unit: string;
+  minimum?: number | null;
+  target?: number | null;
+  good?: number | null;
+  numerator?: number | null;
+  denominator?: number | null;
+  reason?: string | null;
+  context: Record<string, unknown>;
+};
+
+export type MetaManagementPlan = {
+  mode: string;
+  generatedAt: string;
+  window: Record<string, unknown>;
+  campaign: Record<string, unknown>;
+  adsets: Record<string, unknown>[];
+  observedActionTypes: Record<string, string[]>;
+  rows: MetaManagementAdMetrics[];
+  actions: MetaManagementPlannedAction[];
+  appliedActions: MetaManagementAppliedAction[];
+  warnings: string[];
+  benchmarkContext?: MetaManagementBenchmarkContext | null;
+  funnelSnapshot?: MetaManagementFunnelSnapshot | null;
+  benchmarkEvaluations: MetaManagementBenchmarkEvaluation[];
+  artifacts?: {
+    metricsSnapshotArtifactId?: string;
+    recommendedActionsArtifactId?: string;
+    approvalDecisionArtifactId?: string;
   };
 };
 

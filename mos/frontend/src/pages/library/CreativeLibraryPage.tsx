@@ -3,6 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LibraryPage } from "@/pages/library/LibraryPage";
 import { MetaIntegrationPanel } from "@/pages/library/MetaIntegrationPanel";
+import { cn } from "@/lib/utils";
+
+const TOP_TABS = [
+  { key: "library", label: "Library" },
+  { key: "meta", label: "Meta" },
+] as const;
 
 export function CreativeLibraryPage() {
   const [params, setParams] = useSearchParams();
@@ -18,40 +24,27 @@ export function CreativeLibraryPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Creative Library" description={description} />
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            const next = new URLSearchParams(params);
-            next.set("tab", "library");
-            setParams(next, { replace: true });
-          }}
-          className={[
-            "rounded-full px-3 py-1.5 text-sm font-medium transition",
-            tab === "library"
-              ? "bg-primary text-primary-foreground"
-              : "bg-surface-2 text-content-muted hover:bg-hover",
-          ].join(" ")}
-        >
-          Library
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const next = new URLSearchParams(params);
-            next.set("tab", "meta");
-            setParams(next, { replace: true });
-          }}
-          className={[
-            "rounded-full px-3 py-1.5 text-sm font-medium transition",
-            tab === "meta"
-              ? "bg-primary text-primary-foreground"
-              : "bg-surface-2 text-content-muted hover:bg-hover",
-          ].join(" ")}
-        >
-          Meta
-        </button>
-      </div>
+      <nav className="flex gap-1 border-b border-border">
+        {TOP_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set("tab", t.key);
+              setParams(next, { replace: true });
+            }}
+            className={cn(
+              "px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
+              tab === t.key
+                ? "border-accent text-content"
+                : "border-transparent text-content-muted hover:text-content hover:border-border",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
       {tab === "library" ? <LibraryPage showHeader={false} /> : <MetaIntegrationPanel />}
     </div>

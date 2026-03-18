@@ -82,6 +82,25 @@ class PaidAdsQaRepository:
         )
         return self.session.scalars(stmt).first()
 
+    def list_runs(
+        self,
+        *,
+        org_id: str,
+        campaign_id: str | None = None,
+        subject_type: str | None = None,
+        limit: int = 10,
+    ) -> list[PaidAdsQaRun]:
+        stmt = select(PaidAdsQaRun).where(PaidAdsQaRun.org_id == org_id)
+        if campaign_id is not None:
+            stmt = stmt.where(PaidAdsQaRun.campaign_id == campaign_id)
+        if subject_type is not None:
+            stmt = stmt.where(PaidAdsQaRun.subject_type == subject_type)
+        stmt = stmt.order_by(
+            PaidAdsQaRun.completed_at.desc(),
+            PaidAdsQaRun.created_at.desc(),
+        ).limit(limit)
+        return list(self.session.scalars(stmt).all())
+
     def list_findings(self, *, qa_run_id: str) -> list[PaidAdsQaFinding]:
         stmt = (
             select(PaidAdsQaFinding)

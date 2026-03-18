@@ -11,11 +11,16 @@ from temporalio import activity
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
+from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.base import session_scope
 from app.schemas.experiment_spec import ExperimentSpecSet
 from app.schemas.asset_brief import AssetBrief
-from app.strategy_v2.downstream import load_strategy_v2_outputs
+from app.services.campaign_creative_context import load_campaign_creative_context
+from app.services.campaign_destinations import (
+    destination_label_for_type,
+    destination_type_from_funnel_stage,
+)
 from app.services.claude_files import (
     CLAUDE_DEFAULT_MODEL,
     build_document_blocks,
@@ -176,7 +181,7 @@ def _build_asset_brief_prompt(
     format_hint: str,
     tone_guidelines: list[str],
     constraints: list[str],
-    strategy_v2_packet_summary: str,
+    creative_context_summary: str,
     chunk_index: int,
     chunk_total: int,
 ) -> str:
@@ -196,7 +201,7 @@ You are a creative strategist. Using the experiment specs below and the attached
 - This request is chunk {chunk_index} of {chunk_total}; include only briefs for experiment variants present in this chunk.
 {channel_hint}
 {format_hint}
-Strategy V2 downstream packet context (if present): {strategy_v2_packet_summary}
+Campaign creative context summary (if present): {creative_context_summary}
 
 Experiment specs (inline):
 {experiments_json}
@@ -257,6 +262,31 @@ def _find_unverified_claim_pattern(value: str) -> re.Pattern[str] | None:
     return None
 
 
+def _annotate_brief_destinations(*, brief: dict[str, Any], delivery_mode: str) -> None:
+    requirements = brief.get("requirements") or []
+    requirement_destinations: list[str] = []
+    if isinstance(requirements, list):
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                continue
+            destination_type = (
+                destination_type_from_funnel_stage(
+                    requirement.get("funnelStage") if isinstance(requirement.get("funnelStage"), str) else None
+                )
+                or "pre-sales"
+            )
+            requirement["destinationType"] = destination_type
+            requirement["destinationLabel"] = destination_label_for_type(destination_type)
+            requirement_destinations.append(destination_type)
+
+    destination_type = brief.get("destinationType")
+    if not isinstance(destination_type, str) or not destination_type.strip():
+        destination_type = requirement_destinations[0] if requirement_destinations else "pre-sales"
+    brief["deliveryMode"] = delivery_mode
+    brief["destinationType"] = destination_type
+    brief["destinationLabel"] = brief.get("destinationLabel") or destination_label_for_type(destination_type)
+
+
 def _load_metric(repo: ArtifactsRepository, org_id: str, client_id: str, product_id: str) -> Dict[str, Any]:
     artifact = repo.get_latest_by_type(
         org_id=org_id,
@@ -280,17 +310,17 @@ def _load_canon(repo: ArtifactsRepository, org_id: str, client_id: str, product_
 def _build_experiment_prompt(
     *,
     available_metric_ids: list[str],
-    purple_ocean_angles: list[str],
-    strategy_v2_packet: Optional[Dict[str, Any]] = None,
+    angle_names: list[str],
+    creative_context_packet: Optional[Dict[str, Any]] = None,
     campaign_channels: Optional[list[str]] = None,
     asset_brief_types: Optional[list[str]] = None,
 ) -> str:
     if not available_metric_ids:
         raise RuntimeError("available_metric_ids cannot be empty when building experiment prompt.")
-    if not purple_ocean_angles:
+    if not angle_names:
         raise RuntimeError(
-            "purple_ocean_angles is required to build experiments. "
-            "Provide angles from Strategy V2 stage3 or precanon step 015."
+            "angle_names is required to build experiments. "
+            "Provide angles from campaign creative context or precanon step 015."
         )
     channel_hint = ""
     format_hint = ""
@@ -300,22 +330,22 @@ def _build_experiment_prompt(
         )
     if asset_brief_types:
         format_hint = f"\nCreative brief types for this campaign: {asset_brief_types}"
-    angles_hint = "\n".join([f"- {angle}" for angle in purple_ocean_angles])
-    strategy_v2_packet_hint = strategy_v2_packet or {}
+    angles_hint = "\n".join([f"- {angle}" for angle in angle_names])
+    creative_context_packet_hint = creative_context_packet or {}
     return f"""
 You are a media & experiment architect. Use attached strategy context and metric schema to propose ONE experiment per Purple Ocean angle below.
 
 Context hints:
 - Available metricIds (use ONLY these exact ids in metricIds): {available_metric_ids}
 {channel_hint}{format_hint}
-- Strategy V2 downstream packet context (if present): {strategy_v2_packet_hint}
+- Campaign creative context packet (if present): {creative_context_packet_hint}
 
 Purple Ocean angle library (use these exact names as experiment.name):
 {angles_hint}
 
 Rules:
 - Keep strings concise and actionable; no markdown.
-- Return {len(purple_ocean_angles)} experiments (one per angle above).
+- Return {len(angle_names)} experiments (one per angle above).
 - Each experiment.name must be exactly one of the angle names above (no prefixes/suffixes).
 - Include exactly 2 variants per experiment:
   - var_control_generic: generic saturated control messaging (results-first). No regulatory claims.
@@ -485,31 +515,37 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     campaign_channels: Optional[list[str]] = None
     asset_brief_types: Optional[list[str]] = None
+    creative_context_provider = "strategy_v2"
+    creative_context_packet: Dict[str, Any] = {}
     strategy_v2_stage3: Dict[str, Any] = {}
-    strategy_v2_offer: Dict[str, Any] = {}
-    strategy_v2_copy: Dict[str, Any] = {}
-    strategy_v2_copy_context: Dict[str, Any] = {}
-    strategy_v2_packet: Dict[str, Any] = {}
+    manual_angles: Dict[str, Any] = {}
+    manual_offer: Dict[str, Any] = {}
+    manual_copy: Dict[str, Any] = {}
+    manual_copy_context: Dict[str, Any] = {}
     with session_scope() as session:
         repo = ArtifactsRepository(session)
         metric = _load_metric(repo, org_id, client_id, product_id)
         canon = _load_canon(repo, org_id, client_id, product_id)
-        strategy_v2_outputs = load_strategy_v2_outputs(
+        creative_context = load_campaign_creative_context(
             session=session,
             org_id=org_id,
             client_id=client_id,
             product_id=product_id,
+            campaign_id=str(campaign_id or ""),
         )
-        if isinstance(strategy_v2_outputs.get("stage3"), dict):
-            strategy_v2_stage3 = strategy_v2_outputs["stage3"]
-        if isinstance(strategy_v2_outputs.get("offer"), dict):
-            strategy_v2_offer = strategy_v2_outputs["offer"]
-        if isinstance(strategy_v2_outputs.get("copy"), dict):
-            strategy_v2_copy = strategy_v2_outputs["copy"]
-        if isinstance(strategy_v2_outputs.get("copy_context"), dict):
-            strategy_v2_copy_context = strategy_v2_outputs["copy_context"]
-        if isinstance(strategy_v2_outputs.get("downstream_packet"), dict):
-            strategy_v2_packet = strategy_v2_outputs["downstream_packet"]
+        creative_context_provider = str(getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2")
+        if isinstance(creative_context.get("downstream_packet"), dict):
+            creative_context_packet = creative_context["downstream_packet"]
+        if isinstance(creative_context.get("stage3"), dict):
+            strategy_v2_stage3 = creative_context["stage3"]
+        if isinstance(creative_context.get("angles"), dict):
+            manual_angles = creative_context["angles"]
+        if isinstance(creative_context.get("offer"), dict):
+            manual_offer = creative_context["offer"]
+        if isinstance(creative_context.get("copy"), dict):
+            manual_copy = creative_context["copy"]
+        if isinstance(creative_context.get("copy_context"), dict):
+            manual_copy_context = creative_context["copy_context"]
         if campaign_id:
             campaigns_repo = CampaignsRepository(session)
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
@@ -550,21 +586,27 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "Metric schema KPI definitions are present but invalid (expected non-empty strings)."
         )
 
-    purple_ocean_angles = _extract_purple_ocean_angles(
-        canon,
-        strategy_v2_stage3=strategy_v2_stage3 or None,
-    )
-    if not purple_ocean_angles:
+    angle_names = [
+        angle.strip()
+        for angle in (creative_context.get("angle_names") or [])
+        if isinstance(angle, str) and angle.strip()
+    ]
+    if not angle_names:
+        angle_names = _extract_purple_ocean_angles(
+            canon,
+            strategy_v2_stage3=strategy_v2_stage3 or None,
+        )
+    if not angle_names:
         raise RuntimeError(
-            "Purple Ocean angles were not found. "
-            "Expected Strategy V2 selected angle or precanon step 015 to be present before generating experiments."
+            "Experiment angle names were not found. "
+            "Expected manual angles, Strategy V2 selected angle, or precanon step 015 to be present before generating experiments."
         )
 
     # Keep the experiment generator focused: upload a compact canon that includes Purple Ocean
     # angle names + step summaries, rather than passing the entire canon (which can be very large).
     canon_compact = _build_client_canon_compact(
         canon,
-        purple_ocean_angles=purple_ocean_angles,
+        purple_ocean_angles=angle_names,
     )
     canon_compact_bytes = json.dumps(canon_compact, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
     ensure_uploaded_to_claude(
@@ -641,30 +683,65 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 drive_url=None,
             )
 
-    _upload_optional_context(
-        data=strategy_v2_stage3,
-        doc_key="strategy_v2_stage3",
-        title="Strategy V2 Stage3",
-        source_kind="strategy_v2_stage3",
-    )
-    _upload_optional_context(
-        data=strategy_v2_offer,
-        doc_key="strategy_v2_offer",
-        title="Strategy V2 Offer",
-        source_kind="strategy_v2_offer",
-    )
-    _upload_optional_context(
-        data=strategy_v2_copy,
-        doc_key="strategy_v2_copy",
-        title="Strategy V2 Copy",
-        source_kind="strategy_v2_copy",
-    )
-    _upload_optional_context(
-        data=strategy_v2_copy_context,
-        doc_key="strategy_v2_copy_context",
-        title="Strategy V2 Copy Context",
-        source_kind="strategy_v2_copy_context",
-    )
+    if creative_context_provider == "manual":
+        _upload_optional_context(
+            data=manual_angles,
+            doc_key="campaign_loaded_angles",
+            title="Campaign Loaded Angles",
+            source_kind="campaign_loaded_angles",
+        )
+        _upload_optional_context(
+            data=manual_offer,
+            doc_key="campaign_loaded_offer",
+            title="Campaign Loaded Offer",
+            source_kind="campaign_loaded_offer",
+        )
+        _upload_optional_context(
+            data=manual_copy,
+            doc_key="campaign_loaded_copy",
+            title="Campaign Loaded Copy",
+            source_kind="campaign_loaded_copy",
+        )
+        _upload_optional_context(
+            data=manual_copy_context,
+            doc_key="campaign_loaded_copy_context",
+            title="Campaign Loaded Copy Context",
+            source_kind="campaign_loaded_copy_context",
+        )
+        _upload_optional_context(
+            data={
+                "provider": creative_context_provider,
+                "downstreamPacket": creative_context_packet,
+            },
+            doc_key="campaign_creative_context",
+            title="Campaign Creative Context",
+            source_kind="campaign_creative_context",
+        )
+    else:
+        _upload_optional_context(
+            data=strategy_v2_stage3,
+            doc_key="strategy_v2_stage3",
+            title="Strategy V2 Stage3",
+            source_kind="strategy_v2_stage3",
+        )
+        _upload_optional_context(
+            data=creative_context.get("offer") if isinstance(creative_context.get("offer"), dict) else {},
+            doc_key="strategy_v2_offer",
+            title="Strategy V2 Offer",
+            source_kind="strategy_v2_offer",
+        )
+        _upload_optional_context(
+            data=creative_context.get("copy") if isinstance(creative_context.get("copy"), dict) else {},
+            doc_key="strategy_v2_copy",
+            title="Strategy V2 Copy",
+            source_kind="strategy_v2_copy",
+        )
+        _upload_optional_context(
+            data=creative_context.get("copy_context") if isinstance(creative_context.get("copy_context"), dict) else {},
+            doc_key="strategy_v2_copy_context",
+            title="Strategy V2 Copy Context",
+            source_kind="strategy_v2_copy_context",
+        )
 
     # Ensure metric schema is available in this idea workspace so downstream steps can reuse it.
     metric_bytes = json.dumps(metric, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
@@ -744,34 +821,55 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # Prefer a small, angle-focused context set.
     selected: list = []
-    for key in (
+    context_doc_keys = [
         "client_canon_compact",
         "precanon:015",
         "precanon:07",
         "precanon:08",
         "precanon:09",
-        "strategy_v2_stage3",
-        "strategy_v2_offer",
-        "strategy_v2_copy",
-        "strategy_v2_copy_context",
         "metric_schema",
-    ):
+    ]
+    if creative_context_provider == "manual":
+        context_doc_keys.extend(
+            [
+                "campaign_loaded_angles",
+                "campaign_loaded_offer",
+                "campaign_loaded_copy",
+                "campaign_loaded_copy_context",
+                "campaign_creative_context",
+            ]
+        )
+    else:
+        context_doc_keys.extend(
+            [
+                "strategy_v2_stage3",
+                "strategy_v2_offer",
+                "strategy_v2_copy",
+                "strategy_v2_copy_context",
+            ]
+        )
+    for key in context_doc_keys:
         picked = _pick_latest(context_files, doc_key=key)
         if picked is not None:
             selected.append(picked)
 
     if not any((cf.doc_key or "").startswith("metric_schema") for cf in selected):
         raise RuntimeError("Missing required Claude context file: metric_schema.")
-    if not any((cf.doc_key or "") in {"precanon:015", "strategy_v2_stage3"} for cf in selected):
+    required_angle_doc_keys = {"precanon:015"}
+    if creative_context_provider == "manual":
+        required_angle_doc_keys.add("campaign_loaded_angles")
+    else:
+        required_angle_doc_keys.add("strategy_v2_stage3")
+    if not any((cf.doc_key or "") in required_angle_doc_keys for cf in selected):
         raise RuntimeError(
-            "Missing required angle context file: expected one of strategy_v2_stage3 or precanon:015."
+            "Missing required angle context file for experiment generation."
         )
 
     documents = build_document_blocks(selected)
     prompt = _build_experiment_prompt(
         available_metric_ids=available_metric_ids,
-        purple_ocean_angles=purple_ocean_angles,
-        strategy_v2_packet=strategy_v2_packet,
+        angle_names=angle_names,
+        creative_context_packet=creative_context_packet,
         campaign_channels=campaign_channels,
         asset_brief_types=asset_brief_types,
     )
@@ -792,13 +890,13 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     if not isinstance(experiments, list):
         raise RuntimeError("Claude returned invalid experiments; expected a list.")
-    if len(experiments) != len(purple_ocean_angles):
+    if len(experiments) != len(angle_names):
         raise RuntimeError(
             "Experiment spec generation returned the wrong number of experiments "
-            f"(expected={len(purple_ocean_angles)}, got={len(experiments)})."
+            f"(expected={len(angle_names)}, got={len(experiments)})."
         )
 
-    angle_set = {angle.strip() for angle in purple_ocean_angles if isinstance(angle, str) and angle.strip()}
+    angle_set = {angle.strip() for angle in angle_names if isinstance(angle, str) and angle.strip()}
     angle_norm = {_normalize_token(angle): angle for angle in angle_set}
     matched_angles: set[str] = set()
 
@@ -992,7 +1090,9 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
 
     campaign_channels: Optional[list[str]] = None
     asset_brief_types: Optional[list[str]] = None
-    strategy_v2_packet_summary = "{}"
+    creative_context_provider = "strategy_v2"
+    creative_context_summary = "{}"
+    delivery_mode = "internal_funnel"
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
         # Funnel generation runs may use a fresh Temporal workflow id as idea_workspace_id.
@@ -1012,15 +1112,19 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             product_id=product_id,
             artifact_type=ArtifactTypeEnum.client_canon,
         )
-        strategy_v2_outputs = load_strategy_v2_outputs(
+        creative_context = load_campaign_creative_context(
             session=session,
             org_id=org_id,
             client_id=client_id,
             product_id=product_id,
+            campaign_id=str(campaign_id or ""),
         )
-        if isinstance(strategy_v2_outputs.get("downstream_packet"), dict):
-            strategy_v2_packet_summary = json.dumps(
-                strategy_v2_outputs["downstream_packet"],
+        creative_context_provider = str(
+            getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2"
+        )
+        if isinstance(creative_context.get("downstream_packet"), dict):
+            creative_context_summary = json.dumps(
+                creative_context["downstream_packet"],
                 ensure_ascii=True,
             )[:4000]
         if campaign_id:
@@ -1028,6 +1132,12 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
             if not campaign:
                 raise RuntimeError(f"Campaign not found for asset brief generation: {campaign_id}")
+            delivery_config = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+                org_id=org_id,
+                campaign_id=campaign_id,
+            )
+            if delivery_config is not None:
+                delivery_mode = delivery_config.delivery_mode.value
             campaign_channels = [
                 str(ch).strip() for ch in (campaign.channels or []) if isinstance(ch, str) and ch.strip()
             ]
@@ -1097,30 +1207,56 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
     # Keep the context set small so we stay within model token limits.
     selected: list = []
     strategy_doc_key = f"strategy_sheet:{campaign_id or 'none'}"
-    for key in (
+    context_doc_keys = [
         "client_canon_compact",
         "client_canon",
         "precanon:07",
         "precanon:08",
         "precanon:09",
-        "strategy_v2_stage3",
-        "strategy_v2_offer",
-        "strategy_v2_copy",
-        "strategy_v2_copy_context",
         "metric_schema",
         strategy_doc_key,
-    ):
+    ]
+    if creative_context_provider == "manual":
+        context_doc_keys.extend(
+            [
+                "campaign_loaded_angles",
+                "campaign_loaded_offer",
+                "campaign_loaded_copy",
+                "campaign_loaded_copy_context",
+                "campaign_creative_context",
+            ]
+        )
+    else:
+        context_doc_keys.extend(
+            [
+                "strategy_v2_stage3",
+                "strategy_v2_offer",
+                "strategy_v2_copy",
+                "strategy_v2_copy_context",
+            ]
+        )
+    for key in context_doc_keys:
         picked = _pick_latest(context_files, doc_key=key)
         if picked is not None:
             selected.append(picked)
 
     if not any(
         (cf.doc_key or "").startswith("client_canon")
-        or (cf.doc_key or "") in {"strategy_v2_stage3", "strategy_v2_offer", "strategy_v2_copy", "strategy_v2_copy_context"}
+        or (cf.doc_key or "") in {
+            "strategy_v2_stage3",
+            "strategy_v2_offer",
+            "strategy_v2_copy",
+            "strategy_v2_copy_context",
+            "campaign_loaded_angles",
+            "campaign_loaded_offer",
+            "campaign_loaded_copy",
+            "campaign_loaded_copy_context",
+            "campaign_creative_context",
+        }
         for cf in selected
     ):
         raise RuntimeError(
-            "Missing required context file: expected client_canon* or Strategy V2 context artifacts."
+            "Missing required context file: expected client_canon* or campaign creative context artifacts."
         )
 
     if CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL <= 0:
@@ -1157,7 +1293,7 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             format_hint=format_hint,
             tone_guidelines=tone_guidelines,
             constraints=constraints,
-            strategy_v2_packet_summary=strategy_v2_packet_summary,
+            creative_context_summary=creative_context_summary,
             chunk_index=chunk_idx,
             chunk_total=len(experiment_chunks),
         )
@@ -1275,6 +1411,7 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         if brief_id in seen_brief_ids:
             raise RuntimeError(f"Asset brief generation returned duplicate brief id: {brief_id}")
         seen_brief_ids.add(brief_id)
+        _annotate_brief_destinations(brief=brief, delivery_mode=delivery_mode)
         variant_id = brief.get("variantId") or brief.get("variant_id")
         if not variant_id:
             raise RuntimeError("Asset brief generation missing variantId.")
@@ -1294,6 +1431,9 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             experimentId=experiment_id,
             variantId=variant_id,
             funnelId=brief.get("funnelId"),
+            deliveryMode=brief.get("deliveryMode"),
+            destinationType=brief.get("destinationType"),
+            destinationLabel=brief.get("destinationLabel"),
             variantName=brief.get("variantName") or brief.get("variant_name"),
             creativeConcept=brief.get("creativeConcept"),
             requirements=brief.get("requirements") or [],  # type: ignore[arg-type]

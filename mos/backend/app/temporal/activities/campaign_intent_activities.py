@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -15,7 +18,9 @@ from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnu
 from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
@@ -26,13 +31,23 @@ from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.product_types import canonical_product_type, is_book_product_type, product_type_matches
+from app.services.paid_ads_qa import (
+    RULESET_VERSION as PAID_ADS_RULESET_VERSION,
+    MetaProfileRefreshError,
+    activate_mos_meta_funnel_tracking_profile,
+    clean_optional_text,
+    normalize_tracking_provider,
+)
+from app.services.meta_account_configs import (
+    MetaWorkspaceConfigError,
+    merge_meta_profile,
+    meta_ads_client_for_connection,
+    resolve_workspace_config,
+)
 from app.services.shopify_connection import get_client_shopify_connection_status, get_client_shopify_product
 from app.strategy_v2.downstream import load_strategy_v2_outputs
 from app.strategy_v2.template_bridge import (
     apply_strategy_v2_template_patch,
-    build_strategy_v2_template_patch_operations,
-    upgrade_strategy_v2_template_payload_fields,
-    validate_strategy_v2_template_payload_fields,
 )
 
 
@@ -104,6 +119,119 @@ _BOOK_CTA_LABELS: tuple[tuple[str, str], ...] = (
     ("manual", "Manual"),
     ("book", "Book"),
 )
+_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS = 20.0
+
+
+def _activity_heartbeat_safe(payload: dict[str, Any]) -> None:
+    try:
+        activity.heartbeat(payload)
+    except RuntimeError:
+        # Unit tests execute these helpers outside a Temporal activity context.
+        return
+
+
+def _campaign_uses_meta_channel(channels: list[str] | None) -> bool:
+    for channel in channels or []:
+        normalized = normalize_tracking_provider(channel)
+        if normalized in {"facebook", "instagram", "meta"}:
+            return True
+    return False
+
+
+def _meta_profile_dict_from_record(record: Any | None, *, client_id: str) -> dict[str, Any]:
+    if record is None:
+        return {
+            "clientId": client_id,
+            "platform": "meta",
+            "rulesetVersion": PAID_ADS_RULESET_VERSION,
+            "metadata": {},
+        }
+    return {
+        "clientId": str(record.client_id),
+        "platform": "meta",
+        "rulesetVersion": str(record.ruleset_version or PAID_ADS_RULESET_VERSION),
+        "businessManagerId": record.business_manager_id,
+        "businessManagerName": record.business_manager_name,
+        "pageId": record.page_id,
+        "pageName": record.page_name,
+        "adAccountId": record.ad_account_id,
+        "adAccountName": record.ad_account_name,
+        "paymentMethodType": record.payment_method_type,
+        "paymentMethodStatus": record.payment_method_status,
+        "pixelId": record.pixel_id,
+        "dataSetId": record.data_set_id,
+        "dataSetShopifyPartnerInstalled": record.data_set_shopify_partner_installed,
+        "dataSetDataSharingLevel": record.data_set_data_sharing_level,
+        "dataSetAssignedToAdAccount": record.data_set_assigned_to_ad_account,
+        "verifiedDomain": record.verified_domain,
+        "verifiedDomainStatus": record.verified_domain_status,
+        "attributionClickWindow": record.attribution_click_window,
+        "attributionViewWindow": record.attribution_view_window,
+        "viewThroughEnabled": record.view_through_enabled,
+        "trackingProvider": record.tracking_provider,
+        "trackingUrlParameters": record.tracking_url_parameters,
+        "metadata": record.metadata_json if isinstance(record.metadata_json, dict) else {},
+    }
+
+
+def _meta_profile_fields_from_dict(profile: dict[str, Any]) -> dict[str, Any]:
+    metadata = profile.get("metadata")
+    return {
+        "platform": "meta",
+        "ruleset_version": str(profile.get("rulesetVersion") or PAID_ADS_RULESET_VERSION),
+        "business_manager_id": clean_optional_text(profile.get("businessManagerId")),
+        "business_manager_name": clean_optional_text(profile.get("businessManagerName")),
+        "page_id": clean_optional_text(profile.get("pageId")),
+        "page_name": clean_optional_text(profile.get("pageName")),
+        "ad_account_id": clean_optional_text(profile.get("adAccountId")),
+        "ad_account_name": clean_optional_text(profile.get("adAccountName")),
+        "payment_method_type": normalize_tracking_provider(profile.get("paymentMethodType")),
+        "payment_method_status": clean_optional_text(profile.get("paymentMethodStatus")),
+        "pixel_id": clean_optional_text(profile.get("pixelId")),
+        "data_set_id": clean_optional_text(profile.get("dataSetId")),
+        "data_set_shopify_partner_installed": profile.get("dataSetShopifyPartnerInstalled"),
+        "data_set_data_sharing_level": normalize_tracking_provider(profile.get("dataSetDataSharingLevel")),
+        "data_set_assigned_to_ad_account": profile.get("dataSetAssignedToAdAccount"),
+        "verified_domain": clean_optional_text(profile.get("verifiedDomain")),
+        "verified_domain_status": normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+        "attribution_click_window": normalize_tracking_provider(profile.get("attributionClickWindow")),
+        "attribution_view_window": normalize_tracking_provider(profile.get("attributionViewWindow")),
+        "view_through_enabled": profile.get("viewThroughEnabled"),
+        "tracking_provider": normalize_tracking_provider(profile.get("trackingProvider")),
+        "tracking_url_parameters": clean_optional_text(profile.get("trackingUrlParameters")),
+        "metadata_json": metadata if isinstance(metadata, dict) else {},
+    }
+
+
+@contextmanager
+def _activity_heartbeat_loop(
+    *,
+    payload_factory: Callable[[], dict[str, Any]],
+    interval_seconds: float | None = None,
+):
+    interval = (
+        float(interval_seconds)
+        if interval_seconds is not None
+        else float(_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS)
+    )
+    _activity_heartbeat_safe(payload_factory())
+    stop_event = threading.Event()
+
+    def _run() -> None:
+        while not stop_event.wait(interval):
+            _activity_heartbeat_safe(payload_factory())
+
+    thread = threading.Thread(
+        target=_run,
+        name="campaign-intent-heartbeat",
+        daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=max(1.0, interval))
 
 
 def _collect_image_generation_errors(
@@ -422,6 +550,40 @@ def _resolve_strategy_v2_selected_offer_id(
     return raw_offer_id.strip()
 
 
+def _apply_pinned_strategy_v2_template_payload(
+    *,
+    template_id: str,
+    payload_entry: dict[str, Any],
+    base_puck_data: dict[str, Any],
+) -> tuple[dict[str, Any], str]:
+    payload_template_id = str(payload_entry.get("template_id") or "").strip()
+    if payload_template_id != template_id:
+        raise ValueError(
+            "Strategy V2 template payload template_id mismatch for funnel page generation. "
+            f"Expected={template_id}, received={payload_template_id or '<empty>'}."
+        )
+
+    patch_operations = payload_entry.get("template_patch")
+    if not isinstance(patch_operations, list) or not patch_operations:
+        raise ValueError(
+            f"Strategy V2 template payload for {template_id} is missing template_patch operations."
+        )
+
+    try:
+        patched_puck_data = apply_strategy_v2_template_patch(
+            base_puck_data=base_puck_data,
+            operations=patch_operations,
+            template_id=template_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(
+            f"Strategy V2 template payload patch could not be applied for {template_id}. "
+            f"Details: {exc}"
+        ) from exc
+
+    return patched_puck_data, json.dumps(payload_entry, ensure_ascii=True)
+
+
 def _validate_selected_offer_for_funnel(
     *,
     session,
@@ -690,8 +852,10 @@ def create_campaign_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("product_id is required to create a campaign")
     if not channels or not all(isinstance(ch, str) and ch.strip() for ch in channels):
         raise ValueError("channels must include at least one non-empty value.")
-    if not asset_brief_types or not all(isinstance(t, str) and t.strip() for t in asset_brief_types):
-        raise ValueError("asset_brief_types must include at least one non-empty value.")
+    asset_brief_types = normalize_required_asset_brief_types(
+        asset_brief_types,
+        field_name="asset_brief_types",
+    )
 
     with session_scope() as session:
         repo = CampaignsRepository(session)
@@ -937,59 +1101,10 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         "Strategy V2 template payload is missing for page template "
                         f"{template_id}."
                     )
-                payload_template_id = str(payload_entry.get("template_id") or "").strip()
-                if payload_template_id != template_id:
-                    raise ValueError(
-                        "Strategy V2 template payload template_id mismatch for funnel page generation. "
-                        f"Expected={template_id}, received={payload_template_id or '<empty>'}."
-                    )
-                payload_fields = payload_entry.get("fields")
-                if not isinstance(payload_fields, dict):
-                    raise ValueError(
-                        f"Strategy V2 template payload for {template_id} is missing fields."
-                    )
-                upgraded_fields = upgrade_strategy_v2_template_payload_fields(
+                puck_data, template_payload_json = _apply_pinned_strategy_v2_template_payload(
                     template_id=template_id,
-                    payload_fields=payload_fields,
-                )
-                validated_fields = validate_strategy_v2_template_payload_fields(
-                    template_id=template_id,
-                    payload_fields=upgraded_fields,
-                )
-                validated_fields = _normalize_sales_payload_for_product_type(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                    product_type=product_type,
-                )
-                validated_fields = validate_strategy_v2_template_payload_fields(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                )
-                _assert_sales_payload_matches_product_type(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                    product_type=product_type,
-                )
-                patch_operations = build_strategy_v2_template_patch_operations(
-                    template_id=template_id,
-                    payload_fields=validated_fields,
-                )
-                if not patch_operations:
-                    raise ValueError(
-                        f"Strategy V2 template payload for {template_id} could not produce template_patch operations."
-                    )
-                puck_data = apply_strategy_v2_template_patch(
+                    payload_entry=payload_entry,
                     base_puck_data=puck_data,
-                    operations=patch_operations,
-                    template_id=template_id,
-                )
-                template_payload_json = json.dumps(
-                    {
-                        **payload_entry,
-                        "fields": validated_fields,
-                        "template_patch": patch_operations,
-                    },
-                    ensure_ascii=True,
                 )
                 strategy_v2_payload_applied = True
                 footer_links, footer_copyright, footer_icons = _build_policy_footer_payload(
@@ -1154,37 +1269,49 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
                         )
                 try:
-                    result = _run_generate_page_draft_with_retries(
-                        run_generation=lambda: run_generate_page_draft(
-                            session=session,
-                            org_id=org_id,
-                            user_id=str(actor_user_id),
-                            funnel_id=str(funnel.id),
-                            page_id=str(page.id),
-                            prompt=prompt,
-                            current_puck_data=puck_data,
-                            template_id=template_id,
-                            idea_workspace_id=idea_workspace_id,
-                            generate_images=not async_media_enrichment,
-                            generate_testimonials=generate_testimonials and not async_media_enrichment,
-                            skip_draft_generation=strategy_v2_payload_applied,
-                            copy_pack=template_payload_json,
-                        ),
-                        max_attempts=ai_draft_max_attempts,
-                        on_retry=lambda attempt, exc: log_activity(
-                            "funnel_page_draft",
-                            "retrying",
-                            payload_in={
-                                "page_id": str(page.id),
-                                "template_id": template_id,
-                                "funnel_id": str(funnel.id),
-                                "attempt": attempt,
-                                "max_attempts": ai_draft_max_attempts,
-                                "reason": "empty_page_generation",
-                                "error": str(exc),
-                            },
-                        ),
-                    )
+                    heartbeat_started_at = time.monotonic()
+
+                    def _heartbeat_payload() -> dict[str, Any]:
+                        return {
+                            "phase": "funnel_page_generation",
+                            "funnel_id": str(funnel.id),
+                            "page_id": str(page.id),
+                            "template_id": str(template_id),
+                            "elapsed_seconds": int(time.monotonic() - heartbeat_started_at),
+                        }
+
+                    with _activity_heartbeat_loop(payload_factory=_heartbeat_payload):
+                        result = _run_generate_page_draft_with_retries(
+                            run_generation=lambda: run_generate_page_draft(
+                                session=session,
+                                org_id=org_id,
+                                user_id=str(actor_user_id),
+                                funnel_id=str(funnel.id),
+                                page_id=str(page.id),
+                                prompt=prompt,
+                                current_puck_data=puck_data,
+                                template_id=template_id,
+                                idea_workspace_id=idea_workspace_id,
+                                generate_images=not async_media_enrichment,
+                                generate_testimonials=generate_testimonials and not async_media_enrichment,
+                                skip_draft_generation=strategy_v2_payload_applied,
+                                copy_pack=template_payload_json,
+                            ),
+                            max_attempts=ai_draft_max_attempts,
+                            on_retry=lambda attempt, exc: log_activity(
+                                "funnel_page_draft",
+                                "retrying",
+                                payload_in={
+                                    "page_id": str(page.id),
+                                    "template_id": template_id,
+                                    "funnel_id": str(funnel.id),
+                                    "attempt": attempt,
+                                    "max_attempts": ai_draft_max_attempts,
+                                    "reason": "empty_page_generation",
+                                    "error": str(exc),
+                                },
+                            ),
+                        )
                     draft_version_id = result.get("draftVersionId") or ""
                     generated_images = result.get("generatedImages") or []
                     if not draft_version_id:
@@ -1555,6 +1682,118 @@ def enrich_funnel_page_media_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         "generated_images": generated_images,
         "non_fatal_errors": image_errors,
         "agent_run_id": result.get("runId"),
+    }
+
+
+@activity.defn
+def configure_generated_funnels_meta_tracking_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    org_id = str(params.get("org_id") or "").strip()
+    client_id = str(params.get("client_id") or "").strip()
+    campaign_id = str(params.get("campaign_id") or "").strip()
+    funnel_ids = [
+        funnel_id
+        for raw_funnel_id in (params.get("funnel_ids") or [])
+        if isinstance(raw_funnel_id, str)
+        and (funnel_id := raw_funnel_id.strip())
+    ]
+
+    if not org_id:
+        raise ValueError("org_id is required to configure generated funnel Meta tracking.")
+    if not client_id:
+        raise ValueError("client_id is required to configure generated funnel Meta tracking.")
+    if not campaign_id:
+        raise ValueError("campaign_id is required to configure generated funnel Meta tracking.")
+    if not funnel_ids:
+        return {"status": "skipped", "reason": "no_generated_funnels"}
+
+    with session_scope() as session:
+        campaign = CampaignsRepository(session).get(org_id=org_id, campaign_id=campaign_id)
+        if campaign is None:
+            raise ValueError("Campaign not found while configuring generated funnel Meta tracking.")
+        if not _campaign_uses_meta_channel(campaign.channels):
+            return {"status": "skipped", "reason": "campaign_has_no_meta_channel"}
+
+        try:
+            resolved = resolve_workspace_config(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+            )
+        except MetaWorkspaceConfigError as exc:
+            raise ValueError(f"Meta funnel tracking automation failed. {exc}") from exc
+
+        profile_dict = merge_meta_profile(
+            connection=resolved.connection,
+            workspace_config=resolved.workspace_config,
+        )
+        try:
+            configured_profile = activate_mos_meta_funnel_tracking_profile(
+                profile=profile_dict,
+                funnel_ids=funnel_ids,
+                ruleset_version=PAID_ADS_RULESET_VERSION,
+                client=meta_ads_client_for_connection(resolved.connection),
+                api_version=resolved.connection.graph_api_version,
+            )
+        except MetaProfileRefreshError as exc:
+            raise ValueError(
+                "Meta funnel tracking automation failed. "
+                f"{exc}"
+            ) from exc
+        except MetaWorkspaceConfigError as exc:
+            raise ValueError(f"Meta funnel tracking automation failed. {exc}") from exc
+
+        config_repo = MetaAccountConfigsRepository(session)
+        connection_metadata = (
+            dict(resolved.connection.metadata_json)
+            if isinstance(resolved.connection.metadata_json, dict)
+            else {}
+        )
+        metadata = configured_profile.get("metadata")
+        if isinstance(metadata, dict) and isinstance(metadata.get("metaGraphValidation"), dict):
+            connection_metadata["metaGraphValidation"] = metadata["metaGraphValidation"]
+
+        config_repo.update_connection(
+            resolved.connection,
+            metadata_json={
+                **connection_metadata,
+                "paymentMethodType": normalize_tracking_provider(configured_profile.get("paymentMethodType")),
+                "paymentMethodStatus": clean_optional_text(configured_profile.get("paymentMethodStatus")),
+                "dataSetShopifyPartnerInstalled": configured_profile.get("dataSetShopifyPartnerInstalled"),
+                "dataSetDataSharingLevel": normalize_tracking_provider(
+                    configured_profile.get("dataSetDataSharingLevel")
+                ),
+                "dataSetAssignedToAdAccount": configured_profile.get("dataSetAssignedToAdAccount"),
+            },
+        )
+        saved = config_repo.update_workspace_config(
+            resolved.workspace_config,
+            page_id=clean_optional_text(configured_profile.get("pageId")),
+            page_name=clean_optional_text(configured_profile.get("pageName")),
+            pixel_id=clean_optional_text(configured_profile.get("pixelId")),
+            data_set_id=clean_optional_text(configured_profile.get("dataSetId")),
+            verified_domain=clean_optional_text(configured_profile.get("verifiedDomain")),
+            verified_domain_status=normalize_tracking_provider(configured_profile.get("verifiedDomainStatus")),
+            tracking_provider=normalize_tracking_provider(configured_profile.get("trackingProvider")),
+            tracking_url_parameters=clean_optional_text(configured_profile.get("trackingUrlParameters")),
+            attribution_click_window=normalize_tracking_provider(configured_profile.get("attributionClickWindow")),
+            attribution_view_window=normalize_tracking_provider(configured_profile.get("attributionViewWindow")),
+            view_through_enabled=configured_profile.get("viewThroughEnabled"),
+            validation_status="valid",
+            last_validated_at=datetime.now(timezone.utc),
+            last_validation_error=None,
+            metadata_json=metadata if isinstance(metadata, dict) else {},
+        )
+
+    return {
+        "status": "configured",
+        "rulesetVersion": (
+            saved.metadata_json.get("rulesetVersion") if isinstance(saved.metadata_json, dict) else None
+        )
+        or PAID_ADS_RULESET_VERSION,
+        "pixelId": saved.pixel_id,
+        "dataSetId": saved.data_set_id,
+        "trackingProvider": saved.tracking_provider,
+        "funnelCount": len(funnel_ids),
     }
 
 

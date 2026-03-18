@@ -1741,14 +1741,17 @@ async def create_checkout(
 ):
     installation = _resolve_checkout_installation(request=payload, session=session)
 
+    try:
+        checkout_lines = await shopify_api.expand_checkout_lines_with_offer_bonuses(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            lines=[line.model_dump() for line in payload.lines],
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
     cart_input: dict[str, Any] = {
-        "lines": [
-            {
-                "merchandiseId": line.merchandiseId,
-                "quantity": line.quantity,
-            }
-            for line in payload.lines
-        ]
+        "lines": checkout_lines
     }
     if payload.discountCodes:
         cart_input["discountCodes"] = payload.discountCodes
@@ -1946,6 +1949,24 @@ async def orders_create_webhook(
         shopDomain=shop_domain,
         orderId=str(payload.get("id") or ""),
         orderName=payload.get("name"),
+        email=payload.get("email") or payload.get("contact_email"),
+        phone=payload.get("phone")
+        or (
+            payload.get("customer", {}).get("phone")
+            if isinstance(payload.get("customer"), dict)
+            else None
+        ),
+        browserIp=payload.get("browser_ip")
+        or (
+            payload.get("client_details", {}).get("browser_ip")
+            if isinstance(payload.get("client_details"), dict)
+            else None
+        ),
+        userAgent=(
+            payload.get("client_details", {}).get("user_agent")
+            if isinstance(payload.get("client_details"), dict)
+            else None
+        ),
         currency=payload.get("currency"),
         totalPrice=payload.get("total_price"),
         createdAt=payload.get("created_at"),

@@ -494,7 +494,7 @@ function ResearchBrandsTab() {
       {loading ? (
         <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading brands…</div>
       ) : brands.length ? (
-        <div className="ds-card ds-card--md p-0 shadow-sm">
+        <div className="ds-card ds-card--md p-0">
           <Table variant="surface" size={2}>
             <TableHeader>
               <TableRow>

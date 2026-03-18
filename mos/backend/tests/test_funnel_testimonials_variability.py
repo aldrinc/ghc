@@ -1,11 +1,13 @@
 import json
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 
-from app.db.enums import AssetSourceEnum, AssetStatusEnum
-from app.db.models import Asset
-from app.services import funnel_testimonials
+from app.db.enums import AssetSourceEnum, AssetStatusEnum, FunnelStatusEnum
+from app.db.models import Asset, Funnel, Product
+from app.services import funnel_ai, funnel_testimonials
 
 
 def _sample_testimonial(
@@ -555,9 +557,163 @@ def test_normalize_sales_pdp_carousel_plan_unifies_bottom_banner_fields():
     assert {slide["ctaText"] for slide in normalized} == {"Get the handbook - $49"}
 
 
+def test_normalize_sales_pdp_carousel_plan_applies_required_strip_palette():
+    validated = funnel_testimonials._validate_sales_pdp_carousel_plan(
+        {
+            "slides": [
+                {
+                    "variantId": "standard_ugc",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#123456",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.8/5",
+                    "ratingDetailText": "Slide one detail",
+                    "ctaText": "Slide one CTA",
+                    "comments": [_carousel_comment("user_one", "Great fit for my routine.")],
+                    "backgroundPromptVars": {
+                        "product": "Product in hand",
+                        "subject": "Customer selfie",
+                        "scene": "Kitchen morning light",
+                        "extra": "Natural smartphone framing.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "qa_ugc",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#654321",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.7/5",
+                    "ratingDetailText": "Slide two detail",
+                    "ctaText": "Slide two CTA",
+                    "comments": [
+                        _carousel_comment("user_two", "Does it actually work or is it hype?"),
+                        _carousel_comment("trusted_reply", "It gives me a clearer process instead of shrugging."),
+                    ],
+                    "backgroundPromptVars": {
+                        "product": "Product bottle close-up",
+                        "subject": "Customer pointing to product",
+                        "scene": "Bedroom daylight",
+                        "extra": "Question-answer reaction vibe.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "bold_claim",
+                    "template": "pdp_bold_claim",
+                    "logoText": "Brand",
+                    "stripBgColor": "#1a3a2a",
+                    "stripTextColor": "#f5f0e8",
+                    "ratingValueText": "4.6/5",
+                    "ratingDetailText": "Slide three detail",
+                    "ctaText": "Slide three CTA",
+                    "comments": [_carousel_comment("user_three", "Best value in my stack.")],
+                    "backgroundPromptVars": {
+                        "product": "Product on countertop",
+                        "scene": "Clean tabletop",
+                        "extra": "Product-forward composition.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "personal_highlight",
+                    "template": "pdp_personal_highlight",
+                    "logoText": "Brand",
+                    "stripBgColor": "#5c3d1e",
+                    "stripTextColor": "#fdf6ec",
+                    "ratingValueText": "4.5/5",
+                    "ratingDetailText": "Slide four detail",
+                    "ctaText": "Slide four CTA",
+                    "comments": [_carousel_comment("user_four", "This is my keep-using-it product.")],
+                    "backgroundPromptVars": {
+                        "product": "Product with customer",
+                        "subject": "Customer hugging product",
+                        "scene": "Home office",
+                        "extra": "Personal milestone moment.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+                {
+                    "variantId": "dorm_selfie",
+                    "template": "pdp_ugc_standard",
+                    "logoText": "Brand",
+                    "stripBgColor": "#4a3728",
+                    "stripTextColor": "#ffffff",
+                    "ratingValueText": "4.4/5",
+                    "ratingDetailText": "Slide five detail",
+                    "ctaText": "Slide five CTA",
+                    "comments": [_carousel_comment("user_five", "Dorm vibe test")],
+                    "backgroundPromptVars": {
+                        "product": "Product on desk",
+                        "subject": "Younger user selfie",
+                        "scene": "Messy dorm room",
+                        "extra": "Unpolished social selfie style.",
+                        "avoid": ["watermarks"],
+                    },
+                },
+            ]
+        }
+    )
+
+    normalized = funnel_testimonials._normalize_sales_pdp_carousel_plan(
+        validated,
+        shared_banner_copy={
+            "ratingValueText": "4.9/5",
+            "ratingDetailText": "Rated by 2,243 readers",
+            "ctaText": "Get the handbook - $49",
+        },
+        required_strip_palette={
+            "stripBgColor": "#efece7",
+            "stripTextColor": "#0f2618",
+        },
+    )
+
+    assert {slide["stripBgColor"] for slide in normalized} == {"#efece7"}
+    assert {slide["stripTextColor"] for slide in normalized} == {"#0f2618"}
+
+
 def test_should_use_on_dark_logo_for_sales_pdp_strip_prefers_dark_surfaces():
     assert funnel_testimonials._should_use_on_dark_logo_for_sales_pdp_strip("#0f3b2e") is True
     assert funnel_testimonials._should_use_on_dark_logo_for_sales_pdp_strip("#f7efe4") is False
+
+
+def test_resolve_sales_pdp_required_strip_palette_uses_design_system_light_palette():
+    palette = funnel_testimonials._resolve_sales_pdp_required_strip_palette(
+        {
+            "brand": {
+                "logoAssetPublicId": "default-logo-public-id",
+            },
+            "cssVars": {
+                "--color-brand": "#0f2618",
+                "--badge-strip-bg": "#efece7",
+                "--wall-button-text": "var(--color-brand)",
+            },
+        }
+    )
+
+    assert palette == {
+        "stripBgColor": "#efece7",
+        "stripTextColor": "#0f2618",
+    }
+
+
+def test_resolve_sales_pdp_required_strip_palette_returns_none_when_on_dark_logo_exists():
+    palette = funnel_testimonials._resolve_sales_pdp_required_strip_palette(
+        {
+            "brand": {
+                "logoAssetPublicId": "default-logo-public-id",
+                "logoOnDarkAssetPublicId": "dark-logo-public-id",
+            },
+            "cssVars": {
+                "--color-brand": "#0f2618",
+                "--badge-strip-bg": "#efece7",
+            },
+        }
+    )
+
+    assert palette is None
 
 
 def test_resolve_sales_pdp_design_system_logo_selection_uses_on_dark_variant():
@@ -693,6 +849,84 @@ def test_resolve_sales_pdp_background_reference_assets_uses_original_source_firs
         str(source_asset.public_id),
         str(rendered_asset.public_id),
     ]
+
+
+def test_product_context_and_testimonial_primary_image_refresh_stale_product_state(db_session, seed_data):
+    client = seed_data["client"]
+
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="Handbook",
+        description="Printed handbook",
+        product_type="book",
+        primary_asset_id=None,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        campaign_id=seed_data["campaign"].id,
+        product_id=product.id,
+        name="Launch",
+        route_slug="launch",
+        status=FunnelStatusEnum.draft,
+    )
+    db_session.add(funnel)
+    db_session.flush()
+
+    stale_product, _, _ = funnel_ai._load_product_context(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        funnel=funnel,
+    )
+    assert stale_product is not None
+    assert stale_product.primary_asset_id is None
+
+    asset = Asset(
+        org_id=client.org_id,
+        client_id=client.id,
+        source_type=AssetSourceEnum.upload,
+        status=AssetStatusEnum.approved,
+        public_id=uuid4(),
+        asset_kind="image",
+        channel_id="funnel",
+        format="image",
+        content={},
+        file_source="upload",
+        file_status="ready",
+        product_id=product.id,
+        storage_key="dev/orig/test-product-primary.png",
+        content_type="image/png",
+    )
+    db_session.add(asset)
+    db_session.flush()
+
+    db_session.execute(
+        sa.text("update products set primary_asset_id = :asset_id where id = :product_id"),
+        {"asset_id": str(asset.id), "product_id": str(product.id)},
+    )
+    db_session.flush()
+
+    refreshed_product, _, _ = funnel_ai._load_product_context(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        funnel=funnel,
+    )
+    assert refreshed_product is not None
+    assert str(refreshed_product.primary_asset_id) == str(asset.id)
+
+    resolved_asset = funnel_testimonials._resolve_product_primary_image(
+        session=db_session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        product=stale_product,
+    )
+    assert str(resolved_asset.id) == str(asset.id)
 
 
 def test_social_comment_without_attachment_indices_empty_for_small_totals():
@@ -913,7 +1147,6 @@ def test_testimonial_generation_count_enforces_sales_pdp_minimum():
         == 12
     )
 
-
 def test_resolve_testimonial_generation_count_caps_budgeted_sales_pdp_runs():
     budgeted_floor = max(12, funnel_testimonials._SALES_PDP_BUDGETED_MIN_REVIEWS)
     assert (
@@ -952,6 +1185,228 @@ def test_resolve_testimonial_generation_count_keeps_non_budgeted_behavior():
         == 12
     )
 
+
+def test_prepare_testimonial_slot_templates_presales_is_noop():
+    puck_data = {
+        "content": [
+            {
+                "type": "PreSalesTemplate",
+                "props": {
+                    "config": {
+                        "reviews": {
+                            "slides": [
+                                {
+                                    "images": [
+                                        {"src": "/assets/slide-1.webp"},
+                                        {"src": "/assets/slide-2.webp"},
+                                        {"src": "/assets/slide-3.webp"},
+                                    ]
+                                }
+                            ]
+                        },
+                        "reviewsWall": {
+                            "columns": [
+                                [{"image": {"src": "/assets/wall-1.webp"}}],
+                                [{"image": {"src": "/assets/wall-2.webp"}}],
+                            ]
+                        },
+                    }
+                },
+            }
+        ]
+    }
+    original = json.loads(json.dumps(puck_data))
+
+    funnel_testimonials._prepare_testimonial_slot_templates(
+        puck_data,
+        template_kind="pre-sales-listicle",
+    )
+
+    assert puck_data == original
+
+
+def test_prepare_testimonial_slot_templates_sales_pdp_keeps_wall_mix_behavior():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpReviewWall",
+                "props": {
+                    "config": {
+                        "tiles": [
+                            {"image": {"src": "/assets/review-1.webp"}},
+                            {"image": {"src": "/assets/review-2.webp"}},
+                        ]
+                    }
+                },
+            }
+        ]
+    }
+
+    funnel_testimonials._prepare_testimonial_slot_templates(
+        puck_data,
+        template_kind="sales-pdp",
+    )
+
+    tiles = puck_data["content"][0]["props"]["config"]["tiles"]
+    assert tiles[0]["image"]["testimonialTemplate"] == "social_comment"
+    assert tiles[1]["image"]["testimonialTemplate"] == "review_card"
+
+
+def test_resolve_pre_sales_swipe_assignment_maps_all_supported_slot_families():
+    carousel = funnel_testimonials._resolve_pre_sales_swipe_assignment(
+        "pre_sales.reviews.slides[2].images[1]"
+    )
+    wall = funnel_testimonials._resolve_pre_sales_swipe_assignment(
+        "pre_sales.reviewsWall.columns[1][0]"
+    )
+
+    assert carousel.template_file == "SCR-20260310-klev.png"
+    assert carousel.aspect_ratio == "1:1"
+    assert carousel.variation_key == "slide-3-image-2"
+
+    assert wall.template_file == "instagram_download_6.webp"
+    assert wall.aspect_ratio == "9:16"
+    assert wall.style_family == "instagram_ugc_product_demo"
+
+
+def test_resolve_pre_sales_swipe_asset_brief_id_matches_funnel_experiment(monkeypatch):
+    class _FakeArtifactsRepository:
+        def __init__(self, _session):
+            pass
+
+        def list(self, **_kwargs):
+            return [
+                SimpleNamespace(
+                    data={
+                        "asset_briefs": [
+                            {
+                                "id": "brief-other",
+                                "experimentId": "exp-other",
+                                "requirements": [{}],
+                            },
+                            {
+                                "id": "brief-match",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                        ]
+                    }
+                )
+            ]
+
+    monkeypatch.setattr(funnel_testimonials, "ArtifactsRepository", _FakeArtifactsRepository)
+
+    resolved = funnel_testimonials._resolve_pre_sales_swipe_asset_brief_id(
+        session=object(),
+        org_id="org-1",
+        funnel=SimpleNamespace(
+            campaign_id="campaign-1",
+            client_id="client-1",
+            experiment_spec_id="exp-A04",
+        ),
+    )
+
+    assert resolved == "brief-match"
+
+
+def test_resolve_pre_sales_swipe_asset_brief_id_errors_when_multiple_match(monkeypatch):
+    class _FakeArtifactsRepository:
+        def __init__(self, _session):
+            pass
+
+        def list(self, **_kwargs):
+            return [
+                SimpleNamespace(
+                    data={
+                        "asset_briefs": [
+                            {
+                                "id": "brief-a",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                            {
+                                "id": "brief-b",
+                                "experimentId": "exp-A04",
+                                "requirements": [{}],
+                            },
+                        ]
+                    }
+                )
+            ]
+
+    monkeypatch.setattr(funnel_testimonials, "ArtifactsRepository", _FakeArtifactsRepository)
+
+    with pytest.raises(
+        funnel_testimonials.TestimonialGenerationError,
+        match="exactly one matching campaign asset brief",
+    ):
+        funnel_testimonials._resolve_pre_sales_swipe_asset_brief_id(
+            session=object(),
+            org_id="org-1",
+            funnel=SimpleNamespace(
+                campaign_id="campaign-1",
+                client_id="client-1",
+                experiment_spec_id="exp-A04",
+            ),
+        )
+
+
+def test_generate_pre_sales_swipe_testimonial_asset_uses_shared_swipe_activity(monkeypatch):
+    swipe_calls: list[dict[str, object]] = []
+
+    def _fake_swipe_activity(params: dict[str, object]) -> dict[str, object]:
+        swipe_calls.append(params)
+        return {"asset_ids": ["asset-1"], "job_id": "job-1"}
+
+    def _fake_load_asset(asset_id: str) -> funnel_testimonials._LoadedGeneratedTestimonialAsset:
+        assert asset_id == "asset-1"
+        return funnel_testimonials._LoadedGeneratedTestimonialAsset(
+            asset=funnel_testimonials._GeneratedTestimonialAsset(
+                public_id="public-1",
+                asset_id="asset-1",
+                storage_key="storage-key",
+                content_type="image/png",
+            ),
+            ai_metadata={
+                "promptUsed": "render prompt",
+                "swipePromptMarkdown": "```text\\nrender prompt\\n```",
+                "swipePromptModel": "gemini-stage-1",
+                "swipeRenderProvider": "creative_service",
+                "swipeRenderModelIdUsed": "models/gemini-3.1-flash-image-preview",
+            },
+        )
+
+    monkeypatch.setattr(funnel_testimonials, "generate_swipe_image_ad_activity", _fake_swipe_activity)
+    monkeypatch.setattr(funnel_testimonials, "_load_generated_testimonial_asset_record", _fake_load_asset)
+
+    result = funnel_testimonials._generate_pre_sales_swipe_testimonial_asset(
+        org_id="org-1",
+        client_id="client-1",
+        product_id="product-1",
+        campaign_id="campaign-1",
+        asset_brief_id="brief-1",
+        template_url="http://127.0.0.1:9999/template.webp",
+        template_file="template.webp",
+        aspect_ratio="9:16",
+    )
+
+    assert swipe_calls == [
+        {
+            "org_id": "org-1",
+            "client_id": "client-1",
+            "product_id": "product-1",
+            "campaign_id": "campaign-1",
+            "asset_brief_id": "brief-1",
+            "requirement_index": 0,
+            "swipe_image_url": "http://127.0.0.1:9999/template.webp",
+            "swipe_source_label": "template.webp",
+            "aspect_ratio": "9:16",
+            "count": 1,
+        }
+    ]
+    assert result.generated_asset.public_id == "public-1"
+    assert result.job_id == "job-1"
+    assert result.ai_metadata["promptUsed"] == "render prompt"
 
 def test_sync_sales_pdp_guarantee_feed_images_updates_primary_guarantee_image():
     puck_data = {

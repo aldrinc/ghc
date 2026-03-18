@@ -20,6 +20,7 @@ import {
   type StrategyV2LaunchActionResponse,
 } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
+import { ASSET_BRIEF_TYPE_OPTIONS, DEFAULT_ASSET_BRIEF_TYPES, type AssetBriefType } from "@/lib/assetBriefTypes";
 import type { Asset, ResearchArtifactRef, StrategyV2LaunchRecord, StrategyV2State } from "@/types/common";
 
 const EMPTY_RESEARCH_ARTIFACTS: ResearchArtifactRef[] = [];
@@ -348,12 +349,12 @@ export function WorkflowDetailPage() {
   const [launchActionError, setLaunchActionError] = useState<string | null>(null);
   const [latestLaunchResponse, setLatestLaunchResponse] = useState<StrategyV2LaunchActionResponse | null>(null);
   const [launchChannelsInput, setLaunchChannelsInput] = useState("");
-  const [launchAssetBriefTypesInput, setLaunchAssetBriefTypesInput] = useState("");
+  const [launchAssetBriefTypes, setLaunchAssetBriefTypes] = useState<AssetBriefType[]>(DEFAULT_ASSET_BRIEF_TYPES);
   const [launchExperimentPolicy, setLaunchExperimentPolicy] = useState("");
   const [additionalUmsCampaignId, setAdditionalUmsCampaignId] = useState("");
   const [additionalUmsLaunchPrefix, setAdditionalUmsLaunchPrefix] = useState("");
   const [additionalUmsChannelsOverrideInput, setAdditionalUmsChannelsOverrideInput] = useState("");
-  const [additionalUmsAssetBriefTypesOverrideInput, setAdditionalUmsAssetBriefTypesOverrideInput] = useState("");
+  const [additionalUmsAssetBriefTypesOverride, setAdditionalUmsAssetBriefTypesOverride] = useState<AssetBriefType[]>([]);
   const [selectedAdditionalUmsIds, setSelectedAdditionalUmsIds] = useState<string[]>([]);
   const [selectedAdditionalAngleIds, setSelectedAdditionalAngleIds] = useState<string[]>([]);
 
@@ -510,6 +511,18 @@ export function WorkflowDetailPage() {
     setSelectedAdditionalAngleIds((prev) => (prev.includes(id) ? prev.filter((row) => row !== id) : [...prev, id]));
   };
 
+  const toggleLaunchAssetBriefType = (value: AssetBriefType) => {
+    setLaunchAssetBriefTypes((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    );
+  };
+
+  const toggleAdditionalUmsAssetBriefTypeOverride = (value: AssetBriefType) => {
+    setAdditionalUmsAssetBriefTypesOverride((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    );
+  };
+
   const handleLaunchAngleCampaign = async () => {
     setLaunchActionError(null);
     if (!isShopifyLaunchReady) {
@@ -517,14 +530,14 @@ export function WorkflowDetailPage() {
       return;
     }
     const channels = parseDelimitedValues(launchChannelsInput);
-    const assetBriefTypes = parseDelimitedValues(launchAssetBriefTypesInput);
+    const assetBriefTypes = launchAssetBriefTypes;
     const experimentVariantPolicy = launchExperimentPolicy.trim();
     if (!channels.length) {
       setLaunchActionError("channels must include at least one non-empty value.");
       return;
     }
     if (!assetBriefTypes.length) {
-      setLaunchActionError("assetBriefTypes must include at least one non-empty value.");
+      setLaunchActionError("Select at least one supported assetBriefType.");
       return;
     }
     if (!experimentVariantPolicy) {
@@ -564,7 +577,7 @@ export function WorkflowDetailPage() {
       return;
     }
     const channelsOverride = parseDelimitedValues(additionalUmsChannelsOverrideInput);
-    const assetBriefTypesOverride = parseDelimitedValues(additionalUmsAssetBriefTypesOverrideInput);
+    const assetBriefTypesOverride = additionalUmsAssetBriefTypesOverride;
     try {
       const response = await launchAdditionalUms.mutateAsync({
         campaignId,
@@ -586,13 +599,13 @@ export function WorkflowDetailPage() {
       return;
     }
     const channels = parseDelimitedValues(launchChannelsInput);
-    const assetBriefTypes = parseDelimitedValues(launchAssetBriefTypesInput);
+    const assetBriefTypes = launchAssetBriefTypes;
     if (!channels.length) {
       setLaunchActionError("channels must include at least one non-empty value.");
       return;
     }
     if (!assetBriefTypes.length) {
-      setLaunchActionError("assetBriefTypes must include at least one non-empty value.");
+      setLaunchActionError("Select at least one supported assetBriefType.");
       return;
     }
     if (!selectedAdditionalAngleIds.length) {
@@ -624,7 +637,7 @@ export function WorkflowDetailPage() {
           <Menu>
             <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>Actions</MenuTrigger>
             <MenuContent>
-              <MenuItem onClick={() => navigate("/workflows")}>Open all workflows</MenuItem>
+              <MenuItem onClick={() => navigate("/strategy")}>Open all strategy runs</MenuItem>
               <MenuItem onClick={() => void refetch()}>Refresh now</MenuItem>
               {run?.id ? <MenuItem onClick={() => navigator.clipboard.writeText(run.id)}>Copy workflow ID</MenuItem> : null}
               {run?.status === "running" ? (
@@ -878,7 +891,7 @@ export function WorkflowDetailPage() {
                           <TableCell className="font-semibold text-content">Step {art.step_key}</TableCell>
                           <TableCell className="text-sm text-content-muted">{truncate(summary, 120)}</TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Link to={`/workflows/${workflowId}/research/${art.step_key}`} className="text-sm">
+                            <Link to={`/strategy/${workflowId}/research/${art.step_key}`} className="text-sm">
                               <Button variant="secondary" size="xs">View</Button>
                             </Link>
                             {isExternalDocUrl(art.doc_url) ? (
@@ -1028,16 +1041,25 @@ export function WorkflowDetailPage() {
                               />
                             </label>
                             <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">
-                                assetBriefTypes (newline or comma separated)
+                              <div className="mb-1 text-[11px] text-content-muted">assetBriefTypes</div>
+                              <div className="flex flex-wrap gap-3 rounded-md border border-border bg-surface px-2 py-2 text-xs">
+                                {ASSET_BRIEF_TYPE_OPTIONS.map((option) => (
+                                  <label key={option.value} className="flex items-center gap-2 text-content">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                      checked={launchAssetBriefTypes.includes(option.value)}
+                                      onChange={() => toggleLaunchAssetBriefType(option.value)}
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
                               </div>
-                              <textarea
-                                rows={3}
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={launchAssetBriefTypesInput}
-                                onChange={(event) => setLaunchAssetBriefTypesInput(event.target.value)}
-                                placeholder={"static-image\nvideo-script"}
-                              />
+                              {!launchAssetBriefTypes.length ? (
+                                <div className="mt-1 text-[11px] text-danger">
+                                  Select at least one supported creative brief type.
+                                </div>
+                              ) : null}
                             </label>
                             <label className="block">
                               <div className="mb-1 text-[11px] text-content-muted">experimentVariantPolicy</div>
@@ -1109,13 +1131,22 @@ export function WorkflowDetailPage() {
                             </label>
                             <label className="block">
                               <div className="mb-1 text-[11px] text-content-muted">assetBriefTypes override (optional)</div>
-                              <textarea
-                                rows={2}
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={additionalUmsAssetBriefTypesOverrideInput}
-                                onChange={(event) => setAdditionalUmsAssetBriefTypesOverrideInput(event.target.value)}
-                                placeholder="leave empty to inherit campaign"
-                              />
+                              <div className="flex flex-wrap gap-3 rounded-md border border-border bg-surface px-2 py-2 text-xs">
+                                {ASSET_BRIEF_TYPE_OPTIONS.map((option) => (
+                                  <label key={option.value} className="flex items-center gap-2 text-content">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                      checked={additionalUmsAssetBriefTypesOverride.includes(option.value)}
+                                      onChange={() => toggleAdditionalUmsAssetBriefTypeOverride(option.value)}
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              <div className="mt-1 text-[11px] text-content-muted">
+                                Leave all unchecked to inherit the campaign setting.
+                              </div>
                             </label>
                             {additionalUmsOptions.length ? (
                               <div className="space-y-1 rounded-md border border-border bg-surface p-2">
@@ -1217,7 +1248,7 @@ export function WorkflowDetailPage() {
                   <Callout variant="success" title="Launch workflow started">
                     Launch workflow run:{" "}
                     <Link
-                      to={`/workflows/${latestLaunchResponse.launch_workflow_run_id}`}
+                      to={`/strategy/${latestLaunchResponse.launch_workflow_run_id}`}
                       className="font-mono underline"
                     >
                       {latestLaunchResponse.launch_workflow_run_id}
@@ -1273,7 +1304,7 @@ export function WorkflowDetailPage() {
                               <TableCell>{formatDate(row.created_at)}</TableCell>
                               <TableCell>
                                 {row.launch_workflow_run_id ? (
-                                  <Link to={`/workflows/${row.launch_workflow_run_id}`} className="font-mono underline">
+                                  <Link to={`/strategy/${row.launch_workflow_run_id}`} className="font-mono underline">
                                     {row.launch_workflow_run_id}
                                   </Link>
                                 ) : (

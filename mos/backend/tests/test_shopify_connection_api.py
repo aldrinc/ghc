@@ -302,7 +302,7 @@ def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab
             {
                 "sections": {
                     "ss_footer_4_9rJacA": {
-                        "type": "a-ss-footer-4",
+                        "type": "ss-footer-4",
                         "blocks": {
                             "tab_track": {
                                 "type": "tab",
@@ -330,7 +330,7 @@ def test_normalize_theme_export_text_file_content_updates_footer_contact_support
             {
                 "sections": {
                     "ss_footer_4_9rJacA": {
-                        "type": "a-ss-footer-4",
+                        "type": "ss-footer-4",
                         "blocks": {
                             "tab_refund": {
                                 "type": "tab",
@@ -797,6 +797,65 @@ def test_theme_export_zip_write_order_prioritizes_section_dependencies():
     )
 
 
+def test_build_local_shopify_theme_export_payload_uses_shopify_logo_in_settings():
+    payload = clients_router._build_local_shopify_theme_export_payload(
+        shop_domain="example.myshopify.com",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        settings_logo_url="shopify://shop_images/logo-1.png",
+        css_vars={
+            "--color-brand": "#123456",
+            "--color-page-bg-secondary": "#f4efe7",
+        },
+        font_urls=[],
+        data_theme="light",
+        component_image_urls={},
+        component_text_values={},
+        theme_id="local://themes/acme-workspace",
+        theme_name="Acme Workspace",
+        theme_role="MAIN",
+    )
+
+    files_by_filename = {
+        item["filename"]: item for item in payload["files"] if isinstance(item, dict)
+    }
+    settings_payload = json.loads(
+        files_by_filename["config/settings_data.json"]["content"]
+    )
+    assert settings_payload["current"]["logo"] == "shopify://shop_images/logo-1.png"
+    assert (
+        settings_payload["current"]["logo_mobile"]
+        == "shopify://shop_images/logo-1.png"
+    )
+
+    footer_group_payload = json.loads(
+        files_by_filename["sections/footer-group.json"]["content"]
+    )
+    footer_logo_values = [
+        section_payload["settings"]["logo"]
+        for section_payload in footer_group_payload["sections"].values()
+        if isinstance(section_payload, dict)
+        and isinstance(section_payload.get("settings"), dict)
+        and "logo" in section_payload["settings"]
+    ]
+    assert footer_logo_values == ["shopify://shop_images/logo-1.png"]
+
+    exported_layout = files_by_filename["layout/theme.liquid"]["content"]
+    assert (
+        '<meta name="mos-brand-logo-url" content="https://assets.example.com/public/assets/logo-1">'
+        in exported_layout
+    )
+    workspace_css_filename = clients_router._resolve_local_theme_workspace_css_filename(
+        layout_content=exported_layout
+    )
+    exported_workspace_css = files_by_filename[workspace_css_filename]["content"]
+    assert (
+        '--mos-brand-logo-url: "https://assets.example.com/public/assets/logo-1";'
+        in exported_workspace_css
+    )
+
+
 def test_list_local_theme_template_slots_skips_disabled_sections_and_blocks(monkeypatch):
     template_filename = "templates/index.json"
     template_payload = {
@@ -960,21 +1019,21 @@ def test_apply_local_theme_section_group_import_compatibility_rewrites_group_typ
         files_by_filename=files_by_filename,
     )
 
-    assert "sections/a-header.liquid" in files_by_filename
-    assert "sections/a-footer.liquid" in files_by_filename
-    assert "sections/a-search-drawer.liquid" in files_by_filename
-    assert "sections/a-multicolumn-with-icons.liquid" in files_by_filename
-    assert "sections/a-ss-footer-4.liquid" in files_by_filename
+    assert "sections/a-header.liquid" not in files_by_filename
+    assert "sections/a-footer.liquid" not in files_by_filename
+    assert "sections/a-search-drawer.liquid" not in files_by_filename
+    assert "sections/a-multicolumn-with-icons.liquid" not in files_by_filename
+    assert "sections/a-ss-footer-4.liquid" not in files_by_filename
 
     header_group = json.loads(files_by_filename["sections/header-group.json"]["content"])
     footer_group = json.loads(files_by_filename["sections/footer-group.json"]["content"])
     overlay_group = json.loads(files_by_filename["sections/overlay-group.json"]["content"])
 
-    assert header_group["sections"]["header"]["type"] == "a-header"
-    assert footer_group["sections"]["footer"]["type"] == "a-footer"
-    assert footer_group["sections"]["promo"]["type"] == "a-multicolumn-with-icons"
-    assert footer_group["sections"]["custom"]["type"] == "a-ss-footer-4"
-    assert overlay_group["sections"]["drawer"]["type"] == "a-search-drawer"
+    assert header_group["sections"]["header"]["type"] == "header"
+    assert footer_group["sections"]["footer"]["type"] == "footer"
+    assert footer_group["sections"]["promo"]["type"] == "multicolumn-with-icons"
+    assert footer_group["sections"]["custom"]["type"] == "ss-footer-4"
+    assert overlay_group["sections"]["drawer"]["type"] == "search-drawer"
 
 
 def test_apply_theme_template_setting_values_to_local_files_coerces_richtext_markup():
@@ -2551,6 +2610,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     sales_page_path = _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2686,8 +2746,8 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -2737,11 +2797,11 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     assert "templates/index.json" in namelist
     assert "templates/collection.json" in namelist
     assert "sections/footer-group.json" in namelist
-    assert "sections/a-header.liquid" in namelist
-    assert "sections/a-footer.liquid" in namelist
-    assert "sections/a-search-drawer.liquid" in namelist
-    assert "sections/a-multicolumn-with-icons.liquid" in namelist
-    assert "sections/a-ss-footer-4.liquid" in namelist
+    assert "sections/a-header.liquid" not in namelist
+    assert "sections/a-footer.liquid" not in namelist
+    assert "sections/a-search-drawer.liquid" not in namelist
+    assert "sections/a-multicolumn-with-icons.liquid" not in namelist
+    assert "sections/a-ss-footer-4.liquid" not in namelist
     assert "snippets/header-drawer.liquid" in namelist
     assert all(not entry.startswith("mos-template-export/") for entry in namelist)
     exported_workspace_css = archive.read(workspace_css_filename).decode("utf-8")
@@ -2811,7 +2871,6 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         archive.read("sections/footer-group.json").decode("utf-8")
     )
     exported_ss_footer_4 = archive.read("sections/ss-footer-4.liquid").decode("utf-8")
-    exported_a_ss_footer_4 = archive.read("sections/a-ss-footer-4.liquid").decode("utf-8")
     exported_header_group_template = json.loads(
         archive.read("sections/header-group.json").decode("utf-8")
     )
@@ -2842,9 +2901,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         ]
         == "#ffffff"
     )
-    assert (
-        exported_footer_group_template["sections"]["footer"]["type"] == "a-footer"
-    )
+    assert exported_footer_group_template["sections"]["footer"]["type"] == "footer"
     footer_blocks = exported_footer_group_template["sections"]["ss_footer_4_9rJacA"][
         "blocks"
     ]
@@ -2869,14 +2926,10 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     )
     assert ".footer-tab-text-{{ section.id }} a," in exported_ss_footer_4
     assert "text-decoration: underline !important;" in exported_ss_footer_4
-    assert ".footer-tab-text-{{ section.id }} a," in exported_a_ss_footer_4
-    assert "text-decoration: underline !important;" in exported_a_ss_footer_4
-    assert (
-        exported_header_group_template["sections"]["header"]["type"] == "a-header"
-    )
+    assert exported_header_group_template["sections"]["header"]["type"] == "header"
     assert (
         exported_overlay_group_template["sections"]["search-drawer"]["type"]
-        == "a-search-drawer"
+        == "search-drawer"
     )
 
     db_session.expire_all()
@@ -2901,6 +2954,7 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -3020,8 +3074,8 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -4037,6 +4091,7 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -4124,8 +4179,8 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -4172,6 +4227,7 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
 
     db_session.add(
         Product(
@@ -4267,8 +4323,8 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
         assert design_system_id == "design-system-1"
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",
@@ -4311,6 +4367,7 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    latest_logo_public_id = _create_workspace_image_asset(db_session, client=client)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -4394,8 +4451,8 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     ):
         return (
             "Latest Brand Name",
-            "latest-logo",
-            "https://assets.example.com/public/assets/latest-logo",
+            latest_logo_public_id,
+            "shopify://shop_images/latest-logo.png",
             {
                 "--color-brand": "#654321",
                 "--color-page-bg-secondary": "#f4efe7",

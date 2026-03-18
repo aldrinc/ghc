@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 
 
 class IntentFunnelPageTemplate(BaseModel):
@@ -26,3 +28,8 @@ class CampaignIntentRequest(BaseModel):
     funnelName: Optional[str] = None
     funnelPages: Optional[List[IntentFunnelPageTemplate]] = None
     useDefaultFunnelTemplates: bool = False
+
+    @field_validator("assetBriefTypes")
+    @classmethod
+    def _validate_asset_brief_types(cls, value: List[str]) -> List[str]:
+        return normalize_required_asset_brief_types(value, field_name="assetBriefTypes")

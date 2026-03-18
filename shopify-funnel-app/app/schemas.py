@@ -576,6 +576,10 @@ class ForwardOrderPayload(BaseModel):
     shopDomain: str
     orderId: str
     orderName: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    browserIp: str | None = None
+    userAgent: str | None = None
     currency: str | None = None
     totalPrice: str | None = None
     createdAt: str | None = None

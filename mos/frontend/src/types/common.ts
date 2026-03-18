@@ -1,3 +1,5 @@
+import type { AssetBriefType } from "@/lib/assetBriefTypes";
+
 export interface Client {
   id: string;
   org_id: string;
@@ -13,7 +15,7 @@ export interface Campaign {
   product_id?: string | null;
   name: string;
   channels?: string[];
-  asset_brief_types?: string[];
+  asset_brief_types?: AssetBriefType[];
 }
 
 export interface WorkflowRun {

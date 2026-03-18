@@ -17,8 +17,16 @@ branch_labels = None
 depends_on = None
 
 
+def _qualified_version_table_name() -> str:
+    schema = op.get_context().version_table_schema
+    if not schema:
+        return "alembic_version"
+    escaped_schema = schema.replace('"', '""')
+    return f'"{escaped_schema}".alembic_version'
+
+
 def upgrade() -> None:
-    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)")
+    op.execute(f"ALTER TABLE {_qualified_version_table_name()} ALTER COLUMN version_num TYPE VARCHAR(128)")
 
 
 def downgrade() -> None:

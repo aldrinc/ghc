@@ -1,15 +1,54 @@
+import os
 import sys
 import uuid
 from pathlib import Path
 
+import dotenv
 import pytest
 from alembic import command
 from alembic.config import Config
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
-from sqlalchemy import event
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+dotenv.load_dotenv(ROOT_DIR / ".env.example", override=False)
+
+
+def _configure_test_database_url() -> tuple[str, str] | None:
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        return None
+
+    url = make_url(database_url)
+    if not url.drivername.startswith("postgresql"):
+        return None
+
+    schema_name = f"pytest_{uuid.uuid4().hex}"
+    admin_engine = create_engine(
+        url.render_as_string(hide_password=False),
+        future=True,
+        isolation_level="AUTOCOMMIT",
+    )
+    try:
+        with admin_engine.connect() as conn:
+            conn.exec_driver_sql(f'CREATE SCHEMA "{schema_name}"')
+    finally:
+        admin_engine.dispose()
+
+    os.environ["ALEMBIC_VERSION_TABLE_SCHEMA"] = schema_name
+    scoped_url = url.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    os.environ["DATABASE_URL"] = scoped_url.render_as_string(hide_password=False)
+    return url.render_as_string(hide_password=False), schema_name
+
+
+if not os.environ.get("INTEGRATION_SECRETS_KEY"):
+    os.environ["INTEGRATION_SECRETS_KEY"] = Fernet.generate_key().decode("utf-8")
+
+
+TEST_DATABASE_CONFIGURATION = _configure_test_database_url()
 sys.path.insert(0, str(ROOT_DIR))
 
 from app.auth.dependencies import AuthContext, get_current_user
@@ -31,10 +70,32 @@ from app.db.models import (
 from app.main import app
 from app.routers import campaigns as campaigns_router
 from app.routers import clients as clients_router
+from app.routers import swipes as swipes_router
 from app.routers import workflows as workflows_router
 
 
 TEST_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_test_schema() -> None:
+    yield
+
+    if TEST_DATABASE_CONFIGURATION is None:
+        return
+
+    database_url, schema_name = TEST_DATABASE_CONFIGURATION
+    engine.dispose()
+    admin_engine = create_engine(
+        database_url,
+        future=True,
+        isolation_level="AUTOCOMMIT",
+    )
+    try:
+        with admin_engine.connect() as conn:
+            conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE')
+    finally:
+        admin_engine.dispose()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -134,6 +195,7 @@ def fake_temporal(monkeypatch):
 
     monkeypatch.setattr(clients_router, "get_temporal_client", _get_temporal_client)
     monkeypatch.setattr(campaigns_router, "get_temporal_client", _get_temporal_client)
+    monkeypatch.setattr(swipes_router, "get_temporal_client", _get_temporal_client)
     monkeypatch.setattr(workflows_router, "get_temporal_client", _get_temporal_client)
     return client
 

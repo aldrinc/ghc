@@ -7,9 +7,20 @@ import type {
   WorkflowDetail,
   WorkflowRun,
 } from "@/types/common";
+import type { AssetBriefType } from "@/lib/assetBriefTypes";
 import { toast } from "@/components/ui/toast";
 
-export function useWorkflows(filters?: { clientId?: string; productId?: string; campaignId?: string }) {
+type WorkflowFilters = {
+  clientId?: string;
+  productId?: string;
+  campaignId?: string;
+};
+
+type WorkflowQueryOptions = {
+  enabled?: boolean;
+};
+
+export function useWorkflows(filters?: WorkflowFilters, options?: WorkflowQueryOptions) {
   const { get } = useApiClient();
   const path = (() => {
     if (!filters) return "/workflows";
@@ -23,6 +34,7 @@ export function useWorkflows(filters?: { clientId?: string; productId?: string; 
   return useQuery<WorkflowRun[]>({
     queryKey: ["workflows", filters?.clientId ?? null, filters?.productId ?? null, filters?.campaignId ?? null],
     queryFn: () => get(path),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -112,7 +124,7 @@ export type StrategyV2LaunchActionResponse = {
 
 type StrategyV2LaunchAngleCampaignRequest = {
   channels: string[];
-  assetBriefTypes: string[];
+  assetBriefTypes: AssetBriefType[];
   experimentVariantPolicy: string;
 };
 
@@ -121,13 +133,13 @@ type StrategyV2LaunchAdditionalUmsRequest = {
   umsSelectionIds: string[];
   launchNamePrefix: string;
   channels?: string[];
-  assetBriefTypes?: string[];
+  assetBriefTypes?: AssetBriefType[];
 };
 
 type StrategyV2LaunchAdditionalAngleRequest = {
   selectedAngleIds: string[];
   channels: string[];
-  assetBriefTypes: string[];
+  assetBriefTypes: AssetBriefType[];
 };
 
 export function useStrategyV2LaunchAngleCampaign(workflowId?: string) {

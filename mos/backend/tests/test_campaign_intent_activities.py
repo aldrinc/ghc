@@ -1,11 +1,23 @@
+import json
+import time
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
-from app.db.models import Client, Product, ProductOffer, ProductVariant
+from app.db.models import (
+    Campaign,
+    Client,
+    MetaAdAccountConnection,
+    MetaWorkspaceAdConfig,
+    Org,
+    Product,
+    ProductOffer,
+    ProductVariant,
+)
 from app.temporal.activities import campaign_intent_activities as cia
 from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
@@ -125,6 +137,319 @@ def test_collect_image_generation_errors_ignores_non_list_inputs():
     assert errors == []
 
 
+def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_session, monkeypatch):
+    test_org_id = UUID("00000000-0000-0000-0000-000000000111")
+    org = Org(id=test_org_id, name="Meta Tracking Org")
+    db_session.add(org)
+    db_session.commit()
+    db_session.refresh(org)
+    client = Client(org_id=test_org_id, name="Meta Tracking Client", industry="Retail")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    campaign = Campaign(
+        org_id=test_org_id,
+        client_id=client.id,
+        name="Meta Tracking Campaign",
+        channels=["facebook"],
+        asset_brief_types=["image"],
+    )
+    db_session.add(campaign)
+    db_session.commit()
+    db_session.refresh(campaign)
+
+    connection = MetaAdAccountConnection(
+        org_id=test_org_id,
+        name="Meta Tracking Connection",
+        ad_account_id="act_123456",
+        ad_account_name="Meta Tracking Account",
+        graph_api_version="v24.0",
+        graph_api_base_url="https://graph.facebook.com",
+        credential_type="access_token",
+        credentials_encrypted="encrypted-token",
+        status="active",
+        validation_status="pending",
+        metadata_json={},
+        created_by_user_id="test-user",
+    )
+    db_session.add(connection)
+    db_session.commit()
+    db_session.refresh(connection)
+
+    workspace_config = MetaWorkspaceAdConfig(
+        org_id=test_org_id,
+        client_id=client.id,
+        meta_connection_id=connection.id,
+        name="Meta Tracking Workspace Config",
+        is_default=True,
+        status="active",
+        page_id="123456",
+        page_name="Meta Tracking Page",
+        validation_status="pending",
+        metadata_json={},
+        created_by_user_id="test-user",
+    )
+    db_session.add(workspace_config)
+    db_session.commit()
+    db_session.refresh(workspace_config)
+
+    observed: dict[str, object] = {}
+
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    def _activate_stub(*, profile, funnel_ids, ruleset_version, **kwargs):
+        observed["profile"] = profile
+        observed["funnel_ids"] = funnel_ids
+        observed["ruleset_version"] = ruleset_version
+        return {
+            "clientId": str(client.id),
+            "platform": "meta",
+            "rulesetVersion": ruleset_version,
+            "pixelId": "pixel-123",
+            "dataSetId": "dataset-123",
+            "dataSetAssignedToAdAccount": True,
+            "trackingProvider": "mos",
+            "trackingUrlParameters": "utm_source=meta&utm_medium=paid",
+            "metadata": {
+                "mosMetaTracking": {
+                    "status": "active",
+                    "channel": "meta",
+                    "mode": "public_funnel_runtime",
+                    "pixelId": "pixel-123",
+                    "funnelIds": funnel_ids,
+                    "browserEvents": ["PageView", "InitiateCheckout"],
+                    "internalEvents": ["page_view", "cta_click"],
+                }
+            },
+        }
+
+    monkeypatch.setattr(cia, "session_scope", _session_scope_override)
+    monkeypatch.setattr(cia, "activate_mos_meta_funnel_tracking_profile", _activate_stub)
+    monkeypatch.setattr(cia, "meta_ads_client_for_connection", lambda connection: object())
+
+    result = cia.configure_generated_funnels_meta_tracking_activity(
+        {
+            "org_id": str(test_org_id),
+            "client_id": str(client.id),
+            "campaign_id": str(campaign.id),
+            "funnel_ids": ["funnel-a", "funnel-b"],
+        }
+    )
+
+    assert result["status"] == "configured"
+    assert observed["funnel_ids"] == ["funnel-a", "funnel-b"]
+
+    db_session.refresh(workspace_config)
+    assert workspace_config.pixel_id == "pixel-123"
+    assert workspace_config.data_set_id == "dataset-123"
+    assert workspace_config.tracking_provider == "mos"
+    assert workspace_config.tracking_url_parameters == "utm_source=meta&utm_medium=paid"
+    assert workspace_config.metadata_json["mosMetaTracking"]["funnelIds"] == ["funnel-a", "funnel-b"]
+
+
+def test_create_funnel_drafts_activity_uses_pinned_template_patch_for_legacy_presell_payload(
+    monkeypatch,
+    db_session,
+):
+    test_org_id = UUID("00000000-0000-0000-0000-000000000001")
+    client = Client(org_id=test_org_id, name="Legacy Strategy V2 Client")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(
+        org_id=test_org_id,
+        client_id=client.id,
+        title="Herbal Safety Handbook",
+        product_type="digital",
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    campaign = Campaign(
+        org_id=test_org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Pinned Launch Campaign",
+    )
+    db_session.add(campaign)
+    db_session.commit()
+    db_session.refresh(campaign)
+
+    legacy_reasons = [
+        {
+            "number": 1,
+            "title": "Most Herb Guides Ignore Prescription Drug Interactions",
+            "body": "Many guides list benefits without spelling out the medication conflicts that matter most. That leaves readers guessing when the stakes are highest.",
+            "image": {"alt": "Open notes beside medication bottles"},
+        },
+        {
+            "number": 2,
+            "title": "Scattered Online Info Leaves You Guessing at the Worst Moments",
+            "body": "Safety details are buried across tabs, comments, and vague listicles. You need one practical place to check the red flags before you act.",
+            "image": {"alt": "Research tabs and handwritten safety notes"},
+        },
+        {
+            "number": 3,
+            "title": "The 'Natural Equals Safe' Assumption Is the Core Danger",
+            "body": "Natural products can still create serious problems when you mix them casually. A safety-first process keeps you from confusing familiar with harmless.",
+            "image": {"alt": "Checklist with highlighted caution markers"},
+        },
+    ]
+    pre_sales_payload_entry = {
+        "payload_version": "v1",
+        "template_id": "pre-sales-listicle",
+        "angle_run_id": "workflow:angle-1",
+        "fields": {
+            "hero": {
+                "title": "Herbalism Without the Woo",
+                "subtitle": "A practical read before your next herb and medication decision.",
+                "badges": [
+                    {
+                        "label": "5-Star Reviews",
+                        "value": "2,400",
+                        "icon": {"alt": "Five-star review icon", "prompt": "clean editorial five-star rating icon"},
+                    },
+                    {
+                        "label": "Customer Support",
+                        "value": "24/7",
+                        "icon": {"alt": "Customer support icon", "prompt": "editorial customer support headset icon"},
+                    },
+                    {
+                        "label": "Risk Free Trial",
+                        "icon": {"alt": "Guarantee badge icon", "prompt": "editorial shield check icon"},
+                    },
+                ],
+            },
+            "reasons": legacy_reasons,
+            "marquee": ["Medication aware", "No hype", "Safety first"],
+            "pitch": {
+                "title": "Use one practical framework before you decide",
+                "bullets": [
+                    "Spot interaction risks faster",
+                    "Know when to pause",
+                    "Prepare sharper questions",
+                    "Keep one reference handy",
+                ],
+                "cta_label": "Learn more",
+                "image": {"alt": "Handbook open beside a cup of tea"},
+            },
+            "reviews": [],
+            "review_wall": {
+                "title": "Trusted by careful herbal readers",
+                "button_label": "Open full reviews",
+            },
+            "floating_cta": {"label": "Learn more"},
+        },
+        "template_patch": [
+            {
+                "component_type": "PreSalesReasons",
+                "field_path": "props.config",
+                "value": legacy_reasons,
+            }
+        ],
+    }
+    sales_payload_entry = {
+        "payload_version": "v1",
+        "template_id": "sales-pdp",
+        "angle_run_id": "workflow:angle-1",
+        "template_patch": [
+            {
+                "component_type": "SalesPdpHero",
+                "field_path": "props.config.purchase.title",
+                "value": "Herbal Safety Handbook",
+            }
+        ],
+    }
+
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    captured_copy_packs: list[tuple[str | None, dict[str, object]]] = []
+
+    def _run_generate_page_draft_stub(**kwargs):
+        copy_pack = kwargs.get("copy_pack")
+        assert isinstance(copy_pack, str) and copy_pack
+        captured_copy_packs.append(
+            (
+                kwargs.get("template_id"),
+                json.loads(copy_pack),
+            )
+        )
+        return {"draftVersionId": f"draft-{len(captured_copy_packs)}", "generatedImages": []}
+
+    monkeypatch.setattr(cia, "session_scope", _session_scope_override)
+    monkeypatch.setattr(
+        cia,
+        "apply_template_assets",
+        lambda **kwargs: kwargs["template"].puck_data,
+    )
+    monkeypatch.setattr(cia, "resolve_design_system_tokens", lambda **_kwargs: None)
+    monkeypatch.setattr(cia, "normalize_public_page_metadata_for_context", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        cia,
+        "_align_sales_pdp_purchase_options_for_selected_offer",
+        lambda **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        cia,
+        "_build_policy_footer_payload",
+        lambda **_kwargs: (
+            [
+                {"label": "Privacy", "href": "https://example.com/privacy"},
+                {"label": "Terms", "href": "https://example.com/terms"},
+                {"label": "Returns", "href": "https://example.com/returns"},
+                {"label": "Shipping", "href": "https://example.com/shipping"},
+            ],
+            "© 2026 Test Brand",
+            [],
+        ),
+    )
+    monkeypatch.setattr(cia, "run_generate_page_draft", _run_generate_page_draft_stub)
+
+    result = cia.create_funnel_drafts_activity(
+        {
+            "org_id": str(test_org_id),
+            "client_id": str(client.id),
+            "campaign_id": str(campaign.id),
+            "product_id": str(product.id),
+            "experiment_spec_id": "experiment-1",
+            "funnel_name": "Launch",
+            "pages": [
+                {"template_id": "pre-sales-listicle", "name": "Pre-Sales", "slug": "pre-sales"},
+                {"template_id": "sales-pdp", "name": "Sales", "slug": "sales"},
+            ],
+            "experiment": {"id": "experiment-1", "name": "Angle Test", "hypothesis": "Pinned copy wins"},
+            "variant": {"id": "variant-a", "name": "Control", "description": "Pinned Strategy V2 copy"},
+            "strategy_sheet": {"goal": "Launch", "hypothesis": "Pinned copy"},
+            "asset_briefs": [],
+            "strategy_v2_packet": {
+                "template_payloads": {
+                    "pre-sales-listicle": pre_sales_payload_entry,
+                    "sales-pdp": sales_payload_entry,
+                }
+            },
+            "strategy_v2_copy_context": {},
+            "generate_ai_drafts": False,
+            "generate_testimonials": False,
+        }
+    )
+
+    assert len(result["pages"]) == 2
+    assert len(captured_copy_packs) == 2
+    pre_sales_copy_pack = next(
+        payload for template_id, payload in captured_copy_packs if template_id == "pre-sales-listicle"
+    )
+    assert len(pre_sales_copy_pack["fields"]["reasons"]) == 3
+    assert pre_sales_copy_pack["template_patch"][0]["component_type"] == "PreSalesReasons"
+    assert len(pre_sales_copy_pack["template_patch"][0]["value"]) == 3
+
+
 def test_build_policy_footer_payload_returns_links_brand_year_and_icons(monkeypatch):
     profile = SimpleNamespace(
         privacy_policy_url="https://example.com/privacy",
@@ -178,6 +503,87 @@ def test_build_policy_footer_payload_returns_links_brand_year_and_icons(monkeypa
     ]
     assert copyright_text == f"© {datetime.now(timezone.utc).year} The Honest Herbalist"
     assert icon_keys == cia._FOOTER_PAYMENT_ICON_KEYS
+
+
+def test_create_funnel_drafts_activity_emits_activity_heartbeats_during_page_generation(
+    db_session, monkeypatch
+):
+    test_org_id = UUID("00000000-0000-0000-0000-000000000001")
+    client = Client(org_id=test_org_id, name="Heartbeat Client", industry="Health")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(
+        org_id=test_org_id,
+        client_id=client.id,
+        title="Heartbeat Product",
+        description="Launch-ready product description.",
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    campaign = Campaign(
+        org_id=test_org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Heartbeat Campaign",
+        channels=["meta"],
+        asset_brief_types=["static-image"],
+    )
+    db_session.add(campaign)
+    db_session.commit()
+    db_session.refresh(campaign)
+
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    heartbeat_payloads: list[dict[str, object]] = []
+
+    def _heartbeat(payload):
+        heartbeat_payloads.append(dict(payload))
+
+    def _run_generate_page_draft_stub(**_kwargs):
+        time.sleep(0.05)
+        return {"draftVersionId": "draft-heartbeat", "generatedImages": []}
+
+    monkeypatch.setattr(cia, "session_scope", _session_scope_override)
+    monkeypatch.setattr(cia, "apply_template_assets", lambda **kwargs: kwargs["template"].puck_data)
+    monkeypatch.setattr(cia, "resolve_design_system_tokens", lambda **_kwargs: None)
+    monkeypatch.setattr(cia, "normalize_public_page_metadata_for_context", lambda **_kwargs: None)
+    monkeypatch.setattr(cia, "run_generate_page_draft", _run_generate_page_draft_stub)
+    monkeypatch.setattr(cia.activity, "heartbeat", _heartbeat)
+    monkeypatch.setattr(cia, "_FUNNEL_DRAFT_HEARTBEAT_INTERVAL_SECONDS", 0.01)
+
+    cia.create_funnel_drafts_activity(
+        {
+            "org_id": str(test_org_id),
+            "client_id": str(client.id),
+            "campaign_id": str(campaign.id),
+            "product_id": str(product.id),
+            "experiment_spec_id": "experiment-1",
+            "funnel_name": "Launch",
+            "pages": [
+                {"template_id": "pre-sales-listicle", "name": "Pre-Sales", "slug": "pre-sales"},
+                {"template_id": "sales-pdp", "name": "Sales", "slug": "sales"},
+            ],
+            "experiment": {"id": "experiment-1", "name": "Angle Test", "hypothesis": "Pinned copy wins"},
+            "variant": {"id": "variant-a", "name": "Control", "description": "Pinned Strategy V2 copy"},
+            "strategy_sheet": {"goal": "Launch", "hypothesis": "Pinned copy"},
+            "asset_briefs": [],
+            "strategy_v2_packet": {},
+            "strategy_v2_copy_context": {},
+            "generate_ai_drafts": True,
+            "generate_testimonials": False,
+        }
+    )
+
+    assert heartbeat_payloads
+    latest_payload = heartbeat_payloads[-1]
+    assert latest_payload["phase"] == "funnel_page_generation"
+    assert latest_payload["template_id"] in {"pre-sales-listicle", "sales-pdp"}
 
 
 @pytest.mark.parametrize(

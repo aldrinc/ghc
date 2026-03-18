@@ -1922,12 +1922,27 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, org_id: str) -> str:
-    org_component = _normalize_bunny_pull_zone_name_component(
-        value=org_id,
-        label="org_id",
+def _build_bunny_pull_zone_name(*, workspace_id: str) -> str:
+    workspace_component = _normalize_bunny_pull_zone_name_component(
+        value=workspace_id,
+        label="workspace_id",
     )
-    return org_component
+    return workspace_component
+
+
+def _extract_bunny_pull_zone_workspace_id(*, workload: dict[str, Any], workload_name: str) -> str:
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{workload_name}' source_ref must be an object for Bunny pull zone provisioning."
+        )
+
+    workspace_id = str(source_ref.get("client_id") or "").strip()
+    if not workspace_id:
+        raise DeployError(
+            f"Workload '{workload_name}' source_ref.client_id is required for Bunny pull zone provisioning."
+        )
+    return workspace_id
 
 
 def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
@@ -2018,6 +2033,18 @@ def _find_bunny_pull_zone_by_name(*, zone_name: str) -> dict[str, Any] | None:
     return matches[0] if matches else None
 
 
+def _find_bunny_pull_zone_by_hostname(*, hostname: str) -> dict[str, Any] | None:
+    normalized_target = _normalize_hostname(value=hostname, context="Bunny custom domain")
+    matches: list[dict[str, Any]] = []
+    for zone in _list_bunny_pull_zones():
+        hostnames = _extract_bunny_pull_zone_hostname_values(zone)
+        if normalized_target in hostnames:
+            matches.append(zone)
+    if len(matches) > 1:
+        raise DeployError(f"Multiple Bunny pull zones found for hostname '{normalized_target}'.")
+    return matches[0] if matches else None
+
+
 def _coerce_bunny_pull_zone_id(*, zone: dict[str, Any]) -> int:
     raw_id = zone.get("Id")
     try:
@@ -2100,11 +2127,45 @@ def _ensure_bunny_pull_zone_hostname(*, zone_id: int, hostname: str) -> dict[str
     if normalized_hostname in existing:
         return {"hostname": normalized_hostname, "status": "existing"}
 
-    response = _bunny_api_request(
-        method="POST",
-        path=f"/pullzone/{zone_id}/addHostname",
-        payload={"Hostname": normalized_hostname},
-    )
+    registered_zone = _find_bunny_pull_zone_by_hostname(hostname=normalized_hostname)
+    if registered_zone is not None:
+        registered_zone_id = _coerce_bunny_pull_zone_id(zone=registered_zone)
+        if registered_zone_id == zone_id:
+            return {"hostname": normalized_hostname, "status": "existing"}
+        registered_zone_name = str(registered_zone.get("Name") or "").strip() or str(registered_zone_id)
+        raise DeployError(
+            f"Bunny custom domain '{normalized_hostname}' is already registered to pull zone "
+            f"'{registered_zone_name}' (id={registered_zone_id}), not target zone id={zone_id}."
+        )
+
+    try:
+        response = _bunny_api_request(
+            method="POST",
+            path=f"/pullzone/{zone_id}/addHostname",
+            payload={"Hostname": normalized_hostname},
+        )
+    except DeployError as exc:
+        if "already registered" not in str(exc).lower():
+            raise
+        reconciled_zone = _get_bunny_pull_zone(zone_id=zone_id)
+        reconciled_hostnames = _extract_bunny_pull_zone_hostname_values(reconciled_zone)
+        if normalized_hostname in reconciled_hostnames:
+            return {"hostname": normalized_hostname, "status": "existing"}
+        registered_zone = _find_bunny_pull_zone_by_hostname(hostname=normalized_hostname)
+        if registered_zone is not None:
+            registered_zone_id = _coerce_bunny_pull_zone_id(zone=registered_zone)
+            if registered_zone_id == zone_id:
+                return {"hostname": normalized_hostname, "status": "existing"}
+            registered_zone_name = str(registered_zone.get("Name") or "").strip() or str(registered_zone_id)
+            raise DeployError(
+                f"Bunny custom domain '{normalized_hostname}' is already registered to pull zone "
+                f"'{registered_zone_name}' (id={registered_zone_id}), not target zone id={zone_id}."
+            ) from exc
+        raise DeployError(
+            f"Bunny reported hostname '{normalized_hostname}' is already registered, but it was not "
+            "present on the target pull zone or any listed pull zone. Retry after Bunny propagates "
+            "or inspect the Bunny dashboard."
+        ) from exc
     if response is not None and not isinstance(response, (dict, bool, str)):
         raise DeployError("Bunny add hostname response must be an object, bool, or string when present.")
     return {"hostname": normalized_hostname, "status": "created"}
@@ -2277,8 +2338,8 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(org_id=org_id)
+def _ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(workspace_id=workspace_id)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     zone: dict[str, Any]
@@ -2379,6 +2440,7 @@ def configure_bunny_pull_zone_for_workload(
         raise DeployError(
             "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
         )
+    workspace_id = _extract_bunny_pull_zone_workspace_id(workload=workload, workload_name=workload_name)
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2398,7 +2460,7 @@ def configure_bunny_pull_zone_for_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=org_id,
+        workspace_id=workspace_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2454,6 +2516,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         raise DeployError(
             "Bunny pull zone provisioning from publish requires source_type 'funnel_artifact'."
         )
+    workspace_id = _extract_bunny_pull_zone_workspace_id(workload=workload, workload_name=workload_name)
 
     workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
         workload=workload,
@@ -2470,7 +2533,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         workload_port=workload_port,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        org_id=org_id,
+        workspace_id=workspace_id,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(

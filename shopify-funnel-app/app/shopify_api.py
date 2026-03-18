@@ -6,6 +6,7 @@ import binascii
 import colorsys
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 from html import escape
@@ -395,6 +396,18 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (("color", "var(--color-brand)"),),
         ),
         (
+            '.main-collection-banner__content a, .main-collection-banner__content a:visited',
+            (("color", "inherit"),),
+        ),
+        (
+            '.main-collection-banner__content a .icon, .main-collection-banner__content a svg, .main-collection-banner__content a svg *',
+            (
+                ("color", "inherit"),
+                ("fill", "currentColor"),
+                ("stroke", "currentColor"),
+            ),
+        ),
+        (
             'header nav li, header .header__inline-menu li, header .list-menu--inline > li, #shopify-section-header nav li, #shopify-section-header .header__inline-menu li, #shopify-section-header .list-menu--inline > li',
             (
                 ("display", "flex"),
@@ -552,6 +565,8 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
 }
 _MOS_SOURCE_OF_TRUTH_METAFIELD_NAMESPACE = "mos"
 _MOS_SOURCE_OF_TRUTH_METAFIELD_KEY = "product_sync_payload"
+_MOS_BONUS_DISCOUNT_KEY_PREFIX = "offer-bonus"
+_MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH = 255
 _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
     "futrgroup2-0theme": (
         """@media screen and (max-width: 749px) {
@@ -587,6 +602,17 @@ _THEME_COMPONENT_RAW_CSS_BLOCKS_BY_NAME: dict[str, tuple[str, ...]] = {
   .collection .card-grid .card,
   .collection .card-grid .product-card {
     overflow: visible !important;
+  }
+}""",
+        """/* Keep the rotated image stack out of the left gutter in the
+   images-with-text-overlay section. */
+[id*="images-with-text-overlay"] .scrolled-images__main {
+  inset-inline-start: 68% !important;
+}
+
+@media screen and (min-width: 768px) {
+  [id*="images-with-text-overlay"] .scrolled-images__main {
+    inset-inline-start: 72% !important;
   }
 }""",
     ),
@@ -2241,7 +2267,6 @@ class ShopifyApiClient:
             raise ShopifyApiError(message="product_id cannot be empty.", status_code=400)
         if not cleaned_publication_id:
             raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
-
         query = """
         query productPublicationState($id: ID!, $publicationId: ID!) {
             product(id: $id) {
@@ -2293,9 +2318,8 @@ class ShopifyApiClient:
             raise ShopifyApiError(message="product_id cannot be empty.", status_code=400)
         if not cleaned_publication_id:
             raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
-
         mutation = """
-        mutation publishCatalogProduct($id: ID!, $input: [PublicationInput!]!) {
+        mutation publishProductToPublication($id: ID!, $input: [PublicationInput!]!) {
             publishablePublish(id: $id, input: $input) {
                 userErrors {
                     field
@@ -2357,7 +2381,6 @@ class ShopifyApiClient:
             product_id=product_id,
             publication_id=online_store_publication_id,
         )
-
     async def _create_collection(
         self,
         *,
@@ -2655,12 +2678,102 @@ class ShopifyApiClient:
             raise ShopifyApiError(
                 message="product_gid must be a valid Shopify Product GID.",
                 status_code=400,
-            )
+        )
         return await self.ensure_catalog_collection_contains_products(
             shop_domain=shop_domain,
             access_token=access_token,
             product_gids=[cleaned_product_gid],
         )
+
+    async def ensure_products_published_to_online_store(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gids: list[str],
+    ) -> None:
+        normalized_product_gids = self._normalize_catalog_collection_product_gids(
+            product_gids=product_gids
+        )
+        if not normalized_product_gids:
+            return
+
+        online_store_publication_id = await self._get_online_store_publication_id(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        for product_gid in normalized_product_gids:
+            is_published = await self._is_product_published_on_publication(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                product_id=product_gid,
+                publication_id=online_store_publication_id,
+            )
+            if is_published:
+                continue
+            await self._publish_product_to_publication(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                product_id=product_gid,
+                publication_id=online_store_publication_id,
+            )
+
+    def _extract_bonus_product_gids_from_source_payload(
+        self,
+        *,
+        source_payload: dict[str, Any] | None,
+    ) -> list[str]:
+        if not isinstance(source_payload, dict):
+            return []
+
+        raw_offers = source_payload.get("offers")
+        if raw_offers is None:
+            return []
+        if not isinstance(raw_offers, list):
+            raise ShopifyApiError(
+                message="sourceOfTruthPayload.offers must be a list.",
+                status_code=400,
+            )
+
+        bonus_product_gids: list[str] = []
+        for raw_offer in raw_offers:
+            if not isinstance(raw_offer, dict):
+                raise ShopifyApiError(
+                    message="sourceOfTruthPayload.offers must contain only objects.",
+                    status_code=400,
+                )
+            basket = raw_offer.get("basket")
+            if basket is None:
+                continue
+            if not isinstance(basket, dict):
+                raise ShopifyApiError(
+                    message="sourceOfTruthPayload offer basket must be an object.",
+                    status_code=400,
+                )
+
+            raw_bonus_products = basket.get("bonusProducts") or []
+            if not isinstance(raw_bonus_products, list):
+                raise ShopifyApiError(
+                    message="sourceOfTruthPayload basket.bonusProducts must be a list.",
+                    status_code=400,
+                )
+            for raw_bonus_product in raw_bonus_products:
+                if not isinstance(raw_bonus_product, dict):
+                    raise ShopifyApiError(
+                        message="sourceOfTruthPayload basket.bonusProducts must contain only objects.",
+                        status_code=400,
+                    )
+                raw_bonus_product_gid = raw_bonus_product.get("shopifyProductGid")
+                if raw_bonus_product_gid is None:
+                    continue
+                if not isinstance(raw_bonus_product_gid, str) or not raw_bonus_product_gid.strip():
+                    raise ShopifyApiError(
+                        message="sourceOfTruthPayload bonus product shopifyProductGid must be a non-empty string.",
+                        status_code=400,
+                    )
+                bonus_product_gids.append(raw_bonus_product_gid.strip())
+
+        return self._normalize_catalog_collection_product_gids(product_gids=bonus_product_gids)
 
     @staticmethod
     def _price_cents_to_decimal_string(price_cents: int) -> str:
@@ -2704,7 +2817,7 @@ class ShopifyApiClient:
             )
 
         graphql_query = """
-        query productWithVariants($id: ID!, $first: Int!, $after: String) {
+        query productWithVariants($id: ID!, $first: Int!, $after: String, $namespace: String!, $key: String!) {
             shop {
                 currencyCode
             }
@@ -2713,6 +2826,9 @@ class ShopifyApiClient:
                 title
                 handle
                 status
+                metafield(namespace: $namespace, key: $key) {
+                    value
+                }
                 variants(first: $first, after: $after) {
                     pageInfo {
                         hasNextPage
@@ -2749,6 +2865,7 @@ class ShopifyApiClient:
         product_title: str | None = None
         product_handle: str | None = None
         product_status: str | None = None
+        source_of_truth_payload: dict[str, Any] | None = None
         variants: list[dict[str, Any]] = []
 
         while True:
@@ -2758,6 +2875,8 @@ class ShopifyApiClient:
                     "id": cleaned_product_gid,
                     "first": 100,
                     "after": cursor,
+                    "namespace": _MOS_SOURCE_OF_TRUTH_METAFIELD_NAMESPACE,
+                    "key": _MOS_SOURCE_OF_TRUTH_METAFIELD_KEY,
                 },
             }
             response = await self._admin_graphql(
@@ -2819,6 +2938,29 @@ class ShopifyApiClient:
                 product_title = raw_title
                 product_handle = raw_handle
                 product_status = raw_status
+                metafield = product.get("metafield")
+                if metafield is not None:
+                    if not isinstance(metafield, dict):
+                        raise ShopifyApiError(
+                            message="Product response returned invalid product.metafield."
+                        )
+                    raw_source_payload = metafield.get("value")
+                    if raw_source_payload is not None:
+                        if not isinstance(raw_source_payload, str):
+                            raise ShopifyApiError(
+                                message="Product response returned invalid source-of-truth metafield value."
+                            )
+                        try:
+                            parsed_source_payload = json.loads(raw_source_payload)
+                        except ValueError as exc:
+                            raise ShopifyApiError(
+                                message="Product source-of-truth metafield contains invalid JSON."
+                            ) from exc
+                        if not isinstance(parsed_source_payload, dict):
+                            raise ShopifyApiError(
+                                message="Product source-of-truth metafield must deserialize to an object."
+                            )
+                        source_of_truth_payload = parsed_source_payload
             else:
                 if (
                     raw_title != product_title
@@ -3004,6 +3146,7 @@ class ShopifyApiClient:
             "title": product_title,
             "handle": product_handle,
             "status": product_status,
+            "sourceOfTruthPayload": source_of_truth_payload,
             "variants": variants,
         }
 
@@ -3426,6 +3569,485 @@ class ShopifyApiClient:
 
         return payload
 
+    @staticmethod
+    def _bonus_discount_key(*, offer_id: str) -> str:
+        return f"{_MOS_BONUS_DISCOUNT_KEY_PREFIX}:{offer_id}"
+
+    @staticmethod
+    def _bonus_discount_title(*, offer_description: str) -> str:
+        title = "Natural Remedies Handbook + Bonus Gifts"
+        if len(title) <= _MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH:
+            return title
+        return title[:_MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH].rstrip()
+
+    def _extract_bonus_discount_specs(
+        self,
+        *,
+        source_payload: dict[str, Any],
+    ) -> list[dict[str, str | list[str]]]:
+        raw_offers = source_payload.get("offers")
+        if raw_offers is None:
+            return []
+        if not isinstance(raw_offers, list):
+            raise ShopifyApiError(
+                message="sourceOfTruthPayload.offers must be a list.",
+                status_code=400,
+            )
+
+        specs: list[dict[str, str | list[str]]] = []
+        for raw_offer in raw_offers:
+            if not isinstance(raw_offer, dict):
+                raise ShopifyApiError(
+                    message="sourceOfTruthPayload.offers must contain only objects.",
+                    status_code=400,
+                )
+            raw_offer_id = raw_offer.get("id")
+            if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
+                raise ShopifyApiError(
+                    message="Each sourceOfTruthPayload offer requires a non-empty id.",
+                    status_code=400,
+                )
+            offer_id = raw_offer_id.strip()
+            offer_description = raw_offer.get("description")
+
+            basket = raw_offer.get("basket")
+            if basket is None:
+                continue
+            if not isinstance(basket, dict):
+                raise ShopifyApiError(
+                    message=f"Offer {offer_id} basket must be an object.",
+                    status_code=400,
+                )
+
+            raw_shopify_variant_gids = basket.get("shopifyVariantGids")
+            if not isinstance(raw_shopify_variant_gids, list) or not raw_shopify_variant_gids:
+                continue
+            shopify_variant_gids = []
+            for raw_variant_gid in raw_shopify_variant_gids:
+                if not isinstance(raw_variant_gid, str) or not raw_variant_gid.strip():
+                    raise ShopifyApiError(
+                        message=f"Offer {offer_id} basket.shopifyVariantGids must contain only non-empty strings.",
+                        status_code=400,
+                    )
+                shopify_variant_gids.append(raw_variant_gid.strip())
+
+            raw_bonus_products = basket.get("bonusProducts") or []
+            if not isinstance(raw_bonus_products, list):
+                raise ShopifyApiError(
+                    message=f"Offer {offer_id} basket.bonusProducts must be a list.",
+                    status_code=400,
+                )
+            bonus_titles: list[str] = []
+            bonus_product_variant_gids: list[str] = []
+            for raw_bonus_product in raw_bonus_products:
+                if not isinstance(raw_bonus_product, dict):
+                    raise ShopifyApiError(
+                        message=f"Offer {offer_id} basket.bonusProducts must contain only objects.",
+                        status_code=400,
+                    )
+                raw_bonus_product_id = raw_bonus_product.get("id")
+                if not isinstance(raw_bonus_product_id, str) or not raw_bonus_product_id.strip():
+                    raise ShopifyApiError(
+                        message=f"Offer {offer_id} bonus product is missing id.",
+                        status_code=400,
+                    )
+                bonus_product_id = raw_bonus_product_id.strip()
+                raw_bonus_title = raw_bonus_product.get("title")
+                if not isinstance(raw_bonus_title, str) or not raw_bonus_title.strip():
+                    raise ShopifyApiError(
+                        message=f"Offer {offer_id} bonus product {bonus_product_id} is missing title.",
+                        status_code=400,
+                    )
+                raw_bonus_variant_gid = raw_bonus_product.get("shopifyVariantGid")
+                if not isinstance(raw_bonus_variant_gid, str) or not raw_bonus_variant_gid.strip():
+                    raise ShopifyApiError(
+                        message=(
+                            f"Offer {offer_id} bonus product {bonus_product_id} is missing shopifyVariantGid. "
+                            "Resync the product after bonus variant mapping is configured."
+                        ),
+                        status_code=400,
+                    )
+                bonus_titles.append(raw_bonus_title.strip())
+                bonus_product_variant_gids.append(raw_bonus_variant_gid.strip())
+            if bonus_product_variant_gids:
+                specs.append(
+                    {
+                        "key": self._bonus_discount_key(offer_id=offer_id),
+                        "offerId": offer_id,
+                        "title": self._bonus_discount_title(
+                            offer_description=str(offer_description or ""),
+                        ),
+                        "buyProductVariantGids": sorted(set(shopify_variant_gids)),
+                        "bonusProductVariantGids": sorted(set(bonus_product_variant_gids)),
+                    }
+                )
+        return specs
+
+    def _extract_managed_bonus_discount_records(
+        self,
+        *,
+        source_payload: dict[str, Any] | None,
+    ) -> dict[str, dict[str, str]]:
+        if not isinstance(source_payload, dict):
+            return {}
+        records: dict[str, dict[str, str]] = {}
+        raw_offers = source_payload.get("offers")
+        if not isinstance(raw_offers, list):
+            return records
+
+        for raw_offer in raw_offers:
+            if not isinstance(raw_offer, dict):
+                continue
+            raw_offer_id = raw_offer.get("id")
+            if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
+                continue
+            offer_id = raw_offer_id.strip()
+            offer_description = raw_offer.get("description") if isinstance(raw_offer.get("description"), str) else None
+            basket = raw_offer.get("basket")
+            if not isinstance(basket, dict):
+                continue
+            raw_bonus_products = basket.get("bonusProducts")
+            if not isinstance(raw_bonus_products, list):
+                continue
+            bonus_titles: list[str] = []
+            for raw_bonus_product in raw_bonus_products:
+                if not isinstance(raw_bonus_product, dict):
+                    continue
+                raw_bonus_title = raw_bonus_product.get("title")
+                if not isinstance(raw_bonus_title, str) or not raw_bonus_title.strip():
+                    continue
+                bonus_titles.append(raw_bonus_title.strip())
+                automatic_discount = raw_bonus_product.get("automaticDiscount")
+                key = self._bonus_discount_key(offer_id=offer_id)
+                record: dict[str, str] = {
+                    "title": self._bonus_discount_title(
+                        offer_description=str(offer_description or raw_bonus_title.strip()),
+                    )
+                }
+                if isinstance(automatic_discount, dict):
+                    raw_discount_key = automatic_discount.get("key")
+                    if isinstance(raw_discount_key, str) and raw_discount_key.strip():
+                        key = raw_discount_key.strip()
+                    raw_discount_id = automatic_discount.get("discountId")
+                    if isinstance(raw_discount_id, str) and raw_discount_id.strip():
+                        record["discountId"] = raw_discount_id.strip()
+                    raw_discount_title = automatic_discount.get("title")
+                    if isinstance(raw_discount_title, str) and raw_discount_title.strip():
+                        record["title"] = raw_discount_title.strip()
+                records[key] = record
+        return records
+
+    async def _find_automatic_bxgy_discount_node_by_title(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str,
+    ) -> str | None:
+        query = """
+        query automaticDiscountNodesByTitle($first: Int!, $query: String!) {
+            automaticDiscountNodes(first: $first, query: $query) {
+                edges {
+                    node {
+                        id
+                        automaticDiscount {
+                            __typename
+                            ... on DiscountAutomaticBxgy {
+                                title
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": query,
+                "variables": {
+                    "first": 25,
+                    "query": title,
+                },
+            },
+        )
+        connection = response.get("automaticDiscountNodes")
+        if not isinstance(connection, dict):
+            raise ShopifyApiError(message="automaticDiscountNodes response is invalid.")
+        edges = connection.get("edges")
+        if not isinstance(edges, list):
+            raise ShopifyApiError(message="automaticDiscountNodes response is missing edges.")
+
+        matched_node_ids: list[str] = []
+        for edge in edges:
+            if not isinstance(edge, dict):
+                raise ShopifyApiError(message="automaticDiscountNodes response contains invalid edge.")
+            node = edge.get("node")
+            if not isinstance(node, dict):
+                raise ShopifyApiError(message="automaticDiscountNodes response contains invalid node.")
+            automatic_discount = node.get("automaticDiscount")
+            if not isinstance(automatic_discount, dict):
+                continue
+            typename = automatic_discount.get("__typename")
+            discount_title = automatic_discount.get("title")
+            node_id = node.get("id")
+            if typename != "DiscountAutomaticBxgy":
+                continue
+            if not isinstance(discount_title, str) or not discount_title.strip():
+                continue
+            if not isinstance(node_id, str) or not node_id.strip():
+                raise ShopifyApiError(message="automaticDiscountNodes response returned BXGY node without id.")
+            if discount_title.strip() == title:
+                matched_node_ids.append(node_id.strip())
+
+        if not matched_node_ids:
+            return None
+        if len(matched_node_ids) > 1:
+            raise ShopifyApiError(
+                message=(
+                    "Multiple automatic BXGY discounts matched the managed title "
+                    f'"{title}". Clean up duplicates in Shopify before re-syncing.'
+                ),
+                status_code=409,
+            )
+        return matched_node_ids[0]
+
+    async def _upsert_automatic_bxgy_discount(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        discount_id: str | None,
+        title: str,
+        buy_product_variant_gids: list[str],
+        bonus_product_variant_gids: list[str],
+    ) -> str:
+        cleaned_bonus_product_variant_gids = [
+            variant_gid.strip()
+            for variant_gid in bonus_product_variant_gids
+            if isinstance(variant_gid, str) and variant_gid.strip()
+        ]
+        if not cleaned_bonus_product_variant_gids:
+            raise ShopifyApiError(
+                message="bonus_product_variant_gids must contain at least one Shopify variant GID.",
+                status_code=400,
+            )
+        mutation_name = "discountAutomaticBxgyUpdate" if discount_id else "discountAutomaticBxgyCreate"
+        id_argument = "($automaticBxgyDiscount: DiscountAutomaticBxgyInput!, $id: ID!)" if discount_id else "($automaticBxgyDiscount: DiscountAutomaticBxgyInput!)"
+        id_input = "id: $id, " if discount_id else ""
+        mutation = f"""
+        mutation upsertAutomaticBxgy{id_argument} {{
+            {mutation_name}({id_input}automaticBxgyDiscount: $automaticBxgyDiscount) {{
+                automaticDiscountNode {{
+                    id
+                    automaticDiscount {{
+                        ... on DiscountAutomaticBxgy {{
+                            title
+                        }}
+                    }}
+                }}
+                userErrors {{
+                    field
+                    message
+                }}
+            }}
+        }}
+        """
+        variables: dict[str, Any] = {
+            "automaticBxgyDiscount": {
+                "title": title,
+                "startsAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                "customerBuys": {
+                    "items": {
+                        "products": {
+                            "productVariantsToAdd": buy_product_variant_gids,
+                        }
+                    },
+                    "value": {
+                        "quantity": "1",
+                    },
+                },
+                "customerGets": {
+                    "items": {
+                        "products": {
+                            "productVariantsToAdd": cleaned_bonus_product_variant_gids,
+                        }
+                    },
+                    "value": {
+                        "discountOnQuantity": {
+                            "quantity": str(len(cleaned_bonus_product_variant_gids)),
+                            "effect": {
+                                "percentage": 1,
+                            },
+                        }
+                    },
+                },
+                "usesPerOrderLimit": "1",
+                "combinesWith": {
+                    "productDiscounts": True,
+                    "orderDiscounts": True,
+                    "shippingDiscounts": True,
+                },
+            }
+        }
+        if discount_id:
+            variables["id"] = discount_id
+
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": variables,
+            },
+        )
+        mutation_payload = response.get(mutation_name)
+        if not isinstance(mutation_payload, dict):
+            raise ShopifyApiError(message=f"{mutation_name} response is invalid.")
+        user_errors = mutation_payload.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(
+                message=f"{mutation_name} failed: {messages}",
+                status_code=409,
+            )
+        automatic_discount_node = mutation_payload.get("automaticDiscountNode")
+        if not isinstance(automatic_discount_node, dict):
+            raise ShopifyApiError(message=f"{mutation_name} response is missing automaticDiscountNode.")
+        returned_discount_id = automatic_discount_node.get("id")
+        if not isinstance(returned_discount_id, str) or not returned_discount_id.strip():
+            raise ShopifyApiError(message=f"{mutation_name} response is missing automaticDiscountNode.id.")
+        return returned_discount_id.strip()
+
+    async def _delete_automatic_discount(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        discount_id: str,
+    ) -> None:
+        mutation = """
+        mutation deleteAutomaticDiscount($id: ID!) {
+            discountAutomaticDelete(id: $id) {
+                deletedAutomaticDiscountId
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {"id": discount_id},
+            },
+        )
+        mutation_payload = response.get("discountAutomaticDelete")
+        if not isinstance(mutation_payload, dict):
+            raise ShopifyApiError(message="discountAutomaticDelete response is invalid.")
+        user_errors = mutation_payload.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(
+                message=f"discountAutomaticDelete failed: {messages}",
+                status_code=409,
+            )
+
+    async def _sync_offer_bonus_discounts(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        source_payload: dict[str, Any],
+        previous_source_payload: dict[str, Any] | None,
+    ) -> dict[str, dict[str, str]]:
+        desired_specs = self._extract_bonus_discount_specs(source_payload=source_payload)
+        desired_specs_by_key = {
+            str(spec["key"]): spec for spec in desired_specs
+        }
+        previous_records = self._extract_managed_bonus_discount_records(
+            source_payload=previous_source_payload,
+        )
+        discount_records_by_key: dict[str, dict[str, str]] = {}
+
+        for key, spec in desired_specs_by_key.items():
+            previous_record = previous_records.get(key)
+            discount_id = previous_record.get("discountId") if previous_record else None
+            title = str(spec["title"])
+            if discount_id is None:
+                discount_id = await self._find_automatic_bxgy_discount_node_by_title(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    title=title,
+                )
+            discount_records_by_key[key] = {
+                "title": title,
+                "discountId": await self._upsert_automatic_bxgy_discount(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    discount_id=discount_id,
+                    title=title,
+                    buy_product_variant_gids=list(spec["buyProductVariantGids"]),
+                    bonus_product_variant_gids=list(spec["bonusProductVariantGids"]),
+                ),
+            }
+
+        for key, previous_record in previous_records.items():
+            if key in desired_specs_by_key:
+                continue
+            discount_id = previous_record.get("discountId")
+            if not discount_id:
+                continue
+            await self._delete_automatic_discount(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                discount_id=discount_id,
+            )
+
+        return discount_records_by_key
+
+    def _attach_bonus_discount_metadata(
+        self,
+        *,
+        source_payload: dict[str, Any],
+        discount_records_by_key: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        payload = deepcopy(source_payload)
+        raw_offers = payload.get("offers")
+        if not isinstance(raw_offers, list):
+            return payload
+
+        for raw_offer in raw_offers:
+            if not isinstance(raw_offer, dict):
+                continue
+            raw_offer_id = raw_offer.get("id")
+            if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
+                continue
+            basket = raw_offer.get("basket")
+            if not isinstance(basket, dict):
+                continue
+            raw_bonus_products = basket.get("bonusProducts")
+            if not isinstance(raw_bonus_products, list):
+                continue
+            for raw_bonus_product in raw_bonus_products:
+                if not isinstance(raw_bonus_product, dict):
+                    continue
+                key = self._bonus_discount_key(offer_id=raw_offer_id.strip())
+                record = discount_records_by_key.get(key)
+                if not record:
+                    raw_bonus_product.pop("automaticDiscount", None)
+                    continue
+                raw_bonus_product["automaticDiscount"] = {
+                    "key": key,
+                    "title": record["title"],
+                    "discountId": record["discountId"],
+                }
+        return payload
+
     async def sync_product(
         self,
         *,
@@ -3467,6 +4089,9 @@ class ShopifyApiClient:
             access_token=access_token,
             product_gid=cleaned_product_gid,
         )
+        current_source_of_truth_payload = current_product.get("sourceOfTruthPayload")
+        if current_source_of_truth_payload is not None and not isinstance(current_source_of_truth_payload, dict):
+            raise ShopifyApiError(message="Current product sourceOfTruthPayload is invalid.")
         current_variants = current_product.get("variants") or []
         if not isinstance(current_variants, list):
             raise ShopifyApiError(message="Current Shopify product variants payload is invalid.")
@@ -3841,13 +4466,35 @@ class ShopifyApiClient:
                 )
             variant_gid_by_source_id[source_variant_id] = str(matched_final_variant["variantGid"]).strip()
 
+        enriched_source_payload = self._enrich_source_of_truth_payload(
+            source_payload=source_of_truth_payload,
+            product_gid=cleaned_product_gid,
+            variant_gid_by_source_id=variant_gid_by_source_id,
+        )
+        discount_records_by_key = await self._sync_offer_bonus_discounts(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            source_payload=enriched_source_payload,
+            previous_source_payload=current_source_of_truth_payload,
+        )
+        source_payload_with_discounts = self._attach_bonus_discount_metadata(
+            source_payload=enriched_source_payload,
+            discount_records_by_key=discount_records_by_key,
+        )
+        await self.ensure_products_published_to_online_store(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_gids=[
+                cleaned_product_gid,
+                *self._extract_bonus_product_gids_from_source_payload(
+                    source_payload=source_payload_with_discounts,
+                ),
+            ],
+        )
+
         try:
             serialized_source_payload = json.dumps(
-                self._enrich_source_of_truth_payload(
-                    source_payload=source_of_truth_payload,
-                    product_gid=cleaned_product_gid,
-                    variant_gid_by_source_id=variant_gid_by_source_id,
-                ),
+                source_payload_with_discounts,
                 separators=(",", ":"),
                 sort_keys=True,
             )
@@ -3905,7 +4552,7 @@ class ShopifyApiClient:
             if isinstance(item, dict) and isinstance(item.get("variantGid"), str)
         }
         offer_count = 0
-        raw_offers = source_of_truth_payload.get("offers")
+        raw_offers = source_payload_with_discounts.get("offers")
         if isinstance(raw_offers, list):
             offer_count = sum(1 for item in raw_offers if isinstance(item, dict))
 
@@ -3967,6 +4614,146 @@ class ShopifyApiClient:
                 status_code=404,
             )
         return product_gid
+
+    def _resolve_bonus_lines_from_source_payload(
+        self,
+        *,
+        source_payload: dict[str, Any],
+        variant_gid: str,
+    ) -> list[dict[str, Any]]:
+        raw_offers = source_payload.get("offers")
+        if not isinstance(raw_offers, list):
+            raise ShopifyApiError(
+                message="Product source-of-truth payload is missing offers.",
+                status_code=409,
+            )
+
+        matched_offers: list[dict[str, Any]] = []
+        for raw_offer in raw_offers:
+            if not isinstance(raw_offer, dict):
+                raise ShopifyApiError(
+                    message="Product source-of-truth payload contains an invalid offer.",
+                    status_code=409,
+                )
+            basket = raw_offer.get("basket")
+            if not isinstance(basket, dict):
+                continue
+            raw_shopify_variant_gids = basket.get("shopifyVariantGids")
+            if not isinstance(raw_shopify_variant_gids, list):
+                continue
+            if any(not isinstance(item, str) or not item.strip() for item in raw_shopify_variant_gids):
+                raise ShopifyApiError(
+                    message="Product source-of-truth basket.shopifyVariantGids must contain only non-empty strings.",
+                    status_code=409,
+                )
+            normalized_shopify_variant_gids = {item.strip() for item in raw_shopify_variant_gids}
+            if variant_gid in normalized_shopify_variant_gids:
+                matched_offers.append(raw_offer)
+
+        if not matched_offers:
+            return []
+        if len(matched_offers) > 1:
+            raise ShopifyApiError(
+                message=(
+                    "Product source-of-truth payload maps the same Shopify variant to multiple offers. "
+                    f"Variant: {variant_gid}"
+                ),
+                status_code=409,
+            )
+
+        matched_offer = matched_offers[0]
+        basket = matched_offer.get("basket")
+        if not isinstance(basket, dict):
+            return []
+        raw_bonus_products = basket.get("bonusProducts") or []
+        if not isinstance(raw_bonus_products, list):
+            raise ShopifyApiError(
+                message="Product source-of-truth basket.bonusProducts must be a list.",
+                status_code=409,
+            )
+
+        bonus_lines: list[dict[str, Any]] = []
+        for raw_bonus_product in raw_bonus_products:
+            if not isinstance(raw_bonus_product, dict):
+                raise ShopifyApiError(
+                    message="Product source-of-truth basket.bonusProducts contains an invalid bonus entry.",
+                    status_code=409,
+                )
+            raw_bonus_variant_gid = raw_bonus_product.get("shopifyVariantGid")
+            if not isinstance(raw_bonus_variant_gid, str) or not raw_bonus_variant_gid.strip():
+                raise ShopifyApiError(
+                    message="Bonus product is missing shopifyVariantGid in source-of-truth payload.",
+                    status_code=409,
+                )
+            bonus_lines.append(
+                {
+                    "merchandiseId": raw_bonus_variant_gid.strip(),
+                    "quantity": 1,
+                }
+            )
+        return bonus_lines
+
+    async def expand_checkout_lines_with_offer_bonuses(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        lines: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        expanded_lines = [
+            {
+                "merchandiseId": str(line["merchandiseId"]).strip(),
+                "quantity": int(line["quantity"]),
+            }
+            for line in lines
+        ]
+        desired_display_lines = list(expanded_lines)
+        existing_merchandise_ids = {line["merchandiseId"] for line in desired_display_lines}
+        product_source_payloads: dict[str, dict[str, Any] | None] = {}
+
+        for line in expanded_lines:
+            merchandise_id = line["merchandiseId"]
+            if not merchandise_id.startswith("gid://shopify/ProductVariant/"):
+                continue
+
+            product_gid = await self._resolve_variant_product_gid(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                variant_gid=merchandise_id,
+            )
+            if product_gid not in product_source_payloads:
+                product_details = await self.get_product(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    product_gid=product_gid,
+                )
+                source_payload = product_details.get("sourceOfTruthPayload")
+                if source_payload is not None and not isinstance(source_payload, dict):
+                    raise ShopifyApiError(
+                        message="Product source-of-truth payload is invalid.",
+                        status_code=409,
+                    )
+                product_source_payloads[product_gid] = source_payload
+
+            source_payload = product_source_payloads[product_gid]
+            if source_payload is None:
+                continue
+
+            bonus_lines = self._resolve_bonus_lines_from_source_payload(
+                source_payload=source_payload,
+                variant_gid=merchandise_id,
+            )
+            for bonus_line in bonus_lines:
+                bonus_merchandise_id = bonus_line["merchandiseId"]
+                if bonus_merchandise_id in existing_merchandise_ids:
+                    continue
+                existing_merchandise_ids.add(bonus_merchandise_id)
+                desired_display_lines.append(bonus_line)
+
+        # Shopify storefront carts render newly supplied lines in reverse insertion
+        # order, so we reverse the payload after appending bonuses to keep the
+        # purchased variants ahead of the free bonus lines in checkout.
+        return list(reversed(desired_display_lines))
 
     async def update_variant(
         self,
@@ -9461,6 +10248,32 @@ class ShopifyApiClient:
         return updated_content
 
     @classmethod
+    def _stabilize_product_card_vendor_markup(
+        cls,
+        *,
+        filename: str,
+        content: str,
+    ) -> str:
+        if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
+            return content
+
+        def replace_vendor_link(match: re.Match[str]) -> str:
+            class_name = match.group("class_name")
+            quote = match.group("quote")
+            return (
+                f"<span class={quote}{class_name}{quote}>"
+                "{{- product.vendor | escape -}}"
+                "</span>"
+            )
+
+        return re.sub(
+            r"\{\{\-\s*product\.vendor\s*\|\s*link_to_vendor\s*:\s*class:\s*"
+            r"(?P<quote>[\"'])(?P<class_name>.*?)(?P=quote)\s*\-\}\}",
+            replace_vendor_link,
+            content,
+        )
+
+    @classmethod
     def _strip_catalog_navigation_from_header_drawer(
         cls,
         *,
@@ -12392,6 +13205,10 @@ class ShopifyApiClient:
                             filename=filename,
                             content=normalized_content,
                         )
+                    )
+                    normalized_content = self._stabilize_product_card_vendor_markup(
+                        filename=filename,
+                        content=normalized_content,
                     )
                 if filename == _THEME_HEADER_DRAWER_FILENAME:
                     normalized_content = (

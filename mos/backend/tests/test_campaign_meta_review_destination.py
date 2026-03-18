@@ -16,3 +16,25 @@ def test_resolve_meta_review_destination_url_prefers_review_paths() -> None:
         )
         == "https://example.com/offer"
     )
+
+
+def test_resolve_meta_review_destination_url_normalizes_human_destination_labels() -> None:
+    review_paths = {
+        "pre-sales": "/f/product/funnel/pre-sales",
+        "sales": "/f/product/funnel/sales",
+    }
+
+    assert (
+        _resolve_meta_review_destination_url(
+            destination_page="Presales Listicle Page",
+            review_paths=review_paths,
+        )
+        == "/f/product/funnel/pre-sales"
+    )
+    assert (
+        _resolve_meta_review_destination_url(
+            destination_page="Sales Page",
+            review_paths=review_paths,
+        )
+        == "/f/product/funnel/sales"
+    )

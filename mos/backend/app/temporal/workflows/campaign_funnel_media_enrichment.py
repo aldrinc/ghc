@@ -51,6 +51,9 @@ class CampaignFunnelMediaEnrichmentWorkflow:
             schedule_to_close_timeout=timedelta(
                 minutes=max(1, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
             ),
+            heartbeat_timeout=timedelta(
+                minutes=max(5, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_HEARTBEAT_TIMEOUT_MINUTES)
+            ),
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(seconds=30),
                 backoff_coefficient=2.0,

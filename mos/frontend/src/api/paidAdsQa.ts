@@ -1,4 +1,4 @@
-export const PAID_ADS_QA_RULESET_VERSION = "paid_ads_policy_ruleset_v1";
+export const PAID_ADS_QA_RULESET_VERSION = "paid_ads_policy_ruleset_v2";
 
 export type PaidAdsQaPlatform = "meta" | "tiktok";
 export type PaidAdsQaSeverity = "blocker" | "high" | "medium" | "low";
@@ -80,6 +80,32 @@ export type PaidAdsPlatformProfileUpsertPayload = {
   trackingProvider?: string;
   trackingUrlParameters?: string;
   metadata?: Record<string, unknown>;
+};
+
+export type PaidAdsDnsRecord = {
+  provider: string;
+  recordType: string;
+  host: string;
+  domain: string;
+  fqdn: string;
+  value: string;
+  ttl: number;
+  status: string;
+};
+
+export type PaidAdsMetaDomainVerificationProvisionPayload = {
+  txtValue: string;
+  verifiedDomain?: string;
+};
+
+export type PaidAdsMetaDomainVerificationProvisionResponse = {
+  funnelId: string;
+  campaignId: string;
+  clientId: string;
+  verifiedDomain: string;
+  verifiedDomainStatus?: string | null;
+  dnsRecord: PaidAdsDnsRecord;
+  profile: PaidAdsPlatformProfile;
 };
 
 export type PaidAdsQaRun = {

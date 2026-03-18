@@ -122,6 +122,30 @@ def test_health_options_allows_netbird_dev_origins():
     assert resp.headers.get("access-control-allow-origin") == "http://100.79.158.197:5275"
 
 
+def test_create_campaign_rejects_unsupported_asset_brief_types(api_client: TestClient):
+    client_resp = api_client.post("/clients", json={"name": "Invalid Asset Brief Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Invalid Asset Brief Product"})
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    campaign_resp = api_client.post(
+        "/campaigns",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "name": "Invalid Asset Brief Campaign",
+            "channels": ["meta"],
+            "asset_brief_types": ["static-image"],
+        },
+    )
+
+    assert campaign_resp.status_code == 422
+    assert "Supported values: image, video." in campaign_resp.text
+
+
 def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
     app.dependency_overrides.clear()
 

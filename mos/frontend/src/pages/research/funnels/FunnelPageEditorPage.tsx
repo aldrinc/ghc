@@ -16,6 +16,7 @@ import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } 
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
+import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -86,11 +87,18 @@ export function FunnelPageEditorPage() {
   }, [funnel?.pages, pageId]);
   const runtimeProductSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
   const runtimeFunnelSlug = shortUuidRouteToken(funnel?.id || "");
+  const publicOrigin = resolveWindowShopHostedOrigin();
   const publicPageHref = useMemo(() => {
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();
     if (!runtimeProductSlug || !runtimeFunnelSlug || !slug) return null;
-    return buildPublicFunnelPath({ productSlug: runtimeProductSlug, funnelSlug: runtimeFunnelSlug, slug, bundleMode: false });
-  }, [metaSlug, pageDetail?.page.slug, runtimeFunnelSlug, runtimeProductSlug]);
+    const path = buildPublicFunnelPath({
+      productSlug: runtimeProductSlug,
+      funnelSlug: runtimeFunnelSlug,
+      slug,
+      bundleMode: false,
+    });
+    return resolveShopHostedUrl(path, publicOrigin);
+  }, [metaSlug, pageDetail?.page.slug, publicOrigin, runtimeFunnelSlug, runtimeProductSlug]);
 
   const apiBaseUrl = resolveRequiredApiBaseUrl();
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";

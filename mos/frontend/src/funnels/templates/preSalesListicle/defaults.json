@@ -11,20 +11,21 @@
     },
     "badges": [
       {
-        "iconSrc": "/assets/5-stars-reviews-icon.webp",
-        "iconAlt": "5 star reviews",
+        "iconSrc": "/assets/listicle-badge-reviews.svg",
+        "iconAlt": "Five star rating icon",
         "value": "150,000",
-        "label": "5-STAR REVIEWS"
+        "label": "5-Star Reviews"
       },
       {
-        "iconSrc": "/assets/free-shipping-icon.webp",
-        "iconAlt": "Free shipping",
-        "label": "FAST AND FREE SHIPPING"
+        "iconSrc": "/assets/listicle-badge-support.svg",
+        "iconAlt": "Customer support headset icon",
+        "value": "24/7",
+        "label": "Customer Support"
       },
       {
-        "iconSrc": "/assets/risk-free-icon.webp",
-        "iconAlt": "Risk free trial",
-        "label": "90-DAY RISK-FREE TRIAL"
+        "iconSrc": "/assets/listicle-badge-trial.svg",
+        "iconAlt": "Shield check guarantee icon",
+        "label": "Risk Free Trial"
       }
     ],
     "reasons": [

@@ -3,27 +3,35 @@ from __future__ import annotations
 import base64
 import concurrent.futures
 import copy
+import functools
+import http.server
 import io
 import json
+import mimetypes
 import os
 import random
 import re
+import threading
 import time
 from collections import Counter
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, cast
+from urllib.parse import quote
 from uuid import uuid4
 
 from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from temporalio import activity as temporal_activity
 
 from app.config import settings
 from app.db.base import SessionLocal
+from app.db.enums import ArtifactTypeEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
+from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
-from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import (
@@ -38,6 +46,7 @@ from app.services.funnel_metadata import normalize_public_page_metadata_for_cont
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
@@ -48,6 +57,55 @@ class TestimonialGenerationError(RuntimeError):
 
 class TestimonialGenerationNotFoundError(RuntimeError):
     pass
+
+
+def _heartbeat_activity_progress(*, phase: str, step: str, **fields: Any) -> None:
+    payload: dict[str, Any] = {"phase": phase, "step": step}
+    for key, value in fields.items():
+        if value is None:
+            continue
+        if isinstance(value, (str, int, float, bool)):
+            payload[key] = value
+    try:
+        temporal_activity.heartbeat(payload)
+    except RuntimeError:
+        return
+
+
+_FUNNEL_TESTIMONIAL_HEARTBEAT_INTERVAL_SECONDS = 20.0
+
+
+@contextmanager
+def _heartbeat_callback_loop(
+    *,
+    callback: Callable[[], None] | None,
+    interval_seconds: float | None = None,
+) -> Iterator[None]:
+    if callback is None:
+        yield
+        return
+    interval = (
+        float(interval_seconds)
+        if interval_seconds is not None
+        else float(_FUNNEL_TESTIMONIAL_HEARTBEAT_INTERVAL_SECONDS)
+    )
+    stop_event = threading.Event()
+
+    def _run() -> None:
+        while not stop_event.wait(interval):
+            callback()
+
+    thread = threading.Thread(
+        target=_run,
+        name="funnel-testimonials-heartbeat",
+        daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        thread.join(timeout=max(1.0, interval))
 
 
 @dataclass
@@ -171,6 +229,7 @@ _SALES_PDP_MIN_REVIEWS = 74
 _SALES_PDP_BUDGETED_MIN_REVIEWS = max(
     1, int(os.getenv("FUNNEL_TESTIMONIAL_SALES_PDP_BUDGETED_MIN_REVIEWS", "18"))
 )
+_CSS_VAR_FUNCTION_RE = re.compile(r"^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*(.+?)\s*)?\)$")
 
 
 def _clean_single_line(text: str) -> str:
@@ -1384,6 +1443,298 @@ def _generate_testimonial_image_asset(
         return _generated_testimonial_asset(asset)
 
 
+@dataclass(frozen=True)
+class _PreSalesSwipeTemplateAssignment:
+    template_file: str
+    aspect_ratio: str
+    style_family: str
+    variation_key: str
+
+
+@dataclass(frozen=True)
+class _PreSalesSwipeTemplateReference:
+    path: Path
+    content_bytes: bytes
+    mime_type: str
+
+
+@dataclass(frozen=True)
+class _LoadedGeneratedTestimonialAsset:
+    asset: _GeneratedTestimonialAsset
+    ai_metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _PreSalesSwipeActivityResult:
+    generated_asset: _GeneratedTestimonialAsset
+    ai_metadata: dict[str, Any]
+    job_id: str
+
+
+class _LocalStaticServer:
+    def __init__(self, *, root: Path, host: str = "127.0.0.1", port: int = 0) -> None:
+        class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
+                return
+
+        handler = functools.partial(_QuietHandler, directory=str(root))
+        self._server = http.server.ThreadingHTTPServer((host, port), handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self.host = host
+        self.port = int(self._server.server_port)
+
+    def __enter__(self) -> "_LocalStaticServer":
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=5)
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+    def build_url(self, relative_path: str) -> str:
+        normalized = str(relative_path or "").strip().replace("\\", "/")
+        if not normalized:
+            raise TestimonialGenerationError("Template relative path is required to build a local source URL.")
+        return f"{self.base_url}/{quote(normalized, safe='/')}"
+
+
+_PRE_SALES_SLIDE_IMAGE_RE = re.compile(
+    r"^pre_sales\.reviews\.slides\[(?P<slide_index>\d+)\]\.images\[(?P<image_index>\d+)\]$"
+)
+_PRE_SALES_WALL_IMAGE_RE = re.compile(
+    r"^pre_sales\.reviewsWall\.columns\[(?P<column_index>\d+)\]\[(?P<row_index>\d+)\]$"
+)
+_PRE_SALES_CAROUSEL_TEMPLATE_FILES: tuple[tuple[str, str], ...] = (
+    ("17_fb_message_ad.jpg_source.jpg", "facebook_comment_thread"),
+    ("SCR-20260310-klev.png", "twitter_mobile_post"),
+    ("Screenshot_2025-09-16_180726.webp", "facebook_comment_single"),
+)
+_PRE_SALES_WALL_TEMPLATE_FILES: dict[tuple[int, int], tuple[str, str, str]] = {
+    (0, 0): ("download_5.webp", "1:1", "twitter_photo_collage"),
+    (0, 1): ("download_5_dd32708f-34eb-4156-86ab-e08d8dac2fe7.webp", "1:1", "dark_mode_comment"),
+    (1, 0): ("instagram_download_6.webp", "9:16", "instagram_ugc_product_demo"),
+    (1, 1): ("download_6_5f6be698-5d17-411b-84e0-941c3909e7cc.webp", "1:1", "facebook_dark_comment"),
+    (2, 0): ("instagram_post_20250916_152108_via_10015_io.webp", "9:16", "instagram_selfie_car"),
+    (2, 1): ("instagram_post_20250916_152858_via_10015_io.webp", "9:16", "instagram_selfie_home"),
+}
+_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = (
+    Path(__file__).resolve().parents[4] / "template-image-workspace" / "assets"
+)
+
+
+def _resolve_pre_sales_swipe_assignment(render_label: str) -> _PreSalesSwipeTemplateAssignment:
+    slide_match = _PRE_SALES_SLIDE_IMAGE_RE.match(render_label)
+    if slide_match:
+        slide_index = int(slide_match.group("slide_index"))
+        image_index = int(slide_match.group("image_index"))
+        if image_index < 0 or image_index >= len(_PRE_SALES_CAROUSEL_TEMPLATE_FILES):
+            raise TestimonialGenerationError(
+                f"Unsupported pre-sales carousel image slot: {render_label}"
+            )
+        template_file, style_family = _PRE_SALES_CAROUSEL_TEMPLATE_FILES[image_index]
+        return _PreSalesSwipeTemplateAssignment(
+            template_file=template_file,
+            aspect_ratio="1:1",
+            style_family=style_family,
+            variation_key=f"slide-{slide_index + 1}-image-{image_index + 1}",
+        )
+
+    wall_match = _PRE_SALES_WALL_IMAGE_RE.match(render_label)
+    if wall_match:
+        column_index = int(wall_match.group("column_index"))
+        row_index = int(wall_match.group("row_index"))
+        resolved = _PRE_SALES_WALL_TEMPLATE_FILES.get((column_index, row_index))
+        if resolved is None:
+            raise TestimonialGenerationError(
+                f"Unsupported pre-sales review wall image slot: {render_label}"
+            )
+        template_file, aspect_ratio, style_family = resolved
+        return _PreSalesSwipeTemplateAssignment(
+            template_file=template_file,
+            aspect_ratio=aspect_ratio,
+            style_family=style_family,
+            variation_key=f"wall-column-{column_index + 1}-card-{row_index + 1}",
+        )
+
+    raise TestimonialGenerationError(
+        f"Unable to map pre-sales swipe template for testimonial slot: {render_label}"
+    )
+
+
+@functools.lru_cache(maxsize=None)
+def _load_pre_sales_swipe_template_reference(
+    template_file: str,
+) -> _PreSalesSwipeTemplateReference:
+    path = (_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR / template_file).resolve()
+    if not path.exists() or not path.is_file():
+        raise TestimonialGenerationError(
+            f"Pre-sales swipe template file not found: {path}"
+        )
+    content_bytes = path.read_bytes()
+    if not content_bytes:
+        raise TestimonialGenerationError(
+            f"Pre-sales swipe template file is empty: {path}"
+        )
+    mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return _PreSalesSwipeTemplateReference(
+        path=path,
+        content_bytes=content_bytes,
+        mime_type=mime_type,
+    )
+
+
+def _resolve_pre_sales_swipe_asset_brief_id(
+    *,
+    session: Session,
+    org_id: str,
+    funnel: Funnel,
+) -> str:
+    campaign_id = str(funnel.campaign_id or "").strip()
+    if not campaign_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires funnel.campaign_id so it can reuse the campaign asset brief."
+        )
+
+    client_id = str(funnel.client_id or "").strip()
+    if not client_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires funnel.client_id to resolve the campaign asset brief."
+        )
+
+    experiment_spec_id = str(funnel.experiment_spec_id or "").strip()
+    artifacts = ArtifactsRepository(session).list(
+        org_id=org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.asset_brief,
+        limit=200,
+    )
+    if not artifacts:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering could not find any asset brief artifacts for the funnel campaign. "
+            f"campaign_id={campaign_id}"
+        )
+
+    matches: list[dict[str, str]] = []
+    seen_brief_ids: set[str] = set()
+    for artifact in artifacts:
+        payload = artifact.data if isinstance(artifact.data, dict) else {}
+        brief_entries = payload.get("asset_briefs") or payload.get("assetBriefs") or []
+        if not isinstance(brief_entries, list):
+            continue
+        for entry in brief_entries:
+            if not isinstance(entry, dict):
+                continue
+            brief_id = str(entry.get("id") or "").strip()
+            if not brief_id or brief_id in seen_brief_ids:
+                continue
+            entry_experiment_id = str(entry.get("experimentId") or "").strip()
+            if experiment_spec_id and entry_experiment_id != experiment_spec_id:
+                continue
+            requirements = entry.get("requirements")
+            if not isinstance(requirements, list) or len(requirements) != 1:
+                raise TestimonialGenerationError(
+                    "Pre-sales swipe testimonial rendering requires the selected asset brief to contain exactly 1 "
+                    f"requirement. brief_id={brief_id} requirement_count={len(requirements) if isinstance(requirements, list) else 'invalid'}"
+                )
+            matches.append(
+                {
+                    "brief_id": brief_id,
+                    "experiment_id": entry_experiment_id or "[missing]",
+                }
+            )
+            seen_brief_ids.add(brief_id)
+
+    if not matches:
+        if experiment_spec_id:
+            raise TestimonialGenerationError(
+                "Pre-sales swipe testimonial rendering could not find a campaign asset brief matching the funnel "
+                f"experiment spec. campaign_id={campaign_id} experiment_spec_id={experiment_spec_id}"
+            )
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering could not find any usable asset brief entries for the funnel campaign. "
+            f"campaign_id={campaign_id}"
+        )
+
+    if len(matches) != 1:
+        preview = ", ".join(
+            f"{row['brief_id']} (experimentId={row['experiment_id']})"
+            for row in matches[:5]
+        )
+        if len(matches) > 5:
+            preview += ", ..."
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering requires exactly one matching campaign asset brief. "
+            f"campaign_id={campaign_id} experiment_spec_id={experiment_spec_id or '[missing]'} matches={preview}"
+        )
+
+    return matches[0]["brief_id"]
+
+
+def _load_generated_testimonial_asset_record(asset_id: str) -> _LoadedGeneratedTestimonialAsset:
+    with SessionLocal() as thread_session:
+        asset = thread_session.get(Asset, asset_id)
+        if asset is None:
+            raise TestimonialGenerationError(f"Generated testimonial asset not found: {asset_id}")
+        return _LoadedGeneratedTestimonialAsset(
+            asset=_generated_testimonial_asset(asset),
+            ai_metadata=dict(asset.ai_metadata or {}),
+        )
+
+
+def _generate_pre_sales_swipe_testimonial_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str,
+    asset_brief_id: str,
+    template_url: str,
+    template_file: str,
+    aspect_ratio: str,
+) -> _PreSalesSwipeActivityResult:
+    result = generate_swipe_image_ad_activity(
+        {
+            "org_id": org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": campaign_id,
+            "asset_brief_id": asset_brief_id,
+            "requirement_index": 0,
+            "swipe_image_url": template_url,
+            "swipe_source_label": template_file,
+            "aspect_ratio": aspect_ratio,
+            "count": 1,
+        }
+    )
+    asset_ids = result.get("asset_ids")
+    if not isinstance(asset_ids, list) or len(asset_ids) != 1:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering expected exactly 1 generated asset from the swipe pipeline."
+        )
+    asset_id = str(asset_ids[0] or "").strip()
+    if not asset_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering received an empty asset id from the swipe pipeline."
+        )
+    job_id = str(result.get("job_id") or "").strip()
+    if not job_id:
+        raise TestimonialGenerationError(
+            "Pre-sales swipe testimonial rendering expected a non-empty job_id from the swipe pipeline."
+        )
+    asset_record = _load_generated_testimonial_asset_record(asset_id)
+    return _PreSalesSwipeActivityResult(
+        generated_asset=asset_record.asset,
+        ai_metadata=asset_record.ai_metadata,
+        job_id=job_id,
+    )
+
+
 def generate_shopify_theme_testimonial_image_asset(
     *,
     session: Session,
@@ -1483,12 +1834,26 @@ def _resolve_product_primary_image(
     client_id: str,
     product: Product,
 ) -> Asset:
+    refreshed_product = session.scalars(
+        select(Product)
+        .execution_options(populate_existing=True)
+        .where(
+            Product.org_id == org_id,
+            Product.client_id == client_id,
+            Product.id == product.id,
+        )
+    ).first()
+    if refreshed_product is not None:
+        product = refreshed_product
+
     if not product.primary_asset_id:
         raise TestimonialGenerationError(
             "Product primary image is required to render testimonial hero images."
         )
     asset = session.scalars(
-        select(Asset).where(
+        select(Asset)
+        .execution_options(populate_existing=True)
+        .where(
             Asset.org_id == org_id,
             Asset.client_id == client_id,
             Asset.id == product.primary_asset_id,
@@ -1832,82 +2197,11 @@ def _collect_sales_pdp_carousel_slots(
     return slot_targets, contexts
 
 
-def _force_pre_sales_review_media_templates(puck_data: dict[str, Any]) -> None:
-    def update_reviews_config(reviews: dict[str, Any]) -> None:
-        slides = reviews.get("slides")
-        if not isinstance(slides, list) or not slides:
-            raise TestimonialGenerationError("Pre-sales reviews.slides must be a non-empty list.")
-        for idx, slide in enumerate(slides):
-            if not isinstance(slide, dict):
-                raise TestimonialGenerationError("Pre-sales reviews.slides must be objects.")
-            images = slide.get("images")
-            if not isinstance(images, list) or len(images) < 3:
-                raise TestimonialGenerationError(
-                    f"Pre-sales reviews.slides[{idx}].images must include 3 image objects."
-                )
-            for image in images:
-                if isinstance(image, dict):
-                    image["testimonialTemplate"] = "testimonial_media"
-
-    for obj in walk_json(puck_data):
-        if not isinstance(obj, dict):
-            continue
-        comp_type = obj.get("type")
-        if comp_type not in ("PreSalesReviews", "PreSalesTemplate"):
-            continue
-        props = obj.get("props")
-        if not isinstance(props, dict):
-            continue
-        config = props.get("config")
-        if isinstance(config, dict):
-            if comp_type == "PreSalesReviews":
-                update_reviews_config(config)
-            else:
-                reviews = config.get("reviews")
-                if isinstance(reviews, dict):
-                    update_reviews_config(reviews)
-        raw = props.get("configJson")
-        if isinstance(raw, str) and raw.strip():
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise TestimonialGenerationError(
-                    f"{comp_type}.configJson must be valid JSON: {exc}"
-                ) from exc
-            if isinstance(parsed, dict):
-                if comp_type == "PreSalesReviews":
-                    update_reviews_config(parsed)
-                else:
-                    reviews = parsed.get("reviews")
-                    if isinstance(reviews, dict):
-                        update_reviews_config(reviews)
-                props["configJson"] = json.dumps(parsed, ensure_ascii=False)
-
-
 def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: str) -> None:
     def assign_templates(images: list[dict[str, Any]]) -> None:
         templates = _wall_template_sequence(len(images))
         for image, template in zip(images, templates):
             image["testimonialTemplate"] = template
-
-    def update_pre_sales_wall(config: dict[str, Any]) -> None:
-        reviews_wall = config.get("reviewsWall") if "reviewsWall" in config else config
-        if not isinstance(reviews_wall, dict):
-            return
-        columns = reviews_wall.get("columns")
-        if not isinstance(columns, list):
-            return
-        images: list[dict[str, Any]] = []
-        for column in columns:
-            if not isinstance(column, list):
-                continue
-            for item in column:
-                if not isinstance(item, dict):
-                    continue
-                image = item.get("image")
-                if isinstance(image, dict):
-                    images.append(image)
-        assign_templates(images)
 
     def update_sales_wall(config: dict[str, Any]) -> None:
         review_wall = config.get("reviewWall") if "reviewWall" in config else config
@@ -1932,32 +2226,6 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
         props = obj.get("props")
         if not isinstance(props, dict):
             continue
-        if template_kind == "pre-sales-listicle" and comp_type in ("PreSalesReviewWall", "PreSalesTemplate"):
-            config = props.get("config")
-            if isinstance(config, dict):
-                if comp_type == "PreSalesReviewWall":
-                    update_pre_sales_wall(config)
-                else:
-                    reviews_wall = config.get("reviewsWall")
-                    if isinstance(reviews_wall, dict):
-                        update_pre_sales_wall({"reviewsWall": reviews_wall})
-            raw = props.get("configJson")
-            if isinstance(raw, str) and raw.strip():
-                try:
-                    parsed = json.loads(raw)
-                except json.JSONDecodeError as exc:
-                    raise TestimonialGenerationError(
-                        f"{comp_type}.configJson must be valid JSON: {exc}"
-                    ) from exc
-                if isinstance(parsed, dict):
-                    if comp_type == "PreSalesReviewWall":
-                        update_pre_sales_wall(parsed)
-                    else:
-                        reviews_wall = parsed.get("reviewsWall")
-                        if isinstance(reviews_wall, dict):
-                            update_pre_sales_wall({"reviewsWall": reviews_wall})
-                    props["configJson"] = json.dumps(parsed, ensure_ascii=False)
-
         if template_kind == "sales-pdp" and comp_type in ("SalesPdpReviewWall", "SalesPdpTemplate"):
             config = props.get("config")
             if isinstance(config, dict):
@@ -1983,6 +2251,11 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
                         if isinstance(review_wall, dict):
                             update_sales_wall({"reviewWall": review_wall})
                     props["configJson"] = json.dumps(parsed, ensure_ascii=False)
+
+
+def _prepare_testimonial_slot_templates(puck_data: dict[str, Any], template_kind: str) -> None:
+    if template_kind == "sales-pdp":
+        _apply_review_wall_template_mix(puck_data, template_kind)
 
 
 def _collect_sales_pdp_review_wall_images(groups: list[_TestimonialGroup]) -> list[dict[str, Any]]:
@@ -2626,6 +2899,7 @@ def _build_sales_pdp_carousel_prompt(
     today: str,
     brand_name: str | None,
     shared_banner_copy: dict[str, str],
+    required_strip_palette: dict[str, str] | None = None,
 ) -> str:
     variant_lines = "\n".join(
         (
@@ -2636,6 +2910,15 @@ def _build_sales_pdp_carousel_prompt(
     )
     required_variant_ids = ", ".join(spec["variantId"] for spec in _SALES_PDP_CAROUSEL_VARIANTS)
     brand_hint = f"Brand hint: {brand_name}.\n" if isinstance(brand_name, str) and brand_name.strip() else ""
+    strip_palette_rules = ""
+    if required_strip_palette is not None:
+        strip_palette_rules = (
+            "- The design system only includes the default logo variant. "
+            "You MUST use these exact shared strip colors on every slide so the stored brand logo remains legible:\n"
+            f"  stripBgColor={required_strip_palette['stripBgColor']}\n"
+            f"  stripTextColor={required_strip_palette['stripTextColor']}\n"
+            "- Do not choose alternate strip colors, dark strip backgrounds, or near-black backgrounds.\n"
+        )
 
     return (
         "You are generating Sales PDP carousel card specs for one product.\n"
@@ -2662,6 +2945,7 @@ def _build_sales_pdp_carousel_prompt(
         "- For all non-QA variants, comments must contain exactly 1 item.\n"
         "- stripBgColor and stripTextColor must be valid hex colors (e.g. #0f3b2e, #ffffff).\n"
         "- The bottom strip is a shared product-level banner. Use the SAME stripBgColor and stripTextColor for all 5 slides.\n"
+        f"{strip_palette_rules}"
         "- The bottom strip copy is shared too. Use these exact values on every slide:\n"
         f"  ratingValueText={shared_banner_copy['ratingValueText']}\n"
         f"  ratingDetailText={shared_banner_copy['ratingDetailText']}\n"
@@ -3125,12 +3409,19 @@ def _normalize_sales_pdp_carousel_plan(
     plan: list[dict[str, Any]],
     *,
     shared_banner_copy: dict[str, str],
+    required_strip_palette: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     if not plan:
         raise TestimonialGenerationError("Sales PDP carousel plan must include at least one slide.")
 
-    canonical_strip_bg = plan[0]["stripBgColor"]
-    canonical_strip_text = plan[0]["stripTextColor"]
+    canonical_strip_bg = (
+        required_strip_palette["stripBgColor"] if required_strip_palette is not None else plan[0]["stripBgColor"]
+    )
+    canonical_strip_text = (
+        required_strip_palette["stripTextColor"]
+        if required_strip_palette is not None
+        else plan[0]["stripTextColor"]
+    )
     normalized: list[dict[str, Any]] = []
     for slide in plan:
         normalized_slide = dict(slide)
@@ -3231,12 +3522,110 @@ def _contrast_ratio_from_luminance(a: float, b: float) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _resolve_sales_pdp_css_var_value(*, css_vars: dict[str, Any], value: Any, stack: tuple[str, ...] = ()) -> str | None:
+    if isinstance(value, (int, float)):
+        return str(value)
+    if not isinstance(value, str):
+        return None
+
+    raw = value.strip()
+    match = _CSS_VAR_FUNCTION_RE.match(raw)
+    if not match:
+        return raw
+
+    ref_key = match.group(1)
+    fallback = match.group(2)
+    if ref_key in stack:
+        return None
+    ref_value = css_vars.get(ref_key)
+    if ref_value is None:
+        return fallback.strip() if isinstance(fallback, str) and fallback.strip() else None
+    return _resolve_sales_pdp_css_var_value(css_vars=css_vars, value=ref_value, stack=(*stack, ref_key))
+
+
+def _resolve_sales_pdp_hex_css_var(css_vars: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        raw = css_vars.get(key)
+        resolved = _resolve_sales_pdp_css_var_value(css_vars=css_vars, value=raw)
+        if isinstance(resolved, str) and _SALES_PDP_COLOR_RE.match(resolved.strip()):
+            return resolved.strip()
+    return None
+
+
+def _luminance_from_hex(color: str, *, field: str) -> float:
+    r, g, b = _sales_pdp_hex_to_rgb(color, field=field)
+    return _relative_luminance_srgb_local(r, g, b)
+
+
 def _should_use_on_dark_logo_for_sales_pdp_strip(strip_bg_color: str) -> bool:
     r, g, b = _sales_pdp_hex_to_rgb(strip_bg_color, field="stripBgColor")
     luminance = _relative_luminance_srgb_local(r, g, b)
     white_contrast = _contrast_ratio_from_luminance(1.0, luminance)
     black_contrast = _contrast_ratio_from_luminance(0.0, luminance)
     return white_contrast >= black_contrast
+
+
+def _has_sales_pdp_on_dark_logo(tokens: Any) -> bool:
+    if not isinstance(tokens, dict):
+        return False
+    brand = tokens.get("brand")
+    if not isinstance(brand, dict):
+        return False
+    raw = brand.get("logoOnDarkAssetPublicId")
+    return isinstance(raw, str) and bool(raw.strip())
+
+
+def _resolve_sales_pdp_required_strip_palette(tokens: Any) -> dict[str, str] | None:
+    if not isinstance(tokens, dict) or _has_sales_pdp_on_dark_logo(tokens):
+        return None
+
+    css_vars = tokens.get("cssVars")
+    if not isinstance(css_vars, dict):
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip palette because design system tokens.brand.logoOnDarkAssetPublicId is missing, but tokens.cssVars is unavailable."
+        )
+
+    strip_bg_color = _resolve_sales_pdp_hex_css_var(
+        css_vars,
+        "--badge-strip-bg",
+        "--pdp-surface-soft",
+        "--color-page-bg-secondary",
+        "--color-page-bg",
+        "--wall-card-bg",
+    )
+    if strip_bg_color is None:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip palette because design system tokens.brand.logoOnDarkAssetPublicId is missing, but no compatible strip background color was found in design system cssVars."
+        )
+    if _should_use_on_dark_logo_for_sales_pdp_strip(strip_bg_color):
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a light strip background because design system tokens.brand.logoOnDarkAssetPublicId is missing, but the resolved strip background color is still dark."
+        )
+
+    strip_text_color = _resolve_sales_pdp_hex_css_var(
+        css_vars,
+        "--color-brand",
+        "--wall-button-text",
+        "--badge-text-color",
+        "--pdp-brand-strong",
+        "--color-text",
+    )
+    if strip_text_color is None:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires strip text colors from the design system, but no compatible strip text color was found in design system cssVars."
+        )
+
+    bg_luminance = _luminance_from_hex(strip_bg_color, field="stripBgColor")
+    text_luminance = _luminance_from_hex(strip_text_color, field="stripTextColor")
+    if _contrast_ratio_from_luminance(bg_luminance, text_luminance) < 4.5:
+        raise TestimonialGenerationError(
+            "Sales PDP carousel requires a readable light strip palette, but the resolved design system strip colors do not meet contrast requirements."
+        )
+
+    return {
+        "stripBgColor": strip_bg_color,
+        "stripTextColor": strip_text_color,
+    }
 
 
 def _resolve_sales_pdp_design_system_logo_selection(
@@ -3585,6 +3974,16 @@ def generate_sales_pdp_carousel_images(
         expected_count=expected_count,
     )
 
+    def _carousel_heartbeat(step: str, **fields: Any) -> None:
+        _heartbeat_activity_progress(
+            phase="sales_pdp_carousel_generation",
+            step=step,
+            funnel_id=funnel_id,
+            page_id=page_id,
+            template_id=resolved_template_id,
+            **fields,
+        )
+
     product, _, product_context = _load_product_context(
         session=session,
         org_id=org_id,
@@ -3612,28 +4011,42 @@ def generate_sales_pdp_carousel_images(
     model_id = model or llm.default_model
     sales_pdp_image_model, sales_pdp_image_model_source = resolve_funnel_image_model_config()
     today = datetime.now(timezone.utc).date().isoformat()
+    design_system_tokens = resolve_design_system_tokens(
+        session=session,
+        org_id=org_id,
+        client_id=str(funnel.client_id),
+        funnel=funnel,
+        page=page,
+    )
+    required_strip_palette = _resolve_sales_pdp_required_strip_palette(design_system_tokens)
 
     ensure_within_budget("requesting Sales PDP carousel plan")
+    def _heartbeat_carousel_plan_requested() -> None:
+        _carousel_heartbeat("carousel_plan_requested", slot_count=expected_count)
+
+    _heartbeat_carousel_plan_requested()
     prompt = _build_sales_pdp_carousel_prompt(
         product_context=product_context,
         copy=copy_text,
         today=today,
         brand_name=brand_name,
         shared_banner_copy=shared_banner_copy,
+        required_strip_palette=required_strip_palette,
     )
 
     if isinstance(model_id, str) and model_id.lower().startswith("claude"):
         claude_max_tokens = int(max_tokens) if max_tokens else 8_000
-        resp = call_claude_structured_message(
-            model=model_id,
-            system=None,
-            user_content=[{"type": "text", "text": prompt}],
-            output_schema=_sales_pdp_carousel_output_schema(),
-            max_tokens=claude_max_tokens,
-            temperature=temperature,
-            http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
-            max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
-        )
+        with _heartbeat_callback_loop(callback=_heartbeat_carousel_plan_requested):
+            resp = call_claude_structured_message(
+                model=model_id,
+                system=None,
+                user_content=[{"type": "text", "text": prompt}],
+                output_schema=_sales_pdp_carousel_output_schema(),
+                max_tokens=claude_max_tokens,
+                temperature=temperature,
+                http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+                max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+            )
         parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
         if not isinstance(parsed_value, dict):
             raise TestimonialGenerationError("Claude structured Sales PDP carousel response was not a JSON object.")
@@ -3654,15 +4067,18 @@ def generate_sales_pdp_carousel_images(
                 },
             },
         )
-        raw = llm.generate_text(prompt, params=params)
+        with _heartbeat_callback_loop(callback=_heartbeat_carousel_plan_requested):
+            raw = llm.generate_text(prompt, params=params)
         raw_plan = _parse_json_object_response(raw, model_id=model_id, label="Sales PDP carousel")
 
     validated_plan = _normalize_sales_pdp_carousel_plan(
         _validate_sales_pdp_carousel_plan(raw_plan),
         shared_banner_copy=shared_banner_copy,
+        required_strip_palette=required_strip_palette,
     )
     if not validated_plan:
         raise TestimonialGenerationError("Sales PDP carousel plan returned no slides.")
+    _carousel_heartbeat("carousel_plan_completed", slide_count=len(validated_plan))
     variant_spec_by_id = {spec["variantId"]: spec for spec in _SALES_PDP_CAROUSEL_VARIANTS}
 
     logo_selection = _resolve_sales_pdp_logo_selection(
@@ -3786,11 +4202,13 @@ def generate_sales_pdp_carousel_images(
                     slot_index = cast(int, job["slot_index"])
                     render_payload = cast(dict[str, Any], job["render_payload"])
                     ensure_within_budget(f"queuing carousel slot render {slot_index + 1}")
+                    _carousel_heartbeat("carousel_render_queued", slot_index=slot_index + 1)
                     render_futures[slot_index] = pool.submit(renderer.render_png, render_payload)
 
                 for job in render_jobs:
                     slot_index = cast(int, job["slot_index"])
                     ensure_within_budget(f"waiting for carousel slot render {slot_index + 1}")
+                    _carousel_heartbeat("carousel_render_waiting", slot_index=slot_index + 1)
                     future = render_futures[slot_index]
                     try:
                         if deadline_ts is None:
@@ -3807,6 +4225,7 @@ def generate_sales_pdp_carousel_images(
                         raise TestimonialGenerationError(
                             f"Sales PDP carousel step exceeded configured time budget while rendering slot {slot_index + 1}."
                         ) from exc
+                    _carousel_heartbeat("carousel_render_completed", slot_index=slot_index + 1)
 
         for job in render_jobs:
             slot_index = cast(int, job["slot_index"])
@@ -3820,6 +4239,7 @@ def generate_sales_pdp_carousel_images(
                 render_payload.get("comment") or cast(list[dict[str, Any]], render_payload.get("comments"))[0],
             )
             image_bytes = rendered_bytes_by_slot[slot_index]
+            _carousel_heartbeat("carousel_asset_persist_started", slot_index=slot_index + 1)
             asset = create_funnel_upload_asset(
                 session=session,
                 org_id=org_id,
@@ -3890,6 +4310,7 @@ def generate_sales_pdp_carousel_images(
                     },
                 }
             )
+            _carousel_heartbeat("carousel_asset_persist_completed", slot_index=slot_index + 1)
     except TestimonialRenderError as exc:
         raise TestimonialGenerationError(str(exc)) from exc
 
@@ -3944,6 +4365,7 @@ def _generate_validated_synthetic_testimonials(
     max_tokens: int | None = None,
     max_duration_seconds: int | None = None,
     uniqueness_scope: str,
+    progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     if count < 0:
         raise TestimonialGenerationError("count must be non-negative.")
@@ -3979,8 +4401,31 @@ def _generate_validated_synthetic_testimonials(
     today = datetime.now(timezone.utc).date().isoformat()
     batch_size = 6
     validated_testimonials: list[dict[str, Any]] = []
+
+    latest_progress: tuple[str, dict[str, Any]] | None = None
+
+    def _emit_progress(step: str, details: dict[str, Any]) -> None:
+        nonlocal latest_progress
+        payload = dict(details)
+        latest_progress = (step, payload)
+        if progress_callback is not None:
+            progress_callback(step, payload)
+
+    def _replay_latest_progress() -> None:
+        if progress_callback is None or latest_progress is None:
+            return
+        step, payload = latest_progress
+        progress_callback(step, dict(payload))
+
     for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
         ensure_within_budget("generating testimonial identities")
+        _emit_progress(
+            "identity_attempt_started",
+            {
+                "identity_attempt": identity_attempt,
+                "requested_count": count,
+            },
+        )
         candidate_validated: list[dict[str, Any]] = []
         reserved_names: list[str] = []
         reserved_name_keys: set[str] = set()
@@ -3991,6 +4436,14 @@ def _generate_validated_synthetic_testimonials(
         for batch_idx, start in enumerate(range(0, count, batch_size)):
             ensure_within_budget("requesting testimonial LLM batches")
             batch_count = min(batch_size, count - start)
+            _emit_progress(
+                "batch_requested",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "batch_count": batch_count,
+                },
+            )
             prompt = _build_testimonial_prompt(
                 count=batch_count,
                 copy=copy_text,
@@ -4003,16 +4456,17 @@ def _generate_validated_synthetic_testimonials(
 
             parsed: dict[str, Any]
             if isinstance(model_id, str) and model_id.lower().startswith("claude"):
-                resp = call_claude_structured_message(
-                    model=model_id,
-                    system=None,
-                    user_content=[{"type": "text", "text": prompt}, *(claude_document_blocks or [])],
-                    output_schema=_testimonial_output_schema(batch_count),
-                    max_tokens=int(max_tokens) if max_tokens else 16_000,
-                    temperature=attempt_temperature,
-                    http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
-                    max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
-                )
+                with _heartbeat_callback_loop(callback=_replay_latest_progress):
+                    resp = call_claude_structured_message(
+                        model=model_id,
+                        system=None,
+                        user_content=[{"type": "text", "text": prompt}, *(claude_document_blocks or [])],
+                        output_schema=_testimonial_output_schema(batch_count),
+                        max_tokens=int(max_tokens) if max_tokens else 16_000,
+                        temperature=attempt_temperature,
+                        http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+                        max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                    )
                 parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
                 if not isinstance(parsed_value, dict):
                     raise TestimonialGenerationError(
@@ -4035,7 +4489,8 @@ def _generate_validated_synthetic_testimonials(
                         },
                     },
                 )
-                raw = llm.generate_text(prompt, params=params)
+                with _heartbeat_callback_loop(callback=_replay_latest_progress):
+                    raw = llm.generate_text(prompt, params=params)
                 parsed = _parse_testimonials_response(raw, model_id=model_id)
             batch_items = parsed.get("testimonials")
             if not isinstance(batch_items, list):
@@ -4046,6 +4501,14 @@ def _generate_validated_synthetic_testimonials(
                 raise TestimonialGenerationError(
                     f"Expected {batch_count} testimonials, received {len(batch_items)}."
                 )
+            _emit_progress(
+                "batch_received",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "batch_count": len(batch_items),
+                },
+            )
 
             batch_validated: list[dict[str, Any]] = []
             for idx, raw in enumerate(batch_items):
@@ -4060,6 +4523,14 @@ def _generate_validated_synthetic_testimonials(
             if batch_validation_error is not None:
                 break
             candidate_validated.extend(batch_validated)
+            _emit_progress(
+                "batch_validated",
+                {
+                    "identity_attempt": identity_attempt,
+                    "batch_index": batch_idx + 1,
+                    "validated_count": len(batch_validated),
+                },
+            )
 
             for item in batch_validated:
                 primary = item.get("name")
@@ -4101,6 +4572,13 @@ def _generate_validated_synthetic_testimonials(
                 continue
 
         validated_testimonials = candidate_validated
+        _emit_progress(
+            "identity_attempt_completed",
+            {
+                "identity_attempt": identity_attempt,
+                "validated_count": len(candidate_validated),
+            },
+        )
         break
 
     if not validated_testimonials:
@@ -4279,11 +4757,19 @@ def generate_funnel_page_testimonials(
     else:
         raise TestimonialGenerationError(f"Template {resolved_template_id} is not supported for testimonials.")
 
-    if template_kind == "pre-sales-listicle":
-        _force_pre_sales_review_media_templates(base_puck)
-    _apply_review_wall_template_mix(base_puck, template_kind)
+    _prepare_testimonial_slot_templates(base_puck, template_kind)
 
     groups, contexts = _collect_testimonial_targets(base_puck, template_kind)
+
+    def _heartbeat(step: str, **fields: Any) -> None:
+        _heartbeat_activity_progress(
+            phase="testimonials_generation",
+            step=step,
+            funnel_id=funnel_id,
+            page_id=page_id,
+            template_id=resolved_template_id,
+            **fields,
+        )
 
     product, _, product_context = _load_product_context(
         session=session,
@@ -4293,6 +4779,7 @@ def generate_funnel_page_testimonials(
     )
     if not product:
         raise TestimonialGenerationError("Product context is required to generate testimonials.")
+    product_title = _clean_single_line(str(product.title or "")) or "the product"
 
     # Validate that the product has a primary image configured (required by business rules).
     product_primary_asset = _resolve_product_primary_image(
@@ -4365,6 +4852,11 @@ def generate_funnel_page_testimonials(
         image_target_count=len(groups),
         max_duration_seconds=remaining_duration_seconds,
     )
+    _heartbeat(
+        "testimonial_payload_request_started",
+        group_count=len(groups),
+        testimonial_count=testimonial_count,
+    )
     validated_testimonials, model_id = _generate_validated_synthetic_testimonials(
         count=testimonial_count,
         copy_text=copy_text,
@@ -4376,20 +4868,43 @@ def generate_funnel_page_testimonials(
         max_tokens=max_tokens,
         max_duration_seconds=remaining_duration_seconds,
         uniqueness_scope=f"{funnel_id}:{page_id}:{resolved_template_id}",
+        progress_callback=lambda step, details: _heartbeat(step, **details),
+    )
+    _heartbeat(
+        "testimonial_payload_request_completed",
+        testimonial_count=len(validated_testimonials),
     )
 
     generated: list[dict[str, Any]] = []
-    try:
-        render_parallelism = min(
-            4,
-            max(1, sum(len(group.renders) for group in groups)),
+    render_parallelism = min(
+        4,
+        max(1, sum(len(group.renders) for group in groups)),
+    )
+    pre_sales_swipe_asset_brief_id: str | None = None
+    pre_sales_template_server_context: Any = nullcontext()
+    if template_kind == "pre-sales-listicle":
+        pre_sales_swipe_asset_brief_id = _resolve_pre_sales_swipe_asset_brief_id(
+            session=session,
+            org_id=org_id,
+            funnel=funnel,
         )
-        with ThreadedTestimonialRenderer(
+        pre_sales_template_server_context = _LocalStaticServer(root=_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR)
+
+    renderer_context: Any = nullcontext()
+    if template_kind != "pre-sales-listicle":
+        renderer_context = ThreadedTestimonialRenderer(
             worker_count=render_parallelism,
             response_timeout_ms=_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS,
-        ) as renderer:
+        )
+    try:
+        with pre_sales_template_server_context as pre_sales_template_server, renderer_context as renderer:
             def render_with_budget(render_payload: dict[str, Any], *, label: str) -> bytes:
+                if renderer is None:
+                    raise TestimonialGenerationError(
+                        "Renderer context is unavailable for non-swipe testimonial rendering."
+                    )
                 ensure_within_budget(f"rendering {label}")
+                _heartbeat("testimonial_render_requested", label=label)
                 timeout_ms = _TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS
                 if deadline_ts is not None:
                     remaining_seconds = deadline_ts - time.monotonic()
@@ -4471,8 +4986,13 @@ def generate_funnel_page_testimonials(
 
                 for idx, group in enumerate(groups):
                     ensure_within_budget("rendering testimonial groups")
+                    _heartbeat(
+                        "testimonial_group_started",
+                        group_index=idx + 1,
+                        group_count=len(groups),
+                    )
                     validated = validated_testimonials[idx]
-    
+
                     if group.slide is not None:
                         group.slide["text"] = validated["review"]
                         group.slide["author"] = validated["name"]
@@ -4480,7 +5000,87 @@ def generate_funnel_page_testimonials(
                         group.slide["verified"] = validated["verified"]
                         if group.context:
                             group.context.dirty = True
-    
+
+                    if template_kind == "pre-sales-listicle":
+                        if pre_sales_swipe_asset_brief_id is None:
+                            raise TestimonialGenerationError(
+                                "Pre-sales swipe testimonial rendering did not resolve an asset brief id."
+                            )
+                        if pre_sales_template_server is None:
+                            raise TestimonialGenerationError(
+                                "Pre-sales swipe testimonial rendering requires a local template server."
+                            )
+                        for render in group.renders:
+                            ensure_within_budget(f"rendering {render.label}")
+                            _heartbeat(
+                                "testimonial_render_started",
+                                group_index=idx + 1,
+                                label=render.label,
+                            )
+                            assignment = _resolve_pre_sales_swipe_assignment(render.label)
+                            template_reference = _load_pre_sales_swipe_template_reference(
+                                assignment.template_file
+                            )
+                            template_url = pre_sales_template_server.build_url(assignment.template_file)
+                            swipe_render_result = _generate_pre_sales_swipe_testimonial_asset(
+                                org_id=org_id,
+                                client_id=str(funnel.client_id),
+                                product_id=str(product.id),
+                                campaign_id=str(funnel.campaign_id),
+                                asset_brief_id=pre_sales_swipe_asset_brief_id,
+                                template_url=template_url,
+                                template_file=assignment.template_file,
+                                aspect_ratio=assignment.aspect_ratio,
+                            )
+                            render.image["assetPublicId"] = swipe_render_result.generated_asset.public_id
+                            if "alt" not in render.image or not render.image.get("alt"):
+                                render.image["alt"] = f"Customer testimonial from {validated['name']}"
+                            if render.context:
+                                render.context.dirty = True
+                            generated.append(
+                                {
+                                    "target": render.label,
+                                    "publicId": swipe_render_result.generated_asset.public_id,
+                                    "assetId": swipe_render_result.generated_asset.asset_id,
+                                    "prompt": str(swipe_render_result.ai_metadata.get("promptUsed") or ""),
+                                    "swipePromptMarkdown": str(
+                                        swipe_render_result.ai_metadata.get("swipePromptMarkdown") or ""
+                                    ),
+                                    "swipePromptInputText": str(
+                                        swipe_render_result.ai_metadata.get("swipePromptInputText") or ""
+                                    ),
+                                    "swipePromptExtractedRaw": str(
+                                        swipe_render_result.ai_metadata.get("swipePromptExtractedRaw") or ""
+                                    ),
+                                    "templateFile": assignment.template_file,
+                                    "templatePath": str(template_reference.path),
+                                    "templateUrl": template_url,
+                                    "aspectRatio": assignment.aspect_ratio,
+                                    "styleFamily": assignment.style_family,
+                                    "variationKey": assignment.variation_key,
+                                    "assetBriefId": pre_sales_swipe_asset_brief_id,
+                                    "jobId": swipe_render_result.job_id,
+                                    "sourceUrl": str(
+                                        swipe_render_result.ai_metadata.get("swipeSourceUrl") or ""
+                                    ),
+                                    "promptModel": str(
+                                        swipe_render_result.ai_metadata.get("swipePromptModel") or ""
+                                    ),
+                                    "renderProvider": str(
+                                        swipe_render_result.ai_metadata.get("swipeRenderProvider") or ""
+                                    ),
+                                    "renderModelId": str(
+                                        swipe_render_result.ai_metadata.get("swipeRenderModelIdUsed") or ""
+                                    ),
+                                }
+                            )
+                            _heartbeat(
+                                "testimonial_render_completed",
+                                group_index=idx + 1,
+                                label=render.label,
+                            )
+                        continue
+
                     media_targets = [
                         render for render in group.renders if render.template == "testimonial_media"
                     ]
@@ -4496,9 +5096,14 @@ def generate_funnel_page_testimonials(
                                 "mediaPrompts must include exactly 3 prompts for testimonial media images."
                             )
                         media_prompt_iter = iter(enumerate(media_prompts))
-    
+
                     for render in group.renders:
                         ensure_within_budget(f"rendering {render.label}")
+                        _heartbeat(
+                            "testimonial_render_started",
+                            group_index=idx + 1,
+                            label=render.label,
+                        )
                         setting_value = _derive_setting(
                             validated=validated,
                             fallback_text=validated["heroImagePrompt"],
@@ -4508,7 +5113,7 @@ def generate_funnel_page_testimonials(
                             review=validated["review"],
                         )
                         direction_value = _truncate(validated["heroImagePrompt"], limit=260)
-    
+
                         if render.template == "testimonial_media":
                             if media_prompt_iter is None:
                                 raise TestimonialGenerationError(
@@ -4520,7 +5125,7 @@ def generate_funnel_page_testimonials(
                                 raise TestimonialGenerationError(
                                     "Insufficient mediaPrompts provided for testimonial_media renders."
                                 ) from exc
-    
+
                             media_scene_mode = _select_media_scene_mode(media_index)
                             media_prompt = _build_testimonial_scene_prompt(
                                 scene_mode=media_scene_mode,
@@ -4554,7 +5159,7 @@ def generate_funnel_page_testimonials(
                                 product_id=str(funnel.product_id) if funnel.product_id else None,
                                 tags=["funnel", "testimonial", "testimonial_media", "source"],
                             )
-    
+
                             payload = {
                                 "template": "testimonial_media",
                                 "imageUrl": _public_asset_url(media_asset.public_id),
@@ -4573,6 +5178,7 @@ def generate_funnel_page_testimonials(
                                 source_media_prompt: str = media_prompt,
                                 source_media_scene_mode: str = media_scene_mode,
                                 page_slot_index: int = idx,
+                                group_index: int = idx + 1,
                             ) -> dict[str, Any]:
                                 asset = create_funnel_upload_asset(
                                     session=session,
@@ -4597,6 +5203,11 @@ def generate_funnel_page_testimonials(
                                     render_target.image["alt"] = f"Customer scene for {reviewer_name}"
                                 if render_target.context:
                                     render_target.context.dirty = True
+                                _heartbeat(
+                                    "testimonial_render_completed",
+                                    group_index=group_index,
+                                    label=render_target.label,
+                                )
                                 return {
                                     "target": render_target.label,
                                     "payload": payload_public,
@@ -4613,12 +5224,12 @@ def generate_funnel_page_testimonials(
                                 finalize=_finalize_media_render,
                             )
                             continue
-    
+
                         if render.template == "social_comment" and len(validated["review"]) > 600:
                             raise TestimonialGenerationError(
                                 "Testimonial review must be 600 characters or fewer for social_comment renders."
                             )
-    
+
                         if render.template == "review_card":
                             omit_hero = review_card_index in review_without_hero
                             review_card_index += 1
@@ -4651,11 +5262,10 @@ def generate_funnel_page_testimonials(
                             review_avatar_asset: Optional[_GeneratedTestimonialAsset] = None
                             avatar_error: str | None = None
                             asset_jobs: dict[str, concurrent.futures.Future[_GeneratedTestimonialAsset]] = {}
-                            if not omit_hero:
-                                if review_hero_prompt is None:
-                                    raise TestimonialGenerationError(
-                                        "Review card hero prompt was not generated even though hero rendering is enabled."
-                                    )
+                            if not omit_hero and review_hero_prompt is None:
+                                raise TestimonialGenerationError(
+                                    "Review card hero prompt was not generated even though hero rendering is enabled."
+                                )
                             ensure_within_budget(f"generating source assets for {render.label}")
                             with concurrent.futures.ThreadPoolExecutor(
                                 max_workers=min(_TESTIMONIAL_ASSET_MAX_CONCURRENCY, 2)
@@ -4712,7 +5322,7 @@ def generate_funnel_page_testimonials(
                                         hero_asset = result
                                     if key == "avatar":
                                         review_avatar_asset = result
-    
+
                             payload: dict[str, Any] = {
                                 "template": "review_card",
                                 "name": validated["name"],
@@ -4731,13 +5341,13 @@ def generate_funnel_page_testimonials(
                                 "pageCopy": copy_text,
                                 "productContext": product_context,
                             }
-    
+
                             render_payload = dict(payload)
                             if review_avatar_asset is not None:
                                 render_payload["avatarUrl"] = _asset_data_url_from_generated(review_avatar_asset)
                             if hero_asset is not None:
                                 render_payload["heroImageUrl"] = _asset_data_url_from_generated(hero_asset)
-    
+
                             def _finalize_review_card_render(
                                 image_bytes: bytes,
                                 *,
@@ -4755,6 +5365,7 @@ def generate_funnel_page_testimonials(
                                 hero_source_error: str | None = hero_error,
                                 avatar_source_error: str | None = avatar_error,
                                 page_slot_index: int = idx,
+                                group_index: int = idx + 1,
                             ) -> dict[str, Any]:
                                 asset = create_funnel_upload_asset(
                                     session=session,
@@ -4779,6 +5390,11 @@ def generate_funnel_page_testimonials(
                                     render_target.image["alt"] = f"Review from {reviewer_name}"
                                 if render_target.context:
                                     render_target.context.dirty = True
+                                _heartbeat(
+                                    "testimonial_render_completed",
+                                    group_index=group_index,
+                                    label=render_target.label,
+                                )
                                 return {
                                     "target": render_target.label,
                                     "payload": payload_public,
@@ -4806,7 +5422,7 @@ def generate_funnel_page_testimonials(
                                 finalize=_finalize_review_card_render,
                             )
                             continue
-    
+
                         omit_attachment = social_comment_index in social_without_attachment
                         social_comment_index += 1
                         social_avatar_prompt = _build_distinct_avatar_prompt(
@@ -4897,7 +5513,7 @@ def generate_funnel_page_testimonials(
                             meta_date = validated["meta"].get("date")
                             if isinstance(meta_date, str) and meta_date.strip():
                                 time_value = meta_date.strip()
-    
+
                         seed = sum(ord(ch) for ch in render.label) + idx
                         variant = seed % 3
                         replies_public: list[dict[str, Any]] | None = None
@@ -4908,7 +5524,7 @@ def generate_funnel_page_testimonials(
                         reply_payload = validated["reply"]
                         reply_avatar_asset: Optional[_GeneratedTestimonialAsset] = None
                         reply_avatar_error: str | None = None
-    
+
                         def ensure_reply_avatar_asset() -> Optional[_GeneratedTestimonialAsset]:
                             nonlocal reply_avatar_asset, reply_avatar_error
                             if reply_avatar_asset is not None or reply_avatar_error is not None:
@@ -4943,7 +5559,7 @@ def generate_funnel_page_testimonials(
                                 else:
                                     raise
                             return reply_avatar_asset
-    
+
                         is_sales_review_wall = (
                             template_kind == "sales-pdp"
                             and "sales_pdp.reviewWall.tiles" in render.label
@@ -4966,7 +5582,7 @@ def generate_funnel_page_testimonials(
                                 replies_public = [reply_entry_public]
                                 replies_render = [reply_entry_render]
                                 view_replies_text = "View 1 reply"
-    
+
                         if variant == 0:
                             reply_avatar = ensure_reply_avatar_asset()
                             reply_entry_public = {
@@ -4982,7 +5598,7 @@ def generate_funnel_page_testimonials(
                             replies_public = [reply_entry_public]
                             replies_render = [reply_entry_render]
                             view_replies_text = "View 1 reply"
-    
+
                         primary_comment_public = {
                             "name": validated["name"],
                             "text": validated["review"],
@@ -5011,13 +5627,15 @@ def generate_funnel_page_testimonials(
                         if attachment_asset is not None:
                             primary_comment_public["attachmentUrl"] = _public_asset_url(attachment_asset.public_id)
                             primary_comment_render["attachmentUrl"] = _asset_data_url_from_generated(attachment_asset)
-    
+
                         social_template = _next_social_card_variant(social_card_variant_index)
                         social_card_variant_index += 1
                         if social_template == "social_comment_instagram":
                             username = _clean_single_line(validated["name"]).lower().replace(" ", ".")
                             if not username:
-                                raise TestimonialGenerationError("Instagram social template requires a non-empty username.")
+                                raise TestimonialGenerationError(
+                                    "Instagram social template requires a non-empty username."
+                                )
                             location_value = ""
                             if isinstance(validated.get("meta"), dict):
                                 location_raw = validated["meta"].get("location")
@@ -5065,6 +5683,7 @@ def generate_funnel_page_testimonials(
                                 "header": {"title": "All comments", "showSortIcon": variant != 2},
                                 "comments": [primary_comment_render],
                             }
+
                         def _finalize_social_render(
                             image_bytes: bytes,
                             *,
@@ -5088,6 +5707,7 @@ def generate_funnel_page_testimonials(
                             attachment_source_error: str | None = attachment_error,
                             reply_avatar_source_error: str | None = reply_avatar_error,
                             page_slot_index: int = idx,
+                            group_index: int = idx + 1,
                         ) -> dict[str, Any]:
                             asset = create_funnel_upload_asset(
                                 session=session,
@@ -5112,6 +5732,11 @@ def generate_funnel_page_testimonials(
                                 render_target.image["alt"] = f"Social comment from {reviewer_name}"
                             if render_target.context:
                                 render_target.context.dirty = True
+                            _heartbeat(
+                                "testimonial_render_completed",
+                                group_index=group_index,
+                                label=render_target.label,
+                            )
                             return {
                                 "target": render_target.label,
                                 "payload": payload_public,
@@ -5146,6 +5771,7 @@ def generate_funnel_page_testimonials(
                             label=render.label,
                             finalize=_finalize_social_render,
                         )
+
                 while pending_renders:
                     _drain_render_futures(block=True)
                 for order_idx in sorted(generated_by_order):
