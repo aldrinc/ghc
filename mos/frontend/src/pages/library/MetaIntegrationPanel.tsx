@@ -557,7 +557,7 @@ export function MetaIntegrationPanel() {
                 onChange={(event) => setNewWorkspaceTrackingParams(event.target.value)}
                 placeholder="Tracking params"
               />
-              <Button variant="primary" size="sm" onClick={() => void handleCreateAndAttachConnection()} disabled={setupPending}>
+              <Button type="button" variant="primary" size="sm" onClick={() => void handleCreateAndAttachConnection()} disabled={setupPending}>
                 {setupPending ? "Saving…" : "Connect and attach"}
               </Button>
             </div>
@@ -608,6 +608,7 @@ export function MetaIntegrationPanel() {
                                   className="h-8 min-w-[220px] max-w-[360px]"
                                 />
                                 <Button
+                                  type="button"
                                   variant="secondary"
                                   size="sm"
                                   onClick={() => void handleUpdateConnectionCredentials(connection)}
@@ -638,6 +639,7 @@ export function MetaIntegrationPanel() {
                         <TableCell>
                           <div className="flex flex-wrap gap-2">
                             <Button
+                              type="button"
                               variant="secondary"
                               size="sm"
                               onClick={() => void handleValidateConnection(connection.id)}
@@ -646,6 +648,7 @@ export function MetaIntegrationPanel() {
                               Validate
                             </Button>
                             <Button
+                              type="button"
                               variant="secondary"
                               size="sm"
                               onClick={() => void handleAttachExistingConnection(connection)}
