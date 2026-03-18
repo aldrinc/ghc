@@ -38,6 +38,7 @@ from app.db.models import (
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.experiments import ExperimentsRepository
+from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_account_configs import MetaAccountConfigsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.schemas.meta_ads import (
@@ -91,7 +92,13 @@ from app.services.meta_media_buying import (
     MetaInsightsConfig,
     build_management_plan,
 )
-from app.services.paid_ads_qa import RULESET_VERSION, refresh_meta_platform_profile_from_graph
+from app.services.paid_ads_qa import (
+    MetaProfileRefreshError,
+    RULESET_VERSION,
+    activate_mos_meta_funnel_tracking_profile,
+    refresh_meta_platform_profile_from_graph,
+    upsert_meta_platform_profile_from_profile,
+)
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -615,6 +622,88 @@ def _persist_refreshed_workspace_profile(
         metadata_json=workspace_metadata,
     )
     return updated_connection, updated_workspace_config
+
+
+def _campaign_uses_meta_channel(channels: list[str] | None) -> bool:
+    for channel in channels or []:
+        normalized = _clean_optional_text(channel)
+        if normalized and normalized.lower() in {"facebook", "instagram", "meta"}:
+            return True
+    return False
+
+
+def _list_client_meta_funnel_ids(*, session: Session, org_id: str, client_id: str) -> list[str]:
+    funnels = FunnelsRepository(session).list(org_id=org_id, client_id=client_id)
+    campaign_ids = sorted({funnel.campaign_id for funnel in funnels if funnel.campaign_id}, key=str)
+    if not campaign_ids:
+        return []
+
+    campaigns = session.scalars(
+        select(Campaign).where(
+            Campaign.org_id == org_id,
+            Campaign.id.in_(campaign_ids),
+        )
+    ).all()
+    meta_campaign_ids = {str(campaign.id) for campaign in campaigns if _campaign_uses_meta_channel(campaign.channels)}
+    return [str(funnel.id) for funnel in funnels if funnel.campaign_id and str(funnel.campaign_id) in meta_campaign_ids]
+
+
+def _repair_client_meta_funnel_tracking(
+    *,
+    session: Session,
+    auth: AuthContext,
+    client_id: str,
+    refreshed_profile: dict[str, Any] | None = None,
+) -> None:
+    funnel_ids = _list_client_meta_funnel_ids(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
+    if not funnel_ids:
+        return
+
+    resolved = _resolve_meta_workspace_context_for_client_or_config(
+        session=session,
+        auth=auth,
+        client_id=client_id,
+    )
+    ruleset_version = str(
+        (
+            resolved.workspace_config.metadata_json.get("rulesetVersion")
+            if isinstance(resolved.workspace_config.metadata_json, dict)
+            else None
+        )
+        or RULESET_VERSION
+    )
+    resolved_profile = refreshed_profile
+    if resolved_profile is None:
+        try:
+            resolved_profile = activate_mos_meta_funnel_tracking_profile(
+                profile=merge_meta_profile(connection=resolved.connection, workspace_config=resolved.workspace_config),
+                funnel_ids=funnel_ids,
+                ruleset_version=ruleset_version,
+                client=_get_meta_client(connection=resolved.connection),
+                api_version=resolved.connection.graph_api_version,
+            )
+        except MetaProfileRefreshError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        except MetaWorkspaceConfigError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    repo = MetaAccountConfigsRepository(session)
+    _persist_refreshed_workspace_profile(
+        repo=repo,
+        connection=resolved.connection,
+        workspace_config=resolved.workspace_config,
+        refreshed_profile=resolved_profile,
+    )
+    upsert_meta_platform_profile_from_profile(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        profile=resolved_profile,
+    )
 
 
 def _resolve_meta_remote_context(
@@ -1846,6 +1935,8 @@ def create_workspace_meta_config(
         metadata_json=payload.metadata or {},
         created_by_user_id=auth.user_id,
     )
+    if config.is_default and config.status != "archived":
+        _repair_client_meta_funnel_tracking(session=session, auth=auth, client_id=client_id)
     return _meta_workspace_config_response(session=session, workspace_config=config, connection=connection)
 
 
@@ -1927,6 +2018,8 @@ def update_workspace_meta_config(
         status=updates.get("status", config.status),
         metadata_json=updates["metadata"] if "metadata" in updates and updates["metadata"] is not None else config.metadata_json,
     )
+    if config.is_default and config.status != "archived":
+        _repair_client_meta_funnel_tracking(session=session, auth=auth, client_id=client_id)
     return _meta_workspace_config_response(session=session, workspace_config=config)
 
 
@@ -1944,6 +2037,7 @@ def select_workspace_meta_config(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta workspace config not found")
     repo.clear_default_workspace_config(org_id=auth.org_id, client_id=client_id)
     config = repo.update_workspace_config(config, is_default=True)
+    _repair_client_meta_funnel_tracking(session=session, auth=auth, client_id=client_id)
     return _meta_workspace_config_response(session=session, workspace_config=config)
 
 
@@ -1997,6 +2091,13 @@ def validate_workspace_meta_config(
         )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    if config.is_default and config.status != "archived":
+        _repair_client_meta_funnel_tracking(
+            session=session,
+            auth=auth,
+            client_id=client_id,
+            refreshed_profile=refreshed,
+        )
     return _meta_workspace_config_response(session=session, workspace_config=config, connection=connection)
 
 

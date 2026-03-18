@@ -8,6 +8,14 @@ import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckCon
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import {
+  buildPurchaseEventParams,
+  clearCheckoutQueryParam,
+  clearPendingMetaPurchase,
+  pendingMetaPurchaseStorageKey,
+  readPendingMetaPurchase,
+} from "@/lib/metaCheckout";
+import { mapRuntimeEventToMetaPixel } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
@@ -210,28 +218,6 @@ function getUtmParams(): Record<string, string> {
   return utm;
 }
 
-function mapRuntimeEventToMetaPixel(
-  event: { eventType: string; props?: Record<string, unknown> },
-): { eventName: string; params?: Record<string, unknown> } | null {
-  if (event.eventType === "page_view") {
-    return { eventName: "PageView" };
-  }
-  if (event.eventType === "cta_click") {
-    const variantId = typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
-    if (variantId) {
-      return {
-        eventName: "InitiateCheckout",
-        params: {
-          content_ids: [variantId],
-          content_type: "product",
-          num_items: 1,
-        },
-      };
-    }
-  }
-  return null;
-}
-
 async function parsePublicError(resp: Response): Promise<string> {
   let raw: unknown;
   try {
@@ -259,6 +245,7 @@ export function PublicFunnelPage() {
   const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
+  const handledCheckoutReturnRef = useRef<string | null>(null);
   const effectiveSlug = routeSlug || undefined;
 
   const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
@@ -400,6 +387,40 @@ export function PublicFunnelPage() {
     const metaPixelId = page?.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
     ensureMetaPixel(metaPixelId);
   }, [page?.tracking?.metaPixelId, page?.tracking?.provider]);
+
+  useEffect(() => {
+    if (!page) return;
+
+    const url = new URL(window.location.href);
+    const checkoutStatus = url.searchParams.get("checkout");
+    if (checkoutStatus !== "success" && checkoutStatus !== "cancel") {
+      return;
+    }
+
+    const pendingPurchaseKey = pendingMetaPurchaseStorageKey(sessionId, funnelSlug);
+    const pendingPurchase = pendingPurchaseKey ? readPendingMetaPurchase(sessionStorage, pendingPurchaseKey) : null;
+    const checkoutMarker = pendingPurchase
+      ? `${checkoutStatus}:${pendingPurchase.createdAt}`
+      : `${checkoutStatus}:${sessionId}:${page.pageId}`;
+    if (handledCheckoutReturnRef.current === checkoutMarker) {
+      return;
+    }
+    handledCheckoutReturnRef.current = checkoutMarker;
+
+    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    if (checkoutStatus === "success") {
+      if (pendingPurchase) {
+        trackMetaPixelEvent(metaPixelId, "Purchase", buildPurchaseEventParams(pendingPurchase));
+      } else {
+        trackMetaPixelEvent(metaPixelId, "Purchase");
+      }
+    }
+
+    if (pendingPurchaseKey) {
+      clearPendingMetaPurchase(sessionStorage, pendingPurchaseKey);
+    }
+    window.history.replaceState(window.history.state, "", clearCheckoutQueryParam(window.location.href));
+  }, [funnelSlug, page, sessionId]);
 
   useEffect(() => {
     if (!page || !meta) return;

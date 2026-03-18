@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +17,10 @@ class ShopifyOrderWebhookPayload(BaseModel):
     shopDomain: str
     orderId: str
     orderName: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    browserIp: str | None = None
+    userAgent: str | None = None
     currency: str | None = None
     totalPrice: str | None = None
     createdAt: str | None = None

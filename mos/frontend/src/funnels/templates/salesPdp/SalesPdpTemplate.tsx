@@ -35,6 +35,7 @@ import {
 } from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
+import { pendingMetaPurchaseStorageKey, writePendingMetaPurchase } from "@/lib/metaCheckout";
 
 export const salesPdpDefaults = defaults as {
   config: PdpConfig;
@@ -1202,6 +1203,10 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
     setIsCheckingOut(true);
     try {
+      const checkoutReturnUrl = new URL(window.location.href);
+      const checkoutCancelUrl = new URL(window.location.href);
+      checkoutReturnUrl.searchParams.set("checkout", "success");
+      checkoutCancelUrl.searchParams.set("checkout", "cancel");
       runtime.trackEvent?.({ eventType: "cta_click", props: { variantId: variant.id } });
       const response = await fetch(`${apiBaseUrl}/public/checkout`, {
         method: "POST",
@@ -1211,8 +1216,8 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
           variantId: variant.id,
           selection,
           quantity: 1,
-          successUrl: `${window.location.origin}${window.location.pathname}?checkout=success`,
-          cancelUrl: `${window.location.origin}${window.location.pathname}?checkout=cancel`,
+          successUrl: checkoutReturnUrl.toString(),
+          cancelUrl: checkoutCancelUrl.toString(),
           pageId: runtime.pageId || undefined,
           visitorId: runtime.visitorId || undefined,
           sessionId: runtime.sessionId || undefined,
@@ -1226,6 +1231,19 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       const data = await response.json();
       if (!data?.checkoutUrl) {
         throw new Error("Checkout URL is missing.");
+      }
+      const normalizedProvider = typeof variant.provider === "string" ? variant.provider.trim().toLowerCase() : "";
+      const pendingPurchaseKey = pendingMetaPurchaseStorageKey(runtime.sessionId || null, runtime.funnelSlug);
+      if (normalizedProvider === "stripe" && pendingPurchaseKey) {
+        writePendingMetaPurchase(sessionStorage, pendingPurchaseKey, {
+          funnelSlug: runtime.funnelSlug,
+          pageId: runtime.pageId || null,
+          variantId: variant.id,
+          value: variant.price,
+          currency: variant.currency || null,
+          quantity: 1,
+          provider: normalizedProvider,
+        });
       }
       window.location.href = data.checkoutUrl as string;
     } catch (err) {

@@ -11,8 +11,11 @@ from urllib.parse import unquote, urljoin, urlparse
 from uuid import uuid4
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.db.models import PaidAdsPlatformProfile
+from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.services.meta_review import resolve_meta_review_destination_url
 from app.services.meta_ads import MetaAdsClient, MetaAdsError
 
@@ -113,6 +116,45 @@ def clean_optional_text(value: str | None) -> str | None:
 def normalize_tracking_provider(value: str | None) -> str | None:
     cleaned = clean_optional_text(value)
     return cleaned.lower().replace(" ", "_") if cleaned else None
+
+
+def upsert_meta_platform_profile_from_profile(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    profile: dict[str, Any],
+) -> PaidAdsPlatformProfile:
+    metadata = profile.get("metadata")
+    profile_metadata = dict(metadata) if isinstance(metadata, dict) else {}
+    repo = PaidAdsQaRepository(session)
+    return repo.upsert_platform_profile(
+        org_id=org_id,
+        client_id=client_id,
+        platform="meta",
+        ruleset_version=str(profile.get("rulesetVersion") or RULESET_VERSION),
+        business_manager_id=clean_optional_text(profile.get("businessManagerId")),
+        business_manager_name=clean_optional_text(profile.get("businessManagerName")),
+        page_id=clean_optional_text(profile.get("pageId")),
+        page_name=clean_optional_text(profile.get("pageName")),
+        ad_account_id=clean_optional_text(profile.get("adAccountId")),
+        ad_account_name=clean_optional_text(profile.get("adAccountName")),
+        payment_method_type=normalize_tracking_provider(profile.get("paymentMethodType")),
+        payment_method_status=clean_optional_text(profile.get("paymentMethodStatus")),
+        pixel_id=clean_optional_text(profile.get("pixelId")),
+        data_set_id=clean_optional_text(profile.get("dataSetId")),
+        data_set_shopify_partner_installed=profile.get("dataSetShopifyPartnerInstalled"),
+        data_set_data_sharing_level=normalize_tracking_provider(profile.get("dataSetDataSharingLevel")),
+        data_set_assigned_to_ad_account=profile.get("dataSetAssignedToAdAccount"),
+        verified_domain=clean_optional_text(profile.get("verifiedDomain")),
+        verified_domain_status=normalize_tracking_provider(profile.get("verifiedDomainStatus")),
+        attribution_click_window=normalize_tracking_provider(profile.get("attributionClickWindow")),
+        attribution_view_window=normalize_tracking_provider(profile.get("attributionViewWindow")),
+        view_through_enabled=profile.get("viewThroughEnabled"),
+        tracking_provider=normalize_tracking_provider(profile.get("trackingProvider")),
+        tracking_url_parameters=clean_optional_text(profile.get("trackingUrlParameters")),
+        metadata_json=profile_metadata,
+    )
 
 
 def rules_by_id(ruleset: dict[str, Any]) -> dict[str, dict[str, Any]]:
