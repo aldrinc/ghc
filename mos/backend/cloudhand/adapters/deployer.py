@@ -1120,6 +1120,8 @@ WantedBy=multi-user.target
                 )
             listen_port = int(ports[0])
 
+        upstream_api_base_root = source.upstream_api_base_root.rstrip("/")
+
         conf = f"""server {{
     listen {listen_port};
     server_name {server_name_line};
@@ -1130,26 +1132,24 @@ WantedBy=multi-user.target
     proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
     proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
 
-    location = /api/public/checkout {{
-        default_type application/json;
-        return 501 '{{"detail":"Checkout is unavailable in standalone artifact mode."}}';
-    }}
-
-    location ^~ /api/public/events {{
-        return 204;
-    }}
-
-    location ^~ /api/public/assets/ {{
-        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
+    location ^~ /api/ {{
+        proxy_pass {upstream_api_base_root}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }}
 
     location ^~ /public/assets/ {{
-        try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;
-    }}
-
-    location ^~ /api/public/funnels/ {{
-        default_type application/json;
-        try_files $uri.json =404;
+        proxy_pass {upstream_api_base_root}/public/assets/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }}
 
     location / {{
