@@ -58,6 +58,15 @@ export function useMetaApi() {
     [request],
   );
 
+  const updateConnection = useCallback(
+    (connectionId: string, payload: MetaAdAccountConnectionUpsertPayload) =>
+      request<MetaAdAccountConnection>(`/meta/connections/${connectionId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    [request],
+  );
+
   const validateConnection = useCallback(
     (connectionId: string) =>
       request<MetaAdAccountConnection>(`/meta/connections/${connectionId}/validate`, {
@@ -236,6 +245,7 @@ export function useMetaApi() {
   return {
     listConnections,
     createConnection,
+    updateConnection,
     validateConnection,
     getActiveConfig,
     getConfig,
