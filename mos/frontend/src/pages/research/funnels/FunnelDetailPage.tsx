@@ -685,7 +685,18 @@ export function FunnelDetailPage() {
                           {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
                         </span>
                       ) : deployDomains.data?.workspace_scope_error ? (
-                        <span className="truncate text-warning">{deployDomains.data.workspace_scope_error}</span>
+                        <>
+                          <span className="truncate text-warning">{deployDomains.data.workspace_scope_error}</span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            onClick={startEditingDeployDomains}
+                            className="shrink-0"
+                          >
+                            Edit
+                          </Button>
+                        </>
                       ) : deployDomains.data?.workload_found || configuredDeployDomains.length > 0 ? (
                         <>
                           {configuredDeployDomains.length ? (
