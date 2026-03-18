@@ -183,6 +183,52 @@ def _metadata_value(value: object, key: str) -> str:
     return text
 
 
+def _record_checkout_started_event(
+    *,
+    session: Session,
+    request: Request,
+    funnel: Funnel,
+    page_id: str | None,
+    visitor_id: str | None,
+    session_id: str | None,
+    utm: dict[str, object] | None,
+    provider: str,
+    checkout_session_id: str,
+    variant: ProductVariant,
+    quantity: int,
+) -> None:
+    publication_id = funnel.active_publication_id
+    if publication_id is None or not page_id:
+        return
+
+    session.add(
+        FunnelEvent(
+            occurred_at=datetime.now(timezone.utc),
+            org_id=funnel.org_id,
+            client_id=funnel.client_id,
+            campaign_id=funnel.campaign_id,
+            funnel_id=funnel.id,
+            publication_id=publication_id,
+            page_id=page_id,
+            event_type=FunnelEventTypeEnum.checkout_started,
+            visitor_id=visitor_id,
+            session_id=session_id,
+            host=request.headers.get("host"),
+            path=request.url.path,
+            referrer=request.headers.get("referer"),
+            utm=dict(utm or {}),
+            props={
+                "provider": provider,
+                "checkout_session_id": checkout_session_id,
+                "variant_id": str(variant.id),
+                "offer_id": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+                "quantity": quantity,
+            },
+        )
+    )
+    session.commit()
+
+
 def _resolve_public_meta_tracking(*, session: Session, funnel: Funnel) -> dict[str, str] | None:
     profile = PaidAdsQaRepository(session).get_platform_profile(
         org_id=str(funnel.org_id),
@@ -623,6 +669,19 @@ def public_checkout(
             line_items=[{"price": external_price_id, "quantity": payload.quantity}],
             metadata=metadata,
         )
+        _record_checkout_started_event(
+            session=session,
+            request=request,
+            funnel=funnel,
+            page_id=payload.pageId,
+            visitor_id=payload.visitorId,
+            session_id=payload.sessionId,
+            utm=payload.utm,
+            provider=normalized_provider,
+            checkout_session_id=str(checkout_session.id),
+            variant=variant,
+            quantity=payload.quantity,
+        )
         return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
     if normalized_provider == "shopify":
@@ -636,6 +695,19 @@ def public_checkout(
             variant_gid=external_price_id,
             quantity=payload.quantity,
             metadata=metadata,
+        )
+        _record_checkout_started_event(
+            session=session,
+            request=request,
+            funnel=funnel,
+            page_id=payload.pageId,
+            visitor_id=payload.visitorId,
+            session_id=payload.sessionId,
+            utm=payload.utm,
+            provider=normalized_provider,
+            checkout_session_id=str(checkout["cartId"]),
+            variant=variant,
+            quantity=payload.quantity,
         )
         return {"checkoutUrl": checkout["checkoutUrl"], "sessionId": checkout["cartId"]}
 

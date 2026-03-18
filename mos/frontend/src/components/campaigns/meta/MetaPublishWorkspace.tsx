@@ -8,6 +8,7 @@ import { MetaGeneratePanel } from "./MetaGeneratePanel";
 import { MetaReviewPanel } from "./MetaReviewPanel";
 import { MetaQaPanel } from "./MetaQaPanel";
 import { MetaPublishConfigPanel } from "./MetaPublishConfigPanel";
+import { MetaManagementPanel } from "./MetaManagementPanel";
 
 function MetaPublishWorkspaceInner() {
   const [activePhase, setActivePhase] = useState<MetaWorkflowPhase>("review");
@@ -21,6 +22,7 @@ function MetaPublishWorkspaceInner() {
       {activePhase === "review" ? <MetaReviewPanel onAdvance={() => setActivePhase("qa")} /> : null}
       {activePhase === "qa" ? <MetaQaPanel onAdvance={() => setActivePhase("publish")} /> : null}
       {activePhase === "publish" ? <MetaPublishConfigPanel /> : null}
+      {activePhase === "manage" ? <MetaManagementPanel /> : null}
     </div>
   );
 }

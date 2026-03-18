@@ -246,6 +246,7 @@ class FunnelEventTypeEnum(str, Enum):
     cta_click = "cta_click"
     funnel_enter = "funnel_enter"
     funnel_exit = "funnel_exit"
+    checkout_started = "checkout_started"
     order_completed = "order_completed"
 
 

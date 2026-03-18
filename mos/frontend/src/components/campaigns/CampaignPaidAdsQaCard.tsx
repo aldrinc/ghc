@@ -50,6 +50,15 @@ type ProfileFormState = {
   viewThroughEnabled: BooleanSelectValue;
   trackingProvider: string;
   trackingUrlParameters: string;
+  adLinkCtrMin: string;
+  adLinkCtrGood: string;
+  presellCtrTarget: string;
+  salesPdpPurchaseCvrMin: string;
+  salesPdpPurchaseCvrGood: string;
+  checkoutCvrTarget: string;
+  atcTarget30AndBelow: string;
+  atcTarget97To126: string;
+  atcTarget127Plus: string;
 };
 
 const BOOLEAN_OPTIONS: SelectOption[] = [
@@ -96,6 +105,119 @@ const VIEW_WINDOW_OPTIONS: SelectOption[] = [
   { label: "1d", value: "1d" },
   { label: "0d", value: "0d" },
 ];
+
+const META_MANAGEMENT_BENCHMARKS_KEY = "metaManagementBenchmarks";
+
+const DEFAULT_META_MANAGEMENT_BENCHMARKS = {
+  adLinkCtrPct: { minimum: 1.5, good: 2.5 },
+  presellCtrPct: { target: 30 },
+  salesPdpPurchaseCvrPct: { minimum: 3, good: 5 },
+  checkoutCvrPct: { target: 30 },
+  salesPdpAtcPctPriceBands: {
+    atcTarget30AndBelow: 15,
+    atcTarget97To126: 10,
+    atcTarget127Plus: 7,
+  },
+} as const;
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatBenchmarkNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, "");
+}
+
+function parseRequiredNumber(value: string, label: string): number {
+  const parsed = Number(value.trim());
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${label} must be a valid number.`);
+  }
+  return parsed;
+}
+
+function buildMetaManagementBenchmarkMetadata(form: ProfileFormState): Record<string, unknown> {
+  return {
+    version: 1,
+    adLinkCtrPct: {
+      minimum: parseRequiredNumber(form.adLinkCtrMin, "Ad link CTR minimum"),
+      good: parseRequiredNumber(form.adLinkCtrGood, "Ad link CTR good"),
+    },
+    presellCtrPct: {
+      target: parseRequiredNumber(form.presellCtrTarget, "Advertorial / listicle CTR target"),
+    },
+    salesPdpPurchaseCvrPct: {
+      minimum: parseRequiredNumber(form.salesPdpPurchaseCvrMin, "Sales PDP conversion minimum"),
+      good: parseRequiredNumber(form.salesPdpPurchaseCvrGood, "Sales PDP conversion good"),
+    },
+    checkoutCvrPct: {
+      target: parseRequiredNumber(form.checkoutCvrTarget, "Checkout conversion target"),
+    },
+    salesPdpAtcPctPriceBands: [
+      {
+        id: "entry_30",
+        label: "$30 and below",
+        maxPrice: 30,
+        target: parseRequiredNumber(form.atcTarget30AndBelow, "$30 and below ATC target"),
+      },
+      {
+        id: "core_97_126",
+        label: "$97-$126.99",
+        minPrice: 97,
+        maxPrice: 126.99,
+        target: parseRequiredNumber(form.atcTarget97To126, "$97-$126.99 ATC target"),
+      },
+      {
+        id: "premium_127_plus",
+        label: "$127+",
+        minPrice: 127,
+        target: parseRequiredNumber(form.atcTarget127Plus, "$127+ ATC target"),
+      },
+    ],
+  };
+}
+
+function readMetaManagementBenchmarkForm(metadata: Record<string, unknown> | null | undefined) {
+  const root: Record<string, unknown> = metadata && typeof metadata === "object" ? metadata : {};
+  const benchmarks =
+    root[META_MANAGEMENT_BENCHMARKS_KEY] && typeof root[META_MANAGEMENT_BENCHMARKS_KEY] === "object"
+      ? (root[META_MANAGEMENT_BENCHMARKS_KEY] as Record<string, unknown>)
+      : {};
+  const adLinkCtr = benchmarks.adLinkCtrPct as Record<string, unknown> | undefined;
+  const presellCtr = benchmarks.presellCtrPct as Record<string, unknown> | undefined;
+  const salesPdpPurchaseCvr = benchmarks.salesPdpPurchaseCvrPct as Record<string, unknown> | undefined;
+  const checkoutCvr = benchmarks.checkoutCvrPct as Record<string, unknown> | undefined;
+  const atcBands = Array.isArray(benchmarks.salesPdpAtcPctPriceBands)
+    ? benchmarks.salesPdpAtcPctPriceBands
+    : [];
+  const bandById = new Map<string, Record<string, unknown>>(
+    atcBands
+      .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+      .map((entry) => [String(entry.id || ""), entry]),
+  );
+
+  return {
+    adLinkCtrMin: formatBenchmarkNumber(readNumber(adLinkCtr?.minimum) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.minimum),
+    adLinkCtrGood: formatBenchmarkNumber(readNumber(adLinkCtr?.good) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.good),
+    presellCtrTarget: formatBenchmarkNumber(readNumber(presellCtr?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.presellCtrPct.target),
+    salesPdpPurchaseCvrMin: formatBenchmarkNumber(
+      readNumber(salesPdpPurchaseCvr?.minimum) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.minimum,
+    ),
+    salesPdpPurchaseCvrGood: formatBenchmarkNumber(
+      readNumber(salesPdpPurchaseCvr?.good) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.good,
+    ),
+    checkoutCvrTarget: formatBenchmarkNumber(readNumber(checkoutCvr?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.checkoutCvrPct.target),
+    atcTarget30AndBelow: formatBenchmarkNumber(
+      readNumber(bandById.get("entry_30")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget30AndBelow,
+    ),
+    atcTarget97To126: formatBenchmarkNumber(
+      readNumber(bandById.get("core_97_126")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget97To126,
+    ),
+    atcTarget127Plus: formatBenchmarkNumber(
+      readNumber(bandById.get("premium_127_plus")?.target) ?? DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget127Plus,
+    ),
+  };
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -149,6 +271,15 @@ function emptyProfileFormState(): ProfileFormState {
     viewThroughEnabled: "",
     trackingProvider: "",
     trackingUrlParameters: "",
+    adLinkCtrMin: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.minimum),
+    adLinkCtrGood: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.adLinkCtrPct.good),
+    presellCtrTarget: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.presellCtrPct.target),
+    salesPdpPurchaseCvrMin: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.minimum),
+    salesPdpPurchaseCvrGood: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpPurchaseCvrPct.good),
+    checkoutCvrTarget: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.checkoutCvrPct.target),
+    atcTarget30AndBelow: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget30AndBelow),
+    atcTarget97To126: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget97To126),
+    atcTarget127Plus: formatBenchmarkNumber(DEFAULT_META_MANAGEMENT_BENCHMARKS.salesPdpAtcPctPriceBands.atcTarget127Plus),
   };
 }
 
@@ -171,6 +302,7 @@ function normalizeOptionalText(value: string): string | undefined {
 
 function buildProfileFormState(profile: PaidAdsPlatformProfile | null): ProfileFormState {
   if (!profile) return emptyProfileFormState();
+  const benchmarkForm = readMetaManagementBenchmarkForm(profile.metadata);
   return {
     businessManagerId: profile.businessManagerId || "",
     pageId: profile.pageId || "",
@@ -189,6 +321,15 @@ function buildProfileFormState(profile: PaidAdsPlatformProfile | null): ProfileF
     viewThroughEnabled: booleanToSelect(profile.viewThroughEnabled),
     trackingProvider: profile.trackingProvider || "",
     trackingUrlParameters: profile.trackingUrlParameters || "",
+    adLinkCtrMin: benchmarkForm.adLinkCtrMin,
+    adLinkCtrGood: benchmarkForm.adLinkCtrGood,
+    presellCtrTarget: benchmarkForm.presellCtrTarget,
+    salesPdpPurchaseCvrMin: benchmarkForm.salesPdpPurchaseCvrMin,
+    salesPdpPurchaseCvrGood: benchmarkForm.salesPdpPurchaseCvrGood,
+    checkoutCvrTarget: benchmarkForm.checkoutCvrTarget,
+    atcTarget30AndBelow: benchmarkForm.atcTarget30AndBelow,
+    atcTarget97To126: benchmarkForm.atcTarget97To126,
+    atcTarget127Plus: benchmarkForm.atcTarget127Plus,
   };
 }
 
@@ -196,6 +337,10 @@ function buildProfilePayload(
   form: ProfileFormState,
   metadata: Record<string, unknown>,
 ): PaidAdsPlatformProfileUpsertPayload {
+  const nextMetadata = {
+    ...metadata,
+    [META_MANAGEMENT_BENCHMARKS_KEY]: buildMetaManagementBenchmarkMetadata(form),
+  };
   return {
     rulesetVersion: PAID_ADS_QA_RULESET_VERSION,
     businessManagerId: normalizeOptionalText(form.businessManagerId),
@@ -215,7 +360,7 @@ function buildProfilePayload(
     viewThroughEnabled: selectToBoolean(form.viewThroughEnabled),
     trackingProvider: normalizeOptionalText(form.trackingProvider),
     trackingUrlParameters: normalizeOptionalText(form.trackingUrlParameters),
-    metadata,
+    metadata: nextMetadata,
   };
 }
 
@@ -681,6 +826,98 @@ export function CampaignPaidAdsQaCard({
                 placeholder="utm_source=meta&utm_medium=paid"
                 disabled={profileLoading || profilePending}
               />
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-xs text-content-muted">
+            Meta management benchmarks power the post-publish Manage phase. Thresholds are stored in the Meta paid ads
+            profile metadata and used without fallback remapping.
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="text-sm font-semibold text-content">Management benchmarks</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Ad link CTR minimum (%)</label>
+                <Input
+                  value={profileForm.adLinkCtrMin}
+                  onChange={(event) => updateField("adLinkCtrMin", event.target.value)}
+                  placeholder="1.5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Ad link CTR good (%)</label>
+                <Input
+                  value={profileForm.adLinkCtrGood}
+                  onChange={(event) => updateField("adLinkCtrGood", event.target.value)}
+                  placeholder="2.5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Advertorial / listicle CTR target (%)</label>
+                <Input
+                  value={profileForm.presellCtrTarget}
+                  onChange={(event) => updateField("presellCtrTarget", event.target.value)}
+                  placeholder="30"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Sales PDP CVR minimum (%)</label>
+                <Input
+                  value={profileForm.salesPdpPurchaseCvrMin}
+                  onChange={(event) => updateField("salesPdpPurchaseCvrMin", event.target.value)}
+                  placeholder="3"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Sales PDP CVR good (%)</label>
+                <Input
+                  value={profileForm.salesPdpPurchaseCvrGood}
+                  onChange={(event) => updateField("salesPdpPurchaseCvrGood", event.target.value)}
+                  placeholder="5"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Checkout CVR target (%)</label>
+                <Input
+                  value={profileForm.checkoutCvrTarget}
+                  onChange={(event) => updateField("checkoutCvrTarget", event.target.value)}
+                  placeholder="30"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$30 and below ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget30AndBelow}
+                  onChange={(event) => updateField("atcTarget30AndBelow", event.target.value)}
+                  placeholder="15"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$97-$126.99 ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget97To126}
+                  onChange={(event) => updateField("atcTarget97To126", event.target.value)}
+                  placeholder="10"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">$127+ ATC target (%)</label>
+                <Input
+                  value={profileForm.atcTarget127Plus}
+                  onChange={(event) => updateField("atcTarget127Plus", event.target.value)}
+                  placeholder="7"
+                  disabled={profileLoading || profilePending}
+                />
+              </div>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ const STEPS: StepDef[] = [
   { phase: "review", label: "Review" },
   { phase: "qa", label: "QA" },
   { phase: "publish", label: "Publish" },
+  { phase: "manage", label: "Manage" },
 ];
 
 type PhaseStatus = "completed" | "active" | "upcoming";
@@ -22,6 +23,7 @@ function resolveStepStatus(
     hasGeneratedAssets: boolean;
     creativeSpecCount: number;
     includedCount: number;
+    publishedCount: number;
   },
 ): PhaseStatus {
   if (step === activePhase) return "active";
@@ -29,6 +31,7 @@ function resolveStepStatus(
   // Simple heuristic for completion
   if (step === "generate" && context.hasGeneratedAssets && context.creativeSpecCount > 0) return "completed";
   if (step === "review" && context.includedCount > 0 && activePhase !== "generate" && activePhase !== "review") return "completed";
+  if (step === "publish" && context.publishedCount > 0 && activePhase === "manage") return "completed";
 
   const stepIndex = STEPS.findIndex((s) => s.phase === step);
   const activeIndex = STEPS.findIndex((s) => s.phase === activePhase);
@@ -67,7 +70,7 @@ export function MetaWorkflowStepper({
   activePhase: MetaWorkflowPhase;
   onPhaseChange: (phase: MetaWorkflowPhase) => void;
 }) {
-  const { hasGeneratedAssets, creativeSpecCount, includedPackageItems } = useMetaPublishContext();
+  const { hasGeneratedAssets, creativeSpecCount, includedPackageItems, visiblePublishRuns } = useMetaPublishContext();
 
   return (
     <div className="flex items-center gap-0">
@@ -76,12 +79,14 @@ export function MetaWorkflowStepper({
           hasGeneratedAssets,
           creativeSpecCount,
           includedCount: includedPackageItems.length,
+          publishedCount: visiblePublishRuns.length,
         });
         const prevStatus = idx > 0
           ? resolveStepStatus(STEPS[idx - 1].phase, activePhase, {
               hasGeneratedAssets,
               creativeSpecCount,
               includedCount: includedPackageItems.length,
+              publishedCount: visiblePublishRuns.length,
             })
           : null;
 

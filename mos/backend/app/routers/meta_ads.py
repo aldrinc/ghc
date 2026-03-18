@@ -108,7 +108,6 @@ from app.services.paid_ads_qa import (
     refresh_meta_platform_profile_from_graph,
     upsert_meta_platform_profile_from_profile,
 )
-from app.services.campaign_launch_context import ensure_campaign_launch_context_artifact
 from app.services.campaign_creative_context import ensure_campaign_creative_context_ready
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
@@ -984,6 +983,9 @@ def _persist_meta_management_artifacts(
             "adsets": plan.adsets,
             "rows": [row.model_dump(mode="json") for row in plan.rows],
             "observedActionTypes": plan.observedActionTypes,
+            "benchmarkContext": plan.benchmarkContext.model_dump(mode="json") if plan.benchmarkContext else None,
+            "funnelSnapshot": plan.funnelSnapshot.model_dump(mode="json") if plan.funnelSnapshot else None,
+            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
         },
         created_by_user=auth.user_id,
     )
@@ -998,6 +1000,7 @@ def _persist_meta_management_artifacts(
             "mode": plan.mode,
             "actions": [action.model_dump(mode="json") for action in plan.actions],
             "warnings": plan.warnings,
+            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
         },
         created_by_user=auth.user_id,
     )
@@ -1042,11 +1045,6 @@ def _validate_publish_plan(
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]], ResolvedMetaWorkspaceConfig]:
     _require_creative_context_ready(
-        session=session,
-        auth=auth,
-        campaign_id=str(campaign.id),
-    )
-    _require_launch_context_ready(
         session=session,
         auth=auth,
         campaign_id=str(campaign.id),
@@ -2467,21 +2465,51 @@ def plan_meta_management(
         ad_account_id=ad_account_id,
         meta_campaign_id=payload.metaCampaignId,
     )
-    response_payload = jsonable_encoder(plan)
+    campaign = None
     if local_meta_campaign and local_meta_campaign.campaign_id:
         campaigns_repo = CampaignsRepository(session)
         campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=str(local_meta_campaign.campaign_id))
-        if campaign is not None:
-            response_payload["artifacts"] = _persist_meta_management_artifacts(
-                session=session,
-                auth=auth,
-                campaign=campaign,
-                plan=plan,
-            )
-    elif payload.mode == "apply":
+    elif payload.mode == "apply" or payload.evaluateBenchmarks:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Apply mode requires a locally tracked published campaign before actions can be persisted.",
+            detail=(
+                "A locally tracked published campaign is required before management artifacts "
+                "or benchmark evaluation can run."
+            ),
+        )
+
+    if payload.evaluateBenchmarks:
+        if campaign is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Benchmark evaluation requires a locally tracked campaign record.",
+            )
+        try:
+            benchmark_context, funnel_snapshot, benchmark_evaluations = build_management_benchmark_payload(
+                session=session,
+                org_id=auth.org_id,
+                campaign=campaign,
+                meta_campaign_id=payload.metaCampaignId,
+                date_preset=payload.datePreset,
+                ad_rows=plan.rows,
+            )
+        except MetaManagementBenchmarkError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        plan = plan.model_copy(
+            update={
+                "benchmarkContext": benchmark_context,
+                "funnelSnapshot": funnel_snapshot,
+                "benchmarkEvaluations": benchmark_evaluations,
+            }
+        )
+
+    response_payload = jsonable_encoder(plan)
+    if campaign is not None:
+        response_payload["artifacts"] = _persist_meta_management_artifacts(
+            session=session,
+            auth=auth,
+            campaign=campaign,
+            plan=plan,
         )
     return response_payload
 
@@ -2949,8 +2977,8 @@ def create_meta_publish_run(
         run_items_by_asset_id[str(asset.id)] = run_item
 
     try:
-        created_campaign = create_meta_campaign(
-            MetaCampaignCreateRequest(
+        created_campaign = _create_meta_campaign_internal(
+            payload=MetaCampaignCreateRequest(
                 requestId=f"meta-launch-plan:{launch_plan_key}:campaign",
                 adAccountId=ad_account_id,
                 metaConfigId=str(resolved_meta_config.workspace_config.id),
@@ -2982,8 +3010,8 @@ def create_meta_publish_run(
             unique_adset_specs[str(resolved["adset_spec"].id)] = resolved["adset_spec"]
 
         for adset_spec_id, adset_spec in unique_adset_specs.items():
-            created_adset = create_meta_adset(
-                MetaAdSetCreateRequest(
+            created_adset = _create_meta_adset_internal(
+                payload=MetaAdSetCreateRequest(
                     requestId=f"meta-launch-plan:{launch_plan_key}:adset:{adset_spec_id}",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
@@ -3019,9 +3047,9 @@ def create_meta_publish_run(
             adset_spec = resolved["adset_spec"]
             run_item = run_items_by_asset_id[str(asset.id)]
 
-            uploaded_asset = upload_meta_asset(
-                str(asset.id),
-                MetaAssetUploadRequest(
+            uploaded_asset = _upload_meta_asset_internal(
+                asset_id=str(asset.id),
+                payload=MetaAssetUploadRequest(
                     requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:upload",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
@@ -3030,8 +3058,8 @@ def create_meta_publish_run(
                 session=session,
                 resolved_meta_config=resolved_meta_config,
             )
-            created_creative = create_meta_creative(
-                MetaCreativeCreateRequest(
+            created_creative = _create_meta_creative_internal(
+                payload=MetaCreativeCreateRequest(
                     requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:creative",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
@@ -3057,8 +3085,8 @@ def create_meta_publish_run(
                     detail=f"Meta publish run did not receive a meta_creative_id for asset {asset.id}.",
                 )
 
-            created_ad = create_meta_ad(
-                MetaAdCreateRequest(
+            created_ad = _create_meta_ad_internal(
+                payload=MetaAdCreateRequest(
                     requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:ad",
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),

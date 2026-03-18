@@ -1,14 +1,43 @@
 from __future__ import annotations
 
 import io
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from PIL import Image
+from sqlalchemy import select
 
-from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
-from app.db.models import Artifact, Asset, Campaign, ClientUserPreference, MetaAdSetSpec, MetaCampaign, MetaCreativeSpec
+from app.db.enums import (
+    ArtifactTypeEnum,
+    AssetSourceEnum,
+    AssetStatusEnum,
+    FunnelEventTypeEnum,
+    FunnelPageVersionStatusEnum,
+    FunnelStatusEnum,
+)
+from app.db.models import (
+    Artifact,
+    Asset,
+    Campaign,
+    ClientUserPreference,
+    Funnel,
+    FunnelEvent,
+    FunnelPage,
+    FunnelPageVersion,
+    FunnelPublication,
+    FunnelPublicationPage,
+    MetaAdAccountConnection,
+    MetaAdSetSpec,
+    MetaCampaign,
+    MetaCreativeSpec,
+    MetaWorkspaceAdConfig,
+    ProductOffer,
+    ProductVariant,
+)
 from app.routers import meta_ads as meta_ads_router
+from app.services.integration_secrets import encrypt_secret_json
 from app.services.paid_ads_qa import RULESET_VERSION
+from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 
 
@@ -195,7 +224,61 @@ def _create_meta_publish_inputs(
     return creative_spec, adset_spec
 
 
-def _upsert_meta_profile(api_client, *, client_id: str) -> None:
+def _seed_meta_workspace_config(db_session, *, client_id: str) -> MetaWorkspaceAdConfig:
+    connection = MetaAdAccountConnection(
+        org_id=TEST_ORG_ID,
+        name="Primary Meta Connection",
+        ad_account_id="act_123456",
+        ad_account_name="Test Ad Account",
+        business_manager_id="bm_123",
+        business_manager_name="Test Business",
+        graph_api_version="v23.0",
+        graph_api_base_url="https://graph.facebook.com",
+        credentials_encrypted=encrypt_secret_json({"accessToken": "meta-token"}),
+        status="active",
+        validation_status="passed",
+    )
+    db_session.add(connection)
+    db_session.commit()
+    db_session.refresh(connection)
+
+    workspace_config = MetaWorkspaceAdConfig(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        meta_connection_id=connection.id,
+        name="Primary Meta Workspace Config",
+        is_default=True,
+        status="active",
+        page_id="page_123",
+        page_name="Test Page",
+        pixel_id="pixel_123",
+        verified_domain="shop.thehonestherbalist.com",
+        validation_status="passed",
+    )
+    db_session.add(workspace_config)
+    db_session.commit()
+    db_session.refresh(workspace_config)
+    return workspace_config
+
+
+def _meta_management_benchmark_metadata() -> dict[str, object]:
+    return {
+        "metaManagementBenchmarks": {
+            "version": 1,
+            "adLinkCtrPct": {"minimum": 1.5, "good": 2.5},
+            "presellCtrPct": {"target": 30.0},
+            "salesPdpPurchaseCvrPct": {"minimum": 3.0, "good": 5.0},
+            "checkoutCvrPct": {"target": 30.0},
+            "salesPdpAtcPctPriceBands": [
+                {"id": "entry_30", "label": "$30 and below", "maxPrice": 30.0, "target": 15.0},
+                {"id": "core_97_126", "label": "$97-$126.99", "minPrice": 97.0, "maxPrice": 126.99, "target": 10.0},
+                {"id": "premium_127_plus", "label": "$127+", "minPrice": 127.0, "target": 7.0},
+            ],
+        }
+    }
+
+
+def _upsert_meta_profile(api_client, *, client_id: str, metadata: dict[str, object] | None = None) -> None:
     response = api_client.put(
         f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
         json={
@@ -205,9 +288,238 @@ def _upsert_meta_profile(api_client, *, client_id: str) -> None:
             "pixelId": "pixel_123",
             "verifiedDomain": "shop.thehonestherbalist.com",
             "verifiedDomainStatus": "verified",
+            "metadata": metadata or {},
         },
     )
     assert response.status_code == 200
+
+
+def _seed_management_funnel(
+    db_session,
+    *,
+    client_id: str,
+    product_id: str,
+    campaign_id: str,
+    price_cents: int = 10000,
+) -> dict[str, object]:
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    offer = ProductOffer(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        product_id=product_id,
+        name="Primary Offer",
+        business_model="one_time",
+    )
+    db_session.add(offer)
+    db_session.commit()
+    db_session.refresh(offer)
+
+    variant = ProductVariant(
+        product_id=product_id,
+        offer_id=offer.id,
+        title="Default",
+        price=price_cents,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+        option_values=None,
+    )
+    db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
+
+    funnel = Funnel(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        campaign_id=campaign.id,
+        product_id=product_id,
+        selected_offer_id=offer.id,
+        name="Management Funnel",
+        route_slug=f"management-funnel-{uuid4().hex[:8]}",
+        status=FunnelStatusEnum.published,
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    presell_page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Pre-Sell",
+        slug="story",
+        template_id="pre-sales-listicle",
+        ordering=1,
+    )
+    sales_page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales",
+        slug="offer",
+        template_id="sales-pdp",
+        ordering=2,
+    )
+    db_session.add(presell_page)
+    db_session.add(sales_page)
+    db_session.commit()
+    db_session.refresh(presell_page)
+    db_session.refresh(sales_page)
+
+    presell_page.next_page_id = sales_page.id
+    db_session.add(presell_page)
+
+    presell_version = FunnelPageVersion(
+        page_id=presell_page.id,
+        status=FunnelPageVersionStatusEnum.approved,
+        puck_data={"root": {}},
+    )
+    sales_version = FunnelPageVersion(
+        page_id=sales_page.id,
+        status=FunnelPageVersionStatusEnum.approved,
+        puck_data={"root": {}},
+    )
+    db_session.add(presell_version)
+    db_session.add(sales_version)
+    db_session.commit()
+    db_session.refresh(presell_version)
+    db_session.refresh(sales_version)
+
+    publication = FunnelPublication(
+        funnel_id=funnel.id,
+        entry_page_id=presell_page.id,
+        created_by="test-user",
+    )
+    db_session.add(publication)
+    db_session.commit()
+    db_session.refresh(publication)
+
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication.id,
+            page_id=presell_page.id,
+            page_version_id=presell_version.id,
+            slug_at_publish=presell_page.slug,
+            title_at_publish=presell_page.name,
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication.id,
+            page_id=sales_page.id,
+            page_version_id=sales_version.id,
+            slug_at_publish=sales_page.slug,
+            title_at_publish=sales_page.name,
+        )
+    )
+    funnel.entry_page_id = presell_page.id
+    funnel.active_publication_id = publication.id
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    return {
+        "offer": offer,
+        "variant": variant,
+        "funnel": funnel,
+        "publication": publication,
+        "presellPage": presell_page,
+        "salesPage": sales_page,
+    }
+
+
+def _seed_management_funnel_events(
+    db_session,
+    *,
+    funnel: Funnel,
+    publication: FunnelPublication,
+    presell_page: FunnelPage,
+    sales_page: FunnelPage,
+) -> None:
+    now = datetime.now(timezone.utc)
+    events: list[FunnelEvent] = []
+    for idx in range(10):
+        session_id = f"session_{idx}"
+        visitor_id = f"visitor_{idx}"
+        events.append(
+            FunnelEvent(
+                occurred_at=now,
+                org_id=funnel.org_id,
+                client_id=funnel.client_id,
+                campaign_id=funnel.campaign_id,
+                funnel_id=funnel.id,
+                publication_id=publication.id,
+                page_id=presell_page.id,
+                event_type=FunnelEventTypeEnum.page_view,
+                visitor_id=visitor_id,
+                session_id=session_id,
+                host="funnel.example",
+                path="/story",
+                referrer=None,
+                utm={"source": "meta"},
+                props={},
+            )
+        )
+        events.append(
+            FunnelEvent(
+                occurred_at=now,
+                org_id=funnel.org_id,
+                client_id=funnel.client_id,
+                campaign_id=funnel.campaign_id,
+                funnel_id=funnel.id,
+                publication_id=publication.id,
+                page_id=sales_page.id,
+                event_type=FunnelEventTypeEnum.page_view,
+                visitor_id=visitor_id,
+                session_id=session_id,
+                host="funnel.example",
+                path="/offer",
+                referrer=None,
+                utm={"source": "meta"},
+                props={},
+            )
+        )
+    for idx in range(3):
+        events.append(
+            FunnelEvent(
+                occurred_at=now,
+                org_id=funnel.org_id,
+                client_id=funnel.client_id,
+                campaign_id=funnel.campaign_id,
+                funnel_id=funnel.id,
+                publication_id=publication.id,
+                page_id=presell_page.id,
+                event_type=FunnelEventTypeEnum.cta_click,
+                visitor_id=f"visitor_{idx}",
+                session_id=f"session_{idx}",
+                host="funnel.example",
+                path="/story",
+                referrer=None,
+                utm={"source": "meta"},
+                props={},
+            )
+        )
+    for event_type in (FunnelEventTypeEnum.checkout_started, FunnelEventTypeEnum.order_completed):
+        events.append(
+            FunnelEvent(
+                occurred_at=now,
+                org_id=funnel.org_id,
+                client_id=funnel.client_id,
+                campaign_id=funnel.campaign_id,
+                funnel_id=funnel.id,
+                publication_id=publication.id,
+                page_id=sales_page.id,
+                event_type=event_type,
+                visitor_id="visitor_0",
+                session_id="session_0",
+                host="funnel.example",
+                path="/offer",
+                referrer=None,
+                utm={"source": "meta"},
+                props={},
+            )
+        )
+
+    db_session.add_all(events)
+    db_session.commit()
 
 
 def _exclude_asset_from_publish(api_client, *, campaign_id: str, generation_key: str, asset_id: str) -> None:
@@ -673,12 +985,149 @@ def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
     assert payload["publishDomain"] == "lp.example.com"
 
 
+def test_validate_meta_publish_plan_supports_manual_creative_context_without_launch_lineage(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-manual",
+        db_session=None,
+    )
+
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_claude",
+        lambda **_kwargs: "claude-file-1",
+    )
+    monkeypatch.setattr("app.services.campaign_creative_context.is_gemini_file_search_enabled", lambda: False)
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_gemini_file_search",
+        lambda **_kwargs: None,
+    )
+
+    creative_context_response = api_client.post(
+        f"/campaigns/{campaign_id}/creative-context/loaded",
+        json=manual_creative_context_payload(campaign_id=campaign_id),
+    )
+    assert creative_context_response.status_code == 201, creative_context_response.text
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/manual-pre-sale",
+            "salesUrl": "https://lp.example.com/manual-offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_delivery = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_delivery.status_code == 200, validate_delivery.text
+
+    brief_id = "brief-publish-manual"
+    brief_artifact = Artifact(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "experimentId": "exp-manual-1",
+                    "requirements": [{"channel": "facebook", "format": "image_ad"}],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-manual",
+        asset_brief_id=brief_id,
+    )
+    creative_spec = MetaCreativeSpec(
+        org_id=TEST_ORG_ID,
+        asset_id=asset.id,
+        campaign_id=campaign_id,
+        name="Manual Publish Creative",
+        primary_text="Primary text",
+        headline="Headline",
+        description="Description",
+        call_to_action_type="LEARN_MORE",
+        destination_url="https://lp.example.com/manual-pre-sale",
+        page_id="page_123",
+        instagram_actor_id=None,
+        status="draft",
+        metadata_json={
+            "experimentSpecId": "exp-manual-1",
+            "destinationSource": "campaign_delivery_config",
+            "resolvedDestinationUrl": "https://lp.example.com/manual-pre-sale",
+        },
+    )
+    adset_spec = MetaAdSetSpec(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign_id,
+        name="Manual Launch Ad Set",
+        status="draft",
+        optimization_goal="OFFSITE_CONVERSIONS",
+        billing_event="IMPRESSIONS",
+        targeting={"geo_locations": {"countries": ["US"]}},
+        placements={"publisher_platforms": ["facebook"]},
+        daily_budget=5000,
+        lifetime_budget=None,
+        bid_amount=None,
+        start_time=None,
+        end_time=None,
+        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+        conversion_domain="lp.example.com",
+        metadata_json={"experimentSpecId": "exp-manual-1"},
+    )
+    db_session.add(creative_spec)
+    db_session.add(adset_spec)
+    db_session.commit()
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Manual External Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["includedCount"] == 1
+    assert payload["items"][0]["resolvedDestinationUrl"] == "https://lp.example.com/manual-pre-sale"
+
+
 def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, monkeypatch) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(
         api_client,
         suffix="management-apply",
         db_session=db_session,
     )
+    _ = product_id
+    _seed_meta_workspace_config(db_session, client_id=client_id)
     campaign = db_session.get(Campaign, campaign_id)
     assert campaign is not None
 
@@ -707,8 +1156,8 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
             return {"id": ad_id, "status": payload["status"]}
 
     monkeypatch.setattr(
-        "app.services.meta_media_buying.MetaAdsClient.from_settings",
-        classmethod(lambda cls: _FakeManagementClient()),
+        "app.routers.meta_ads._get_meta_client",
+        lambda **_kwargs: _FakeManagementClient(),
     )
     monkeypatch.setattr(
         "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
@@ -741,7 +1190,7 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
         "/meta/management/plan",
         json={
             "metaCampaignId": "meta_campaign_apply_123",
-            "adAccountId": "act_123456",
+            "clientId": client_id,
             "mode": "apply",
         },
     )
@@ -754,3 +1203,174 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
     assert payload["artifacts"]["recommendedActionsArtifactId"]
     assert payload["artifacts"]["approvalDecisionArtifactId"]
+
+
+def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_client, db_session, monkeypatch) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="management-benchmarks",
+        db_session=db_session,
+    )
+    _seed_meta_workspace_config(db_session, client_id=client_id)
+    _upsert_meta_profile(
+        api_client,
+        client_id=client_id,
+        metadata=_meta_management_benchmark_metadata(),
+    )
+    funnel_data = _seed_management_funnel(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        price_cents=10000,
+    )
+    _seed_management_funnel_events(
+        db_session,
+        funnel=funnel_data["funnel"],
+        publication=funnel_data["publication"],
+        presell_page=funnel_data["presellPage"],
+        sales_page=funnel_data["salesPage"],
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    local_meta_campaign = MetaCampaign(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:benchmark-campaign",
+        meta_campaign_id="meta_campaign_benchmark_123",
+        name="Benchmark Campaign",
+        objective="OUTCOME_SALES",
+        status="ACTIVE",
+        metadata_json={},
+    )
+    db_session.add(local_meta_campaign)
+    db_session.commit()
+
+    class _FakeManagementClient:
+        pass
+
+    monkeypatch.setattr(
+        "app.routers.meta_ads._get_meta_client",
+        lambda **_kwargs: _FakeManagementClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
+        lambda **_kwargs: (
+            {"id": "meta_campaign_benchmark_123", "name": "Benchmark Campaign", "status": "ACTIVE"},
+            [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_ad_level_insights",
+        lambda **_kwargs: [
+            {
+                "ad_id": "meta_ad_123",
+                "ad_name": "Ad One",
+                "adset_id": "meta_adset_123",
+                "campaign_id": "meta_campaign_benchmark_123",
+                "impressions": "1000",
+                "spend": "65.00",
+                "cpm": "65.00",
+                "inline_link_clicks": "30",
+                "inline_link_click_ctr": "3.0",
+                "cost_per_inline_link_click": "2.17",
+                "actions": [],
+                "action_values": [],
+            }
+        ],
+    )
+
+    response = api_client.post(
+        "/meta/management/plan",
+        json={
+            "metaCampaignId": "meta_campaign_benchmark_123",
+            "clientId": client_id,
+            "evaluateBenchmarks": True,
+            "datePreset": "last_3d",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
+    assert payload["benchmarkContext"]["atcPriceBandId"] == "core_97_126"
+    assert payload["funnelSnapshot"]["presellPageViewSessions"] == 10
+    assert payload["funnelSnapshot"]["presellCtaClickSessions"] == 3
+    assert payload["funnelSnapshot"]["salesPageViewSessions"] == 10
+    assert payload["funnelSnapshot"]["checkoutStartedSessions"] == 1
+    assert payload["funnelSnapshot"]["orderCompletedSessions"] == 1
+
+    evaluations = {entry["metricId"]: entry for entry in payload["benchmarkEvaluations"]}
+    assert evaluations["ad_link_ctr_pct"]["status"] == "good"
+    assert evaluations["presell_ctr_pct"]["status"] == "on_target"
+    assert evaluations["sales_pdp_atc_pct"]["status"] == "on_target"
+    assert evaluations["sales_pdp_purchase_cvr_pct"]["status"] == "good"
+    assert evaluations["checkout_cvr_pct"]["status"] == "on_target"
+    assert payload["artifacts"]["metricsSnapshotArtifactId"]
+
+    metrics_artifact = db_session.scalars(
+        select(Artifact).where(Artifact.id == payload["artifacts"]["metricsSnapshotArtifactId"])
+    ).first()
+    assert metrics_artifact is not None
+    assert metrics_artifact.data["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
+    assert metrics_artifact.data["funnelSnapshot"]["checkoutStartedSessions"] == 1
+    assert len(metrics_artifact.data["benchmarkEvaluations"]) == 5
+
+
+def test_meta_management_plan_errors_when_benchmark_profile_is_missing(api_client, db_session, monkeypatch) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="management-benchmarks-missing-profile",
+        db_session=db_session,
+    )
+    _ = product_id
+    _seed_meta_workspace_config(db_session, client_id=client_id)
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    local_meta_campaign = MetaCampaign(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:benchmark-missing-profile",
+        meta_campaign_id="meta_campaign_missing_profile_123",
+        name="Benchmark Campaign",
+        objective="OUTCOME_SALES",
+        status="ACTIVE",
+        metadata_json={},
+    )
+    db_session.add(local_meta_campaign)
+    db_session.commit()
+
+    class _FakeManagementClient:
+        pass
+
+    monkeypatch.setattr(
+        "app.routers.meta_ads._get_meta_client",
+        lambda **_kwargs: _FakeManagementClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
+        lambda **_kwargs: (
+            {"id": "meta_campaign_missing_profile_123", "name": "Benchmark Campaign", "status": "ACTIVE"},
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_ad_level_insights",
+        lambda **_kwargs: [],
+    )
+
+    response = api_client.post(
+        "/meta/management/plan",
+        json={
+            "metaCampaignId": "meta_campaign_missing_profile_123",
+            "clientId": client_id,
+            "evaluateBenchmarks": True,
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert "Meta paid ads profile is required" in response.json()["detail"]

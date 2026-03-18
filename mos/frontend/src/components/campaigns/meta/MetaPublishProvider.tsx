@@ -29,7 +29,7 @@ import type {
 
 export type MetaPackageView = "review" | "final";
 
-export type MetaWorkflowPhase = "generate" | "review" | "qa" | "publish";
+export type MetaWorkflowPhase = "generate" | "review" | "qa" | "publish" | "manage";
 
 export type MetaPublishCampaignForm = {
   publishBaseUrl: string;
@@ -473,7 +473,7 @@ export function MetaPublishProvider({
   // ---- Effects: config & pipeline loading -----------------------------------
   useEffect(() => {
     let cancelled = false;
-    getConfig()
+    getConfig(campaign.client_id)
       .then((data) => {
         if (cancelled) return;
         setConfig({ adAccountId: data.adAccountId, pageId: data.pageId, graphApiVersion: data.graphApiVersion });
@@ -485,7 +485,7 @@ export function MetaPublishProvider({
         setConfigError(getErrorMessage(err));
       });
     return () => { cancelled = true; };
-  }, [getConfig]);
+  }, [campaign.client_id, getConfig]);
 
   useEffect(() => { void refreshPipeline(); }, [refreshPipeline]);
 

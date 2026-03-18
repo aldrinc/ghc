@@ -20,7 +20,8 @@ export function MetaWorkflowHeader({
         <div>
           <div className="text-base font-semibold text-content">Meta ads review</div>
           <div className="text-sm text-content-muted">
-            Review internal Meta specs, exclude unwanted creatives, validate the final package, and publish paused to Meta.
+            Review internal Meta specs, exclude unwanted creatives, validate the final package, publish paused to Meta,
+            and monitor post-launch benchmarks.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
