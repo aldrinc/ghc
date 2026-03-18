@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
-from app.db.enums import CampaignDeliveryValidationStatusEnum, WorkflowStatusEnum
+from app.db.enums import ArtifactTypeEnum, CampaignDeliveryValidationStatusEnum, WorkflowStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, WorkflowRun
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
@@ -21,11 +21,17 @@ from app.db.repositories.products import ProductsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
+from app.schemas.campaign_creative_context import (
+    CampaignCreativeContextProviderRequest,
+    CampaignCreativeContextProviderResponse,
+    CampaignCreativeContextReadinessResponse,
+    CampaignManualCreativeContextUpsertRequest,
+    CampaignManualCreativeContextUpsertResponse,
+)
 from app.schemas.campaign_delivery import (
     CampaignDeliveryResponse,
     CampaignDeliveryUpsertRequest,
     CampaignDeliveryValidationResponse,
-    CampaignLaunchContextReadinessResponse,
 )
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
@@ -59,7 +65,11 @@ from app.services.campaign_delivery import (
     validate_campaign_delivery_config,
     validation_response_payload,
 )
-from app.services.campaign_launch_context import ensure_campaign_launch_context_artifact
+from app.services.campaign_creative_context import (
+    ensure_campaign_creative_context_ready,
+    persist_manual_campaign_creative_context,
+    set_campaign_creative_context_provider,
+)
 from app.services.paid_ads_qa import list_meta_copy_policy_issues
 from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
@@ -174,14 +184,14 @@ def _campaign_delivery_config_or_404(
     return config
 
 
-def _require_campaign_launch_context_ready(
+def _require_campaign_creative_context_ready(
     *,
     session: Session,
     org_id: str,
     campaign_id: str,
 ) -> None:
     campaign = _get_campaign_or_404(session=session, org_id=org_id, campaign_id=campaign_id)
-    readiness = ensure_campaign_launch_context_artifact(
+    readiness = ensure_campaign_creative_context_ready(
         session=session,
         org_id=org_id,
         campaign=campaign,
@@ -190,8 +200,8 @@ def _require_campaign_launch_context_ready(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "message": "Campaign launch context is not ready for downstream execution.",
-                "launchContextReadiness": readiness,
+                "message": "Campaign creative context is not ready for downstream execution.",
+                "creativeContextReadiness": readiness,
             },
         )
 
@@ -523,7 +533,7 @@ def upsert_campaign_delivery(
     except CampaignDeliveryConfigError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if normalized.delivery_mode.value == "external_urls":
-        _require_campaign_launch_context_ready(
+        _require_campaign_creative_context_ready(
             session=session,
             org_id=auth.org_id,
             campaign_id=str(campaign.id),
@@ -596,12 +606,60 @@ def get_campaign_launch_context_readiness(
     session: Session = Depends(get_session),
 ):
     campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
-    payload = ensure_campaign_launch_context_artifact(
+    payload = ensure_campaign_creative_context_ready(
         session=session,
         org_id=auth.org_id,
         campaign=campaign,
     )
-    return CampaignLaunchContextReadinessResponse.model_validate(payload).model_dump(mode="json")
+    return CampaignCreativeContextReadinessResponse.model_validate(payload).model_dump(mode="json")
+
+
+@router.put("/{campaign_id}/creative-context/provider")
+def update_campaign_creative_context_provider(
+    campaign_id: str,
+    payload: CampaignCreativeContextProviderRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    artifact = set_campaign_creative_context_provider(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+        provider=payload.provider,
+        created_by_user=auth.user_id,
+    )
+    return CampaignCreativeContextProviderResponse.model_validate(
+        {
+            "campaignId": str(campaign.id),
+            "provider": payload.provider.value,
+            "creativeContextArtifactId": str(artifact.id),
+            "checkedAt": artifact.created_at.isoformat() if artifact.created_at else _utcnow().isoformat(),
+        }
+    ).model_dump(mode="json")
+
+
+@router.post("/{campaign_id}/creative-context/loaded", status_code=status.HTTP_201_CREATED)
+def upsert_campaign_manual_creative_context(
+    campaign_id: str,
+    payload: CampaignManualCreativeContextUpsertRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign is missing a product_id. Attach a product before loading manual creative context.",
+        )
+    response_payload = persist_manual_campaign_creative_context(
+        session=session,
+        org_id=auth.org_id,
+        campaign=campaign,
+        payload=payload,
+        created_by_user=auth.user_id,
+    )
+    return CampaignManualCreativeContextUpsertResponse.model_validate(response_payload).model_dump(mode="json")
 
 
 @router.get("/{campaign_id}/strategy-v2-launches")
@@ -700,15 +758,11 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
-    try:
-        require_strategy_v2_outputs_if_enabled(
-            session=session,
-            org_id=auth.org_id,
-            client_id=str(campaign.client_id),
-            product_id=str(campaign.product_id),
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    _require_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
     if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -849,7 +903,7 @@ async def start_creative_production(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing a product_id. Attach a product before starting creative production.",
         )
-    _require_campaign_launch_context_ready(
+    _require_campaign_creative_context_ready(
         session=session,
         org_id=auth.org_id,
         campaign_id=str(campaign.id),
@@ -1010,7 +1064,7 @@ def setup_campaign_meta_review(
                 "missingAssetBriefIds": missing_brief_ids,
             },
         )
-    _require_campaign_launch_context_ready(
+    _require_campaign_creative_context_ready(
         session=session,
         org_id=auth.org_id,
         campaign_id=str(campaign.id),

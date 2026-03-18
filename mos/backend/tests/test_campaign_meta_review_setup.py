@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
 from app.services.paid_ads_qa import RULESET_VERSION
+from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 
 
@@ -452,6 +453,155 @@ def test_campaign_meta_review_setup_uses_external_campaign_delivery_urls(
     assert creative_spec.destination_url == "https://lp.example.com/pre-sale"
     assert creative_spec.metadata_json["destinationSource"] == "campaign_delivery_config"
     assert creative_spec.metadata_json["campaignDelivery"]["deliveryMode"] == "external_urls"
+
+
+def test_campaign_meta_review_setup_supports_manual_creative_context_without_launch_lineage(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="meta-review-manual",
+        db_session=None,
+    )
+
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_claude",
+        lambda **_kwargs: "claude-file-1",
+    )
+    monkeypatch.setattr("app.services.campaign_creative_context.is_gemini_file_search_enabled", lambda: False)
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_gemini_file_search",
+        lambda **_kwargs: None,
+    )
+
+    creative_context_response = api_client.post(
+        f"/campaigns/{campaign_id}/creative-context/loaded",
+        json=manual_creative_context_payload(campaign_id=campaign_id),
+    )
+    assert creative_context_response.status_code == 201, creative_context_response.text
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/manual-pre-sale",
+            "salesUrl": "https://lp.example.com/manual-offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_response = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_response.status_code == 200, validate_response.text
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    brief_id = "brief-exp-manual-external"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "destinationLabel": "Pre-Sales Landing Page",
+                    "experimentId": "exp-manual-1",
+                    "variantId": "var_angle",
+                    "variantName": "Structured angle",
+                    "creativeConcept": "Drive clicks with the manually loaded structured angle.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Show the decision path before the click.",
+                            "angle": "Structured relief path",
+                            "destinationType": "pre-sales",
+                            "destinationLabel": "Pre-Sales Landing Page",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=None,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/test-meta-review-manual.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "creativeGenerationBatchId": "batch-manual",
+            "deliveryMode": "external_urls",
+            "destinationType": "pre-sales",
+            "resolvedDestinationUrl": "https://lp.example.com/manual-pre-sale",
+            "swipeCopyPack": _build_swipe_copy_pack(
+                requirement_index=0,
+                angle="Structured relief path",
+                hook="Show the decision path before the click.",
+                primary_text="Walk buyers through the offer before they commit.",
+                headline="A clearer external decision path",
+                description="Manual creative context drives the published copy.",
+            ),
+            "swipeCopyInputs": _build_swipe_copy_inputs(
+                source_label="21.png",
+                source_url="https://example.com/swipes/21.png",
+                angle_used="Structured relief path",
+                destination_page="pre-sales",
+            ),
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200, setup_resp.text
+
+    creative_spec = db_session.scalar(
+        select(MetaCreativeSpec).where(
+            MetaCreativeSpec.campaign_id == campaign_id,
+            MetaCreativeSpec.asset_id == asset.id,
+        )
+    )
+    assert creative_spec is not None
+    assert creative_spec.destination_url == "https://lp.example.com/manual-pre-sale"
+    assert creative_spec.metadata_json["destinationSource"] == "campaign_delivery_config"
 
 
 def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exists(

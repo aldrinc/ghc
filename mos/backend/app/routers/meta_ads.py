@@ -109,6 +109,7 @@ from app.services.paid_ads_qa import (
     upsert_meta_platform_profile_from_profile,
 )
 from app.services.campaign_launch_context import ensure_campaign_launch_context_artifact
+from app.services.campaign_creative_context import ensure_campaign_creative_context_ready
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -846,11 +847,11 @@ def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) 
     )
 
 
-def _require_launch_context_ready(*, session: Session, auth: AuthContext, campaign_id: str) -> dict[str, Any]:
+def _require_creative_context_ready(*, session: Session, auth: AuthContext, campaign_id: str) -> dict[str, Any]:
     campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=campaign_id)
     if campaign is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
-    readiness = ensure_campaign_launch_context_artifact(
+    readiness = ensure_campaign_creative_context_ready(
         session=session,
         org_id=auth.org_id,
         campaign=campaign,
@@ -859,8 +860,8 @@ def _require_launch_context_ready(*, session: Session, auth: AuthContext, campai
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "message": "Campaign launch context is not ready for Meta launch.",
-                "launchContextReadiness": readiness,
+                "message": "Campaign creative context is not ready for Meta launch.",
+                "creativeContextReadiness": readiness,
             },
         )
     return readiness
@@ -1040,6 +1041,11 @@ def _validate_publish_plan(
     auth: AuthContext,
     session: Session,
 ) -> tuple[MetaPublishPlanValidationResponse, list[dict[str, Any]], ResolvedMetaWorkspaceConfig]:
+    _require_creative_context_ready(
+        session=session,
+        auth=auth,
+        campaign_id=str(campaign.id),
+    )
     _require_launch_context_ready(
         session=session,
         auth=auth,
@@ -2858,7 +2864,7 @@ def create_meta_publish_run(
                 "validation": jsonable_encoder(validation_response),
             },
         )
-    launch_context_readiness = _require_launch_context_ready(
+    launch_context_readiness = _require_creative_context_ready(
         session=session,
         auth=auth,
         campaign_id=str(campaign.id),

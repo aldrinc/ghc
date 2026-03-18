@@ -57,6 +57,7 @@ from app.services.campaign_destinations import (
     require_valid_external_delivery,
     resolve_campaign_delivery_destination,
 )
+from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.creative_service_client import (
     CreativeServiceClient,
     CreativeServiceConfigError,
@@ -733,6 +734,16 @@ def _select_copy_generation_context_files(
     product_id: str,
     campaign_id: str | None,
 ) -> list[Any]:
+    creative_context = load_campaign_creative_context(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=str(campaign_id or ""),
+    )
+    creative_context_provider = str(
+        getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2"
+    )
     context_files = ClaudeContextFilesRepository(session).list_for_generation_context(
         org_id=org_id,
         idea_workspace_id=idea_workspace_id,
@@ -741,30 +752,56 @@ def _select_copy_generation_context_files(
         campaign_id=campaign_id,
     )
     selected: list[Any] = []
-    for doc_key in (
+    doc_keys = [
         "client_canon_compact",
         "client_canon",
-        "strategy_v2_stage3",
-        "strategy_v2_offer",
-        "strategy_v2_copy",
-        "strategy_v2_copy_context",
         "metric_schema",
         f"strategy_sheet:{campaign_id or 'none'}",
         f"experiment_specs:{campaign_id or 'none'}",
         f"asset_briefs:{campaign_id or 'none'}",
-    ):
+    ]
+    if creative_context_provider == "manual":
+        doc_keys.extend(
+            [
+                "campaign_loaded_angles",
+                "campaign_loaded_offer",
+                "campaign_loaded_copy",
+                "campaign_loaded_copy_context",
+                "campaign_creative_context",
+            ]
+        )
+    else:
+        doc_keys.extend(
+            [
+                "strategy_v2_stage3",
+                "strategy_v2_offer",
+                "strategy_v2_copy",
+                "strategy_v2_copy_context",
+            ]
+        )
+    for doc_key in doc_keys:
         picked = _pick_latest_context_file(context_files, doc_key=doc_key)
         if picked is not None:
             selected.append(picked)
 
     if not any(
         (getattr(record, "doc_key", None) or "").startswith("client_canon")
-        or (getattr(record, "doc_key", None) or "") in {"strategy_v2_stage3", "strategy_v2_offer", "strategy_v2_copy", "strategy_v2_copy_context"}
+        or (getattr(record, "doc_key", None) or "") in {
+            "strategy_v2_stage3",
+            "strategy_v2_offer",
+            "strategy_v2_copy",
+            "strategy_v2_copy_context",
+            "campaign_loaded_angles",
+            "campaign_loaded_offer",
+            "campaign_loaded_copy",
+            "campaign_loaded_copy_context",
+            "campaign_creative_context",
+        }
         for record in selected
     ):
         raise RuntimeError(
             "Missing required copy-pack generation context files. "
-            "Expected client_canon* or Strategy V2 context artifacts in Claude workspace."
+            "Expected client_canon* or campaign creative context artifacts in Claude workspace."
         )
     return selected
 
@@ -812,7 +849,7 @@ def _build_ad_copy_pack_prompt(
 
     return (
         "Generate one ad copy pack for each image-ad requirement in the attached asset brief.\n"
-        "Use the attached strategy, offer, copy, copy-context, and experiment documents as the source of truth.\n"
+        "Use the attached campaign creative context, copy, and experiment documents as the source of truth.\n"
         "Do not invent claims, pricing, guarantees, or proof. If a detail is unsupported, keep the copy conservative.\n"
         "The copy pack will be reused across multiple swipe-source executions for the same requirement, so it must be platform-ready and brand-safe.\n\n"
         "Rules:\n"

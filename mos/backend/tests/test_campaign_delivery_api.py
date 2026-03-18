@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.db.enums import ArtifactTypeEnum
 from app.db.models import Artifact, Campaign, Client, Product
 from app.strategy_v2 import launches as strategy_v2_launches
+from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 from tests.conftest import TEST_ORG_ID
 
@@ -233,3 +234,118 @@ def test_campaign_launch_context_readiness_pins_artifact_when_ready(api_client, 
     assert second_payload["ready"] is True
     assert second_payload["refreshed"] is False
     assert second_payload["launchContextArtifactId"] == artifact_id
+
+
+def test_campaign_manual_creative_context_ingest_sets_manual_readiness(api_client, db_session, monkeypatch) -> None:
+    _, _, campaign_id = _create_campaign_with_product(api_client, suffix="manual-context")
+
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_claude",
+        lambda **_kwargs: "claude-file-1",
+    )
+    monkeypatch.setattr("app.services.campaign_creative_context.is_gemini_file_search_enabled", lambda: False)
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_gemini_file_search",
+        lambda **_kwargs: None,
+    )
+
+    response = api_client.post(
+        f"/campaigns/{campaign_id}/creative-context/loaded",
+        json=manual_creative_context_payload(campaign_id=campaign_id),
+    )
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["provider"] == "manual"
+    assert "campaign_creative_context" in payload["artifactIds"]
+    assert "campaign_loaded_copy" in payload["artifactIds"]
+    assert f"experiment_specs:{campaign_id}" in payload["uploadedDocKeys"]
+
+    readiness_response = api_client.get(f"/campaigns/{campaign_id}/launch-context-readiness")
+    assert readiness_response.status_code == 200, readiness_response.text
+    readiness_payload = readiness_response.json()
+    assert readiness_payload["provider"] == "manual"
+    assert readiness_payload["ready"] is True
+    assert readiness_payload["manualCreativeContextArtifactId"] == payload["creativeContextArtifactId"]
+
+    creative_context_artifact = db_session.scalars(
+        select(Artifact).where(
+            Artifact.campaign_id == campaign_id,
+            Artifact.type == ArtifactTypeEnum.campaign_creative_context,
+        )
+    ).first()
+    assert creative_context_artifact is not None
+    assert creative_context_artifact.data["provider"] == "manual"
+
+
+def test_creative_production_accepts_manual_creative_context_without_launch_lineage(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, _, campaign_id = _create_campaign_with_product(api_client, suffix="manual-produce")
+
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_claude",
+        lambda **_kwargs: "claude-file-1",
+    )
+    monkeypatch.setattr("app.services.campaign_creative_context.is_gemini_file_search_enabled", lambda: False)
+    monkeypatch.setattr(
+        "app.services.campaign_creative_context.ensure_uploaded_to_gemini_file_search",
+        lambda **_kwargs: None,
+    )
+
+    creative_context_response = api_client.post(
+        f"/campaigns/{campaign_id}/creative-context/loaded",
+        json=manual_creative_context_payload(campaign_id=campaign_id),
+    )
+    assert creative_context_response.status_code == 201, creative_context_response.text
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        return 200, url, "<html>privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://lp.example.com/manual-pre-sale",
+            "salesUrl": "https://lp.example.com/manual-offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+    validate_response = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert validate_response.status_code == 200, validate_response.text
+
+    brief_artifact = Artifact(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": "brief-manual-produce",
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "deliveryMode": "external_urls",
+                    "destinationType": "pre-sales",
+                    "experimentId": "exp-manual-1",
+                    "variantId": "var_angle",
+                    "variantName": "Structured angle",
+                    "creativeConcept": "Drive clicks with the structured angle.",
+                    "requirements": [{"channel": "facebook", "format": "image_ad"}],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+
+    response = api_client.post(
+        f"/campaigns/{campaign_id}/creative/produce",
+        json={"asset_brief_ids": ["brief-manual-produce"]},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["workflow_run_id"]
+    assert payload["temporal_workflow_id"]

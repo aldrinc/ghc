@@ -49,6 +49,7 @@ from app.services.campaign_destinations import (
     requirement_destination_type,
     resolve_campaign_delivery_destination,
 )
+from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.image_render_client import (
     build_image_render_client,
     get_image_render_provider,
@@ -1320,8 +1321,18 @@ def _load_required_swipe_stage1_rag_docs(
         },
         "data": asset_brief_artifact.data,
     }
+    creative_context = load_campaign_creative_context(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=str(campaign_id or ""),
+    )
+    creative_context_provider = str(
+        getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2"
+    )
 
-    return [
+    base_docs = [
         _require_latest_product_artifact(
             artifact_type=ArtifactTypeEnum.client_canon,
             doc_key="swipe_stage1_client_canon",
@@ -1335,46 +1346,6 @@ def _load_required_swipe_stage1_rag_docs(
             "mime_type": "text/plain",
             "content_bytes": _json_payload_bytes(design_system_payload),
         },
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_stage0,
-            doc_key="swipe_stage1_strategy_v2_stage0",
-            title="Swipe Stage1 Strategy V2 Stage0",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_stage1,
-            doc_key="swipe_stage1_strategy_v2_stage1",
-            title="Swipe Stage1 Strategy V2 Stage1",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_stage2,
-            doc_key="swipe_stage1_strategy_v2_stage2",
-            title="Swipe Stage1 Strategy V2 Stage2",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_stage3,
-            doc_key="swipe_stage1_strategy_v2_stage3",
-            title="Swipe Stage1 Strategy V2 Stage3",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_awareness_angle_matrix,
-            doc_key="swipe_stage1_strategy_v2_awareness_angle_matrix",
-            title="Swipe Stage1 Strategy V2 Awareness Angle Matrix",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_offer,
-            doc_key="swipe_stage1_strategy_v2_offer",
-            title="Swipe Stage1 Strategy V2 Offer",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_copy_context,
-            doc_key="swipe_stage1_strategy_v2_copy_context",
-            title="Swipe Stage1 Strategy V2 Copy Context",
-        ),
-        _require_latest_product_artifact(
-            artifact_type=ArtifactTypeEnum.strategy_v2_copy,
-            doc_key="swipe_stage1_strategy_v2_copy",
-            title="Swipe Stage1 Strategy V2 Copy",
-        ),
         {
             "doc_key": "swipe_stage1_product_profile",
             "doc_title": "Swipe Stage1 Product Profile",
@@ -1410,6 +1381,78 @@ def _load_required_swipe_stage1_rag_docs(
             "content_bytes": _json_payload_bytes(asset_brief_payload),
         },
     ]
+    if creative_context_provider == "manual":
+        provider_docs = [
+            _require_latest_campaign_artifact(
+                artifact_type=ArtifactTypeEnum.campaign_loaded_angles,
+                doc_key="swipe_stage1_campaign_loaded_angles",
+                title="Swipe Stage1 Campaign Loaded Angles",
+            ),
+            _require_latest_campaign_artifact(
+                artifact_type=ArtifactTypeEnum.campaign_loaded_offer,
+                doc_key="swipe_stage1_campaign_loaded_offer",
+                title="Swipe Stage1 Campaign Loaded Offer",
+            ),
+            _require_latest_campaign_artifact(
+                artifact_type=ArtifactTypeEnum.campaign_loaded_copy_context,
+                doc_key="swipe_stage1_campaign_loaded_copy_context",
+                title="Swipe Stage1 Campaign Loaded Copy Context",
+            ),
+            _require_latest_campaign_artifact(
+                artifact_type=ArtifactTypeEnum.campaign_loaded_copy,
+                doc_key="swipe_stage1_campaign_loaded_copy",
+                title="Swipe Stage1 Campaign Loaded Copy",
+            ),
+            _require_latest_campaign_artifact(
+                artifact_type=ArtifactTypeEnum.campaign_creative_context,
+                doc_key="swipe_stage1_campaign_creative_context",
+                title="Swipe Stage1 Campaign Creative Context",
+            ),
+        ]
+    else:
+        provider_docs = [
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_stage0,
+                doc_key="swipe_stage1_strategy_v2_stage0",
+                title="Swipe Stage1 Strategy V2 Stage0",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_stage1,
+                doc_key="swipe_stage1_strategy_v2_stage1",
+                title="Swipe Stage1 Strategy V2 Stage1",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_stage2,
+                doc_key="swipe_stage1_strategy_v2_stage2",
+                title="Swipe Stage1 Strategy V2 Stage2",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_stage3,
+                doc_key="swipe_stage1_strategy_v2_stage3",
+                title="Swipe Stage1 Strategy V2 Stage3",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_awareness_angle_matrix,
+                doc_key="swipe_stage1_strategy_v2_awareness_angle_matrix",
+                title="Swipe Stage1 Strategy V2 Awareness Angle Matrix",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_offer,
+                doc_key="swipe_stage1_strategy_v2_offer",
+                title="Swipe Stage1 Strategy V2 Offer",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_copy_context,
+                doc_key="swipe_stage1_strategy_v2_copy_context",
+                title="Swipe Stage1 Strategy V2 Copy Context",
+            ),
+            _require_latest_product_artifact(
+                artifact_type=ArtifactTypeEnum.strategy_v2_copy,
+                doc_key="swipe_stage1_strategy_v2_copy",
+                title="Swipe Stage1 Strategy V2 Copy",
+            ),
+        ]
+    return [*base_docs, *provider_docs]
 
 
 def _resolve_swipe_stage1_gemini_file_search_context(
@@ -1446,6 +1489,7 @@ def _resolve_swipe_stage1_gemini_file_search_context(
             raise RuntimeError(f"Duplicate swipe stage-1 RAG doc key encountered: {doc_key}")
         docs_by_key[doc_key] = doc
 
+    manual_provider = "swipe_stage1_campaign_creative_context" in docs_by_key
     bundle_specs: list[tuple[str, str, list[str]]] = [
         (
             "swipe_stage1_bundle_brand_foundation",
@@ -1461,27 +1505,41 @@ def _resolve_swipe_stage1_gemini_file_search_context(
             "Swipe Stage1 Bundle: Offer And Pricing",
             [
                 "swipe_stage1_offer_pricing",
-                "swipe_stage1_strategy_v2_offer",
+                "swipe_stage1_campaign_loaded_offer" if manual_provider else "swipe_stage1_strategy_v2_offer",
             ],
         ),
         (
             "swipe_stage1_bundle_strategy_stages",
             "Swipe Stage1 Bundle: Strategy Stages",
-            [
-                "swipe_stage1_strategy_v2_stage0",
-                "swipe_stage1_strategy_v2_stage1",
-                "swipe_stage1_strategy_v2_stage2",
-                "swipe_stage1_strategy_v2_stage3",
-                "swipe_stage1_strategy_v2_awareness_angle_matrix",
-            ],
+            (
+                [
+                    "swipe_stage1_campaign_loaded_angles",
+                    "swipe_stage1_campaign_creative_context",
+                ]
+                if manual_provider
+                else [
+                    "swipe_stage1_strategy_v2_stage0",
+                    "swipe_stage1_strategy_v2_stage1",
+                    "swipe_stage1_strategy_v2_stage2",
+                    "swipe_stage1_strategy_v2_stage3",
+                    "swipe_stage1_strategy_v2_awareness_angle_matrix",
+                ]
+            ),
         ),
         (
             "swipe_stage1_bundle_strategy_copy",
             "Swipe Stage1 Bundle: Strategy Copy",
-            [
-                "swipe_stage1_strategy_v2_copy_context",
-                "swipe_stage1_strategy_v2_copy",
-            ],
+            (
+                [
+                    "swipe_stage1_campaign_loaded_copy_context",
+                    "swipe_stage1_campaign_loaded_copy",
+                ]
+                if manual_provider
+                else [
+                    "swipe_stage1_strategy_v2_copy_context",
+                    "swipe_stage1_strategy_v2_copy",
+                ]
+            ),
         ),
         (
             "swipe_stage1_bundle_campaign_context",
