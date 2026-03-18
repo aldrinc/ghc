@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 import importlib.util
 from pathlib import Path
@@ -83,4 +84,7 @@ def test_backfill_meta_workspace_configs_uses_typed_metadata_binds(monkeypatch) 
         assert params is not None
         metadata_bind = statement._bindparams["metadata"]
         assert isinstance(metadata_bind.type, postgresql.JSONB)
-        assert params["metadata"] == profile_metadata
+        metadata_payload = params["metadata"]
+        if isinstance(metadata_payload, str):
+            metadata_payload = json.loads(metadata_payload)
+        assert metadata_payload == profile_metadata
