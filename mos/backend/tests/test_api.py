@@ -9,6 +9,7 @@ from app.db.models import Artifact, Funnel, GeminiContextFile, Org
 from app.main import app
 from app.routers import gemini as gemini_router
 from app.services.gemini_file_search import GeminiChatResult, GeminiCitation
+from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
 
 
 def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tuple[str, str, str]:
@@ -419,8 +420,14 @@ def test_generate_campaign_funnels_rejects_existing_angle(api_client, fake_tempo
     assert fake_temporal.started == []
 
 
-def test_generate_campaign_funnels_rejects_when_run_in_progress(api_client, fake_temporal):
-    _client_id, _product_id, campaign_id = _create_campaign_with_product(api_client, suffix="Running Workflow")
+def test_generate_campaign_funnels_rejects_when_run_in_progress(api_client, fake_temporal, db_session):
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="Running Workflow")
+    seed_ready_launch_context_for_campaign(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+    )
 
     first_generate = api_client.post(
         f"/campaigns/{campaign_id}/funnels/generate",

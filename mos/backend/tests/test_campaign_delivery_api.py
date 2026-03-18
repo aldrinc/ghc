@@ -280,8 +280,8 @@ def test_campaign_manual_creative_context_ingest_sets_manual_readiness(api_clien
 def test_creative_production_accepts_manual_creative_context_without_launch_lineage(
     api_client,
     db_session,
-    monkeypatch,
     fake_temporal,
+    monkeypatch,
 ) -> None:
     client_id, _, campaign_id = _create_campaign_with_product(api_client, suffix="manual-produce")
 

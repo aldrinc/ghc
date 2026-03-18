@@ -838,6 +838,12 @@ async def generate_campaign_funnels(
             detail=f"Funnels already exist for angle ids: {joined_ids}.",
         )
 
+    _require_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+
     handle = await temporal.start_workflow(
         CampaignFunnelGenerationWorkflow.run,
         CampaignFunnelGenerationInput(
