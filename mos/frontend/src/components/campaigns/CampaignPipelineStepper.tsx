@@ -15,7 +15,7 @@ function StepDot({ status }: { status: PhaseStatus }) {
   if (status === "in_progress") {
     return (
       <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent">
-        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+        <span className="h-1.5 w-1.5 rounded-full bg-surface" />
       </span>
     );
   }

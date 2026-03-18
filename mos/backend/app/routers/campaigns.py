@@ -758,11 +758,6 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
-    _require_campaign_creative_context_ready(
-        session=session,
-        org_id=auth.org_id,
-        campaign_id=str(campaign.id),
-    )
     if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -842,6 +837,12 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Funnels already exist for angle ids: {joined_ids}.",
         )
+
+    _require_campaign_creative_context_ready(
+        session=session,
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
 
     handle = await temporal.start_workflow(
         CampaignFunnelGenerationWorkflow.run,

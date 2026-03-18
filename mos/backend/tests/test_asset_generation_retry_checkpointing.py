@@ -119,7 +119,11 @@ def _install_image_generation_stubs(
             "brief-artifact-1",
         ),
     )
-    monkeypatch.setattr(asset_activities, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        asset_activities,
+        "_validate_brief_scope",
+        lambda **_kwargs: SimpleNamespace(funnel_id=None, campaign_delivery_config=None),
+    )
     monkeypatch.setattr(asset_activities, "_get_or_create_ad_copy_pack_artifact", lambda **_kwargs: copy_artifact)
 
     def _fake_create_plan(**kwargs):
