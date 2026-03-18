@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import subprocess
@@ -57,12 +58,44 @@ def resolve_branch(cwd: str, ref: str) -> str | None:
     return branch
 
 
-def github_get(path: str, token: str | None) -> Any:
+def resolve_auth_headers(cwd: str) -> dict[str, str]:
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+
+    try:
+        credential_blob = subprocess.check_output(
+            ["git", "credential", "fill"],
+            cwd=cwd,
+            input="protocol=https\nhost=github.com\n\n",
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {}
+
+    fields = {}
+    for line in credential_blob.splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        fields[key.strip()] = value.strip()
+
+    username = fields.get("username")
+    password = fields.get("password")
+    if not username or not password:
+        return {}
+
+    basic_token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+    return {"Authorization": f"Basic {basic_token}"}
+
+
+def github_get(path: str, auth_headers: dict[str, str]) -> Any:
     request = urllib.request.Request(
         f"{API_BASE_URL}{path}",
         headers={
             "Accept": "application/vnd.github+json",
-            **({"Authorization": f"Bearer {token}"} if token else {}),
+            **auth_headers,
         },
     )
     try:
@@ -73,16 +106,16 @@ def github_get(path: str, token: str | None) -> Any:
         raise RuntimeError(f"GitHub API request failed for {path}: HTTP {exc.code}: {body}") from exc
 
 
-def fetch_workflow_runs(repo: str, sha: str, token: str | None) -> list[dict[str, Any]]:
+def fetch_workflow_runs(repo: str, sha: str, auth_headers: dict[str, str]) -> list[dict[str, Any]]:
     encoded_repo = urllib.parse.quote(repo, safe="/")
     encoded_sha = urllib.parse.quote(sha, safe="")
-    payload = github_get(f"/repos/{encoded_repo}/actions/runs?head_sha={encoded_sha}&per_page=50", token)
+    payload = github_get(f"/repos/{encoded_repo}/actions/runs?head_sha={encoded_sha}&per_page=50", auth_headers)
     return payload.get("workflow_runs", [])
 
 
-def fetch_jobs(repo: str, run_id: int, token: str | None) -> list[dict[str, Any]]:
+def fetch_jobs(repo: str, run_id: int, auth_headers: dict[str, str]) -> list[dict[str, Any]]:
     encoded_repo = urllib.parse.quote(repo, safe="/")
-    payload = github_get(f"/repos/{encoded_repo}/actions/runs/{run_id}/jobs", token)
+    payload = github_get(f"/repos/{encoded_repo}/actions/runs/{run_id}/jobs", auth_headers)
     return payload.get("jobs", [])
 
 
@@ -106,10 +139,10 @@ def latest_run(
     return candidates[0] if candidates else None
 
 
-def summarize_run(repo: str, run: dict[str, Any] | None, token: str | None) -> WorkflowSummary | None:
+def summarize_run(repo: str, run: dict[str, Any] | None, auth_headers: dict[str, str]) -> WorkflowSummary | None:
     if run is None:
         return None
-    jobs_payload = fetch_jobs(repo, int(run["id"]), token) if run.get("id") is not None else []
+    jobs_payload = fetch_jobs(repo, int(run["id"]), auth_headers) if run.get("id") is not None else []
     jobs = [
         {
             "name": job.get("name"),
@@ -249,7 +282,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cwd = os.getcwd()
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    auth_headers = resolve_auth_headers(cwd)
     repo = resolve_repo(cwd, args.repo)
     sha = resolve_sha(cwd, args.sha)
     branch = args.branch or resolve_branch(cwd, args.sha)
@@ -258,11 +291,11 @@ def main() -> int:
     last_payload: tuple[WorkflowSummary | None, WorkflowSummary | None, str, str] | None = None
 
     while True:
-        runs = fetch_workflow_runs(repo, sha, token)
+        runs = fetch_workflow_runs(repo, sha, auth_headers)
         ci_cd = summarize_run(
             repo,
             latest_run(runs, "CI/CD", branch=branch, allowed_events={"push", "workflow_dispatch"}),
-            token,
+            auth_headers,
         )
         self_deploy = summarize_run(
             repo,
@@ -272,7 +305,7 @@ def main() -> int:
                 branch=branch,
                 allowed_events={"workflow_run", "workflow_dispatch"},
             ),
-            token,
+            auth_headers,
         )
         state, message = overall_state(ci_cd, self_deploy, expect_production=args.expect_production)
         last_payload = (ci_cd, self_deploy, state, message)
