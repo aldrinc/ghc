@@ -298,6 +298,90 @@ def test_list_bunny_pull_zones_accepts_array_response(monkeypatch):
     assert zones[1]["Id"] == 456
 
 
+def test_ensure_bunny_pull_zone_hostname_skips_create_when_hostname_already_on_same_zone(monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "_get_bunny_pull_zone",
+        lambda *, zone_id: {"Id": zone_id, "Hostnames": []},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_find_bunny_pull_zone_by_hostname",
+        lambda *, hostname: {"Id": 777, "Name": "workspace-123", "Hostnames": [{"Value": hostname}]},
+    )
+
+    def _unexpected_request(*, method: str, path: str, payload: dict | None = None):
+        raise AssertionError(f"addHostname should not run when hostname already exists ({method} {path} {payload})")
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", _unexpected_request)
+
+    output = deploy_service._ensure_bunny_pull_zone_hostname(
+        zone_id=777,
+        hostname="shop.example.com",
+    )
+
+    assert output == {"hostname": "shop.example.com", "status": "existing"}
+
+
+def test_ensure_bunny_pull_zone_hostname_errors_when_hostname_is_on_other_zone(monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "_get_bunny_pull_zone",
+        lambda *, zone_id: {"Id": zone_id, "Hostnames": []},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_find_bunny_pull_zone_by_hostname",
+        lambda *, hostname: {"Id": 888, "Name": "workspace-other", "Hostnames": [{"Value": hostname}]},
+    )
+
+    with pytest.raises(
+        deploy_service.DeployError,
+        match="already registered to pull zone 'workspace-other' \\(id=888\\), not target zone id=777",
+    ):
+        deploy_service._ensure_bunny_pull_zone_hostname(
+            zone_id=777,
+            hostname="shop.example.com",
+        )
+
+
+def test_ensure_bunny_pull_zone_hostname_reconciles_already_registered_after_bunny_rejects_create(monkeypatch):
+    zone_fetches = {"count": 0}
+
+    def fake_get_bunny_pull_zone(*, zone_id: int):
+        zone_fetches["count"] += 1
+        if zone_fetches["count"] == 1:
+            return {"Id": zone_id, "Hostnames": []}
+        return {
+            "Id": zone_id,
+            "Hostnames": [
+                {"Value": "workspace-123.b-cdn.net"},
+                {"Value": "shop.example.com"},
+            ],
+        }
+
+    monkeypatch.setattr(deploy_service, "_get_bunny_pull_zone", fake_get_bunny_pull_zone)
+    monkeypatch.setattr(deploy_service, "_find_bunny_pull_zone_by_hostname", lambda *, hostname: None)
+
+    def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
+        assert method == "POST"
+        assert path == "/pullzone/777/addHostname"
+        assert payload == {"Hostname": "shop.example.com"}
+        raise deploy_service.DeployError(
+            "Bunny API request failed (POST /pullzone/777/addHostname) with status 400: The hostname is already registered."
+        )
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
+
+    output = deploy_service._ensure_bunny_pull_zone_hostname(
+        zone_id=777,
+        hostname="shop.example.com",
+    )
+
+    assert output == {"hostname": "shop.example.com", "status": "existing"}
+    assert zone_fetches["count"] == 2
+
+
 def test_provision_bunny_custom_domains_upserts_namecheap_and_requests_ssl(monkeypatch):
     bunny_zone = {
         "Id": 777,
