@@ -1,7 +1,7 @@
 """Scope deploy domains by workspace.
 
-Revision ID: 0061_workspace_scoped_deploy_domains
-Revises: 0060_merge_0059_heads
+Revision ID: 0064_workspace_scoped_deploy_domains
+Revises: 0063_checkout_started_event_type
 Create Date: 2026-03-18 15:20:00.000000
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "0061_workspace_scoped_deploy_domains"
-down_revision = "0060_merge_0059_heads"
+revision = "0064_workspace_scoped_deploy_domains"
+down_revision = "0063_checkout_started_event_type"
 branch_labels = None
 depends_on = None
 
