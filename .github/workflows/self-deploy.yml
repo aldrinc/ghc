@@ -52,8 +52,8 @@ jobs:
   #         echo "should_deploy=true" >> "$GITHUB_OUTPUT"
 
   apply:
-    needs: gate
-    if: needs.gate.outputs.should_deploy == 'true'
+    # needs: gate
+    # if: needs.gate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Validate required secrets
