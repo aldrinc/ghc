@@ -182,12 +182,30 @@ def overall_state(
 
     deploy_job = next((job for job in ci_cd.jobs if job.get("name") == "deploy"), None)
     if expect_production:
-        if deploy_job is None:
-            return "incomplete", "CI/CD succeeded but no deploy job was recorded."
-        if deploy_job.get("status") != "completed":
-            return "pending", f"CI/CD deploy job is still {deploy_job.get('status')}."
-        if deploy_job.get("conclusion") != "success":
-            return "incomplete", f"CI/CD deploy job concluded with {deploy_job.get('conclusion')}."
+        if ci_cd.event == "workflow_dispatch":
+            if deploy_job is None:
+                return "incomplete", "CI/CD succeeded but no deploy job was recorded."
+            if deploy_job.get("status") != "completed":
+                return "pending", f"CI/CD deploy job is still {deploy_job.get('status')}."
+            if deploy_job.get("conclusion") != "success":
+                return "incomplete", f"CI/CD deploy job concluded with {deploy_job.get('conclusion')}."
+            return "success", "CI/CD and the manual production deploy job both completed successfully."
+
+        if self_deploy is None:
+            return "pending", "CI/CD succeeded; waiting for Self Deploy to start."
+        if self_deploy.status != "completed":
+            return "pending", f"Self Deploy is still {self_deploy.status}."
+        if self_deploy.conclusion != "success":
+            return "failure", f"Self Deploy concluded with {self_deploy.conclusion}."
+
+        apply_job = next((job for job in self_deploy.jobs if job.get("name") == "apply"), None)
+        if apply_job is None:
+            return "incomplete", "Self Deploy succeeded but no apply job was recorded."
+        if apply_job.get("status") != "completed":
+            return "pending", f"Self Deploy apply job is still {apply_job.get('status')}."
+        if apply_job.get("conclusion") != "success":
+            return "incomplete", f"Self Deploy apply job concluded with {apply_job.get('conclusion')}."
+        return "success", "CI/CD and Self Deploy both completed successfully."
 
     if self_deploy is not None:
         if self_deploy.status != "completed":
@@ -195,8 +213,6 @@ def overall_state(
         if self_deploy.conclusion != "success":
             return "failure", f"Self Deploy concluded with {self_deploy.conclusion}."
 
-    if expect_production:
-        return "success", "CI/CD and the production deploy job both completed successfully."
     return "success", "CI/CD completed successfully."
 
 
@@ -266,7 +282,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--expect-production",
         action="store_true",
-        help="Treat a skipped or failed CI/CD deploy job as incomplete/failure instead of success.",
+        help=(
+            "Require the commit's production publish path to finish successfully: Self Deploy for push runs, "
+            "or the CI/CD deploy job for manual workflow_dispatch runs."
+        ),
     )
     parser.add_argument(
         "--wait",

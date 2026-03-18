@@ -164,7 +164,7 @@ jobs:
 
   deploy:
     needs: [backend-image, frontend-image]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_PRODUCTION_CD == 'true')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     steps:
