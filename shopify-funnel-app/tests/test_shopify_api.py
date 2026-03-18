@@ -183,14 +183,6 @@ def test_ensure_catalog_collection_route_is_available_returns_existing_published
         if "query collectionPublicationState" in query:
             call_log.append("collectionPublicationState")
             return {"collection": {"id": "gid://shopify/Collection/1", "publishedOnPublication": True}}
-        if "query shopProductsForCatalogRoute" in query:
-            call_log.append("shopProductsForCatalogRoute")
-            return {
-                "products": {
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                    "nodes": [],
-                }
-            }
         raise AssertionError(f"Unexpected query: {query}")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -206,7 +198,6 @@ def test_ensure_catalog_collection_route_is_available_returns_existing_published
         "collectionByHandle",
         "publications",
         "collectionPublicationState",
-        "shopProductsForCatalogRoute",
     ]
     assert result == {
         "collectionId": "gid://shopify/Collection/1",
@@ -269,33 +260,6 @@ def test_ensure_catalog_collection_route_is_available_creates_and_publishes_coll
                 "input": [{"publicationId": "gid://shopify/Publication/1"}],
             }
             return {"publishablePublish": {"userErrors": []}}
-        if "query shopProductsForCatalogRoute" in query:
-            call_log.append("shopProductsForCatalogRoute")
-            return {
-                "products": {
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                    "nodes": [{"id": "gid://shopify/Product/10"}],
-                }
-            }
-        if "query collectionProductsForCatalogRoute" in query:
-            call_log.append("collectionProductsForCatalogRoute")
-            return {
-                "collection": {
-                    "id": "gid://shopify/Collection/2",
-                    "products": {
-                        "pageInfo": {"hasNextPage": False, "endCursor": None},
-                        "nodes": [],
-                    },
-                }
-            }
-        if "mutation collectionAddProductsForCatalog" in query:
-            call_log.append("collectionAddProductsForCatalog")
-            variables = payload.get("variables")
-            assert variables == {
-                "id": "gid://shopify/Collection/2",
-                "productIds": ["gid://shopify/Product/10"],
-            }
-            return {"collectionAddProducts": {"userErrors": []}}
         raise AssertionError(f"Unexpected query: {query}")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -313,15 +277,12 @@ def test_ensure_catalog_collection_route_is_available_creates_and_publishes_coll
         "publications",
         "collectionPublicationState",
         "publishCatalogCollection",
-        "shopProductsForCatalogRoute",
-        "collectionProductsForCatalogRoute",
-        "collectionAddProductsForCatalog",
     ]
     assert result == {
         "collectionId": "gid://shopify/Collection/2",
         "collectionHandle": "all",
         "collectionTitle": "Catalog",
-        "addedProductCount": 1,
+        "addedProductCount": 0,
     }
 
 
@@ -333,11 +294,9 @@ def test_ensure_catalog_collection_contains_products_adds_only_missing_targets()
         *,
         shop_domain: str,
         access_token: str,
-        sync_all_products: bool = True,
     ):
         observed["shop_domain"] = shop_domain
         observed["access_token"] = access_token
-        observed["sync_all_products"] = sync_all_products
         return {
             "collectionId": "gid://shopify/Collection/7",
             "collectionHandle": "all",
@@ -385,7 +344,6 @@ def test_ensure_catalog_collection_contains_products_adds_only_missing_targets()
     assert observed == {
         "shop_domain": "example.myshopify.com",
         "access_token": "admin_token",
-        "sync_all_products": False,
         "listed_collection_id": "gid://shopify/Collection/7",
         "added_collection_id": "gid://shopify/Collection/7",
         "product_ids": ["gid://shopify/Product/11"],

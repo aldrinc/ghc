@@ -7,6 +7,7 @@ Create Date: 2026-03-13 14:30:00.000000
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -19,6 +20,12 @@ revision = "0059_meta_account_connections_and_configs"
 down_revision = "0058_meta_publish_runs"
 branch_labels = None
 depends_on = None
+
+jsonb = postgresql.JSONB(astext_type=sa.Text())
+
+
+def _typed_metadata_insert(sql: str) -> sa.TextClause:
+    return sa.text(sql).bindparams(sa.bindparam("metadata", type_=jsonb))
 
 
 def upgrade() -> None:
@@ -50,7 +57,7 @@ def upgrade() -> None:
         sa.Column("last_validation_error", sa.Text(), nullable=True),
         sa.Column(
             "metadata",
-            postgresql.JSONB(astext_type=sa.Text()),
+            jsonb,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
@@ -100,7 +107,7 @@ def upgrade() -> None:
         sa.Column("last_validation_error", sa.Text(), nullable=True),
         sa.Column(
             "metadata",
-            postgresql.JSONB(astext_type=sa.Text()),
+            jsonb,
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
@@ -311,7 +318,7 @@ def _backfill_meta_workspace_configs() -> None:
                 or (f"Meta account {ad_account_id}" if ad_account_id else "Meta account")
             )
             bind.execute(
-                sa.text(
+                _typed_metadata_insert(
                     """
                     INSERT INTO meta_ad_account_connections (
                         id,
@@ -353,7 +360,7 @@ def _backfill_meta_workspace_configs() -> None:
                         'pending',
                         NULL,
                         NULL,
-                        :metadata,
+                        CAST(:metadata AS jsonb),
                         NULL,
                         :created_at,
                         :updated_at
@@ -369,7 +376,7 @@ def _backfill_meta_workspace_configs() -> None:
                     "business_manager_id": profile["business_manager_id"],
                     "business_manager_name": profile["business_manager_name"],
                     "graph_api_version": api_version,
-                    "metadata": profile_metadata,
+                    "metadata": json.dumps(profile_metadata),
                     "created_at": profile["created_at"] or datetime.now(timezone.utc),
                     "updated_at": profile["updated_at"] or datetime.now(timezone.utc),
                 },
@@ -377,7 +384,7 @@ def _backfill_meta_workspace_configs() -> None:
             connection_ids_by_key[connection_key] = connection_id
 
         bind.execute(
-            sa.text(
+            _typed_metadata_insert(
                 """
                 INSERT INTO meta_workspace_ad_configs (
                     id,
@@ -429,7 +436,7 @@ def _backfill_meta_workspace_configs() -> None:
                     'pending',
                     NULL,
                     NULL,
-                    :metadata,
+                    CAST(:metadata AS jsonb),
                     NULL,
                     :created_at,
                     :updated_at
@@ -449,13 +456,16 @@ def _backfill_meta_workspace_configs() -> None:
                 "verified_domain": profile["verified_domain"],
                 "verified_domain_status": profile["verified_domain_status"],
                 "tracking_provider": profile["tracking_provider"],
-                "tracking_url_parameters": profile["tracking_url_parameters"],
+                "tracking_url_parameters": (
+                    json.dumps(profile["tracking_url_parameters"])
+                    if isinstance(profile["tracking_url_parameters"], (dict, list))
+                    else profile["tracking_url_parameters"]
+                ),
                 "attribution_click_window": profile["attribution_click_window"],
                 "attribution_view_window": profile["attribution_view_window"],
                 "view_through_enabled": profile["view_through_enabled"],
-                "metadata": profile_metadata,
+                "metadata": json.dumps(profile_metadata),
                 "created_at": profile["created_at"] or datetime.now(timezone.utc),
                 "updated_at": profile["updated_at"] or datetime.now(timezone.utc),
             },
         )
-

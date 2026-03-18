@@ -172,16 +172,20 @@ def test_build_creative_generation_plan_items_expands_all_default_swipes_determi
     first = _build_creative_generation_plan_items(
         asset_brief_id="brief-123",
         batch_id="batch-1",
+        brief={},
         requirements=requirements,
         default_swipes=default_swipes,
         copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+        campaign_delivery_config=None,
     )
     second = _build_creative_generation_plan_items(
         asset_brief_id="brief-123",
         batch_id="batch-1",
+        brief={},
         requirements=requirements,
         default_swipes=default_swipes,
         copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+        campaign_delivery_config=None,
     )
 
     assert [item.id for item in first] == [item.id for item in second]
@@ -196,9 +200,11 @@ def test_build_creative_generation_plan_items_errors_when_image_requirement_has_
         _build_creative_generation_plan_items(
             asset_brief_id="brief-123",
             batch_id="batch-1",
+            brief={},
             requirements=[{"channel": "facebook", "format": "image_ad"}],
             default_swipes=[],
             copy_pack_ids_by_requirement={},
+            campaign_delivery_config=None,
         )
     except ValueError as exc:
         assert "missing_requirement_index=0" in str(exc)

@@ -102,6 +102,7 @@ export function MetaIntegrationPanel() {
     listRemoteAdSets,
     listRemoteAds,
     selectWorkspaceConfig,
+    updateConnection,
     validateConnection,
   } = useMetaApi();
   const [config, setConfig] = useState<MetaWorkspaceAdConfig | null>(null);
@@ -116,6 +117,7 @@ export function MetaIntegrationPanel() {
   const [newConnectionAdAccountName, setNewConnectionAdAccountName] = useState("");
   const [newConnectionAccessToken, setNewConnectionAccessToken] = useState("");
   const [newConnectionGraphApiVersion, setNewConnectionGraphApiVersion] = useState("v24.0");
+  const [connectionAccessTokens, setConnectionAccessTokens] = useState<Record<string, string>>({});
   const [newWorkspaceConfigName, setNewWorkspaceConfigName] = useState("");
   const [newWorkspacePageId, setNewWorkspacePageId] = useState("");
   const [newWorkspacePixelId, setNewWorkspacePixelId] = useState("");
@@ -360,6 +362,40 @@ export function MetaIntegrationPanel() {
     }
   };
 
+  const handleUpdateConnectionCredentials = async (connection: MetaAdAccountConnection) => {
+    const accessToken = (connectionAccessTokens[connection.id] || "").trim();
+    if (!accessToken) {
+      setSetupError(`Access token is required to update '${connection.name}'.`);
+      return;
+    }
+    setSetupPending(true);
+    setSetupError(null);
+    try {
+      await updateConnection(connection.id, {
+        name: connection.name,
+        adAccountId: connection.adAccountId || undefined,
+        adAccountName: connection.adAccountName || undefined,
+        businessManagerId: connection.businessManagerId || undefined,
+        businessManagerName: connection.businessManagerName || undefined,
+        graphApiVersion: connection.graphApiVersion,
+        graphApiBaseUrl: connection.graphApiBaseUrl,
+        accessToken,
+        tokenExpiresAt: connection.tokenExpiresAt || undefined,
+        status: connection.status,
+        metadata: connection.metadata || {},
+      });
+      setConnectionAccessTokens((current) => ({
+        ...current,
+        [connection.id]: "",
+      }));
+      await refreshMetaState();
+    } catch (err) {
+      setSetupError((err as ApiError)?.message || "Failed to update Meta connection credentials");
+    } finally {
+      setSetupPending(false);
+    }
+  };
+
   const inventoryFetcher = useMemo(() => {
     switch (inventoryTab) {
       case "videos":
@@ -521,7 +557,7 @@ export function MetaIntegrationPanel() {
                 onChange={(event) => setNewWorkspaceTrackingParams(event.target.value)}
                 placeholder="Tracking params"
               />
-              <Button variant="primary" size="sm" onClick={() => void handleCreateAndAttachConnection()} disabled={setupPending}>
+              <Button type="button" variant="primary" size="sm" onClick={() => void handleCreateAndAttachConnection()} disabled={setupPending}>
                 {setupPending ? "Saving…" : "Connect and attach"}
               </Button>
             </div>
@@ -558,6 +594,33 @@ export function MetaIntegrationPanel() {
                                 {connection.validationStatus}
                               </Badge>
                             </div>
+                            {!connection.hasCredentials ? (
+                              <div className="flex flex-wrap items-center gap-2 pt-2">
+                                <Input
+                                  value={connectionAccessTokens[connection.id] || ""}
+                                  onChange={(event) =>
+                                    setConnectionAccessTokens((current) => ({
+                                      ...current,
+                                      [connection.id]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Paste access token to reconnect"
+                                  className="h-8 min-w-[220px] max-w-[360px]"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => void handleUpdateConnectionCredentials(connection)}
+                                  disabled={setupPending || !(connectionAccessTokens[connection.id] || "").trim()}
+                                >
+                                  Save token
+                                </Button>
+                              </div>
+                            ) : null}
+                            {connection.lastValidationError ? (
+                              <div className="text-xs text-danger">{connection.lastValidationError}</div>
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -576,6 +639,7 @@ export function MetaIntegrationPanel() {
                         <TableCell>
                           <div className="flex flex-wrap gap-2">
                             <Button
+                              type="button"
                               variant="secondary"
                               size="sm"
                               onClick={() => void handleValidateConnection(connection.id)}
@@ -584,6 +648,7 @@ export function MetaIntegrationPanel() {
                               Validate
                             </Button>
                             <Button
+                              type="button"
                               variant="secondary"
                               size="sm"
                               onClick={() => void handleAttachExistingConnection(connection)}

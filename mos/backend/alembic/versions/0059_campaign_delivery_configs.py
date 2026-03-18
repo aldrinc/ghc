@@ -7,8 +7,8 @@ Create Date: 2026-03-16 12:00:00.000000
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 
@@ -122,3 +122,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("idx_campaign_delivery_configs_org_campaign", table_name="campaign_delivery_configs")
     op.drop_table("campaign_delivery_configs")
+    op.execute("DROP TYPE IF EXISTS campaign_delivery_validation_status")
+    op.execute("DROP TYPE IF EXISTS campaign_delivery_mode")
