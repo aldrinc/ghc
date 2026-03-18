@@ -194,9 +194,9 @@ def test_get_workload_domains_includes_org_server_names(
     assert body["server_names"] == []
 
 
-def test_build_bunny_pull_zone_name_uses_workspace_id():
+def test_build_bunny_pull_zone_name_uses_org_id():
     name = deploy_service._build_bunny_pull_zone_name(
-        workspace_id="Workspace_123",
+        org_id="Workspace_123",
     )
     assert name == "workspace-123"
 
@@ -271,7 +271,7 @@ def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
 
     monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
     zone = deploy_service._ensure_bunny_pull_zone(
-        workspace_id="workspace-123",
+        org_id="workspace-123",
         origin_url="http://46.225.124.104",
     )
     urls = deploy_service._extract_bunny_pull_zone_access_urls(zone)
@@ -558,8 +558,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -600,7 +600,64 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     assert output["pull_zone"]["dnsTargetHostname"] == "workspace-123.b-cdn.net"
     assert isinstance(output["pull_zone"]["domainProvisioning"], list)
     assert captured == {
-        "workspace_id": "workspace-123",
+        "org_id": "workspace-123",
+        "origin_url": "http://46.225.124.104",
+    }
+
+
+def test_configure_bunny_pull_zone_for_workload_uses_org_id_for_zone_scope(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {"client_id": "client-456"},
+                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "org-123",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "org-123.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+
+    output = deploy_service.configure_bunny_pull_zone_for_workload(
+        org_id="org-123",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+    )
+
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["name"] == "org-123"
+    assert captured == {
+        "org_id": "org-123",
         "origin_url": "http://46.225.124.104",
     }
 
@@ -635,8 +692,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -660,7 +717,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
     assert output["pull_zone"]["accessUrls"] == ["https://workspace-123.b-cdn.net/"]
     assert output["pull_zone"]["workloadPort"] == 24123
     assert captured == {
-        "workspace_id": "workspace-123",
+        "org_id": "workspace-123",
         "origin_url": "http://46.225.124.104:24123",
     }
 
@@ -695,8 +752,8 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -719,7 +776,7 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
     assert output["pull_zone"]["workloadPortPending"] is True
     assert output["pull_zone"]["workloadPortSource"] == "pending"
     assert captured == {
-        "workspace_id": "workspace-123",
+        "org_id": "workspace-123",
         "origin_url": "http://46.225.124.104",
     }
 
@@ -754,8 +811,8 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
 
     captured: dict[str, object] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -785,13 +842,13 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
     )
     assert output["provider"] == "bunny"
     assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
-    assert captured["workspace_id"] == "workspace-123"
+    assert captured["org_id"] == "workspace-123"
     assert captured["origin_url"] == "http://46.225.124.104"
     assert captured["server_names"] == ["shop.example.com"]
     assert captured["request_ssl"] is False
 
 
-def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_id_missing(tmp_path, monkeypatch):
+def test_configure_bunny_pull_zone_for_workload_errors_when_org_id_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
 
@@ -819,9 +876,9 @@ def test_configure_bunny_pull_zone_for_workload_errors_when_workspace_id_missing
         encoding="utf-8",
     )
 
-    with pytest.raises(deploy_service.DeployError, match="source_ref\\.client_id is required"):
+    with pytest.raises(deploy_service.DeployError, match="org_id is required"):
         deploy_service.configure_bunny_pull_zone_for_workload(
-            org_id="org-123",
+            org_id="",
             workload_name="brand-funnels-brand-abc",
             plan_path=str(plan_path),
             instance_name="mos-ghc-1",
@@ -879,8 +936,8 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, workspace_id: str, origin_url: str):
-        captured["workspace_id"] = workspace_id
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
         captured["origin_url"] = origin_url
         return {
             "Id": 999,
@@ -905,7 +962,7 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
     assert output["pull_zone"]["workloadPortSource"] == "spec"
     assert output["pull_zone"]["workloadPortPending"] is False
     assert captured == {
-        "workspace_id": "workspace-123",
+        "org_id": "workspace-123",
         "origin_url": "http://46.225.124.104:24123",
     }
 
