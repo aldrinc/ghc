@@ -322,7 +322,6 @@ async def _apply_shop_connection_defaults(
     await shopify_api.ensure_catalog_collection_route_is_available(
         shop_domain=shop_domain,
         access_token=cleaned_access_token,
-        sync_all_products=False,
     )
     await shopify_api.normalize_catalog_in_default_store_navigation(
         shop_domain=shop_domain,

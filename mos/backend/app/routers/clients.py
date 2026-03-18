@@ -218,13 +218,6 @@ _THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _THEME_SHOPPABLE_VIDEO_SECTION_FILENAME = "sections/ss-shoppable-video.liquid"
 _THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
-_THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE = re.compile(
-    (
-        r'(<a\b(?=[^>]*\bclass="[^"]*(?:product-card__title|title)[^"]*")'
-        r'[^>]*\bhref=)"\{\{\s*product(?:_|\.)url\s*\}\}"'
-    ),
-    re.IGNORECASE,
-)
 _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
     r'href="\{\{\s*product(?:_|\.)url\s*\}\}"',
     re.IGNORECASE,
@@ -745,14 +738,34 @@ def _resolve_theme_export_sales_page_path(
     client_id: str,
     auth: AuthContext,
     session: Session,
+    preferred_product_id: str | None = None,
 ) -> tuple[str, str | None]:
-    product = session.scalars(
-        select(Product)
-        .where(Product.org_id == auth.org_id, Product.client_id == client_id)
-        .order_by(Product.created_at.asc(), Product.id.asc())
-        .limit(1)
-    ).first()
-    if not product:
+    primary_product: Product | None = None
+    if isinstance(preferred_product_id, str) and preferred_product_id.strip():
+        primary_product = session.scalars(
+            select(Product).where(
+                Product.org_id == auth.org_id,
+                Product.client_id == client_id,
+                Product.id == preferred_product_id.strip(),
+            )
+        ).first()
+        if not primary_product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "Theme ZIP export could not resolve the selected template product. "
+                    f"productId={preferred_product_id.strip()}."
+                ),
+            )
+    else:
+        primary_product = session.scalars(
+            select(Product)
+            .where(Product.org_id == auth.org_id, Product.client_id == client_id)
+            .order_by(Product.created_at.asc(), Product.id.asc())
+            .limit(1)
+        ).first()
+
+    if not primary_product:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -762,13 +775,13 @@ def _resolve_theme_export_sales_page_path(
         )
 
     try:
-        require_product_route_slug(product=product)
+        require_product_route_slug(product=primary_product)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Theme ZIP export could not resolve a public product slug for the first "
-                f"workspace product: {exc}"
+                "Theme ZIP export could not resolve a public product slug for the selected "
+                f"template product: {exc}"
             ),
         ) from exc
 
@@ -815,17 +828,30 @@ def _resolve_theme_export_sales_page_path(
             return None
         return f"/f/{target_product_slug}/{target_funnel_slug}/{target_page_slug}"
 
-    first_product_sales_page = _find_latest_sales_page_for_product(product_id=product.id)
-    if first_product_sales_page is not None:
-        first_product_record, first_route_slug, first_page_slug = first_product_sales_page
-        if isinstance(first_product_record, Product):
-            first_product_sales_page_path = _build_sales_page_path(
-                target_product=first_product_record,
-                route_slug=first_route_slug,
-                page_slug=first_page_slug,
+    primary_product_sales_page = _find_latest_sales_page_for_product(
+        product_id=primary_product.id
+    )
+    if primary_product_sales_page is not None:
+        primary_product_record, primary_route_slug, primary_page_slug = (
+            primary_product_sales_page
+        )
+        if isinstance(primary_product_record, Product):
+            primary_product_sales_page_path = _build_sales_page_path(
+                target_product=primary_product_record,
+                route_slug=primary_route_slug,
+                page_slug=primary_page_slug,
             )
-            if first_product_sales_page_path:
-                return first_product_sales_page_path, None
+            if primary_product_sales_page_path:
+                return primary_product_sales_page_path, None
+
+    if isinstance(preferred_product_id, str) and preferred_product_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Theme ZIP export could not resolve a sales page for the selected template product. "
+                f"productId={preferred_product_id.strip()}."
+            ),
+        )
 
     latest_workspace_sales_page = _find_latest_sales_page_for_product(product_id=None)
     if latest_workspace_sales_page is not None:
@@ -842,8 +868,8 @@ def _resolve_theme_export_sales_page_path(
                 return (
                     workspace_sales_page_path,
                     (
-                        "Theme ZIP downloaded, but sales page was not found for the first "
-                        f"workspace product '{product.title}'. Using latest available sales page "
+                        "Theme ZIP downloaded, but sales page was not found for the selected "
+                        f"template product '{primary_product.title}'. Using latest available sales page "
                         f"from workspace product '{workspace_product.title}'."
                     ),
                 )
@@ -851,8 +877,8 @@ def _resolve_theme_export_sales_page_path(
     return (
         "",
         (
-            "Theme ZIP downloaded, but sales page was not found for the first "
-            f"workspace product '{product.title}'. Links were left blank."
+            "Theme ZIP downloaded, but sales page was not found for the selected "
+            f"template product '{primary_product.title}'. Links were left blank."
         ),
     )
 
@@ -912,30 +938,15 @@ def _normalize_theme_export_catalog_product_card_links(
     if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
         return content
 
-    normalized_content, rewritten_title_count = _THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE.subn(
-        rf'\1"{sales_page_path}"',
-        content,
-        count=1,
-    )
-    if rewritten_title_count != 1:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "Theme ZIP export could not rewrite the catalog product title link "
-                "in snippets/product-card.liquid."
-            ),
-        )
-
     normalized_content, rewritten_link_count = _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE.subn(
         f'href="{sales_page_path}"',
-        normalized_content,
-        count=2,
+        content,
     )
-    if rewritten_link_count != 2:
+    if rewritten_link_count == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "Theme ZIP export could not rewrite the expected catalog product links "
+                "Theme ZIP export could not rewrite any catalog product links "
                 "in snippets/product-card.liquid."
             ),
         )
@@ -8473,6 +8484,11 @@ def _build_shopify_theme_template_export_zip_response(
         client_id=client_id,
         auth=auth,
         session=session,
+        preferred_product_id=(
+            draft_data.productId
+            if isinstance(draft_data.productId, str) and draft_data.productId.strip()
+            else (str(draft.product_id) if draft.product_id else None)
+        ),
     )
     if isinstance(sales_page_path_resolution, tuple):
         sales_page_path, sales_page_warning = sales_page_path_resolution

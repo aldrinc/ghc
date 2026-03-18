@@ -1893,7 +1893,6 @@ class ShopifyApiClient:
         *,
         shop_domain: str,
         access_token: str,
-        sync_all_products: bool = True,
     ) -> dict[str, Any]:
         collection = await self._get_collection_by_handle(
             shop_domain=shop_domain,
@@ -1926,42 +1925,11 @@ class ShopifyApiClient:
                 publication_id=online_store_publication_id,
             )
 
-        added_product_count = 0
-        if sync_all_products:
-            shop_product_ids = await self._list_shop_product_ids(
-                shop_domain=shop_domain,
-                access_token=access_token,
-            )
-            if shop_product_ids:
-                collection_product_ids = await self._list_collection_product_ids(
-                    shop_domain=shop_domain,
-                    access_token=access_token,
-                    collection_id=collection["id"],
-                )
-                existing_product_ids = set(collection_product_ids)
-                missing_product_ids = [
-                    product_id
-                    for product_id in shop_product_ids
-                    if product_id not in existing_product_ids
-                ]
-                for start in range(
-                    0, len(missing_product_ids), _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
-                ):
-                    await self._add_products_to_collection(
-                        shop_domain=shop_domain,
-                        access_token=access_token,
-                        collection_id=collection["id"],
-                        product_ids=missing_product_ids[
-                            start : start + _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
-                        ],
-                    )
-                added_product_count = len(missing_product_ids)
-
         return {
             "collectionId": collection["id"],
             "collectionHandle": collection["handle"],
             "collectionTitle": collection["title"],
-            "addedProductCount": added_product_count,
+            "addedProductCount": 0,
         }
 
     @staticmethod
@@ -2003,7 +1971,6 @@ class ShopifyApiClient:
         collection = await self.ensure_catalog_collection_route_is_available(
             shop_domain=shop_domain,
             access_token=access_token,
-            sync_all_products=False,
         )
 
         added_product_count = 0
@@ -2414,77 +2381,6 @@ class ShopifyApiClient:
             "handle": collection_handle.strip(),
             "title": collection_title.strip(),
         }
-
-    async def _list_shop_product_ids(
-        self,
-        *,
-        shop_domain: str,
-        access_token: str,
-    ) -> list[str]:
-        query = """
-        query shopProductsForCatalogRoute($first: Int!, $after: String) {
-            products(first: $first, after: $after) {
-                pageInfo {
-                    hasNextPage
-                    endCursor
-                }
-                nodes {
-                    id
-                }
-            }
-        }
-        """
-        product_ids: list[str] = []
-        cursor: str | None = None
-        for _ in range(100):
-            response = await self._admin_graphql(
-                shop_domain=shop_domain,
-                access_token=access_token,
-                payload={
-                    "query": query,
-                    "variables": {
-                        "first": _GRAPHQL_MAX_PAGE_SIZE,
-                        "after": cursor,
-                    },
-                },
-            )
-            products = response.get("products")
-            if not isinstance(products, dict):
-                raise ShopifyApiError(message="products query response is invalid.")
-            nodes = products.get("nodes")
-            if not isinstance(nodes, list):
-                raise ShopifyApiError(message="products query response is missing nodes.")
-            for node in nodes:
-                if not isinstance(node, dict):
-                    raise ShopifyApiError(
-                        message="products query returned an invalid product node."
-                    )
-                product_id = node.get("id")
-                if not isinstance(product_id, str) or not product_id.strip():
-                    raise ShopifyApiError(
-                        message="products query response is missing product.id."
-                    )
-                product_ids.append(product_id.strip())
-
-            page_info = products.get("pageInfo")
-            if not isinstance(page_info, dict):
-                raise ShopifyApiError(message="products query response is missing pageInfo.")
-            has_next_page = page_info.get("hasNextPage")
-            if not isinstance(has_next_page, bool):
-                raise ShopifyApiError(
-                    message="products query response is missing pageInfo.hasNextPage."
-                )
-            if not has_next_page:
-                return product_ids
-            end_cursor = page_info.get("endCursor")
-            if not isinstance(end_cursor, str) or not end_cursor.strip():
-                raise ShopifyApiError(
-                    message="products query response is missing pageInfo.endCursor."
-                )
-            cursor = end_cursor
-        raise ShopifyApiError(
-            message="products query exceeded pagination limit while loading shop products."
-        )
 
     async def _list_collection_product_ids(
         self,
