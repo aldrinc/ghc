@@ -15,6 +15,9 @@ function pageViewParams(event: RuntimeTrackingEvent) {
 export function mapRuntimeEventToMetaPixelEvents(
   event: RuntimeTrackingEvent,
 ): MetaPixelRuntimeEvent[] {
+  if (event.eventType === "Entered Funnel") {
+    return [{ eventName: "Entered Funnel", method: "trackCustom", params: pageViewParams(event) }];
+  }
   if (event.eventType === "pre_sales_page_view" || event.eventType === "custom_page_view") {
     return [{ eventName: "PageView", params: pageViewParams(event) }];
   }

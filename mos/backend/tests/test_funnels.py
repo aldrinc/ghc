@@ -436,7 +436,14 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
                 "channel": "meta",
                 "mode": "public_funnel_runtime",
                 "pixelId": "pixel-123",
-                "browserEvents": ["PageView", "ViewContent", "PreSalesToSalesClick", "AddToCart", "Purchase"],
+                "browserEvents": [
+                    "Entered Funnel",
+                    "PageView",
+                    "ViewContent",
+                    "PreSalesToSalesClick",
+                    "AddToCart",
+                    "Purchase",
+                ],
                 "internalEvents": [
                     "Entered Funnel",
                     "pre_sales_page_view",

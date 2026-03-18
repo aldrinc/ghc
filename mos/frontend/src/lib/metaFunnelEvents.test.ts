@@ -3,6 +3,21 @@ import { describe, expect, it } from "vitest";
 import { mapRuntimeEventToMetaPixelEvents } from "./metaFunnelEvents";
 
 describe("mapRuntimeEventToMetaPixelEvents", () => {
+  it("maps funnel entries to a Meta custom event", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "Entered Funnel",
+        props: { pageStage: "pre_sales" },
+      }),
+    ).toEqual([
+      {
+        eventName: "Entered Funnel",
+        method: "trackCustom",
+        params: { page_stage: "pre_sales" },
+      },
+    ]);
+  });
+
   it("maps pre-sales page views to Meta PageView", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({

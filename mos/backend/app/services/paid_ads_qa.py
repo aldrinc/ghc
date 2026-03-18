@@ -339,6 +339,7 @@ def activate_mos_meta_funnel_tracking_profile(
         "pixelId": pixel_id,
         "dataSetId": data_set_id,
         "browserEvents": [
+            "Entered Funnel",
             "PageView",
             "ViewContent",
             "PreSalesToSalesClick",
