@@ -19,6 +19,7 @@ from app.db.models import (
     ClientUserPreference,
     Funnel,
     FunnelPage,
+    OrgDeployDomain,
     Product,
     ShopifyThemeTemplateDraft,
     ShopifyThemeTemplateDraftVersion,
@@ -28,7 +29,7 @@ from app.schemas.shopify_connection import (
     ShopifyThemeTemplateGenerateImagesRequest,
 )
 from app.services.shopify_connection import ShopifyInstallation
-from app.services.public_routing import require_product_route_slug
+from app.services.public_routing import require_product_route_slug, require_short_uuid_route_token
 from app.testimonial_renderer.validate import TestimonialRenderError as RendererError
 from sqlalchemy import select
 
@@ -140,6 +141,39 @@ def _seed_sales_page_for_product(
     db_session.add(page)
     db_session.commit()
     return product, funnel, page
+
+
+def _add_workspace_deploy_domain(
+    db_session,
+    *,
+    client: Client,
+    hostname: str = "offers.example.com",
+) -> str:
+    normalized_hostname = hostname.strip().lower()
+    db_session.add(
+        OrgDeployDomain(
+            org_id=client.org_id,
+            client_id=client.id,
+            hostname=normalized_hostname,
+        )
+    )
+    db_session.commit()
+    return normalized_hostname
+
+
+def _expected_runtime_sales_page_url(
+    *,
+    base_url: str,
+    product: Product,
+    funnel: Funnel,
+    page: FunnelPage,
+) -> str:
+    return (
+        f"{base_url.rstrip('/')}"
+        f"/{require_product_route_slug(product=product)}"
+        f"/{require_short_uuid_route_token(value=funnel.id, label='Funnel')}"
+        f"/{page.slug}"
+    )
 
 
 def test_sanitize_theme_component_text_value_removes_unsupported_characters():
@@ -263,6 +297,7 @@ def test_resolve_theme_export_sales_page_path_prefers_selected_template_product(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    workspace_hostname = _add_workspace_deploy_domain(db_session, client=client)
 
     _seed_sales_page_for_product(
         db_session,
@@ -273,7 +308,7 @@ def test_resolve_theme_export_sales_page_path_prefers_selected_template_product(
         funnel_created_at=datetime(2026, 3, 11, tzinfo=timezone.utc),
         page_slug="sales",
     )
-    selected_product, _, _ = _seed_sales_page_for_product(
+    selected_product, selected_funnel, selected_page = _seed_sales_page_for_product(
         db_session,
         client=client,
         product_title="Selected Product",
@@ -292,7 +327,12 @@ def test_resolve_theme_export_sales_page_path_prefers_selected_template_product(
 
     assert (
         sales_page_path
-        == f"/f/{require_product_route_slug(product=selected_product)}/selected-funnel/sales"
+        == _expected_runtime_sales_page_url(
+            base_url=f"https://{workspace_hostname}",
+            product=selected_product,
+            funnel=selected_funnel,
+            page=selected_page,
+        )
     )
     assert warning is None
 
@@ -635,6 +675,7 @@ def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_se
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    workspace_hostname = _add_workspace_deploy_domain(db_session, client=client)
 
     start_time = datetime.now(timezone.utc)
     first_product, first_funnel, first_page = _seed_sales_page_for_product(
@@ -662,9 +703,11 @@ def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_se
         session=db_session,
     )
 
-    expected_product_slug = str(first_product.id).split("-", 1)[0][:8]
-    assert sales_page_path == (
-        f"/f/{expected_product_slug}/{first_funnel.route_slug}/{first_page.slug}"
+    assert sales_page_path == _expected_runtime_sales_page_url(
+        base_url=f"https://{workspace_hostname}",
+        product=first_product,
+        funnel=first_funnel,
+        page=first_page,
     )
     assert warning is None
 
@@ -675,6 +718,7 @@ def test_resolve_theme_export_sales_page_path_uses_latest_sales_page_for_first_p
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    workspace_hostname = _add_workspace_deploy_domain(db_session, client=client)
 
     start_time = datetime.now(timezone.utc)
     product = Product(
@@ -743,8 +787,18 @@ def test_resolve_theme_export_sales_page_path_uses_latest_sales_page_for_first_p
         session=db_session,
     )
 
-    expected_product_slug = str(product.id).split("-", 1)[0][:8]
-    assert sales_page_path == f"/f/{expected_product_slug}/latest-sales-funnel/sales"
+    latest_page = db_session.scalar(
+        select(FunnelPage)
+        .where(FunnelPage.funnel_id == latest_funnel.id, FunnelPage.template_id == "sales-pdp")
+        .limit(1)
+    )
+    assert latest_page is not None
+    assert sales_page_path == _expected_runtime_sales_page_url(
+        base_url=f"https://{workspace_hostname}",
+        product=product,
+        funnel=latest_funnel,
+        page=latest_page,
+    )
     assert warning is None
 
 
@@ -754,6 +808,7 @@ def test_resolve_theme_export_sales_page_path_uses_latest_workspace_sales_page_w
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    workspace_hostname = _add_workspace_deploy_domain(db_session, client=client)
 
     start_time = datetime.now(timezone.utc)
     db_session.add(
@@ -782,14 +837,79 @@ def test_resolve_theme_export_sales_page_path_uses_latest_workspace_sales_page_w
         session=db_session,
     )
 
-    expected_second_product_slug = str(second_product.id).split("-", 1)[0][:8]
-    assert sales_page_path == (
-        f"/f/{expected_second_product_slug}/{second_funnel.route_slug}/{second_page.slug}"
+    assert sales_page_path == _expected_runtime_sales_page_url(
+        base_url=f"https://{workspace_hostname}",
+        product=second_product,
+        funnel=second_funnel,
+        page=second_page,
     )
     assert warning is not None
     assert "Theme ZIP downloaded, but sales page was not found" in warning
     assert "First Product" in warning
     assert "Second Product" in warning
+
+
+def test_resolve_theme_export_sales_page_path_uses_configured_public_base_url_when_workspace_domain_missing(
+    db_session, api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    monkeypatch.setattr(clients_router.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
+
+    product, funnel, page = _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Fallback Product",
+        product_created_at=datetime.now(timezone.utc),
+        funnel_route_slug="ignored-funnel-slug",
+        funnel_created_at=datetime.now(timezone.utc),
+        page_slug="sales",
+    )
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    assert sales_page_path == _expected_runtime_sales_page_url(
+        base_url="https://moshq.app",
+        product=product,
+        funnel=funnel,
+        page=page,
+    )
+    assert warning is None
+
+
+def test_resolve_theme_export_sales_page_path_errors_when_public_origin_missing(
+    db_session, api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    monkeypatch.setattr(clients_router.settings, "DEPLOY_PUBLIC_BASE_URL", None)
+
+    product, _, _ = _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Missing Origin Product",
+        product_created_at=datetime.now(timezone.utc),
+        funnel_route_slug="ignored-funnel-slug",
+        funnel_created_at=datetime.now(timezone.utc),
+        page_slug="sales",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        clients_router._resolve_theme_export_sales_page_path(
+            client_id=client_id,
+            auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+            session=db_session,
+            preferred_product_id=str(product.id),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "workspace deploy domain or DEPLOY_PUBLIC_BASE_URL" in str(exc_info.value.detail)
 
 
 def test_resolve_theme_export_sales_page_path_returns_blank_when_none_available(
