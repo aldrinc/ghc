@@ -49,6 +49,13 @@ from app.services.meta_review import (
     select_assets_for_generation,
 )
 from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_workspace_config
+from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_BILLING_EVENT,
+    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+    DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
+    default_meta_publish_attribution_spec,
+    default_meta_publish_targeting,
+)
 from app.services.campaign_destinations import (
     CampaignDestinationError,
     campaign_delivery_destination_map,
@@ -1472,7 +1479,15 @@ def setup_campaign_meta_review(
                 campaign_id=str(campaign.id),
                 name=str(experiment_config["name"]),
                 status="draft",
-                metadata_json=experiment_config["metadata_json"],
+                optimization_goal=DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
+                billing_event=DEFAULT_META_PUBLISH_BILLING_EVENT,
+                targeting=default_meta_publish_targeting(),
+                metadata_json={
+                    **experiment_config["metadata_json"],
+                    "templateId": "default-broad-int-cbo",
+                    "campaignDailyBudget": DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+                    "attributionSpec": default_meta_publish_attribution_spec(),
+                },
             )
             existing_adset_specs_by_experiment[experiment_id] = new_adset_spec
             created_adset_spec_ids.append(str(new_adset_spec.id))

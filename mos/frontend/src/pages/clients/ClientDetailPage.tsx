@@ -60,14 +60,10 @@ export function ClientDetailPage() {
               <div className="space-y-1 text-sm text-content">
                 <div className="font-semibold text-content">Onboarding</div>
                 <p className="text-content-muted">
-                  Start the staged onboarding wizard to collect brand context, product details, and goals.
+                  Start the staged onboarding wizard to collect brand context and product details.
                 </p>
               </div>
-              <OnboardingWizard
-                clientId={clientId}
-                clientName={client?.name}
-                clientIndustry={client?.industry}
-              />
+              <OnboardingWizard clientId={clientId} clientName={client?.name} />
             </div>
           </TabsContent>
 

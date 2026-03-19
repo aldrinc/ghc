@@ -96,7 +96,11 @@ export function MetaPublishConfigPanel() {
         <div className="text-xs font-semibold uppercase tracking-wider text-content-muted">Campaign</div>
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
           <Field label="Campaign name">
-            <Input value={publishCampaignForm.campaignName} onChange={(e) => updatePublishCampaignField("campaignName", e.target.value)} placeholder="Honest Herbalist Launch" />
+            <Input
+              value={publishCampaignForm.campaignName}
+              onChange={(e) => updatePublishCampaignField("campaignName", e.target.value)}
+              placeholder="[3/19/26] - [Campaign] - [CBO] - [Broad/Int]"
+            />
           </Field>
           <Field label="Publish base URL">
             <Input value={publishCampaignForm.publishBaseUrl} onChange={(e) => updatePublishCampaignField("publishBaseUrl", e.target.value)} placeholder="https://shop.example.com" />
@@ -126,7 +130,8 @@ export function MetaPublishConfigPanel() {
           </div>
         </div>
         <p className="text-xs text-content-muted">
-          Creates the Meta campaign, ad sets, and ads in <span className="font-semibold text-content">PAUSED</span> status.
+          Creates the Meta campaign, ad sets, and ads in <span className="font-semibold text-content">PAUSED</span> status. New publish plans default to a{" "}
+          <span className="font-semibold text-content">$100/day campaign-level CBO budget</span>.
         </p>
       </section>
 
@@ -179,10 +184,10 @@ export function MetaPublishConfigPanel() {
                       <Input value={form.conversionDomain} onChange={(e) => updatePublishAdSetField(spec.id, "conversionDomain", e.target.value)} placeholder="Optional" />
                     </Field>
                     <Field label="Daily budget">
-                      <Input value={form.dailyBudget} onChange={(e) => updatePublishAdSetField(spec.id, "dailyBudget", e.target.value)} placeholder="Leave blank for lifetime" />
+                      <Input value={form.dailyBudget} onChange={(e) => updatePublishAdSetField(spec.id, "dailyBudget", e.target.value)} placeholder="Leave blank for campaign CBO" />
                     </Field>
                     <Field label="Lifetime budget">
-                      <Input value={form.lifetimeBudget} onChange={(e) => updatePublishAdSetField(spec.id, "lifetimeBudget", e.target.value)} placeholder="Leave blank for daily" />
+                      <Input value={form.lifetimeBudget} onChange={(e) => updatePublishAdSetField(spec.id, "lifetimeBudget", e.target.value)} placeholder="Leave blank for campaign CBO" />
                     </Field>
                     <Field label="Bid amount">
                       <Input value={form.bidAmount} onChange={(e) => updatePublishAdSetField(spec.id, "bidAmount", e.target.value)} placeholder="Optional" />
@@ -227,10 +232,10 @@ export function MetaPublishConfigPanel() {
                       <Textarea
                         value={form.placementsJson}
                         onChange={(e) => updatePublishAdSetField(spec.id, "placementsJson", e.target.value)}
-                        placeholder='{"publisher_platforms":["facebook","instagram"],"facebook_positions":["feed"],"instagram_positions":["stream"]}'
+                        placeholder="{}"
                       />
                       <div className="text-xs text-content-muted">
-                        New ad sets default to Facebook + Instagram feeds. Choose Automatic to let Meta decide placements, or edit the JSON for an advanced mix.
+                        New ad sets default to the Broad/Int launch template: US, CA, GB, AU with Advantage Audience, relaxed brand safety, and Automatic placements. Edit the JSON only when you want to deviate from that baseline.
                       </div>
                     </div>
                     <div className="text-xs text-content-muted">

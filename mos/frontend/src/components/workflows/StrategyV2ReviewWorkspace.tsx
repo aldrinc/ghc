@@ -962,6 +962,7 @@ export function StrategyV2ReviewWorkspace({
     });
   };
 
+  const isRunning = runStatus === "running";
   const activeFile = activeFileId ? requiredFiles.find((file) => file.id === activeFileId) : undefined;
   const resolvedActiveFile = activeFile || foundationalReviewFiles.find((file) => file.id === activeFileId);
   const activeRuntime = resolvedActiveFile ? getFileRuntime(resolvedActiveFile.id) : undefined;
@@ -1228,8 +1229,9 @@ export function StrategyV2ReviewWorkspace({
               <div className="grid gap-2 md:grid-cols-2">
                 {foundationalReviewFiles.map((file) => {
                   const runtime = getFileRuntime(file.id);
+                  const isMissingWhileRunning = Boolean(file.missingReason) && isRunning;
                   const statusTone = file.missingReason
-                    ? "danger"
+                    ? (isMissingWhileRunning ? "warning" : "danger")
                     : runtime.reviewed
                       ? "success"
                       : runtime.status === "loading"
@@ -1238,7 +1240,7 @@ export function StrategyV2ReviewWorkspace({
                           ? "accent"
                           : "neutral";
                   const statusText = file.missingReason
-                    ? "Missing"
+                    ? (isMissingWhileRunning ? "Pending" : "Missing")
                     : runtime.reviewed
                       ? "Reviewed"
                       : runtime.status === "loading"
@@ -1252,7 +1254,9 @@ export function StrategyV2ReviewWorkspace({
                       type="button"
                       className={cn(
                         "ds-card ds-card--sm text-left transition",
-                        file.missingReason ? "bg-danger/5 border-danger/30" : "bg-surface-2 hover:bg-hover",
+                        file.missingReason
+                          ? (isMissingWhileRunning ? "bg-warning/5 border-warning/30 opacity-60" : "bg-danger/5 border-danger/30")
+                          : "bg-surface-2 hover:bg-hover",
                       )}
                       onClick={() => {
                         if (file.missingReason) return;
@@ -1264,8 +1268,11 @@ export function StrategyV2ReviewWorkspace({
                         <div className="min-w-0">
                           <div className="text-xs font-semibold text-content truncate">{file.title}</div>
                           <div className="text-[11px] text-content-muted">{file.subtitle || ""}</div>
-                          {file.missingReason ? (
+                          {file.missingReason && !isMissingWhileRunning ? (
                             <div className="mt-1 text-[11px] text-danger">{file.missingReason}</div>
+                          ) : null}
+                          {isMissingWhileRunning ? (
+                            <div className="mt-1 text-[11px] text-warning">Still being generated…</div>
                           ) : null}
                         </div>
                         <Badge tone={statusTone}>{statusText}</Badge>
@@ -1276,11 +1283,17 @@ export function StrategyV2ReviewWorkspace({
               </div>
 
               {!availableFoundationalFiles.length ? (
-                <Callout variant="danger" title="Foundational docs are unavailable for this workflow run">
-                  This run does not contain persisted Stage 1 foundational files in research artifacts.
-                </Callout>
+                isRunning ? (
+                  <Callout variant="warning" title="Foundational docs are still being generated">
+                    The workflow is still running. These files will appear as each stage completes.
+                  </Callout>
+                ) : (
+                  <Callout variant="danger" title="Foundational docs are unavailable for this workflow run">
+                    This run does not contain persisted Stage 1 foundational files in research artifacts.
+                  </Callout>
+                )
               ) : null}
-              {missingFoundationalFiles.length ? (
+              {missingFoundationalFiles.length && !isRunning ? (
                 <Callout variant="warning" title="Some foundational docs are missing">
                   {missingFoundationalFiles.map((file) => (
                     <div key={file.id}>• {file.title}</div>
@@ -1304,8 +1317,9 @@ export function StrategyV2ReviewWorkspace({
                 <div className="grid gap-2 md:grid-cols-2">
                   {requiredFiles.map((file) => {
                     const runtime = getFileRuntime(file.id);
+                    const isMissingWhileRunning = Boolean(file.missingReason) && isRunning;
                     const statusTone = file.missingReason
-                      ? "danger"
+                      ? (isMissingWhileRunning ? "warning" : "danger")
                       : runtime.reviewed
                         ? "success"
                         : runtime.status === "loading"
@@ -1314,7 +1328,7 @@ export function StrategyV2ReviewWorkspace({
                             ? "accent"
                             : "neutral";
                     const statusText = file.missingReason
-                      ? "Missing"
+                      ? (isMissingWhileRunning ? "Pending" : "Missing")
                       : runtime.reviewed
                         ? "Reviewed"
                         : runtime.status === "loading"
@@ -1328,7 +1342,9 @@ export function StrategyV2ReviewWorkspace({
                         type="button"
                         className={cn(
                           "ds-card ds-card--sm text-left transition",
-                          file.missingReason ? "bg-danger/5 border-danger/30" : "bg-surface-2 hover:bg-hover",
+                          file.missingReason
+                            ? (isMissingWhileRunning ? "bg-warning/5 border-warning/30 opacity-60" : "bg-danger/5 border-danger/30")
+                            : "bg-surface-2 hover:bg-hover",
                         )}
                         onClick={() => {
                           void openFile(file);
@@ -1338,8 +1354,11 @@ export function StrategyV2ReviewWorkspace({
                           <div className="min-w-0">
                             <div className="text-xs font-semibold text-content truncate">{file.title}</div>
                             <div className="text-[11px] text-content-muted">{file.subtitle || ""}</div>
-                            {file.missingReason ? (
+                            {file.missingReason && !isMissingWhileRunning ? (
                               <div className="mt-1 text-[11px] text-danger">{file.missingReason}</div>
+                            ) : null}
+                            {isMissingWhileRunning ? (
+                              <div className="mt-1 text-[11px] text-warning">Still being generated…</div>
                             ) : null}
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">

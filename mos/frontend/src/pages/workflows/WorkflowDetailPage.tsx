@@ -15,6 +15,7 @@ import { LaunchConfigCard } from "@/components/workflows/LaunchConfigCard";
 import { LaunchHubView } from "@/components/workflows/LaunchHubView";
 import { useAssets } from "@/api/assets";
 import { useClientShopifyStatus } from "@/api/clients";
+import { useProduct } from "@/api/products";
 import {
   useStopWorkflow,
   useStrategyV2LaunchAdditionalAngle,
@@ -130,6 +131,12 @@ export function WorkflowDetailPage() {
     () => products.find((item) => item.id === run?.product_id),
     [products, run?.product_id]
   );
+  const {
+    data: runProductDetail,
+    isLoading: isLoadingRunProductDetail,
+    isError: hasRunProductDetailError,
+    refetch: refetchRunProductDetail,
+  } = useProduct(run?.product_id || undefined);
   const researchArtifacts: ResearchArtifactRef[] = useMemo(
     () => (Array.isArray(data?.research_artifacts) ? (data?.research_artifacts as ResearchArtifactRef[]) : EMPTY_RESEARCH_ARTIFACTS),
     [data?.research_artifacts],
@@ -201,6 +208,48 @@ export function WorkflowDetailPage() {
         : run?.status !== "completed"
           ? "Launch is available once the Strategy V2 run completes."
           : null;
+  const primaryProductAsset = useMemo(() => {
+    if (!runProductDetail?.primary_asset_id) return null;
+    return (
+      runProductDetail.assets.find(
+        (asset) => asset.is_primary || asset.id === runProductDetail.primary_asset_id
+      ) || null
+    );
+  }, [runProductDetail]);
+
+  const productImageLaunchState: "ready" | "blocked" | "unknown" = !run?.product_id
+    ? "blocked"
+    : isLoadingRunProductDetail || hasRunProductDetailError || !runProductDetail
+      ? "unknown"
+      : !runProductDetail.primary_asset_id
+        ? "blocked"
+        : !primaryProductAsset
+          ? "blocked"
+          : primaryProductAsset.asset_kind !== "image"
+            ? "blocked"
+            : primaryProductAsset.file_status && primaryProductAsset.file_status !== "ready"
+              ? "blocked"
+              : !primaryProductAsset.public_id
+                ? "blocked"
+                : "ready";
+  const productImageLaunchStatusMessage = !run?.product_id
+    ? "This workflow run is missing product scope for primary image validation."
+    : isLoadingRunProductDetail
+      ? "Checking primary product image status for this product."
+      : hasRunProductDetailError || !runProductDetail
+        ? "Product details are temporarily unavailable. You can retry now, or launch and let the backend validate the primary image."
+        : !runProductDetail.primary_asset_id
+          ? "Add a primary product image in product setup before launching."
+          : !primaryProductAsset
+            ? "The configured primary product image could not be loaded."
+            : primaryProductAsset.asset_kind !== "image"
+              ? `Primary product asset must be an image before launch (current: ${primaryProductAsset.asset_kind}).`
+              : primaryProductAsset.file_status && primaryProductAsset.file_status !== "ready"
+                ? `Primary product image must finish processing before launch (current: ${primaryProductAsset.file_status}).`
+                : !primaryProductAsset.public_id
+                  ? "Primary product image is missing its public asset id and cannot be used for launch."
+                  : null;
+  const resolvedRunProductTitle = runProduct?.title || runProductDetail?.title || null;
 
   const strategyV2StateSummaries =
     (strategyV2State?.scored_candidate_summaries || {}) as Record<string, unknown>;
@@ -660,8 +709,8 @@ export function WorkflowDetailPage() {
               : strategyV2PendingSignal
                 ? `Gate ${GATE_SEQUENCE.indexOf(strategyV2PendingSignal) + 1} of 6: ${GATE_LABELS[strategyV2PendingSignal]}`
                 : "Processing \u2014 we'll pause when a decision is needed."
-            : runProduct?.title
-              ? `Inspect research artifacts for ${runProduct.title}.`
+            : resolvedRunProductTitle
+              ? `Inspect research artifacts for ${resolvedRunProductTitle}.`
               : "Inspect research artifacts and unblock any required gates."
         }
         actions={
@@ -716,7 +765,7 @@ export function WorkflowDetailPage() {
                   size="sm"
                   onClick={() =>
                     selectProduct(run.product_id || "", {
-                      title: runProduct?.title,
+                      title: resolvedRunProductTitle || undefined,
                       client_id: run.client_id || undefined,
                     })
                   }
@@ -727,7 +776,7 @@ export function WorkflowDetailPage() {
             >
               <>
                 This workflow is scoped to{" "}
-                <span className="font-semibold text-content">{runProduct?.title || run.product_id}</span>. Switch product
+                <span className="font-semibold text-content">{resolvedRunProductTitle || run.product_id}</span>. Switch product
                 to review artifacts in context.
               </>
             </Callout>
@@ -881,9 +930,19 @@ export function WorkflowDetailPage() {
                         selectedAngleName={selectedAngleName}
                         isShopifyReady={isShopifyLaunchReady}
                         shopifyBlockedReason={shopifyLaunchBlockedReason}
+                        productImageState={productImageLaunchState}
+                        productImageStatusMessage={productImageLaunchStatusMessage}
                         isLaunching={anyLaunchPending}
                         onLaunch={async (config) => {
                           setLaunchActionError(null);
+                          if (!isShopifyLaunchReady || productImageLaunchState === "blocked") {
+                            setLaunchActionError(
+                              shopifyLaunchBlockedReason ||
+                                productImageLaunchStatusMessage ||
+                                "Launch prerequisites are not satisfied."
+                            );
+                            return;
+                          }
                           try {
                             const response = await launchAngleCampaign.mutateAsync(config);
                             setLatestLaunchResponse(response);
@@ -893,6 +952,8 @@ export function WorkflowDetailPage() {
                         }}
                         onRefreshShopify={() => void refetchShopifyStatus()}
                         isLoadingShopify={isLoadingShopifyStatus}
+                        onRefreshProductImage={() => void refetchRunProductDetail()}
+                        isLoadingProductImage={isLoadingRunProductDetail}
                         productId={run?.product_id || undefined}
                         latestLaunchResponse={latestLaunchResponse}
                         launchError={launchActionError}
@@ -907,8 +968,21 @@ export function WorkflowDetailPage() {
                         defaultCampaignId={additionalUmsCampaignId}
                         isShopifyReady={isShopifyLaunchReady}
                         shopifyBlockedReason={shopifyLaunchBlockedReason}
+                        productImageState={productImageLaunchState}
+                        productImageStatusMessage={productImageLaunchStatusMessage}
+                        onRefreshProductImage={() => void refetchRunProductDetail()}
+                        isLoadingProductImage={isLoadingRunProductDetail}
+                        productId={run?.product_id || undefined}
                         onLaunchAdditionalAngles={async (config) => {
                           setLaunchActionError(null);
+                          if (!isShopifyLaunchReady || productImageLaunchState === "blocked") {
+                            setLaunchActionError(
+                              shopifyLaunchBlockedReason ||
+                                productImageLaunchStatusMessage ||
+                                "Launch prerequisites are not satisfied."
+                            );
+                            return;
+                          }
                           try {
                             const response = await launchAdditionalAngle.mutateAsync({
                               selectedAngleIds: config.selectedAngleIds,
@@ -922,6 +996,14 @@ export function WorkflowDetailPage() {
                         }}
                         onLaunchAdditionalUms={async (config) => {
                           setLaunchActionError(null);
+                          if (!isShopifyLaunchReady || productImageLaunchState === "blocked") {
+                            setLaunchActionError(
+                              shopifyLaunchBlockedReason ||
+                                productImageLaunchStatusMessage ||
+                                "Launch prerequisites are not satisfied."
+                            );
+                            return;
+                          }
                           try {
                             const response = await launchAdditionalUms.mutateAsync(config);
                             setLatestLaunchResponse(response);
@@ -962,7 +1044,7 @@ export function WorkflowDetailPage() {
                   <div>
                     <div className="text-content-muted">Product</div>
                     <div className="font-mono text-[11px] text-content-muted">
-                      {runProduct?.title || run.product_id || "—"}
+                      {resolvedRunProductTitle || run.product_id || "—"}
                     </div>
                   </div>
                   <div>
@@ -1005,7 +1087,7 @@ export function WorkflowDetailPage() {
                     <div>
                       <div className="text-content-muted">Product</div>
                       <div className="font-mono text-[11px] text-content-muted">
-                        {runProduct?.title || run.product_id || "—"}
+                        {resolvedRunProductTitle || run.product_id || "—"}
                       </div>
                     </div>
                     <div>

@@ -12,6 +12,8 @@ import {
 import type { StrategyV2LaunchRecord } from "@/types/common";
 import type { StrategyV2LaunchActionResponse } from "@/api/workflows";
 
+type ProductImageLaunchState = "ready" | "blocked" | "unknown";
+
 type LaunchHubViewProps = {
   /** Launch history */
   launches: StrategyV2LaunchRecord[];
@@ -28,6 +30,11 @@ type LaunchHubViewProps = {
   /** Shopify state */
   isShopifyReady: boolean;
   shopifyBlockedReason: string | null;
+  productImageState: ProductImageLaunchState;
+  productImageStatusMessage: string | null;
+  onRefreshProductImage: () => void;
+  isLoadingProductImage: boolean;
+  productId?: string;
 
   /** Handlers */
   onLaunchAdditionalAngles: (config: {
@@ -100,6 +107,11 @@ export function LaunchHubView({
   defaultCampaignId,
   isShopifyReady,
   shopifyBlockedReason,
+  productImageState,
+  productImageStatusMessage,
+  onRefreshProductImage,
+  isLoadingProductImage,
+  productId,
   onLaunchAdditionalAngles,
   onLaunchAdditionalUms,
   isLaunching,
@@ -120,9 +132,10 @@ export function LaunchHubView({
   const unlaunchedUms = umsOptions.filter((u) => !launchedUmsIds.has(u.id));
 
   const canLaunchAngles =
-    isShopifyReady && !isLaunching && selectedAngleIds.length > 0;
+    isShopifyReady && productImageState !== "blocked" && !isLaunching && selectedAngleIds.length > 0;
   const canLaunchUms =
     isShopifyReady &&
+    productImageState !== "blocked" &&
     !isLaunching &&
     selectedUmsIds.length > 0 &&
     launchNamePrefix.trim().length > 0;
@@ -198,6 +211,45 @@ export function LaunchHubView({
         <Callout variant="warning" title="Shopify not ready">
           {shopifyBlockedReason ??
             "Shopify must be connected and ready before launching."}
+        </Callout>
+      ) : null}
+
+      {productImageState !== "ready" ? (
+        <Callout
+          variant={productImageState === "unknown" ? "info" : "warning"}
+          title={productImageState === "unknown" ? "Primary product image status unavailable" : "Primary product image not ready"}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={onRefreshProductImage}
+                disabled={isLoadingProductImage}
+              >
+                {isLoadingProductImage ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+              {productId ? (
+                <Link
+                  to={`/workspaces/products/${productId}`}
+                  className={buttonClasses({ variant: "secondary", size: "xs" })}
+                >
+                  Go to product setup
+                </Link>
+              ) : null}
+            </div>
+          }
+        >
+          {productImageStatusMessage ??
+            (productImageState === "unknown"
+              ? "We could not verify product image readiness here. Launch will still be validated by the backend."
+              : "Add a primary product image in product setup before launching.")}
         </Callout>
       ) : null}
 

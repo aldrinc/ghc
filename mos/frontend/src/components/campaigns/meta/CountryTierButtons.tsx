@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import {
+  META_DEFAULT_BROAD_INT_COUNTRIES,
   META_COUNTRY_TIER_1,
   META_COUNTRY_TIER_2,
   META_COUNTRY_TIER_3,
@@ -19,6 +20,7 @@ function tierActive(current: string[], tier: readonly string[]): boolean {
 
 export function CountryTierButtons({ targetingJson, onTargetingJsonChange }: CountryTierButtonsProps) {
   const current = parseCountriesFromTargetingJson(targetingJson);
+  const defaultBroadIntActive = tierActive(current, META_DEFAULT_BROAD_INT_COUNTRIES);
   const t1Active = tierActive(current, META_COUNTRY_TIER_1);
   const t2Active = tierActive(current, META_COUNTRY_TIER_2);
   const t3Active = tierActive(current, META_COUNTRY_TIER_3);
@@ -26,6 +28,14 @@ export function CountryTierButtons({ targetingJson, onTargetingJsonChange }: Cou
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-content-muted">Quick-fill:</span>
+      <Button
+        type="button"
+        variant={defaultBroadIntActive ? "primary" : "secondary"}
+        size="xs"
+        onClick={() => onTargetingJsonChange(mergeCountriesIntoTargetingJson(targetingJson, META_DEFAULT_BROAD_INT_COUNTRIES))}
+      >
+        Broad/Int ({META_DEFAULT_BROAD_INT_COUNTRIES.length})
+      </Button>
       <Button
         type="button"
         variant={t1Active ? "primary" : "secondary"}

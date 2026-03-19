@@ -6,7 +6,11 @@ import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
 import type { PaidAdsQaRun } from "@/api/paidAdsQa";
 import { useMetaApi } from "@/api/meta";
-import { META_DEFAULT_FEED_PLACEMENTS, formatPlacementPresetJson } from "@/lib/metaAdsConstants";
+import {
+  META_AUTOMATIC_PLACEMENTS,
+  META_DEFAULT_BROAD_INT_TARGETING,
+  formatPlacementPresetJson,
+} from "@/lib/metaAdsConstants";
 import { resolveMetaCreativeQaState } from "@/lib/metaCreativeQa";
 import {
   resolveConfiguredShopHostedOrigin,
@@ -214,6 +218,18 @@ export function fromLocalDateTimeValue(value: string): string | null {
   return date.toISOString();
 }
 
+function formatPublishCampaignDate(value = new Date()): string {
+  const month = value.getMonth() + 1;
+  const day = value.getDate();
+  const year = String(value.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
+}
+
+function buildDefaultPublishCampaignName(campaignName: string): string {
+  const cleaned = campaignName.trim() || "Campaign";
+  return `[${formatPublishCampaignDate()}] - [${cleaned}] - [CBO] - [Broad/Int]`;
+}
+
 export function buildAdSetForm(
   spec: MetaAdSetSpec,
   defaults?: {
@@ -223,13 +239,14 @@ export function buildAdSetForm(
   const promotedObject = readRecord(spec.promoted_object);
   const optimizationGoal = spec.optimization_goal || "OFFSITE_CONVERSIONS";
   const defaultPageName = readString(defaults?.pageName) || "";
-  const placementDefaults = spec.placements ?? META_DEFAULT_FEED_PLACEMENTS;
+  const targetingDefaults = spec.targeting ?? META_DEFAULT_BROAD_INT_TARGETING;
+  const placementDefaults = spec.placements ?? META_AUTOMATIC_PLACEMENTS;
   return {
     name: spec.name || "",
     optimizationGoal,
     billingEvent: spec.billing_event || "IMPRESSIONS",
-    targetingJson: formatJsonInput(spec.targeting),
-    placementsJson: formatJsonInput(placementDefaults) || formatPlacementPresetJson(META_DEFAULT_FEED_PLACEMENTS),
+    targetingJson: formatJsonInput(targetingDefaults),
+    placementsJson: formatJsonInput(placementDefaults) || formatPlacementPresetJson(META_AUTOMATIC_PLACEMENTS),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
     bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
@@ -496,7 +513,7 @@ export function MetaPublishProvider({
   const [qaRunsError, setQaRunsError] = useState<string | null>(null);
   const [publishCampaignForm, setPublishCampaignForm] = useState<MetaPublishCampaignForm>(() => ({
     publishBaseUrl: reviewBaseUrl || "",
-    campaignName: "",
+    campaignName: buildDefaultPublishCampaignName(campaign.name),
     campaignObjective: "OUTCOME_SALES",
     buyingType: "AUCTION",
     specialAdCategories: "",

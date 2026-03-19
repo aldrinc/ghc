@@ -11,10 +11,14 @@ import {
 } from "@/lib/assetBriefTypes";
 import type { StrategyV2LaunchActionResponse } from "@/api/workflows";
 
+type ProductImageLaunchState = "ready" | "blocked" | "unknown";
+
 type LaunchConfigCardProps = {
   selectedAngleName: string;
   isShopifyReady: boolean;
   shopifyBlockedReason: string | null;
+  productImageState: ProductImageLaunchState;
+  productImageStatusMessage: string | null;
   isLaunching: boolean;
   onLaunch: (config: {
     channels: string[];
@@ -23,6 +27,8 @@ type LaunchConfigCardProps = {
   }) => void;
   onRefreshShopify: () => void;
   isLoadingShopify: boolean;
+  onRefreshProductImage: () => void;
+  isLoadingProductImage: boolean;
   productId?: string;
   latestLaunchResponse: StrategyV2LaunchActionResponse | null;
   launchError: string | null;
@@ -32,10 +38,14 @@ export function LaunchConfigCard({
   selectedAngleName,
   isShopifyReady,
   shopifyBlockedReason,
+  productImageState,
+  productImageStatusMessage,
   isLaunching,
   onLaunch,
   onRefreshShopify,
   isLoadingShopify,
+  onRefreshProductImage,
+  isLoadingProductImage,
   productId,
   latestLaunchResponse,
   launchError,
@@ -54,7 +64,7 @@ export function LaunchConfigCard({
   };
 
   const canLaunch =
-    isShopifyReady && !isLaunching && assetBriefTypes.length > 0;
+    isShopifyReady && productImageState !== "blocked" && !isLaunching && assetBriefTypes.length > 0;
 
   const handleLaunch = () => {
     onLaunch({
@@ -108,6 +118,50 @@ export function LaunchConfigCard({
         >
           {shopifyBlockedReason ||
             "Shopify must be connected and ready before launching."}
+        </Callout>
+      )}
+
+      {productImageState === "ready" ? (
+        <div className="flex items-center gap-2 text-sm text-success">
+          <CheckCircle2 className="size-4 shrink-0" />
+          <span className="font-medium">Primary product image ready</span>
+        </div>
+      ) : (
+        <Callout
+          variant={productImageState === "unknown" ? "info" : "warning"}
+          title={productImageState === "unknown" ? "Primary product image status unavailable" : "Primary product image not ready"}
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={onRefreshProductImage}
+                disabled={isLoadingProductImage}
+              >
+                {isLoadingProductImage ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Checking…
+                  </>
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+              {productId ? (
+                <Link
+                  to={`/workspaces/products/${productId}`}
+                  className={buttonClasses({ variant: "secondary", size: "xs" })}
+                >
+                  Go to product setup
+                </Link>
+              ) : null}
+            </div>
+          }
+        >
+          {productImageStatusMessage ||
+            (productImageState === "unknown"
+              ? "We could not verify product image readiness here. Launch will still be validated by the backend."
+              : "Add a primary product image in product setup before launching.")}
         </Callout>
       )}
 

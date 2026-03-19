@@ -67,6 +67,7 @@ class MetaAdSetCreateRequest(BaseModel):
     dsaBeneficiary: Optional[str] = None
     dsaPayor: Optional[str] = None
     promotedObject: Optional[dict[str, Any]] = None
+    attributionSpec: Optional[list[dict[str, Any]]] = None
     validateOnly: Optional[bool] = None
 
 

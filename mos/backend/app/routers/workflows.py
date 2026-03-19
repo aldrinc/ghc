@@ -604,6 +604,84 @@ def _load_source_context_or_409(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+def _require_product_primary_image_launch_ready_or_409(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: Any,
+    product_id: Any,
+) -> Asset:
+    normalized_client_id = str(client_id or "").strip()
+    normalized_product_id = str(product_id or "").strip()
+    if not normalized_client_id or not normalized_product_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Source Strategy V2 run is missing client/product scope required for primary image validation.",
+        )
+
+    product = ProductsRepository(session).get(org_id=org_id, product_id=normalized_product_id)
+    if not product:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Source Strategy V2 product was not found. "
+                "Remediation: reopen Strategy Hub from a valid product scope and try again."
+            ),
+        )
+    if str(product.client_id) != normalized_client_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Source Strategy V2 product does not match the launch client scope.",
+        )
+    if not product.primary_asset_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Launch requires a primary product image. "
+                "Remediation: upload an image asset on the product page and set it as primary before launching."
+            ),
+        )
+
+    asset = session.scalars(
+        select(Asset)
+        .execution_options(populate_existing=True)
+        .where(
+            Asset.org_id == org_id,
+            Asset.client_id == normalized_client_id,
+            Asset.id == product.primary_asset_id,
+        )
+    ).first()
+    if not asset:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Product primary image asset was not found. "
+                "Remediation: re-upload the product image and set it as primary before launching."
+            ),
+        )
+    if asset.product_id and str(asset.product_id) != str(product.id):
+        raise HTTPException(
+            status_code=409,
+            detail="Product primary image asset does not belong to the selected product.",
+        )
+    if asset.asset_kind != "image":
+        raise HTTPException(
+            status_code=409,
+            detail="Product primary asset must be an image before launch.",
+        )
+    if asset.file_status and asset.file_status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Product primary image asset is not ready (file_status={asset.file_status}).",
+        )
+    if not asset.public_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Product primary image asset is missing public_id and cannot be used for launch.",
+        )
+    return asset
+
+
 def _build_deterministic_launch_temporal_workflow_id(
     *,
     prefix: str,
@@ -1452,6 +1530,12 @@ async def strategy_v2_launch_angle_campaign(
         raise HTTPException(status_code=404, detail="Workflow run not found.")
     source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
     effective_source_run = getattr(source_context, "source_run", source_run)
+    _require_product_primary_image_launch_ready_or_409(
+        session=session,
+        org_id=auth.org_id,
+        client_id=getattr(effective_source_run, "client_id", None),
+        product_id=getattr(effective_source_run, "product_id", None),
+    )
 
     channels = _normalize_required_string_list(value=body.channels, field_name="channels")
     asset_brief_types = _normalize_required_asset_brief_types_or_400(
@@ -1620,6 +1704,12 @@ async def strategy_v2_launch_additional_ums(
         raise HTTPException(status_code=404, detail="Workflow run not found.")
     source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
     effective_source_run = getattr(source_context, "source_run", source_run)
+    _require_product_primary_image_launch_ready_or_409(
+        session=session,
+        org_id=auth.org_id,
+        client_id=getattr(effective_source_run, "client_id", None),
+        product_id=getattr(effective_source_run, "product_id", None),
+    )
 
     campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=body.campaign_id)
     if not campaign:
@@ -1822,6 +1912,12 @@ async def strategy_v2_launch_additional_angle(
         raise HTTPException(status_code=404, detail="Workflow run not found.")
     source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
     effective_source_run = getattr(source_context, "source_run", source_run)
+    _require_product_primary_image_launch_ready_or_409(
+        session=session,
+        org_id=auth.org_id,
+        client_id=getattr(effective_source_run, "client_id", None),
+        product_id=getattr(effective_source_run, "product_id", None),
+    )
     if source_context.competitor_analysis is None:
         raise HTTPException(
             status_code=409,

@@ -102,6 +102,10 @@ from app.services.meta_management_benchmarks import (
     MetaManagementBenchmarkError,
     build_management_benchmark_payload,
 )
+from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+    default_meta_publish_attribution_spec,
+)
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
     RULESET_VERSION,
@@ -451,6 +455,48 @@ def _targeting_country_codes(targeting: Any) -> set[str]:
 
 def _requires_dsa_declarations(targeting: Any) -> bool:
     return bool(_targeting_country_codes(targeting) & _EU_COUNTRY_CODES)
+
+
+def _unique_publish_adset_specs(resolved_items: list[dict[str, Any]]) -> dict[str, MetaAdSetSpec]:
+    unique_specs: dict[str, MetaAdSetSpec] = {}
+    for resolved in resolved_items:
+        adset_spec = resolved.get("adset_spec")
+        if isinstance(adset_spec, MetaAdSetSpec):
+            unique_specs[str(adset_spec.id)] = adset_spec
+    return unique_specs
+
+
+def _publish_budget_scope_for_specs(specs: list[MetaAdSetSpec] | dict[str, MetaAdSetSpec]) -> str:
+    rows = specs.values() if isinstance(specs, dict) else specs
+    saw_campaign_budget_scope = False
+    saw_adset_budget_scope = False
+    for spec in rows:
+        has_adset_budget = spec.daily_budget is not None or spec.lifetime_budget is not None
+        if has_adset_budget:
+            saw_adset_budget_scope = True
+        else:
+            saw_campaign_budget_scope = True
+    if saw_campaign_budget_scope and saw_adset_budget_scope:
+        return "mixed"
+    if saw_adset_budget_scope:
+        return "adset"
+    return "campaign"
+
+
+def _publish_budget_scope_blocker_message() -> str:
+    return (
+        "Linked Meta ad set specs mix campaign-budgeted and ad-set-budgeted launch settings. "
+        "Either leave all ad set budgets blank to use the default $100/day CBO campaign budget, "
+        "or set explicit budgets on every linked ad set."
+    )
+
+
+def _resolved_publish_adset_attribution_spec(adset_spec: MetaAdSetSpec) -> list[dict[str, Any]]:
+    metadata = adset_spec.metadata_json if isinstance(adset_spec.metadata_json, dict) else {}
+    raw_value = metadata.get("attributionSpec")
+    if isinstance(raw_value, list) and all(isinstance(item, dict) for item in raw_value):
+        return [dict(item) for item in raw_value]
+    return default_meta_publish_attribution_spec()
 
 
 def _missing_dsa_party_message(field_name: str) -> str:
@@ -1086,6 +1132,8 @@ def _build_launch_plan_payload(
     launch_context_readiness: dict[str, Any],
     delivery_snapshot: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    unique_adset_specs = _unique_publish_adset_specs(resolved_items)
+    budget_scope = _publish_budget_scope_for_specs(unique_adset_specs)
     items: list[dict[str, Any]] = []
     for resolved in resolved_items:
         creative_spec = resolved["creative_spec"]
@@ -1120,6 +1168,7 @@ def _build_launch_plan_payload(
                     "startTime": adset_spec.start_time.isoformat() if adset_spec.start_time else None,
                     "endTime": adset_spec.end_time.isoformat() if adset_spec.end_time else None,
                     "promotedObject": adset_spec.promoted_object,
+                    "attributionSpec": _resolved_publish_adset_attribution_spec(adset_spec),
                     "conversionDomain": adset_spec.conversion_domain,
                 },
             }
@@ -1133,6 +1182,10 @@ def _build_launch_plan_payload(
         "campaignName": payload.campaignName,
         "campaignObjective": payload.campaignObjective,
         "buyingType": payload.buyingType,
+        "budgetScope": budget_scope,
+        "campaignDailyBudget": (
+            DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS if budget_scope == "campaign" else None
+        ),
         "specialAdCategories": payload.specialAdCategories,
         "launchContextReadiness": launch_context_readiness,
         "campaignDelivery": delivery_snapshot,
@@ -1424,8 +1477,6 @@ def _validate_publish_plan(
                         scope_label="Linked Meta ad set spec",
                     )
                 )
-                if adset_spec.daily_budget is None and adset_spec.lifetime_budget is None:
-                    item_blockers.append("Linked Meta ad set spec must set either dailyBudget or lifetimeBudget.")
                 if adset_spec.daily_budget is not None and adset_spec.lifetime_budget is not None:
                     item_blockers.append("Linked Meta ad set spec cannot set both dailyBudget and lifetimeBudget.")
                 item_blockers.extend(
@@ -1486,6 +1537,10 @@ def _validate_publish_plan(
                     "effective_page_id": _clean_optional_text(creative_spec.page_id) or profile_page_id,
                 }
             )
+
+    budget_scope = _publish_budget_scope_for_specs(_unique_publish_adset_specs(resolved_items))
+    if budget_scope == "mixed":
+        blockers.append(_publish_budget_scope_blocker_message())
 
     if len(publish_domains) > 1:
         blockers.append("Final-package creatives resolve to multiple publish domains. Use one launch domain per publish run.")
@@ -1974,6 +2029,8 @@ def _create_meta_adset_internal(
         request_payload["dsa_payor"] = dsa_payor
     if payload.promotedObject:
         request_payload["promoted_object"] = payload.promotedObject
+    if payload.attributionSpec:
+        request_payload["attribution_spec"] = payload.attributionSpec
     if payload.validateOnly:
         request_payload["execution_options"] = ["validate_only"]
 
@@ -3198,6 +3255,7 @@ def create_meta_publish_run(
         launch_plan_payload=launch_plan_payload,
     )
     launch_plan_key = str(launch_plan_payload["launchPlanKey"])
+    publish_budget_scope = _publish_budget_scope_for_specs(_unique_publish_adset_specs(resolved_items))
 
     ad_account_id = _resolved_ad_account_id_for_context(resolved=resolved_meta_config)
     page_id = _require_meta_page_id(workspace_config=resolved_meta_config.workspace_config)
@@ -3268,7 +3326,12 @@ def create_meta_publish_run(
                 status="PAUSED",
                 specialAdCategories=payload.specialAdCategories,
                 buyingType=payload.buyingType,
-                isAdsetBudgetSharingEnabled=False,
+                dailyBudget=(
+                    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+                    if publish_budget_scope == "campaign"
+                    else None
+                ),
+                isAdsetBudgetSharingEnabled=False if publish_budget_scope == "adset" else None,
             ),
             auth=auth,
             session=session,
@@ -3298,8 +3361,8 @@ def create_meta_publish_run(
                     campaignId=meta_campaign_id or "",
                     name=_clean_optional_text(adset_spec.name) or adset_spec_id,
                     status="PAUSED",
-                    dailyBudget=adset_spec.daily_budget,
-                    lifetimeBudget=adset_spec.lifetime_budget,
+                    dailyBudget=adset_spec.daily_budget if publish_budget_scope == "adset" else None,
+                    lifetimeBudget=adset_spec.lifetime_budget if publish_budget_scope == "adset" else None,
                     billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
                     optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
                     targeting=adset_spec.targeting or {},
@@ -3310,6 +3373,7 @@ def create_meta_publish_run(
                     dsaBeneficiary=_clean_optional_text(adset_spec.dsa_beneficiary),
                     dsaPayor=_clean_optional_text(adset_spec.dsa_payor),
                     promotedObject=adset_spec.promoted_object,
+                    attributionSpec=_resolved_publish_adset_attribution_spec(adset_spec),
                     validateOnly=False,
                 ),
                 auth=auth,

@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.db.enums import ArtifactTypeEnum, WorkflowKindEnum, WorkflowStatusEnum
-from app.db.models import Artifact, Campaign, Client, Product, ResearchArtifact, StrategyV2Launch, WorkflowRun
+from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum, WorkflowKindEnum, WorkflowStatusEnum
+from app.db.models import Asset, Artifact, Campaign, Client, Product, ResearchArtifact, StrategyV2Launch, WorkflowRun
 from app.routers import workflows as workflows_router
 from app.temporal.workflows import strategy_v2_launch as strategy_v2_launch_workflow
 from app.strategy_v2 import launches as strategy_v2_launches
@@ -49,6 +49,34 @@ def _seed_strategy_v2_scope(db_session):
         description="Launch-ready product description.",
     )
     db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    primary_asset = Asset(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        source_type=AssetSourceEnum.upload,
+        status=AssetStatusEnum.approved,
+        asset_kind="image",
+        channel_id="brand",
+        format="image",
+        content={},
+        public_id=uuid4(),
+        storage_key="products/launch-primary.png",
+        content_type="image/png",
+        size_bytes=123,
+        width=1200,
+        height=1200,
+        file_source="upload",
+        file_status="ready",
+        tags=[],
+    )
+    db_session.add(primary_asset)
+    db_session.commit()
+    db_session.refresh(primary_asset)
+
+    product.primary_asset_id = primary_asset.id
     db_session.commit()
     db_session.refresh(product)
 
@@ -171,6 +199,56 @@ def test_launch_angle_campaign_uses_created_workflow_run_id(api_client, db_sessi
     assert launch_run is not None
     assert launch_run.kind == WorkflowKindEnum.strategy_v2_angle_launch
     assert launch_run.temporal_run_id != "pending"
+
+
+def test_launch_angle_campaign_requires_primary_product_image(api_client, db_session, monkeypatch):
+    _, product, source_run, _ = _seed_strategy_v2_scope(db_session)
+    product.primary_asset_id = None
+    db_session.commit()
+
+    monkeypatch.setattr(
+        workflows_router,
+        "_load_source_context_or_409",
+        lambda **_kwargs: _fake_source_context(),
+    )
+
+    response = api_client.post(
+        f"/workflows/{source_run.id}/actions/strategy-v2/launch-angle-campaign",
+        json={
+            "channels": ["meta"],
+            "assetBriefTypes": ["image"],
+            "experimentVariantPolicy": "angle_launch_standard_v1",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert "Launch requires a primary product image." in response.json()["detail"]
+
+
+def test_launch_angle_campaign_requires_ready_primary_product_image(api_client, db_session, monkeypatch):
+    _, product, source_run, _ = _seed_strategy_v2_scope(db_session)
+    primary_asset = db_session.get(Asset, product.primary_asset_id)
+    assert primary_asset is not None
+    primary_asset.file_status = "processing"
+    db_session.commit()
+
+    monkeypatch.setattr(
+        workflows_router,
+        "_load_source_context_or_409",
+        lambda **_kwargs: _fake_source_context(),
+    )
+
+    response = api_client.post(
+        f"/workflows/{source_run.id}/actions/strategy-v2/launch-angle-campaign",
+        json={
+            "channels": ["meta"],
+            "assetBriefTypes": ["image"],
+            "experimentVariantPolicy": "angle_launch_standard_v1",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert "Product primary image asset is not ready" in response.json()["detail"]
 
 
 def test_launch_workflow_retries_funnel_generation_on_infra_failures_only():

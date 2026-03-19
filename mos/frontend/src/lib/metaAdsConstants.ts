@@ -83,6 +83,24 @@ export const META_CUSTOM_EVENT_TYPES: SelectOption[] = [
 export type MetaPlacementSpec = Record<string, string[]>;
 
 export const META_AUTOMATIC_PLACEMENTS: MetaPlacementSpec = {};
+export const META_DEFAULT_BROAD_INT_COUNTRIES = ["US", "CA", "GB", "AU"] as const;
+export const META_DEFAULT_BROAD_INT_TARGETING = {
+  age_min: 18,
+  age_max: 65,
+  age_range: [18, 65],
+  geo_locations: {
+    countries: [...META_DEFAULT_BROAD_INT_COUNTRIES],
+    location_types: ["home", "recent"],
+  },
+  brand_safety_content_filter_levels: ["FACEBOOK_RELAXED"],
+  targeting_automation: {
+    advantage_audience: 1,
+    individual_setting: {
+      age: 1,
+      gender: 1,
+    },
+  },
+} as const;
 
 export const META_DEFAULT_FEED_PLACEMENTS: MetaPlacementSpec = {
   publisher_platforms: ["facebook", "instagram"],

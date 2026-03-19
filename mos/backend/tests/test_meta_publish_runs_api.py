@@ -36,6 +36,11 @@ from app.db.models import (
 )
 from app.routers import meta_ads as meta_ads_router
 from app.services.integration_secrets import encrypt_secret_json
+from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
+    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+    DEFAULT_META_PUBLISH_TARGETING,
+)
 from app.services.paid_ads_qa import RULESET_VERSION
 from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
@@ -205,16 +210,19 @@ def _create_meta_publish_inputs(
         status="draft",
         optimization_goal="OFFSITE_CONVERSIONS",
         billing_event="IMPRESSIONS",
-        targeting={"geo_locations": {"countries": ["US"]}} if with_targeting else None,
-        placements={"publisher_platforms": ["facebook"]},
-        daily_budget=5000,
+        targeting=dict(DEFAULT_META_PUBLISH_TARGETING) if with_targeting else None,
+        placements=None,
+        daily_budget=None,
         lifetime_budget=None,
         bid_amount=None,
         start_time=None,
         end_time=None,
         promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
         conversion_domain="shop.thehonestherbalist.com",
-        metadata_json={"experimentSpecId": experiment_key},
+        metadata_json={
+            "experimentSpecId": experiment_key,
+            "attributionSpec": DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
+        },
     )
     db_session.add(creative_spec)
     db_session.add(adset_spec)
@@ -826,15 +834,20 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         def create_campaign(self, **kwargs):
             assert kwargs["ad_account_id"] == "act_123456"
             assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["daily_budget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+            assert "is_adset_budget_sharing_enabled" not in kwargs["payload"]
             return {"id": "meta_campaign_123", "status": "PAUSED"}
 
         def create_adset(self, **kwargs):
             assert kwargs["payload"]["status"] == "PAUSED"
             assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
             assert kwargs["payload"]["dsa_payor"] == "Test Page"
-            assert kwargs["payload"]["targeting"]["geo_locations"]["countries"] == ["US"]
-            assert kwargs["payload"]["targeting"]["publisher_platforms"] == ["facebook"]
-            assert "placements" not in kwargs["payload"]
+            assert kwargs["payload"]["targeting"]["geo_locations"]["countries"] == list(DEFAULT_META_PUBLISH_TARGETING["geo_locations"]["countries"])
+            assert kwargs["payload"]["targeting"]["brand_safety_content_filter_levels"] == ["FACEBOOK_RELAXED"]
+            assert kwargs["payload"]["targeting"]["targeting_automation"]["advantage_audience"] == 1
+            assert "daily_budget" not in kwargs["payload"]
+            assert "lifetime_budget" not in kwargs["payload"]
+            assert kwargs["payload"]["attribution_spec"] == DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC
             return {"id": "meta_adset_123", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
@@ -945,6 +958,7 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
         def create_campaign(self, **kwargs):
             counters["create_campaign"] += 1
             assert kwargs["ad_account_id"] == "act_123456"
+            assert kwargs["payload"]["daily_budget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
             return {"id": f"meta_campaign_{counters['create_campaign']}", "status": "PAUSED"}
 
         def create_adset(self, **kwargs):
@@ -1210,6 +1224,7 @@ def test_validate_meta_publish_plan_blocks_duplicate_placement_keys(api_client, 
         "geo_locations": {"countries": ["US"]},
         "publisher_platforms": ["instagram"],
     }
+    adset_spec.placements = {"publisher_platforms": ["facebook"]}
     db_session.commit()
     db_session.refresh(adset_spec)
     _upsert_meta_profile(api_client, client_id=client_id)

@@ -4,6 +4,11 @@ from sqlalchemy import select
 
 from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
+from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
+    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+    DEFAULT_META_PUBLISH_TARGETING,
+)
 from app.services.paid_ads_qa import RULESET_VERSION
 from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
@@ -311,6 +316,17 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["creative_spec"]["metadata_json"]["reviewPaths"]["sales"].endswith("/sales")
     assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
     assert row["adset_specs"][0]["metadata_json"]["experimentSpecId"] == "exp-A02-Interaction Triage Workflow"
+    assert row["adset_specs"][0]["optimization_goal"] == "OFFSITE_CONVERSIONS"
+    assert row["adset_specs"][0]["billing_event"] == "IMPRESSIONS"
+    assert row["adset_specs"][0]["daily_budget"] is None
+    assert row["adset_specs"][0]["lifetime_budget"] is None
+    assert row["adset_specs"][0]["placements"] is None
+    assert row["adset_specs"][0]["targeting"] == DEFAULT_META_PUBLISH_TARGETING
+    assert row["adset_specs"][0]["metadata_json"]["templateId"] == "default-broad-int-cbo"
+    assert row["adset_specs"][0]["metadata_json"]["campaignDailyBudget"] == (
+        DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+    )
+    assert row["adset_specs"][0]["metadata_json"]["attributionSpec"] == DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC
 
     library_pipeline_resp = api_client.get(f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&statuses=draft")
     assert library_pipeline_resp.status_code == 200
