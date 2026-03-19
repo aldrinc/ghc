@@ -63,6 +63,8 @@ class MetaAdSetCreateRequest(BaseModel):
     startTime: Optional[str] = None
     endTime: Optional[str] = None
     bidAmount: Optional[int] = None
+    dsaBeneficiary: Optional[str] = None
+    dsaPayor: Optional[str] = None
     promotedObject: Optional[dict[str, Any]] = None
     validateOnly: Optional[bool] = None
 
@@ -113,6 +115,8 @@ class MetaAdSetSpecCreateRequest(BaseModel):
     dailyBudget: Optional[int] = None
     lifetimeBudget: Optional[int] = None
     bidAmount: Optional[int] = None
+    dsaBeneficiary: Optional[str] = None
+    dsaPayor: Optional[str] = None
     startTime: Optional[datetime] = None
     endTime: Optional[datetime] = None
     promotedObject: Optional[dict[str, Any]] = None
@@ -221,6 +225,8 @@ class MetaAdSetSpecUpdateRequest(BaseModel):
     dailyBudget: int | None = None
     lifetimeBudget: int | None = None
     bidAmount: int | None = None
+    dsaBeneficiary: str | None = None
+    dsaPayor: str | None = None
     startTime: datetime | None = None
     endTime: datetime | None = None
     promotedObject: dict[str, Any] | None = None

@@ -113,6 +113,38 @@ from app.services.storefront_domains import normalize_absolute_origin, resolve_s
 
 router = APIRouter(prefix="/meta", tags=["meta"])
 
+_EU_COUNTRY_CODES = frozenset(
+    {
+        "AT",
+        "BE",
+        "BG",
+        "HR",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "DE",
+        "GR",
+        "HU",
+        "IE",
+        "IT",
+        "LV",
+        "LT",
+        "LU",
+        "MT",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
+    }
+)
+
 
 class _MetaEventMappingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -282,6 +314,51 @@ def _publish_selection_response(record: Any) -> MetaPublishSelectionResponse:
 def _clean_optional_text(value: Any) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
+    return None
+
+
+def _targeting_country_codes(targeting: Any) -> set[str]:
+    if not isinstance(targeting, dict):
+        return set()
+    geo_locations = targeting.get("geo_locations")
+    if not isinstance(geo_locations, dict):
+        return set()
+    countries = geo_locations.get("countries")
+    if not isinstance(countries, list):
+        return set()
+    return {
+        cleaned.upper()
+        for entry in countries
+        if (cleaned := _clean_optional_text(entry))
+    }
+
+
+def _requires_dsa_declarations(targeting: Any) -> bool:
+    return bool(_targeting_country_codes(targeting) & _EU_COUNTRY_CODES)
+
+
+def _missing_dsa_party_message(field_name: str) -> str:
+    return (
+        f"EU-targeted Meta ad sets must define {field_name}. "
+        "Set it on the ad set or ensure the selected Meta workspace config has pageName."
+    )
+
+
+def _resolve_dsa_party_value(
+    *,
+    explicit_value: Any,
+    workspace_page_name: Any,
+    field_name: str,
+    targeting: Any,
+) -> str | None:
+    resolved_value = _clean_optional_text(explicit_value) or _clean_optional_text(workspace_page_name)
+    if resolved_value:
+        return resolved_value
+    if _requires_dsa_declarations(targeting):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_missing_dsa_party_message(field_name),
+        )
     return None
 
 
@@ -1216,6 +1293,17 @@ def _validate_publish_plan(
                     item_blockers.append("Linked Meta ad set spec cannot set both dailyBudget and lifetimeBudget.")
                 if adset_spec.start_time and adset_spec.end_time and adset_spec.end_time <= adset_spec.start_time:
                     item_blockers.append("Linked Meta ad set spec endTime must be after startTime.")
+                if _requires_dsa_declarations(adset_spec.targeting):
+                    if not (
+                        _clean_optional_text(adset_spec.dsa_beneficiary)
+                        or _clean_optional_text(resolved_meta_config.workspace_config.page_name)
+                    ):
+                        item_blockers.append(_missing_dsa_party_message("dsaBeneficiary"))
+                    if not (
+                        _clean_optional_text(adset_spec.dsa_payor)
+                        or _clean_optional_text(resolved_meta_config.workspace_config.page_name)
+                    ):
+                        item_blockers.append(_missing_dsa_party_message("dsaPayor"))
 
             effective_page_id = _clean_optional_text(creative_spec.page_id) or profile_page_id
             if not effective_page_id:
@@ -1716,6 +1804,22 @@ def _create_meta_adset_internal(
         request_payload["end_time"] = payload.endTime
     if payload.bidAmount is not None:
         request_payload["bid_amount"] = payload.bidAmount
+    dsa_beneficiary = _resolve_dsa_party_value(
+        explicit_value=payload.dsaBeneficiary,
+        workspace_page_name=resolved.workspace_config.page_name,
+        field_name="dsaBeneficiary",
+        targeting=payload.targeting,
+    )
+    dsa_payor = _resolve_dsa_party_value(
+        explicit_value=payload.dsaPayor,
+        workspace_page_name=resolved.workspace_config.page_name,
+        field_name="dsaPayor",
+        targeting=payload.targeting,
+    )
+    if dsa_beneficiary:
+        request_payload["dsa_beneficiary"] = dsa_beneficiary
+    if dsa_payor:
+        request_payload["dsa_payor"] = dsa_payor
     if payload.promotedObject:
         request_payload["promoted_object"] = payload.promotedObject
     if payload.validateOnly:
@@ -2620,6 +2724,8 @@ def create_meta_adset_spec(
         daily_budget=payload.dailyBudget,
         lifetime_budget=payload.lifetimeBudget,
         bid_amount=payload.bidAmount,
+        dsa_beneficiary=_clean_optional_text(payload.dsaBeneficiary),
+        dsa_payor=_clean_optional_text(payload.dsaPayor),
         start_time=payload.startTime,
         end_time=payload.endTime,
         promoted_object=payload.promotedObject,
@@ -2695,6 +2801,16 @@ def update_meta_adset_spec(
         daily_budget=daily_budget,
         lifetime_budget=lifetime_budget,
         bid_amount=update_fields["bidAmount"] if "bidAmount" in update_fields else record.bid_amount,
+        dsa_beneficiary=(
+            _clean_optional_text(update_fields["dsaBeneficiary"])
+            if "dsaBeneficiary" in update_fields
+            else record.dsa_beneficiary
+        ),
+        dsa_payor=(
+            _clean_optional_text(update_fields["dsaPayor"])
+            if "dsaPayor" in update_fields
+            else record.dsa_payor
+        ),
         start_time=start_time,
         end_time=end_time,
         promoted_object=update_fields["promotedObject"] if "promotedObject" in update_fields else record.promoted_object,
@@ -3026,6 +3142,8 @@ def create_meta_publish_run(
                     startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
                     endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
                     bidAmount=adset_spec.bid_amount,
+                    dsaBeneficiary=_clean_optional_text(adset_spec.dsa_beneficiary),
+                    dsaPayor=_clean_optional_text(adset_spec.dsa_payor),
                     promotedObject=adset_spec.promoted_object,
                     validateOnly=False,
                 ),

@@ -145,7 +145,7 @@ export function MetaPublishConfigPanel() {
         {includedAdSetSpecs.length ? (
           <div className="space-y-5">
             {includedAdSetSpecs.map((spec) => {
-              const form = publishAdSetForms[spec.id] || buildAdSetForm(spec);
+              const form = publishAdSetForms[spec.id] || buildAdSetForm(spec, { pageName: config?.pageName });
               const usesWebsiteConversions = form.optimizationGoal.trim().toUpperCase() === "OFFSITE_CONVERSIONS";
               return (
                 <div key={`publish-adset-${spec.id}`} className="space-y-3 rounded-lg border border-border p-4">
@@ -186,6 +186,20 @@ export function MetaPublishConfigPanel() {
                     <Field label="Bid amount">
                       <Input value={form.bidAmount} onChange={(e) => updatePublishAdSetField(spec.id, "bidAmount", e.target.value)} placeholder="Optional" />
                     </Field>
+                    <Field label="DSA beneficiary">
+                      <Input
+                        value={form.dsaBeneficiary}
+                        onChange={(e) => updatePublishAdSetField(spec.id, "dsaBeneficiary", e.target.value)}
+                        placeholder={config?.pageName || "Defaults to page name"}
+                      />
+                    </Field>
+                    <Field label="DSA payor">
+                      <Input
+                        value={form.dsaPayor}
+                        onChange={(e) => updatePublishAdSetField(spec.id, "dsaPayor", e.target.value)}
+                        placeholder={config?.pageName || "Defaults to page name"}
+                      />
+                    </Field>
                     <Field label="Start time">
                       <Input type="datetime-local" value={form.startTime} onChange={(e) => updatePublishAdSetField(spec.id, "startTime", e.target.value)} />
                     </Field>
@@ -206,6 +220,9 @@ export function MetaPublishConfigPanel() {
                     <Callout variant="info" size="sm">
                       Placements use Meta defaults in this publish flow. No marketer input is required here, and custom placement JSON is hidden until the publish path supports it.
                     </Callout>
+                    <div className="text-xs text-content-muted">
+                      DSA beneficiary and payor default to the active Meta page name when left blank. Edit them here if the advertiser or payer should be different.
+                    </div>
                     {usesWebsiteConversions ? (
                       <div className="space-y-3 rounded-md border border-border bg-surface-2 p-3">
                         <div className="space-y-1">

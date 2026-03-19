@@ -1412,6 +1412,8 @@ class MetaAdSetSpec(Base):
     daily_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lifetime_budget: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bid_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    dsa_beneficiary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dsa_payor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     start_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     promoted_object: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)

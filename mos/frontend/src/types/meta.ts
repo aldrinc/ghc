@@ -30,6 +30,8 @@ export type MetaAdSetSpec = {
   daily_budget?: number | null;
   lifetime_budget?: number | null;
   bid_amount?: number | null;
+  dsa_beneficiary?: string | null;
+  dsa_payor?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   promoted_object?: Record<string, unknown> | null;
@@ -104,6 +106,8 @@ export type MetaAdSetSpecUpdatePayload = {
   dailyBudget?: number | null;
   lifetimeBudget?: number | null;
   bidAmount?: number | null;
+  dsaBeneficiary?: string | null;
+  dsaPayor?: string | null;
   startTime?: string | null;
   endTime?: string | null;
   promotedObject?: Record<string, unknown> | null;

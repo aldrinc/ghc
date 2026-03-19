@@ -278,13 +278,20 @@ def _meta_management_benchmark_metadata() -> dict[str, object]:
     }
 
 
-def _upsert_meta_profile(api_client, *, client_id: str, metadata: dict[str, object] | None = None) -> None:
+def _upsert_meta_profile(
+    api_client,
+    *,
+    client_id: str,
+    metadata: dict[str, object] | None = None,
+    page_name: str | None = "Test Page",
+) -> None:
     response = api_client.put(
         f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
         json={
             "rulesetVersion": RULESET_VERSION,
             "adAccountId": "act_123456",
             "pageId": "page_123",
+            "pageName": page_name,
             "pixelId": "pixel_123",
             "verifiedDomain": "shop.thehonestherbalist.com",
             "verifiedDomainStatus": "verified",
@@ -820,6 +827,8 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
 
         def create_adset(self, **kwargs):
             assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
+            assert kwargs["payload"]["dsa_payor"] == "Test Page"
             return {"id": "meta_adset_123", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
@@ -863,6 +872,61 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert len(history_payload) == 1
     assert history_payload[0]["id"] == publish_payload["id"]
     assert history_payload[0]["items"][0]["metaAdId"] == "meta_ad_123"
+
+
+def test_validate_meta_publish_plan_blocks_eu_targeting_without_dsa_defaults(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-eu-dsa",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-eu-dsa"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-eu-dsa",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-eu-dsa",
+        with_targeting=True,
+    )
+    adset_spec.targeting = {"geo_locations": {"countries": ["DE"]}}
+    db_session.commit()
+    db_session.refresh(adset_spec)
+    _upsert_meta_profile(api_client, client_id=client_id, page_name=None)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert meta_ads_router._missing_dsa_party_message("dsaBeneficiary") in payload["items"][0]["blockers"]
+    assert meta_ads_router._missing_dsa_party_message("dsaPayor") in payload["items"][0]["blockers"]
 
 
 def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(

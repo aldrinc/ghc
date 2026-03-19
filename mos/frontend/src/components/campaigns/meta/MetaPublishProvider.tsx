@@ -50,6 +50,8 @@ export type MetaPublishAdSetForm = {
   dailyBudget: string;
   lifetimeBudget: string;
   bidAmount: string;
+  dsaBeneficiary: string;
+  dsaPayor: string;
   startTime: string;
   endTime: string;
   promotedPixelId: string;
@@ -211,9 +213,15 @@ export function fromLocalDateTimeValue(value: string): string | null {
   return date.toISOString();
 }
 
-export function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
+export function buildAdSetForm(
+  spec: MetaAdSetSpec,
+  defaults?: {
+    pageName?: string | null;
+  },
+): MetaPublishAdSetForm {
   const promotedObject = readRecord(spec.promoted_object);
   const optimizationGoal = spec.optimization_goal || "OFFSITE_CONVERSIONS";
+  const defaultPageName = readString(defaults?.pageName) || "";
   return {
     name: spec.name || "",
     optimizationGoal,
@@ -223,6 +231,8 @@ export function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
     bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
+    dsaBeneficiary: readString(spec.dsa_beneficiary) || defaultPageName,
+    dsaPayor: readString(spec.dsa_payor) || defaultPageName,
     startTime: toLocalDateTimeValue(spec.start_time),
     endTime: toLocalDateTimeValue(spec.end_time),
     promotedPixelId: readString(promotedObject?.pixel_id) || "",
@@ -290,6 +300,7 @@ type MetaPublishContextValue = {
   config: {
     adAccountId: string;
     pageId?: string | null;
+    pageName?: string | null;
     pixelId?: string | null;
     graphApiVersion?: string | null;
     validationStatus?: string | null;
@@ -452,6 +463,7 @@ export function MetaPublishProvider({
   const [config, setConfig] = useState<{
     adAccountId: string;
     pageId?: string | null;
+    pageName?: string | null;
     pixelId?: string | null;
     graphApiVersion?: string | null;
     validationStatus?: string | null;
@@ -542,6 +554,7 @@ export function MetaPublishProvider({
         setConfig({
           adAccountId: data.adAccountId,
           pageId: data.pageId,
+          pageName: data.pageName,
           pixelId: data.pixelId,
           graphApiVersion: data.graphApiVersion,
           validationStatus: data.validationStatus,
@@ -834,10 +847,12 @@ export function MetaPublishProvider({
   useEffect(() => {
     setPublishAdSetForms((cur) => {
       const next: Record<string, MetaPublishAdSetForm> = {};
-      includedAdSetSpecs.forEach((spec) => { next[spec.id] = cur[spec.id] || buildAdSetForm(spec); });
+      includedAdSetSpecs.forEach((spec) => {
+        next[spec.id] = cur[spec.id] || buildAdSetForm(spec, { pageName: config?.pageName });
+      });
       return next;
     });
-  }, [includedAdSetSpecs]);
+  }, [config?.pageName, includedAdSetSpecs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -954,12 +969,16 @@ export function MetaPublishProvider({
       setPublishAdSetForms((cur) => ({
         ...cur,
         [specId]: {
-          ...(cur[specId] || buildAdSetForm(includedAdSetSpecs.find((s) => s.id === specId) || ({ id: specId, name: "", status: "draft" } as MetaAdSetSpec))),
+          ...(cur[specId] ||
+            buildAdSetForm(
+              includedAdSetSpecs.find((s) => s.id === specId) || ({ id: specId, name: "", status: "draft" } as MetaAdSetSpec),
+              { pageName: config?.pageName },
+            )),
           [field]: value,
         },
       }));
     },
-    [includedAdSetSpecs],
+    [config?.pageName, includedAdSetSpecs],
   );
 
   const buildPublishRequestPayload = useCallback(() => {
@@ -978,7 +997,7 @@ export function MetaPublishProvider({
 
   const persistPublishAdSetConfigs = useCallback(async () => {
     for (const spec of includedAdSetSpecs) {
-      const form = publishAdSetForms[spec.id] || buildAdSetForm(spec);
+      const form = publishAdSetForms[spec.id] || buildAdSetForm(spec, { pageName: config?.pageName });
       await updateAdSetSpec(spec.id, {
         name: form.name.trim() || null,
         optimizationGoal: form.optimizationGoal.trim() || null,
@@ -988,6 +1007,8 @@ export function MetaPublishProvider({
         dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
         lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
         bidAmount: parseIntegerInput(form.bidAmount, `${spec.name || spec.id} bid amount`),
+        dsaBeneficiary: form.dsaBeneficiary.trim() || readString(config?.pageName) || null,
+        dsaPayor: form.dsaPayor.trim() || readString(config?.pageName) || null,
         startTime: fromLocalDateTimeValue(form.startTime),
         endTime: fromLocalDateTimeValue(form.endTime),
         promotedObject: buildPromotedObjectPayload(form, {
@@ -1000,7 +1021,7 @@ export function MetaPublishProvider({
         conversionDomain: form.conversionDomain.trim() || null,
       });
     }
-  }, [config?.lastValidatedAt, config?.pixelId, config?.validationStatus, includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
+  }, [config?.lastValidatedAt, config?.pageName, config?.pixelId, config?.validationStatus, includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
 
   const refreshPublishRuns = useCallback(async () => {
     setPublishRunsLoading(true);
