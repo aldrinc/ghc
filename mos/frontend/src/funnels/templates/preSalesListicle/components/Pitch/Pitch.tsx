@@ -1,5 +1,6 @@
 import type { Pitch as PitchType } from '../../types'
 import { resolveImageSrc } from '../../utils/assetUtils'
+import { Button } from '../Button/Button'
 import { Container } from '../Container/Container'
 import { CheckIcon } from '../Icons/CheckIcon'
 import styles from './Pitch.module.css'
@@ -34,6 +35,13 @@ export function Pitch({ pitch }: Props) {
                 </li>
               ))}
             </ul>
+            {pitch.cta ? (
+              <div className={styles.ctaWrap}>
+                <Button linkType={pitch.cta.linkType} href={pitch.cta.href} targetPageId={pitch.cta.targetPageId}>
+                  {pitch.cta.label}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.mediaFrame}>
