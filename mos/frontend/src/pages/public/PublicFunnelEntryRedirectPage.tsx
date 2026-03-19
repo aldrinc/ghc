@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
 import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 
@@ -21,6 +21,7 @@ function ensureNoIndex() {
 
 export function PublicFunnelEntryRedirectPage() {
   const { productSlug, funnelSlug } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const bundleMode = isStandaloneBundleMode();
@@ -41,20 +42,21 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
+        const entryPath = buildPublicFunnelPath({
+          productSlug,
+          funnelSlug,
+          slug: meta.entrySlug,
+          bundleMode,
+        });
         navigate(
-          buildPublicFunnelPath({
-            productSlug,
-            funnelSlug,
-            slug: meta.entrySlug,
-            bundleMode,
-          }),
+          `${entryPath}${location.search}${location.hash}`,
           { replace: true },
         );
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Unable to load funnel");
       });
-  }, [bundleMode, funnelSlug, navigate, productSlug]);
+  }, [bundleMode, funnelSlug, location.hash, location.search, navigate, productSlug]);
 
   return (
     <div className="min-h-screen bg-surface px-6 py-10 text-sm text-content-muted">

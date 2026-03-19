@@ -71,6 +71,10 @@
   font-weight: var(--pitch-bullet-strong-weight);
 }
 
+.ctaWrap {
+  margin-top: 24px;
+}
+
 .mediaFrame {
   justify-self: end;
   width: min(var(--pitch-media-max), 100%);
