@@ -96,12 +96,14 @@ def _public_page_slug_candidates(slug: str | None) -> list[str]:
         if cleaned and cleaned not in candidates:
             candidates.append(cleaned)
 
-    if normalized_slug in {"pre-sales", "presales"}:
-        for candidate in ("presales", "pre-sales"):
-            if candidate not in candidates:
-                candidates.append(candidate)
+    if normalized_slug == "presales" and "pre-sales" not in candidates:
+        candidates.append("pre-sales")
 
     return candidates
+
+
+def _is_legacy_public_presales_slug(slug: str | None) -> bool:
+    return normalize_route_token(clean_optional_text(slug) or "") == "pre-sales"
 
 
 def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Funnel | None:
@@ -462,6 +464,9 @@ def public_funnel_page(
         product_slug=product_slug,
         funnel_slug=funnel_slug,
     )
+
+    if _is_legacy_public_presales_slug(slug):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:

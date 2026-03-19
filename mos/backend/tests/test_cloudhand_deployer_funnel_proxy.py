@@ -378,7 +378,7 @@ def test_funnel_artifact_site_writes_short_funnel_id_alias_for_uuid_funnel_id():
     assert short_page_path in uploaded
 
 
-def test_funnel_artifact_site_canonicalizes_presales_slug_and_writes_legacy_redirect():
+def test_funnel_artifact_site_canonicalizes_presales_slug_without_legacy_alias():
     app = _artifact_app()
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     legacy_page = funnel_payload["pages"].pop("presales")
@@ -398,13 +398,12 @@ def test_funnel_artifact_site_canonicalizes_presales_slug_and_writes_legacy_redi
 
     meta_payload = json.loads(uploaded[meta_path])
     canonical_page_payload = json.loads(uploaded[canonical_page_path])
-    legacy_redirect_payload = json.loads(uploaded[legacy_page_path])
 
     assert meta_payload["entrySlug"] == "presales"
     assert meta_payload["pages"] == [{"pageId": "page-1", "slug": "presales"}]
     assert canonical_page_payload["slug"] == "presales"
     assert canonical_page_payload["pageMap"] == {"page-1": "presales"}
-    assert legacy_redirect_payload == {"redirectToSlug": "presales"}
+    assert legacy_page_path not in uploaded
 
 
 def test_funnel_artifact_site_injects_default_route_into_runtime_config():
