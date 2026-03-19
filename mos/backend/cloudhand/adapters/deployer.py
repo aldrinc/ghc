@@ -777,13 +777,6 @@ WantedBy=multi-user.target
 
         return canonical_payload
 
-    def _legacy_funnel_artifact_page_alias(self, *, raw_slug: str, canonical_slug: str) -> Optional[str]:
-        normalized_raw_slug = str(raw_slug or "").strip().lower()
-        normalized_canonical_slug = str(canonical_slug or "").strip().lower()
-        if not normalized_raw_slug or normalized_raw_slug == normalized_canonical_slug:
-            return None
-        return normalized_raw_slug
-
     def _build_entry_image_preload_map(self, *, source: FunnelArtifactSourceSpec) -> Dict[str, str]:
         artifact = source.artifact or {}
         products = artifact.get("products")
@@ -1133,21 +1126,6 @@ WantedBy=multi-user.target
                             f"{pages_dir}/{canonical_page_slug}.json",
                         )
                         written_page_slugs.add(canonical_page_slug)
-
-                        legacy_alias_slug = self._legacy_funnel_artifact_page_alias(
-                            raw_slug=page_slug,
-                            canonical_slug=canonical_page_slug,
-                        )
-                        if legacy_alias_slug:
-                            if legacy_alias_slug in written_page_slugs:
-                                raise ValueError(
-                                    f"Artifact funnel '{product_slug}/{funnel_slug}' duplicates page slug '{legacy_alias_slug}'."
-                                )
-                            self.upload_file(
-                                json.dumps({"redirectToSlug": canonical_page_slug}, ensure_ascii=False),
-                                f"{pages_dir}/{legacy_alias_slug}.json",
-                            )
-                            written_page_slugs.add(legacy_alias_slug)
 
     def _configure_funnel_artifact_site(self, app: ApplicationSpec):
         source = app.source_ref

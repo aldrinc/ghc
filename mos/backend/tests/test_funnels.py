@@ -233,7 +233,7 @@ def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_clien
     assert meta.json()["funnelSlug"] == route_slug
 
 
-def test_public_funnel_canonicalizes_presales_slug(api_client: TestClient, db_session):
+def test_public_funnel_exposes_only_canonical_presales_slug(api_client: TestClient, db_session):
     client_resp = api_client.post("/clients", json={"name": "Canonical Slug Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -300,8 +300,7 @@ def test_public_funnel_canonicalizes_presales_slug(api_client: TestClient, db_se
     assert any(page["pageId"] == presales_page["id"] and page["slug"] == "presales" for page in meta_payload["pages"])
 
     legacy_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/pre-sales")
-    assert legacy_page.status_code == 200
-    assert legacy_page.json()["redirectToSlug"] == "presales"
+    assert legacy_page.status_code == 404
 
     canonical_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/presales")
     assert canonical_page.status_code == 200
