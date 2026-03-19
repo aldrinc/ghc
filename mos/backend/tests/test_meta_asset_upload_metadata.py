@@ -165,3 +165,84 @@ def test_upload_meta_asset_fails_when_image_bytes_are_invalid(
 
     assert response.status_code == 400
     assert "metadata sanitization failed" in response.json()["detail"].lower()
+
+
+def test_upload_meta_asset_reuses_existing_upload_when_request_id_changes(
+    api_client,
+    db_session,
+    seed_data,
+    monkeypatch,
+) -> None:
+    _seed_meta_workspace_profile(api_client, client_id=str(seed_data["client"].id))
+    source_bytes = _jpeg_with_exif()
+
+    asset = Asset(
+        org_id=seed_data["client"].org_id,
+        client_id=seed_data["client"].id,
+        campaign_id=seed_data["campaign"].id,
+        experiment_id=seed_data["experiment"].id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.approved,
+        asset_kind="image",
+        channel_id="meta",
+        format="image",
+        content={},
+        storage_key="creative/reuse-image.jpg",
+        content_type="image/jpeg",
+        size_bytes=len(source_bytes),
+        width=16,
+        height=16,
+        file_source="ai",
+        file_status="ready",
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            assert key == "creative/reuse-image.jpg"
+            _ = bucket
+            return source_bytes, "image/jpeg"
+
+    upload_calls = {"count": 0}
+
+    class _FakeMetaClient:
+        def upload_image(
+            self,
+            *,
+            ad_account_id: str,
+            filename: str,
+            content: bytes,
+            content_type: str | None = None,
+            name: str | None = None,
+        ) -> dict[str, object]:
+            upload_calls["count"] += 1
+            assert ad_account_id == "123456"
+            _ = content
+            _ = content_type
+            _ = name
+            return {"images": {filename: {"hash": "meta-hash-reuse-123"}}}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
+
+    first_response = api_client.post(
+        f"/meta/assets/{asset.id}/upload",
+        json={"requestId": "req-meta-upload-original", "adAccountId": "123456"},
+    )
+
+    assert first_response.status_code == 201
+    first_payload = first_response.json()
+    assert first_payload["meta_image_hash"] == "meta-hash-reuse-123"
+
+    second_response = api_client.post(
+        f"/meta/assets/{asset.id}/upload",
+        json={"requestId": "req-meta-upload-updated", "adAccountId": "123456"},
+    )
+
+    assert second_response.status_code == 201
+    second_payload = second_response.json()
+    assert second_payload["id"] == first_payload["id"]
+    assert second_payload["meta_image_hash"] == first_payload["meta_image_hash"]
+    assert upload_calls["count"] == 1

@@ -881,6 +881,134 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert history_payload[0]["items"][0]["metaAdId"] == "meta_ad_123"
 
 
+def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-rerun-upload-reuse",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-rerun-upload-reuse"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-rerun-upload-reuse",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-publish-rerun-upload-reuse",
+        with_targeting=True,
+    )
+    adset_spec.dsa_payor = "Initial Payor"
+    db_session.add(adset_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    counters = {
+        "upload_image": 0,
+        "create_campaign": 0,
+        "create_adset": 0,
+        "create_adcreative": 0,
+        "create_ad": 0,
+    }
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key == "creative/publish-rerun-upload-reuse.jpg"
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            counters["upload_image"] += 1
+            assert kwargs["ad_account_id"] == "act_123456"
+            return {"images": {kwargs["filename"]: {"hash": "hash_reuse_123"}}}
+
+        def create_campaign(self, **kwargs):
+            counters["create_campaign"] += 1
+            assert kwargs["ad_account_id"] == "act_123456"
+            return {"id": f"meta_campaign_{counters['create_campaign']}", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            counters["create_adset"] += 1
+            assert kwargs["payload"]["status"] == "PAUSED"
+            return {"id": f"meta_adset_{counters['create_adset']}", "status": "PAUSED"}
+
+        def create_adcreative(self, **kwargs):
+            counters["create_adcreative"] += 1
+            return {"id": f"meta_creative_{counters['create_adcreative']}"}
+
+        def create_ad(self, **kwargs):
+            counters["create_ad"] += 1
+            assert kwargs["payload"]["status"] == "PAUSED"
+            return {"id": f"meta_ad_{counters['create_ad']}", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
+
+    first_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist V2",
+            "campaignObjective": "OUTCOME_SALES",
+            "buyingType": "AUCTION",
+        },
+    )
+
+    assert first_response.status_code == 200
+    first_payload = first_response.json()
+    assert first_payload["status"] == "published"
+    first_upload_id = first_payload["items"][0]["metaAssetUploadId"]
+    assert first_upload_id
+
+    adset_spec.dsa_payor = "Updated Payor"
+    db_session.add(adset_spec)
+    db_session.commit()
+
+    second_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist V2",
+            "campaignObjective": "OUTCOME_SALES",
+            "buyingType": "AUCTION",
+        },
+    )
+
+    assert second_response.status_code == 200
+    second_payload = second_response.json()
+    assert second_payload["status"] == "published"
+    assert second_payload["items"][0]["metaAssetUploadId"] == first_upload_id
+    assert counters["upload_image"] == 1
+    assert counters["create_campaign"] == 2
+    assert counters["create_adset"] == 2
+    assert counters["create_adcreative"] == 2
+    assert counters["create_ad"] == 2
+
+
 def test_validate_meta_publish_plan_blocks_eu_targeting_without_dsa_defaults(api_client, db_session) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(
         api_client,

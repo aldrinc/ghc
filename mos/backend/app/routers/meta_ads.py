@@ -1072,6 +1072,10 @@ def _launch_plan_key(payload: dict[str, Any]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _meta_asset_upload_request_id(*, asset_id: str) -> str:
+    return f"meta-asset-upload:{asset_id}"
+
+
 def _build_launch_plan_payload(
     *,
     campaign: Campaign,
@@ -1539,11 +1543,6 @@ def _upload_meta_asset_internal(
 
     existing_asset = repo.get_asset_upload(org_id=auth.org_id, ad_account_id=ad_account_id, asset_id=asset_id)
     if existing_asset:
-        if existing_asset.request_id != payload.requestId:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Asset already uploaded with a different requestId.",
-            )
         return jsonable_encoder(existing_asset)
 
     storage = MediaStorage()
@@ -3334,7 +3333,7 @@ def create_meta_publish_run(
             uploaded_asset = _upload_meta_asset_internal(
                 asset_id=str(asset.id),
                 payload=MetaAssetUploadRequest(
-                    requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:upload",
+                    requestId=_meta_asset_upload_request_id(asset_id=str(asset.id)),
                     adAccountId=ad_account_id,
                     metaConfigId=str(resolved_meta_config.workspace_config.id),
                 ),
