@@ -1015,7 +1015,9 @@ def build_client_funnel_runtime_artifact_payload(
 
     template_to_artifact: dict[str, str] = {
         "pre-sales-listicle": "presales",
+        "pre_sales_listicle": "presales",
         "sales-pdp": "sales",
+        "sales_pdp": "sales",
     }
 
     client_funnels = list(

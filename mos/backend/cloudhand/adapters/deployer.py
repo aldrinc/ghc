@@ -730,6 +730,60 @@ WantedBy=multi-user.target
                 funnel_path_tokens.append(short_funnel_id_token)
         return funnel_path_tokens
 
+    def _canonical_funnel_artifact_page_slug(self, raw_slug: object) -> str:
+        normalized_slug = str(raw_slug or "").strip().lower()
+        if normalized_slug == "pre-sales":
+            return "presales"
+        return normalized_slug
+
+    def _canonicalize_funnel_artifact_meta(self, *, funnel_meta: Dict[str, Any]) -> Dict[str, Any]:
+        canonical_meta = dict(funnel_meta)
+        canonical_entry_slug = self._canonical_funnel_artifact_page_slug(canonical_meta.get("entrySlug"))
+        if canonical_entry_slug:
+            canonical_meta["entrySlug"] = canonical_entry_slug
+
+        pages = canonical_meta.get("pages")
+        if isinstance(pages, list):
+            canonical_pages: list[Dict[str, Any]] = []
+            for raw_page in pages:
+                if not isinstance(raw_page, dict):
+                    raise ValueError("Artifact funnel meta.pages entries must be objects.")
+                canonical_page = dict(raw_page)
+                canonical_page_slug = self._canonical_funnel_artifact_page_slug(canonical_page.get("slug"))
+                if canonical_page_slug:
+                    canonical_page["slug"] = canonical_page_slug
+                canonical_pages.append(canonical_page)
+            canonical_meta["pages"] = canonical_pages
+
+        return canonical_meta
+
+    def _canonicalize_funnel_artifact_page_payload(
+        self,
+        *,
+        page_slug: str,
+        page_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        canonical_payload = dict(page_payload)
+        canonical_slug = self._canonical_funnel_artifact_page_slug(page_slug)
+        if canonical_slug:
+            canonical_payload["slug"] = canonical_slug
+
+        page_map = canonical_payload.get("pageMap")
+        if isinstance(page_map, dict):
+            canonical_payload["pageMap"] = {
+                str(page_id): self._canonical_funnel_artifact_page_slug(slug_value)
+                for page_id, slug_value in page_map.items()
+            }
+
+        return canonical_payload
+
+    def _legacy_funnel_artifact_page_alias(self, *, raw_slug: str, canonical_slug: str) -> Optional[str]:
+        normalized_raw_slug = str(raw_slug or "").strip().lower()
+        normalized_canonical_slug = str(canonical_slug or "").strip().lower()
+        if not normalized_raw_slug or normalized_raw_slug == normalized_canonical_slug:
+            return None
+        return normalized_raw_slug
+
     def _build_entry_image_preload_map(self, *, source: FunnelArtifactSourceSpec) -> Dict[str, str]:
         artifact = source.artifact or {}
         products = artifact.get("products")
@@ -758,13 +812,13 @@ WantedBy=multi-user.target
                 if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
                     continue
 
-                entry_slug = str(funnel_meta.get("entrySlug") or "").strip().lower()
+                entry_slug = self._canonical_funnel_artifact_page_slug(funnel_meta.get("entrySlug"))
                 if not entry_slug:
                     continue
 
                 entry_page_payload: Optional[Dict[str, Any]] = None
                 for raw_page_slug, page_payload in pages.items():
-                    page_slug = str(raw_page_slug or "").strip().lower()
+                    page_slug = self._canonical_funnel_artifact_page_slug(raw_page_slug)
                     if page_slug != entry_slug:
                         continue
                     if not isinstance(page_payload, dict):
@@ -1027,10 +1081,12 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a pages object."
                     )
 
+                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
+
                 funnel_path_tokens = self._resolve_funnel_path_tokens(
                     product_slug=product_slug,
                     funnel_slug=funnel_slug,
-                    funnel_meta=funnel_meta,
+                    funnel_meta=canonical_funnel_meta,
                 )
 
                 for funnel_path_token in funnel_path_tokens:
@@ -1043,11 +1099,12 @@ WantedBy=multi-user.target
                     funnel_dir = f"{product_dir}/{funnel_path_token}"
                     pages_dir = f"{funnel_dir}/pages"
                     self.run(f"mkdir -p {shlex.quote(pages_dir)}")
-                    self.upload_file(json.dumps(funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
+                    self.upload_file(json.dumps(canonical_funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
 
                     if isinstance(commerce, dict):
                         self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{funnel_dir}/commerce.json")
 
+                    written_page_slugs: set[str] = set()
                     for raw_page_slug, page_payload in pages.items():
                         page_slug = str(raw_page_slug or "").strip()
                         if not page_slug:
@@ -1060,10 +1117,37 @@ WantedBy=multi-user.target
                             raise ValueError(
                                 f"Artifact page payload for '{product_slug}/{funnel_slug}/{page_slug}' must be an object."
                             )
-                        self.upload_file(
-                            json.dumps(page_payload, ensure_ascii=False),
-                            f"{pages_dir}/{page_slug}.json",
+                        canonical_page_slug = self._canonical_funnel_artifact_page_slug(page_slug)
+                        if not canonical_page_slug:
+                            continue
+                        if canonical_page_slug in written_page_slugs:
+                            raise ValueError(
+                                f"Artifact funnel '{product_slug}/{funnel_slug}' duplicates page slug '{canonical_page_slug}'."
+                            )
+                        canonical_page_payload = self._canonicalize_funnel_artifact_page_payload(
+                            page_slug=page_slug,
+                            page_payload=page_payload,
                         )
+                        self.upload_file(
+                            json.dumps(canonical_page_payload, ensure_ascii=False),
+                            f"{pages_dir}/{canonical_page_slug}.json",
+                        )
+                        written_page_slugs.add(canonical_page_slug)
+
+                        legacy_alias_slug = self._legacy_funnel_artifact_page_alias(
+                            raw_slug=page_slug,
+                            canonical_slug=canonical_page_slug,
+                        )
+                        if legacy_alias_slug:
+                            if legacy_alias_slug in written_page_slugs:
+                                raise ValueError(
+                                    f"Artifact funnel '{product_slug}/{funnel_slug}' duplicates page slug '{legacy_alias_slug}'."
+                                )
+                            self.upload_file(
+                                json.dumps({"redirectToSlug": canonical_page_slug}, ensure_ascii=False),
+                                f"{pages_dir}/{legacy_alias_slug}.json",
+                            )
+                            written_page_slugs.add(legacy_alias_slug)
 
     def _configure_funnel_artifact_site(self, app: ApplicationSpec):
         source = app.source_ref
