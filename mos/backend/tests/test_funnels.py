@@ -233,6 +233,87 @@ def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_clien
     assert meta.json()["funnelSlug"] == route_slug
 
 
+def test_public_funnel_canonicalizes_presales_slug(api_client: TestClient, db_session):
+    client_resp = api_client.post("/clients", json={"name": "Canonical Slug Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Canonical Slug Product", "handle": "canonical-slug-product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
+
+    funnel_resp = api_client.post(
+        "/funnels",
+        json={"clientId": client_id, "productId": product_id, "name": "Canonical Slug Funnel", "description": "Demo"},
+    )
+    assert funnel_resp.status_code == 201
+    funnel = funnel_resp.json()
+    funnel_id = funnel["id"]
+    route_slug = funnel["route_slug"]
+
+    presales_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Pre-sales"})
+    assert presales_resp.status_code == 201
+    presales_page = presales_resp.json()["page"]
+    sales_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Sales"})
+    assert sales_resp.status_code == 201
+    sales_page = sales_resp.json()["page"]
+
+    presales_model = db_session.scalars(select(FunnelPage).where(FunnelPage.id == presales_page["id"])).first()
+    sales_model = db_session.scalars(select(FunnelPage).where(FunnelPage.id == sales_page["id"])).first()
+    assert presales_model is not None
+    assert sales_model is not None
+    presales_model.slug = "pre-sales"
+    presales_model.name = "Pre-sales"
+    presales_model.template_id = "pre-sales-listicle"
+    presales_model.next_page_id = sales_model.id
+    sales_model.slug = "sales"
+    sales_model.name = "Sales"
+    sales_model.template_id = "sales-pdp"
+    db_session.commit()
+
+    set_entry = api_client.patch(f"/funnels/{funnel_id}", json={"entryPageId": presales_page["id"]})
+    assert set_entry.status_code == 200
+
+    for page_id, text in ((presales_page["id"], "Pre-sales published"), (sales_page["id"], "Sales published")):
+        save_draft = api_client.put(
+            f"/funnels/{funnel_id}/pages/{page_id}",
+            json={
+                "puckData": {
+                    "root": {"props": {}},
+                    "content": [{"type": "Text", "props": {"text": text}}],
+                    "zones": {},
+                }
+            },
+        )
+        assert save_draft.status_code == 200
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    meta_payload = meta.json()
+    assert meta_payload["entrySlug"] == "presales"
+    assert any(page["pageId"] == presales_page["id"] and page["slug"] == "presales" for page in meta_payload["pages"])
+
+    legacy_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/pre-sales")
+    assert legacy_page.status_code == 200
+    assert legacy_page.json()["redirectToSlug"] == "presales"
+
+    canonical_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/presales")
+    assert canonical_page.status_code == 200
+    canonical_payload = canonical_page.json()
+    assert canonical_payload["slug"] == "presales"
+    assert canonical_payload["stage"] == "pre_sales"
+    assert canonical_payload["pageMap"][presales_page["id"]] == "presales"
+    assert canonical_payload["pageMap"][sales_page["id"]] == "sales"
+    assert canonical_payload["pageStageMap"][presales_page["id"]] == "pre_sales"
+    assert canonical_payload["pageStageMap"][sales_page["id"]] == "sales"
+
+
 def test_delete_funnel_removes_funnel_and_pages(api_client: TestClient, db_session):
     funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
         api_client,

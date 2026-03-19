@@ -76,6 +76,34 @@ def _public_page_stage(*, slug: str | None = None, template_id: str | None = Non
     return "custom"
 
 
+def _canonical_public_page_slug(*, slug: str | None = None, template_id: str | None = None, page_name: str | None = None) -> str | None:
+    raw_slug = clean_optional_text(slug)
+    stage = _public_page_stage(slug=raw_slug, template_id=template_id, page_name=page_name)
+    if stage == "pre_sales":
+        return "presales"
+    return raw_slug
+
+
+def _public_page_slug_candidates(slug: str | None) -> list[str]:
+    raw_slug = clean_optional_text(slug)
+    if not raw_slug:
+        return []
+
+    candidates: list[str] = []
+    normalized_slug = normalize_route_token(raw_slug)
+    for candidate in (raw_slug, normalized_slug):
+        cleaned = clean_optional_text(candidate)
+        if cleaned and cleaned not in candidates:
+            candidates.append(cleaned)
+
+    if normalized_slug in {"pre-sales", "presales"}:
+        for candidate in ("presales", "pre-sales"):
+            if candidate not in candidates:
+                candidates.append(candidate)
+
+    return candidates
+
+
 def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Funnel | None:
     token = str(funnel_token or "").strip()
     if not token:
@@ -336,10 +364,24 @@ def public_funnel_meta(
         if not publication:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
         pages = public_repo.list_publication_pages(publication_id=str(funnel.active_publication_id))
+        page_rows = {
+            str(page.id): page
+            for page in session.scalars(
+                select(FunnelPage).where(FunnelPage.id.in_([item.page_id for item in pages]))
+            ).all()
+        }
         entry_slug = None
         for pp in pages:
             if str(pp.page_id) == str(publication.entry_page_id):
-                entry_slug = pp.slug_at_publish
+                page = page_rows.get(str(pp.page_id))
+                entry_slug = (
+                    _canonical_public_page_slug(
+                        slug=pp.slug_at_publish,
+                        template_id=page.template_id if page else None,
+                        page_name=page.name if page else None,
+                    )
+                    or pp.slug_at_publish
+                )
                 break
         if not entry_slug:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
@@ -351,14 +393,47 @@ def public_funnel_meta(
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "entrySlug": entry_slug,
-            "pages": [{"pageId": str(pp.page_id), "slug": pp.slug_at_publish} for pp in pages],
+            "pages": [
+                {
+                    "pageId": str(pp.page_id),
+                    "slug": (
+                        _canonical_public_page_slug(
+                            slug=pp.slug_at_publish,
+                            template_id=page_rows.get(str(pp.page_id)).template_id
+                            if page_rows.get(str(pp.page_id))
+                            else None,
+                            page_name=page_rows.get(str(pp.page_id)).name if page_rows.get(str(pp.page_id)) else None,
+                        )
+                        or pp.slug_at_publish
+                    ),
+                }
+                for pp in pages
+            ],
         }
 
     # Preview mode: allow viewing approved pages even if the funnel hasn't been published yet.
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
+    preview_pages = session.scalars(
+        select(FunnelPage)
+        .where(FunnelPage.funnel_id == funnel.id)
+        .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+    ).all()
+    preview_page_rows = {str(page.id): page for page in preview_pages}
+    public_page_map = {
+        page_id: (
+            _canonical_public_page_slug(
+                slug=preview_page_rows[page_id].slug,
+                template_id=preview_page_rows[page_id].template_id,
+                page_name=preview_page_rows[page_id].name,
+            )
+            or slug_value
+        )
+        for page_id, slug_value in page_map.items()
+        if page_id in preview_page_rows
+    }
     if not funnel.entry_page_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
-    entry_slug = page_map.get(str(funnel.entry_page_id))
+    entry_slug = public_page_map.get(str(funnel.entry_page_id))
     if not entry_slug:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version")
 
@@ -369,7 +444,7 @@ def public_funnel_meta(
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "entrySlug": entry_slug,
-        "pages": [{"pageId": page_id, "slug": slug} for page_id, slug in page_map.items()],
+        "pages": [{"pageId": page_id, "slug": slug} for page_id, slug in public_page_map.items()],
     }
 
 
@@ -390,12 +465,25 @@ def public_funnel_page(
 
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:
-        pp = public_repo.get_publication_page_by_slug(publication_id=str(funnel.active_publication_id), slug=slug)
+        slug_candidates = _public_page_slug_candidates(slug)
+        pp = None
+        for candidate_slug in slug_candidates:
+            pp = public_repo.get_publication_page_by_slug(
+                publication_id=str(funnel.active_publication_id), slug=candidate_slug
+            )
+            if pp:
+                break
         if not pp:
-            redirect = public_repo.get_redirect(funnel_id=str(funnel.id), from_slug=slug)
+            redirect = None
+            for candidate_slug in slug_candidates:
+                redirect = public_repo.get_redirect(funnel_id=str(funnel.id), from_slug=candidate_slug)
+                if redirect:
+                    break
             if redirect:
                 response.headers["X-Robots-Tag"] = "noindex, nofollow"
-                return {"redirectToSlug": redirect.to_slug}
+                return {
+                    "redirectToSlug": _canonical_public_page_slug(slug=redirect.to_slug) or redirect.to_slug,
+                }
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
         version = public_repo.get_page_version(version_id=str(pp.page_version_id))
@@ -410,15 +498,37 @@ def public_funnel_page(
                 select(FunnelPage).where(FunnelPage.id.in_([item.page_id for item in publication_pages]))
             ).all()
         }
+        public_page_map = {
+            page_id: (
+                _canonical_public_page_slug(
+                    slug=slug_value,
+                    template_id=page_rows.get(page_id).template_id if page_rows.get(page_id) else None,
+                    page_name=page_rows.get(page_id).name if page_rows.get(page_id) else None,
+                )
+                or slug_value
+            )
+            for page_id, slug_value in page_map.items()
+        }
         page_stage_map = {
             str(item.page_id): _public_page_stage(
-                slug=item.slug_at_publish,
+                slug=public_page_map[str(item.page_id)],
                 template_id=page_rows.get(str(item.page_id)).template_id if page_rows.get(str(item.page_id)) else None,
                 page_name=page_rows.get(str(item.page_id)).name if page_rows.get(str(item.page_id)) else None,
             )
             for item in publication_pages
         }
         page = session.scalars(select(FunnelPage).where(FunnelPage.id == pp.page_id)).first()
+        canonical_slug = (
+            _canonical_public_page_slug(
+                slug=pp.slug_at_publish,
+                template_id=page.template_id if page else None,
+                page_name=page.name if page else None,
+            )
+            or pp.slug_at_publish
+        )
+        if normalize_route_token(slug) != normalize_route_token(canonical_slug):
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
+            return {"redirectToSlug": canonical_slug}
         design_system_tokens = resolve_design_system_tokens(
             session=session,
             org_id=str(funnel.org_id),
@@ -440,14 +550,14 @@ def public_funnel_page(
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "pageId": str(pp.page_id),
-            "slug": pp.slug_at_publish,
+            "slug": canonical_slug,
             "stage": _public_page_stage(
-                slug=pp.slug_at_publish,
+                slug=canonical_slug,
                 template_id=page.template_id if page else None,
                 page_name=page.name if page else None,
             ),
             "puckData": version.puck_data,
-            "pageMap": page_map,
+            "pageMap": public_page_map,
             "pageStageMap": page_stage_map,
             "designSystemTokens": design_system_tokens,
             "metadata": metadata,
@@ -456,14 +566,19 @@ def public_funnel_page(
         }
 
     # Preview mode: allow viewing pages with draft or approved versions even if the funnel hasn't been published yet.
+    slug_candidates = _public_page_slug_candidates(slug)
     page = session.scalars(
-        select(FunnelPage).where(FunnelPage.funnel_id == funnel.id, FunnelPage.slug == slug)
+        select(FunnelPage).where(FunnelPage.funnel_id == funnel.id, FunnelPage.slug.in_(slug_candidates))
     ).first()
     if not page:
-        redirect = public_repo.get_redirect(funnel_id=str(funnel.id), from_slug=slug)
+        redirect = None
+        for candidate_slug in slug_candidates:
+            redirect = public_repo.get_redirect(funnel_id=str(funnel.id), from_slug=candidate_slug)
+            if redirect:
+                break
         if redirect:
             response.headers["X-Robots-Tag"] = "noindex, nofollow"
-            return {"redirectToSlug": redirect.to_slug}
+            return {"redirectToSlug": _canonical_public_page_slug(slug=redirect.to_slug) or redirect.to_slug}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
     versions_repo = FunnelPageVersionsRepository(session)
@@ -479,14 +594,38 @@ def public_funnel_page(
         .where(FunnelPage.funnel_id == funnel.id)
         .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
     ).all()
+    public_page_map = {
+        page_id: (
+            _canonical_public_page_slug(
+                slug=item.slug,
+                template_id=item.template_id,
+                page_name=item.name,
+            )
+            or slug_value
+        )
+        for page_id, slug_value in page_map.items()
+        for item in preview_pages
+        if str(item.id) == page_id
+    }
     page_stage_map = {
         str(item.id): _public_page_stage(
-            slug=item.slug,
+            slug=public_page_map.get(str(item.id), item.slug),
             template_id=item.template_id,
             page_name=item.name,
         )
         for item in preview_pages
     }
+    canonical_slug = (
+        _canonical_public_page_slug(
+            slug=page.slug,
+            template_id=page.template_id,
+            page_name=page.name,
+        )
+        or page.slug
+    )
+    if normalize_route_token(slug) != normalize_route_token(canonical_slug):
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return {"redirectToSlug": canonical_slug}
     design_system_tokens = resolve_design_system_tokens(
         session=session,
         org_id=str(funnel.org_id),
@@ -508,14 +647,14 @@ def public_funnel_page(
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "pageId": str(page.id),
-        "slug": page.slug,
+        "slug": canonical_slug,
         "stage": _public_page_stage(
-            slug=page.slug,
+            slug=canonical_slug,
             template_id=page.template_id,
             page_name=page.name,
         ),
         "puckData": version.puck_data,
-        "pageMap": page_map,
+        "pageMap": public_page_map,
         "pageStageMap": page_stage_map,
         "designSystemTokens": design_system_tokens,
         "metadata": metadata,
@@ -545,6 +684,12 @@ def public_funnel_graph(
         if not publication:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
         pages = public_repo.list_publication_pages(publication_id=str(funnel.active_publication_id))
+        page_rows = {
+            str(page.id): page
+            for page in session.scalars(
+                select(FunnelPage).where(FunnelPage.id.in_([item.page_id for item in pages]))
+            ).all()
+        }
         links = public_repo.list_publication_links(publication_id=str(funnel.active_publication_id))
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
@@ -553,12 +698,33 @@ def public_funnel_graph(
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "entryPageId": str(publication.entry_page_id),
-            "pages": [{"pageId": str(pp.page_id), "slug": pp.slug_at_publish} for pp in pages],
+            "pages": [
+                {
+                    "pageId": str(pp.page_id),
+                    "slug": (
+                        _canonical_public_page_slug(
+                            slug=pp.slug_at_publish,
+                            template_id=page_rows.get(str(pp.page_id)).template_id
+                            if page_rows.get(str(pp.page_id))
+                            else None,
+                            page_name=page_rows.get(str(pp.page_id)).name if page_rows.get(str(pp.page_id)) else None,
+                        )
+                        or pp.slug_at_publish
+                    ),
+                }
+                for pp in pages
+            ],
             "links": [jsonable_encoder(link) for link in links],
         }
 
     # Preview mode: only return pages that have at least one saved version (draft or approved) for the graph.
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
+    preview_pages = session.scalars(
+        select(FunnelPage)
+        .where(FunnelPage.funnel_id == funnel.id)
+        .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+    ).all()
+    preview_page_rows = {str(page.id): page for page in preview_pages}
     if not funnel.entry_page_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
     if str(funnel.entry_page_id) not in page_map:
@@ -571,7 +737,21 @@ def public_funnel_graph(
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "entryPageId": str(funnel.entry_page_id),
-        "pages": [{"pageId": page_id, "slug": slug_value} for page_id, slug_value in page_map.items()],
+        "pages": [
+            {
+                "pageId": page_id,
+                "slug": (
+                    _canonical_public_page_slug(
+                        slug=preview_page_rows[page_id].slug,
+                        template_id=preview_page_rows[page_id].template_id,
+                        page_name=preview_page_rows[page_id].name,
+                    )
+                    or slug_value
+                ),
+            }
+            for page_id, slug_value in page_map.items()
+            if page_id in preview_page_rows
+        ],
         "links": [],
     }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from pathlib import Path
 import pytest
 
@@ -375,6 +376,35 @@ def test_funnel_artifact_site_writes_short_funnel_id_alias_for_uuid_funnel_id():
     short_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/f85405a4/pages/presales.json"
     assert short_meta_path in uploaded
     assert short_page_path in uploaded
+
+
+def test_funnel_artifact_site_canonicalizes_presales_slug_and_writes_legacy_redirect():
+    app = _artifact_app()
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    legacy_page = funnel_payload["pages"].pop("presales")
+    legacy_page["slug"] = "pre-sales"
+    legacy_page["pageMap"] = {"page-1": "pre-sales"}
+    funnel_payload["meta"]["entrySlug"] = "pre-sales"
+    funnel_payload["meta"]["pages"] = [{"pageId": "page-1", "slug": "pre-sales"}]
+    funnel_payload["pages"]["pre-sales"] = legacy_page
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/meta.json"
+    canonical_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
+    legacy_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/pre-sales.json"
+
+    meta_payload = json.loads(uploaded[meta_path])
+    canonical_page_payload = json.loads(uploaded[canonical_page_path])
+    legacy_redirect_payload = json.loads(uploaded[legacy_page_path])
+
+    assert meta_payload["entrySlug"] == "presales"
+    assert meta_payload["pages"] == [{"pageId": "page-1", "slug": "presales"}]
+    assert canonical_page_payload["slug"] == "presales"
+    assert canonical_page_payload["pageMap"] == {"page-1": "presales"}
+    assert legacy_redirect_payload == {"redirectToSlug": "presales"}
 
 
 def test_funnel_artifact_site_injects_default_route_into_runtime_config():
