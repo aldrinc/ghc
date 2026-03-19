@@ -829,6 +829,9 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             assert kwargs["payload"]["status"] == "PAUSED"
             assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
             assert kwargs["payload"]["dsa_payor"] == "Test Page"
+            assert kwargs["payload"]["targeting"]["geo_locations"]["countries"] == ["US"]
+            assert kwargs["payload"]["targeting"]["publisher_platforms"] == ["facebook"]
+            assert "placements" not in kwargs["payload"]
             return {"id": "meta_adset_123", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
@@ -927,6 +930,67 @@ def test_validate_meta_publish_plan_blocks_eu_targeting_without_dsa_defaults(api
     assert payload["items"][0]["status"] == "blocked"
     assert meta_ads_router._missing_dsa_party_message("dsaBeneficiary") in payload["items"][0]["blockers"]
     assert meta_ads_router._missing_dsa_party_message("dsaPayor") in payload["items"][0]["blockers"]
+
+
+def test_validate_meta_publish_plan_blocks_duplicate_placement_keys(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-placement-dup",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-placement-dup"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-placement-dup",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-placement-dup",
+        with_targeting=True,
+    )
+    adset_spec.targeting = {
+        "geo_locations": {"countries": ["US"]},
+        "publisher_platforms": ["instagram"],
+    }
+    db_session.commit()
+    db_session.refresh(adset_spec)
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert any(
+        "Linked Meta ad set spec duplicates placement keys in targeting and placements: publisher_platforms."
+        in blocker
+        for blocker in payload["items"][0]["blockers"]
+    )
 
 
 def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(

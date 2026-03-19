@@ -9,6 +9,7 @@ import { MetaPublishHistoryPanel } from "./MetaPublishHistoryPanel";
 import { SelectWithCustom } from "./SelectWithCustom";
 import { SpecialAdCategoriesCheckboxGroup } from "./SpecialAdCategoriesCheckboxGroup";
 import { CountryTierButtons } from "./CountryTierButtons";
+import { PlacementPresetButtons } from "./PlacementPresetButtons";
 import {
   META_CAMPAIGN_OBJECTIVES,
   META_BUYING_TYPES,
@@ -217,9 +218,21 @@ export function MetaPublishConfigPanel() {
                       />
                       <Textarea value={form.targetingJson} onChange={(e) => updatePublishAdSetField(spec.id, "targetingJson", e.target.value)} placeholder='{"geo_locations":{"countries":["US"]}}' />
                     </div>
-                    <Callout variant="info" size="sm">
-                      Placements use Meta defaults in this publish flow. No marketer input is required here, and custom placement JSON is hidden until the publish path supports it.
-                    </Callout>
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-medium text-content-muted">Placements</div>
+                      <PlacementPresetButtons
+                        placementsJson={form.placementsJson}
+                        onPlacementsJsonChange={(v) => updatePublishAdSetField(spec.id, "placementsJson", v)}
+                      />
+                      <Textarea
+                        value={form.placementsJson}
+                        onChange={(e) => updatePublishAdSetField(spec.id, "placementsJson", e.target.value)}
+                        placeholder='{"publisher_platforms":["facebook","instagram"],"facebook_positions":["feed"],"instagram_positions":["stream"]}'
+                      />
+                      <div className="text-xs text-content-muted">
+                        New ad sets default to Facebook + Instagram feeds. Choose Automatic to let Meta decide placements, or edit the JSON for an advanced mix.
+                      </div>
+                    </div>
                     <div className="text-xs text-content-muted">
                       DSA beneficiary and payor default to the active Meta page name when left blank. Edit them here if the advertiser or payer should be different.
                     </div>

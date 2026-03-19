@@ -6,6 +6,7 @@ import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
 import type { PaidAdsQaRun } from "@/api/paidAdsQa";
 import { useMetaApi } from "@/api/meta";
+import { META_DEFAULT_FEED_PLACEMENTS, formatPlacementPresetJson } from "@/lib/metaAdsConstants";
 import { resolveMetaCreativeQaState } from "@/lib/metaCreativeQa";
 import {
   resolveConfiguredShopHostedOrigin,
@@ -222,12 +223,13 @@ export function buildAdSetForm(
   const promotedObject = readRecord(spec.promoted_object);
   const optimizationGoal = spec.optimization_goal || "OFFSITE_CONVERSIONS";
   const defaultPageName = readString(defaults?.pageName) || "";
+  const placementDefaults = spec.placements ?? META_DEFAULT_FEED_PLACEMENTS;
   return {
     name: spec.name || "",
     optimizationGoal,
     billingEvent: spec.billing_event || "IMPRESSIONS",
     targetingJson: formatJsonInput(spec.targeting),
-    placementsJson: formatJsonInput(spec.placements),
+    placementsJson: formatJsonInput(placementDefaults) || formatPlacementPresetJson(META_DEFAULT_FEED_PLACEMENTS),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
     bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
@@ -848,7 +850,17 @@ export function MetaPublishProvider({
     setPublishAdSetForms((cur) => {
       const next: Record<string, MetaPublishAdSetForm> = {};
       includedAdSetSpecs.forEach((spec) => {
-        next[spec.id] = cur[spec.id] || buildAdSetForm(spec, { pageName: config?.pageName });
+        const seeded = buildAdSetForm(spec, { pageName: config?.pageName });
+        const existing = cur[spec.id];
+        if (!existing) {
+          next[spec.id] = seeded;
+          return;
+        }
+        next[spec.id] = {
+          ...existing,
+          dsaBeneficiary: existing.dsaBeneficiary.trim() || seeded.dsaBeneficiary,
+          dsaPayor: existing.dsaPayor.trim() || seeded.dsaPayor,
+        };
       });
       return next;
     });

@@ -317,6 +317,73 @@ def _clean_optional_text(value: Any) -> str | None:
     return None
 
 
+_META_PLACEMENT_TARGETING_KEYS = frozenset(
+    {
+        "device_platforms",
+        "publisher_platforms",
+        "facebook_positions",
+        "instagram_positions",
+        "audience_network_positions",
+        "messenger_positions",
+    }
+)
+
+
+def _placement_validation_errors(
+    *,
+    targeting: Any,
+    placements: Any,
+    scope_label: str,
+) -> list[str]:
+    if placements is None:
+        return []
+    if not isinstance(placements, dict):
+        return [f"{scope_label} placements must be a JSON object."]
+    unsupported_keys = sorted(str(key) for key in placements.keys() if key not in _META_PLACEMENT_TARGETING_KEYS)
+    if unsupported_keys:
+        supported_keys = ", ".join(sorted(_META_PLACEMENT_TARGETING_KEYS))
+        return [
+            f"{scope_label} placements contain unsupported keys: {', '.join(unsupported_keys)}. "
+            f"Supported keys: {supported_keys}."
+        ]
+    if not isinstance(targeting, dict):
+        return []
+    duplicate_keys = sorted(key for key in placements.keys() if key in targeting)
+    if duplicate_keys:
+        return [
+            f"{scope_label} duplicates placement keys in targeting and placements: {', '.join(duplicate_keys)}. "
+            "Keep placement fields in placements only."
+        ]
+    return []
+
+
+def _merge_targeting_with_placements(
+    *,
+    targeting: Any,
+    placements: Any,
+    scope_label: str,
+) -> dict[str, Any]:
+    if not isinstance(targeting, dict) or not targeting:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{scope_label} targeting must be a non-empty JSON object.",
+        )
+    placement_errors = _placement_validation_errors(
+        targeting=targeting,
+        placements=placements,
+        scope_label=scope_label,
+    )
+    if placement_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=" ".join(placement_errors),
+        )
+    merged_targeting = dict(targeting)
+    if isinstance(placements, dict):
+        merged_targeting.update(placements)
+    return merged_targeting
+
+
 def _targeting_country_codes(targeting: Any) -> set[str]:
     if not isinstance(targeting, dict):
         return set()
@@ -1287,6 +1354,13 @@ def _validate_publish_plan(
                     item_blockers.append("Linked Meta ad set spec is missing billingEvent.")
                 if not isinstance(adset_spec.targeting, dict) or not adset_spec.targeting:
                     item_blockers.append("Linked Meta ad set spec is missing targeting.")
+                item_blockers.extend(
+                    _placement_validation_errors(
+                        targeting=adset_spec.targeting,
+                        placements=adset_spec.placements,
+                        scope_label="Linked Meta ad set spec",
+                    )
+                )
                 if adset_spec.daily_budget is None and adset_spec.lifetime_budget is None:
                     item_blockers.append("Linked Meta ad set spec must set either dailyBudget or lifetimeBudget.")
                 if adset_spec.daily_budget is not None and adset_spec.lifetime_budget is not None:
@@ -1792,7 +1866,11 @@ def _create_meta_adset_internal(
         "status": payload.status,
         "billing_event": payload.billingEvent,
         "optimization_goal": payload.optimizationGoal,
-        "targeting": payload.targeting,
+        "targeting": _merge_targeting_with_placements(
+            targeting=payload.targeting,
+            placements=payload.placements,
+            scope_label="Meta ad set",
+        ),
     }
     if payload.dailyBudget is not None:
         request_payload["daily_budget"] = payload.dailyBudget
@@ -3139,6 +3217,7 @@ def create_meta_publish_run(
                     billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
                     optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
                     targeting=adset_spec.targeting or {},
+                    placements=adset_spec.placements if isinstance(adset_spec.placements, dict) else None,
                     startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
                     endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
                     bidAmount=adset_spec.bid_amount,

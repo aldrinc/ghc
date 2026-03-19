@@ -60,6 +60,7 @@ class MetaAdSetCreateRequest(BaseModel):
     billingEvent: str
     optimizationGoal: str
     targeting: dict[str, Any]
+    placements: Optional[dict[str, Any]] = None
     startTime: Optional[str] = None
     endTime: Optional[str] = None
     bidAmount: Optional[int] = None

@@ -77,6 +77,90 @@ export const META_CUSTOM_EVENT_TYPES: SelectOption[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Placement presets
+// ---------------------------------------------------------------------------
+
+export type MetaPlacementSpec = Record<string, string[]>;
+
+export const META_AUTOMATIC_PLACEMENTS: MetaPlacementSpec = {};
+
+export const META_DEFAULT_FEED_PLACEMENTS: MetaPlacementSpec = {
+  publisher_platforms: ["facebook", "instagram"],
+  facebook_positions: ["feed"],
+  instagram_positions: ["stream"],
+};
+
+export const META_PLACEMENT_PRESETS: Array<{
+  label: string;
+  value: MetaPlacementSpec;
+}> = [
+  { label: "Automatic", value: META_AUTOMATIC_PLACEMENTS },
+  { label: "FB + IG feeds", value: META_DEFAULT_FEED_PLACEMENTS },
+  {
+    label: "Facebook feed",
+    value: {
+      publisher_platforms: ["facebook"],
+      facebook_positions: ["feed"],
+    },
+  },
+  {
+    label: "Instagram feed",
+    value: {
+      publisher_platforms: ["instagram"],
+      instagram_positions: ["stream"],
+    },
+  },
+  {
+    label: "Reels",
+    value: {
+      publisher_platforms: ["facebook", "instagram"],
+      facebook_positions: ["facebook_reels"],
+      instagram_positions: ["reels"],
+    },
+  },
+  {
+    label: "Stories",
+    value: {
+      device_platforms: ["mobile"],
+      publisher_platforms: ["facebook", "instagram"],
+      facebook_positions: ["story"],
+      instagram_positions: ["story"],
+    },
+  },
+];
+
+function normalizePlacementValue(value: MetaPlacementSpec): string {
+  const normalizedEntries = Object.entries(value)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, entryValue]) => [
+      key,
+      Array.isArray(entryValue) ? [...entryValue] : entryValue,
+    ]);
+  return JSON.stringify(Object.fromEntries(normalizedEntries));
+}
+
+export function formatPlacementPresetJson(value: MetaPlacementSpec): string {
+  return JSON.stringify(value, null, 2);
+}
+
+export function placementPresetIsActive(
+  placementsJson: string,
+  presetValue: MetaPlacementSpec,
+): boolean {
+  const cleaned = placementsJson.trim();
+  if (!cleaned) return false;
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return false;
+    }
+    return normalizePlacementValue(parsed as MetaPlacementSpec) === normalizePlacementValue(presetValue);
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Special Ad Categories
 // ---------------------------------------------------------------------------
 
