@@ -14,6 +14,7 @@ import re
 import threading
 import time
 from typing import Any
+from urllib.parse import quote, urlparse
 from uuid import UUID, uuid4
 import zipfile
 
@@ -44,6 +45,10 @@ from app.db.repositories.jobs import (
 )
 from app.db.repositories.shopify_theme_template_drafts import (
     ShopifyThemeTemplateDraftsRepository,
+)
+from app.db.repositories.org_deploy_domains import (
+    LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR,
+    OrgDeployDomainsRepository,
 )
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository, ProductVariantsRepository
 from app.db.repositories.workflows import WorkflowsRepository
@@ -117,7 +122,7 @@ from app.services.funnel_testimonials import (
     generate_shopify_theme_testimonial_image_asset,
 )
 from app.services.media_storage import MediaStorage
-from app.services.public_routing import require_product_route_slug
+from app.services.public_routing import require_product_route_slug, require_short_uuid_route_token
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     auto_provision_client_shopify_storefront_token,
@@ -740,6 +745,58 @@ def _resolve_theme_export_sales_page_path(
     session: Session,
     preferred_product_id: str | None = None,
 ) -> tuple[str, str | None]:
+    public_runtime_base_url: str | None = None
+
+    def _resolve_public_runtime_base_url() -> str:
+        repo = OrgDeployDomainsRepository(session)
+        try:
+            workspace_hostnames = repo.list_hostnames(
+                org_id=auth.org_id,
+                client_id=client_id,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            if message == LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Theme ZIP export could not resolve a workspace deploy domain. "
+                        f"{message}"
+                    ),
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Theme ZIP export could not resolve a workspace deploy domain: "
+                    f"{message}"
+                ),
+            ) from exc
+
+        if workspace_hostnames:
+            return f"https://{workspace_hostnames[0]}"
+
+        configured_public_base_url = str(settings.DEPLOY_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if not configured_public_base_url:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Theme ZIP export requires a workspace deploy domain or "
+                    "DEPLOY_PUBLIC_BASE_URL to build public sales page links."
+                ),
+            )
+
+        parsed_public_base_url = urlparse(configured_public_base_url)
+        if not parsed_public_base_url.scheme or not parsed_public_base_url.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Theme ZIP export DEPLOY_PUBLIC_BASE_URL must be an absolute URL "
+                    f"when workspace deploy domains are unavailable. Received "
+                    f"'{configured_public_base_url}'."
+                ),
+            )
+        return configured_public_base_url
+
     primary_product: Product | None = None
     if isinstance(preferred_product_id, str) and preferred_product_id.strip():
         primary_product = session.scalars(
@@ -790,7 +847,7 @@ def _resolve_theme_export_sales_page_path(
         product_id: str | None,
     ) -> Any | None:
         query = (
-            select(Product, Funnel.route_slug, FunnelPage.slug)
+            select(Product, Funnel.id, FunnelPage.slug)
             .join(Funnel, Funnel.product_id == Product.id)
             .join(FunnelPage, FunnelPage.funnel_id == Funnel.id)
             .where(
@@ -815,30 +872,38 @@ def _resolve_theme_export_sales_page_path(
     def _build_sales_page_path(
         *,
         target_product: Product,
-        route_slug: Any,
+        funnel_id: Any,
         page_slug: Any,
     ) -> str | None:
-        target_funnel_slug = str(route_slug or "").strip()
+        nonlocal public_runtime_base_url
         target_page_slug = str(page_slug or "").strip()
-        if not target_funnel_slug or not target_page_slug:
+        if not target_page_slug:
             return None
         try:
             target_product_slug = require_product_route_slug(product=target_product)
+            target_funnel_slug = require_short_uuid_route_token(value=funnel_id, label="Funnel")
         except ValueError:
             return None
-        return f"/f/{target_product_slug}/{target_funnel_slug}/{target_page_slug}"
+        if public_runtime_base_url is None:
+            public_runtime_base_url = _resolve_public_runtime_base_url()
+        return (
+            f"{public_runtime_base_url}"
+            f"/{quote(target_product_slug, safe='')}"
+            f"/{quote(target_funnel_slug, safe='')}"
+            f"/{quote(target_page_slug, safe='')}"
+        )
 
     primary_product_sales_page = _find_latest_sales_page_for_product(
         product_id=primary_product.id
     )
     if primary_product_sales_page is not None:
-        primary_product_record, primary_route_slug, primary_page_slug = (
+        primary_product_record, primary_funnel_id, primary_page_slug = (
             primary_product_sales_page
         )
         if isinstance(primary_product_record, Product):
             primary_product_sales_page_path = _build_sales_page_path(
                 target_product=primary_product_record,
-                route_slug=primary_route_slug,
+                funnel_id=primary_funnel_id,
                 page_slug=primary_page_slug,
             )
             if primary_product_sales_page_path:
@@ -855,13 +920,13 @@ def _resolve_theme_export_sales_page_path(
 
     latest_workspace_sales_page = _find_latest_sales_page_for_product(product_id=None)
     if latest_workspace_sales_page is not None:
-        workspace_product, workspace_route_slug, workspace_page_slug = (
+        workspace_product, workspace_funnel_id, workspace_page_slug = (
             latest_workspace_sales_page
         )
         if isinstance(workspace_product, Product):
             workspace_sales_page_path = _build_sales_page_path(
                 target_product=workspace_product,
-                route_slug=workspace_route_slug,
+                funnel_id=workspace_funnel_id,
                 page_slug=workspace_page_slug,
             )
             if workspace_sales_page_path:
