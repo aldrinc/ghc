@@ -798,13 +798,16 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         suffix="publish-run",
         asset_brief_id=brief_id,
     )
-    _create_meta_publish_inputs(
+    creative_spec, _adset_spec = _create_meta_publish_inputs(
         db_session,
         asset=asset,
         campaign_id=campaign_id,
         experiment_key="exp-publish",
         with_targeting=True,
     )
+    creative_spec.call_to_action_type = "Learn More"
+    db_session.add(creative_spec)
+    db_session.commit()
     _upsert_meta_profile(api_client, client_id=client_id)
 
     content = _jpeg_bytes()
@@ -837,6 +840,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
         def create_adcreative(self, **kwargs):
             assert kwargs["payload"]["object_story_spec"]["page_id"] == "page_123"
             assert kwargs["payload"]["object_story_spec"]["link_data"]["link"] == "https://shop.thehonestherbalist.com/presales"
+            assert kwargs["payload"]["object_story_spec"]["link_data"]["call_to_action"]["type"] == "LEARN_MORE"
             return {"id": "meta_creative_123"}
 
         def create_ad(self, **kwargs):
@@ -930,6 +934,117 @@ def test_validate_meta_publish_plan_blocks_eu_targeting_without_dsa_defaults(api
     assert payload["items"][0]["status"] == "blocked"
     assert meta_ads_router._missing_dsa_party_message("dsaBeneficiary") in payload["items"][0]["blockers"]
     assert meta_ads_router._missing_dsa_party_message("dsaPayor") in payload["items"][0]["blockers"]
+
+
+def test_validate_meta_publish_plan_blocks_invalid_cta_type(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-invalid-cta",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-invalid-cta"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-invalid-cta",
+        asset_brief_id=brief_id,
+    )
+    creative_spec, _adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-invalid-cta",
+        with_targeting=True,
+    )
+    creative_spec.call_to_action_type = "Click Here"
+    db_session.add(creative_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert any(
+        "Unsupported Meta callToActionType 'Click Here'." in blocker
+        for blocker in payload["items"][0]["blockers"]
+    )
+
+
+def test_validate_meta_publish_plan_blocks_daily_budget_under_meta_minimum(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-low-budget",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-low-budget"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-low-budget",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-low-budget",
+        with_targeting=True,
+    )
+    adset_spec.daily_budget = 100
+    db_session.add(adset_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["items"][0]["status"] == "blocked"
+    assert meta_ads_router._meta_daily_budget_too_low_message("Linked Meta ad set spec") in payload["items"][0]["blockers"]
 
 
 def test_validate_meta_publish_plan_blocks_duplicate_placement_keys(api_client, db_session) -> None:

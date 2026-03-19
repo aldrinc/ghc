@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -145,6 +146,14 @@ _EU_COUNTRY_CODES = frozenset(
     }
 )
 
+_META_CTA_ENUM_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+_META_CTA_LABEL_ALIASES = {
+    "LEARN MORE": "LEARN_MORE",
+    "SHOP NOW": "SHOP_NOW",
+    "WATCH MORE": "WATCH_MORE",
+    "SIGN UP": "SIGN_UP",
+}
+_META_MIN_DAILY_BUDGET_MINOR_UNITS = 100
 
 class _MetaEventMappingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -317,6 +326,46 @@ def _clean_optional_text(value: Any) -> str | None:
     return None
 
 
+def _invalid_meta_cta_message(value: str) -> str:
+    supported_labels = ", ".join(sorted(_META_CTA_LABEL_ALIASES.keys(), key=str))
+    return (
+        f"Unsupported Meta callToActionType '{value}'. "
+        "Use a Meta Graph enum like LEARN_MORE, SHOP_NOW, WATCH_MORE, or SIGN_UP, "
+        f"or one of the supported marketer labels: {supported_labels}."
+    )
+
+
+def _normalize_meta_call_to_action_type(value: Any) -> str | None:
+    cleaned = _clean_optional_text(value)
+    if not cleaned:
+        return None
+    if cleaned in _META_CTA_LABEL_ALIASES:
+        return _META_CTA_LABEL_ALIASES[cleaned]
+    normalized_label = re.sub(r"\s+", " ", cleaned).upper()
+    if normalized_label in _META_CTA_LABEL_ALIASES:
+        return _META_CTA_LABEL_ALIASES[normalized_label]
+    if _META_CTA_ENUM_RE.fullmatch(cleaned):
+        return cleaned
+    raise ValueError(_invalid_meta_cta_message(cleaned))
+
+
+def _meta_daily_budget_too_low_message(scope_label: str) -> str:
+    return (
+        f"{scope_label} dailyBudget must be greater than {_META_MIN_DAILY_BUDGET_MINOR_UNITS} minor units. "
+        "For USD accounts, that means more than $1.00/day."
+    )
+
+
+def _validate_meta_adset_budget_fields(
+    *,
+    daily_budget: Any,
+    scope_label: str,
+) -> list[str]:
+    if daily_budget is None:
+        return []
+    if int(daily_budget) <= _META_MIN_DAILY_BUDGET_MINOR_UNITS:
+        return [_meta_daily_budget_too_low_message(scope_label)]
+    return []
 _META_PLACEMENT_TARGETING_KEYS = frozenset(
     {
         "device_platforms",
@@ -1059,8 +1108,13 @@ def _build_launch_plan_payload(
                     "billingEvent": adset_spec.billing_event,
                     "dailyBudget": adset_spec.daily_budget,
                     "lifetimeBudget": adset_spec.lifetime_budget,
+                    "bidAmount": adset_spec.bid_amount,
+                    "dsaBeneficiary": adset_spec.dsa_beneficiary,
+                    "dsaPayor": adset_spec.dsa_payor,
                     "targeting": adset_spec.targeting,
                     "placements": adset_spec.placements,
+                    "startTime": adset_spec.start_time.isoformat() if adset_spec.start_time else None,
+                    "endTime": adset_spec.end_time.isoformat() if adset_spec.end_time else None,
                     "promotedObject": adset_spec.promoted_object,
                     "conversionDomain": adset_spec.conversion_domain,
                 },
@@ -1329,6 +1383,11 @@ def _validate_publish_plan(
             item_blockers.append("Final-package asset is missing a prepared Meta creative spec.")
 
         if asset is not None and creative_spec is not None:
+            try:
+                _normalize_meta_call_to_action_type(creative_spec.call_to_action_type)
+            except ValueError as exc:
+                item_blockers.append(str(exc))
+
             experiment_key = (
                 str(asset.experiment_id)
                 if asset.experiment_id
@@ -1365,6 +1424,12 @@ def _validate_publish_plan(
                     item_blockers.append("Linked Meta ad set spec must set either dailyBudget or lifetimeBudget.")
                 if adset_spec.daily_budget is not None and adset_spec.lifetime_budget is not None:
                     item_blockers.append("Linked Meta ad set spec cannot set both dailyBudget and lifetimeBudget.")
+                item_blockers.extend(
+                    _validate_meta_adset_budget_fields(
+                        daily_budget=adset_spec.daily_budget,
+                        scope_label="Linked Meta ad set spec",
+                    )
+                )
                 if adset_spec.start_time and adset_spec.end_time and adset_spec.end_time <= adset_spec.start_time:
                     item_blockers.append("Linked Meta ad set spec endTime must be after startTime.")
                 if _requires_dsa_declarations(adset_spec.targeting):
@@ -1615,6 +1680,10 @@ def _create_meta_creative_internal(
             status_code=status.HTTP_409_CONFLICT,
             detail="Asset must be uploaded to Meta before creating a creative.",
         )
+    try:
+        normalized_cta_type = _normalize_meta_call_to_action_type(payload.callToActionType)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     if upload.meta_image_hash:
         link_data: dict[str, Any] = {
@@ -1627,9 +1696,9 @@ def _create_meta_creative_internal(
             link_data["name"] = payload.headline
         if payload.description:
             link_data["description"] = payload.description
-        if payload.callToActionType:
+        if normalized_cta_type:
             link_data["call_to_action"] = {
-                "type": payload.callToActionType,
+                "type": normalized_cta_type,
                 "value": {"link": payload.linkUrl},
             }
         object_story_spec: dict[str, Any] = {
@@ -1647,9 +1716,9 @@ def _create_meta_creative_internal(
             video_data["title"] = payload.headline
         if payload.description:
             video_data["link_description"] = payload.description
-        if payload.callToActionType:
+        if normalized_cta_type:
             video_data["call_to_action"] = {
-                "type": payload.callToActionType,
+                "type": normalized_cta_type,
                 "value": {"link": payload.linkUrl},
             }
         object_story_spec = {
@@ -1859,6 +1928,12 @@ def _create_meta_adset_internal(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Provide at most one of dailyBudget or lifetimeBudget.",
         )
+    budget_errors = _validate_meta_adset_budget_fields(
+        daily_budget=payload.dailyBudget,
+        scope_label="Meta ad set",
+    )
+    if budget_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
 
     request_payload: dict[str, Any] = {
         "name": payload.name,
@@ -2787,6 +2862,12 @@ def create_meta_adset_spec(
         experiment = experiments_repo.get(org_id=auth.org_id, experiment_id=payload.experimentId)
         if not experiment:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found")
+    budget_errors = _validate_meta_adset_budget_fields(
+        daily_budget=payload.dailyBudget,
+        scope_label="Meta ad set spec",
+    )
+    if budget_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
 
     repo = MetaAdsRepository(session)
     record = repo.create_adset_spec(
@@ -2852,6 +2933,12 @@ def update_meta_adset_spec(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Provide at most one of dailyBudget or lifetimeBudget.",
         )
+    budget_errors = _validate_meta_adset_budget_fields(
+        daily_budget=daily_budget,
+        scope_label="Meta ad set spec",
+    )
+    if budget_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
 
     start_time = update_fields.get("startTime", record.start_time)
     end_time = update_fields.get("endTime", record.end_time)
