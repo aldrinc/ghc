@@ -49,7 +49,7 @@ export function WorkspaceOnboardingPage() {
           </p>
           <h1 className="text-3xl font-bold leading-tight text-content">Start a new workspace</h1>
           <p className="max-w-3xl text-base text-content-muted">
-            Create the client record and kick off onboarding. We’ll run research and generate canon, strategy, and angle plans.
+            Set up your brand, add your product, and we’ll handle the research and strategy generation.
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export function WorkspaceOnboardingPage() {
 
             <div className="mt-6 space-y-3">
               {[
-                "Capture key details and goals",
+                "Capture brand and product details",
                 "Run baseline research and canon generation",
                 "Prepare strategy + angle scaffolds",
               ].map((item) => (
@@ -76,7 +76,7 @@ export function WorkspaceOnboardingPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-surface p-6 shadow-none lg:h-[clamp(560px,calc(100vh-240px),760px)] lg:overflow-hidden">
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-none lg:h-[calc(100vh-240px)] lg:overflow-hidden">
             <OnboardingWizard variant="page" triggerLabel="Start onboarding" onCompleted={handleComplete} />
           </div>
         </div>

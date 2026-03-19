@@ -9,7 +9,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,16 +21,15 @@ import {
   type ClientComplianceProfile,
   type ComplianceBusinessModel,
 } from "@/api/compliance";
-import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api/products";
 import { toast } from "@/components/ui/toast";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import {
-  SUPPORTED_PRODUCT_IMAGE_ACCEPT,
-  SUPPORTED_PRODUCT_IMAGE_LABEL,
-  isSupportedProductImageFile,
-} from "@/lib/productAssetUpload";
+import { cn } from "@/lib/utils";
 import type { Client } from "@/types/common";
+
+/* ------------------------------------------------------------------ */
+/*  Types & constants                                                  */
+/* ------------------------------------------------------------------ */
 
 type WizardStep = {
   key: string;
@@ -41,14 +39,34 @@ type WizardStep = {
 };
 
 const steps: WizardStep[] = [
-  { key: "basics", label: "Basics", description: "Business type and brand story", requiredFields: ["brand_story"] },
+  {
+    key: "brand",
+    label: "Your Brand",
+    description: "Tell us about your business",
+    requiredFields: ["brand_story", "business_model"],
+  },
   {
     key: "product",
-    label: "Product",
-    description: "Add what we should scope research and strategy to.",
+    label: "Your Product",
+    description: "What are you selling?",
   },
-  { key: "funnel", label: "Strategy V2", description: "Required Strategy V2 operator inputs" },
-  { key: "review", label: "Review", description: "Confirm and submit" },
+  {
+    key: "audience",
+    label: "Audience & Channels",
+    description: "Who are you reaching and where?",
+    requiredFields: ["funnel_position", "target_platforms", "target_regions"],
+  },
+  {
+    key: "creative",
+    label: "Creative Direction",
+    description: "How should your brand sound?",
+    requiredFields: ["brand_voice_notes", "existing_proof_assets"],
+  },
+  {
+    key: "review",
+    label: "Review & Launch",
+    description: "Check your details and start",
+  },
 ];
 
 const complianceBusinessModelOptions: Array<{ label: string; value: ComplianceBusinessModel }> = [
@@ -65,13 +83,7 @@ type ProductDraft = {
   price: string;
   product_type: string;
   product_category: string;
-  primary_benefits: string;
-  feature_bullets: string;
-  guarantee_text: string;
-  disclaimers: string;
-  goals: string;
   competitor_urls: string;
-  primary_image_file: File | null;
 };
 
 const emptyProductDraft: ProductDraft = {
@@ -80,21 +92,13 @@ const emptyProductDraft: ProductDraft = {
   price: "",
   product_type: "",
   product_category: "",
-  primary_benefits: "",
-  feature_bullets: "",
-  guarantee_text: "",
-  disclaimers: "",
-  goals: "",
   competitor_urls: "",
-  primary_image_file: null,
 };
 
 type WizardState = {
   client_name: string;
-  client_industry: string;
   business_type: "new" | "existing";
   brand_story: string;
-  funnel_notes: string;
   product_customizable: boolean;
   business_model: ComplianceBusinessModel | "";
   funnel_position: string;
@@ -108,10 +112,8 @@ type WizardState = {
 
 const baseState: WizardState = {
   client_name: "",
-  client_industry: "",
   business_type: "new",
   brand_story: "",
-  funnel_notes: "",
   product_customizable: false,
   business_model: "",
   funnel_position: "",
@@ -123,10 +125,9 @@ const baseState: WizardState = {
   products: [],
 };
 
-const initialState = (clientName?: string, clientIndustry?: string): WizardState => ({
+const initialState = (clientName?: string): WizardState => ({
   ...baseState,
   client_name: clientName || "",
-  client_industry: clientIndustry || "",
 });
 
 const productTypeOptions = [
@@ -148,10 +149,131 @@ function parseListInput(value: string): string[] {
     .filter(Boolean);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Step indicator                                                     */
+/* ------------------------------------------------------------------ */
+
+type StepStatus = "completed" | "current" | "upcoming";
+
+function StepDot({ status }: { status: StepStatus }) {
+  if (status === "completed") {
+    return (
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-success text-white">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+          <path d="M2 5.5L4 7.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    );
+  }
+  if (status === "current") {
+    return (
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent">
+        <span className="h-1.5 w-1.5 rounded-full bg-surface" />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border bg-transparent" />
+  );
+}
+
+function OnboardingStepIndicator({
+  currentIndex,
+  onStepClick,
+  disabled,
+}: {
+  currentIndex: number;
+  onStepClick: (index: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-y-2">
+      {steps.map((step, idx) => {
+        const status: StepStatus =
+          idx < currentIndex ? "completed" : idx === currentIndex ? "current" : "upcoming";
+        const canClick = idx < currentIndex && !disabled;
+
+        return (
+          <div key={step.key} className="flex items-center">
+            {idx > 0 ? (
+              <div
+                className={cn(
+                  "h-0.5 w-4",
+                  idx <= currentIndex ? "bg-success" : "bg-border",
+                )}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => canClick && onStepClick(idx)}
+              disabled={!canClick}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition",
+                canClick && "hover:ring-2 hover:ring-accent/20 cursor-pointer",
+                status === "completed" && "text-content",
+                status === "current" && "text-accent",
+                status === "upcoming" && "text-content-muted opacity-50",
+                !canClick && status !== "current" && status !== "upcoming" && "cursor-default",
+              )}
+            >
+              <StepDot status={status} />
+              <span className="hidden sm:inline">{step.label}</span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Review section card                                                */
+/* ------------------------------------------------------------------ */
+
+function ReviewSection({
+  title,
+  onEdit,
+  items,
+}: {
+  title: string;
+  onEdit: () => void;
+  items: Array<{ label: string; value: string; multiline?: boolean }>;
+}) {
+  const visibleItems = items.filter((item) => item.value && item.value !== "Not set");
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-content">{title}</div>
+        <Button variant="ghost" size="xs" onClick={onEdit}>
+          Edit
+        </Button>
+      </div>
+      {visibleItems.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {visibleItems.map((item) => (
+            <div key={item.label}>
+              <div className="text-xs font-medium text-content-muted">{item.label}</div>
+              <div className={cn("text-sm text-content", item.multiline && "whitespace-pre-line")}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 text-xs text-content-muted">No details added yet.</div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main wizard                                                        */
+/* ------------------------------------------------------------------ */
+
 type OnboardingWizardProps = {
   clientId?: string;
   clientName?: string;
-  clientIndustry?: string;
   triggerLabel?: string;
   onCompleted?: (payload: {
     clientId: string;
@@ -165,7 +287,6 @@ type OnboardingWizardProps = {
 export function OnboardingWizard({
   clientId,
   clientName,
-  clientIndustry,
   triggerLabel = "Start onboarding",
   onCompleted,
   variant = "modal",
@@ -176,7 +297,7 @@ export function OnboardingWizard({
   const isPage = variant === "page";
   const [open, setOpen] = useState(isPage);
   const [stepIndex, setStepIndex] = useState(0);
-  const [state, setState] = useState<WizardState>(() => initialState(clientName, clientIndustry));
+  const [state, setState] = useState<WizardState>(() => initialState(clientName));
   const [activeClientId, setActiveClientId] = useState<string | null>(clientId ?? null);
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
   const [editingProductIndex, setEditingProductIndex] = useState<number | null>(null);
@@ -185,36 +306,33 @@ export function OnboardingWizard({
   const { request } = useApiClient();
   const onboarding = useStartOnboarding();
   const createClient = useCreateClient();
-  const uploadProductAssetsById = useUploadProductAssetsById();
-  const setProductPrimaryAssetById = useSetProductPrimaryAssetById();
 
   useEffect(() => {
     if (!open && !isPage) {
-      setState(initialState(clientName, clientIndustry));
+      setState(initialState(clientName));
       setStepIndex(0);
       setActiveClientId(clientId ?? null);
       setIsProductEditorOpen(false);
       setEditingProductIndex(null);
       setProductDraft(emptyProductDraft);
     }
-  }, [open, clientId, clientName, clientIndustry, isPage]);
+  }, [open, clientId, clientName, isPage]);
 
   const currentStep = steps[stepIndex];
-  const progress = Math.round(((stepIndex + 1) / steps.length) * 100);
   const requiresClientName = !activeClientId;
   const isSubmitting =
     isSavingComplianceProfile ||
     onboarding.isPending ||
-    createClient.isPending ||
-    uploadProductAssetsById.isPending ||
-    setProductPrimaryAssetById.isPending;
+    createClient.isPending;
+
+  /* ------ Validation per step ------ */
 
   const canNext = useMemo(() => {
-    if (currentStep.key === "basics") {
+    if (currentStep.key === "brand") {
+      const hasName = !requiresClientName || Boolean(state.client_name.trim());
       const hasBrandStory = Boolean(state.brand_story.trim());
-      const needsName = requiresClientName;
-      const hasName = !needsName || Boolean(state.client_name.trim());
-      return hasBrandStory && hasName;
+      const hasBusinessModel = Boolean(state.business_model.trim());
+      return hasName && hasBrandStory && hasBusinessModel;
     }
     if (currentStep.key === "product") {
       if (state.products.length !== 1) return false;
@@ -222,21 +340,24 @@ export function OnboardingWizard({
         Boolean(state.products[0]?.product_name?.trim()) &&
         Boolean(state.products[0]?.product_description?.trim()) &&
         Boolean(state.products[0]?.price?.trim()) &&
-        Boolean(state.products[0]?.product_type?.trim()) &&
-        Boolean(state.products[0]?.primary_image_file)
+        Boolean(state.products[0]?.product_type?.trim())
       );
     }
-    if (currentStep.key === "funnel") {
-      if (!state.business_model.trim()) return false;
+    if (currentStep.key === "audience") {
       if (!state.funnel_position.trim()) return false;
       if (!parseListInput(state.target_platforms).length) return false;
       if (!parseListInput(state.target_regions).length) return false;
-      if (!parseListInput(state.existing_proof_assets).length) return false;
+      return true;
+    }
+    if (currentStep.key === "creative") {
       if (!state.brand_voice_notes.trim()) return false;
+      if (!parseListInput(state.existing_proof_assets).length) return false;
       return true;
     }
     return true;
   }, [currentStep, requiresClientName, state]);
+
+  /* ------ Navigation ------ */
 
   const goNext = () => {
     if (stepIndex < steps.length - 1) setStepIndex((i) => i + 1);
@@ -245,8 +366,10 @@ export function OnboardingWizard({
     if (stepIndex > 0) setStepIndex((i) => i - 1);
   };
 
+  const navigationBlocked = isSubmitting || (currentStep.key === "product" && isProductEditorOpen);
+
   const resetWizard = () => {
-    setState(initialState(clientName, clientIndustry));
+    setState(initialState(clientName));
     setStepIndex(0);
     setActiveClientId(clientId ?? null);
     setIsProductEditorOpen(false);
@@ -287,16 +410,16 @@ export function OnboardingWizard({
   };
 
   useEffect(() => {
-    // Keep the wizard surface stable: close inline editors when leaving a step.
     setIsProductEditorOpen(false);
     setEditingProductIndex(null);
   }, [stepIndex]);
+
+  /* ------ Client creation ------ */
 
   const ensureClient = async (): Promise<string> => {
     if (activeClientId) return activeClientId;
     const created = (await createClient.mutateAsync({
       name: state.client_name.trim(),
-      industry: state.client_industry.trim() || undefined,
       strategyV2Enabled: true,
     })) as Client;
     if (!created?.id) {
@@ -306,61 +429,59 @@ export function OnboardingWizard({
     return created.id;
   };
 
+  /* ------ Submit ------ */
+
   const handleSubmit = async () => {
     const firstProduct = state.products[0];
     if (!state.brand_story.trim()) {
-      toast.error("Brand story is required.");
+      toast.error("Please add your brand story before submitting.");
       return;
     }
     if (state.products.length !== 1 || !firstProduct?.product_name?.trim()) {
-      toast.error("Add exactly one product (product name is required).");
+      toast.error("Please add a product with a name before submitting.");
       return;
     }
     if (!firstProduct?.product_description?.trim()) {
-      toast.error("Product description is required.");
+      toast.error("Please add a product description.");
       return;
     }
     if (!firstProduct?.price?.trim()) {
-      toast.error("Product price is required.");
+      toast.error("Please set a product price.");
       return;
     }
     if (!firstProduct?.product_type?.trim()) {
-      toast.error("Product type is required.");
-      return;
-    }
-    if (!firstProduct?.primary_image_file) {
-      toast.error("A primary product image is required.");
+      toast.error("Please select a product type.");
       return;
     }
     if (requiresClientName && !state.client_name.trim()) {
-      toast.error("Client name is required.");
+      toast.error("Please enter a business name.");
       return;
     }
     const targetPlatforms = parseListInput(state.target_platforms);
     const targetRegions = parseListInput(state.target_regions);
     const existingProofAssets = parseListInput(state.existing_proof_assets);
     if (!state.business_model.trim()) {
-      toast.error("Business model is required.");
+      toast.error("Please select how you sell (business model).");
       return;
     }
     if (!state.funnel_position.trim()) {
-      toast.error("Funnel position is required.");
+      toast.error("Please describe who you're targeting.");
       return;
     }
     if (!targetPlatforms.length) {
-      toast.error("At least one target platform is required.");
+      toast.error("Please add at least one advertising platform.");
       return;
     }
     if (!targetRegions.length) {
-      toast.error("At least one target region is required.");
+      toast.error("Please add at least one target region.");
       return;
     }
     if (!existingProofAssets.length) {
-      toast.error("At least one existing proof asset is required.");
+      toast.error("Please add at least one piece of social proof.");
       return;
     }
     if (!state.brand_voice_notes.trim()) {
-      toast.error("Brand voice notes are required.");
+      toast.error("Please describe your brand voice.");
       return;
     }
     const payload = {
@@ -379,18 +500,6 @@ export function OnboardingWizard({
       product_description: firstProduct.product_description.trim(),
       product_type: firstProduct.product_type.trim(),
       product_category: firstProduct.product_category.trim() || undefined,
-      primary_benefits: firstProduct.primary_benefits.trim()
-        ? firstProduct.primary_benefits.split(",").map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      feature_bullets: firstProduct.feature_bullets.trim()
-        ? firstProduct.feature_bullets.split(",").map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      guarantee_text: firstProduct.guarantee_text.trim() || undefined,
-      disclaimers: firstProduct.disclaimers.trim()
-        ? firstProduct.disclaimers.split(",").map((item) => item.trim()).filter(Boolean)
-        : undefined,
-      funnel_notes: state.funnel_notes || undefined,
-      goals: firstProduct.goals ? firstProduct.goals.split(",").map((g) => g.trim()).filter(Boolean) : undefined,
       competitor_urls: undefined as string[] | undefined,
     };
     const competitorList = firstProduct.competitor_urls
@@ -451,40 +560,15 @@ export function OnboardingWizard({
         productId,
         productName: (response as any)?.product_name || firstProduct.product_name.trim(),
       };
-      const primaryImageFile = firstProduct.primary_image_file;
-      let imageSetupFailed = false;
-      if (primaryImageFile) {
-        try {
-          const uploadedAssets = await uploadProductAssetsById.mutateAsync({
-            productId,
-            files: [primaryImageFile],
-          });
-          const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
-          if (!primaryImageAsset?.id) {
-            throw new Error("Product image upload did not return an image asset.");
-          }
-          await setProductPrimaryAssetById.mutateAsync({
-            productId,
-            primaryAssetId: primaryImageAsset.id,
-          });
-        } catch (error) {
-          imageSetupFailed = true;
-          console.error("Post-onboarding product image setup failed", error);
-        }
-      }
-
       resetWizard();
       setOpen(false);
       completeOnboarding(completionPayload);
-      if (imageSetupFailed) {
-        toast.error(
-          `Onboarding started, but the primary product image was not saved. Upload a ${SUPPORTED_PRODUCT_IMAGE_LABEL} file from the product page.`,
-        );
-      }
     } catch (err) {
       // errors are surfaced via mutation onError handlers
     }
   };
+
+  /* ------ Product editor ------ */
 
   const openAddProduct = () => {
     if (state.products.length >= 1) {
@@ -530,10 +614,6 @@ export function OnboardingWizard({
       toast.error("Product type is required.");
       return;
     }
-    if (!productDraft.primary_image_file) {
-      toast.error("Primary product image is required.");
-      return;
-    }
     if (editingProductIndex === null && state.products.length >= 1) {
       toast.error("Only one product is supported right now.");
       return;
@@ -569,82 +649,116 @@ export function OnboardingWizard({
     }
   };
 
-  const stepHeader = (
+  /* ================================================================ */
+  /*  RENDER                                                           */
+  /* ================================================================ */
+
+  const stepIndicator = (
+    <OnboardingStepIndicator
+      currentIndex={stepIndex}
+      onStepClick={(idx) => setStepIndex(idx)}
+      disabled={navigationBlocked}
+    />
+  );
+
+  const stepDescription = currentStep.description ? (
     <div className="rounded-lg border border-border px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-content">{currentStep.label}</div>
-          {currentStep.description ? (
-            <div className="mt-1 text-xs text-content-muted">{currentStep.description}</div>
-          ) : null}
+          <div className="mt-1 text-xs text-content-muted">{currentStep.description}</div>
         </div>
-        <Badge tone="neutral" className="shrink-0">
-          Step {stepIndex + 1} of {steps.length}
-        </Badge>
       </div>
     </div>
-  );
+  ) : null;
+
+  /* ------ Form sections ------ */
 
   const form = (
     <FormRoot className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-      {currentStep.key === "basics" && (
+      {/* ---- Step 1: Your Brand ---- */}
+      {currentStep.key === "brand" && (
         <>
-          <FieldRoot name="client_name">
-            <FieldLabel>Workspace name</FieldLabel>
-            <FieldDescription>Creates the workspace (client) before starting onboarding.</FieldDescription>
-            <Input
-              value={state.client_name}
-              onChange={(e) => setState((s) => ({ ...s, client_name: e.target.value }))}
-              required
-              placeholder="Acme Corp"
-              disabled={Boolean(activeClientId)}
-            />
-            <FieldError />
-          </FieldRoot>
-          <FieldRoot name="client_industry">
-            <FieldLabel>Industry</FieldLabel>
-            <FieldDescription>Optional context for filtering and reporting.</FieldDescription>
-            <Input
-              value={state.client_industry}
-              onChange={(e) => setState((s) => ({ ...s, client_industry: e.target.value }))}
-              placeholder="E-commerce"
-              disabled={Boolean(activeClientId)}
-            />
-          </FieldRoot>
-          <FieldRoot name="business_type">
-            <FieldLabel>Business type</FieldLabel>
-            <div className="flex gap-4 text-sm text-content">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={state.business_type === "new"}
-                  onChange={() => setState((s) => ({ ...s, business_type: "new" }))}
-                />
-                New business (supported)
-              </label>
-              <label className="flex items-center gap-2 text-content-muted">
-                <input
-                  type="radio"
-                  checked={state.business_type === "existing"}
-                  onChange={() => setState((s) => ({ ...s, business_type: "existing" }))}
-                />
-                Existing business (coming soon)
-              </label>
-            </div>
-          </FieldRoot>
+          <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Identity</div>
+            <FieldRoot name="client_name">
+              <FieldLabel>Business name</FieldLabel>
+              <FieldDescription>This becomes your workspace name and is used as your legal business name for compliance.</FieldDescription>
+              <Input
+                value={state.client_name}
+                onChange={(e) => setState((s) => ({ ...s, client_name: e.target.value }))}
+                required
+                placeholder="Acme Corp"
+                disabled={Boolean(activeClientId)}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="business_type">
+              <FieldLabel>Business stage</FieldLabel>
+              <FieldDescription>Are you launching something new or improving an existing business?</FieldDescription>
+              <div className="flex gap-4 text-sm text-content">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={state.business_type === "new"}
+                    onChange={() => setState((s) => ({ ...s, business_type: "new" }))}
+                  />
+                  New business (supported)
+                </label>
+                <label className="flex items-center gap-2 text-content-muted">
+                  <input
+                    type="radio"
+                    checked={state.business_type === "existing"}
+                    onChange={() => setState((s) => ({ ...s, business_type: "existing" }))}
+                  />
+                  Existing business (coming soon)
+                </label>
+              </div>
+            </FieldRoot>
+            <FieldRoot name="business_model">
+              <FieldLabel>How do you sell?</FieldLabel>
+              <FieldDescription>
+                How your business makes money. This drives your compliance setup and shapes offer strategy.{" "}
+                <span className="italic text-content-muted/60">(Business model)</span>
+              </FieldDescription>
+              <Select
+                value={state.business_model}
+                onValueChange={(value) =>
+                  setState((s) => ({ ...s, business_model: value as ComplianceBusinessModel | "" }))
+                }
+                options={[
+                  { label: "Select how you sell...", value: "" },
+                  ...complianceBusinessModelOptions,
+                ]}
+                required
+              />
+              <FieldError />
+            </FieldRoot>
+          </div>
+
           <FieldRoot name="brand_story">
-            <FieldLabel>Brand story / context</FieldLabel>
-            <FieldDescription>Required. What should we know before generating Strategy V2 outputs?</FieldDescription>
+            <FieldLabel>Brand story</FieldLabel>
+            <FieldDescription>
+              Tell us about your brand in your own words — what you do, who you serve, and what makes you different. This shapes all the research and strategy we generate.
+            </FieldDescription>
             <FieldControl
               value={state.brand_story}
               onChange={(e) => setState((s) => ({ ...s, brand_story: e.target.value }))}
-              render={(props) => <Textarea {...props} rows={3} required />}
+              render={(props) => (
+                <Textarea
+                  {...props}
+                  rows={4}
+                  required
+                  placeholder="We make natural sleep supplements for busy professionals who want to fall asleep faster without pills. Our founder developed the formula after years of insomnia..."
+                />
+              )}
             />
             <FieldError />
           </FieldRoot>
         </>
       )}
 
+      {/* ---- Step 2: Your Product ---- */}
       {currentStep.key === "product" && (
         <div className="space-y-4">
           {!state.products.length && !isProductEditorOpen ? (
@@ -663,17 +777,16 @@ export function OnboardingWizard({
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-content">{product.product_name}</div>
                       <div className="mt-1 text-xs text-content-muted">
-                        Price: {product.price || "Missing"}
+                        Price: {product.price || "Not set"}
                       </div>
                       <div className="mt-1 text-xs text-content-muted">
-                        Type: {product.product_type || "Missing"}
+                        Type: {product.product_type || "Not set"}
                       </div>
-                      <div className="mt-1 text-xs text-content-muted">
-                        {product.product_category ? `Category: ${product.product_category}` : "Category not set"}
-                      </div>
-                      <div className="mt-1 text-xs text-content-muted">
-                        Primary image: {product.primary_image_file?.name || "Missing"}
-                      </div>
+                      {product.product_category ? (
+                        <div className="mt-1 text-xs text-content-muted">
+                          Category: {product.product_category}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Button variant="secondary" size="xs" onClick={() => openEditProduct(idx)} disabled={isSubmitting}>
@@ -697,7 +810,7 @@ export function OnboardingWizard({
                     {editingProductIndex === null ? "Add product" : "Edit product"}
                   </div>
                   <div className="mt-1 text-xs text-content-muted">
-                    Product details help generate strategy, offer, and copy outputs.
+                    These details shape your strategy, offer, and copy outputs.
                   </div>
                 </div>
                 <Badge tone="neutral" className="shrink-0">
@@ -708,7 +821,7 @@ export function OnboardingWizard({
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <FieldRoot name="product_name" className="md:col-span-2">
                   <FieldLabel>Product name</FieldLabel>
-                  <FieldDescription>Required.</FieldDescription>
+                  <FieldDescription>The name customers see. This becomes the default name for your offer and strategy.</FieldDescription>
                   <Input
                     value={productDraft.product_name}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_name: e.target.value }))}
@@ -721,7 +834,7 @@ export function OnboardingWizard({
 
                 <FieldRoot name="product_type">
                   <FieldLabel>Product type</FieldLabel>
-                  <FieldDescription>Required. This drives offer, copy, image, and Shopify validation.</FieldDescription>
+                  <FieldDescription>What kind of product is this? Affects how we generate images, copy, and store layouts.</FieldDescription>
                   <Select
                     value={productDraft.product_type}
                     onValueChange={(value) => setProductDraft((draft) => ({ ...draft, product_type: value }))}
@@ -732,37 +845,25 @@ export function OnboardingWizard({
                 </FieldRoot>
 
                 <FieldRoot name="product_category">
-                  <FieldLabel>Category</FieldLabel>
-                  <FieldDescription>Optional category or niche for research context.</FieldDescription>
+                  <FieldLabel>Niche or category</FieldLabel>
+                  <FieldDescription>Optional. A specific label like "sleep supplements" or "productivity SaaS" that focuses our research.</FieldDescription>
                   <Input
                     value={productDraft.product_category}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_category: e.target.value }))}
-                    placeholder="Supplements, SaaS, Courses"
-                    disabled={isSubmitting}
-                  />
-                  <FieldError />
-                </FieldRoot>
-
-                <FieldRoot name="goals">
-                  <FieldLabel>Goals</FieldLabel>
-                  <FieldDescription>Optional business goals (comma-separated).</FieldDescription>
-                  <Input
-                    value={productDraft.goals}
-                    onChange={(e) => setProductDraft((draft) => ({ ...draft, goals: e.target.value }))}
-                    placeholder="Increase ROAS, New market launch"
+                    placeholder="Sleep supplements, productivity SaaS"
                     disabled={isSubmitting}
                   />
                   <FieldError />
                 </FieldRoot>
 
                 <FieldRoot name="product_description" className="md:col-span-2">
-                  <FieldLabel>Description</FieldLabel>
-                  <FieldDescription>Required short description of the product.</FieldDescription>
+                  <FieldLabel>Product description</FieldLabel>
+                  <FieldDescription>A short summary of what this product is and does. Used throughout strategy and copy generation.</FieldDescription>
                   <FieldControl
                     value={productDraft.product_description}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_description: e.target.value }))}
                     render={(props) => (
-                      <Textarea {...props} rows={3} placeholder="Sleep support tincture with calming herbs." />
+                      <Textarea {...props} rows={3} placeholder="Sleep support tincture with calming herbs. Designed for busy professionals who want to fall asleep faster without pills." />
                     )}
                   />
                   <FieldError />
@@ -770,7 +871,7 @@ export function OnboardingWizard({
 
                 <FieldRoot name="price">
                   <FieldLabel>Price</FieldLabel>
-                  <FieldDescription>Required. Used for Strategy V2 and the default offer price point.</FieldDescription>
+                  <FieldDescription>The price customers pay. Sets the starting point for your offer and pricing strategy.</FieldDescription>
                   <Input
                     value={productDraft.price}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, price: e.target.value }))}
@@ -781,97 +882,16 @@ export function OnboardingWizard({
                   <FieldError />
                 </FieldRoot>
 
-                <FieldRoot name="primary_benefits">
-                  <FieldLabel>Primary benefits</FieldLabel>
-                  <FieldDescription>Optional comma-separated list.</FieldDescription>
-                  <Input
-                    value={productDraft.primary_benefits}
-                    onChange={(e) => setProductDraft((draft) => ({ ...draft, primary_benefits: e.target.value }))}
-                    placeholder="Fall asleep faster, Wake refreshed"
-                    disabled={isSubmitting}
-                  />
-                  <FieldError />
-                </FieldRoot>
-
-                <FieldRoot name="feature_bullets">
-                  <FieldLabel>Feature bullets</FieldLabel>
-                  <FieldDescription>Optional comma-separated list.</FieldDescription>
-                  <Input
-                    value={productDraft.feature_bullets}
-                    onChange={(e) => setProductDraft((draft) => ({ ...draft, feature_bullets: e.target.value }))}
-                    placeholder="Organic herbs, Fast-acting drops"
-                    disabled={isSubmitting}
-                  />
-                  <FieldError />
-                </FieldRoot>
-
-                <FieldRoot name="guarantee_text" className="md:col-span-2">
-                  <FieldLabel>Guarantee text</FieldLabel>
-                  <FieldDescription>Optional guarantee statement.</FieldDescription>
-                  <Input
-                    value={productDraft.guarantee_text}
-                    onChange={(e) => setProductDraft((draft) => ({ ...draft, guarantee_text: e.target.value }))}
-                    placeholder="30-day money back guarantee"
-                    disabled={isSubmitting}
-                  />
-                  <FieldError />
-                </FieldRoot>
-
-                <FieldRoot name="disclaimers" className="md:col-span-2">
-                  <FieldLabel>Disclaimers</FieldLabel>
-                  <FieldDescription>Optional comma-separated list.</FieldDescription>
-                  <Input
-                    value={productDraft.disclaimers}
-                    onChange={(e) => setProductDraft((draft) => ({ ...draft, disclaimers: e.target.value }))}
-                    placeholder="Not medical advice, Results may vary"
-                    disabled={isSubmitting}
-                  />
-                  <FieldError />
-                </FieldRoot>
-
                 <FieldRoot name="competitor_urls" className="md:col-span-2">
-                  <FieldLabel>Competitor URLs</FieldLabel>
-                  <FieldDescription>Optional. One URL per line. We’ll use these as seed competitors.</FieldDescription>
+                  <FieldLabel>Competitor websites</FieldLabel>
+                  <FieldDescription>Optional. Paste competitor URLs (one per line). We use these as starting points for competitive research.</FieldDescription>
                   <FieldControl
                     value={productDraft.competitor_urls}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, competitor_urls: e.target.value }))}
                     render={(props) => (
-                      <Textarea {...props} rows={4} placeholder="https://competitor1.com\nhttps://competitor2.com" />
+                      <Textarea {...props} rows={3} placeholder={"https://competitor1.com\nhttps://competitor2.com"} />
                     )}
                   />
-                  <FieldError />
-                </FieldRoot>
-
-                <FieldRoot name="primary_image_file" className="md:col-span-2">
-                  <FieldLabel>Primary product image</FieldLabel>
-                  <FieldDescription>
-                    Required. Upload the product image used for downstream generation. Supported:{" "}
-                    {SUPPORTED_PRODUCT_IMAGE_LABEL}.
-                  </FieldDescription>
-                  <Input
-                    type="file"
-                    accept={SUPPORTED_PRODUCT_IMAGE_ACCEPT}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      if (!file) {
-                        setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
-                        return;
-                      }
-                      if (!isSupportedProductImageFile(file)) {
-                        setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
-                        toast.error(`Primary product image must be a ${SUPPORTED_PRODUCT_IMAGE_LABEL} file.`);
-                        e.currentTarget.value = "";
-                        return;
-                      }
-                      setProductDraft((draft) => ({ ...draft, primary_image_file: file }));
-                    }}
-                    disabled={isSubmitting}
-                  />
-                  <div className="mt-1 text-xs text-content-muted">
-                    {productDraft.primary_image_file
-                      ? `Selected: ${productDraft.primary_image_file.name}`
-                      : "No primary image selected."}
-                  </div>
                   <FieldError />
                 </FieldRoot>
               </div>
@@ -889,85 +909,57 @@ export function OnboardingWizard({
         </div>
       )}
 
-      {currentStep.key === "funnel" && (
+      {/* ---- Step 3: Audience & Channels ---- */}
+      {currentStep.key === "audience" && (
         <div className="space-y-4">
-          <label className="flex items-center gap-2 text-sm text-content">
-            <input
-              type="checkbox"
-              checked={state.product_customizable}
-              onChange={() => setState((s) => ({ ...s, product_customizable: !s.product_customizable }))}
+          <FieldRoot name="funnel_position">
+            <FieldLabel>Who are you targeting?</FieldLabel>
+            <FieldDescription>
+              Are you reaching people who've never heard of you (cold traffic), or people who already know your brand (warm retargeting)?{" "}
+              <span className="italic text-content-muted/60">(Funnel position)</span>
+            </FieldDescription>
+            <Input
+              value={state.funnel_position}
+              onChange={(e) => setState((s) => ({ ...s, funnel_position: e.target.value }))}
+              placeholder="Cold traffic — reaching people who haven't heard of us yet"
+              required
             />
-            Product customizable
-          </label>
+            <FieldError />
+          </FieldRoot>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldRoot name="business_model">
-              <FieldLabel>Business model</FieldLabel>
-              <FieldDescription>Required for compliance profile setup.</FieldDescription>
-              <Select
-                value={state.business_model}
-                onValueChange={(value) =>
-                  setState((s) => ({ ...s, business_model: value as ComplianceBusinessModel | "" }))
-                }
-                options={[
-                  { label: "Select business model", value: "" },
-                  ...complianceBusinessModelOptions,
-                ]}
-                required
-              />
-              <FieldError />
-            </FieldRoot>
-            <FieldRoot name="funnel_position">
-              <FieldLabel>Funnel position</FieldLabel>
-              <FieldDescription>Required. Example: cold traffic, warm retargeting.</FieldDescription>
-              <Input
-                value={state.funnel_position}
-                onChange={(e) => setState((s) => ({ ...s, funnel_position: e.target.value }))}
-                placeholder="Cold traffic acquisition"
-                required
-              />
-              <FieldError />
-            </FieldRoot>
             <FieldRoot name="target_platforms">
-              <FieldLabel>Target platforms</FieldLabel>
-              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldLabel>Where will you advertise?</FieldLabel>
+              <FieldDescription>Which advertising platforms will you use? List each one on a new line or separate with commas.</FieldDescription>
               <FieldControl
                 value={state.target_platforms}
                 onChange={(e) => setState((s) => ({ ...s, target_platforms: e.target.value }))}
-                render={(props) => <Textarea {...props} rows={3} placeholder="Meta Ads, TikTok Ads" required />}
+                render={(props) => <Textarea {...props} rows={3} placeholder={"Meta Ads\nTikTok Ads\nGoogle Ads"} required />}
               />
               <FieldError />
             </FieldRoot>
             <FieldRoot name="target_regions">
-              <FieldLabel>Target regions</FieldLabel>
-              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldLabel>Where are your customers?</FieldLabel>
+              <FieldDescription>Which countries or regions are you targeting? List each one on a new line or separate with commas.</FieldDescription>
               <FieldControl
                 value={state.target_regions}
                 onChange={(e) => setState((s) => ({ ...s, target_regions: e.target.value }))}
-                render={(props) => <Textarea {...props} rows={3} placeholder="United States, Canada" required />}
+                render={(props) => <Textarea {...props} rows={3} placeholder={"United States\nCanada\nUnited Kingdom"} required />}
               />
               <FieldError />
             </FieldRoot>
-            <FieldRoot name="existing_proof_assets" className="md:col-span-2">
-              <FieldLabel>Existing proof assets</FieldLabel>
-              <FieldDescription>Required. Comma or newline separated proof references.</FieldDescription>
-              <FieldControl
-                value={state.existing_proof_assets}
-                onChange={(e) => setState((s) => ({ ...s, existing_proof_assets: e.target.value }))}
-                render={(props) => (
-                  <Textarea
-                    {...props}
-                    rows={3}
-                    placeholder="Customer testimonials, before/after screenshots, case study docs"
-                    required
-                  />
-                )}
-              />
-              <FieldError />
-            </FieldRoot>
-            <FieldRoot name="brand_voice_notes" className="md:col-span-2">
-              <FieldLabel>Brand voice notes</FieldLabel>
-              <FieldDescription>Required guidance for headline/copy generation.</FieldDescription>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Step 4: Creative Direction ---- */}
+      {currentStep.key === "creative" && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Voice & proof</div>
+            <FieldRoot name="brand_voice_notes">
+              <FieldLabel>Brand voice</FieldLabel>
+              <FieldDescription>How should your brand sound? Describe the tone and style for all headlines and copy we generate.</FieldDescription>
               <FieldControl
                 value={state.brand_voice_notes}
                 onChange={(e) => setState((s) => ({ ...s, brand_voice_notes: e.target.value }))}
@@ -975,163 +967,150 @@ export function OnboardingWizard({
                   <Textarea
                     {...props}
                     rows={3}
-                    placeholder="Conversational, direct response, confident but compliant."
+                    placeholder="Conversational and friendly, like a knowledgeable friend giving advice. Direct response style but never pushy. Confident claims, always backed by evidence."
                     required
                   />
                 )}
               />
               <FieldError />
             </FieldRoot>
-            <FieldRoot name="compliance_notes" className="md:col-span-2">
-              <FieldLabel>Compliance notes</FieldLabel>
-              <FieldDescription>Optional legal/compliance constraints.</FieldDescription>
+            <FieldRoot name="existing_proof_assets">
+              <FieldLabel>Social proof you already have</FieldLabel>
+              <FieldDescription>
+                Testimonials, case studies, before/after results, media mentions. We never invent proof — we build your offer around what you actually have.
+              </FieldDescription>
               <FieldControl
-                value={state.compliance_notes}
-                onChange={(e) => setState((s) => ({ ...s, compliance_notes: e.target.value }))}
-                render={(props) => <Textarea {...props} rows={2} placeholder="Avoid medical diagnosis language." />}
+                value={state.existing_proof_assets}
+                onChange={(e) => setState((s) => ({ ...s, existing_proof_assets: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={3}
+                    placeholder={"1,200+ five-star reviews on Amazon\nBefore/after customer photos\nFeatured in Men's Health magazine"}
+                    required
+                  />
+                )}
               />
               <FieldError />
             </FieldRoot>
-            <FieldRoot name="funnel_notes" className="md:col-span-2">
-              <FieldLabel>Additional funnel notes</FieldLabel>
-              <FieldDescription>Optional extra context.</FieldDescription>
-              <FieldControl
-                value={state.funnel_notes}
-                onChange={(e) => setState((s) => ({ ...s, funnel_notes: e.target.value }))}
-                render={(props) => <Textarea {...props} rows={2} />}
+          </div>
+
+          <div className="rounded-lg border border-border bg-surface-2 p-4 space-y-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Constraints</div>
+            <label className="flex items-start gap-3 text-sm text-content">
+              <input
+                type="checkbox"
+                checked={state.product_customizable}
+                onChange={() => setState((s) => ({ ...s, product_customizable: !s.product_customizable }))}
+                className="mt-0.5"
               />
+              <div>
+                <div className="font-medium">Can we suggest changes to your product?</div>
+                <div className="text-xs text-content-muted">
+                  If yes, our strategy may recommend product modifications. If no, we only change how it's framed and offered.
+                </div>
+              </div>
+            </label>
+            <FieldRoot name="compliance_notes">
+              <FieldLabel>Legal or compliance constraints</FieldLabel>
+              <FieldDescription>Optional. Any specific legal restrictions we should follow when generating copy and claims.</FieldDescription>
+              <FieldControl
+                value={state.compliance_notes}
+                onChange={(e) => setState((s) => ({ ...s, compliance_notes: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={2}
+                    placeholder="No medical diagnosis claims. Must include FDA disclaimer for supplements. Avoid absolute guarantees."
+                  />
+                )}
+              />
+              <FieldError />
             </FieldRoot>
           </div>
         </div>
       )}
 
+      {/* ---- Step 5: Review & Launch ---- */}
       {currentStep.key === "review" && (
-        <div className="space-y-2 text-sm text-content">
-          <div className="font-semibold text-content">Review details</div>
-          <div className="rounded-lg border border-border bg-surface-2 p-3 shadow-inner">
-            <p>
-              <strong>Workspace name:</strong> {state.client_name || "Missing"}
-            </p>
-            <p>
-              <strong>Industry:</strong> {state.client_industry || "Not set"}
-            </p>
-            <p>
-              <strong>Business type:</strong> {state.business_type}
-            </p>
-            <p>
-              <strong>Brand story:</strong> {state.brand_story || "Missing"}
-            </p>
-            <p>
-              <strong>Product customizable:</strong> {state.product_customizable ? "Yes" : "No"}
-            </p>
-            <p>
-              <strong>Business model:</strong> {state.business_model || "Missing"}
-            </p>
-            <p>
-              <strong>Funnel position:</strong> {state.funnel_position || "Missing"}
-            </p>
-            <p>
-              <strong>Target platforms:</strong> {parseListInput(state.target_platforms).join(", ") || "Missing"}
-            </p>
-            <p>
-              <strong>Target regions:</strong> {parseListInput(state.target_regions).join(", ") || "Missing"}
-            </p>
-            <p>
-              <strong>Existing proof assets:</strong> {parseListInput(state.existing_proof_assets).join(", ") || "Missing"}
-            </p>
-            <p>
-              <strong>Brand voice notes:</strong> {state.brand_voice_notes || "Missing"}
-            </p>
-            {state.compliance_notes ? (
-              <p>
-                <strong>Compliance notes:</strong> {state.compliance_notes}
-              </p>
-            ) : null}
-            <p>
-              <strong>Products:</strong> {state.products.length ? state.products.length : "Missing"}
-            </p>
-            {state.products[0]?.product_name ? (
-              <>
-                <p>
-                  <strong>Product name:</strong> {state.products[0].product_name}
-                </p>
-                <p>
-                  <strong>Description:</strong> {state.products[0].product_description || "Missing"}
-                </p>
-                <p>
-                  <strong>Price:</strong> {state.products[0].price || "Missing"}
-                </p>
-                <p>
-                  <strong>Product type:</strong> {state.products[0].product_type || "Missing"}
-                </p>
-                {state.products[0].product_category ? (
-                  <p>
-                    <strong>Category:</strong> {state.products[0].product_category}
-                  </p>
-                ) : null}
-                {state.products[0].primary_benefits ? (
-                  <p>
-                    <strong>Primary benefits:</strong> {state.products[0].primary_benefits}
-                  </p>
-                ) : null}
-                {state.products[0].feature_bullets ? (
-                  <p>
-                    <strong>Feature bullets:</strong> {state.products[0].feature_bullets}
-                  </p>
-                ) : null}
-                {state.products[0].guarantee_text ? (
-                  <p>
-                    <strong>Guarantee:</strong> {state.products[0].guarantee_text}
-                  </p>
-                ) : null}
-                {state.products[0].disclaimers ? (
-                  <p>
-                    <strong>Disclaimers:</strong> {state.products[0].disclaimers}
-                  </p>
-                ) : null}
-                {state.products[0].goals ? (
-                  <p>
-                    <strong>Goals:</strong> {state.products[0].goals}
-                  </p>
-                ) : null}
-                {state.products[0].competitor_urls ? (
-                  <p className="whitespace-pre-line">
-                    <strong>Competitor URLs:</strong> {state.products[0].competitor_urls}
-                  </p>
-                ) : null}
-                <p>
-                  <strong>Primary image:</strong> {state.products[0].primary_image_file?.name || "Missing"}
-                </p>
-              </>
-            ) : null}
-            {state.funnel_notes ? (
-              <p>
-                <strong>Funnel notes:</strong> {state.funnel_notes}
-              </p>
-            ) : null}
-          </div>
+        <div className="space-y-4">
+          <ReviewSection
+            title="Your Brand"
+            onEdit={() => setStepIndex(0)}
+            items={[
+              { label: "Business name", value: state.client_name || clientName || "Not set" },
+              { label: "Business stage", value: state.business_type === "new" ? "New business" : "Existing business" },
+              {
+                label: "How you sell",
+                value: complianceBusinessModelOptions.find((o) => o.value === state.business_model)?.label || "Not set",
+              },
+              { label: "Brand story", value: state.brand_story || "Not set", multiline: true },
+            ]}
+          />
+
+          <ReviewSection
+            title="Your Product"
+            onEdit={() => setStepIndex(1)}
+            items={[
+              { label: "Product name", value: state.products[0]?.product_name || "Not set" },
+              { label: "Type", value: state.products[0]?.product_type || "Not set" },
+              { label: "Price", value: state.products[0]?.price || "Not set" },
+              { label: "Description", value: state.products[0]?.product_description || "Not set", multiline: true },
+              ...(state.products[0]?.product_category
+                ? [{ label: "Category", value: state.products[0].product_category }]
+                : []),
+              ...(state.products[0]?.competitor_urls
+                ? [{ label: "Competitor websites", value: state.products[0].competitor_urls, multiline: true }]
+                : []),
+            ]}
+          />
+
+          <ReviewSection
+            title="Audience & Channels"
+            onEdit={() => setStepIndex(2)}
+            items={[
+              { label: "Targeting", value: state.funnel_position || "Not set" },
+              { label: "Platforms", value: parseListInput(state.target_platforms).join(", ") || "Not set" },
+              { label: "Regions", value: parseListInput(state.target_regions).join(", ") || "Not set" },
+            ]}
+          />
+
+          <ReviewSection
+            title="Creative Direction"
+            onEdit={() => setStepIndex(3)}
+            items={[
+              { label: "Brand voice", value: state.brand_voice_notes || "Not set", multiline: true },
+              { label: "Social proof", value: parseListInput(state.existing_proof_assets).join(", ") || "Not set" },
+              { label: "Product changeable", value: state.product_customizable ? "Yes" : "No" },
+              ...(state.compliance_notes
+                ? [{ label: "Compliance constraints", value: state.compliance_notes, multiline: true }]
+                : []),
+            ]}
+          />
         </div>
       )}
     </FormRoot>
   );
 
+  /* ------ Layout ------ */
+
   const content = (
     <div className={isPage ? "flex h-full flex-col gap-4" : "flex flex-col gap-4"}>
       {!isPage ? (
         <>
-          <DialogTitle>Workspace onboarding</DialogTitle>
-          <DialogDescription>Create the workspace and capture onboarding details in one flow.</DialogDescription>
-          <Progress value={progress} />
+          <DialogTitle>Set up your workspace</DialogTitle>
+          <DialogDescription>We'll collect a few details and then handle research and strategy generation for you.</DialogDescription>
+          {stepIndicator}
         </>
       ) : (
         <div className="space-y-3">
           <div className="text-sm font-semibold text-content">Onboarding flow</div>
-          <Progress value={progress} />
-          <p className="text-sm text-content-muted">We’ll set up the workspace and start the first workflow automatically.</p>
+          {stepIndicator}
+          <p className="text-sm text-content-muted">We'll set up your workspace and start the first workflow automatically.</p>
         </div>
       )}
 
-      {stepHeader}
+      {stepDescription}
 
       {isPage ? (
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">{form}</div>
@@ -1144,7 +1123,7 @@ export function OnboardingWizard({
           variant="secondary"
           size="sm"
           onClick={goPrev}
-          disabled={stepIndex === 0 || isSubmitting || (currentStep.key === "product" && isProductEditorOpen)}
+          disabled={stepIndex === 0 || navigationBlocked}
         >
           Back
         </Button>
@@ -1152,13 +1131,13 @@ export function OnboardingWizard({
           <Button
             size="sm"
             onClick={goNext}
-            disabled={!canNext || isSubmitting || (currentStep.key === "product" && isProductEditorOpen)}
+            disabled={!canNext || navigationBlocked}
           >
             Next
           </Button>
         ) : (
           <Button size="sm" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Starting…" : "Start onboarding"}
+            {isSubmitting ? "Starting..." : "Launch onboarding"}
           </Button>
         )}
       </div>
