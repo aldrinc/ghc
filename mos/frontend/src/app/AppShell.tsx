@@ -66,6 +66,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useJourneyPhase } from "@/hooks/useJourneyPhase";
+import { GATE_LABELS, GATE_SEQUENCE } from "@/components/workflows/StrategyGateProgress";
 
 type NavItem = {
   title: string;
@@ -89,7 +91,7 @@ const WORKSPACE_NAV: NavSection = {
   label: "Workspace",
   items: [
     { title: "Overview", path: "/workspaces/overview", icon: LayoutDashboard },
-    { title: "Workflows", path: "/strategy", icon: ListChecks },
+    { title: "Strategy", path: "/strategy", icon: ListChecks },
     { title: "Brand", path: "/workspaces/brand", icon: Settings2 },
     { title: "Commerce", path: "/commerce", icon: ShoppingBag },
     { title: "Products", path: "/workspaces/products", icon: Package },
@@ -125,7 +127,43 @@ const AI_NAV: NavSection = {
   items: [{ title: "Assistant Chat", path: "/claude-chat", icon: MessageSquare }],
 };
 
-function NavigationMenu({ label, items }: NavSection) {
+function JourneyIndicator() {
+  const journey = useJourneyPhase();
+
+  if (journey.phase === "no-workspace" || journey.phase === "idle") return null;
+
+  let text = "";
+  let dotColor = "";
+
+  if (journey.phase === "onboarding-running") {
+    text = "Setting up...";
+    dotColor = "bg-warning";
+  } else if (journey.phase === "strategy-processing") {
+    text = "Strategy processing...";
+    dotColor = "bg-warning";
+  } else if (journey.phase === "strategy-needs-input") {
+    const signal = GATE_SEQUENCE[journey.gateIndex];
+    text = signal ? `Strategy — ${GATE_LABELS[signal]}` : "Strategy — input needed";
+    dotColor = "bg-accent";
+  } else if (journey.phase === "strategy-complete") {
+    text = "Strategy complete — ready to launch";
+    dotColor = "bg-success";
+  } else if (journey.phase === "campaigns-active") {
+    text = `${journey.count} campaign${journey.count === 1 ? "" : "s"} active`;
+    dotColor = "bg-success";
+  }
+
+  if (!text) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-content-muted">
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)} />
+      <span className="truncate">{text}</span>
+    </div>
+  );
+}
+
+function NavigationMenu({ label, items, strategyNeedsInput }: NavSection & { strategyNeedsInput?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { setOpenMobile } = useSidebar();
@@ -178,6 +216,7 @@ function NavigationMenu({ label, items }: NavSection) {
       <SidebarMenu>
         {parsedItems.map(({ item }) => {
           const isActive = item.path === activeItemPath;
+          const showDot = strategyNeedsInput && item.path === "/strategy";
 
           return (
             <SidebarMenuItem key={item.path}>
@@ -190,7 +229,12 @@ function NavigationMenu({ label, items }: NavSection) {
                   setOpenMobile(false);
                 }}
               >
-                <item.icon className="size-4" />
+                <div className="relative">
+                  <item.icon className="size-4" />
+                  {showDot ? (
+                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent animate-pulse" />
+                  ) : null}
+                </div>
                 <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -217,6 +261,8 @@ export function AppShell() {
     error: workspaceError,
   } = useWorkspace();
   const { product, products, selectProduct, isLoading: isLoadingProducts } = useProductContext();
+  const journey = useJourneyPhase();
+  const strategyNeedsInput = journey.phase === "strategy-needs-input";
 
   const activeRoute = useMemo(
     () => appRoutes.find((route) => location.pathname.startsWith(route.path)),
@@ -370,10 +416,11 @@ export function AppShell() {
               </DropdownMenu>
             </SidebarMenuItem>
           </SidebarMenu>
+          <JourneyIndicator />
         </SidebarHeader>
 
         <SidebarContent>
-          <NavigationMenu {...WORKSPACE_NAV} />
+          <NavigationMenu {...WORKSPACE_NAV} strategyNeedsInput={strategyNeedsInput} />
           <NavigationMenu {...RESEARCH_NAV} />
           <NavigationMenu {...EXECUTION_NAV} />
           <NavigationMenu {...AI_NAV} />

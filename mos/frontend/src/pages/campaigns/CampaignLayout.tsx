@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -84,6 +84,7 @@ function CampaignLayoutInner({ campaignId }: { campaignId: string }) {
 
   const workspaceName = ctx?.workspaceName;
   const campaignProductLabel = ctx?.campaignProductLabel;
+  const strategyLaunch = ctx?.campaignLaunches?.find((l) => l.angle_run_id);
   const productMismatch =
     Boolean(campaign.product_id) && Boolean(product?.id) && campaign.product_id !== product?.id;
   const productMissing = Boolean(campaign.product_id) && !product?.id;
@@ -115,6 +116,15 @@ function CampaignLayoutInner({ campaignId }: { campaignId: string }) {
           <span className="text-[10px]">copy</span>
         </button>
       </PageHeader>
+
+      {strategyLaunch?.angle_run_id ? (
+        <div className="text-xs text-content-muted">
+          From strategy:{" "}
+          <Link to={`/strategy/${strategyLaunch.angle_run_id}`} className="text-accent hover:underline">
+            {strategyLaunch.angle_id ? `Angle ${strategyLaunch.angle_id.slice(0, 8)}...` : "View strategy"}
+          </Link>
+        </div>
+      ) : null}
 
       {ctx ? (
         <PipelineStepperSection campaignId={campaignId} />

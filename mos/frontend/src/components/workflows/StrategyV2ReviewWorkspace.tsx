@@ -8,6 +8,7 @@ import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { ActivityLog, ResearchArtifactRef, StrategyV2State } from "@/types/common";
+import { GATE_LABELS, GATE_DESCRIPTIONS, GATE_EXPLANATIONS, GATE_SEQUENCE, StrategyGateProgress } from "./StrategyGateProgress";
 
 export type StrategyV2PendingSignal =
   | "strategy_v2_proceed_research"
@@ -65,15 +66,6 @@ type FileRuntimeState = {
   error: string;
 };
 
-const GATE_SEQUENCE: StrategyV2PendingSignal[] = [
-  "strategy_v2_proceed_research",
-  "strategy_v2_confirm_competitor_assets",
-  "strategy_v2_select_angle",
-  "strategy_v2_select_ump_ums",
-  "strategy_v2_select_offer_winner",
-  "strategy_v2_approve_final_copy",
-];
-
 const FOUNDATIONAL_DOC_SPECS = [
   {
     stepSuffix: "01",
@@ -107,12 +99,12 @@ function strategyV2SignalPath(signal: StrategyV2PendingSignal): string {
 }
 
 function strategyV2SignalLabel(signal: StrategyV2PendingSignal): string {
-  if (signal === "strategy_v2_proceed_research") return "Proceed Research";
-  if (signal === "strategy_v2_confirm_competitor_assets") return "Confirm Competitor Assets";
-  if (signal === "strategy_v2_select_angle") return "Select Angle";
-  if (signal === "strategy_v2_select_ump_ums") return "Select UMP/UMS";
-  if (signal === "strategy_v2_select_offer_winner") return "Select Offer Winner";
-  return "Approve Final Copy";
+  if (signal === "strategy_v2_proceed_research") return "Review Research";
+  if (signal === "strategy_v2_confirm_competitor_assets") return "Select Competitors";
+  if (signal === "strategy_v2_select_angle") return "Choose Angle";
+  if (signal === "strategy_v2_select_ump_ums") return "Choose Messaging";
+  if (signal === "strategy_v2_select_offer_winner") return "Select Offer";
+  return "Approve Copy";
 }
 
 function formatReceiptDate(value?: string): string {
@@ -1087,62 +1079,34 @@ export function StrategyV2ReviewWorkspace({
   return (
     <div className="mt-3 space-y-4">
       {pendingSignal ? (
-        <Callout variant="warning" title={`Decision needed: ${strategyV2SignalLabel(pendingSignal)}`}>
-          Review the available files if helpful, then send the decision.
+        <Callout variant="warning" title={GATE_LABELS[pendingSignal]}>
+          {GATE_EXPLANATIONS[pendingSignal]}
+        </Callout>
+      ) : runStatus === "running" ? (
+        <Callout variant="neutral" title="Processing">
+          The system is working on automatic stages. We'll pause here when a decision is needed.
         </Callout>
       ) : (
-        <Callout variant="neutral" title="No pending Strategy V2 gate">
-          The workflow is running automatic stages or has completed all human checkpoints. Foundational docs remain
-          available below when persisted for this run.
+        <Callout variant="neutral" title="All gates complete">
+          All human checkpoints have been completed. Foundational docs remain available below.
         </Callout>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <div className="space-y-2">
-          {GATE_SEQUENCE.map((gate, index) => {
-            const status = index < completedGateCount ? "completed" : index === pendingGateIndex ? "current" : "upcoming";
-            const isSelected = gate === selectedCompletedGate;
-            return (
-              <button
-                key={gate}
-                type="button"
-                className={cn(
-                  "ds-card ds-card--sm w-full text-left",
-                  status === "upcoming" ? "bg-surface-2 opacity-70 cursor-default" : "bg-surface-2 hover:bg-hover",
-                  isSelected ? "ring-1 ring-accent" : "",
-                )}
-                onClick={() => {
-                  if (status === "upcoming") return;
-                  setActiveFileId(null);
-                  if (status === "completed") {
-                    setSelectedCompletedGate(gate);
-                    return;
-                  }
-                  setSelectedCompletedGate(null);
-                }}
-                disabled={status === "upcoming"}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold text-content">Step {index + 1}</div>
-                    <div className="text-xs text-content-muted">{strategyV2SignalLabel(gate)}</div>
-                  </div>
-                  <Badge tone={status === "completed" ? "success" : status === "current" ? "accent" : "neutral"}>
-                    {status === "completed" ? "Completed" : status === "current" ? "Current" : "Upcoming"}
-                  </Badge>
-                </div>
-              </button>
-            );
-          })}
-
-          <Button
-            variant="secondary"
-            size="xs"
-            className="w-full"
-            onClick={() => setShowAllArtifacts((value) => !value)}
-          >
-            {showAllArtifacts ? "Hide all artifacts" : "All artifacts"}
-          </Button>
+          <StrategyGateProgress
+            completedGateCount={completedGateCount}
+            pendingGateIndex={pendingGateIndex}
+            selectedCompletedGate={selectedCompletedGate}
+            onGateClick={(gate, status) => {
+              setActiveFileId(null);
+              if (status === "completed") {
+                setSelectedCompletedGate(gate);
+                return;
+              }
+              setSelectedCompletedGate(null);
+            }}
+          />
         </div>
 
         <div className="space-y-4">
@@ -1171,7 +1135,7 @@ export function StrategyV2ReviewWorkspace({
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
                 <div>
                   <div className="text-sm font-semibold text-content">
-                    Decision receipt: {strategyV2SignalLabel(selectedCompletedGate as StrategyV2PendingSignal)}
+                    Decision receipt: {GATE_LABELS[selectedCompletedGate as StrategyV2PendingSignal]}
                   </div>
                   <div className="text-xs text-content-muted">Read-only audit view for completed gate submission.</div>
                 </div>
@@ -1325,12 +1289,15 @@ export function StrategyV2ReviewWorkspace({
               ) : null}
             </div>
           ) : (
-            <>
-              <div className="ds-card ds-card--md space-y-3">
-                <div>
-                  <div className="text-sm font-semibold text-content">Required files</div>
-                  <div className="text-xs text-content-muted">
-                    Open each file in the center reader and mark it reviewed before submission.
+            <div className="ds-card ds-card--md space-y-0 p-0">
+              {/* Section 1: Review Materials */}
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-content">Step 1: Review materials</div>
+                    <div className="text-xs text-content-muted">
+                      {requiredFiles.filter((f) => getFileRuntime(f.id).reviewed).length} of {requiredFiles.length} reviewed
+                    </div>
                   </div>
                 </div>
 
@@ -1384,19 +1351,21 @@ export function StrategyV2ReviewWorkspace({
                     );
                   })}
                 </div>
+
+                {reviewChecklistItems.length > 0 && (
+                  <div className="text-[11px] text-content-muted space-y-0.5">
+                    {reviewChecklistItems.map((item) => (
+                      <div key={item}>• {item}</div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="ds-card ds-card--md">
-                <div className="text-sm font-semibold text-content">Review checklist</div>
-                <div className="mt-2 space-y-1 text-xs text-content-muted">
-                  {reviewChecklistItems.map((item) => (
-                    <div key={item}>• {item}</div>
-                  ))}
-                </div>
-              </div>
+              <div className="border-t border-border" />
 
-              <div className="ds-card ds-card--md space-y-3">
-                <div className="text-sm font-semibold text-content">Decide</div>
+              {/* Section 2: Make Your Decision */}
+              <div className="p-4 space-y-3">
+                <div className="text-sm font-semibold text-content">Step 2: Make your decision</div>
 
                 {pendingSignal === "strategy_v2_proceed_research" ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -1587,8 +1556,11 @@ export function StrategyV2ReviewWorkspace({
                 ) : null}
               </div>
 
-              <div className="ds-card ds-card--md space-y-3">
-                <div className="text-sm font-semibold text-content">Submit decision</div>
+              <div className="border-t border-border" />
+
+              {/* Section 3: Submit */}
+              <div className="p-4 space-y-3">
+                <div className="text-sm font-semibold text-content">Step 3: Confirm and submit</div>
 
                 <div>
                   <div className="text-xs text-content-muted mb-1">Operator note (optional)</div>
@@ -1620,11 +1592,11 @@ export function StrategyV2ReviewWorkspace({
 
                 <div className="flex justify-end">
                   <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
-                    {isSubmitting ? "Sending..." : `Send ${strategyV2SignalLabel(pendingSignal)}`}
+                    {isSubmitting ? "Submitting..." : "Submit decision"}
                   </Button>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -170,24 +170,34 @@ export function CampaignOverviewTab() {
           {campaignStrategyV2LaunchesLoading ? <Badge tone="accent">Loading</Badge> : null}
         </div>
         {campaignAngleIdentity ? (
-          <div className="mt-3 grid gap-2 text-sm text-content md:grid-cols-2">
-            <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
-              <div className="text-xs text-content-muted">Angle ID</div>
-              <div className="font-mono">{campaignAngleIdentity.angle_id}</div>
+          <>
+            <div className="mt-3 grid gap-2 text-sm text-content md:grid-cols-2">
+              <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                <div className="text-xs text-content-muted">Angle ID</div>
+                <div className="font-mono">{campaignAngleIdentity.angle_id}</div>
+              </div>
+              <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                <div className="text-xs text-content-muted">Angle run ID</div>
+                <div className="font-mono">{campaignAngleIdentity.angle_run_id}</div>
+              </div>
+              <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                <div className="text-xs text-content-muted">Launch type</div>
+                <div>{campaignAngleIdentity.launch_type}</div>
+              </div>
+              <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                <div className="text-xs text-content-muted">Latest UMS group</div>
+                <div>{campaignAngleIdentity.selected_ums_id}</div>
+              </div>
             </div>
-            <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
-              <div className="text-xs text-content-muted">Angle run ID</div>
-              <div className="font-mono">{campaignAngleIdentity.angle_run_id}</div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
-              <div className="text-xs text-content-muted">Launch type</div>
-              <div>{campaignAngleIdentity.launch_type}</div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
-              <div className="text-xs text-content-muted">Latest UMS group</div>
-              <div>{campaignAngleIdentity.selected_ums_id}</div>
-            </div>
-          </div>
+            {campaignAngleIdentity.angle_run_id ? (
+              <Link
+                to={`/strategy/${campaignAngleIdentity.angle_run_id}`}
+                className="mt-2 inline-block text-xs text-accent hover:underline"
+              >
+                Open source strategy run &rarr;
+              </Link>
+            ) : null}
+          </>
         ) : (
           <div className="mt-3 text-sm text-content-muted">
             No Strategy V2 launch lineage found for this campaign yet.

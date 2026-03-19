@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
 import { StrategyV2ReviewWorkspace } from "@/components/workflows/StrategyV2ReviewWorkspace";
+import { GATE_LABELS, GATE_SEQUENCE } from "@/components/workflows/StrategyGateProgress";
+import { StrategyCompleteSummary } from "@/components/workflows/StrategyCompleteSummary";
+import { LaunchConfigCard } from "@/components/workflows/LaunchConfigCard";
+import { LaunchHubView } from "@/components/workflows/LaunchHubView";
 import { useAssets } from "@/api/assets";
 import { useClientShopifyStatus } from "@/api/clients";
 import {
@@ -345,6 +350,7 @@ export function WorkflowDetailPage() {
     [strategyV2Candidates]
   );
 
+  const [activeTab, setActiveTab] = useState<string>("review");
   const [launchStepUnlocked, setLaunchStepUnlocked] = useState(false);
   const [launchActionError, setLaunchActionError] = useState<string | null>(null);
   const [latestLaunchResponse, setLatestLaunchResponse] = useState<StrategyV2LaunchActionResponse | null>(null);
@@ -479,6 +485,15 @@ export function WorkflowDetailPage() {
     }, 15000);
     return () => window.clearInterval(interval);
   }, [run?.status, refetch]);
+
+  useEffect(() => {
+    if (!isStrategyV2) return;
+    if (strategyV2PendingSignal) {
+      setActiveTab("review");
+    } else if (strategyV2LaunchReady) {
+      setActiveTab("launch");
+    }
+  }, [isStrategyV2, strategyV2PendingSignal, strategyV2LaunchReady]);
   const handleApproveExperiments = () => {
     workflowSignal.mutate({
       signal: "approve-experiments",
@@ -627,11 +642,27 @@ export function WorkflowDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Workflow detail"
+        title={
+          isStrategyV2
+            ? strategyV2LaunchReady
+              ? strategyV2Launches.length
+                ? "Strategy Hub"
+                : "Strategy Complete"
+              : "Strategy Review"
+            : "Workflow detail"
+        }
         description={
-          runProduct?.title
-            ? `Inspect research artifacts for ${runProduct.title}.`
-            : "Inspect research artifacts and unblock any required gates."
+          isStrategyV2
+            ? strategyV2LaunchReady
+              ? strategyV2Launches.length
+                ? `${strategyV2Launches.length} campaign${strategyV2Launches.length === 1 ? "" : "s"} launched. Launch more angles or iterations.`
+                : "All decisions made. Ready to launch."
+              : strategyV2PendingSignal
+                ? `Gate ${GATE_SEQUENCE.indexOf(strategyV2PendingSignal) + 1} of 6: ${GATE_LABELS[strategyV2PendingSignal]}`
+                : "Processing \u2014 we'll pause when a decision is needed."
+            : runProduct?.title
+              ? `Inspect research artifacts for ${runProduct.title}.`
+              : "Inspect research artifacts and unblock any required gates."
         }
         actions={
           <Menu>
@@ -701,628 +732,449 @@ export function WorkflowDetailPage() {
               </>
             </Callout>
           ) : null}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="ds-card ds-card--md shadow-none">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-content">Run overview</div>
-                  <div className="text-xs text-content-muted">ID: <span className="font-mono">{run.id}</span></div>
-                </div>
-                <StatusBadge status={run.status} />
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-content">
-                <div>
-                  <div className="text-content-muted">Kind</div>
-                  <div className="font-semibold">{run.kind}</div>
-                </div>
-                <div>
-                  <div className="text-content-muted">Workspace</div>
-                  <div className="font-mono text-[11px] text-content-muted">{run.client_id || "—"}</div>
-                </div>
-                <div>
-                  <div className="text-content-muted">Product</div>
-                  <div className="font-mono text-[11px] text-content-muted">
-                    {runProduct?.title || run.product_id || "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-content-muted">Started</div>
-                  <div>{formatDate(run.started_at)}</div>
-                </div>
-                <div>
-                  <div className="text-content-muted">Finished</div>
-                  <div>{run.finished_at ? formatDate(run.finished_at) : "—"}</div>
-                </div>
-              </div>
-              {canonStory ? (
-                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs">
-                  <div className="mb-1 font-semibold text-content">Canon story</div>
-                  <p className="text-content-muted">{truncate(canonStory, 220)}</p>
-                </div>
-              ) : null}
-            </div>
+          {isStrategyV2 ? (
+            <>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="review">Review</TabsTrigger>
+                  <TabsTrigger value="outputs">Outputs</TabsTrigger>
+                  <TabsTrigger value="launch" disabled={!strategyV2LaunchReady && run?.status !== "completed"}>
+                    Launch {strategyV2LaunchReady ? "" : `(${6 - (GATE_SEQUENCE.indexOf(strategyV2PendingSignal!) + 1 || 0)} gates left)`}
+                  </TabsTrigger>
+                </TabsList>
 
-            <div className="ds-card ds-card--md shadow-none">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-content">Review & gates</div>
-                  <div className="text-xs text-content-muted">
-                    {isOnboarding
-                      ? "Onboarding is automatic and does not require approvals."
-                      : isStrategyV2
-                        ? "Strategy V2 requires explicit HITL decisions at each manual checkpoint."
-                      : isCreativeProduction
-                        ? "Creative production waits for asset approvals."
-                        : isCampaignPlanning
-                          ? "Campaign planning waits for experiment approvals."
-                          : "This workflow type has no manual gates."}
-                  </div>
-                </div>
-              </div>
-              {isOnboarding ? (
-                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
-                  No action required. This run will proceed automatically as activities complete.
-                </div>
-              ) : isStrategyV2 ? (
-                <StrategyV2ReviewWorkspace
-                  workflowId={workflowId}
-                  runStatus={run.status}
-                  pendingSignal={strategyV2PendingSignal}
-                  pendingPayload={strategyV2PendingPayload}
-                  strategyState={strategyV2State}
-                  candidates={strategyV2Candidates}
-                  candidateIds={strategyCandidateIds}
-                  researchArtifacts={researchArtifacts}
-                  stepSummaries={stepSummaries}
-                  logs={data?.logs || []}
-                  disabled={approvalsDisabled}
-                  isSubmitting={workflowSignal.isPending}
-                  onSubmitSignal={handleStrategyV2SubmitSignal}
-                />
-              ) : isCampaignPlanning ? (
-                <div className="mt-3 space-y-3 text-sm">
-                  {experimentSpecs.length ? (
-                    <>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-content-muted">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                            checked={allExperimentsSelected}
-                            onChange={toggleAllExperiments}
-                          />
-                          <span>Select all</span>
-                        </label>
-                        <span>{selectedExperimentIds.length} selected</span>
-                      </div>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleApproveExperiments}
-                        disabled={approvalsDisabled || workflowSignal.isPending || selectedExperimentIds.length === 0}
-                      >
-                        {workflowSignal.isPending ? "Sending…" : "Approve selected experiments"}
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
-                      No experiment specs available yet.
-                    </div>
-                  )}
-                  {approvalsDisabled ? (
-                    <div className="text-xs text-content-muted">Approvals disabled because the run is not active.</div>
+                <TabsContent value="review">
+                  {strategyV2LaunchReady && run?.status === "completed" ? (
+                    <StrategyCompleteSummary
+                      selectedAngleName={selectedAngleName}
+                      selectedUmpName={String(strategyV2Stage3Data.ump || "")}
+                      selectedUmsName={String(strategyV2Stage3Data.ums || "")}
+                      selectedVariantName={String(strategyV2OfferData.variant_selected || "")}
+                      copyApproved={hasStrategyV2Copy}
+                      onLaunchClick={() => setActiveTab("launch")}
+                      hasLaunches={strategyV2Launches.length > 0}
+                    />
                   ) : null}
-                </div>
-              ) : isCreativeProduction ? (
-                <div className="mt-3 space-y-2 text-sm">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleApproveAssets}
-                    disabled={
-                      approvalsDisabled ||
-                      workflowSignal.isPending ||
-                      (approvedAssetIds.size === 0 && rejectedAssetIds.size === 0)
-                    }
-                  >
-                    {workflowSignal.isPending ? "Sending…" : "Send asset approvals"}
-                  </Button>
-                  <div className="text-xs text-content-muted">
-                    {approvedAssetIds.size} approved · {rejectedAssetIds.size} rejected
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
-                  This workflow type has no manual gates.
-                </div>
-              )}
-            </div>
-          </div>
+                  <StrategyV2ReviewWorkspace
+                    workflowId={workflowId}
+                    runStatus={run.status}
+                    pendingSignal={strategyV2PendingSignal}
+                    pendingPayload={strategyV2PendingPayload}
+                    strategyState={strategyV2State}
+                    candidates={strategyV2Candidates}
+                    candidateIds={strategyCandidateIds}
+                    researchArtifacts={researchArtifacts}
+                    stepSummaries={stepSummaries}
+                    logs={data?.logs || []}
+                    disabled={approvalsDisabled}
+                    isSubmitting={workflowSignal.isPending}
+                    onSubmitSignal={handleStrategyV2SubmitSignal}
+                  />
+                </TabsContent>
 
-          {data?.pending_activity_progress?.length ? (
-            <div className="ds-card ds-card--md p-0 shadow-none">
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div>
-                  <div className="text-sm font-semibold text-content">Pending activity progress</div>
-                  <div className="text-xs text-content-muted">Temporal heartbeat snapshots for active activities.</div>
-                </div>
-              </div>
-              <div className="space-y-2 p-4 text-xs text-content">
-                {data.pending_activity_progress.map((row) => (
-                  <div key={`${row.activity_id}-${row.attempt || 0}`} className="ds-card ds-card--sm bg-surface-2">
-                    <div className="font-semibold text-content">{row.activity_type || row.activity_id}</div>
-                    <div className="mt-1 text-content-muted">
-                      State: {row.state || "—"} · Attempt: {row.attempt || 0} · Last heartbeat:{" "}
-                      {formatDate(row.last_heartbeat_time || null)}
+                <TabsContent value="outputs">
+                  <div className="space-y-4">
+                    <div className="ds-card ds-card--md p-0 shadow-none">
+                      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                        <div>
+                          <div className="text-sm font-semibold text-content">Strategy V2 outputs</div>
+                          <div className="text-xs text-content-muted">Canonical stage, offer, copy, and context artifacts.</div>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 p-4 md:grid-cols-2 text-xs text-content">
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="font-semibold text-content">Stage 3</div>
+                          <div className="mt-1 text-content-muted">
+                            Angle: {String((strategyV2Stage3Data.selected_angle as any)?.angle_name || "—")}
+                          </div>
+                          <div className="text-content-muted">UMP: {String(strategyV2Stage3Data.ump || "—")}</div>
+                          <div className="text-content-muted">UMS: {String(strategyV2Stage3Data.ums || "—")}</div>
+                        </div>
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="font-semibold text-content">Offer</div>
+                          <div className="mt-1 text-content-muted">
+                            Winner: {String((strategyV2OfferData.variant_selected as string) || "—")}
+                          </div>
+                          <div className="text-content-muted">
+                            Composite score: {String(strategyV2OfferData.composite_score || "—")}
+                          </div>
+                          <div className="text-content-muted">
+                            Guarantee: {String(strategyV2OfferData.guarantee_type || "—")}
+                          </div>
+                        </div>
+                        <div className="ds-card ds-card--sm bg-surface-2 md:col-span-2">
+                          <div className="font-semibold text-content">Copy (canonical)</div>
+                          <div className="mt-1 text-content-muted">
+                            Headline: {String(strategyV2CopyCanonical.headline || "—")}
+                          </div>
+                          <div className="text-content-muted">
+                            Presell length: {String(String(strategyV2CopyCanonical.presell_markdown || "").length || 0)} chars
+                          </div>
+                          <div className="text-content-muted">
+                            Sales length: {String(String(strategyV2CopyCanonical.sales_page_markdown || "").length || 0)} chars
+                          </div>
+                        </div>
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="font-semibold text-content">Awareness matrix</div>
+                          <div className="mt-1 text-content-muted">
+                            Angle name: {String(strategyV2AwarenessData.angle_name || "—")}
+                          </div>
+                        </div>
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="font-semibold text-content">Copy context</div>
+                          <div className="mt-1 text-content-muted">
+                            Context keys: {Object.keys(strategyV2CopyContextData || {}).length}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {row.heartbeat_progress ? (
-                      <div className="mt-1 text-content-muted">
-                        Heartbeat: {truncate(JSON.stringify(row.heartbeat_progress), 200)}
+
+                    {researchArtifacts?.length ? (
+                      <div className="ds-card ds-card--md p-0 shadow-none">
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                          <div>
+                            <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
+                            <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <Table variant="ghost">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHeadCell>Step</TableHeadCell>
+                                <TableHeadCell>Summary</TableHeadCell>
+                                <TableHeadCell>Document</TableHeadCell>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {researchArtifacts.map((art) => {
+                                const summary = art.summary || stepSummaries[art.step_key];
+                                return (
+                                  <TableRow key={art.doc_id}>
+                                    <TableCell className="font-semibold text-content">Step {art.step_key}</TableCell>
+                                    <TableCell className="text-sm text-content-muted">{truncate(summary, 120)}</TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                      <Link to={`/strategy/${workflowId}/research/${art.step_key}`} className="text-sm">
+                                        <Button variant="secondary" size="xs">View</Button>
+                                      </Link>
+                                      {isExternalDocUrl(art.doc_url) ? (
+                                        <a href={art.doc_url} target="_blank" rel="noreferrer" className="text-primary underline text-xs">
+                                          Open doc
+                                        </a>
+                                      ) : null}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     ) : null}
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+                </TabsContent>
 
-          {researchArtifacts?.length ? (
-            <div className="ds-card ds-card--md p-0 shadow-none">
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div>
-                  <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
-                  <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <Table variant="ghost">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHeadCell>Step</TableHeadCell>
-                      <TableHeadCell>Summary</TableHeadCell>
-                      <TableHeadCell>Document</TableHeadCell>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {researchArtifacts.map((art) => {
-                      const summary = art.summary || stepSummaries[art.step_key];
-                      return (
-                        <TableRow key={art.doc_id}>
-                          <TableCell className="font-semibold text-content">Step {art.step_key}</TableCell>
-                          <TableCell className="text-sm text-content-muted">{truncate(summary, 120)}</TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Link to={`/strategy/${workflowId}/research/${art.step_key}`} className="text-sm">
-                              <Button variant="secondary" size="xs">View</Button>
-                            </Link>
-                            {isExternalDocUrl(art.doc_url) ? (
-                              <a href={art.doc_url} target="_blank" rel="noreferrer" className="text-primary underline text-xs">
-                                Open doc
-                              </a>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          ) : null}
+                <TabsContent value="launch">
+                  <div className="space-y-4">
+                    {!strategyV2Launches.length ? (
+                      <LaunchConfigCard
+                        selectedAngleName={selectedAngleName}
+                        isShopifyReady={isShopifyLaunchReady}
+                        shopifyBlockedReason={shopifyLaunchBlockedReason}
+                        isLaunching={anyLaunchPending}
+                        onLaunch={async (config) => {
+                          setLaunchActionError(null);
+                          try {
+                            const response = await launchAngleCampaign.mutateAsync(config);
+                            setLatestLaunchResponse(response);
+                          } catch (error) {
+                            setLaunchActionError(toErrorMessage(error));
+                          }
+                        }}
+                        onRefreshShopify={() => void refetchShopifyStatus()}
+                        isLoadingShopify={isLoadingShopifyStatus}
+                        productId={run?.product_id || undefined}
+                        latestLaunchResponse={latestLaunchResponse}
+                        launchError={launchActionError}
+                      />
+                    ) : (
+                      <LaunchHubView
+                        launches={strategyV2Launches}
+                        angleOptions={additionalAngleOptions}
+                        launchedAngleIds={new Set(strategyV2Launches.filter((l) => l.launch_type === "initial_angle" || l.launch_type === "additional_angle").map((l) => l.angle_id))}
+                        umsOptions={additionalUmsOptions}
+                        launchedUmsIds={new Set(strategyV2Launches.filter((l) => l.launch_type === "additional_ums" && l.selected_ums_id).map((l) => l.selected_ums_id!))}
+                        defaultCampaignId={additionalUmsCampaignId}
+                        isShopifyReady={isShopifyLaunchReady}
+                        shopifyBlockedReason={shopifyLaunchBlockedReason}
+                        onLaunchAdditionalAngles={async (config) => {
+                          setLaunchActionError(null);
+                          try {
+                            const response = await launchAdditionalAngle.mutateAsync({
+                              selectedAngleIds: config.selectedAngleIds,
+                              channels: config.channels,
+                              assetBriefTypes: config.assetBriefTypes,
+                            });
+                            setLatestLaunchResponse(response);
+                          } catch (error) {
+                            setLaunchActionError(toErrorMessage(error));
+                          }
+                        }}
+                        onLaunchAdditionalUms={async (config) => {
+                          setLaunchActionError(null);
+                          try {
+                            const response = await launchAdditionalUms.mutateAsync(config);
+                            setLatestLaunchResponse(response);
+                          } catch (error) {
+                            setLaunchActionError(toErrorMessage(error));
+                          }
+                        }}
+                        isLaunching={anyLaunchPending}
+                        launchError={launchActionError}
+                        latestLaunchResponse={latestLaunchResponse}
+                      />
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
 
-          {isStrategyV2 ? (
-            <div className="ds-card ds-card--md p-0 shadow-none">
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div>
-                  <div className="text-sm font-semibold text-content">Strategy V2 outputs</div>
-                  <div className="text-xs text-content-muted">Canonical stage, offer, copy, and context artifacts.</div>
-                </div>
-              </div>
-              <div className="grid gap-3 p-4 md:grid-cols-2 text-xs text-content">
-                <div className="ds-card ds-card--sm bg-surface-2">
-                  <div className="font-semibold text-content">Stage 3</div>
-                  <div className="mt-1 text-content-muted">
-                    Angle: {String((strategyV2Stage3Data.selected_angle as any)?.angle_name || "—")}
+              <details className="ds-card ds-card--md shadow-none">
+                <summary className="text-sm font-semibold text-content cursor-pointer">
+                  Run details
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-content">
+                  <div>
+                    <div className="text-content-muted">Status</div>
+                    <div className="font-semibold"><StatusBadge status={run.status} /></div>
                   </div>
-                  <div className="text-content-muted">UMP: {String(strategyV2Stage3Data.ump || "—")}</div>
-                  <div className="text-content-muted">UMS: {String(strategyV2Stage3Data.ums || "—")}</div>
-                </div>
-                <div className="ds-card ds-card--sm bg-surface-2">
-                  <div className="font-semibold text-content">Offer</div>
-                  <div className="mt-1 text-content-muted">
-                    Winner: {String((strategyV2OfferData.variant_selected as string) || "—")}
+                  <div>
+                    <div className="text-content-muted">ID</div>
+                    <div className="font-mono text-[11px] text-content-muted">{run.id}</div>
                   </div>
-                  <div className="text-content-muted">
-                    Composite score: {String(strategyV2OfferData.composite_score || "—")}
+                  <div>
+                    <div className="text-content-muted">Kind</div>
+                    <div className="font-semibold">{run.kind}</div>
                   </div>
-                  <div className="text-content-muted">
-                    Guarantee: {String(strategyV2OfferData.guarantee_type || "—")}
+                  <div>
+                    <div className="text-content-muted">Workspace</div>
+                    <div className="font-mono text-[11px] text-content-muted">{run.client_id || "—"}</div>
                   </div>
-                </div>
-                <div className="ds-card ds-card--sm bg-surface-2 md:col-span-2">
-                  <div className="font-semibold text-content">Copy (canonical)</div>
-                  <div className="mt-1 text-content-muted">
-                    Headline: {String(strategyV2CopyCanonical.headline || "—")}
+                  <div>
+                    <div className="text-content-muted">Product</div>
+                    <div className="font-mono text-[11px] text-content-muted">
+                      {runProduct?.title || run.product_id || "—"}
+                    </div>
                   </div>
-                  <div className="text-content-muted">
-                    Presell length: {String(String(strategyV2CopyCanonical.presell_markdown || "").length || 0)} chars
+                  <div>
+                    <div className="text-content-muted">Started</div>
+                    <div>{formatDate(run.started_at)}</div>
                   </div>
-                  <div className="text-content-muted">
-                    Sales length: {String(String(strategyV2CopyCanonical.sales_page_markdown || "").length || 0)} chars
+                  <div>
+                    <div className="text-content-muted">Finished</div>
+                    <div>{run.finished_at ? formatDate(run.finished_at) : "—"}</div>
                   </div>
                 </div>
-                <div className="ds-card ds-card--sm bg-surface-2">
-                  <div className="font-semibold text-content">Awareness matrix</div>
-                  <div className="mt-1 text-content-muted">
-                    Angle name: {String(strategyV2AwarenessData.angle_name || "—")}
+                {canonStory ? (
+                  <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs">
+                    <div className="mb-1 font-semibold text-content">Canon story</div>
+                    <p className="text-content-muted">{truncate(canonStory, 220)}</p>
                   </div>
-                </div>
-                <div className="ds-card ds-card--sm bg-surface-2">
-                  <div className="font-semibold text-content">Copy context</div>
-                  <div className="mt-1 text-content-muted">
-                    Context keys: {Object.keys(strategyV2CopyContextData || {}).length}
+                ) : null}
+              </details>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="ds-card ds-card--md shadow-none">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Run overview</div>
+                      <div className="text-xs text-content-muted">ID: <span className="font-mono">{run.id}</span></div>
+                    </div>
+                    <StatusBadge status={run.status} />
                   </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-content">
+                    <div>
+                      <div className="text-content-muted">Kind</div>
+                      <div className="font-semibold">{run.kind}</div>
+                    </div>
+                    <div>
+                      <div className="text-content-muted">Workspace</div>
+                      <div className="font-mono text-[11px] text-content-muted">{run.client_id || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-content-muted">Product</div>
+                      <div className="font-mono text-[11px] text-content-muted">
+                        {runProduct?.title || run.product_id || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-content-muted">Started</div>
+                      <div>{formatDate(run.started_at)}</div>
+                    </div>
+                    <div>
+                      <div className="text-content-muted">Finished</div>
+                      <div>{run.finished_at ? formatDate(run.finished_at) : "—"}</div>
+                    </div>
+                  </div>
+                  {canonStory ? (
+                    <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs">
+                      <div className="mb-1 font-semibold text-content">Canon story</div>
+                      <p className="text-content-muted">{truncate(canonStory, 220)}</p>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            </div>
-          ) : null}
 
-          {isStrategyV2 ? (
-            <div className="ds-card ds-card--md p-0 shadow-none">
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div>
-                  <div className="text-sm font-semibold text-content">Strategy V2 launch actions</div>
-                  <div className="text-xs text-content-muted">
-                    Launch campaigns and funnel iterations from the approved Strategy V2 copy branch.
+                <div className="ds-card ds-card--md shadow-none">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Review & gates</div>
+                      <div className="text-xs text-content-muted">
+                        {isOnboarding
+                          ? "Onboarding is automatic and does not require approvals."
+                          : isCreativeProduction
+                            ? "Creative production waits for asset approvals."
+                            : isCampaignPlanning
+                              ? "Campaign planning waits for experiment approvals."
+                              : "This workflow type has no manual gates."}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="space-y-4 p-4 text-xs text-content">
-                {strategyV2LaunchReady ? (
-                  launchStepUnlocked ? (
-                    <>
-                      <Callout
-                        variant={isShopifyLaunchReady ? "success" : "warning"}
-                        title="Step 2: Verify Shopify connection"
-                        actions={
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="secondary"
-                              size="xs"
-                              onClick={() => void refetchShopifyStatus()}
-                              disabled={isLoadingShopifyStatus || anyLaunchPending}
-                            >
-                              {isLoadingShopifyStatus ? "Checking…" : "Refresh status"}
-                            </Button>
-                            {run?.product_id ? (
-                              <Link
-                                to={`/workspaces/products/${run.product_id}`}
-                                className={buttonClasses({ variant: "secondary", size: "xs" })}
-                              >
-                                Open product setup
-                              </Link>
-                            ) : null}
+                  {isOnboarding ? (
+                    <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
+                      No action required. This run will proceed automatically as activities complete.
+                    </div>
+                  ) : isCampaignPlanning ? (
+                    <div className="mt-3 space-y-3 text-sm">
+                      {experimentSpecs.length ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-content-muted">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                checked={allExperimentsSelected}
+                                onChange={toggleAllExperiments}
+                              />
+                              <span>Select all</span>
+                            </label>
+                            <span>{selectedExperimentIds.length} selected</span>
                           </div>
-                        }
-                      >
-                        {isShopifyLaunchReady
-                          ? `Shopify ready${shopifyStatus?.shopDomain ? ` (${shopifyStatus.shopDomain})` : ""}. Launch actions can run.`
-                          : shopifyLaunchBlockedReason || "Shopify must be connected and ready before launching."}
-                      </Callout>
-
-                      <Callout
-                        variant="success"
-                        title="Launch setup unlocked"
-                        actions={
                           <Button
-                            variant="secondary"
-                            size="xs"
-                            onClick={() => setLaunchStepUnlocked(false)}
-                            disabled={anyLaunchPending}
+                            variant="primary"
+                            size="sm"
+                            onClick={handleApproveExperiments}
+                            disabled={approvalsDisabled || workflowSignal.isPending || selectedExperimentIds.length === 0}
                           >
-                            Lock
+                            {workflowSignal.isPending ? "Sending…" : "Approve selected experiments"}
                           </Button>
+                        </>
+                      ) : (
+                        <div className="ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
+                          No experiment specs available yet.
+                        </div>
+                      )}
+                      {approvalsDisabled ? (
+                        <div className="text-xs text-content-muted">Approvals disabled because the run is not active.</div>
+                      ) : null}
+                    </div>
+                  ) : isCreativeProduction ? (
+                    <div className="mt-3 space-y-2 text-sm">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleApproveAssets}
+                        disabled={
+                          approvalsDisabled ||
+                          workflowSignal.isPending ||
+                          (approvedAssetIds.size === 0 && rejectedAssetIds.size === 0)
                         }
                       >
-                        Copy is approved and this run is complete. Configure launch actions below.
-                      </Callout>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="ds-card ds-card--sm bg-surface-2">
-                          <div className="text-xs font-semibold text-content">Launch inputs</div>
-                          <div className="mt-2 space-y-2">
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">channels (newline or comma separated)</div>
-                              <textarea
-                                rows={3}
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={launchChannelsInput}
-                                onChange={(event) => setLaunchChannelsInput(event.target.value)}
-                                placeholder={"facebook\ninstagram"}
-                              />
-                            </label>
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">assetBriefTypes</div>
-                              <div className="flex flex-wrap gap-3 rounded-md border border-border bg-surface px-2 py-2 text-xs">
-                                {ASSET_BRIEF_TYPE_OPTIONS.map((option) => (
-                                  <label key={option.value} className="flex items-center gap-2 text-content">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                                      checked={launchAssetBriefTypes.includes(option.value)}
-                                      onChange={() => toggleLaunchAssetBriefType(option.value)}
-                                    />
-                                    <span>{option.label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                              {!launchAssetBriefTypes.length ? (
-                                <div className="mt-1 text-[11px] text-danger">
-                                  Select at least one supported creative brief type.
-                                </div>
-                              ) : null}
-                            </label>
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">experimentVariantPolicy</div>
-                              <input
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={launchExperimentPolicy}
-                                onChange={(event) => setLaunchExperimentPolicy(event.target.value)}
-                                placeholder="angle_launch_standard_v1"
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="ds-card ds-card--sm bg-surface-2">
-                          <div className="text-xs font-semibold text-content">Initial angle launch</div>
-                          <div className="mt-1 text-[11px] text-content-muted">
-                            Creates campaign + strategy/brief artifacts + pre-sales/sales funnel for selected angle.
-                          </div>
-                          <div className="mt-2 text-[11px] text-content-muted">
-                            Selected angle: {selectedAngleName || "—"}
-                          </div>
-                          <div className="mt-2">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => void handleLaunchAngleCampaign()}
-                              disabled={anyLaunchPending || !isShopifyLaunchReady}
-                            >
-                              {launchAngleCampaign.isPending ? "Launching…" : "Launch angle campaign"}
-                            </Button>
-                          </div>
-                        </div>
+                        {workflowSignal.isPending ? "Sending…" : "Send asset approvals"}
+                      </Button>
+                      <div className="text-xs text-content-muted">
+                        {approvedAssetIds.size} approved · {rejectedAssetIds.size} rejected
                       </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="ds-card ds-card--sm bg-surface-2">
-                          <div className="text-xs font-semibold text-content">Additional UMS launch (same campaign)</div>
-                          <div className="mt-1 text-[11px] text-content-muted">
-                            Creates one funnel per selected UMS under an existing angle campaign.
-                          </div>
-                          <div className="mt-2 space-y-2">
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">campaignId</div>
-                              <input
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={additionalUmsCampaignId}
-                                onChange={(event) => setAdditionalUmsCampaignId(event.target.value)}
-                                placeholder="Campaign UUID"
-                              />
-                            </label>
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">launchNamePrefix</div>
-                              <input
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={additionalUmsLaunchPrefix}
-                                onChange={(event) => setAdditionalUmsLaunchPrefix(event.target.value)}
-                                placeholder="Angle iteration"
-                              />
-                            </label>
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">channels override (optional)</div>
-                              <textarea
-                                rows={2}
-                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
-                                value={additionalUmsChannelsOverrideInput}
-                                onChange={(event) => setAdditionalUmsChannelsOverrideInput(event.target.value)}
-                                placeholder="leave empty to inherit campaign"
-                              />
-                            </label>
-                            <label className="block">
-                              <div className="mb-1 text-[11px] text-content-muted">assetBriefTypes override (optional)</div>
-                              <div className="flex flex-wrap gap-3 rounded-md border border-border bg-surface px-2 py-2 text-xs">
-                                {ASSET_BRIEF_TYPE_OPTIONS.map((option) => (
-                                  <label key={option.value} className="flex items-center gap-2 text-content">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                                      checked={additionalUmsAssetBriefTypesOverride.includes(option.value)}
-                                      onChange={() => toggleAdditionalUmsAssetBriefTypeOverride(option.value)}
-                                    />
-                                    <span>{option.label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                              <div className="mt-1 text-[11px] text-content-muted">
-                                Leave all unchecked to inherit the campaign setting.
-                              </div>
-                            </label>
-                            {additionalUmsOptions.length ? (
-                              <div className="space-y-1 rounded-md border border-border bg-surface p-2">
-                                <div className="text-[11px] font-semibold text-content">UMS selections</div>
-                                {additionalUmsOptions.map((option) => (
-                                  <label key={option.id} className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                                      checked={selectedAdditionalUmsIds.includes(option.id)}
-                                      onChange={() => toggleAdditionalUmsSelection(option.id)}
-                                    />
-                                    <span>{option.label}</span>
-                                    <span className="font-mono text-[11px] text-content-muted">{option.id}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[11px] text-content-muted">No UMS candidates available in state.</div>
-                            )}
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => void handleLaunchAdditionalUms()}
-                              disabled={anyLaunchPending || !isShopifyLaunchReady}
-                            >
-                              {launchAdditionalUms.isPending ? "Launching…" : "Launch additional UMS funnels"}
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="ds-card ds-card--sm bg-surface-2">
-                          <div className="text-xs font-semibold text-content">Additional angle launch (new campaigns)</div>
-                          <div className="mt-1 text-[11px] text-content-muted">
-                            Replays angle branch and launches selected angles into separate campaigns.
-                          </div>
-                          <div className="mt-2 space-y-2">
-                            {additionalAngleOptions.length ? (
-                              <div className="space-y-1 rounded-md border border-border bg-surface p-2">
-                                <div className="text-[11px] font-semibold text-content">Angle selections</div>
-                                {additionalAngleOptions.map((option) => (
-                                  <label key={option.id} className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
-                                      checked={selectedAdditionalAngleIds.includes(option.id)}
-                                      onChange={() => toggleAdditionalAngleSelection(option.id)}
-                                    />
-                                    <span>{option.label}</span>
-                                    <span className="font-mono text-[11px] text-content-muted">{option.id}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[11px] text-content-muted">No additional angle candidates available in state.</div>
-                            )}
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => void handleLaunchAdditionalAngle()}
-                              disabled={anyLaunchPending || !isShopifyLaunchReady}
-                            >
-                              {launchAdditionalAngle.isPending ? "Launching…" : "Launch additional angles"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <Callout
-                      variant="warning"
-                      title="Step 1: Proceed to launch setup"
-                      actions={
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => setLaunchStepUnlocked(true)}
-                        >
-                          Proceed to launch setup
-                        </Button>
-                      }
-                    >
-                      Copy is generated and approved. Click to proceed before running launch actions.
-                    </Callout>
-                  )
-                ) : (
-                  <Callout variant="neutral" title="Launch actions are blocked">
-                    {strategyV2LaunchBlockedReason || "This workflow is not ready for launch actions yet."}
-                  </Callout>
-                )}
-
-                {launchActionError ? (
-                  <Callout variant="danger" title="Launch request failed">
-                    {launchActionError}
-                  </Callout>
-                ) : null}
-
-                {latestLaunchResponse ? (
-                  <Callout variant="success" title="Launch workflow started">
-                    Launch workflow run:{" "}
-                    <Link
-                      to={`/strategy/${latestLaunchResponse.launch_workflow_run_id}`}
-                      className="font-mono underline"
-                    >
-                      {latestLaunchResponse.launch_workflow_run_id}
-                    </Link>
-                  </Callout>
-                ) : null}
-
-                <div className="border-t border-border pt-3">
-                  <div className="text-xs font-semibold text-content">Launch history</div>
-                  {strategyV2Launches.length ? (
-                    <div className="mt-2 overflow-x-auto">
-                      <Table variant="ghost">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHeadCell>Type</TableHeadCell>
-                            <TableHeadCell>Campaign</TableHeadCell>
-                            <TableHeadCell>Funnel</TableHeadCell>
-                            <TableHeadCell>Angle / UMS</TableHeadCell>
-                            <TableHeadCell>Status</TableHeadCell>
-                            <TableHeadCell>Created</TableHeadCell>
-                            <TableHeadCell>Workflow</TableHeadCell>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {strategyV2Launches.map((row) => (
-                            <TableRow key={row.id}>
-                              <TableCell>{formatLaunchType(row.launch_type)}</TableCell>
-                              <TableCell>
-                                {row.campaign_id ? (
-                                  <Link to={`/campaigns/${row.campaign_id}`} className="font-mono underline">
-                                    {row.campaign_id}
-                                  </Link>
-                                ) : (
-                                  "—"
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {row.funnel_id ? (
-                                  <Link to={`/research/funnels/${row.funnel_id}`} className="font-mono underline">
-                                    {row.funnel_id}
-                                  </Link>
-                                ) : (
-                                  "—"
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div className="text-[11px] text-content-muted">angle={row.angle_id}</div>
-                                <div className="text-[11px] text-content-muted">
-                                  ums={row.selected_ums_id || "primary"}
-                                </div>
-                              </TableCell>
-                              <TableCell>{row.launch_status || "—"}</TableCell>
-                              <TableCell>{formatDate(row.created_at)}</TableCell>
-                              <TableCell>
-                                {row.launch_workflow_run_id ? (
-                                  <Link to={`/strategy/${row.launch_workflow_run_id}`} className="font-mono underline">
-                                    {row.launch_workflow_run_id}
-                                  </Link>
-                                ) : (
-                                  "—"
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
                     </div>
                   ) : (
-                    <div className="mt-2 text-[11px] text-content-muted">No launch history yet.</div>
+                    <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
+                      This workflow type has no manual gates.
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          ) : null}
+
+              {data?.pending_activity_progress?.length ? (
+                <div className="ds-card ds-card--md p-0 shadow-none">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Pending activity progress</div>
+                      <div className="text-xs text-content-muted">Temporal heartbeat snapshots for active activities.</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 p-4 text-xs text-content">
+                    {data.pending_activity_progress.map((row) => (
+                      <div key={`${row.activity_id}-${row.attempt || 0}`} className="ds-card ds-card--sm bg-surface-2">
+                        <div className="font-semibold text-content">{row.activity_type || row.activity_id}</div>
+                        <div className="mt-1 text-content-muted">
+                          State: {row.state || "—"} · Attempt: {row.attempt || 0} · Last heartbeat:{" "}
+                          {formatDate(row.last_heartbeat_time || null)}
+                        </div>
+                        {row.heartbeat_progress ? (
+                          <div className="mt-1 text-content-muted">
+                            Heartbeat: {truncate(JSON.stringify(row.heartbeat_progress), 200)}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {researchArtifacts?.length ? (
+                <div className="ds-card ds-card--md p-0 shadow-none">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
+                      <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table variant="ghost">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHeadCell>Step</TableHeadCell>
+                          <TableHeadCell>Summary</TableHeadCell>
+                          <TableHeadCell>Document</TableHeadCell>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {researchArtifacts.map((art) => {
+                          const summary = art.summary || stepSummaries[art.step_key];
+                          return (
+                            <TableRow key={art.doc_id}>
+                              <TableCell className="font-semibold text-content">Step {art.step_key}</TableCell>
+                              <TableCell className="text-sm text-content-muted">{truncate(summary, 120)}</TableCell>
+                              <TableCell className="text-right space-x-2">
+                                <Link to={`/strategy/${workflowId}/research/${art.step_key}`} className="text-sm">
+                                  <Button variant="secondary" size="xs">View</Button>
+                                </Link>
+                                {isExternalDocUrl(art.doc_url) ? (
+                                  <a href={art.doc_url} target="_blank" rel="noreferrer" className="text-primary underline text-xs">
+                                    Open doc
+                                  </a>
+                                ) : null}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
 
           {isCampaignPlanning && experimentSpecs.length ? (
             <div className="ds-card ds-card--md p-0 shadow-none">

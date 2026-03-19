@@ -7,7 +7,7 @@ export const appRoutes: AppRoute[] = [
   { path: "/workspaces/overview", label: "Workspace Overview" },
   { path: "/workspaces/brand", label: "Brand Settings" },
   { path: "/workspaces/products", label: "Products" },
-  { path: "/strategy", label: "Workflows" },
+  { path: "/strategy", label: "Strategy" },
   { path: "/campaigns", label: "Campaigns" },
   { path: "/commerce", label: "Commerce" },
   { path: "/research/documents", label: "Documents" },
