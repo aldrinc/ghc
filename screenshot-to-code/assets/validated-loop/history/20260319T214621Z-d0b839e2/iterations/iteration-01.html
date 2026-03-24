@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ease - Healthcare System</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            dark: '#113b29',
+                            light: '#c2e0c6',
+                        },
+                        bg: {
+                            white: '#ffffff',
+                            offwhite: '#f9faf9',
+                            muted: '#b8cdd0',
+                        },
+                        text: {
+                            main: '#1a1a1a',
+                            muted: '#6b7280',
+                        },
+                        border: {
+                            light: '#e5e7eb'
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['Newsreader', 'Georgia', 'serif'],
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    transitionTimingFunction: {
+                        'spring': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        'expo': 'cubic-bezier(0.16, 1, 0.3, 1)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- GSAP for complex scroll animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        /* Custom Utilities to supplement Tailwind */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .nav-blur {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* SVG Line drawing */
+        .scroll-path {
+            fill: none;
+            stroke: var(--color-primary-dark, #113b29);
+            stroke-width: 2px;
+            stroke-linecap: round;
+        }
+
+        /* Hero UI Card base styles */
+        .ui-skeleton-line {
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body class="font-sans text-text-main bg-bg-offwhite antialiased selection:bg-primary-light selection:text-primary-dark">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 nav-blur bg-bg-white/70 border-b border-border-light/50">
+        <div class="max-w-[1440px] mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
+            <!-- Logo -->
+            <a href="#" class="font-serif text-3xl text-primary-dark font-medium tracking-tight">Ease</a>
+            
+            <!-- Desktop Nav -->
+            <nav class="hidden lg:flex items-center gap-8">
+                <a href="#" class="text-sm font-medium hover:text-primary-dark transition-colors">About</a>
+                <a href="#" class="text-sm font-medium hover:text-primary-dark transition-colors">Case Studies</a>
+                
+                <!-- Dropdown: Resources -->
+                <div class="group relative py-8 cursor-pointer">
+                    <span class="text-sm font-medium group-hover:text-primary-dark transition-colors flex items-center gap-1">
+                        Resources
+                        <svg class="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </span>
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 w-[400px] bg-white rounded-xl shadow-2xl p-6 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300">
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Content</h4>
+                                <ul class="space-y-2">
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Blog</a></li>
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Case Studies</a></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Learn</h4>
+                                <ul class="space-y-2">
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Glossary</a></li>
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Help Center</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dropdown: What We Offer -->
+                <div class="group relative py-8 cursor-pointer">
+                    <span class="text-sm font-medium group-hover:text-primary-dark transition-colors flex items-center gap-1">
+                        What We Offer
+                        <svg class="w-3 h-3 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </span>
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 w-[600px] bg-white rounded-xl shadow-2xl p-6 opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300">
+                        <div class="grid grid-cols-3 gap-6">
+                            <div>
+                                <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">CRM</h4>
+                                <ul class="space-y-2">
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Intake</a></li>
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Referrals</a></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">EHR</h4>
+                                <ul class="space-y-2">
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Clinical Notes</a></li>
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Scheduling</a></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">RCM</h4>
+                                <ul class="space-y-2">
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Billing</a></li>
+                                    <li><a href="#" class="text-sm hover:text-primary-dark block py-1">Reporting</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- CTA -->
+            <a href="#" class="hidden lg:inline-flex items-center justify-center bg-primary-dark text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-opacity-90 transition-all">
+                Book a Demo
+            </a>
+            
+            <!-- Mobile Menu Button (visual only for template) -->
+            <button class="lg:hidden p-2 text-primary-dark">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="pt-24 pb-12">
+        <!-- HERO SECTION -->
+        <section class="max-w-[1440px] mx-auto px-4 lg:px-8 mb-24">
+            <div class="flex flex-col lg:flex-row gap-6 min-h-[600px]">
+                
+                <!-- Left Column (Copy) -->
+                <div class="flex-1 bg-primary-light rounded-[2rem] p-8 lg:p-16 flex flex-col justify-center items-start">
+                    <h1 class="font-serif text-5xl lg:text-7xl leading-[1.1] text-primary-dark mb-6">
+                        Fewer clicks. <br>More care.
+                    </h1>
+                    <p class="text-lg lg:text-xl text-primary-dark/80 max-w-md mb-10 leading-relaxed">
+                        Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.
+                    </p>
+                    <a href="#" class="group inline-flex items-center gap-3 bg-primary-dark text-white px-8 py-4 rounded-full text-base font-medium hover:bg-opacity-90 transition-all">
+                        Request a Demo
+                        <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </a>
+                </div>
+
+                <!-- Right Column (Animated UI Mockup) -->
+                <div class="flex-1 bg-bg-muted rounded-[2rem] p-8 lg:p-12 relative overflow-hidden flex flex-col items-center">
+                    
+                    <!-- Stage Labels -->
+                    <div class="flex gap-4 relative z-10 w-full max-w-[400px] justify-between mb-12">
+                        <!-- Animated pill background -->
+                        <div id="hero-pill" class="absolute left-0 top-1/2 -translate-y-1/2 bg-white/60 backdrop-blur-sm rounded-full h-10 w-[30%] transition-transform duration-700 ease-spring"></div>
+                        
+                        <div class="flex-1 text-center py-2 text-sm font-semibold tracking-wide text-primary-dark z-10 cursor-default">CRM</div>
+                        <div class="flex-1 text-center py-2 text-sm font-semibold tracking-wide text-primary-dark z-10 cursor-default">EHR</div>
+                        <div class="flex-1 text-center py-2 text-sm font-semibold tracking-wide text-primary-dark z-10 cursor-default">RCM</div>
+                    </div>
+
+                    <!-- The Animated Card Container -->
+                    <div class="relative w-full max-w-[400px] h-[350px]">
+                        <!-- The Card Itself -->
+                        <div id="hero-card" class="absolute top-0 left-0 w-[80%] bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-700 ease-spring border border-border-light/50 h-[200px]">
+                            
+                            <!-- State 1: CRM (Intake profile) -->
+                            <div id="card-state-crm" class="absolute inset-0 p-6 transition-opacity duration-300 opacity-100 flex flex-col">
+                                <div class="flex items-center gap-4 mb-6">
+                                    <div class="w-12 h-12 rounded-full bg-primary-light/50 flex items-center justify-center text-primary-dark font-serif text-xl">JD</div>
+                                    <div>
+                                        <div class="text-sm font-semibold">Jane Doe</div>
+                                        <div class="text-xs text-text-muted">New Referral</div>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="ui-skeleton-line w-full"></div>
+                                    <div class="ui-skeleton-line w-4/5"></div>
+                                    <div class="ui-skeleton-line w-2/3"></div>
+                                </div>
+                            </div>
+
+                            <!-- State 2: EHR (Clinical Notes / Form) -->
+                            <div id="card-state-ehr" class="absolute inset-0 p-6 transition-opacity duration-300 opacity-0 flex flex-col">
+                                <div class="text-sm font-semibold mb-4 pb-2 border-b border-border-light">Assessment Notes</div>
+                                <div class="flex-1 bg-bg-offwhite rounded-lg p-3 border border-border-light mb-4">
+                                    <div class="ui-skeleton-line w-full h-2"></div>
+                                    <div class="ui-skeleton-line w-full h-2"></div>
+                                    <div class="ui-skeleton-line w-3/4 h-2"></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="h-8 flex-1 bg-primary-light/30 rounded-md"></div>
+                                    <div class="h-8 flex-1 bg-primary-dark rounded-md"></div>
+                                </div>
+                            </div>
+
+                            <!-- State 3: RCM (Billing / Graph) -->
+                            <div id="card-state-rcm" class="absolute inset-0 p-6 transition-opacity duration-300 opacity-0 flex flex-col items-center justify-center">
+                                <div class="text-xs text-text-muted mb-1 uppercase tracking-widest">Collected</div>
+                                <div class="font-serif text-4xl text-primary-dark mb-6">$12,450</div>
+                                <!-- Simple CSS Bar Chart -->
+                                <div class="flex items-end gap-2 h-20 w-full px-4">
+                                    <div class="flex-1 bg-bg-muted rounded-t-sm h-[40%]"></div>
+                                    <div class="flex-1 bg-primary-light rounded-t-sm h-[70%]"></div>
+                                    <div class="flex-1 bg-primary-dark rounded-t-sm h-[100%]"></div>
+                                    <div class="flex-1 bg-bg-muted rounded-t-sm h-[60%]"></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LOGO CLOUD -->
+        <section class="max-w-[1000px] mx-auto px-6 mb-32 text-center">
+            <p class="text-xs font-semibold text-text-muted uppercase tracking-widest mb-8">Backed by leading investors</p>
+            <div class="flex flex-wrap justify-center items-center gap-8 lg:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                <!-- Placeholder SVGs for Logos -->
+                <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">a16z</text></svg>
+                <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">Abstract</text></svg>
+                <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">Maven</text></svg>
+                <svg class="h-6" viewBox="0 0 120 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">BoxGroup</text></svg>
+                <svg class="h-6" viewBox="0 0 60 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">F3</text></svg>
+                <svg class="h-6" viewBox="0 0 120 30" fill="currentColor"><text x="0" y="20" font-family="Inter" font-weight="bold" font-size="20">Sunflower</text></svg>
+            </div>
+        </section>
+
+        <!-- CAPABILITIES STICKY SCROLL SECTION -->
+        <!-- We use a very tall container to allow scrolling, with right column sticky -->
+        <section class="max-w-[1440px] mx-auto px-4 lg:px-8 mb-32 relative flex flex-col lg:flex-row items-start gap-12 lg:gap-24">
+            
+            <!-- Left Column (Scrolling List) -->
+            <div class="flex-1 w-full lg:w-1/2 pt-[20vh] pb-[40vh] space-y-[40vh]" id="capabilities-list">
+                <!-- Items. JS will toggle opacity based on scroll position -->
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">Eating Disorder</h2>
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">Detox</h2>
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">SUD</h2>
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">Residential</h2>
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">PHP</h2>
+                <h2 class="cap-item text-4xl lg:text-6xl font-serif text-primary-dark opacity-20 transition-opacity duration-500 text-left lg:text-right">MAT</h2>
+            </div>
+
+            <!-- Right Column (Sticky) -->
+            <div class="flex-1 w-full lg:w-1/2 lg:sticky top-[20vh] h-auto lg:h-[60vh] flex flex-col justify-center pb-24 lg:pb-0">
+                <div class="bg-white rounded-3xl p-8 lg:p-12 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-border-light/40">
+                    <span class="inline-block px-3 py-1 bg-bg-muted/30 text-text-muted text-xs font-semibold rounded-md uppercase tracking-wider mb-6">Broad Clinical Support</span>
+                    <h3 class="font-serif text-3xl lg:text-4xl text-primary-dark mb-10 leading-tight">Built for the complexity of behavioral health.</h3>
+                    
+                    <div class="grid grid-cols-2 gap-8">
+                        <div>
+                            <div class="font-serif text-4xl lg:text-5xl text-primary-dark mb-2">3x</div>
+                            <div class="text-sm text-text-muted leading-relaxed">Faster intake processing times on average.</div>
+                        </div>
+                        <div>
+                            <div class="font-serif text-4xl lg:text-5xl text-primary-dark mb-2">98%</div>
+                            <div class="text-sm text-text-muted leading-relaxed">Clean claim rate leading to faster payouts.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROBLEM & SOLUTION CONTINUOUS ANIMATION SECTION -->
+        <!-- Wrapped in a relative container to house the absolutely positioned SVG that spans both -->
+        <div id="prob-sol-container" class="relative w-full overflow-hidden">
+            
+            <!-- The SVG Canvas for the drawing lines -->
+            <svg id="line-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-10" preserveAspectRatio="none">
+                <!-- Paths will be generated via JS to fit container dynamically -->
+            </svg>
+
+            <!-- 1. The Problem Section -->
+            <section id="problem-section" class="w-full bg-white py-32 lg:py-48 relative z-20">
+                <div class="max-w-[800px] mx-auto px-6 lg:ml-[40%] text-left">
+                    <span class="inline-block px-3 py-1 bg-bg-offwhite text-text-muted text-xs font-semibold rounded-md uppercase tracking-wider mb-8 border border-border-light">The Problem</span>
+                    <p class="font-serif text-3xl lg:text-5xl text-text-main leading-tight">
+                        Fragmented CRM, EHR, and RCM systems are inefficient. They slow intake, burden staff, and hide revenue leakage.
+                    </p>
+                </div>
+            </section>
+
+            <!-- 2. The Solution Section -->
+            <section id="solution-section" class="w-full bg-primary-light py-32 lg:py-48 relative z-0">
+                <div class="max-w-[800px] mx-auto px-6 lg:ml-[40%] text-left relative z-20">
+                    <span class="inline-block px-3 py-1 bg-white/50 text-primary-dark text-xs font-semibold rounded-md uppercase tracking-wider mb-8">The Solution</span>
+                    <p class="font-serif text-3xl lg:text-5xl text-primary-dark leading-tight">
+                        Instead of bouncing between CRM, EHR, and RCM systems, Ease provides one AI-powered system for referrals, clinical notes, and billing.
+                    </p>
+                </div>
+            </section>
+        </div>
+
+        <!-- BENEFITS CARDS SECTION -->
+        <section class="max-w-[1440px] mx-auto px-6 lg:px-8 py-32 bg-bg-offwhite">
+            <div class="mb-16">
+                <span class="inline-block px-3 py-1 bg-white text-text-muted text-xs font-semibold rounded-md uppercase tracking-wider mb-6 border border-border-light">Why Ease</span>
+                <h2 class="font-serif text-4xl lg:text-5xl text-primary-dark max-w-2xl leading-tight">A super-powered system, working together.</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8" id="benefits-grid">
+                
+                <!-- Card 1 -->
+                <div class="benefit-card opacity-0 translate-y-8 bg-white p-8 lg:p-10 rounded-3xl shadow-sm border border-border-light/40 transition-all duration-300 hover:shadow-xl">
+                    <div class="w-12 h-12 bg-primary-light/40 rounded-xl flex items-center justify-center mb-8 text-primary-dark">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    </div>
+                    <h3 class="font-serif text-2xl text-primary-dark mb-4">See everything in one place.</h3>
+                    <p class="text-text-muted leading-relaxed text-sm lg:text-base">Consolidate tools, reduce spend, and gain unified reporting without painful integrations.</p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="benefit-card opacity-0 translate-y-8 bg-white p-8 lg:p-10 rounded-3xl shadow-sm border border-border-light/40 transition-all duration-300 hover:shadow-xl">
+                    <div class="w-12 h-12 bg-primary-light/40 rounded-xl flex items-center justify-center mb-8 text-primary-dark">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    </div>
+                    <h3 class="font-serif text-2xl text-primary-dark mb-4">Get more done, more easily.</h3>
+                    <p class="text-text-muted leading-relaxed text-sm lg:text-base">AI support helps admins, clinicians, supervisors, and billers complete important tasks in less time.</p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="benefit-card opacity-0 translate-y-8 bg-white p-8 lg:p-10 rounded-3xl shadow-sm border border-border-light/40 transition-all duration-300 hover:shadow-xl">
+                    <div class="w-12 h-12 bg-primary-light/40 rounded-xl flex items-center justify-center mb-8 text-primary-dark">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    </div>
+                    <h3 class="font-serif text-2xl text-primary-dark mb-4">Scale with confidence.</h3>
+                    <p class="text-text-muted leading-relaxed text-sm lg:text-base">Built on a secure, HIPAA-compliant infrastructure designed to grow alongside your expanding practice.</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER (Basic) -->
+    <footer class="bg-primary-dark text-white py-12 text-center">
+        <p class="text-sm opacity-60 font-serif">&copy; 2024 Ease Healthcare Systems. All rights reserved.</p>
+    </footer>
+
+    <!-- SCRIPTS FOR ANIMATIONS -->
+    <script>
+        // Ensure GSAP plugins are registered
+        gsap.registerPlugin(ScrollTrigger);
+
+        // --- 1. HERO UI CARD ANIMATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const states = ['crm', 'ehr', 'rcm'];
+            let currentStateIndex = 0;
+            
+            const card = document.getElementById('hero-card');
+            const pill = document.getElementById('hero-pill');
+            
+            const contents = {
+                crm: document.getElementById('card-state-crm'),
+                ehr: document.getElementById('card-state-ehr'),
+                rcm: document.getElementById('card-state-rcm')
+            };
+
+            function updateHeroState() {
+                const state = states[currentStateIndex];
+                
+                // 1. Move pill (width 30%, gap layout)
+                // Appx percentages to align under text: 2%, 35%, 68%
+                if(state === 'crm') pill.style.transform = 'translateX(5%)';
+                if(state === 'ehr') pill.style.transform = 'translateX(115%)';
+                if(state === 'rcm') pill.style.transform = 'translateX(225%)';
+
+                // 2. Move & Resize Card
+                // Left offsets
+                if(state === 'crm') { card.style.left = '0%'; card.style.height = '200px'; }
+                if(state === 'ehr') { card.style.left = '10%'; card.style.height = '240px'; }
+                if(state === 'rcm') { card.style.left = '20%'; card.style.height = '220px'; }
+
+                // 3. Fade Content
+                Object.keys(contents).forEach(key => {
+                    if(key === state) {
+                        contents[key].style.opacity = '1';
+                        contents[key].style.pointerEvents = 'auto';
+                    } else {
+                        contents[key].style.opacity = '0';
+                        contents[key].style.pointerEvents = 'none';
+                    }
+                });
+
+                // Loop
+                currentStateIndex = (currentStateIndex + 1) % states.length;
+            }
+
+            // Init and set interval
+            updateHeroState();
+            setInterval(updateHeroState, 3000);
+        });
+
+
+        // --- 2. CAPABILITIES SCROLL SPY ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const items = document.querySelectorAll('.cap-item');
+            
+            // Setup Intersection Observer to detect middle of viewport
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.remove('opacity-20');
+                        entry.target.classList.add('opacity-100');
+                    } else {
+                        entry.target.classList.add('opacity-20');
+                        entry.target.classList.remove('opacity-100');
+                    }
+                });
+            }, {
+                // Trigger when item is roughly in the middle 20% of the screen vertically
+                rootMargin: "-40% 0px -40% 0px",
+                threshold: 0
+            });
+
+            items.forEach(item => observer.observe(item));
+        });
+
+
+        // --- 3. PROBLEM/SOLUTION SVG LINE DRAWING ---
+        function initSVGDrawing() {
+            const container = document.getElementById('prob-sol-container');
+            const svg = document.getElementById('line-canvas');
+            if(!container || !svg) return;
+
+            // Clean previous lines if resizing
+            svg.innerHTML = '';
+            
+            // Get dimensions
+            const w = container.offsetWidth;
+            const h = container.offsetHeight;
+            
+            // Set precise viewBox based on current dimensions
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+            // Define coordinates
+            // Start lines on left side (desktop) or near left edge
+            const startX = w < 1024 ? 20 : w * 0.1;
+            const endX = w < 1024 ? 40 : w * 0.3; // Point where they merge and go down
+
+            // Y coordinates spanning the problem section height
+            const probSectionHeight = document.getElementById('problem-section').offsetHeight;
+            const y1 = probSectionHeight * 0.3;
+            const y2 = probSectionHeight * 0.5;
+            const y3 = probSectionHeight * 0.7;
+            const mergeY = probSectionHeight * 0.9;
+            const endY = h; // Bottom of container
+
+            // Generate path strings (cubic beziers for smooth curves)
+            const p1 = `M ${startX} ${y1} C ${startX + 100} ${y1}, ${endX} ${mergeY - 100}, ${endX} ${mergeY} L ${endX} ${endY}`;
+            const p2 = `M ${startX} ${y2} C ${startX + 100} ${y2}, ${endX} ${mergeY - 100}, ${endX} ${mergeY} L ${endX} ${endY}`;
+            const p3 = `M ${startX} ${y3} C ${startX + 100} ${y3}, ${endX} ${mergeY - 100}, ${endX} ${mergeY} L ${endX} ${endY}`;
+
+            // Create SVG path elements
+            [p1, p2, p3].forEach((d, index) => {
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute('d', d);
+                path.classList.add('scroll-path');
+                // slight opacity differences for visual depth
+                if(index === 0) path.style.opacity = '0.4';
+                if(index === 1) path.style.opacity = '1';
+                if(index === 2) path.style.opacity = '0.4';
+                svg.appendChild(path);
+            });
+
+            // Set up GSAP ScrollTrigger for drawing
+            const paths = document.querySelectorAll('.scroll-path');
+            
+            paths.forEach(path => {
+                const length = path.getTotalLength();
+                // Set initial state (hidden)
+                path.style.strokeDasharray = length;
+                path.style.strokeDashoffset = length;
+
+                // Create animation tied to scroll
+                gsap.to(path, {
+                    strokeDashoffset: 0,
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: container,
+                        start: "top 70%", // Start drawing when container enters view
+                        end: "bottom 80%", // Finish drawing before container leaves view
+                        scrub: 1 // Smooth scrubbing
+                    }
+                });
+            });
+        }
+
+        // Initialize SVG on load and handle resize
+        window.addEventListener('load', () => {
+            initSVGDrawing();
+            // Debounce resize to prevent too many redraws
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    ScrollTrigger.getAll().forEach(t => t.kill()); // Kill old triggers
+                    initSVGDrawing();
+                }, 250);
+            });
+        });
+
+
+        // --- 4. BENEFITS CARDS ENTRANCE ANIMATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            gsap.to('.benefit-card', {
+                y: 0,
+                opacity: 1,
+                duration: 0.8,
+                stagger: 0.2,
+                ease: "power2.out",
+                scrollTrigger: {
+                    trigger: "#benefits-grid",
+                    start: "top 80%",
+                    toggleActions: "play none none none"
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>

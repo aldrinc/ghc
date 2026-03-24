@@ -1,0 +1,287 @@
+{
+  "updatedAt": "2026-03-20T19:37:11.137464+00:00",
+  "iteration": 0,
+  "bestIteration": 0,
+  "bestFilePath": "/Users/auggieclement/Documents/GitHub/screenshot-to-code/assets/validated-loop/best/index.html",
+  "runDir": "/Users/auggieclement/Documents/GitHub/screenshot-to-code/assets/validated-loop/history/20260320T193711Z-cd5070b8",
+  "stopReason": null,
+  "requirements": {
+    "summary": "A modern, clean landing page featuring a staggered entrance animation. The layout includes a sticky header, a split-pane hero section with text on the left and UI mockups on the right, followed by a logo cloud for investors.",
+    "template_goal": "Create a reusable, animated landing page template where colors, typography, and card contents can be easily customized. The entrance animation sequence must be faithfully recreated using CSS or a lightweight animation library.",
+    "viewport": {
+      "width": 1440,
+      "height": 1024,
+      "device": "desktop"
+    },
+    "hard_constraints": [
+      "The entrance animation must follow the exact staggered sequence observed in the reference: Header -> Background Cards -> Card Contents -> Investor Logos.",
+      "The hero section must use a two-column layout with distinct background colors and rounded corners for each column.",
+      "The three UI mockup cards in the right hero column must overlap slightly or be positioned to show depth, and must animate in sequentially."
+    ],
+    "preserve_requirements": [
+      "The specific serif font for headings and sans-serif for body text.",
+      "The generous padding and border radii (approx 24px-32px) on the main hero cards.",
+      "The dark green primary color used for text, logos, and buttons."
+    ],
+    "design_tokens": {
+      "colors": [
+        "primary-dark: #113320",
+        "surface-green: #CDE5D3",
+        "surface-blue: #A8C2C6",
+        "surface-white: #FFFFFF",
+        "text-main: #113320",
+        "text-muted: #556B5D"
+      ],
+      "typography": [
+        "font-heading: 'Playfair Display', Georgia, serif",
+        "font-body: 'Inter', system-ui, sans-serif",
+        "text-hero-heading: 4rem / 1.1",
+        "text-hero-body: 1.125rem / 1.5"
+      ],
+      "spacing": [
+        "section-py: 4rem",
+        "container-px: 2rem",
+        "card-p: 3rem",
+        "gap-hero: 1.5rem"
+      ],
+      "radii": [
+        "radius-button: 9999px",
+        "radius-card-sm: 1rem",
+        "radius-card-lg: 2rem"
+      ],
+      "shadows": [
+        "shadow-ui-card: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)"
+      ],
+      "motion": [
+        "ease-out-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1)",
+        "duration-slow: 800ms",
+        "duration-med: 500ms",
+        "stagger-delay: 150ms"
+      ]
+    },
+    "section_requirements": [
+      {
+        "name": "Header",
+        "purpose": "Site navigation and primary call to action.",
+        "layout": "Flex container, space-between, items centered vertically.",
+        "must_include": [
+          "Logo (left)",
+          "Navigation links (center)",
+          "Book a Demo button (right)"
+        ],
+        "styling": [
+          "Transparent background",
+          "Padding top and bottom approx 1.5rem",
+          "Dark green text"
+        ],
+        "copy_items": [
+          "ease (logo text)",
+          "About",
+          "Case Studies",
+          "Resources",
+          "What We Offer",
+          "Book a Demo"
+        ],
+        "assets": [],
+        "behaviors": [
+          "Fades in on load."
+        ],
+        "editable_fields": [
+          "Navigation links",
+          "Button text"
+        ]
+      },
+      {
+        "name": "Hero Section",
+        "purpose": "Main value proposition and visual hook.",
+        "layout": "CSS Grid, 2 columns (approx 40% / 60% split), with a gap.",
+        "must_include": [
+          "Left card with heading, paragraph, and CTA button.",
+          "Right card with three smaller UI mockup cards."
+        ],
+        "styling": [
+          "Left card: Light green background, large border radius.",
+          "Right card: Light blue/grey background, large border radius.",
+          "UI mockup cards: White background, subtle shadow, smaller border radius."
+        ],
+        "copy_items": [
+          "Fewer clicks. More care.",
+          "Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.",
+          "Request a Demo",
+          "Emma Smith",
+          "CRM",
+          "EHR",
+          "RCM"
+        ],
+        "assets": [
+          "Avatar image for Emma Smith",
+          "Mockup graphics for EHR and RCM cards"
+        ],
+        "behaviors": [
+          "Cards slide up and fade in.",
+          "Inner elements stagger in after cards."
+        ],
+        "editable_fields": [
+          "Hero heading",
+          "Hero body text",
+          "CTA button text",
+          "UI card labels"
+        ]
+      },
+      {
+        "name": "Investor Logos",
+        "purpose": "Social proof.",
+        "layout": "Flex column, centered text, flex row for logos wrapping as needed.",
+        "must_include": [
+          "Section heading",
+          "Row of at least 6 investor logos"
+        ],
+        "styling": [
+          "Small, muted text for heading.",
+          "Logos should be greyscale or visually balanced."
+        ],
+        "copy_items": [
+          "Backed by leading investors"
+        ],
+        "assets": [
+          "Andreessen Horowitz logo",
+          "Abstract logo",
+          "Maven logo",
+          "BoxGroup logo",
+          "F3 logo",
+          "Sunflower Capital logo"
+        ],
+        "behaviors": [
+          "Fades in after hero animation completes."
+        ],
+        "editable_fields": [
+          "Heading text",
+          "Logo images"
+        ]
+      }
+    ],
+    "layout_requirements": [
+      "Use a max-width container (e.g., 1280px or 1440px) with auto margins to center the content on large screens.",
+      "The hero section should use a grid layout to easily manage the split columns and gap.",
+      "The UI cards inside the right hero column should use absolute positioning or negative margins to achieve the overlapping/staggered layout."
+    ],
+    "styling_requirements": [
+      "Ensure high contrast for text against the light background cards.",
+      "Buttons should have fully rounded corners (pill shape).",
+      "Use a serif font for the main hero heading to match the brand feel, and a clean sans-serif for all other text."
+    ],
+    "copy_requirements": [
+      "All text must be easily editable via variables or a configuration object.",
+      "Maintain exact wording from the reference for the initial template state."
+    ],
+    "asset_requirements": [
+      "Use placeholder SVGs or generic images for the UI card contents if exact assets are unavailable, but maintain the layout structure (e.g., an avatar, some text lines, a chart placeholder)."
+    ],
+    "behavior_requirements": [
+      "The page must not scroll horizontally.",
+      "Hover states on buttons should subtly change background color or opacity."
+    ],
+    "animation_requirements": [
+      "Initial state: All animated elements have opacity 0. Elements that slide up have transform translateY(40px).",
+      "Sequence 1 (0ms): Header elements fade in (duration 500ms).",
+      "Sequence 2 (300ms): Left green card and right blue card slide up to translateY(0) and fade in (duration 800ms, ease-out).",
+      "Sequence 3 (600ms): 'Request a Demo' button in the left card slides up and fades in.",
+      "Sequence 4 (700ms, staggered): The three white UI cards in the right column slide up and fade in sequentially (CRM, then EHR, then RCM).",
+      "Sequence 5 (1200ms): Investor heading and logos fade in."
+    ],
+    "structure_guidance": [
+      "Wrap the entire animated sequence in a container that controls the initial hidden state to prevent flashes of unstyled content.",
+      "Use data attributes (e.g., data-animate=\"slide-up\") to tag elements for animation, allowing a single script or CSS file to handle the logic."
+    ],
+    "execution_plan": [
+      "1. Setup HTML skeleton with Tailwind CSS (or equivalent) and define custom color/font tokens in the config.",
+      "2. Build the Header component with flexbox.",
+      "3. Build the Hero section grid layout. Create the left and right cards with their respective background colors and border radii.",
+      "4. Populate the left card with typography and the CTA button.",
+      "5. Populate the right card with the three white UI mockup cards, using absolute positioning to arrange them.",
+      "6. Build the Investor logo section.",
+      "7. Implement the CSS keyframes or animation library logic.",
+      "8. Apply animation classes/attributes to elements according to the staggered sequence.",
+      "9. Test the animation timing and adjust delays to match the reference video."
+    ],
+    "known_unknowns": [
+      "The exact font families used (Playfair Display and Inter are assumed based on visual similarity).",
+      "The exact hex codes for colors (approximations used).",
+      "The content of the section below the fold (only partially visible)."
+    ],
+    "interaction_checkpoints": [
+      {
+        "name": "Page Load Start",
+        "trigger": "User navigates to page",
+        "expected_result": "Page is blank/white."
+      },
+      {
+        "name": "Header Appears",
+        "trigger": "Animation sequence starts",
+        "expected_result": "Logo and navigation fade into view."
+      },
+      {
+        "name": "Hero Backgrounds Appear",
+        "trigger": "Animation sequence continues",
+        "expected_result": "Large green and blue cards slide up into position."
+      },
+      {
+        "name": "Hero Content Appears",
+        "trigger": "Animation sequence continues",
+        "expected_result": "Left CTA button and right UI cards slide up into position."
+      },
+      {
+        "name": "Animation Complete",
+        "trigger": "Animation sequence ends",
+        "expected_result": "Investor logos are visible, page is fully interactive."
+      }
+    ],
+    "acceptance_criteria": [
+      "The layout matches the two-column hero design with correct proportions.",
+      "Colors and border radii visually match the reference.",
+      "The entrance animation plays automatically on load.",
+      "The animation follows the exact staggered sequence: Header -> Backgrounds -> Inner Content -> Logos.",
+      "The three UI cards in the right column animate in one after the other, not simultaneously."
+    ]
+  },
+  "validation": {
+    "verdict": "revise",
+    "overall_score": 0.96,
+    "visual_fidelity_score": 0.96,
+    "behavior_fidelity_score": 0.99,
+    "animation_fidelity_score": 0.99,
+    "editability_score": 0.98,
+    "summary": "Excellent work. The layout, styling, and complex staggered animation sequence perfectly match the requirements and reference video. Only a minor content adjustment is needed on the RCM card to match the reference visual.",
+    "strengths": [
+      "Perfect implementation of the staggered animation sequence using data attributes and a centralized JS controller.",
+      "Accurate layout and positioning of the overlapping UI cards in the right column.",
+      "Good use of Tailwind configuration for design tokens (colors, fonts, spacing)."
+    ],
+    "issues": [
+      {
+        "severity": "minor",
+        "category": "copy",
+        "title": "RCM card content mismatch",
+        "observed": "The RCM card displays '$1,240.00', 'Claim #4821', and a 'Paid' badge.",
+        "expected": "The RCM card should display '$225,390' and have a simpler layout without the claim number or paid badge, matching the reference video.",
+        "fix_instructions": "Update the large text value in the RCM card to '$225,390'. Remove the 'Claim #4821' paragraph and the 'Paid' badge span."
+      },
+      {
+        "severity": "minor",
+        "category": "styling",
+        "title": "RCM card chart styling",
+        "observed": "The placeholder chart in the RCM card uses prominent green colors.",
+        "expected": "The chart in the reference video is very faint and subtle.",
+        "fix_instructions": "Reduce the opacity or change the color of the chart bars in the RCM card to be much fainter (e.g., using surface-blue with low opacity)."
+      }
+    ],
+    "patch_instructions": [
+      "Locate the RCM card div with `data-card=\"rcm\"`.",
+      "Find the paragraph containing the price: `<p class=\"text-[1.75rem] font-semibold text-primary-dark leading-tight\">$1,240<span class=\"text-lg\">.00</span></p>`.",
+      "Change the price HTML to `<p class=\"text-[1.75rem] font-semibold text-primary-dark leading-tight\">$225,390</p>`.",
+      "Remove the paragraph above it: `<p class=\"text-xs text-text-muted mb-1\">Claim #4821</p>`.",
+      "In the header of the RCM card, remove the badge: `<span class=\"text-xs font-medium text-primary-dark bg-surface-green/60 px-2 py-0.5 rounded-full\">Paid</span>`.",
+      "To better match the faint chart in the reference, change the background classes of all the chart bars in the RCM card to `bg-surface-blue/30`."
+    ]
+  }
+}

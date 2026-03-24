@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ease - AI-Native Behavioral Healthcare System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.0.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.0.0/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --color-primary-dark: #113320;
+            --color-primary-light: #BDE3C0;
+            --color-primary-medium: #A3D2A6;
+            --font-serif: 'Playfair Display', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            color: var(--color-primary-dark);
+            overflow-x: hidden;
+        }
+
+        .font-serif { font-family: var(--font-serif); }
+        .text-primary { color: var(--color-primary-dark); }
+        .bg-primary { background-color: var(--color-primary-dark); }
+        .bg-light-green { background-color: var(--color-primary-light); }
+        .bg-medium-green { background-color: var(--color-primary-medium); }
+
+        .mega-menu {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .group:hover .mega-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .why-ease-card {
+        }
+
+        .scroll-line {
+            transform-origin: left;
+            scale: 0 1;
+        }
+
+        .sticky-container {
+            height: 200vh;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-primary-medium);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useLayoutEffect } = React;
+
+        gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+
+        // --- Configuration & Constants ---
+        const CONFIG = {
+            navLinks: [
+                { name: 'About', href: '#' },
+                { name: 'Case Studies', href: '#' },
+                { 
+                    name: 'Resources', 
+                    href: '#', 
+                    dropdown: [
+                        { name: 'Blog', desc: 'Practice insights & guides', href: '#' },
+                        { name: 'Resources', desc: 'Templates, checklists & tools', href: '#' },
+                        { name: 'Glossary', desc: 'Behavioral health terms', href: '#' }
+                    ]
+                },
+                { 
+                    name: 'What We Offer', 
+                    href: '#',
+                    isMega: true,
+                    megaContent: {
+                        crm: {
+                            title: "CRM",
+                            items: ["Lead management", "Seamless EHR Connection", "Activity & Analytics", "Alumni & Refer-Out"]
+                        },
+                        ehr: {
+                            title: "EHR",
+                            items: ["Intelligent documentation", "Flexible scheduling", "Task management", "Reporting & Analytics", "Client management", "Claims engine"]
+                        },
+                        rcm: {
+                            title: "RCM",
+                            items: ["Billing & Claims follow-up", "Credentialing", "Authorizations", "Utilization Review", "Verification of Benefits"]
+                        }
+                    }
+                }
+            ],
+            hero: {
+                headline: "Fewer clicks. More care.",
+                subheadline: "Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.",
+                cta: "Request a Demo"
+            },
+            investors: [
+                { name: "Andreessen Horowitz", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Andreessen_Horowitz_logo.svg/1280px-Andreessen_Horowitz_logo.svg.png" },
+                { name: "Abstract", logo: "https://placehold.co/200x80/113320/ffffff?text=Abstract" },
+                { name: "Maven", logo: "https://placehold.co/200x80/113320/ffffff?text=Maven" },
+                { name: "BoxGroup", logo: "https://placehold.co/200x80/113320/ffffff?text=BoxGroup" },
+                { name: "F3", logo: "https://placehold.co/200x80/113320/ffffff?text=F3" },
+                { name: "Sunflower Capital", logo: "https://placehold.co/200x80/113320/ffffff?text=Sunflower" }
+            ],
+            specialties: ["Detox", "SUD", "Residential", "PHP", "MAT", "IOP", "Outpatient", "Medication", "OBOT", "OTP"],
+            clinicalSupport: {
+                tagline: "Broad clinical support",
+                description: "Ease is built from the ground up for behavioral health practices, with AI at the core.",
+                stats: [
+                    { label: "claims processed", value: "$2.5B+" },
+                    { label: "payor claims submitted", value: "11M+" }
+                ]
+            },
+            problemSolution: {
+                problem: {
+                    title: "The problem",
+                    text: "Fragmented CRM, EHR, and RCM systems are inefficient. They slow intake, burden staff, and hide revenue leakage."
+                },
+                solution: {
+                    title: "The solution",
+                    text: "Instead of bouncing between CRM, EHR, and RCM systems, Ease provides one AI-powered system for referrals, clinical notes, and billing."
+                }
+            },
+            whyEase: {
+                tagline: "Why Ease",
+                headline: "A super-powered system, working together.",
+                cards: [
+                    {
+                        icon: "fa-layer-group",
+                        title: "See everything in one place.",
+                        description: "Consolidate tools, reduce spend, and gain unified reporting without painful integrations."
+                    },
+                    {
+                        icon: "fa-clipboard-check",
+                        title: "Get more done, more easily.",
+                        description: "AI support helps admins, clinicians, supervisors, and billers complete important tasks in less time."
+                    },
+                    {
+                        icon: "fa-chart-line",
+                        title: "Bill on time, every time.",
+                        description: "AI-driven billing engine and expert services run in the background so you collect more, faster."
+                    }
+                ]
+            },
+            heroCards: [
+                {
+                    id: 'crm',
+                    type: 'CRM',
+                    icon: 'fa-user-plus',
+                    title: 'Emma Smith',
+                    subtitle: 'Requested booking • 7m ago',
+                    status: 'New Inquiry',
+                    time: '10:24 AM',
+                    avatar: 'ES'
+                },
+                {
+                    id: 'ehr',
+                    type: 'EHR',
+                    icon: 'fa-file-medical',
+                    title: 'Emma Smith',
+                    gender: 'Female',
+                    age: '32 yrs',
+                    dob: '05/14/1992',
+                    therapy: 'Individual therapy'
+                },
+                {
+                    id: 'rcm',
+                    type: 'RCM',
+                    icon: 'fa-chart-pie',
+                    title: 'Revenue Cycle',
+                    amount: '$225,390',
+                    label: 'Net Collections',
+                    trend: '+12.5%',
+                    goal: '85% of goal'
+                }
+            ]
+        };
+
+        // --- Components ---
+
+        const MegaMenu = ({ content }) => (
+            <div className="mega-menu absolute left-0 top-full w-full bg-white shadow-2xl border-t border-gray-100 z-50 overflow-hidden rounded-b-3xl">
+                <div className="max-w-7xl mx-auto px-12 py-16 grid grid-cols-3 gap-12">
+                    {Object.entries(content).map(([key, section]) => (
+                        <div key={key} className="space-y-6">
+                            <h3 className="flex items-center gap-3 font-bold text-gray-900 uppercase tracking-widest text-xs">
+                                <i className={`fas ${key === 'crm' ? 'fa-users' : key === 'ehr' ? 'fa-file-medical' : 'fa-file-invoice-dollar'} text-green-700`}></i> 
+                                {section.title}
+                            </h3>
+                            <ul className="space-y-4 text-gray-500 font-medium">
+                                {section.items.map((item, idx) => (
+                                    <li key={idx} className="hover:text-green-800 cursor-pointer transition-colors flex items-center gap-2 group/item">
+                                        <span className="w-1.5 h-1.5 bg-green-200 rounded-full group-hover/item:bg-green-600"></span>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const Header = () => {
+            return (
+                <header className="sticky top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 z-[100]">
+                    <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between relative">
+                        <div className="flex items-center relative z-10">
+                            <a href="/" className="text-2xl font-bold font-serif tracking-tight text-primary flex items-center gap-2.5">
+                                <div className="w-10 h-10 bg-primary rounded-[10px] flex items-center justify-center shadow-lg shadow-green-900/10">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white">
+                                        <path d="M21,11C21,11 13,11 10,19C10,19 4,11 3,8C3,8 3,2 11,2C11,2 21,2 21,11Z" />
+                                    </svg>
+                                </div>
+                                <span className="tracking-tight">ease</span>
+                            </a>
+                        </div>
+
+                        <nav className="hidden lg:flex items-center gap-10 absolute left-1/2 -translate-x-1/2">
+                            {CONFIG.navLinks.map((link) => (
+                                <div key={link.name} className={`group py-6 ${link.isMega ? '' : 'relative'}`}>
+                                    <a href={link.href} className="text-sm font-bold text-gray-600 hover:text-primary flex items-center gap-1.5 transition-colors">
+                                        {link.name}
+                                        {(link.dropdown || link.isMega) && <i className="fas fa-chevron-down text-[10px] opacity-40 group-hover:rotate-180 transition-transform duration-300"></i>}
+                                    </a>
+                                    {link.dropdown && !link.isMega && (
+                                        <div className={`mega-menu absolute left-1/2 -translate-x-1/2 top-full bg-white shadow-2xl rounded-2xl border border-gray-100 py-4 ${link.name === 'Resources' ? 'w-[480px] grid grid-cols-1 gap-1 p-2' : 'w-48'}`}>
+                                            {link.dropdown.map(sub => (
+                                                <a key={sub.name} href={sub.href} className="group/item block hover:bg-green-50 p-3 rounded-xl transition-all duration-300">
+                                                    <div className="text-sm font-bold text-gray-900 group-hover/item:text-primary transition-colors">{sub.name}</div>
+                                                    {sub.desc && <div className="text-xs text-gray-400 mt-1 font-medium">{sub.desc}</div>}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {link.isMega && <MegaMenu content={link.megaContent} />}
+                                </div>
+                            ))}
+                        </nav>
+
+                        <div className="flex items-center gap-4 relative z-10">
+                            <button className="hidden md:block text-sm font-bold text-gray-600 hover:text-primary px-4 py-2 transition-colors">Log In</button>
+                            <button className="bg-primary text-white px-7 py-3 rounded-full text-sm font-bold hover:bg-opacity-90 transition-all shadow-lg active:scale-95 shadow-green-900/10">
+                                Book a Demo
+                            </button>
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
+        const Hero = () => {
+            const containerRef = useRef(null);
+
+            useLayoutEffect(() => {
+                const ctx = gsap.context(() => {
+                    const cards = gsap.utils.toArray('.hero-card');
+
+                    const tl = gsap.timeline({ delay: 0.5 });
+                    
+                    // Reset all
+                    gsap.set(cards, { opacity: 0, y: 20 });
+
+                    tl.to(cards, { 
+                        opacity: 1, 
+                        y: 0, 
+                        duration: 0.6, 
+                        stagger: 0.2,
+                        ease: "power2.out"
+                    });
+
+                }, containerRef);
+                return () => ctx.revert();
+            }, []);
+
+            return (
+                <section className="max-w-7xl mx-auto px-6 py-12 md:py-24 grid lg:grid-cols-[5fr_7fr] gap-12 items-stretch" ref={containerRef}>
+                    <div className="bg-light-green rounded-[2.5rem] p-12 md:p-20 flex flex-col justify-center">
+                        <h1 className="text-5xl md:text-7xl font-serif text-primary leading-[1.1] mb-8">
+                            {CONFIG.hero.headline}
+                        </h1>
+                        <p className="text-lg md:text-xl text-primary opacity-80 mb-10 max-w-md">
+                            {CONFIG.hero.subheadline}
+                        </p>
+                        <button className="bg-primary text-white w-fit px-8 py-4 rounded-full text-lg font-bold flex items-center gap-3 hover:gap-5 transition-all group shadow-xl">
+                            {CONFIG.hero.cta}
+                            <i className="fas fa-arrow-right text-sm"></i>
+                        </button>
+                    </div>
+
+                    <div className="bg-slate-100 rounded-[2.5rem] p-8 md:p-4 relative overflow-hidden flex flex-col justify-center min-h-[600px] w-full">
+                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 w-full py-8">
+                            {CONFIG.heroCards.map((card, idx) => (
+                                <React.Fragment key={idx}>
+                                <div 
+                                    className={`hero-card bg-white rounded-2xl shadow-xl p-5 border border-gray-100 flex flex-col gap-4 w-full md:w-[190px] shrink-0 relative z-20 group hover:border-green-200 transition-colors ${idx === 1 ? 'md:mt-12' : idx === 2 ? 'md:mt-24' : ''}`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-green-900/5 rounded-lg flex items-center justify-center text-primary text-xs">
+                                                <i className={`fas ${card.icon}`}></i>
+                                            </div>
+                                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{card.type}</div>
+                                        </div>
+                                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                    </div>
+
+                                    {card.id === 'crm' && (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-light-green flex items-center justify-center font-bold text-primary text-sm">
+                                                    {card.avatar}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{card.title}</div>
+                                                    <div className="text-[10px] text-gray-500">{card.time}</div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-2 flex justify-between items-center border border-gray-100">
+                                                <span className="text-[10px] font-medium text-gray-600">{card.status}</span>
+                                                <i className="fas fa-check-circle text-green-600 text-[10px]"></i>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {card.id === 'ehr' && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-light-green flex items-center justify-center font-bold text-primary text-sm">ES</div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{card.title}</div>
+                                                    <div className="text-[10px] text-gray-500">Patient Profile</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-y-2 text-[10px]">
+                                                <div className="text-gray-400 font-medium">Gender</div>
+                                                <div className="text-gray-900 font-bold text-right">{card.gender}</div>
+                                                <div className="text-gray-400 font-medium">Age</div>
+                                                <div className="text-gray-900 font-bold text-right">{card.age}</div>
+                                                <div className="text-gray-400 font-medium">DOB</div>
+                                                <div className="text-gray-900 font-bold text-right">{card.dob}</div>
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100 flex justify-between items-center group/select cursor-pointer">
+                                                <span className="text-[10px] font-bold text-gray-700">{card.therapy}</span>
+                                                <i className="fas fa-chevron-down text-[8px] text-gray-400"></i>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {card.id === 'rcm' && (
+                                        <div className="space-y-3">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{card.label}</div>
+                                            <div className="flex items-end gap-2">
+                                                <div className="text-2xl font-serif font-bold text-primary">{card.amount}</div>
+                                                <div className="text-[10px] font-bold text-green-600 mb-1.5">{card.trend}</div>
+                                            </div>
+                                            <div className="h-12 w-full pt-2">
+                                                <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible">
+                                                    <path 
+                                                        d="M 0 35 Q 20 30 40 25 T 70 15 T 100 5" 
+                                                        fill="none" 
+                                                        stroke="#113320" 
+                                                        strokeWidth="2.5"
+                                                        strokeLinecap="round"
+                                                        className="drop-shadow-sm"
+                                                    />
+                                                    <circle cx="100" cy="5" r="3" fill="#113320" />
+                                                </svg>
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 font-medium text-center">{card.goal}</div>
+                                        </div>
+                                    )}
+                                </div>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        const LogoCloud = () => (
+            <section className="py-24 border-y border-gray-100">
+                <div className="max-w-7xl mx-auto px-6 text-center">
+                    <p className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-12">Backed by leading investors</p>
+                    <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-40 grayscale transition-all hover:opacity-100 hover:grayscale-0">
+                        {CONFIG.investors.map(inv => (
+                            <img key={inv.name} src={inv.logo} alt={inv.name} className="h-8 md:h-12 object-contain" />
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+
+        const ClinicalSupport = () => {
+            const containerRef = useRef(null);
+            const itemsRef = useRef([]);
+
+            useLayoutEffect(() => {
+                const ctx = gsap.context(() => {
+                    itemsRef.current.forEach((item) => {
+                        if (!item) return;
+                        gsap.to(item, {
+                            opacity: 1,
+                            color: "#113320",
+                            duration: 0.4,
+                            scrollTrigger: {
+                                trigger: item,
+                                start: "top 60%",
+                                end: "bottom 40%",
+                                toggleActions: "play reverse play reverse",
+                                // markers: true, // for debugging
+                            }
+                        });
+                    });
+                }, containerRef);
+                return () => ctx.revert();
+            }, []);
+
+            return (
+                <section ref={containerRef} className="max-w-7xl mx-auto px-6 py-24 md:py-32 flex flex-col md:flex-row gap-20">
+                    <div className="md:w-1/2 py-24 md:py-48">
+                        <div className="space-y-4 md:space-y-6">
+                            {CONFIG.specialties.map((spec, i) => (
+                                <div 
+                                    key={spec} 
+                                    ref={el => itemsRef.current[i] = el}
+                                    className="text-4xl md:text-6xl font-serif text-primary opacity-30 cursor-default transition-all duration-300"
+                                >
+                                    {spec}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="md:w-1/2 h-screen sticky top-0 flex items-center">
+                        <div className="space-y-12 bg-slate-50 p-10 md:p-14 rounded-[3rem] w-full border border-gray-100 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-green-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                            <div className="relative z-10">
+                                <span className="inline-block bg-white text-primary border border-primary/10 px-4 py-1.5 rounded-full text-[10px] font-bold mb-8 uppercase tracking-widest shadow-sm">{CONFIG.clinicalSupport.tagline}</span>
+                                <p className="text-2xl md:text-3xl text-primary leading-tight font-serif italic mb-2 opacity-90">
+                                    {CONFIG.clinicalSupport.description}
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-10 pt-10 border-t border-gray-200 relative z-10">
+                                {CONFIG.clinicalSupport.stats.map(stat => (
+                                    <div key={stat.label}>
+                                        <div className="text-4xl md:text-5xl font-serif text-primary mb-2 tracking-tight">{stat.value}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] leading-tight">{stat.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        const ProblemSolution = () => {
+            const sectionRef = useRef(null);
+            const problemRef = useRef(null);
+            const solutionRef = useRef(null);
+            const svgRef = useRef(null);
+
+            useLayoutEffect(() => {
+                const ctx = gsap.context(() => {
+                    const paths = gsap.utils.toArray(".scroll-path");
+                    const centerY = 300;
+                    const width = 2000;
+
+                    const tl = gsap.timeline({
+                        scrollTrigger: {
+                            trigger: sectionRef.current,
+                            start: "top top",
+                            end: "+=250%",
+                            scrub: 1.5,
+                            pin: true,
+                        }
+                    });
+
+                    // Initial state for everything
+                    gsap.set(solutionRef.current, { opacity: 0, y: 60 });
+                    gsap.set(problemRef.current, { opacity: 1, y: 0 });
+
+                    // Initial state for paths
+                    paths.forEach((path, i) => {
+                        const y = 80 + i * 85;
+                        gsap.set(path, { 
+                            attr: { d: `M 0 ${y} L ${width} ${y}` }, 
+                            strokeDasharray: 100,
+                            strokeDashoffset: 100,
+                            opacity: 0
+                        });
+                    });
+
+                    // 1. Lines draw in
+                    tl.to(paths, {
+                        strokeDashoffset: 0,
+                        opacity: 0.6,
+                        duration: 1,
+                        stagger: 0.1,
+                        ease: "power2.out"
+                    }, "start");
+
+                    // 2. BG Color & Problem fade out
+                    tl.to(sectionRef.current, { backgroundColor: "#BDE3C0", duration: 1.5 }, "start+=0.5")
+                      .to(problemRef.current, { opacity: 0, y: -60, duration: 1 }, "start+=0.5");
+
+                    // 3. Solution fade in
+                    tl.to(solutionRef.current, { opacity: 1, y: 0, duration: 1 }, "start+=1.2");
+
+                    // 4. Lines converge
+                    paths.forEach((path, i) => {
+                        const startY = 80 + i * 85;
+                        tl.to(path, {
+                            attr: { d: `M 0 ${startY} C ${width * 0.4} ${startY} ${width * 0.6} ${centerY} ${width} ${centerY}` },
+                            duration: 1.5,
+                            opacity: 0.8,
+                            ease: "power3.inOut"
+                        }, "start+=1.5");
+                    });
+
+                    // 5. Final consolidation
+                    tl.to(paths, { strokeWidth: 4, opacity: 0.6, duration: 0.5 }, "start+=2.5");
+
+                }, sectionRef);
+                return () => ctx.revert();
+            }, []);
+
+            return (
+                <div ref={sectionRef} className="h-screen overflow-hidden bg-white flex flex-col justify-center relative">
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                        <svg ref={svgRef} className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 2000 600">
+                            {[...Array(6)].map((_, i) => (
+                                <path 
+                                    key={i} 
+                                    className="scroll-path" 
+                                    fill="none" 
+                                    stroke="#113320" 
+                                    strokeWidth="1.5"
+                                    pathLength="100"
+                                />
+                            ))}
+                        </svg>
+                    </div>
+
+                    <div className="relative z-10 max-w-7xl mx-auto w-full px-6 md:px-24">
+                        <div className="max-w-3xl relative mx-auto">
+                            <div ref={problemRef} className="flex flex-col items-start justify-center">
+                                <span className="inline-block bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold mb-8 uppercase tracking-widest">{CONFIG.problemSolution.problem.title}</span>
+                                <h2 className="text-4xl md:text-6xl font-serif text-primary leading-tight">
+                                    {CONFIG.problemSolution.problem.text}
+                                </h2>
+                            </div>
+                            
+                            <div ref={solutionRef} className="absolute inset-0 flex flex-col items-start justify-center pointer-events-none">
+                                <span className="inline-block bg-white text-primary px-3 py-1 rounded-full text-xs font-semibold mb-8 uppercase tracking-widest">{CONFIG.problemSolution.solution.title}</span>
+                                <h2 className="text-4xl md:text-6xl font-serif text-primary leading-tight">
+                                    {CONFIG.problemSolution.solution.text}
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const WhyEase = () => {
+            const sectionRef = useRef(null);
+
+            useLayoutEffect(() => {
+                const ctx = gsap.context(() => {
+                    gsap.fromTo('.why-ease-card', 
+                        { opacity: 0, y: 30 },
+                        { 
+                            opacity: 1, 
+                            y: 0, 
+                            duration: 1, 
+                            stagger: 0.2, 
+                            ease: 'power2.out',
+                            scrollTrigger: {
+                                trigger: sectionRef.current,
+                                start: "top 85%",
+                                toggleActions: "play none none none"
+                            }
+                        }
+                    );
+                }, sectionRef);
+                return () => ctx.revert();
+            }, []);
+
+            return (
+                <section ref={sectionRef} className="max-w-7xl mx-auto px-6 py-24 md:py-32">
+                    <div className="text-center mb-24">
+                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-green-700 mb-6 block">{CONFIG.whyEase.tagline}</span>
+                        <h2 className="text-5xl md:text-7xl font-serif text-primary max-w-4xl mx-auto leading-tight">
+                            {CONFIG.whyEase.headline}
+                        </h2>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {CONFIG.whyEase.cards.map((card, i) => (
+                            <div 
+                                key={i} 
+                                className="why-ease-card bg-green-50 p-12 rounded-[2.5rem] hover:bg-light-green/40 transition-all duration-700 ease-out group border border-transparent hover:border-light-green shadow-sm hover:shadow-xl"
+                            >
+                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-10 shadow-md group-hover:scale-110 transition-transform duration-500 border border-gray-50">
+                                    <i className={`fas ${card.icon} text-primary text-2xl`}></i>
+                                </div>
+                                <h3 className="text-2xl font-serif text-primary mb-6">{card.title}</h3>
+                                <p className="text-gray-600 leading-relaxed text-lg">
+                                    {card.description}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            );
+        };
+
+        const Footer = () => (
+            <footer className="bg-primary text-white py-20">
+                <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-12">
+                    <div className="col-span-2">
+                        <div className="text-3xl font-bold font-serif tracking-tight mb-8 flex items-center gap-2">
+                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-primary">
+                                    <path d="M21,11C21,11 13,11 10,19C10,19 4,11 3,8C3,8 3,2 11,2C11,2 21,2 21,11Z" />
+                                </svg>
+                            </div>
+                            ease
+                        </div>
+                        <p className="text-white opacity-60 max-w-sm text-lg">
+                            The AI-native platform built to help behavioral healthcare facilities grow and provide better care.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="font-bold mb-6">Product</h4>
+                        <ul className="space-y-4 text-white opacity-60">
+                            <li><a href="#" className="hover:text-white transition-colors">CRM</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">EHR</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">RCM</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-bold mb-6">Company</h4>
+                        <ul className="space-y-4 text-white opacity-60">
+                            <li><a href="#" className="hover:text-white transition-colors">About</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                            <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-white border-opacity-10 text-white text-opacity-40 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p>&copy; 2024 Ease Systems, Inc. All rights reserved.</p>
+                    <div className="flex gap-8">
+                        <a href="#"><i className="fab fa-linkedin-in"></i></a>
+                        <a href="#"><i className="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </footer>
+        );
+
+        const App = () => {
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    ScrollTrigger.refresh();
+                }, 1000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            return (
+                <div className="min-h-screen bg-white selection:bg-primary selection:text-white">
+                    <Header />
+                    <main>
+                        <Hero />
+                        <LogoCloud />
+                        <ClinicalSupport />
+                        <ProblemSolution />
+                        <WhyEase />
+                        
+                        {/* Final CTA Section */}
+                        <section className="max-w-7xl mx-auto px-6 py-32">
+                            <div className="bg-primary rounded-[3rem] p-12 md:p-24 text-center text-white relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <h2 className="text-4xl md:text-6xl font-serif mb-8 max-w-2xl mx-auto">Ready to simplify your clinical operations?</h2>
+                                    <p className="text-white opacity-70 text-lg md:text-xl mb-12 max-w-xl mx-auto">Join dozens of leading facilities that have streamlined their workflows with Ease.</p>
+                                    <button className="bg-white text-primary px-10 py-5 rounded-full text-xl font-bold hover:bg-light-green transition-all shadow-2xl active:scale-95">
+                                        Request a Demo
+                                    </button>
+                                </div>
+                                {/* Decorative elements */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                                <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+                            </div>
+                        </section>
+                    </main>
+                    <Footer />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
