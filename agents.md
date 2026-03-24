@@ -4,3 +4,6 @@ Never ever ask me to run scripts or code, especially when the work is validation
 Do not ever create any fake data unless explicitly authorized.
 Never deploy directly to production, restart production services, or make live server changes without explicit authorization in the current thread.
 When deployment is needed, prefer the normal `main` -> GitHub -> CI/CD path first. Only use direct prod access when I explicitly authorize that override.
+Optimize outputs for human review speed. Review is the bottleneck.
+For plans, docs, and design writeups: lead with the decision, use short sections, prefer scannable bullets, and use tables only where they materially improve comprehension such as taxonomies, schemas, field maps, and decision matrices.
+Do not turn an entire document into tables when only one section needs tabular structure.

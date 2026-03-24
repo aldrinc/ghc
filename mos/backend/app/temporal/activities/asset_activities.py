@@ -16,6 +16,7 @@ import httpx
 from PIL import Image
 from sqlalchemy import select
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 
 from app.config import settings
 from app.db.base import session_scope
@@ -33,7 +34,7 @@ from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.repositories.products import ProductsRepository
-from app.db.repositories.swipes import CompanySwipesRepository
+from app.db.repositories.swipes import CompanySwipesRepository, SwipeCollectionsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.creative_generation import (
     AdCopyPackArtifact,
@@ -64,7 +65,10 @@ from app.services.creative_service_client import (
     CreativeServiceRequestError,
 )
 from app.services.design_systems import resolve_design_system_tokens
-from app.services.gemini_file_search import ensure_uploaded_to_gemini_file_search, is_gemini_file_search_enabled
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
+)
 from app.services.media_storage import IMMUTABLE_CACHE_CONTROL, MediaStorage
 from app.services.video_ads_orchestrator import (
     VideoAdsOrchestrator,
@@ -204,9 +208,7 @@ def _extract_requirement_swipe_requires_product_image(requirement: dict[str, Any
 
 def _extract_swipe_requires_product_image_from_tags(tags: list[str] | None) -> bool | None:
     normalized_tags = {
-        tag.strip().lower()
-        for tag in (tags or [])
-        if isinstance(tag, str) and tag.strip()
+        tag.strip().lower() for tag in (tags or []) if isinstance(tag, str) and tag.strip()
     }
     requires_tag = "swipe:requires_product_image"
     no_product_tag = "swipe:no_product_image"
@@ -380,6 +382,16 @@ def _generate_image_plan_item_asset(
                 "ad_copy_pack_id": execution.copy_pack_id,
             },
         )
+    except ApplicationError as exc:
+        error_summary = _summarize_exception_message(exc)
+        raise ApplicationError(
+            "Swipe image ad generation failed for planned execution item "
+            f"(asset_brief_id={asset_brief_id}, requirement_index={execution.requirement_index}, "
+            f"plan_item_id={execution.plan_item.id}, company_swipe_id={execution.plan_item.company_swipe_id}, "
+            f"source_label={execution.plan_item.source_label}, error={error_summary}).",
+            type=exc.type or "SwipeImageAdGenerationFailed",
+            non_retryable=exc.non_retryable,
+        ) from None
     except Exception as exc:  # noqa: BLE001
         error_summary = _summarize_exception_message(exc)
         raise RuntimeError(
@@ -451,7 +463,9 @@ def _retention_expires_at(now: datetime | None = None) -> datetime:
     return current + timedelta(days=retention_days)
 
 
-def _split_requirement_asset_counts(requirements: list[dict[str, Any]], total_assets: int) -> list[tuple[int, dict[str, Any], int]]:
+def _split_requirement_asset_counts(
+    requirements: list[dict[str, Any]], total_assets: int
+) -> list[tuple[int, dict[str, Any], int]]:
     if not requirements:
         raise ValueError("Asset brief has no requirements to generate assets from.")
     if total_assets <= 0:
@@ -542,8 +556,30 @@ def _extract_company_swipe_media_url(media: Any) -> str | None:
     return None
 
 
+def _product_image_policy_to_bool(value: str | None) -> bool | None:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized == "requires_product_image":
+        return True
+    if normalized == "no_product_image":
+        return False
+    if normalized == "either":
+        return None
+    raise ValueError(f"Unsupported swipe product image policy: {value}")
+
+
+def _build_swipe_collection_source_set_key(collection_id: str) -> str:
+    cleaned = str(collection_id or "").strip()
+    if not cleaned:
+        raise ValueError("swipe collection id is required to build a source set key.")
+    return f"swipe_collection:{cleaned}"
+
+
 def _resolve_default_swipe_sources(*, session, org_id: str) -> list[_DefaultSwipeSource]:
-    from app.temporal.activities.swipe_image_ad_activities import _resolve_swipe_requires_product_image_policy
+    from app.temporal.activities.swipe_image_ad_activities import (
+        _resolve_swipe_requires_product_image_policy,
+    )
 
     company_repo = CompanySwipesRepository(session)
     by_label: dict[str, _DefaultSwipeSource] = {}
@@ -563,9 +599,11 @@ def _resolve_default_swipe_sources(*, session, org_id: str) -> list[_DefaultSwip
                 continue
             if source_label not in _DEFAULT_SWIPE_SOURCE_LABELS:
                 continue
-            product_image_policy, _policy_source, _source_filename = _resolve_swipe_requires_product_image_policy(
-                explicit_requires_product_image=None,
-                swipe_source_url=source_media_url,
+            product_image_policy, _policy_source, _source_filename = (
+                _resolve_swipe_requires_product_image_policy(
+                    explicit_requires_product_image=None,
+                    swipe_source_url=source_media_url,
+                )
             )
             source = _DefaultSwipeSource(
                 company_swipe_id=swipe_id,
@@ -598,6 +636,83 @@ def _resolve_default_swipe_sources(*, session, org_id: str) -> list[_DefaultSwip
         )
 
     return [by_label[label] for label in _DEFAULT_SWIPE_SOURCE_LABELS]
+
+
+def _resolve_collection_swipe_sources(
+    *,
+    session,
+    org_id: str,
+    swipe_asset_ids: Sequence[str],
+) -> list[_DefaultSwipeSource]:
+    from app.temporal.activities.swipe_image_ad_activities import (
+        _resolve_swipe_requires_product_image_policy,
+    )
+
+    normalized_ids: list[str] = []
+    seen_ids: set[str] = set()
+    for raw_id in swipe_asset_ids:
+        cleaned = str(raw_id or "").strip()
+        if not cleaned or cleaned in seen_ids:
+            continue
+        seen_ids.add(cleaned)
+        normalized_ids.append(cleaned)
+    if not normalized_ids:
+        raise ValueError("Selected swipe collection resolved zero swipe asset ids.")
+
+    company_repo = CompanySwipesRepository(session)
+    sources: list[_DefaultSwipeSource] = []
+    missing_ids: list[str] = []
+
+    for swipe_asset_id in normalized_ids:
+        swipe_asset = company_repo.get_asset(org_id=org_id, swipe_id=swipe_asset_id)
+        if swipe_asset is None:
+            missing_ids.append(swipe_asset_id)
+            continue
+        media_items = company_repo.list_media(org_id=org_id, swipe_asset_id=swipe_asset_id)
+        if not media_items:
+            raise ValueError(f"Selected swipe asset has no media: {swipe_asset_id}")
+        source_media_url = None
+        for media in media_items:
+            source_media_url = _extract_company_swipe_media_url(media)
+            if source_media_url:
+                break
+        if not source_media_url:
+            raise ValueError(
+                f"Selected swipe asset media is missing a usable URL: {swipe_asset_id}"
+            )
+
+        source_label = (
+            str(getattr(swipe_asset, "title", "") or "").strip()
+            or _extract_source_filename(source_media_url)
+            or f"swipe-{swipe_asset_id}"
+        )
+        product_image_policy = _product_image_policy_to_bool(
+            getattr(swipe_asset, "product_image_policy", None)
+        )
+        if product_image_policy is None:
+            product_image_policy, _policy_source, _source_filename = (
+                _resolve_swipe_requires_product_image_policy(
+                    explicit_requires_product_image=None,
+                    swipe_source_url=source_media_url,
+                )
+            )
+        sources.append(
+            _DefaultSwipeSource(
+                company_swipe_id=swipe_asset_id,
+                source_label=source_label,
+                source_media_url=source_media_url,
+                product_image_policy=product_image_policy,
+            )
+        )
+
+    if missing_ids:
+        raise ValueError(
+            "Selected swipe collection contains missing swipe assets. "
+            f"missing_ids={', '.join(missing_ids)}"
+        )
+    if not sources:
+        raise ValueError("Selected swipe collection resolved zero usable swipe sources.")
+    return sources
 
 
 def _extract_brief(
@@ -657,13 +772,17 @@ def _validate_brief_scope(
         try:
             validated_config = require_valid_external_delivery(config)
         except CampaignDestinationError as exc:
-            raise ValueError(f"Asset brief {asset_brief_id} cannot execute without a valid external delivery config: {exc}") from exc
+            raise ValueError(
+                f"Asset brief {asset_brief_id} cannot execute without a valid external delivery config: {exc}"
+            ) from exc
         return _BriefExecutionScope(
             funnel_id=None,
             campaign_delivery_config=validated_config,
         )
 
-    funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
+    funnel = session.scalars(
+        select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)
+    ).first()
     if not funnel:
         raise ValueError(f"Funnel not found for asset brief {asset_brief_id}")
     if str(funnel.client_id) != str(client_id):
@@ -713,7 +832,10 @@ def _find_latest_campaign_artifact_for_brief(
     )
     for artifact in artifacts:
         payload = artifact.data if isinstance(artifact.data, dict) else {}
-        if str(payload.get("assetBriefId") or payload.get("asset_brief_id") or "").strip() != asset_brief_id:
+        if (
+            str(payload.get("assetBriefId") or payload.get("asset_brief_id") or "").strip()
+            != asset_brief_id
+        ):
             continue
         if source_brief_sha256 is not None:
             candidate_sha = str(
@@ -742,7 +864,8 @@ def _select_copy_generation_context_files(
         campaign_id=str(campaign_id or ""),
     )
     creative_context_provider = str(
-        getattr(creative_context.get("provider"), "value", creative_context.get("provider")) or "strategy_v2"
+        getattr(creative_context.get("provider"), "value", creative_context.get("provider"))
+        or "strategy_v2"
     )
     context_files = ClaudeContextFilesRepository(session).list_for_generation_context(
         org_id=org_id,
@@ -786,7 +909,8 @@ def _select_copy_generation_context_files(
 
     if not any(
         (getattr(record, "doc_key", None) or "").startswith("client_canon")
-        or (getattr(record, "doc_key", None) or "") in {
+        or (getattr(record, "doc_key", None) or "")
+        in {
             "strategy_v2_stage3",
             "strategy_v2_offer",
             "strategy_v2_copy",
@@ -823,7 +947,9 @@ def _build_ad_copy_pack_prompt(
                 "angle": requirement.get("angle"),
                 "hook": requirement.get("hook"),
                 "destinationType": destination_type,
-                "destinationLabel": requirement_destination_label(brief=brief, requirement=requirement),
+                "destinationLabel": requirement_destination_label(
+                    brief=brief, requirement=requirement
+                ),
             }
         )
 
@@ -863,6 +989,27 @@ def _build_ad_copy_pack_prompt(
         "- Use clear, literal marketing copy. Do not output placeholders.\n\n"
         f"INPUT JSON:\n{json.dumps(prompt_payload, ensure_ascii=False, indent=2)}"
     )
+
+
+def _summarize_ad_copy_pack_destinations(
+    *,
+    brief: dict[str, Any],
+    image_requirements: list[tuple[int, dict[str, Any]]],
+) -> tuple[str | None, str | None]:
+    resolved_pairs = [
+        (
+            requirement_destination_type(brief=brief, requirement=requirement),
+            requirement_destination_label(brief=brief, requirement=requirement),
+        )
+        for _requirement_index, requirement in image_requirements
+    ]
+    if not resolved_pairs:
+        return None, None
+    destination_types = {destination_type for destination_type, _destination_label in resolved_pairs}
+    destination_labels = {destination_label for _destination_type, destination_label in resolved_pairs}
+    destination_type = resolved_pairs[0][0] if len(destination_types) == 1 else None
+    destination_label = resolved_pairs[0][1] if len(destination_labels) == 1 else None
+    return destination_type, destination_label
 
 
 def _persist_context_doc(
@@ -927,7 +1074,8 @@ def _get_or_create_ad_copy_pack_artifact(
     image_requirements = [
         (idx, requirement)
         for idx, requirement in enumerate(brief.get("requirements") or [])
-        if isinstance(requirement, dict) and _normalize_requirement_format(str(requirement.get("format") or "")) == "image"
+        if isinstance(requirement, dict)
+        and _normalize_requirement_format(str(requirement.get("format") or "")) == "image"
     ]
     if not image_requirements:
         raise ValueError(
@@ -996,8 +1144,10 @@ def _get_or_create_ad_copy_pack_artifact(
             f"asset_brief_id={asset_brief_id} expected={expected_indexes} returned={seen_indexes}"
         )
 
-    destination_type = requirement_destination_type(brief=brief)
-    destination_label = requirement_destination_label(brief=brief)
+    destination_type, destination_label = _summarize_ad_copy_pack_destinations(
+        brief=brief,
+        image_requirements=image_requirements,
+    )
     image_requirements_by_index = {idx: requirement for idx, requirement in image_requirements}
     copy_packs = []
     for item in sorted(validated.copy_packs, key=lambda item: item.requirement_index):
@@ -1023,8 +1173,12 @@ def _get_or_create_ad_copy_pack_artifact(
         assetBriefId=asset_brief_id,
         sourceBriefArtifactId=brief_artifact_id,
         sourceBriefSha256=source_brief_sha256,
-        sourceFunnelId=str(brief.get("funnelId")).strip() if isinstance(brief.get("funnelId"), str) and brief.get("funnelId").strip() else None,
-        campaignDeliveryConfigId=str(campaign_delivery_config.id) if campaign_delivery_config is not None else None,
+        sourceFunnelId=str(brief.get("funnelId")).strip()
+        if isinstance(brief.get("funnelId"), str) and brief.get("funnelId").strip()
+        else None,
+        campaignDeliveryConfigId=str(campaign_delivery_config.id)
+        if campaign_delivery_config is not None
+        else None,
         deliveryMode=str(brief.get("deliveryMode") or "").strip() or None,
         destinationType=destination_type,
         destinationLabel=destination_label,
@@ -1065,11 +1219,21 @@ def _create_creative_generation_plan_artifact(
     ad_copy_pack_artifact: Any,
     batch_id: str,
     campaign_delivery_config: CampaignDeliveryConfig | None,
+    swipe_collection_id: str,
+    swipe_collection_name: str,
+    swipe_asset_ids: Sequence[str],
 ) -> Any:
     artifacts_repo = ArtifactsRepository(session)
-    source_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
+    source_payload = (
+        ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
+    )
     validated_copy_artifact = AdCopyPackArtifact.model_validate(source_payload)
-    default_swipes = _resolve_default_swipe_sources(session=session, org_id=org_id)
+    swipe_sources = _resolve_collection_swipe_sources(
+        session=session,
+        org_id=org_id,
+        swipe_asset_ids=swipe_asset_ids,
+    )
+    source_set_key = _build_swipe_collection_source_set_key(swipe_collection_id)
     copy_pack_ids_by_requirement = {
         item.requirement_index: item.id for item in validated_copy_artifact.copy_packs
     }
@@ -1078,9 +1242,10 @@ def _create_creative_generation_plan_artifact(
         batch_id=batch_id,
         brief=brief,
         requirements=brief.get("requirements") or [],
-        default_swipes=default_swipes,
+        swipe_sources=swipe_sources,
         copy_pack_ids_by_requirement=copy_pack_ids_by_requirement,
         campaign_delivery_config=campaign_delivery_config,
+        source_set_key=source_set_key,
     )
 
     if not items:
@@ -1094,7 +1259,10 @@ def _create_creative_generation_plan_artifact(
         sourceBriefArtifactId=brief_artifact_id,
         adCopyPackArtifactId=str(ad_copy_pack_artifact.id),
         batchId=batch_id,
-        sourceSetKey=_DEFAULT_SWIPE_SOURCE_SET_KEY,
+        sourceSetKey=source_set_key,
+        sourceCollectionId=swipe_collection_id,
+        sourceCollectionName=swipe_collection_name,
+        resolvedSwipeAssetIds=list(swipe_asset_ids),
         items=items,
     )
     return artifacts_repo.insert(
@@ -1113,9 +1281,10 @@ def _build_creative_generation_plan_items(
     batch_id: str,
     brief: dict[str, Any],
     requirements: Sequence[Any],
-    default_swipes: Sequence[_DefaultSwipeSource],
+    swipe_sources: Sequence[_DefaultSwipeSource],
     copy_pack_ids_by_requirement: dict[int, str],
     campaign_delivery_config: CampaignDeliveryConfig | None,
+    source_set_key: str,
 ) -> list[CreativeGenerationPlanItem]:
     items: list[CreativeGenerationPlanItem] = []
     for requirement_index, requirement in enumerate(requirements):
@@ -1132,7 +1301,7 @@ def _build_creative_generation_plan_items(
             )
         destination_type = requirement_destination_type(brief=brief, requirement=requirement)
         destination_label = requirement_destination_label(brief=brief, requirement=requirement)
-        for source in default_swipes:
+        for source in swipe_sources:
             items.append(
                 CreativeGenerationPlanItem(
                     id=_stable_idempotency_key(
@@ -1150,29 +1319,34 @@ def _build_creative_generation_plan_items(
                     format=str(requirement.get("format") or "image_ad"),
                     funnelStage=(
                         str(requirement.get("funnelStage")).strip()
-                        if isinstance(requirement.get("funnelStage"), str) and requirement.get("funnelStage").strip()
+                        if isinstance(requirement.get("funnelStage"), str)
+                        and requirement.get("funnelStage").strip()
                         else None
                     ),
                     angle=(
                         str(requirement.get("angle")).strip()
-                        if isinstance(requirement.get("angle"), str) and requirement.get("angle").strip()
+                        if isinstance(requirement.get("angle"), str)
+                        and requirement.get("angle").strip()
                         else None
                     ),
                     hook=(
                         str(requirement.get("hook")).strip()
-                        if isinstance(requirement.get("hook"), str) and requirement.get("hook").strip()
+                        if isinstance(requirement.get("hook"), str)
+                        and requirement.get("hook").strip()
                         else None
                     ),
                     deliveryMode=str(brief.get("deliveryMode") or "").strip() or None,
                     destinationType=destination_type,
                     destinationLabel=destination_label,
-                    campaignDeliveryConfigId=str(campaign_delivery_config.id) if campaign_delivery_config is not None else None,
+                    campaignDeliveryConfigId=str(campaign_delivery_config.id)
+                    if campaign_delivery_config is not None
+                    else None,
                     companySwipeId=source.company_swipe_id,
                     sourceLabel=source.source_label,
                     sourceMediaUrl=source.source_media_url,
                     copyPackId=copy_pack_id,
                     productImagePolicy=source.product_image_policy,
-                    sourceSetKey=_DEFAULT_SWIPE_SOURCE_SET_KEY,
+                    sourceSetKey=source_set_key,
                 )
             )
     return items
@@ -1319,7 +1493,9 @@ def _download_remote_asset(*, url: str, timeout_seconds: float) -> tuple[bytes, 
         resp = httpx.get(url, follow_redirects=True, timeout=timeout_seconds)
         resp.raise_for_status()
     except httpx.HTTPError as exc:
-        raise RuntimeError(f"Failed to download generated asset from creative service url={url}: {exc}") from exc
+        raise RuntimeError(
+            f"Failed to download generated asset from creative service url={url}: {exc}"
+        ) from exc
 
     content = resp.content
     if not content:
@@ -1403,7 +1579,9 @@ def _resolve_brand_logo_reference_asset(
         )
     now = datetime.now(timezone.utc)
     if asset.expires_at and asset.expires_at <= now:
-        raise ValueError(f"Brand logo asset is expired (public_id={logo_public_id}, expires_at={asset.expires_at})")
+        raise ValueError(
+            f"Brand logo asset is expired (public_id={logo_public_id}, expires_at={asset.expires_at})"
+        )
 
     title = None
     if isinstance(asset.ai_metadata, dict):
@@ -1420,7 +1598,9 @@ def _resolve_brand_logo_reference_asset(
     )
 
 
-def _select_product_reference_assets(*, session, org_id: str, product_id: str) -> list[_ProductReferenceAsset]:
+def _select_product_reference_assets(
+    *, session, org_id: str, product_id: str
+) -> list[_ProductReferenceAsset]:
     limit = int(settings.CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT or 6)
     if limit <= 0:
         raise ValueError("CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT must be greater than zero.")
@@ -1505,7 +1685,9 @@ def _ensure_remote_reference_asset_ids(
                 f"Local product asset disappeared while syncing reference asset: {reference.local_asset_id}"
             )
         if not asset.storage_key:
-            raise RuntimeError(f"Local product asset is missing storage key: {reference.local_asset_id}")
+            raise RuntimeError(
+                f"Local product asset is missing storage key: {reference.local_asset_id}"
+            )
 
         content_bytes, downloaded_content_type = storage.download_bytes(key=asset.storage_key)
         if not content_bytes:
@@ -1517,7 +1699,9 @@ def _ensure_remote_reference_asset_ids(
             )
 
         ext = _extension_for_content_type(content_type)
-        title_slug = (reference.title or f"mos_product_reference_{index + 1}").strip().replace(" ", "_")
+        title_slug = (
+            (reference.title or f"mos_product_reference_{index + 1}").strip().replace(" ", "_")
+        )
         file_name = title_slug if title_slug.endswith(f".{ext}") else f"{title_slug}.{ext}"
 
         created = creative_client.upload_asset(
@@ -1537,7 +1721,9 @@ def _ensure_remote_reference_asset_ids(
         )
         remote_asset_id = created.id.strip()
         if not remote_asset_id:
-            raise RuntimeError(f"Creative service returned empty asset id for local asset {reference.local_asset_id}")
+            raise RuntimeError(
+                f"Creative service returned empty asset id for local asset {reference.local_asset_id}"
+            )
 
         metadata = dict(asset.ai_metadata) if isinstance(asset.ai_metadata, dict) else {}
         metadata.update(
@@ -1603,7 +1789,9 @@ def _create_generated_asset_from_url(
             with Image.open(io.BytesIO(content)) as img:
                 width, height = img.size
         except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to inspect generated image dimensions for url={primary_url}: {exc}") from exc
+            raise RuntimeError(
+                f"Failed to inspect generated image dimensions for url={primary_url}: {exc}"
+            ) from exc
 
     created_asset = _repo(session).create(
         org_id=org_id,
@@ -1697,6 +1885,44 @@ def _wait_for_image_job(
 
 
 @activity.defn
+def resolve_default_swipe_collection_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    org_id = str(params.get("org_id") or "").strip()
+    if not org_id:
+        raise ValueError("org_id is required to resolve the default swipe collection.")
+
+    with session_scope() as session:
+        swipe_collections_repo = SwipeCollectionsRepository(session)
+        swipe_collection = swipe_collections_repo.ensure_default_collection(org_id=org_id)
+        swipe_collection_id = str(swipe_collection.id)
+        ready_swipe_asset_ids = swipe_collections_repo.ready_asset_ids(
+            org_id=org_id,
+            collection_id=swipe_collection_id,
+        )
+        if not ready_swipe_asset_ids:
+            raise ValueError(
+                "Default swipe collection has no ready swipe assets for creative generation."
+            )
+
+        return {
+            "swipe_collection_id": swipe_collection_id,
+            "swipe_collection_name": str(swipe_collection.name),
+            "swipe_asset_ids": ready_swipe_asset_ids,
+        }
+
+
+def _raise_invalid_activity_input(*missing_fields: str) -> None:
+    joined_fields = ", ".join(field for field in missing_fields if field)
+    raise ApplicationError(
+        "generate_assets_for_brief_activity received invalid params: "
+        f"missing required field(s): {joined_fields}. "
+        "This activity payload is already recorded in Temporal history, so retrying will not "
+        "populate missing fields.",
+        type="InvalidActivityInput",
+        non_retryable=True,
+    )
+
+
+@activity.defn
 def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate and persist creative assets for a single asset brief.
@@ -1709,19 +1935,35 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
     campaign_id = params.get("campaign_id")
     product_id = params.get("product_id")
     asset_brief_id = params.get("asset_brief_id")
+    swipe_collection_id = str(params.get("swipe_collection_id") or "").strip()
+    swipe_collection_name = str(params.get("swipe_collection_name") or "").strip()
+    swipe_asset_ids = [
+        str(value).strip() for value in (params.get("swipe_asset_ids") or []) if str(value).strip()
+    ]
     workflow_run_id = params.get("workflow_run_id")
 
+    missing_fields: list[str] = []
     if not isinstance(product_id, str) or not product_id.strip():
-        raise ValueError("product_id is required to generate assets for a brief.")
+        missing_fields.append("product_id")
     if not isinstance(asset_brief_id, str) or not asset_brief_id.strip():
-        raise ValueError("asset_brief_id is required to generate assets.")
+        missing_fields.append("asset_brief_id")
+    if not swipe_collection_id:
+        missing_fields.append("swipe_collection_id")
+    if not swipe_collection_name:
+        missing_fields.append("swipe_collection_name")
+    if not swipe_asset_ids:
+        missing_fields.append("swipe_asset_ids")
+    if missing_fields:
+        _raise_invalid_activity_input(*missing_fields)
     execution_key = _resolve_creative_generation_execution_key(workflow_run_id=workflow_run_id)
     batch_id = _build_creative_generation_batch_id(
         execution_key=execution_key,
         asset_brief_id=asset_brief_id,
     )
 
-    def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
+    def log_activity(
+        step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None
+    ) -> None:
         if not workflow_run_id:
             return
         with session_scope() as log_session:
@@ -1737,7 +1979,14 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
     log_activity(
         "asset_generation",
         "started",
-        payload_in={"asset_brief_id": asset_brief_id, "campaign_id": campaign_id, "product_id": product_id},
+        payload_in={
+            "asset_brief_id": asset_brief_id,
+            "campaign_id": campaign_id,
+            "product_id": product_id,
+            "swipe_collection_id": swipe_collection_id,
+            "swipe_collection_name": swipe_collection_name,
+            "swipe_asset_ids": swipe_asset_ids,
+        },
     )
 
     creative_client: CreativeServiceClient | None = None
@@ -1784,13 +2033,23 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6),
             )
             variant_id = brief.get("variantId") or brief.get("variant_id")
-            constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str)]
-            tone_guidelines = [item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str)]
-            visual_guidelines = [item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str)]
+            constraints = [
+                item for item in (brief.get("constraints") or []) if isinstance(item, str)
+            ]
+            tone_guidelines = [
+                item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str)
+            ]
+            visual_guidelines = [
+                item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str)
+            ]
             selected_swipe_sources: list[dict[str, Any]] = []
             for req in requirements:
-                explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
-                explicit_swipe_requires_product_image = _extract_requirement_swipe_requires_product_image(req)
+                explicit_company_swipe_id, explicit_swipe_image_url = (
+                    _extract_requirement_swipe_source(req)
+                )
+                explicit_swipe_requires_product_image = (
+                    _extract_requirement_swipe_requires_product_image(req)
+                )
                 if explicit_swipe_requires_product_image is not None and not (
                     explicit_company_swipe_id or explicit_swipe_image_url
                 ):
@@ -1799,10 +2058,12 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         "(companySwipeId/company_swipe_id or swipeImageUrl/swipe_image_url)."
                     )
                 normalized_format = _normalize_requirement_format(str(req.get("format") or ""))
-                if normalized_format == "image" and (explicit_company_swipe_id or explicit_swipe_image_url):
+                if normalized_format == "image" and (
+                    explicit_company_swipe_id or explicit_swipe_image_url
+                ):
                     raise ValueError(
                         "Image-ad requirements must not declare explicit swipe bindings in the asset brief. "
-                        "Swipe source binding is system-owned and comes from the curated default swipe set."
+                        "Swipe source binding is system-owned and comes from the selected swipe collection."
                     )
 
             image_reference_asset_ids: list[str] = []
@@ -1822,7 +2083,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 brief=brief,
                 campaign_delivery_config=campaign_delivery_config,
             )
-            ad_copy_pack_payload = ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
+            ad_copy_pack_payload = (
+                ad_copy_pack_artifact.data if isinstance(ad_copy_pack_artifact.data, dict) else {}
+            )
             ad_copy_pack = AdCopyPackArtifact.model_validate(ad_copy_pack_payload)
             copy_pack_by_id = {item.id: item for item in ad_copy_pack.copy_packs}
             creative_generation_plan_artifact = _create_creative_generation_plan_artifact(
@@ -1837,6 +2100,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 ad_copy_pack_artifact=ad_copy_pack_artifact,
                 batch_id=batch_id,
                 campaign_delivery_config=campaign_delivery_config,
+                swipe_collection_id=swipe_collection_id,
+                swipe_collection_name=swipe_collection_name,
+                swipe_asset_ids=swipe_asset_ids,
             )
             creative_generation_plan_payload = (
                 creative_generation_plan_artifact.data
@@ -1860,7 +2126,8 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
             )
 
             video_requirements_present = any(
-                _normalize_requirement_format(str(req.get("format") or "")) == "video" for req in requirements
+                _normalize_requirement_format(str(req.get("format") or "")) == "video"
+                for req in requirements
             )
             if video_requirements_present:
                 try:
@@ -1874,7 +2141,12 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     product_id=product_id,
                 )
 
-                design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
+                design_tokens = (
+                    resolve_design_system_tokens(
+                        session=session, org_id=org_id, client_id=client_id
+                    )
+                    or {}
+                )
                 logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
                 logo_reference_asset: _ProductReferenceAsset | None = None
                 logo_remote_asset_id: str | None = None
@@ -1904,7 +2176,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 video_reference_attachments = [
                     CreativeServiceVideoAttachmentIn(
                         asset_id=remote_asset_id,
-                        title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
+                        title=product_reference_assets[idx].title
+                        if idx < len(product_reference_assets)
+                        else None,
                         role="product_reference",
                     )
                     for idx, remote_asset_id in enumerate(product_reference_remote_ids)
@@ -1918,7 +2192,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         )
                     )
 
-            video_orchestrator = VideoAdsOrchestrator(client=creative_client) if creative_client else None
+            video_orchestrator = (
+                VideoAdsOrchestrator(client=creative_client) if creative_client else None
+            )
 
             for requirement_index, req, allocation_count in requirement_allocations:
                 channel_id = req.get("channel") or "meta"
@@ -1973,7 +2249,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     generated_asset_ids_by_plan_item: dict[str, str] = {}
                     generation_errors: list[str] = []
                     if pending_executions:
-                        max_workers = _resolve_creative_image_plan_item_max_concurrency(len(pending_executions))
+                        max_workers = _resolve_creative_image_plan_item_max_concurrency(
+                            len(pending_executions)
+                        )
                         with ThreadPoolExecutor(max_workers=max_workers) as executor:
                             future_to_execution = {
                                 executor.submit(
@@ -1985,7 +2263,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                     asset_brief_id=asset_brief_id,
                                     workflow_run_id=workflow_run_id,
                                     creative_generation_batch_id=creative_generation_plan.batch_id,
-                                    creative_generation_plan_artifact_id=str(creative_generation_plan_artifact.id),
+                                    creative_generation_plan_artifact_id=str(
+                                        creative_generation_plan_artifact.id
+                                    ),
                                     ad_copy_pack_artifact_id=str(ad_copy_pack_artifact.id),
                                     execution=execution,
                                 ): execution
@@ -1996,25 +2276,33 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 try:
                                     generated_asset_id = future.result()
                                 except Exception as exc:  # noqa: BLE001
-                                    generation_errors.append(_summarize_exception_message(exc, max_chars=900))
+                                    generation_errors.append(
+                                        _summarize_exception_message(exc, max_chars=900)
+                                    )
                                     continue
                                 _annotate_generated_image_plan_item_asset(
                                     assets_repo=assets_repo,
                                     org_id=org_id,
                                     asset_brief_id=asset_brief_id,
                                     creative_generation_batch_id=creative_generation_plan.batch_id,
-                                    creative_generation_plan_artifact_id=str(creative_generation_plan_artifact.id),
+                                    creative_generation_plan_artifact_id=str(
+                                        creative_generation_plan_artifact.id
+                                    ),
                                     ad_copy_pack_artifact_id=str(ad_copy_pack_artifact.id),
                                     execution=execution,
                                     generated_asset_id=generated_asset_id,
                                 )
-                                generated_asset_ids_by_plan_item[execution.plan_item.id] = generated_asset_id
-                                completed_image_plan_item_assets[execution.plan_item.id] = generated_asset_id
+                                generated_asset_ids_by_plan_item[execution.plan_item.id] = (
+                                    generated_asset_id
+                                )
+                                completed_image_plan_item_assets[execution.plan_item.id] = (
+                                    generated_asset_id
+                                )
 
                     for execution in plan_executions:
-                        asset_id = existing_asset_ids_by_plan_item.get(execution.plan_item.id) or generated_asset_ids_by_plan_item.get(
+                        asset_id = existing_asset_ids_by_plan_item.get(
                             execution.plan_item.id
-                        )
+                        ) or generated_asset_ids_by_plan_item.get(execution.plan_item.id)
                         if asset_id:
                             created_asset_ids.append(asset_id)
                             selected_swipe_sources.append(
@@ -2079,7 +2367,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                             str(requirement_index),
                             str(current_variant_index),
                         )
-                        existing_run = _get_existing_run_by_idempotency(session=session, idempotency_key=session_key)
+                        existing_run = _get_existing_run_by_idempotency(
+                            session=session, idempotency_key=session_key
+                        )
                         if existing_run:
                             if existing_run.status != "succeeded":
                                 raise RuntimeError(
@@ -2102,7 +2392,10 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 retention_expires_at=existing_run.retention_expires_at,
                                 event_type="video.session.reused",
                                 status="succeeded",
-                                payload={"reason": "idempotent_replay", "asset_id": existing_asset_ids[0]},
+                                payload={
+                                    "reason": "idempotent_replay",
+                                    "asset_id": existing_asset_ids[0],
+                                },
                             )
                             continue
 
@@ -2124,7 +2417,8 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 "message": initial_message,
                                 "context": context_payload,
                                 "attachments": [
-                                    attachment.model_dump(mode="json") for attachment in video_reference_attachments
+                                    attachment.model_dump(mode="json")
+                                    for attachment in video_reference_attachments
                                 ],
                             },
                             retention_expires_at=retention_expires_at,
@@ -2209,7 +2503,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         run.status = "succeeded"
                         run.response_payload = orchestrated.result.model_dump(mode="json")
                         run.started_at = (
-                            orchestrated.turns[0].started_at if orchestrated.turns else datetime.now(timezone.utc)
+                            orchestrated.turns[0].started_at
+                            if orchestrated.turns
+                            else datetime.now(timezone.utc)
                         )
                         run.finished_at = datetime.now(timezone.utc)
                         run.updated_at = datetime.now(timezone.utc)
@@ -2232,7 +2528,11 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                     f"(variant_index={current_variant_index}, session_id={orchestrated.session_id})"
                                 )
 
-                            final_turn_id = turn_id_map.get(orchestrated.turns[-1].turn_id) if orchestrated.turns else None
+                            final_turn_id = (
+                                turn_id_map.get(orchestrated.turns[-1].turn_id)
+                                if orchestrated.turns
+                                else None
+                            )
                             local_video_asset_id = _create_generated_asset_from_url(
                                 session=session,
                                 org_id=org_id,
@@ -2255,7 +2555,9 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 retention_expires_at=retention_expires_at,
                                 extra_ai_metadata={
                                     "remoteSessionId": orchestrated.session_id,
-                                    "remoteTurnIds": [trace.turn_id for trace in orchestrated.turns],
+                                    "remoteTurnIds": [
+                                        trace.turn_id for trace in orchestrated.turns
+                                    ],
                                     "remoteAssetId": final_video.asset_id,
                                 },
                                 attach_to_product=True,
@@ -2273,10 +2575,17 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                                 primary_url=final_video.primary_url,
                                 prompt_used=final_video.prompt_used,
                                 local_asset_id=local_video_asset_id,
-                                metadata={"requirementIndex": requirement_index, "variantIndex": current_variant_index},
+                                metadata={
+                                    "requirementIndex": requirement_index,
+                                    "variantIndex": current_variant_index,
+                                },
                             )
 
-                            pins = (orchestrated.result.project.pins if orchestrated.result.project else {}) or {}
+                            pins = (
+                                orchestrated.result.project.pins
+                                if orchestrated.result.project
+                                else {}
+                            ) or {}
                             for pin_name, pin_value in pins.items():
                                 pin_url: str | None = None
                                 pin_uri: str | None = None
@@ -2360,6 +2669,17 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 payload_out={"asset_brief_id": asset_brief_id, "asset_ids": created_asset_ids},
             )
             return {"asset_ids": created_asset_ids}
+    except CampaignDestinationError as exc:
+        log_activity(
+            "asset_generation",
+            "failed",
+            error=_summarize_exception_message(exc),
+        )
+        raise ApplicationError(
+            str(exc),
+            type="InvalidCreativeGenerationBrief",
+            non_retryable=True,
+        ) from exc
     except Exception as exc:
         log_activity(
             "asset_generation",
@@ -2430,7 +2750,11 @@ def persist_assets_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             if campaign_id and str(funnel.campaign_id) != str(campaign_id):
                 raise ValueError("Funnel must belong to the same campaign as the asset brief")
             experiment_id = brief.get("experimentId")
-            if experiment_id and funnel.experiment_spec_id and funnel.experiment_spec_id != experiment_id:
+            if (
+                experiment_id
+                and funnel.experiment_spec_id
+                and funnel.experiment_spec_id != experiment_id
+            ):
                 raise ValueError("Funnel experiment does not match asset brief experiment")
 
         repo = _repo(session)

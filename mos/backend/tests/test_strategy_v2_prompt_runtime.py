@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 from pathlib import Path
+import time
 
 import pytest
 
@@ -211,6 +212,94 @@ def test_llm_generate_text_resumes_openai_response_from_matching_heartbeat(monke
     assert captured["response_id"] == "resp_resume_123"
     assert progress_sink["response_id"] == "resp_resume_123"
     assert progress_sink["status"] == "completed"
+
+
+def test_run_with_activity_heartbeats_merges_dynamic_progress(monkeypatch: pytest.MonkeyPatch) -> None:
+    heartbeat_payloads: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        strategy_v2_activities.activity,
+        "heartbeat",
+        lambda payload: heartbeat_payloads.append(dict(payload)),
+    )
+
+    progress_payload: dict[str, object] = {"status": "queued"}
+
+    def _slow_fn() -> str:
+        time.sleep(0.02)
+        progress_payload["response_id"] = "resp_watchdog_123"
+        progress_payload["status"] = "retrieving"
+        time.sleep(0.02)
+        return "done"
+
+    result = strategy_v2_activities._run_with_activity_heartbeats(
+        phase="foundational",
+        operation="foundational_step_04_llm",
+        heartbeat_payload={
+            "activity": "strategy_v2.run_voc_angle_pipeline",
+            "step_key": "04",
+            "model": "gpt-5.2-2025-12-11",
+        },
+        progress_payload=progress_payload,
+        fn=_slow_fn,
+        interval_seconds=0.01,
+    )
+
+    assert result == "done"
+    assert heartbeat_payloads
+    assert any(payload.get("response_id") == "resp_watchdog_123" for payload in heartbeat_payloads)
+    assert all(payload.get("activity") == "strategy_v2.run_voc_angle_pipeline" for payload in heartbeat_payloads)
+
+
+def test_run_tagged_foundational_step_uses_watchdog_progress_sink(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+    completed_payloads: list[dict[str, object]] = []
+
+    monkeypatch.setattr(strategy_v2_activities, "_append_tagged_output_guardrails", lambda **kwargs: kwargs["prompt_text"])
+
+    def _fake_run_with_activity_heartbeats(**kwargs):  # noqa: ANN003
+        captured["heartbeat_payload"] = dict(kwargs["heartbeat_payload"])
+        captured["progress_payload"] = kwargs["progress_payload"]
+        return kwargs["fn"]()
+
+    def _fake_llm_generate_text(**kwargs):  # noqa: ANN003
+        captured["heartbeat_context"] = kwargs.get("heartbeat_context")
+        progress_sink = kwargs.get("progress_sink")
+        assert isinstance(progress_sink, dict)
+        progress_sink["response_id"] = "resp_foundational_04"
+        progress_sink["status"] = "in_progress"
+        return "<SUMMARY>Step summary</SUMMARY><CONTENT>Step content</CONTENT>"
+
+    monkeypatch.setattr(strategy_v2_activities, "_run_with_activity_heartbeats", _fake_run_with_activity_heartbeats)
+    monkeypatch.setattr(strategy_v2_activities, "_llm_generate_text", _fake_llm_generate_text)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_heartbeat_safe",
+        lambda payload: completed_payloads.append(dict(payload)),
+    )
+
+    parsed = strategy_v2_activities._run_tagged_foundational_step(
+        step_key="04",
+        prompt_text="Return tagged output.",
+        model="gpt-5.2-2025-12-11",
+        summary_max_chars=1800,
+        use_reasoning=True,
+        use_web_search=True,
+    )
+
+    assert parsed["summary"] == "Step summary"
+    assert parsed["content"] == "Step content"
+    assert captured["heartbeat_context"] is None
+    heartbeat_payload = captured["heartbeat_payload"]
+    assert heartbeat_payload == {
+        "activity": "strategy_v2.run_voc_angle_pipeline",
+        "phase": "foundational",
+        "step_key": "04",
+        "model": "gpt-5.2-2025-12-11",
+    }
+    assert isinstance(captured["progress_payload"], dict)
+    assert completed_payloads[-1]["response_id"] == "resp_foundational_04"
+    assert completed_payloads[-1]["status"] == "completed"
 
 
 def test_enforce_strict_openai_json_schema_preserves_explicit_object_constraints() -> None:

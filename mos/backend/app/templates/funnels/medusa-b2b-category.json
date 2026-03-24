@@ -1,0 +1,107 @@
+{
+  "id": "medusa-b2b-category",
+  "name": "Honest Herbalist Category",
+  "description": "Product category/collection page with filtering and selection.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Product Category",
+        "description": "Browse products in this category."
+      }
+    },
+    "content": [
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "header",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "sm",
+          "content": [
+            {
+              "type": "CommerceStoreHeader",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showSearch": false,
+                "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "CommerceCategoryHeading",
+              "props": {}
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "contained",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "CommerceCategoryList",
+              "props": {}
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "CommerceProductGrid",
+              "props": {
+                "columns": 3
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "footer",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "muted",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "CommerceStoreFooter",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showCategories": true,
+                "showCollections": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

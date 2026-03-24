@@ -8,7 +8,9 @@ import type { PaidAdsQaRun } from "@/api/paidAdsQa";
 import { useMetaApi } from "@/api/meta";
 import {
   META_AUTOMATIC_PLACEMENTS,
+  META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
   META_DEFAULT_BROAD_INT_TARGETING,
+  META_DEFAULT_PUBLISH_ATTRIBUTION_SPEC,
   formatPlacementPresetJson,
 } from "@/lib/metaAdsConstants";
 import { resolveMetaCreativeQaState } from "@/lib/metaCreativeQa";
@@ -44,6 +46,7 @@ export type MetaPublishCampaignForm = {
   campaignObjective: string;
   buyingType: string;
   specialAdCategories: string;
+  campaignDailyBudget: string;
 };
 
 export type MetaPublishAdSetForm = {
@@ -52,6 +55,7 @@ export type MetaPublishAdSetForm = {
   billingEvent: string;
   targetingJson: string;
   placementsJson: string;
+  attributionSpecJson: string;
   dailyBudget: string;
   lifetimeBudget: string;
   bidAmount: string;
@@ -176,6 +180,15 @@ export function formatJsonInput(value: unknown): string {
   }
 }
 
+export function formatJsonArrayInput(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+}
+
 export function parseJsonObjectInput(value: string, label: string): Record<string, unknown> | null {
   const cleaned = value.trim();
   if (!cleaned) return null;
@@ -189,6 +202,21 @@ export function parseJsonObjectInput(value: string, label: string): Record<strin
     throw new Error(`${label} must be a JSON object.`);
   }
   return parsed as Record<string, unknown>;
+}
+
+export function parseJsonObjectArrayInput(value: string, label: string): Record<string, unknown>[] | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`${label} must be valid JSON.`);
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => !item || typeof item !== "object" || Array.isArray(item))) {
+    throw new Error(`${label} must be a JSON array of objects.`);
+  }
+  return parsed as Record<string, unknown>[];
 }
 
 export function parseIntegerInput(value: string, label: string): number | null {
@@ -230,6 +258,19 @@ function buildDefaultPublishCampaignName(campaignName: string): string {
   return `[${formatPublishCampaignDate()}] - [${cleaned}] - [CBO] - [Broad/Int]`;
 }
 
+function cloneDefaultAttributionSpec(): Record<string, unknown>[] {
+  return META_DEFAULT_PUBLISH_ATTRIBUTION_SPEC.map((entry) => ({ ...entry }));
+}
+
+function resolveAdSetAttributionSpec(spec: MetaAdSetSpec): Record<string, unknown>[] {
+  const metadata = readRecord(spec.metadata_json);
+  const rawValue = metadata?.attributionSpec;
+  if (Array.isArray(rawValue) && rawValue.every((item) => item && typeof item === "object" && !Array.isArray(item))) {
+    return rawValue as Record<string, unknown>[];
+  }
+  return cloneDefaultAttributionSpec();
+}
+
 export function buildAdSetForm(
   spec: MetaAdSetSpec,
   defaults?: {
@@ -247,6 +288,7 @@ export function buildAdSetForm(
     billingEvent: spec.billing_event || "IMPRESSIONS",
     targetingJson: formatJsonInput(targetingDefaults),
     placementsJson: formatJsonInput(placementDefaults) || formatPlacementPresetJson(META_AUTOMATIC_PLACEMENTS),
+    attributionSpecJson: formatJsonArrayInput(resolveAdSetAttributionSpec(spec)),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
     bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
@@ -337,6 +379,8 @@ type MetaPublishContextValue = {
   // Generation
   generatePending: boolean;
   generateError: string | null;
+  selectedSwipeCollectionId: string | null;
+  setSelectedSwipeCollectionId: (value: string | null) => void;
   handleGenerateAssets: () => Promise<void>;
   autoRefreshUntil: number | null;
   lastWorkflowRunId: string | null;
@@ -495,6 +539,7 @@ export function MetaPublishProvider({
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [generatePending, setGeneratePending] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [selectedSwipeCollectionId, setSelectedSwipeCollectionId] = useState<string | null>(null);
   const [preparePending, setPreparePending] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [prepareIssues, setPrepareIssues] = useState<MetaReviewSetupIssue[]>([]);
@@ -517,6 +562,7 @@ export function MetaPublishProvider({
     campaignObjective: "OUTCOME_SALES",
     buyingType: "AUCTION",
     specialAdCategories: "",
+    campaignDailyBudget: String(META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS),
   }));
   const [publishAdSetForms, setPublishAdSetForms] = useState<Record<string, MetaPublishAdSetForm>>({});
   const [publishFormError, setPublishFormError] = useState<string | null>(null);
@@ -898,9 +944,16 @@ export function MetaPublishProvider({
   const handleGenerateAssets = useCallback(async () => {
     setGenerateError(null);
     if (!assetBriefIds.length) { setGenerateError("No asset briefs exist for this campaign yet."); return; }
+    if (!selectedSwipeCollectionId) {
+      setGenerateError("Select a swipe collection before generating creatives.");
+      return;
+    }
     setGeneratePending(true);
     try {
-      const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, { assetBriefIds });
+      const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, {
+        assetBriefIds,
+        swipeCollectionId: selectedSwipeCollectionId,
+      });
       setLastWorkflowRunId(response.workflow_run_id);
       setAutoRefreshUntil(Date.now() + 3 * 60 * 1000);
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
@@ -910,7 +963,7 @@ export function MetaPublishProvider({
     } finally {
       setGeneratePending(false);
     }
-  }, [assetBriefIds, campaign.id, post, queryClient, refreshPipeline]);
+  }, [assetBriefIds, campaign.id, post, queryClient, refreshPipeline, selectedSwipeCollectionId]);
 
   const handlePrepareMetaReview = useCallback(async () => {
     setPrepareError(null);
@@ -1021,12 +1074,16 @@ export function MetaPublishProvider({
       campaignObjective: publishCampaignForm.campaignObjective.trim(),
       buyingType: publishCampaignForm.buyingType.trim() || null,
       specialAdCategories: publishCampaignForm.specialAdCategories.split(",").map((e) => e.trim()).filter(Boolean),
+      campaignDailyBudget: parseIntegerInput(publishCampaignForm.campaignDailyBudget, "Campaign daily budget"),
     };
   }, [activeFunnelId, latestGenerationKey, publishCampaignForm, requiresFunnelScope]);
 
   const persistPublishAdSetConfigs = useCallback(async () => {
     for (const spec of includedAdSetSpecs) {
       const form = publishAdSetForms[spec.id] || buildAdSetForm(spec, { pageName: config?.pageName });
+      const attributionSpec =
+        parseJsonObjectArrayInput(form.attributionSpecJson, `${spec.name || spec.id} attribution spec`) || cloneDefaultAttributionSpec();
+      const existingMetadata = readRecord(spec.metadata_json) || {};
       await updateAdSetSpec(spec.id, {
         name: form.name.trim() || null,
         optimizationGoal: form.optimizationGoal.trim() || null,
@@ -1048,6 +1105,10 @@ export function MetaPublishProvider({
               : null,
         }),
         conversionDomain: form.conversionDomain.trim() || null,
+        metadata: {
+          ...existingMetadata,
+          attributionSpec,
+        },
       });
     }
   }, [config?.lastValidatedAt, config?.pageName, config?.pixelId, config?.validationStatus, includedAdSetSpecs, publishAdSetForms, updateAdSetSpec]);
@@ -1123,6 +1184,8 @@ export function MetaPublishProvider({
       refreshPipeline,
       generatePending,
       generateError,
+      selectedSwipeCollectionId,
+      setSelectedSwipeCollectionId,
       handleGenerateAssets,
       autoRefreshUntil,
       lastWorkflowRunId,
@@ -1199,7 +1262,7 @@ export function MetaPublishProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally wide deps
     [
       campaign, assetBriefs, config, configError, pipeline, pipelineLoading, pipelineError, refreshPipeline,
-      generatePending, generateError, handleGenerateAssets, autoRefreshUntil, lastWorkflowRunId,
+      generatePending, generateError, selectedSwipeCollectionId, handleGenerateAssets, autoRefreshUntil, lastWorkflowRunId,
       preparePending, prepareError, prepareIssues, lastPreparedAt, handlePrepareMetaReview,
       latestGenerationOnly, selectedFunnelId, packageView,
       assetBriefIds, briefById, funnelById, isExternalDelivery, requiresFunnelScope,

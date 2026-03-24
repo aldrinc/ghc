@@ -39,7 +39,7 @@ export function LibraryPage({ showHeader = true }: { showHeader?: boolean }) {
       case "ads":
         return "Raw ads you’ve ingested (with full media + metadata).";
       case "saved":
-        return "Your saved swipes inside the library.";
+        return "Browse every swipe collection and inspect the swipes inside each set.";
       default:
         return "Swipe library and reference assets.";
     }
@@ -57,7 +57,7 @@ export function LibraryPage({ showHeader = true }: { showHeader?: boolean }) {
           Ads
         </TabButton>
         <TabButton active={tab === "saved"} onClick={() => setTab("saved")}>
-          Saved
+          Collections
         </TabButton>
       </div>
 

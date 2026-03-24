@@ -6,6 +6,7 @@ import { useClientShopifyStatus } from "@/api/clients";
 import { useFunnels } from "@/api/funnels";
 import { useMetaApi } from "@/api/meta";
 import { CampaignPaidAdsQaCard } from "@/components/campaigns/CampaignPaidAdsQaCard";
+import { SwipeCollectionSelector } from "@/components/campaigns/SwipeCollectionSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -412,6 +413,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [generatePending, setGeneratePending] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [selectedSwipeCollectionId, setSelectedSwipeCollectionId] = useState<string | null>(null);
   const [preparePending, setPreparePending] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [prepareIssues, setPrepareIssues] = useState<MetaReviewSetupIssue[]>([]);
@@ -549,10 +551,15 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
       setGenerateError("No asset briefs exist for this campaign yet.");
       return;
     }
+    if (!selectedSwipeCollectionId) {
+      setGenerateError("Select a swipe collection before generating creatives.");
+      return;
+    }
     setGeneratePending(true);
     try {
       const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, {
         assetBriefIds,
+        swipeCollectionId: selectedSwipeCollectionId,
       });
       setLastWorkflowRunId(response.workflow_run_id);
       setAutoRefreshUntil(Date.now() + 3 * 60 * 1000);
@@ -1161,8 +1168,22 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
           </div>
         </div>
 
+        <SwipeCollectionSelector
+          className="mt-4"
+          campaignId={campaign.id}
+          value={selectedSwipeCollectionId}
+          onChange={setSelectedSwipeCollectionId}
+          title="Swipe collection"
+          description="Meta generation uses this swipe collection as the explicit remix source."
+        />
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button variant="primary" size="sm" onClick={handleGenerateAssets} disabled={generatePending || !assetBriefIds.length}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleGenerateAssets}
+            disabled={generatePending || !assetBriefIds.length || !selectedSwipeCollectionId}
+          >
             {generatePending ? "Starting…" : "Generate creatives"}
           </Button>
           <Button

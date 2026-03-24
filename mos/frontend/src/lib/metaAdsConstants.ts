@@ -1,5 +1,17 @@
 import type { SelectOption } from "@/components/ui/select";
 
+export type MetaAttributionSpecEntry = {
+  event_type: string;
+  window_days: number;
+};
+
+export const META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS = 10000;
+export const META_DEFAULT_PUBLISH_ATTRIBUTION_SPEC: MetaAttributionSpecEntry[] = [
+  { event_type: "CLICK_THROUGH", window_days: 7 },
+  { event_type: "VIEW_THROUGH", window_days: 1 },
+  { event_type: "ENGAGED_VIDEO_VIEW", window_days: 1 },
+];
+
 // ---------------------------------------------------------------------------
 // Campaign Objective (ODAX)
 // ---------------------------------------------------------------------------

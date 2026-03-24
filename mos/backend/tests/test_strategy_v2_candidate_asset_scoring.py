@@ -239,6 +239,7 @@ def test_prepare_competitor_asset_candidates_success(monkeypatch: pytest.MonkeyP
     assert isinstance(result.get("candidates"), list)
     assert len(result["candidates"]) >= 3
     assert all("candidate_asset_score" in row for row in result["candidates"])
+    assert "apify_context" not in result
     summary = result.get("candidate_summary")
     assert isinstance(summary, dict)
     assert summary.get("selected_candidate_count", 0) >= 3
@@ -249,6 +250,71 @@ def test_prepare_competitor_asset_candidates_success(monkeypatch: pytest.MonkeyP
     operator_confirmation_policy = summary.get("operator_confirmation_policy")
     assert isinstance(operator_confirmation_policy, dict)
     assert operator_confirmation_policy.get("target_confirmed_assets") == strategy_v2_activities._H2_TARGET_CONFIRMED_ASSETS
+
+
+def test_prepare_competitor_asset_candidates_persists_large_context_without_returning_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    persisted_payloads: list[dict[str, object]] = []
+
+    def _stub_ingest(**_kwargs) -> dict[str, object]:
+        return {
+            "candidate_assets": [],
+            "social_video_observations": [{"id": "social-1", "caption": "caption"}],
+            "external_voc_corpus": [{"id": "voc-1", "quote": "quote"}],
+            "proof_asset_candidates": [{"id": "proof-1"}],
+            "raw_runs": [],
+            "summary": {
+                "strategy_config_run_count": 1,
+                "planned_actor_run_count": 1,
+            },
+        }
+
+    def _stub_persist_step_payload(**kwargs) -> str:
+        payload = kwargs.get("payload")
+        assert isinstance(payload, dict)
+        persisted_payloads.append(dict(payload))
+        return "artifact-1"
+
+    monkeypatch.setattr(strategy_v2_activities, "_ingest_strategy_v2_asset_data", _stub_ingest)
+    monkeypatch.setattr(strategy_v2_activities, "_persist_step_payload", _stub_persist_step_payload)
+
+    result = prepare_strategy_v2_competitor_asset_candidates_activity(
+        {
+            "org_id": "org-1",
+            "client_id": "client-1",
+            "product_id": "product-1",
+            "workflow_run_id": "workflow-1",
+            "stage1": _stage1_payload(
+                competitor_urls=[
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ]
+            ),
+        }
+    )
+
+    assert result["step_payload_artifact_id"] == "artifact-1"
+    assert "apify_context" not in result
+    assert len(persisted_payloads) == 1
+    assert persisted_payloads[0]["apify_context"] == {
+        "candidate_assets": [],
+        "social_video_observations": [{"id": "social-1", "caption": "caption"}],
+        "external_voc_corpus": [{"id": "voc-1", "quote": "quote"}],
+        "proof_asset_candidates": [{"id": "proof-1"}],
+        "raw_runs": [],
+        "summary": {
+            "strategy_config_run_count": 1,
+            "planned_actor_run_count": 1,
+        },
+        "excluded_source_refs": [],
+        "ingestion_source_refs": [
+            "https://competitor-a.example/asset-1",
+            "https://competitor-b.example/asset-2",
+            "https://competitor-c.example/asset-3",
+        ],
+    }
 
 
 def test_prepare_competitor_asset_candidates_prefers_scraped_caption_over_seed_stub(

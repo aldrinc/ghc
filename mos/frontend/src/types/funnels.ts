@@ -72,6 +72,9 @@ export type PublicFunnelMeta = {
 
 export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
 
+// Site page types for commerce experiences
+export type SitePageType = "home" | "category" | "product_detail" | "cart" | "checkout";
+
 export type PublicFunnelPage = {
   productSlug: string;
   funnelId: string;
@@ -82,6 +85,7 @@ export type PublicFunnelPage = {
   puckData: unknown;
   pageMap: Record<string, string>;
   pageStageMap: Record<string, PublicFunnelStage>;
+  pageTypeMap?: Record<string, SitePageType>;
   designSystemTokens?: DesignSystemTokens | null;
   metadata?: {
     title: string;

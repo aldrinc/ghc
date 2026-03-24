@@ -71,6 +71,9 @@ class CreativeGenerationPlanArtifact(BaseModel):
     ad_copy_pack_artifact_id: str = Field(alias="adCopyPackArtifactId")
     batch_id: str = Field(alias="batchId")
     source_set_key: str = Field(alias="sourceSetKey")
+    source_collection_id: str | None = Field(default=None, alias="sourceCollectionId")
+    source_collection_name: str | None = Field(default=None, alias="sourceCollectionName")
+    resolved_swipe_asset_ids: list[str] = Field(default_factory=list, alias="resolvedSwipeAssetIds")
     items: list[CreativeGenerationPlanItem] = Field(default_factory=list)
 
 

@@ -21,6 +21,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from pydantic import ValidationError
 
 from app.config import settings
@@ -280,6 +281,18 @@ def _is_retryable_swipe_copy_gemini_error(exc: Exception, *, error_text: str) ->
     return any(marker in normalized for marker in retryable_markers)
 
 
+def _is_non_retryable_swipe_copy_gemini_error(*, error_text: str) -> bool:
+    normalized = error_text.lower()
+    if "resource_exhausted" not in normalized and "quota exceeded" not in normalized:
+        return False
+    non_retryable_markers = (
+        "generaterequestsperdayperprojectpermodel",
+        "quota exceeded for metric",
+        "please retry in ",
+    )
+    return any(marker in normalized for marker in non_retryable_markers)
+
+
 def _call_gemini_generate_content_with_retries(
     *,
     gemini_client: Any,
@@ -302,6 +315,12 @@ def _call_gemini_generate_content_with_retries(
             error_text = str(exc)
             if "File search tool is not enabled for this model" in error_text:
                 raise RuntimeError(file_search_model_error_message) from exc
+            if _is_non_retryable_swipe_copy_gemini_error(error_text=error_text):
+                raise ApplicationError(
+                    f"{operation_name} failed with Gemini: {error_text}",
+                    type="GeminiQuotaExceeded",
+                    non_retryable=True,
+                ) from exc
             status_code = _extract_swipe_copy_gemini_status_code(exc)
             if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
                 exc,
@@ -1840,6 +1859,19 @@ def _normalize_blind_angle_text(value: str) -> str:
 
 def _collect_blind_angle_forbidden_terms(*values: str | None) -> list[str]:
     phrases: set[str] = set()
+
+    def _add_phrase_candidate(candidate_text: str) -> None:
+        candidate = _normalize_blind_angle_text(candidate_text)
+        if not candidate:
+            return
+        candidate_tokens = candidate.split()
+        # The lexical blacklist is for explicit reveal phrases, not generic
+        # taxonomy nouns like "safety" that can appear innocuously.
+        if len(candidate_tokens) < 2:
+            return
+        if any(token in _BLIND_ANGLE_MECHANISM_TERMS for token in candidate_tokens):
+            phrases.add(candidate)
+
     for raw_value in values:
         if not isinstance(raw_value, str) or not raw_value.strip():
             continue
@@ -1850,19 +1882,13 @@ def _collect_blind_angle_forbidden_terms(*values: str | None) -> list[str]:
         for idx, token in enumerate(tokens):
             if token not in _BLIND_ANGLE_MECHANISM_TERMS:
                 continue
-            phrases.add(token)
             start = max(0, idx - 2)
             end = min(len(tokens), idx + 3)
             phrase = " ".join(tokens[start:end]).strip()
             if phrase and phrase != token:
-                phrases.add(phrase)
+                _add_phrase_candidate(phrase)
         for match in re.finditer(r"['\"]([^'\"]{2,120})['\"]", raw_value):
-            candidate = _normalize_blind_angle_text(match.group(1))
-            if not candidate:
-                continue
-            candidate_tokens = candidate.split()
-            if any(token in _BLIND_ANGLE_MECHANISM_TERMS for token in candidate_tokens):
-                phrases.add(candidate)
+            _add_phrase_candidate(match.group(1))
     return sorted((phrase for phrase in phrases if phrase), key=lambda item: (-len(item), item))
 
 
@@ -2067,6 +2093,10 @@ def _build_rendered_asset_swipe_copy_prompt(
         "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
         "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
         "same angle.\n\n"
+        "ANGLE LABEL HANDLING:\n"
+        "Treat the supplied Angle Used and hook as internal taxonomy labels, not copy to repeat verbatim. Preserve "
+        "the same strategic promise, but rewrite it into fresh feed language and never echo the label itself inside "
+        "variation titles or ad copy.\n\n"
         "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
         "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
         "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "
@@ -2212,6 +2242,10 @@ def _build_swipe_copy_stage1_prompt(
         "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
         "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
         "same angle.\n\n"
+        "ANGLE LABEL HANDLING:\n"
+        "Treat the supplied Angle Used and hook as internal taxonomy labels, not copy to repeat verbatim. Preserve "
+        "the same strategic promise, but rewrite it into fresh feed language and never echo the label itself inside "
+        "variation titles or ad copy.\n\n"
         "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
         "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
         "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "

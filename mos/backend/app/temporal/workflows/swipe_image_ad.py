@@ -5,9 +5,13 @@ from datetime import timedelta
 from typing import Any, Dict, Optional
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
+
+
+_SWIPE_IMAGE_AD_ACTIVITY_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 
 
 @dataclass
@@ -60,4 +64,5 @@ class SwipeImageAdWorkflow:
             generate_swipe_image_ad_activity,
             params,
             schedule_to_close_timeout=timedelta(minutes=20),
+            retry_policy=_SWIPE_IMAGE_AD_ACTIVITY_RETRY_POLICY,
         )

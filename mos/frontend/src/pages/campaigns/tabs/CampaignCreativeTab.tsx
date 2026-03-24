@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { SwipeCollectionSelector } from "@/components/campaigns/SwipeCollectionSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useApiClient, type ApiError } from "@/api/client";
@@ -44,6 +45,7 @@ export function CampaignCreativeTab() {
 
   // ---- Local state --------------------------------------------------------
   const [selectedAssetBriefIds, setSelectedAssetBriefIds] = useState<string[]>([]);
+  const [selectedSwipeCollectionId, setSelectedSwipeCollectionId] = useState<string | null>(null);
   const [creativeProductionPending, setCreativeProductionPending] = useState(false);
   const [creativeProductionError, setCreativeProductionError] = useState<string | null>(null);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
@@ -135,11 +137,16 @@ export function CampaignCreativeTab() {
       setCreativeProductionError("Select at least one creative brief to generate assets.");
       return;
     }
+    if (!selectedSwipeCollectionId) {
+      setCreativeProductionError("Select a swipe collection before generating assets.");
+      return;
+    }
 
     setCreativeProductionPending(true);
     try {
       const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, {
         assetBriefIds: selectedAssetBriefIds,
+        swipeCollectionId: selectedSwipeCollectionId,
       });
       if (!response?.workflow_run_id) {
         setCreativeProductionError("Creative production started but no workflow id was returned.");
@@ -180,12 +187,19 @@ export function CampaignCreativeTab() {
               variant="primary"
               size="sm"
               onClick={handleStartCreativeProduction}
-              disabled={creativeProductionPending || selectedAssetBriefIds.length === 0}
+              disabled={creativeProductionPending || selectedAssetBriefIds.length === 0 || !selectedSwipeCollectionId}
             >
               {creativeProductionPending ? "Starting…" : "Generate assets"}
             </Button>
           </div>
         </div>
+
+        <SwipeCollectionSelector
+          className="mt-4"
+          campaignId={campaign.id}
+          value={selectedSwipeCollectionId}
+          onChange={setSelectedSwipeCollectionId}
+        />
 
         {/* Brief selection (expanded by default when briefs exist) */}
         {assetBriefs.length > 0 ? (

@@ -1,0 +1,73 @@
+{
+  "id": "medusa-b2b-checkout",
+  "name": "Honest Herbalist Checkout",
+  "description": "Checkout flow with shipping, payment, and order confirmation.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Checkout",
+        "description": "Complete your order with shipping and payment."
+      }
+    },
+    "content": [
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "header",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "sm",
+          "content": [
+            {
+              "type": "CommerceStoreHeader",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showSearch": false,
+                "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "contained",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "md",
+          "content": [
+            {
+              "type": "CommerceCheckout",
+              "props": {}
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "footer",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "muted",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "CommerceStoreFooter",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showCategories": true,
+                "showCollections": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

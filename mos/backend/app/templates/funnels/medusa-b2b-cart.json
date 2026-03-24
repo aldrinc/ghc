@@ -1,0 +1,120 @@
+{
+  "id": "medusa-b2b-cart",
+  "name": "Honest Herbalist Cart",
+  "description": "Shopping cart with quantity adjustments and checkout initiation.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Shopping Cart",
+        "description": "Review your order and proceed to checkout."
+      }
+    },
+    "content": [
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "header",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "sm",
+          "content": [
+            {
+              "type": "CommerceStoreHeader",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showSearch": false,
+                "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "contained",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "md",
+          "content": [
+            {
+              "type": "CommerceCart",
+              "props": {}
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "contained",
+          "containerWidth": "lg",
+          "variant": "muted",
+          "padding": "md",
+          "content": [
+            {
+              "type": "Columns",
+              "props": {
+                "ratio": "1:1",
+                "gap": "md",
+                "left": [
+                  {
+                    "type": "Button",
+                    "props": {
+                      "label": "Continue Shopping",
+                      "variant": "secondary",
+                      "size": "lg",
+                      "width": "full",
+                      "align": "left",
+                      "linkType": "funnelPage",
+                      "targetPageId": "__PAGE_CATEGORY__"
+                    }
+                  }
+                ],
+                "right": [
+                  {
+                    "type": "Button",
+                    "props": {
+                      "label": "Proceed to Checkout",
+                      "variant": "primary",
+                      "size": "lg",
+                      "width": "full",
+                      "align": "left",
+                      "linkType": "funnelPage",
+                      "targetPageId": "__PAGE_CHECKOUT__"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "footer",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "muted",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "CommerceStoreFooter",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showCategories": true,
+                "showCollections": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

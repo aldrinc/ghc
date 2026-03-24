@@ -84,7 +84,9 @@ class Settings(BaseSettings):
     STRATEGY_V2_VOC_PROMPT_EXTERNAL_ROWS: int = 40
     STRATEGY_V2_VOC_SOURCE_DIVERSITY_MAX_RATIO: float = 0.25
 
-    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(default_factory=_default_backend_cors_origins)
+    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = Field(
+        default_factory=_default_backend_cors_origins
+    )
 
     OPENAI_API_KEY: str | None = None
     BASETEN_API_KEY: str | None = None
@@ -96,6 +98,7 @@ class Settings(BaseSettings):
     GEMINI_FILE_SEARCH_POLL_INTERVAL_SECONDS: float = 2.0
     GEMINI_FILE_SEARCH_POLL_TIMEOUT_SECONDS: float = 300.0
     SWIPE_GEMINI_TIMEOUT_SECONDS: int = 300
+    SWIPE_TAXONOMY_MODEL: str | None = None
     AGENTA_ENABLED: bool = False
     AGENTA_API_KEY: str | None = None
     AGENTA_HOST: str = "https://cloud.agenta.ai"
@@ -141,6 +144,11 @@ class Settings(BaseSettings):
     SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS: float = 180.0
     SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS: float = 600.0
     SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE: int = 4
+
+    # Medusa service bridge configuration.
+    MEDUSA_SERVICE_BASE_URL: str | None = None
+    MEDUSA_INTERNAL_API_TOKEN: str | None = None
+    MEDUSA_REQUEST_TIMEOUT_SECONDS: float = 30.0
 
     INTEGRATION_SECRETS_KEY: str | None = None
 

@@ -1,0 +1,21 @@
+[Unit]
+Description=home.moshq.app policy site
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/home-site
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME_SITE_ROOT=/opt/home-site
+Environment=HOME_SITE_DATA_DIR=/opt/home-site/data
+Environment=HOME_SITE_DB_PATH=/opt/home-site/data/requests.sqlite3
+Environment=HOME_SITE_BIND=127.0.0.1
+Environment=HOME_SITE_PORT=8015
+ExecStart=/usr/bin/python3 /opt/home-site/server.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -15,6 +15,9 @@ import { WorkspaceOverviewPage } from "@/pages/workspaces/WorkspaceOverviewPage"
 import { BrandDesignSystemPage } from "@/pages/workspaces/BrandDesignSystemPage";
 import { ProductsPage } from "@/pages/workspaces/ProductsPage";
 import { ProductDetailPage } from "@/pages/workspaces/ProductDetailPage";
+import { StoreTemplatesPage } from "@/pages/workspaces/StoreTemplatesPage";
+import { SitesPage } from "@/pages/workspaces/SitesPage";
+import { SiteDetailPage } from "@/pages/workspaces/SiteDetailPage";
 import { WorkflowsPage } from "@/pages/workflows/WorkflowsPage";
 import { WorkflowDetailPage } from "@/pages/workflows/WorkflowDetailPage";
 import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
@@ -95,6 +98,9 @@ function App() {
             <Route index element={<Navigate to="/workspaces/overview" replace />} />
             <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
             <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
+            <Route path="workspaces/store-templates" element={<StoreTemplatesPage />} />
+            <Route path="workspaces/sites" element={<SitesPage />} />
+            <Route path="workspaces/sites/:siteId" element={<SiteDetailPage />} />
             <Route path="workspaces/products" element={<ProductsPage />} />
             <Route path="workspaces/products/:productId" element={<ProductDetailPage />} />
             <Route path="research/documents" element={<DocumentsPage />} />

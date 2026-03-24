@@ -11,6 +11,11 @@ class CreativeProductionRequest(BaseModel):
         validation_alias="assetBriefIds",
         serialization_alias="assetBriefIds",
     )
+    swipe_collection_id: str = Field(
+        ...,
+        validation_alias="swipeCollectionId",
+        serialization_alias="swipeCollectionId",
+    )
 
     @field_validator("asset_brief_ids")
     @classmethod
@@ -34,3 +39,10 @@ class CreativeProductionRequest(BaseModel):
             raise ValueError("assetBriefIds must include at least one id.")
         return deduped
 
+    @field_validator("swipe_collection_id")
+    @classmethod
+    def _validate_swipe_collection_id(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            raise ValueError("swipeCollectionId is required.")
+        return cleaned

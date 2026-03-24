@@ -41,6 +41,8 @@ from app.routers import (
     shopify_webhooks,
     deploy,
     paid_ads_qa,
+    storefront_templates,
+    sites,
 )
 
 logger = logging.getLogger(__name__)
@@ -168,6 +170,8 @@ def create_app() -> FastAPI:
     app.include_router(claude.router)
     app.include_router(gemini.router)
     app.include_router(deploy.router)
+    app.include_router(storefront_templates.router)
+    app.include_router(sites.router)
 
     return app
 

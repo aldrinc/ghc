@@ -1,13 +1,16 @@
 import { Render } from "@measured/puck";
 import type { Data } from "@measured/puck";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { PublicFunnelMeta, PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
-import type { PublicFunnelCommerce } from "@/types/commerce";
+import type { PublicFunnelCommerce, SiteCommerceData } from "@/types/commerce";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import {
+  CommerceRuntimeProvider,
+} from "@/components/commerce/CommerceBlocks";
 import {
   buildPurchaseEventParams,
   clearCheckoutQueryParam,
@@ -20,9 +23,13 @@ import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
+console.log("[PublicFunnelPage] apiBaseUrl:", apiBaseUrl);
 const runtimeConfig = createFunnelPuckConfig();
 const managedFaviconAttr = "data-mos-managed-favicon";
 const managedMetaAttr = "data-mos-managed-meta";
+
+// Site page stages that use the commerce runtime
+const SITE_PAGE_STAGES = new Set(["home", "category", "product_detail", "cart", "checkout"]);
 
 type ResolvedPageMetadata = {
   title: string;
@@ -259,20 +266,35 @@ function hasPaidEntryAttribution(): boolean {
   return false;
 }
 
+function isSiteExperience(page: PublicFunnelPageType | null): boolean {
+  if (!page) return false;
+  return Boolean(page.pageTypeMap && Object.keys(page.pageTypeMap).length > 0);
+}
+
 export function PublicFunnelPage() {
   const { productSlug: routeProductSlug, funnelSlug: routeFunnelSlug, slug: routeSlug } = useParams();
+  const [searchParams] = useSearchParams();
   const productSlug = routeProductSlug || undefined;
   const funnelSlug = routeFunnelSlug || undefined;
   const bundleMode = isStandaloneBundleMode();
+  console.log("[PublicFunnelPage] Route params - productSlug:", productSlug, "funnelSlug:", funnelSlug, "routeSlug:", routeSlug, "bundleMode:", bundleMode);
   const navigate = useNavigate();
   const [meta, setMeta] = useState<PublicFunnelMeta | null>(null);
   const [page, setPage] = useState<PublicFunnelPageType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
+  const [siteCommerce, setSiteCommerce] = useState<SiteCommerceData | null>(null);
+  const [siteCommerceError, setSiteCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
   const handledCheckoutReturnRef = useRef<string | null>(null);
   const effectiveSlug = routeSlug || undefined;
+
+  // Get product handle from query params for product detail pages
+  const productHandle = searchParams.get("product") || undefined;
+  const productId = searchParams.get("product_id") || undefined;
+  const cartId = searchParams.get("cart_id") || undefined;
+  const categoryHandle = searchParams.get("category") || undefined;
 
   const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
   const sessionId = useMemo(
@@ -283,6 +305,9 @@ export function PublicFunnelPage() {
     if (!page) return null;
     return normalizePuckData(page.puckData, { designSystemTokens: page.designSystemTokens ?? null });
   }, [page]);
+
+  // Determine if this is a site experience
+  const isSite = useMemo(() => isSiteExperience(page), [page]);
 
   useEffect(() => {
     ensureNoIndex();
@@ -299,8 +324,10 @@ export function PublicFunnelPage() {
       .catch(() => setMeta(null));
   }, [funnelSlug, productSlug]);
 
+  // Fetch legacy commerce data for non-site funnels
   useEffect(() => {
     if (!productSlug || !funnelSlug) return;
+    if (isSite) return; // Skip legacy commerce for site experiences
     setCommerce(null);
     setCommerceError(null);
     fetch(`${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/commerce`)
@@ -314,23 +341,73 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setCommerceError(err instanceof Error ? err.message : "Unable to load commerce data");
       });
-  }, [funnelSlug, productSlug]);
+  }, [funnelSlug, productSlug, isSite]);
+
+  // Fetch site commerce data for site experiences
+  useEffect(() => {
+    if (!productSlug || !funnelSlug) return;
+    if (!isSite) {
+      console.log("[PublicFunnelPage] Site commerce skipped - not a site experience");
+      return;
+    }
+    console.log("[PublicFunnelPage] Fetching site commerce for:", productSlug, funnelSlug);
+    setSiteCommerce(null);
+    setSiteCommerceError(null);
+
+    const params = new URLSearchParams();
+    if (productHandle) params.set("product_handle", productHandle);
+    if (productId) params.set("product_id", productId);
+    if (cartId) params.set("cart_id", cartId);
+    if (categoryHandle) params.set("category_handle", categoryHandle);
+
+    const queryString = params.toString();
+    const url = `${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/site/commerce${queryString ? `?${queryString}` : ""}`;
+    console.log("[PublicFunnelPage] Site commerce URL:", url);
+
+    fetch(url)
+      .then(async (resp) => {
+        console.log("[PublicFunnelPage] Site commerce response status:", resp.status);
+        if (!resp.ok) {
+          throw new Error(await parsePublicError(resp));
+        }
+        return (await resp.json()) as SiteCommerceData;
+      })
+      .then((data) => {
+        // Check for critical errors in the response
+        if (data.errors && data.errors.length > 0) {
+          // Log errors but still set the data - components can handle missing data
+          console.warn("Site commerce data has errors:", data.errors);
+        }
+        setSiteCommerce(data);
+      })
+      .catch((err: unknown) => {
+        console.error("[PublicFunnelPage] Site commerce error:", err);
+        setSiteCommerceError(err instanceof Error ? err.message : "Unable to load site commerce data");
+      });
+  }, [funnelSlug, productSlug, isSite, productHandle, productId, cartId, categoryHandle]);
 
   useEffect(() => {
-    if (!productSlug || !funnelSlug || !effectiveSlug) return;
+    console.log("[PublicFunnelPage] Page effect running - productSlug:", productSlug, "funnelSlug:", funnelSlug, "effectiveSlug:", effectiveSlug);
+    if (!productSlug || !funnelSlug || !effectiveSlug) {
+      console.log("[PublicFunnelPage] Page effect skipped - missing params");
+      return;
+    }
     setError(null);
     setPage(null);
-    fetch(
-      `${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/pages/${encodeURIComponent(effectiveSlug)}`,
-    )
+    const fetchUrl = `${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/pages/${encodeURIComponent(effectiveSlug)}`;
+    console.log("[PublicFunnelPage] Fetching page:", fetchUrl);
+    fetch(fetchUrl)
       .then(async (resp) => {
+        console.log("[PublicFunnelPage] Page fetch response status:", resp.status);
         if (!resp.ok) {
           throw new Error(await parsePublicError(resp));
         }
         return (await resp.json()) as PublicFunnelPageType;
       })
       .then((data) => {
+        console.log("[PublicFunnelPage] Page fetch success, slug:", data.slug, "pageTypeMap:", data.pageTypeMap, "pageMap:", data.pageMap);
         if (data.redirectToSlug) {
+          console.log("[PublicFunnelPage] Redirecting to:", data.redirectToSlug);
           navigate(
             buildPublicFunnelPath({
               productSlug,
@@ -345,6 +422,7 @@ export function PublicFunnelPage() {
         setPage(data);
       })
       .catch((err: unknown) => {
+        console.error("[PublicFunnelPage] Page fetch error:", err);
         setError(err instanceof Error ? err.message : "Unable to load funnel page");
       });
   }, [bundleMode, effectiveSlug, funnelSlug, navigate, productSlug]);
@@ -489,6 +567,57 @@ export function PublicFunnelPage() {
     return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
   }
 
+  // Site experience: wrap with CommerceRuntimeProvider
+  if (isSite) {
+    return (
+      <div className="min-h-screen bg-surface">
+        <FunnelRuntimeProvider
+          value={{
+            productSlug,
+            funnelSlug,
+            pageMap: page.pageMap,
+            pageStageMap: page.pageStageMap,
+            pageTypeMap: page.pageTypeMap,
+            bundleMode,
+            entrySlug: meta?.entrySlug ?? null,
+            pageStage: page.stage,
+            trackEvent,
+            commerce,
+            commerceError,
+            pageId: page.pageId,
+            nextPageId: page.nextPageId ?? null,
+            visitorId,
+            sessionId,
+          }}
+        >
+          <CommerceRuntimeProvider
+            productSlug={productSlug}
+            funnelSlug={funnelSlug}
+            apiBaseUrl={apiBaseUrl}
+            initialRegions={siteCommerce?.regions || []}
+            initialProducts={siteCommerce?.products || []}
+            initialCollections={siteCommerce?.collections || []}
+            initialCategories={siteCommerce?.categories || []}
+            initialCurrentProduct={siteCommerce?.currentProduct || null}
+            initialCurrentCategory={siteCommerce?.currentCategory || null}
+            siteFamily={siteCommerce?.siteFamily || null}
+            commerceProvider={siteCommerce?.commerceProvider || null}
+            storeName={siteCommerce?.storeName || null}
+          >
+            <DesignSystemProvider tokens={page.designSystemTokens}>
+              <Render
+                key={page.pageId}
+                config={runtimeConfig}
+                data={(normalizedPuckData ?? page.puckData) as unknown as Data}
+              />
+            </DesignSystemProvider>
+          </CommerceRuntimeProvider>
+        </FunnelRuntimeProvider>
+      </div>
+    );
+  }
+
+  // Non-site funnel: use existing FunnelRuntimeProvider only
   return (
     <div className="min-h-screen bg-surface">
       <FunnelRuntimeProvider
@@ -510,7 +639,11 @@ export function PublicFunnelPage() {
         }}
       >
         <DesignSystemProvider tokens={page.designSystemTokens}>
-          <Render config={runtimeConfig} data={(normalizedPuckData ?? page.puckData) as unknown as Data} />
+          <Render
+            key={page.pageId}
+            config={runtimeConfig}
+            data={(normalizedPuckData ?? page.puckData) as unknown as Data}
+          />
         </DesignSystemProvider>
       </FunnelRuntimeProvider>
     </div>

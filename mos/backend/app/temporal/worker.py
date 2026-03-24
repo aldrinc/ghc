@@ -14,10 +14,13 @@ from app.temporal.workflows.client_onboarding import ClientOnboardingWorkflow
 from app.temporal.workflows.campaign_planning import CampaignPlanningWorkflow
 from app.temporal.workflows.campaign_intent import CampaignIntentWorkflow
 from app.temporal.workflows.campaign_funnel_generation import CampaignFunnelGenerationWorkflow
-from app.temporal.workflows.campaign_funnel_media_enrichment import CampaignFunnelMediaEnrichmentWorkflow
+from app.temporal.workflows.campaign_funnel_media_enrichment import (
+    CampaignFunnelMediaEnrichmentWorkflow,
+)
 from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
 from app.temporal.workflows.creative_production import CreativeProductionWorkflow
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdWorkflow
+from app.temporal.workflows.swipe_taxonomy import SwipeTaxonomyWorkflow
 from app.temporal.workflows.experiment_cycle import ExperimentCycleWorkflow
 from app.temporal.workflows.playbook_update import PlaybookUpdateWorkflow
 from app.temporal.workflows.test_campaign import TestCampaignWorkflow
@@ -50,7 +53,9 @@ from app.temporal.activities.precanon_research_activities import (
     run_step04_deep_research_activity,
 )
 from app.temporal.activities.competitor_table_activities import extract_competitors_table_activity
-from app.temporal.activities.competitor_facebook_activities import resolve_competitor_facebook_pages_activity
+from app.temporal.activities.competitor_facebook_activities import (
+    resolve_competitor_facebook_pages_activity,
+)
 from app.temporal.activities.competitor_brand_discovery_activities import (
     build_competitor_brand_discovery_activity,
 )
@@ -67,7 +72,11 @@ from app.temporal.activities.campaign_intent_activities import (
     create_funnels_from_experiments_activity,
     enrich_funnel_page_media_activity,
 )
-from app.temporal.activities.asset_activities import generate_assets_for_brief_activity, persist_assets_activity
+from app.temporal.activities.asset_activities import (
+    generate_assets_for_brief_activity,
+    persist_assets_activity,
+    resolve_default_swipe_collection_activity,
+)
 from app.temporal.activities.qa_activities import run_brand_qa_activity, run_compliance_qa_activity
 from app.temporal.activities.signal_activities import (
     ensure_experiment_configured_activity,
@@ -90,6 +99,7 @@ from app.temporal.activities.ad_breakdown_activities import (
 from app.temporal.activities.swipe_image_ad_activities import (
     generate_swipe_image_ad_activity,
 )
+from app.temporal.activities.swipe_taxonomy_activities import analyze_swipe_asset_activity
 from app.temporal.activities.strategy_v2_activities import (
     apply_strategy_v2_angle_selection_activity,
     build_strategy_v2_foundational_research_activity,
@@ -138,6 +148,7 @@ async def main() -> None:
             ExperimentDesignWorkflow,
             CreativeProductionWorkflow,
             SwipeImageAdWorkflow,
+            SwipeTaxonomyWorkflow,
             ExperimentCycleWorkflow,
             PlaybookUpdateWorkflow,
             AdsIngestionWorkflow,
@@ -177,6 +188,7 @@ async def main() -> None:
             create_funnels_from_experiments_activity,
             configure_generated_funnels_meta_tracking_activity,
             enrich_funnel_page_media_activity,
+            resolve_default_swipe_collection_activity,
             generate_assets_for_brief_activity,
             persist_assets_activity,
             run_brand_qa_activity,
@@ -194,6 +206,7 @@ async def main() -> None:
             generate_ad_breakdown_activity,
             persist_teardown_from_breakdown_activity,
             generate_swipe_image_ad_activity,
+            analyze_swipe_asset_activity,
             check_strategy_v2_enabled_activity,
             ensure_strategy_v2_workflow_run_activity,
             build_strategy_v2_stage0_activity,

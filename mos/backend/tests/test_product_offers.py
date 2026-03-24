@@ -198,7 +198,9 @@ def test_add_offer_bonus_creates_shopify_product_when_gid_missing(api_client, mo
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
     monkeypatch.setattr(products_router, "verify_shopify_product_exists", fake_verify)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
 
     response = api_client.post(
         f"/products/offers/{offer_id}/bonuses",
@@ -373,7 +375,9 @@ def test_delete_shopify_mapped_variant_allows_force(api_client):
 def test_create_variant_rejects_offer_from_other_product(api_client):
     client_id = _create_client(api_client, name="Offer Variant Scope")
     primary_product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
-    secondary_product_id = _create_product(api_client, client_id=client_id, title="Secondary Product")
+    secondary_product_id = _create_product(
+        api_client, client_id=client_id, title="Secondary Product"
+    )
     secondary_offer_id = _create_offer(api_client, product_id=secondary_product_id)
 
     response = api_client.post(
@@ -403,7 +407,10 @@ def test_create_variant_requires_external_price_id_for_shopify_provider(api_clie
         },
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == 'Shopify provider requires externalPriceId (gid://shopify/ProductVariant/...).'
+    assert (
+        response.json()["detail"]
+        == "Shopify provider requires externalPriceId (gid://shopify/ProductVariant/...)."
+    )
 
 
 def test_create_variant_rejects_non_gid_external_price_id_for_shopify_provider(api_client):
@@ -443,6 +450,55 @@ def test_create_variant_normalizes_shopify_provider(api_client):
     payload = response.json()
     assert payload["provider"] == "shopify"
     assert payload["external_price_id"] == "gid://shopify/ProductVariant/123456789"
+
+
+def test_create_variant_accepts_medusa_provider(api_client):
+    client_id = _create_client(api_client, name="Medusa Variant Create")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    response = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "medusa",
+            "externalPriceId": "medusa_variant_123",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["provider"] == "medusa"
+    assert payload["external_price_id"] == "medusa_variant_123"
+
+
+def test_update_variant_accepts_medusa_provider(api_client):
+    client_id = _create_client(api_client, name="Medusa Variant Update")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "stripe",
+            "externalPriceId": "price_test_123",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"provider": "medusa", "externalPriceId": "medusa_variant_456"},
+    )
+
+    assert update_resp.status_code == 200
+    payload = update_resp.json()
+    assert payload["provider"] == "medusa"
+    assert payload["external_price_id"] == "medusa_variant_456"
 
 
 def test_update_variant_rejects_shopify_gid_with_non_shopify_provider(api_client):
@@ -502,7 +558,9 @@ def test_update_shopify_managed_variant_propagates_to_shopify(api_client, monkey
             "missingScopes": [],
         }
 
-    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+    def fake_update_variant(
+        *, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None
+    ):
         observed["update_client_id"] = client_id
         observed["variant_gid"] = variant_gid
         observed["fields"] = fields
@@ -542,7 +600,9 @@ def test_update_shopify_managed_variant_propagates_to_shopify(api_client, monkey
     assert body["shopify_last_sync_error"] is None
 
 
-def test_update_shopify_managed_variant_propagates_inventory_related_fields(api_client, monkeypatch):
+def test_update_shopify_managed_variant_propagates_inventory_related_fields(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Shopify Variant Inventory Propagation")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
 
@@ -572,7 +632,9 @@ def test_update_shopify_managed_variant_propagates_inventory_related_fields(api_
             "missingScopes": [],
         }
 
-    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+    def fake_update_variant(
+        *, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None
+    ):
         observed["variant_gid"] = variant_gid
         observed["fields"] = fields
         observed["shop_domain"] = shop_domain
@@ -641,7 +703,9 @@ def test_update_shopify_managed_variant_records_sync_error(api_client, monkeypat
             "missingScopes": [],
         }
 
-    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+    def fake_update_variant(
+        *, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None
+    ):
         raise HTTPException(status_code=502, detail="Shopify checkout app error: upstream timeout")
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
@@ -659,7 +723,9 @@ def test_update_shopify_managed_variant_records_sync_error(api_client, monkeypat
     variants = detail_resp.json().get("variants") or []
     updated_variant = next(item for item in variants if item["id"] == variant_id)
     assert updated_variant["shopify_last_synced_at"] is None
-    assert updated_variant["shopify_last_sync_error"] == "Shopify checkout app error: upstream timeout"
+    assert (
+        updated_variant["shopify_last_sync_error"] == "Shopify checkout app error: upstream timeout"
+    )
 
 
 def test_update_shopify_managed_variant_requires_ready_shopify_connection(api_client, monkeypatch):
@@ -692,7 +758,9 @@ def test_update_shopify_managed_variant_requires_ready_shopify_connection(api_cl
             "missingScopes": [],
         }
 
-    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+    def fake_update_variant(
+        *, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None
+    ):
         called["value"] = True
         return {}
 
@@ -756,9 +824,13 @@ def test_update_shopify_managed_variant_allows_option_values_local_update(api_cl
         called["value"] = True
         raise AssertionError("Connection status should not be checked for optionValues-only update")
 
-    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+    def fake_update_variant(
+        *, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None
+    ):
         called["value"] = True
-        raise AssertionError("Shopify variant update should not be called for optionValues-only update")
+        raise AssertionError(
+            "Shopify variant update should not be called for optionValues-only update"
+        )
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
     monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
@@ -964,7 +1036,9 @@ def test_sync_shopify_variants_for_product_accepts_short_product_id(api_client, 
     assert variants[0]["title"] == "Starter"
 
 
-def test_sync_shopify_variants_for_product_backfills_unmapped_variants_by_title(api_client, monkeypatch):
+def test_sync_shopify_variants_for_product_backfills_unmapped_variants_by_title(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Shopify Variant Pull Backfill")
     product_id = _create_product(
         api_client,
@@ -1265,8 +1339,12 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_client_shopify_product)
-    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "get_client_shopify_product", fake_get_client_shopify_product
+    )
+    monkeypatch.setattr(
+        products_router, "sync_client_shopify_product", fake_sync_client_shopify_product
+    )
 
     response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
     assert response.status_code == 200
@@ -1309,7 +1387,9 @@ def test_sync_shopify_product_for_product_pushes_offer_baskets(api_client, monke
     assert bonus_variants[0]["external_price_id"] == "gid://shopify/ProductVariant/223"
 
 
-def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_client, monkeypatch, db_session):
+def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(
+    api_client, monkeypatch, db_session
+):
     client_id = _create_client(api_client, name="Shopify Product Push Sync Bonus Create")
     product_id = _create_product(
         api_client,
@@ -1454,8 +1534,12 @@ def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_cl
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
-    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
+    monkeypatch.setattr(
+        products_router, "sync_client_shopify_product", fake_sync_client_shopify_product
+    )
 
     response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
     assert response.status_code == 200
@@ -1491,7 +1575,9 @@ def test_sync_shopify_product_for_product_creates_unmapped_bonus_products(api_cl
     assert bonus_variants[0]["external_price_id"] == "gid://shopify/ProductVariant/223"
 
 
-def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(api_client, monkeypatch):
+def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Shopify Product Initial Push Sync")
     product_id = _create_product(
         api_client,
@@ -1666,8 +1752,12 @@ def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
-    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
+    monkeypatch.setattr(
+        products_router, "sync_client_shopify_product", fake_sync_client_shopify_product
+    )
 
     response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
     assert response.status_code == 200
@@ -1699,7 +1789,9 @@ def test_sync_shopify_product_for_product_creates_shopify_product_when_unmapped(
     assert detail["shopify_product_gid"] == "gid://shopify/Product/777"
 
 
-def test_sync_shopify_product_for_product_rejects_unsupported_inventory_quantity(api_client, monkeypatch):
+def test_sync_shopify_product_for_product_rejects_unsupported_inventory_quantity(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Shopify Product Push Unsupported Field")
     product_id = _create_product(
         api_client,
@@ -1737,7 +1829,9 @@ def test_sync_shopify_product_for_product_rejects_unsupported_inventory_quantity
         return kwargs
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "sync_client_shopify_product", fake_sync_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "sync_client_shopify_product", fake_sync_client_shopify_product
+    )
 
     response = api_client.post(f"/products/{product_id}/shopify/sync", json={})
     assert response.status_code == 409
@@ -1799,7 +1893,9 @@ def test_create_shopify_product_for_product_imports_shopify_variants(api_client,
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
 
     response = api_client.post(
         f"/products/{product_id}/shopify/create",
@@ -1882,7 +1978,9 @@ def test_create_shopify_product_for_product_uses_mos_active_status(api_client, m
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
 
     response = api_client.post(
         f"/products/{product_id}/shopify/create",
@@ -1929,7 +2027,14 @@ def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
         observed["verified_client_id"] = client_id
         observed["verified_product_gid"] = product_gid
 
-    def fake_sync(*, session, org_id: str, client_id: str, shop_domain: str | None = None, extra_product_gids=None):
+    def fake_sync(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        shop_domain: str | None = None,
+        extra_product_gids=None,
+    ):
         del session, shop_domain
         observed["sync_org_id"] = org_id
         observed["sync_client_id"] = client_id
@@ -2004,7 +2109,9 @@ def test_create_shopify_product_for_product_requires_ready_connection(api_client
     assert "Shopify connection is not ready" in response.json()["detail"]
 
 
-def test_create_shopify_product_for_product_rejects_duplicate_shopify_variant_title(api_client, monkeypatch):
+def test_create_shopify_product_for_product_rejects_duplicate_shopify_variant_title(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Shopify Product Duplicate Title")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
 
@@ -2064,7 +2171,9 @@ def test_create_shopify_product_for_product_rejects_duplicate_shopify_variant_ti
         }
 
     monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+    monkeypatch.setattr(
+        products_router, "create_client_shopify_product", fake_create_client_shopify_product
+    )
 
     response = api_client.post(
         f"/products/{product_id}/shopify/create",
@@ -2076,4 +2185,7 @@ def test_create_shopify_product_for_product_rejects_duplicate_shopify_variant_ti
     )
     assert observed["called"] is True
     assert response.status_code == 409
-    assert response.json()["detail"] == 'Shopify variant title "Starter" already exists for this product.'
+    assert (
+        response.json()["detail"]
+        == 'Shopify variant title "Starter" already exists for this product.'
+    )

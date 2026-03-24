@@ -39,8 +39,20 @@ import {
   preSalesDefaults,
 } from "@/funnels/templates/preSalesListicle/PreSalesTemplate";
 import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
-import type { PublicFunnelCommerce } from "@/types/commerce";
-import type { PublicFunnelStage } from "@/types/funnels";
+import type { PublicFunnelCommerce, PublicFunnelStage, SitePageType } from "@/types/funnels";
+import {
+  CommerceCatalogHero,
+  CommerceProductGrid,
+  CommerceProductDetail,
+  CommerceCart,
+  CommerceCheckout,
+  CommerceCategoryList,
+  CommerceCategoryHeading,
+  CommerceCartSummary,
+  CommerceStoreHeader,
+  CommerceStoreFooter,
+  CommerceStoreTemplate,
+} from "@/components/commerce/CommerceBlocks";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -50,6 +62,7 @@ type FunnelRuntimeContextValue = {
   funnelSlug: string;
   pageMap: Record<string, string>;
   pageStageMap: Record<string, PublicFunnelStage>;
+  pageTypeMap?: Record<string, SitePageType>;
   bundleMode?: boolean;
   entrySlug?: string | null;
   pageStage?: PublicFunnelStage;
@@ -1003,6 +1016,105 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           theme: preSalesDefaults.theme,
         },
         render: withBlockBoundary("PreSalesTemplate", (props: Record<string, unknown>) => <PreSalesTemplate {...props} />),
+      },
+      // Commerce blocks for site pages - render from runtime commerce data
+      CommerceCatalogHero: {
+        fields: {
+          title: { type: "text" },
+          description: { type: "textarea" },
+        },
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCatalogHero", (props: Record<string, unknown>) => (
+          <CommerceCatalogHero
+            title={typeof props.title === "string" ? props.title : undefined}
+            description={typeof props.description === "string" ? props.description : undefined}
+          />
+        )),
+      },
+      CommerceProductGrid: {
+        fields: {
+          columns: {
+            type: "select",
+            options: [
+              { label: "2 columns", value: 2 },
+              { label: "3 columns", value: 3 },
+              { label: "4 columns", value: 4 },
+            ],
+          },
+        },
+        defaultProps: { columns: 3 },
+        render: withBlockBoundary("CommerceProductGrid", (props: Record<string, unknown>) => (
+          <CommerceProductGrid
+            columns={typeof props.columns === "number" ? props.columns : 3}
+          />
+        )),
+      },
+      CommerceProductDetail: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceProductDetail", () => <CommerceProductDetail />),
+      },
+      CommerceCart: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCart", () => <CommerceCart />),
+      },
+      CommerceCheckout: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCheckout", () => <CommerceCheckout />),
+      },
+      CommerceCategoryList: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCategoryList", () => <CommerceCategoryList />),
+      },
+      CommerceCategoryHeading: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCategoryHeading", () => <CommerceCategoryHeading />),
+      },
+      CommerceCartSummary: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCartSummary", () => <CommerceCartSummary />),
+      },
+      CommerceStoreHeader: {
+        fields: {
+          storeName: { type: "text" },
+          showSearch: { type: "checkbox" },
+          showCart: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showSearch: false, showCart: true },
+        render: withBlockBoundary("CommerceStoreHeader", (props: Record<string, unknown>) => (
+          <CommerceStoreHeader
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showSearch={props.showSearch === true}
+            showCart={props.showCart !== false}
+          />
+        )),
+      },
+      CommerceStoreFooter: {
+        fields: {
+          storeName: { type: "text" },
+          showCategories: { type: "checkbox" },
+          showCollections: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showCategories: true, showCollections: true },
+        render: withBlockBoundary("CommerceStoreFooter", (props: Record<string, unknown>) => (
+          <CommerceStoreFooter
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showCategories={props.showCategories !== false}
+            showCollections={props.showCollections !== false}
+          />
+        )),
+      },
+      CommerceStoreTemplate: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceStoreTemplate", (props: Record<string, unknown>) => (
+          <CommerceStoreTemplate {...props} />
+        )),
       },
       Spacer: {
         fields: {

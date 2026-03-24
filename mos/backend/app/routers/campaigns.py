@@ -18,6 +18,7 @@ from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfig
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.products import ProductsRepository
+from app.db.repositories.swipes import SwipeCollectionsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
@@ -934,6 +935,23 @@ async def start_creative_production(
             ) from exc
 
     asset_brief_ids = payload.asset_brief_ids
+    swipe_collections_repo = SwipeCollectionsRepository(session)
+    swipe_collection = swipe_collections_repo.get(
+        org_id=auth.org_id,
+        collection_id=payload.swipe_collection_id,
+    )
+    if swipe_collection is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+    ready_swipe_asset_ids = swipe_collections_repo.ready_asset_ids(
+        org_id=auth.org_id,
+        collection_id=str(swipe_collection.id),
+    )
+    if not ready_swipe_asset_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Selected swipe collection has no ready swipe assets for creative generation.",
+        )
+
     artifacts_repo = ArtifactsRepository(session)
     brief_artifacts = artifacts_repo.list(
         org_id=auth.org_id,
@@ -989,6 +1007,9 @@ async def start_creative_production(
                 product_id=str(campaign.product_id),
                 campaign_id=str(campaign.id),
                 asset_brief_ids=asset_brief_ids,
+                swipe_collection_id=str(swipe_collection.id),
+                swipe_collection_name=str(swipe_collection.name),
+                swipe_asset_ids=ready_swipe_asset_ids,
                 workflow_run_id=str(run.id),
             ),
             id=temporal_workflow_id,
@@ -1009,7 +1030,13 @@ async def start_creative_production(
         workflow_run_id=str(run.id),
         step="creative_production",
         status="started",
-        payload_in={"campaign_id": str(campaign.id), "asset_brief_ids": asset_brief_ids},
+        payload_in={
+            "campaign_id": str(campaign.id),
+            "asset_brief_ids": asset_brief_ids,
+            "swipe_collection_id": str(swipe_collection.id),
+            "swipe_collection_name": str(swipe_collection.name),
+            "swipe_asset_ids": ready_swipe_asset_ids,
+        },
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}

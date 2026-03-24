@@ -18,7 +18,7 @@ export function ConnectAccountForm({ formState, onFieldChange, onSubmit, disable
       <div>
         <div className="text-sm font-semibold text-content">Connect new ad account</div>
         <div className="text-xs text-content-muted">
-          Credentials live on the reusable connection. Page and pixel stay on the workspace config.
+          Credentials live on the reusable connection. Page stays on the workspace config, and leaving Pixel ID blank will make mOS create a dedicated Meta pixel for this workspace.
         </div>
       </div>
 
@@ -89,11 +89,11 @@ export function ConnectAccountForm({ formState, onFieldChange, onSubmit, disable
       </FieldRoot>
 
       <FieldRoot>
-        <FieldLabel className="text-xs">Pixel ID</FieldLabel>
+        <FieldLabel className="text-xs">Pixel ID (optional)</FieldLabel>
         <Input
           value={formState.pixelId}
           onChange={(e) => onFieldChange("pixelId", e.target.value)}
-          placeholder="Pixel ID"
+          placeholder="Leave blank to auto-create"
         />
       </FieldRoot>
 

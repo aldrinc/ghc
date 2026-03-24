@@ -270,3 +270,31 @@ class AgentToolCallStatusEnum(str, Enum):
     completed = "completed"
     failed = "failed"
     cancelled = "cancelled"
+
+
+class FunnelExperienceKindEnum(str, Enum):
+    funnel = "funnel"
+    site = "site"
+
+
+class SiteTypeEnum(str, Enum):
+    ecommerce = "ecommerce"
+
+
+class SiteFamilyEnum(str, Enum):
+    medusa_b2b_starter = "medusa-b2b-starter"
+
+
+class CommerceProviderEnum(str, Enum):
+    medusa = "medusa"
+    shopify = "shopify"
+
+
+class SitePageTypeEnum(str, Enum):
+    home = "home"
+    category = "category"
+    product_detail = "product_detail"
+    cart = "cart"
+    account = "account"
+    quote = "quote"
+    approval = "approval"

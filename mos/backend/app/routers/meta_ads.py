@@ -491,6 +491,20 @@ def _publish_budget_scope_blocker_message() -> str:
     )
 
 
+def _resolved_publish_campaign_daily_budget(
+    *,
+    payload: MetaPublishRunRequest,
+    budget_scope: str,
+) -> int | None:
+    if budget_scope != "campaign":
+        return None
+    return (
+        payload.campaignDailyBudget
+        if payload.campaignDailyBudget is not None
+        else DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+    )
+
+
 def _resolved_publish_adset_attribution_spec(adset_spec: MetaAdSetSpec) -> list[dict[str, Any]]:
     metadata = adset_spec.metadata_json if isinstance(adset_spec.metadata_json, dict) else {}
     raw_value = metadata.get("attributionSpec")
@@ -760,6 +774,69 @@ def _get_client_or_404(*, session: Session, org_id: str, client_id: str) -> Clie
     if client is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return client
+
+
+def _workspace_pixel_name(*, workspace: Client, requested_config_name: str) -> str:
+    workspace_name = _clean_optional_text(workspace.name)
+    config_name = _clean_optional_text(requested_config_name)
+    if workspace_name:
+        return workspace_name
+    if config_name:
+        return config_name
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Unable to determine a Meta pixel name for this workspace.",
+    )
+
+
+def _auto_provision_workspace_pixel(
+    *,
+    workspace: Client,
+    connection: MetaAdAccountConnection,
+    requested_config_name: str,
+    config_status: str,
+    pixel_id: str | None,
+    data_set_id: str | None,
+    metadata: dict[str, Any] | None,
+) -> tuple[str | None, str | None, dict[str, Any]]:
+    resolved_pixel_id = _clean_optional_text(pixel_id)
+    resolved_data_set_id = _clean_optional_text(data_set_id)
+    resolved_metadata = dict(metadata) if isinstance(metadata, dict) else {}
+    if resolved_pixel_id or _clean_optional_text(config_status) == "archived":
+        return resolved_pixel_id, resolved_data_set_id, resolved_metadata
+
+    ad_account_id = _clean_optional_text(connection.ad_account_id)
+    if not ad_account_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta ad account connection must define adAccountId before mOS can create a workspace pixel.",
+        )
+
+    pixel_name = _workspace_pixel_name(workspace=workspace, requested_config_name=requested_config_name)
+    client = _get_meta_client(connection=connection)
+    try:
+        response = client.create_ad_pixel(ad_account_id=ad_account_id, name=pixel_name)
+    except MetaAdsError as exc:
+        _raise_meta_error(exc)
+
+    created_pixel_id = _clean_optional_text(response.get("id")) if isinstance(response, dict) else None
+    if not created_pixel_id:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Meta pixel response did not include an id.",
+        )
+
+    resolved_metadata["metaPixelName"] = _clean_optional_text(
+        response.get("name") if isinstance(response, dict) else None
+    ) or pixel_name
+    resolved_metadata["pixelProvisioning"] = {
+        "status": "created",
+        "source": "mos.workspace_config_create",
+        "pixelId": created_pixel_id,
+        "adAccountId": ad_account_id,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+    return created_pixel_id, resolved_data_set_id or created_pixel_id, resolved_metadata
 
 
 def _derive_meta_connection_validation_metadata(
@@ -1132,8 +1209,6 @@ def _build_launch_plan_payload(
     launch_context_readiness: dict[str, Any],
     delivery_snapshot: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    unique_adset_specs = _unique_publish_adset_specs(resolved_items)
-    budget_scope = _publish_budget_scope_for_specs(unique_adset_specs)
     items: list[dict[str, Any]] = []
     for resolved in resolved_items:
         creative_spec = resolved["creative_spec"]
@@ -1182,10 +1257,8 @@ def _build_launch_plan_payload(
         "campaignName": payload.campaignName,
         "campaignObjective": payload.campaignObjective,
         "buyingType": payload.buyingType,
-        "budgetScope": budget_scope,
-        "campaignDailyBudget": (
-            DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS if budget_scope == "campaign" else None
-        ),
+        "budgetScope": validation_response.budgetScope,
+        "campaignDailyBudget": validation_response.campaignDailyBudget,
         "specialAdCategories": payload.specialAdCategories,
         "launchContextReadiness": launch_context_readiness,
         "campaignDelivery": delivery_snapshot,
@@ -1541,6 +1614,17 @@ def _validate_publish_plan(
     budget_scope = _publish_budget_scope_for_specs(_unique_publish_adset_specs(resolved_items))
     if budget_scope == "mixed":
         blockers.append(_publish_budget_scope_blocker_message())
+    campaign_daily_budget = _resolved_publish_campaign_daily_budget(
+        payload=payload,
+        budget_scope=budget_scope,
+    )
+    if budget_scope == "campaign":
+        blockers.extend(
+            _validate_meta_adset_budget_fields(
+                daily_budget=campaign_daily_budget,
+                scope_label="Campaign CBO",
+            )
+        )
 
     if len(publish_domains) > 1:
         blockers.append("Final-package creatives resolve to multiple publish domains. Use one launch domain per publish run.")
@@ -1553,6 +1637,8 @@ def _validate_publish_plan(
         adsetCount=len({str(item["adset_spec"].id) for item in resolved_items}),
         publishBaseUrl=publish_base_url,
         publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
+        budgetScope=budget_scope,
+        campaignDailyBudget=campaign_daily_budget,
         blockers=blockers,
         items=validation_items,
     )
@@ -2429,7 +2515,7 @@ def create_workspace_meta_config(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    workspace = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     repo = MetaAccountConfigsRepository(session)
     connection = repo.get_connection(org_id=auth.org_id, connection_id=payload.connectionId)
     if connection is None:
@@ -2441,6 +2527,16 @@ def create_workspace_meta_config(
             status_code=status.HTTP_409_CONFLICT,
             detail="This Meta ad account is already attached to the workspace.",
         )
+
+    resolved_pixel_id, resolved_data_set_id, resolved_metadata = _auto_provision_workspace_pixel(
+        workspace=workspace,
+        connection=connection,
+        requested_config_name=payload.name,
+        config_status=payload.status,
+        pixel_id=payload.pixelId,
+        data_set_id=payload.dataSetId,
+        metadata=payload.metadata,
+    )
     if payload.isDefault:
         repo.clear_default_workspace_config(org_id=auth.org_id, client_id=client_id)
 
@@ -2454,8 +2550,8 @@ def create_workspace_meta_config(
         page_id=_clean_optional_text(payload.pageId),
         page_name=_clean_optional_text(payload.pageName),
         instagram_actor_id=_clean_optional_text(payload.instagramActorId),
-        pixel_id=_clean_optional_text(payload.pixelId),
-        data_set_id=_clean_optional_text(payload.dataSetId),
+        pixel_id=resolved_pixel_id,
+        data_set_id=resolved_data_set_id,
         verified_domain=_clean_optional_text(payload.verifiedDomain),
         verified_domain_status=_clean_optional_text(payload.verifiedDomainStatus),
         tracking_provider=_clean_optional_text(payload.trackingProvider),
@@ -2466,7 +2562,7 @@ def create_workspace_meta_config(
         validation_status="pending",
         last_validated_at=None,
         last_validation_error=None,
-        metadata_json=payload.metadata or {},
+        metadata_json=resolved_metadata,
         created_by_user_id=auth.user_id,
     )
     if config.is_default and config.status != "archived":
@@ -3255,7 +3351,8 @@ def create_meta_publish_run(
         launch_plan_payload=launch_plan_payload,
     )
     launch_plan_key = str(launch_plan_payload["launchPlanKey"])
-    publish_budget_scope = _publish_budget_scope_for_specs(_unique_publish_adset_specs(resolved_items))
+    publish_budget_scope = validation_response.budgetScope
+    campaign_daily_budget = validation_response.campaignDailyBudget
 
     ad_account_id = _resolved_ad_account_id_for_context(resolved=resolved_meta_config)
     page_id = _require_meta_page_id(workspace_config=resolved_meta_config.workspace_config)
@@ -3284,6 +3381,8 @@ def create_meta_publish_run(
             "launchPlanArtifactId": launch_plan_artifact_id,
             "launchPlanKey": launch_plan_key,
             "campaignDelivery": delivery_snapshot,
+            "budgetScope": publish_budget_scope,
+            "campaignDailyBudget": campaign_daily_budget,
         },
         completed_at=None,
     )
@@ -3326,11 +3425,7 @@ def create_meta_publish_run(
                 status="PAUSED",
                 specialAdCategories=payload.specialAdCategories,
                 buyingType=payload.buyingType,
-                dailyBudget=(
-                    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
-                    if publish_budget_scope == "campaign"
-                    else None
-                ),
+                dailyBudget=campaign_daily_budget,
                 isAdsetBudgetSharingEnabled=False if publish_budget_scope == "adset" else None,
             ),
             auth=auth,

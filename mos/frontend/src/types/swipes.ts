@@ -1,6 +1,8 @@
 export interface CompanySwipeAsset {
   id: string;
   org_id: string;
+  source_kind?: string;
+  origin_system?: string;
   title?: string;
   body?: string;
   platforms?: string;
@@ -13,6 +15,22 @@ export interface CompanySwipeAsset {
   brand_id?: string;
   external_ad_id?: string;
   external_platform_ad_id?: string;
+  analysis_status?: string;
+  analysis_error?: string;
+  analysis_model?: string;
+  analysis_updated_at?: string;
+  ad_unit_format?: string;
+  placement_shape?: string;
+  channel?: string;
+  destination_type?: string;
+  funnel_stage?: string;
+  angle_family?: string;
+  hook_type?: string;
+  visual_archetype?: string;
+  product_presence?: string;
+  proof_type?: string;
+  claim_risk?: string;
+  product_image_policy?: string;
   active?: boolean;
   active_in_library?: boolean;
   ad_library_object?: Record<string, any>;
@@ -48,4 +66,34 @@ export interface CompanySwipeMedia {
   size_bytes?: number;
   video_length?: number;
   download_url?: string;
+}
+
+export interface SwipeCollection {
+  id: string;
+  org_id: string;
+  name: string;
+  kind: string;
+  cloned_from_collection_id?: string | null;
+  created_by_user_id?: string | null;
+  created_at: string;
+  writable: boolean;
+  item_count: number;
+  analysis_counts: Record<string, number>;
+}
+
+export interface SwipeCollectionDetail extends SwipeCollection {
+  swipes: CompanySwipeAsset[];
+}
+
+export interface SwipeCollectionCreateRequest {
+  name: string;
+  kind: "uploaded" | "curated";
+}
+
+export interface SwipeCollectionCloneRequest {
+  name: string;
+}
+
+export interface SwipeCollectionItemsRequest {
+  swipeAssetIds: string[];
 }

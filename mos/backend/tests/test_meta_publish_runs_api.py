@@ -780,6 +780,60 @@ def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_se
     assert payload["includedCount"] == 1
     assert len(payload["items"]) == 1
     assert payload["items"][0]["assetId"] == str(asset.id)
+    assert payload["budgetScope"] == "campaign"
+    assert payload["campaignDailyBudget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+
+
+def test_validate_meta_publish_plan_respects_requested_campaign_daily_budget(api_client, db_session) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-custom-cbo-budget",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-custom-cbo-budget"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-custom-cbo-budget",
+        asset_brief_id=brief_id,
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-custom-cbo-budget",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+            "campaignDailyBudget": 25000,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["budgetScope"] == "campaign"
+    assert payload["campaignDailyBudget"] == 25000
 
 
 def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_session, monkeypatch) -> None:
@@ -833,6 +887,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
 
         def create_campaign(self, **kwargs):
             assert kwargs["ad_account_id"] == "act_123456"
+            assert kwargs["payload"]["name"] == "Honest Herbalist Launch"
             assert kwargs["payload"]["status"] == "PAUSED"
             assert kwargs["payload"]["daily_budget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
             assert "is_adset_budget_sharing_enabled" not in kwargs["payload"]
@@ -892,6 +947,86 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert len(history_payload) == 1
     assert history_payload[0]["id"] == publish_payload["id"]
     assert history_payload[0]["items"][0]["metaAdId"] == "meta_ad_123"
+
+
+def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_session, monkeypatch) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-run-custom-budget",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-run-custom-budget"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-run-custom-budget",
+        asset_brief_id=brief_id,
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-publish-run-custom-budget",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key == "creative/publish-run-custom-budget.jpg"
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            assert kwargs["ad_account_id"] == "act_123456"
+            return {"images": {kwargs["filename"]: {"hash": "hash_987"}}}
+
+        def create_campaign(self, **kwargs):
+            assert kwargs["payload"]["daily_budget"] == 25000
+            return {"id": "meta_campaign_custom_budget", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            return {"id": "meta_adset_custom_budget", "status": "PAUSED"}
+
+        def create_adcreative(self, **kwargs):
+            return {"id": "meta_creative_custom_budget"}
+
+        def create_ad(self, **kwargs):
+            return {"id": "meta_ad_custom_budget", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+            "campaignDailyBudget": 25000,
+        },
+    )
+
+    assert publish_response.status_code == 200
+    publish_payload = publish_response.json()
+    assert publish_payload["metadata"]["budgetScope"] == "campaign"
+    assert publish_payload["metadata"]["campaignDailyBudget"] == 25000
 
 
 def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(

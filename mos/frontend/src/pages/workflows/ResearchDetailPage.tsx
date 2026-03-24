@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, Copy, Download, ExternalLink } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { useWorkflowDetail, useWorkflowResearchArtifact } from "@/api/workflows";
+import {
+  useWorkflowDetail,
+  useWorkflowResearchArtifact,
+  useDownloadResearchMarkdown,
+  normalizeMarkdownContent,
+} from "@/api/workflows";
 import type { ResearchArtifactRef } from "@/types/common";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 
@@ -25,45 +30,11 @@ function isExternalDocUrl(value?: string): boolean {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
-function toJsonMarkdown(title: string, value: unknown): string {
-  let body = "";
-  try {
-    body = JSON.stringify(value, null, 2) || "null";
-  } catch {
-    body = String(value);
-  }
-  const heading = title.trim() ? `# ${title.trim()}\n\n` : "";
-  return `${heading}\`\`\`json\n${body}\n\`\`\`\n`;
-}
-
-function normalizeMarkdownContent(title: string, value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  if (typeof value !== "object") return String(value);
-
-  const asRecord = value as Record<string, unknown>;
-  const directContent = asRecord.content;
-  if (typeof directContent === "string" && directContent.trim()) return directContent;
-
-  const directMarkdown = asRecord.markdown;
-  if (typeof directMarkdown === "string" && directMarkdown.trim()) return directMarkdown;
-
-  const payload = asRecord.payload;
-  if (payload && typeof payload === "object") {
-    const payloadRecord = payload as Record<string, unknown>;
-    const payloadContent = payloadRecord.content;
-    if (typeof payloadContent === "string" && payloadContent.trim()) return payloadContent;
-    const payloadMarkdown = payloadRecord.markdown;
-    if (typeof payloadMarkdown === "string" && payloadMarkdown.trim()) return payloadMarkdown;
-  }
-
-  return toJsonMarkdown(title, value);
-}
-
 export function ResearchDetailPage() {
   const { workflowId, stepKey } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, isError } = useWorkflowDetail(workflowId);
+  const downloadMarkdown = useDownloadResearchMarkdown();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<number | null>(null);
 
@@ -144,14 +115,10 @@ export function ResearchDetailPage() {
   return (
     <div className="space-y-6">
       <div className="max-w-6xl mx-auto space-y-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-sm font-medium text-content-muted transition hover:text-content"
-        >
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
           Back
-        </button>
+        </Button>
 
         <PageHeader
           title={hasTitle ? resolvedTitle : "Research document"}
@@ -163,6 +130,28 @@ export function ResearchDetailPage() {
           actions={
             hasFullContent || canOpenExternalDoc ? (
               <div className="flex items-center gap-2">
+                {hasFullContent ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-content-muted hover:text-content"
+                    aria-label="Download as Markdown"
+                    title="Download as Markdown"
+                    disabled={downloadMarkdown.isPending}
+                    onClick={() => {
+                      if (workflowId && resolvedStepKey) {
+                        downloadMarkdown.mutate({
+                          workflowId,
+                          stepKey: resolvedStepKey,
+                          title: resolvedTitle,
+                        });
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                ) : null}
                 {hasFullContent ? (
                   <Button
                     type="button"

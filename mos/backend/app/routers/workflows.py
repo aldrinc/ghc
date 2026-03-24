@@ -1,12 +1,16 @@
+import io
 import json
 from datetime import datetime, timezone
 import hashlib
 import os
+import re
 from typing import Any
 from uuid import UUID, uuid4
+import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -382,6 +386,191 @@ def _normalize_strategy_v2_state_for_api(state: Any) -> dict[str, Any] | None:
         normalized_payload["candidates"] = _normalize_angle_gate_candidates(pending_payload.get("candidates"))
         normalized_state["pending_decision_payload"] = normalized_payload
     return normalized_state
+
+
+def _normalize_research_canon_artifact_refs(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        step_key = str(item.get("step_key") or "").strip()
+        title = str(item.get("title") or "").strip()
+        doc_url = str(item.get("doc_url") or "").strip()
+        doc_id = str(item.get("doc_id") or "").strip()
+        if not step_key or not title or not doc_url or not doc_id:
+            continue
+        normalized.append(
+            {
+                "step_key": step_key,
+                "title": title,
+                "doc_url": doc_url,
+                "doc_id": doc_id,
+            }
+        )
+    return normalized
+
+
+def _list_workflow_research_documents(
+    *,
+    session: Session,
+    org_id: str,
+    run: WorkflowRun,
+) -> list[dict[str, str]]:
+    research_repo = ResearchArtifactsRepository(session)
+    research_rows = research_repo.list_for_workflow_run(
+        org_id=org_id,
+        workflow_run_id=str(run.id),
+    )
+    canon_by_step: dict[str, dict[str, str]] = {}
+    step_summaries: dict[str, str] = {}
+
+    if run.client_id and run.product_id:
+        client_canon = ArtifactsRepository(session).get_latest_by_type(
+            org_id=org_id,
+            client_id=run.client_id,
+            artifact_type=ArtifactTypeEnum.client_canon,
+            product_id=run.product_id,
+        )
+        if client_canon and isinstance(client_canon.data, dict):
+            precanon_research = client_canon.data.get("precanon_research")
+            if isinstance(precanon_research, dict):
+                raw_step_summaries = precanon_research.get("step_summaries")
+                if isinstance(raw_step_summaries, dict):
+                    step_summaries = {
+                        str(key): str(value)
+                        for key, value in raw_step_summaries.items()
+                        if isinstance(key, str) and isinstance(value, str)
+                    }
+                for ref in _normalize_research_canon_artifact_refs(precanon_research.get("artifact_refs")):
+                    canon_by_step[ref["step_key"]] = ref
+
+    documents: list[dict[str, str]] = []
+    seen_steps: set[str] = set()
+
+    for row in research_rows:
+        step_key = str(getattr(row, "step_key", "") or "").strip()
+        if not step_key or step_key in seen_steps:
+            continue
+        seen_steps.add(step_key)
+        canon_ref = canon_by_step.get(step_key)
+        title = str(getattr(row, "title", "") or "").strip() or (
+            canon_ref["title"] if canon_ref else step_key
+        )
+        summary = str(getattr(row, "summary", "") or "").strip() or step_summaries.get(step_key, "")
+        doc_url = str(getattr(row, "doc_url", "") or "").strip() or (
+            canon_ref["doc_url"] if canon_ref else ""
+        )
+        doc_id = str(getattr(row, "doc_id", "") or "").strip() or (canon_ref["doc_id"] if canon_ref else "")
+        documents.append(
+            {
+                "step_key": step_key,
+                "title": title,
+                "doc_url": doc_url,
+                "doc_id": doc_id,
+                "summary": summary,
+            }
+        )
+
+    for step_key, canon_ref in canon_by_step.items():
+        if step_key in seen_steps:
+            continue
+        seen_steps.add(step_key)
+        documents.append(
+            {
+                "step_key": step_key,
+                "title": canon_ref["title"],
+                "doc_url": canon_ref["doc_url"],
+                "doc_id": canon_ref["doc_id"],
+                "summary": step_summaries.get(step_key, ""),
+            }
+        )
+
+    return documents
+
+
+def _load_research_document_content(
+    *,
+    session: Session,
+    org_id: str,
+    step_key: str,
+    title: str,
+    doc_url: str,
+    doc_id: str,
+) -> Any:
+    if not doc_id:
+        raise HTTPException(
+            status_code=500,
+            detail=f'Research artifact "{title or step_key}" is missing a doc_id.',
+        )
+
+    if doc_url.startswith("artifact://"):
+        artifact_id = doc_url.split("artifact://", 1)[1].strip() or doc_id
+        artifact = ArtifactsRepository(session).get(org_id=org_id, artifact_id=artifact_id)
+        if not artifact:
+            raise HTTPException(
+                status_code=404,
+                detail=f'Referenced artifact record was not found for "{title or step_key}".',
+            )
+        return artifact.data
+
+    if doc_url.startswith("drive-stub://"):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f'Research artifact "{title or step_key}" was persisted with a Drive stub; '
+                "full content is unavailable."
+            ),
+        )
+
+    try:
+        return download_drive_text_file(file_id=doc_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=502,
+            detail=f'Failed to download research artifact "{title or step_key}": {exc}',
+        ) from exc
+
+
+def _normalize_research_markdown_content(title: str, value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return ""
+    if not isinstance(value, dict):
+        return str(value)
+
+    direct_content = value.get("content")
+    if isinstance(direct_content, str) and direct_content.strip():
+        return direct_content
+
+    direct_markdown = value.get("markdown")
+    if isinstance(direct_markdown, str) and direct_markdown.strip():
+        return direct_markdown
+
+    payload = value.get("payload")
+    if isinstance(payload, dict):
+        payload_content = payload.get("content")
+        if isinstance(payload_content, str) and payload_content.strip():
+            return payload_content
+        payload_markdown = payload.get("markdown")
+        if isinstance(payload_markdown, str) and payload_markdown.strip():
+            return payload_markdown
+
+    try:
+        body = json.dumps(value, indent=2) or "null"
+    except TypeError:
+        body = str(value)
+    heading = f"# {title.strip()}\n\n" if title.strip() else ""
+    return f"{heading}```json\n{body}\n```\n"
+
+
+def _sanitize_research_filename(value: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "", value).strip().lower()
+    cleaned = re.sub(r"\s+", "-", cleaned)
+    cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-")
+    return cleaned[:80] or "document"
 
 
 def _require_nonempty_string(*, value: Any, field_name: str) -> str:
@@ -1110,6 +1299,69 @@ async def get_workflow_run(
     )
 
 
+@router.get("/{workflow_run_id}/research/download-all")
+def download_workflow_research_markdown_archive(
+    workflow_run_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    repo = WorkflowsRepository(session)
+    run = _resolve_workflow_run(
+        repo=repo,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+
+    documents = _list_workflow_research_documents(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+    )
+    if not documents:
+        raise HTTPException(status_code=404, detail="No research documents found for this workflow.")
+
+    used_filenames: dict[str, int] = {}
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for document in documents:
+            step_key = document["step_key"]
+            title = document["title"]
+            content = _normalize_research_markdown_content(
+                title or step_key,
+                _load_research_document_content(
+                    session=session,
+                    org_id=auth.org_id,
+                    step_key=step_key,
+                    title=title,
+                    doc_url=document["doc_url"],
+                    doc_id=document["doc_id"],
+                ),
+            )
+            if not content.strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f'Research artifact "{title or step_key}" has no content available to download.',
+                )
+            filename_base = _sanitize_research_filename(f"{step_key}-{title or step_key}")
+            duplicate_count = used_filenames.get(filename_base, 0)
+            used_filenames[filename_base] = duplicate_count + 1
+            archive_name = (
+                f"{filename_base}.md" if duplicate_count == 0 else f"{filename_base}-{duplicate_count + 1}.md"
+            )
+            zip_file.writestr(archive_name, content)
+
+    zip_buffer.seek(0)
+    archive_filename = f"research-documents-{_sanitize_research_filename(str(run.id))}.zip"
+    headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers=headers,
+    )
+
+
 @router.get("/{workflow_run_id}/research/{step_key}")
 def get_workflow_research_artifact(
     workflow_run_id: str,
@@ -1134,50 +1386,30 @@ def get_workflow_research_artifact(
     if not run:
         raise HTTPException(status_code=404, detail="Workflow run not found")
 
-    research_repo = ResearchArtifactsRepository(session)
-    record = research_repo.get_for_step(org_id=auth.org_id, workflow_run_id=str(run.id), step_key=step_key)
+    documents = _list_workflow_research_documents(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+    )
+    record = next((item for item in documents if item["step_key"] == step_key), None)
     if not record:
         raise HTTPException(status_code=404, detail="Research artifact not found for this step")
-
-    doc_url = getattr(record, "doc_url", None) or ""
-    doc_id = getattr(record, "doc_id", None) or ""
-    if not doc_id:
-        raise HTTPException(status_code=500, detail="Research artifact is missing a doc_id")
-
-    if isinstance(doc_url, str) and doc_url.startswith("artifact://"):
-        artifact_id = doc_url.split("artifact://", 1)[1].strip() or doc_id
-        artifact = ArtifactsRepository(session).get(org_id=auth.org_id, artifact_id=artifact_id)
-        if not artifact:
-            raise HTTPException(status_code=404, detail="Referenced artifact record was not found.")
-        return jsonable_encoder(
-            {
-                "step_key": record.step_key,
-                "title": record.title,
-                "doc_url": record.doc_url,
-                "doc_id": record.doc_id,
-                "summary": record.summary,
-                "content": artifact.data,
-            }
-        )
-
-    if isinstance(doc_url, str) and doc_url.startswith("drive-stub://"):
-        raise HTTPException(
-            status_code=409,
-            detail="Research artifact was persisted with a Drive stub; full content is unavailable.",
-        )
-
-    try:
-        content = download_drive_text_file(file_id=doc_id)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    content = _load_research_document_content(
+        session=session,
+        org_id=auth.org_id,
+        step_key=record["step_key"],
+        title=record["title"],
+        doc_url=record["doc_url"],
+        doc_id=record["doc_id"],
+    )
 
     return jsonable_encoder(
         {
-            "step_key": record.step_key,
-            "title": record.title,
-            "doc_url": record.doc_url,
-            "doc_id": record.doc_id,
-            "summary": record.summary,
+            "step_key": record["step_key"],
+            "title": record["title"],
+            "doc_url": record["doc_url"],
+            "doc_id": record["doc_id"],
+            "summary": record["summary"],
             "content": content,
         }
     )

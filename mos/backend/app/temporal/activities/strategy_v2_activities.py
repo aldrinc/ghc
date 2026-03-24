@@ -4933,6 +4933,7 @@ def _run_with_activity_heartbeats(
     phase: str,
     operation: str,
     heartbeat_payload: Mapping[str, Any],
+    progress_payload: Mapping[str, Any] | None = None,
     fn: Callable[[], Any],
     interval_seconds: float = 15.0,
 ) -> Any:
@@ -4952,6 +4953,10 @@ def _run_with_activity_heartbeats(
                 for key, value in heartbeat_payload.items():
                     if value is not None:
                         payload[str(key)] = value
+                if progress_payload is not None:
+                    for key, value in progress_payload.items():
+                        if value is not None:
+                            payload[str(key)] = value
                 activity.heartbeat(payload)
 
 
@@ -8411,19 +8416,31 @@ def _run_tagged_foundational_step(
         prompt_text=prompt_text,
         include_step4_prompt=include_step4_prompt,
     )
-    raw_output = _llm_generate_text(
-        prompt=guarded_prompt,
-        model=model,
-        use_reasoning=use_reasoning,
-        use_web_search=use_web_search,
-        max_tokens=max_tokens,
-        heartbeat_context={
-            "activity": "strategy_v2.run_voc_angle_pipeline",
-            "phase": "foundational",
-            "step_key": step_key,
-            "model": model,
-        },
+    heartbeat_context = {
+        "activity": "strategy_v2.run_voc_angle_pipeline",
+        "phase": "foundational",
+        "step_key": step_key,
+        "model": model,
+    }
+    progress_payload: dict[str, Any] = {}
+    raw_output = _run_with_activity_heartbeats(
+        phase="foundational",
+        operation=f"foundational_step_{step_key}_llm",
+        heartbeat_payload=heartbeat_context,
+        progress_payload=progress_payload,
+        fn=lambda: _llm_generate_text(
+            prompt=guarded_prompt,
+            model=model,
+            use_reasoning=use_reasoning,
+            use_web_search=use_web_search,
+            max_tokens=max_tokens,
+            progress_sink=progress_payload,
+        ),
     )
+    completed_payload = dict(heartbeat_context)
+    completed_payload.update({str(key): value for key, value in progress_payload.items() if value is not None})
+    completed_payload["status"] = "completed"
+    _heartbeat_safe(completed_payload)
     try:
         parsed = parse_step_output(
             step_key=step_key,
@@ -17004,13 +17021,6 @@ def prepare_strategy_v2_competitor_asset_candidates_activity(params: dict[str, A
     result: dict[str, Any] = {
         "candidates": selected_candidates,
         "candidate_summary": candidate_summary,
-        "apify_context": {
-            "ads_context": apify_context.get("ads_context"),
-            "social_video_observations": apify_context.get("social_video_observations"),
-            "external_voc_corpus": apify_context.get("external_voc_corpus"),
-            "proof_asset_candidates": apify_context.get("proof_asset_candidates"),
-            "summary": apify_context.get("summary"),
-        },
     }
     if step_payload_artifact_id:
         result["step_payload_artifact_id"] = step_payload_artifact_id

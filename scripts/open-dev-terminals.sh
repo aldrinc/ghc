@@ -8,6 +8,7 @@ CMD_TEMPORAL="cd \"$ROOT\" && ./scripts/start-temporal.sh"
 CMD_BACKEND="cd \"$ROOT\" && ./scripts/start-backend.sh"
 CMD_WORKER="cd \"$ROOT\" && SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh"
 CMD_FRONTEND="cd \"$ROOT\" && ./scripts/start-frontend.sh"
+CMD_MEDUSA="cd \"$ROOT\" && ./scripts/start-medusa.sh"
 
 if command -v osascript >/dev/null 2>&1; then
   # macOS Terminal
@@ -19,6 +20,7 @@ tell application "Terminal"
   do script "cd '$ROOT'; ./scripts/start-backend.sh"
   do script "cd '$ROOT'; SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh"
   do script "cd '$ROOT'; ./scripts/start-frontend.sh"
+  do script "cd '$ROOT'; ./scripts/start-medusa.sh"
   activate
 end tell
 EOF
@@ -32,6 +34,7 @@ if command -v gnome-terminal >/dev/null 2>&1; then
   gnome-terminal -- bash -lc "$CMD_BACKEND; exec bash" &
   gnome-terminal -- bash -lc "$CMD_WORKER; exec bash" &
   gnome-terminal -- bash -lc "$CMD_FRONTEND; exec bash" &
+  gnome-terminal -- bash -lc "$CMD_MEDUSA; exec bash" &
   exit 0
 fi
 
@@ -42,3 +45,4 @@ echo "$CMD_TEMPORAL"
 echo "$CMD_BACKEND"
 echo "$CMD_WORKER"
 echo "$CMD_FRONTEND"
+echo "$CMD_MEDUSA"

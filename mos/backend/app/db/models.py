@@ -41,11 +41,13 @@ from app.db.enums import (
     GeminiContextFileStatusEnum,
     CampaignStatusEnum,
     ClientStatusEnum,
+    CommerceProviderEnum,
     FunnelAssetKindEnum,
     FunnelAssetSourceEnum,
     FunnelAssetStatusEnum,
     FunnelDomainStatusEnum,
     FunnelEventTypeEnum,
+    FunnelExperienceKindEnum,
     FunnelPageReviewStatusEnum,
     FunnelPageVersionSourceEnum,
     FunnelPageVersionStatusEnum,
@@ -54,6 +56,9 @@ from app.db.enums import (
     MediaAssetTypeEnum,
     MediaMirrorStatusEnum,
     ResearchJobStatusEnum,
+    SiteFamilyEnum,
+    SitePageTypeEnum,
+    SiteTypeEnum,
     UserRoleEnum,
     WorkflowKindEnum,
     WorkflowStatusEnum,
@@ -79,7 +84,9 @@ class Org(Base):
 class OrgDeployDomain(Base):
     __tablename__ = "org_deploy_domains"
     __table_args__ = (
-        UniqueConstraint("org_id", "client_id", "hostname", name="uq_org_deploy_domains_org_client_hostname"),
+        UniqueConstraint(
+            "org_id", "client_id", "hostname", name="uq_org_deploy_domains_org_client_hostname"
+        ),
         sa.Index("idx_org_deploy_domains_org_client", "org_id", "client_id"),
     )
 
@@ -142,8 +149,8 @@ class Client(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     industry: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     primary_markets: Mapped[list[str]] = mapped_column(
-    ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
-)
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
     primary_languages: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -167,7 +174,9 @@ class Product(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     # Shopify-aligned attribute name; stored in legacy DB column "name".
     title: Mapped[str] = mapped_column("name", Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -181,6 +190,7 @@ class Product(Base):
     template_suffix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     shopify_product_gid: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    medusa_product_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     primary_benefits: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -204,7 +214,9 @@ class ProductOffer(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
@@ -239,10 +251,14 @@ class ProductVariant(Base):
     provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_price_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     option_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
-    compare_at_price: Mapped[Optional[int]] = mapped_column("compare_at_price_cents", Integer, nullable=True)
+    compare_at_price: Mapped[Optional[int]] = mapped_column(
+        "compare_at_price_cents", Integer, nullable=True
+    )
     sku: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     barcode: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    requires_shipping: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    requires_shipping: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("true")
+    )
     taxable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
     weight: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     weight_unit: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -250,26 +266,36 @@ class ProductVariant(Base):
     inventory_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     inventory_management: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     incoming: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-    next_incoming_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_incoming_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     unit_price: Mapped[Optional[int]] = mapped_column("unit_price_cents", Integer, nullable=True)
     unit_price_measurement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     quantity_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
-    quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
-    shopify_last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    shopify_last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     shopify_last_sync_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class ProductOfferBonus(Base):
     __tablename__ = "product_offer_bonuses"
     __table_args__ = (
-        UniqueConstraint("offer_id", "bonus_product_id", name="uq_product_offer_bonuses_offer_bonus_product"),
+        UniqueConstraint(
+            "offer_id", "bonus_product_id", name="uq_product_offer_bonuses_offer_bonus_product"
+        ),
         sa.Index("idx_product_offer_bonuses_offer", "offer_id"),
         sa.Index("idx_product_offer_bonuses_bonus_product", "bonus_product_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     offer_id: Mapped[str] = mapped_column(
         ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=False
     )
@@ -287,7 +313,9 @@ class Campaign(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
@@ -324,8 +352,12 @@ class CampaignDeliveryConfig(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
+    )
     delivery_mode: Mapped[CampaignDeliveryModeEnum] = mapped_column(
         Enum(CampaignDeliveryModeEnum, name="campaign_delivery_mode"),
         nullable=False,
@@ -362,7 +394,9 @@ class Funnel(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     design_system_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("design_systems.id", ondelete="SET NULL"), nullable=True
     )
@@ -391,6 +425,12 @@ class Funnel(Base):
     active_publication_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("funnel_publications.id", ondelete="SET NULL"), nullable=True
     )
+    experience_kind: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, server_default="funnel"
+    )
+    site_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    site_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    commerce_provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -425,6 +465,7 @@ class FunnelPage(Base):
         server_default=FunnelPageReviewStatusEnum.draft.value,
     )
     ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -506,7 +547,9 @@ class FunnelPublicationPage(Base):
 
 class FunnelPublicationLink(Base):
     __tablename__ = "funnel_publication_links"
-    __table_args__ = (sa.Index("idx_funnel_publication_links_pub_from", "publication_id", "from_page_id"),)
+    __table_args__ = (
+        sa.Index("idx_funnel_publication_links_pub_from", "publication_id", "from_page_id"),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     publication_id: Mapped[str] = mapped_column(
@@ -563,7 +606,9 @@ class FunnelDomain(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     funnel_id: Mapped[str] = mapped_column(
         ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
     )
@@ -591,7 +636,9 @@ class FunnelAsset(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     public_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, default=uuid4)
     kind: Mapped[FunnelAssetKindEnum] = mapped_column(
         Enum(FunnelAssetKindEnum, name="funnel_asset_kind"), nullable=False
@@ -633,7 +680,9 @@ class FunnelEvent(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
     )
@@ -672,8 +721,12 @@ class FunnelOrder(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    funnel_id: Mapped[str] = mapped_column(ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
     publication_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("funnel_publications.id", ondelete="SET NULL"), nullable=True
     )
@@ -705,14 +758,18 @@ class Artifact(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
     )
-    type: Mapped[ArtifactTypeEnum] = mapped_column(Enum(ArtifactTypeEnum, name="artifact_type"), nullable=False)
+    type: Mapped[ArtifactTypeEnum] = mapped_column(
+        Enum(ArtifactTypeEnum, name="artifact_type"), nullable=False
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     created_by_user: Mapped[Optional[str]] = mapped_column(
@@ -726,7 +783,9 @@ class Artifact(Base):
 class ResearchArtifact(Base):
     __tablename__ = "research_artifacts"
     __table_args__ = (
-        UniqueConstraint("org_id", "workflow_run_id", "step_key", name="uq_research_artifacts_run_step"),
+        UniqueConstraint(
+            "org_id", "workflow_run_id", "step_key", name="uq_research_artifacts_run_step"
+        ),
         sa.Index("idx_research_artifacts_run", "org_id", "workflow_run_id"),
         sa.Index("idx_research_artifacts_created_at", "created_at"),
     )
@@ -867,8 +926,12 @@ class Experiment(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     experiment_spec_artifact_id: Mapped[str] = mapped_column(
         ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False
@@ -891,7 +954,9 @@ class Asset(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
     )
@@ -917,7 +982,9 @@ class Asset(Base):
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
-    funnel_id: Mapped[Optional[str]] = mapped_column(ForeignKey("funnels.id", ondelete="SET NULL"), nullable=True)
+    funnel_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnels.id", ondelete="SET NULL"), nullable=True
+    )
     icp_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     funnel_stage_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     concept_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1003,7 +1070,9 @@ class CreativeServiceRun(Base):
 class CreativeServiceTurn(Base):
     __tablename__ = "creative_service_turns"
     __table_args__ = (
-        UniqueConstraint("run_id", "remote_turn_id", name="uq_creative_service_turns_run_remote_turn"),
+        UniqueConstraint(
+            "run_id", "remote_turn_id", name="uq_creative_service_turns_run_remote_turn"
+        ),
         sa.Index("idx_creative_service_turns_run_idx", "run_id", "turn_index"),
         sa.Index(
             "uq_creative_service_turns_idempotency_key",
@@ -1098,7 +1167,9 @@ class AssetPerformanceSnapshot(Base):
     __tablename__ = "asset_performance_snapshots"
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     experiment_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("experiments.id", ondelete="SET NULL"), nullable=True
     )
@@ -1114,7 +1185,9 @@ class AssetPerformanceSnapshot(Base):
 class MetaAdAccountConnection(Base):
     __tablename__ = "meta_ad_account_connections"
     __table_args__ = (
-        UniqueConstraint("org_id", "ad_account_id", name="uq_meta_ad_account_connections_org_account"),
+        UniqueConstraint(
+            "org_id", "ad_account_id", name="uq_meta_ad_account_connections_org_account"
+        ),
         sa.Index("idx_meta_ad_account_connections_org_status", "org_id", "status"),
     )
 
@@ -1126,14 +1199,24 @@ class MetaAdAccountConnection(Base):
     business_manager_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     business_manager_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     graph_api_version: Mapped[str] = mapped_column(Text, nullable=False)
-    graph_api_base_url: Mapped[str] = mapped_column(Text, nullable=False, server_default="https://graph.facebook.com")
-    credential_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="access_token")
+    graph_api_base_url: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="https://graph.facebook.com"
+    )
+    credential_type: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="access_token"
+    )
     credentials_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    credentials_last_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    credentials_last_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
     validation_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
-    last_validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
@@ -1169,12 +1252,16 @@ class MetaWorkspaceAdConfig(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     meta_connection_id: Mapped[str] = mapped_column(
         ForeignKey("meta_ad_account_connections.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
     page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     page_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1189,7 +1276,9 @@ class MetaWorkspaceAdConfig(Base):
     attribution_view_window: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     view_through_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     validation_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
-    last_validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
@@ -1207,13 +1296,17 @@ class MetaAssetUpload(Base):
     __tablename__ = "meta_asset_uploads"
     __table_args__ = (
         UniqueConstraint("org_id", "ad_account_id", "asset_id", name="uq_meta_asset_upload_asset"),
-        UniqueConstraint("org_id", "ad_account_id", "request_id", name="uq_meta_asset_upload_request"),
+        UniqueConstraint(
+            "org_id", "ad_account_id", "request_id", name="uq_meta_asset_upload_request"
+        ),
         sa.Index("idx_meta_asset_uploads_org_asset", "org_id", "asset_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     meta_workspace_config_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("meta_workspace_ad_configs.id", ondelete="SET NULL"), nullable=True
     )
@@ -1234,7 +1327,9 @@ class MetaAssetUpload(Base):
 class MetaAdCreative(Base):
     __tablename__ = "meta_ad_creatives"
     __table_args__ = (
-        UniqueConstraint("org_id", "ad_account_id", "request_id", name="uq_meta_ad_creatives_request"),
+        UniqueConstraint(
+            "org_id", "ad_account_id", "request_id", name="uq_meta_ad_creatives_request"
+        ),
         sa.Index("idx_meta_ad_creatives_org_asset", "org_id", "asset_id"),
     )
 
@@ -1367,7 +1462,9 @@ class MetaCreativeSpec(Base):
     experiment_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("experiments.id", ondelete="SET NULL"), nullable=True
     )
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     primary_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     headline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1431,7 +1528,9 @@ class MetaAdSetSpec(Base):
 
 class CompanySwipeBrand(Base):
     __tablename__ = "company_swipe_brands"
-    __table_args__ = (UniqueConstraint("org_id", "external_brand_id", name="uq_company_swipe_brand_org_ext"),)
+    __table_args__ = (
+        UniqueConstraint("org_id", "external_brand_id", name="uq_company_swipe_brand_org_ext"),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
@@ -1449,9 +1548,22 @@ class CompanySwipeBrand(Base):
 
 class CompanySwipeAsset(Base):
     __tablename__ = "company_swipe_assets"
+    __table_args__ = (
+        sa.Index("idx_company_swipe_assets_org_analysis_status", "org_id", "analysis_status"),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    source_kind: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=sa.text("'catalog'"),
+    )
+    origin_system: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=sa.text("'internal_seed_set'"),
+    )
     external_ad_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_platform_ad_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     brand_id: Mapped[Optional[str]] = mapped_column(
@@ -1483,7 +1595,9 @@ class CompanySwipeAsset(Base):
     gender_audience: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     eu_total_reach: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     ad_spend_range_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    ad_spend_range_score_data: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    ad_spend_range_score_data: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
     added_human_time: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     added_by_user_human_time: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     saved_by_this_user: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -1497,6 +1611,28 @@ class CompanySwipeAsset(Base):
     ad_reach_by_location: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     ad_spend: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     ad_library_object: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    analysis_status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=sa.text("'ready'"),
+    )
+    analysis_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    analysis_model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    analysis_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ad_unit_format: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    placement_shape: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    channel: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    destination_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    funnel_stage: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    angle_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    hook_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    visual_archetype: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    product_presence: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    proof_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    claim_risk: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    product_image_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1532,12 +1668,59 @@ class CompanySwipeMedia(Base):
     )
 
 
+class SwipeCollection(Base):
+    __tablename__ = "swipe_collections"
+    __table_args__ = (
+        UniqueConstraint("org_id", "name", name="uq_swipe_collections_org_name"),
+        sa.Index("idx_swipe_collections_org_kind", "org_id", "kind"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    cloned_from_collection_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("swipe_collections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SwipeCollectionItem(Base):
+    __tablename__ = "swipe_collection_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_id", "swipe_asset_id", name="uq_swipe_collection_items_collection_asset"
+        ),
+        sa.Index("idx_swipe_collection_items_org_collection", "org_id", "collection_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    collection_id: Mapped[str] = mapped_column(
+        ForeignKey("swipe_collections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    swipe_asset_id: Mapped[str] = mapped_column(
+        ForeignKey("company_swipe_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ClientSwipeAsset(Base):
     __tablename__ = "client_swipe_assets"
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     company_swipe_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("company_swipe_assets.id", ondelete="SET NULL"), nullable=True
     )
@@ -1598,7 +1781,9 @@ class StrategyV2Launch(Base):
             "selected_ums_id",
             name="uq_strategy_v2_launches_org_angle_run_ums",
         ),
-        sa.Index("idx_strategy_v2_launches_source_run", "org_id", "source_strategy_v2_workflow_run_id"),
+        sa.Index(
+            "idx_strategy_v2_launches_source_run", "org_id", "source_strategy_v2_workflow_run_id"
+        ),
         sa.Index("idx_strategy_v2_launches_campaign", "org_id", "campaign_id"),
         sa.Index("idx_strategy_v2_launches_angle", "org_id", "client_id", "product_id", "angle_id"),
         sa.Index("idx_strategy_v2_launches_created_at", "created_at"),
@@ -1610,8 +1795,12 @@ class StrategyV2Launch(Base):
         ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False
     )
     source_strategy_v2_temporal_workflow_id: Mapped[str] = mapped_column(Text, nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
     )
@@ -1737,9 +1926,7 @@ class AgentToolCall(Base):
 
 class AgentArtifact(Base):
     __tablename__ = "agent_artifacts"
-    __table_args__ = (
-        sa.Index("idx_agent_artifacts_run_kind", "run_id", "kind"),
-    )
+    __table_args__ = (sa.Index("idx_agent_artifacts_run_kind", "run_id", "kind"),)
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     run_id: Mapped[str] = mapped_column(
@@ -1758,7 +1945,9 @@ class OnboardingPayload(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
@@ -1812,17 +2001,30 @@ class ProductBrandRelationship(Base):
             "relationship_type",
             name="uq_product_brand_relationship",
         ),
-        sa.Index("idx_product_brand_relationships_org_client_product", "org_id", "client_id", "product_id"),
-        sa.Index("idx_product_brand_relationships_org_client_brand", "org_id", "client_id", "brand_id"),
+        sa.Index(
+            "idx_product_brand_relationships_org_client_product",
+            "org_id",
+            "client_id",
+            "product_id",
+        ),
+        sa.Index(
+            "idx_product_brand_relationships_org_client_brand", "org_id", "client_id", "brand_id"
+        ),
         sa.Index("idx_product_brand_relationships_product", "product_id"),
         sa.Index("idx_product_brand_relationships_brand", "brand_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     relationship_type: Mapped[ProductBrandRelationshipTypeEnum] = mapped_column(
         Enum(ProductBrandRelationshipTypeEnum, name="product_brand_relationship_type"),
         nullable=False,
@@ -1897,7 +2099,9 @@ class BrandUserPreference(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     user_external_id: Mapped[str] = mapped_column(Text, nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
     created_at: Mapped[datetime] = mapped_column(
@@ -1918,7 +2122,9 @@ class ClientUserPreference(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     user_external_id: Mapped[str] = mapped_column(Text, nullable=False)
     active_product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
@@ -1936,15 +2142,49 @@ class ClientUserPreference(Base):
 class ClientShopifyAppCredential(Base):
     __tablename__ = "client_shopify_app_credentials"
     __table_args__ = (
-        UniqueConstraint("org_id", "client_id", name="uq_client_shopify_app_credentials_org_client"),
+        UniqueConstraint(
+            "org_id", "client_id", name="uq_client_shopify_app_credentials_org_client"
+        ),
         sa.Index("idx_client_shopify_app_credentials_org_client", "org_id", "client_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     api_key: Mapped[str] = mapped_column(Text, nullable=False)
     api_secret: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ClientMedusaConfig(Base):
+    __tablename__ = "client_medusa_configs"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_client_medusa_configs_org_client"),
+        sa.Index("idx_client_medusa_configs_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    base_url: Mapped[str] = mapped_column(Text, nullable=False)
+    admin_api_key_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    publishable_key_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    connection_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=sa.text("'not_configured'")
+    )
+    last_connection_check_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_connection_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1962,7 +2202,9 @@ class ClientComplianceProfile(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     ruleset_version: Mapped[str] = mapped_column(Text, nullable=False)
     business_models: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
@@ -1984,7 +2226,9 @@ class ClientComplianceProfile(Base):
     shipping_policy_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     contact_support_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     company_information_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    subscription_terms_and_cancellation_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    subscription_terms_and_cancellation_url: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
 
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
@@ -2007,14 +2251,23 @@ class MetaPublishSelection(Base):
             "asset_id",
             name="uq_meta_publish_selections_org_campaign_generation_asset",
         ),
-        sa.Index("idx_meta_publish_selections_org_campaign_generation", "org_id", "campaign_id", "generation_key"),
+        sa.Index(
+            "idx_meta_publish_selections_org_campaign_generation",
+            "org_id",
+            "campaign_id",
+            "generation_key",
+        ),
         sa.Index("idx_meta_publish_selections_org_asset", "org_id", "asset_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
+    )
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     generation_key: Mapped[str] = mapped_column(Text, nullable=False)
     decision: Mapped[str] = mapped_column(Text, nullable=False)
     decided_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2038,7 +2291,9 @@ class MetaPublishRun(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    campaign_id: Mapped[str] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
+    )
     generation_key: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
     campaign_name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -2082,7 +2337,9 @@ class MetaPublishRunItem(Base):
     publish_run_id: Mapped[str] = mapped_column(
         ForeignKey("meta_publish_runs.id", ondelete="CASCADE"), nullable=False
     )
-    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
     creative_spec_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("meta_creative_specs.id", ondelete="SET NULL"), nullable=True
     )
@@ -2110,13 +2367,20 @@ class MetaPublishRunItem(Base):
 class PaidAdsPlatformProfile(Base):
     __tablename__ = "paid_ads_platform_profiles"
     __table_args__ = (
-        UniqueConstraint("org_id", "client_id", "platform", name="uq_paid_ads_platform_profiles_org_client_platform"),
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "platform",
+            name="uq_paid_ads_platform_profiles_org_client_platform",
+        ),
         sa.Index("idx_paid_ads_platform_profiles_org_client", "org_id", "client_id"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     platform: Mapped[str] = mapped_column(Text, nullable=False)
     ruleset_version: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -2130,7 +2394,9 @@ class PaidAdsPlatformProfile(Base):
     payment_method_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     pixel_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     data_set_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    data_set_shopify_partner_installed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    data_set_shopify_partner_installed: Mapped[Optional[bool]] = mapped_column(
+        Boolean, nullable=True
+    )
     data_set_data_sharing_level: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     data_set_assigned_to_ad_account: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     verified_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2160,7 +2426,9 @@ class PaidAdsQaRun(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
     campaign_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=True
     )
@@ -2173,7 +2441,9 @@ class PaidAdsQaRun(Base):
     high_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     medium_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     low_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    needs_manual_review_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    needs_manual_review_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
     checked_rule_ids: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -2215,7 +2485,9 @@ class PaidAdsQaFinding(Base):
     evidence_json: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
     )
-    needs_verification: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    needs_verification: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
     source_id: Mapped[str] = mapped_column(Text, nullable=False)
     source_title: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2471,6 +2743,161 @@ class ShopifyThemeTemplateDraftVersion(Base):
     )
 
 
+class SiteImport(Base):
+    __tablename__ = "site_imports"
+    __table_args__ = (
+        sa.Index("idx_site_imports_org_client", "org_id", "client_id"),
+        sa.Index("idx_site_imports_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_hostname: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_type_hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    capture_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    suggested_template_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    theme_candidate: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    normalized_sections: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteImportSnapshot(Base):
+    __tablename__ = "site_import_snapshots"
+    __table_args__ = (
+        UniqueConstraint("site_import_id", name="uq_site_import_snapshots_site_import"),
+        sa.Index("idx_site_import_snapshots_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_import_id: Mapped[str] = mapped_column(
+        ForeignKey("site_imports.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    html_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    desktop_screenshot_data_url: Mapped[str] = mapped_column(Text, nullable=False)
+    mobile_screenshot_data_url: Mapped[str] = mapped_column(Text, nullable=False)
+    capture_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class TemplateStylePreset(Base):
+    __tablename__ = "template_style_presets"
+    __table_args__ = (sa.Index("idx_template_style_presets_org_client", "org_id", "client_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    site_import_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_imports.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    tokens: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class TemplateVariant(Base):
+    __tablename__ = "template_variants"
+    __table_args__ = (
+        sa.Index("idx_template_variants_org_client", "org_id", "client_id"),
+        sa.Index("idx_template_variants_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    site_import_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_imports.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    style_preset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("template_style_presets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    family: Mapped[str] = mapped_column(Text, nullable=False)
+    page_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    accepted_sections: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    provenance: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class AdIngestRun(Base):
     __tablename__ = "ad_ingest_runs"
 
@@ -2494,7 +2921,9 @@ class AdIngestRun(Base):
         nullable=False,
         server_default=AdIngestStatusEnum.RUNNING.value,
     )
-    is_partial: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    is_partial: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
     results_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     items_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2524,7 +2953,9 @@ class AdLibraryPageTotal(Base):
     research_run_id: Mapped[str] = mapped_column(
         ForeignKey("research_runs.id", ondelete="CASCADE"), nullable=False
     )
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     brand_channel_identity_id: Mapped[str] = mapped_column(
         ForeignKey("brand_channel_identities.id", ondelete="CASCADE"),
         nullable=False,
@@ -2562,7 +2993,9 @@ class Ad(Base):
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     brand_channel_identity_id: Mapped[str] = mapped_column(
         ForeignKey("brand_channel_identities.id", ondelete="CASCADE"), nullable=False
     )
@@ -2571,11 +3004,19 @@ class Ad(Base):
     )
     external_ad_id: Mapped[str] = mapped_column(Text, nullable=False)
     ad_status: Mapped[AdStatusEnum] = mapped_column(
-        Enum(AdStatusEnum, name="ad_status"), nullable=False, server_default=AdStatusEnum.unknown.value
+        Enum(AdStatusEnum, name="ad_status"),
+        nullable=False,
+        server_default=AdStatusEnum.unknown.value,
     )
-    started_running_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    ended_running_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    first_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_running_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ended_running_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    first_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     body_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     headline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2609,7 +3050,9 @@ class AdFacts(Base):
 
     ad_id: Mapped[str] = mapped_column(ForeignKey("ads.id", ondelete="CASCADE"), primary_key=True)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     channel: Mapped[AdChannelEnum] = mapped_column(
         Enum(AdChannelEnum, name="ad_channel"), nullable=False
     )
@@ -2649,7 +3092,9 @@ class AdScore(Base):
 
     ad_id: Mapped[str] = mapped_column(ForeignKey("ads.id", ondelete="CASCADE"), primary_key=True)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     channel: Mapped[AdChannelEnum] = mapped_column(
         Enum(AdChannelEnum, name="ad_channel"), nullable=False
     )
@@ -2778,7 +3223,9 @@ class AdCreative(Base):
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
-    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id: Mapped[str] = mapped_column(
+        ForeignKey("brands.id", ondelete="CASCADE"), nullable=False
+    )
     channel: Mapped[AdChannelEnum] = mapped_column(
         Enum(AdChannelEnum, name="ad_channel"), nullable=False
     )
@@ -2860,7 +3307,9 @@ class AdTeardown(Base):
     raw_payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
     )
-    is_canonical: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    is_canonical: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("true")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -3018,9 +3467,7 @@ class AdTeardownAdCopyBlock(Base):
 
 class AdTeardownAssertion(Base):
     __tablename__ = "ad_teardown_assertions"
-    __table_args__ = (
-        sa.Index("idx_ad_teardown_assertions_type", "teardown_id", "assertion_type"),
-    )
+    __table_args__ = (sa.Index("idx_ad_teardown_assertions_type", "teardown_id", "assertion_type"),)
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     teardown_id: Mapped[str] = mapped_column(

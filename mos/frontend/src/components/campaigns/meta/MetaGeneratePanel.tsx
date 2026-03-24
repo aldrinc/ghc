@@ -1,3 +1,4 @@
+import { SwipeCollectionSelector } from "@/components/campaigns/SwipeCollectionSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -9,6 +10,9 @@ export function MetaGeneratePanel() {
     hasGeneratedAssets,
     generatePending,
     generateError,
+    campaign,
+    selectedSwipeCollectionId,
+    setSelectedSwipeCollectionId,
     handleGenerateAssets,
     preparePending,
     prepareAssetBriefIds,
@@ -36,8 +40,22 @@ export function MetaGeneratePanel() {
           Generate creative assets from briefs, then prepare internal Meta creative specs for review.
         </div>
 
+        <SwipeCollectionSelector
+          className="mt-4"
+          campaignId={campaign.id}
+          value={selectedSwipeCollectionId}
+          onChange={setSelectedSwipeCollectionId}
+          title="Swipe collection"
+          description="Meta creative generation uses this swipe collection as the explicit source set for remixing."
+        />
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => void handleGenerateAssets()} disabled={generatePending || !assetBriefIds.length}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void handleGenerateAssets()}
+            disabled={generatePending || !assetBriefIds.length || !selectedSwipeCollectionId}
+          >
             {generatePending ? "Starting…" : "Generate creatives"}
           </Button>
           <Button
