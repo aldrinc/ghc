@@ -695,21 +695,42 @@ export function CommerceRuntimeProvider({
 export function CommerceCatalogHero({ title, description }: { title?: string; description?: string }) {
   const runtime = useCommerceRuntime();
   if (!runtime) {
-    return <div className="p-4 text-sm text-content-muted">Commerce context not available</div>;
+    return <div className="p-4 text-sm text-neutral-400">Commerce context not available</div>;
   }
 
   // Use currentCategory if set (from ?category= query param), otherwise fall back to first category or generic
   const displayTitle = title || runtime.currentCategory?.name || runtime.categories[0]?.name || "Products";
   const displayDescription = description || runtime.currentCategory?.description || runtime.categories[0]?.description || "";
 
-  // Starter-style: centered with max-width like the starter
+  // Starter-style: full-width hero with large centered content
   return (
-    <section className="py-12">
-      <div className="mx-auto max-w-4xl px-6 text-center">
-        <h1 className="text-3xl font-bold text-zinc-900">{displayTitle}</h1>
-        {displayDescription && (
-          <p className="mt-4 text-lg text-zinc-500">{displayDescription}</p>
-        )}
+    <section className="h-[75vh] w-full border-b border-neutral-200 relative bg-neutral-100">
+      <div className="absolute inset-0 z-[1] flex flex-col justify-center items-center text-center px-6 sm:px-32 gap-6">
+        <span>
+          <p className="text-neutral-600 text-xs uppercase tracking-wider">
+            {displayDescription ? displayTitle : "Browse our collection"}
+          </p>
+          <h1 className="text-6xl leading-tight text-zinc-900 font-normal mt-6 mb-5">
+            {displayTitle}
+          </h1>
+          {displayDescription && (
+            <p className="leading-relaxed text-neutral-500 font-normal text-lg max-w-xl mx-auto">
+              {displayDescription}
+            </p>
+          )}
+        </span>
+        <button
+          onClick={() => {
+            // Scroll to products section
+            const productsEl = document.querySelector('[data-testid="products-list"]');
+            if (productsEl) {
+              productsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }}
+          className="px-6 py-2.5 border border-zinc-900 rounded-full text-sm font-medium text-zinc-900 hover:bg-zinc-900 hover:text-white transition-colors duration-200"
+        >
+          Browse Products
+        </button>
       </div>
     </section>
   );
@@ -722,16 +743,20 @@ export function CommerceCatalogHero({ title, description }: { title?: string; de
 export function CommerceProductGrid({ columns = 3 }: { columns?: number }) {
   const runtime = useCommerceRuntime();
   if (!runtime) {
-    return <div className="p-4 text-sm text-zinc-500">Commerce context not available</div>;
+    return <div className="p-4 text-sm text-neutral-500">Commerce context not available</div>;
   }
 
   const { products } = runtime;
 
   if (products.length === 0) {
-    return <div className="p-4 text-sm text-zinc-500">No products available</div>;
+    return (
+      <div className="rounded-lg bg-white p-8 text-center text-sm text-neutral-500 shadow-sm">
+        No products found.
+      </div>
+    );
   }
 
-  const gridCols = columns === 2 ? "md:grid-cols-2" : columns === 4 ? "md:grid-cols-4" : "md:grid-cols-3";
+  const gridCols = columns === 2 ? "small:grid-cols-2" : columns === 4 ? "small:grid-cols-4" : "small:grid-cols-3";
 
   const handleProductClick = (product: MedusaProduct) => {
     if (product.handle) {
@@ -781,49 +806,94 @@ export function CommerceProductGrid({ columns = 3 }: { columns?: number }) {
     return null;
   };
 
-  return (
-    <div className={`grid gap-6 ${gridCols}`}>
-      {products.map((product) => (
-        <div
-          key={product.id}
-          className="group cursor-pointer"
-          onClick={() => handleProductClick(product)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              handleProductClick(product);
-            }
-          }}
-          tabIndex={0}
-          role="button"
-        >
-          {/* Image */}
-          <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
-            {product.thumbnail ? (
-              <img
-                src={product.thumbnail}
-                alt={product.title}
-                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <span className="text-sm text-zinc-400">No image</span>
-              </div>
-            )}
-          </div>
+  const getInventoryQuantity = (product: MedusaProduct): number => {
+    return (product.variants || []).reduce((acc, v) => acc + ((v as Record<string, unknown>).inventory_quantity as number || 0), 0);
+  };
 
-          {/* Info */}
-          <div className="space-y-1">
-            <h3 className="text-sm font-medium text-zinc-900 line-clamp-1">{product.title}</h3>
-            {product.subtitle && (
-              <p className="text-xs text-zinc-500 line-clamp-1">{product.subtitle}</p>
-            )}
-            <p className="text-sm font-semibold text-zinc-900">
-              {formatPrice(product) || "Price not available"}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
+  return (
+    <ul className={`grid grid-cols-1 ${gridCols} gap-3`} data-testid="products-list">
+      {products.map((product) => {
+        const inventory = getInventoryQuantity(product);
+        const priceStr = formatPrice(product);
+        return (
+          <li key={product.id}>
+            <div
+              className="group cursor-pointer"
+              onClick={() => handleProductClick(product)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") handleProductClick(product);
+              }}
+              tabIndex={0}
+              role="button"
+              data-testid="product-wrapper"
+            >
+              <div className="flex flex-col gap-4 relative aspect-[3/5] w-full overflow-hidden p-4 bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] group-hover:shadow-[0_0_0_4px_rgba(0,0,0,0.1)] transition-shadow ease-in-out duration-150">
+                {/* Thumbnail */}
+                <div className="w-full flex-1 flex items-center justify-center p-8">
+                  {product.thumbnail ? (
+                    <img
+                      src={product.thumbnail}
+                      alt={product.title}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full w-full">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-12 h-12 text-neutral-300">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Product info */}
+                <div className="flex flex-col">
+                  <span className="text-neutral-500 text-[10px] uppercase tracking-wider">Brand</span>
+                  <span className="text-zinc-900 text-sm font-medium line-clamp-1" data-testid="product-title">
+                    {product.title}
+                  </span>
+                </div>
+
+                {/* Price */}
+                <div className="flex flex-col">
+                  <span className="text-zinc-900 font-semibold text-sm" data-testid="product-price">
+                    {priceStr ? `From ${priceStr}` : "Price not available"}
+                  </span>
+                  <span className="text-neutral-500 text-[10px]">Excl. VAT</span>
+                </div>
+
+                {/* Inventory + Quick add */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <span className={`text-lg leading-none ${
+                      inventory > 50 ? "text-green-500" :
+                      inventory > 0 ? "text-orange-500" :
+                      "text-red-500"
+                    }`}>
+                      &bull;
+                    </span>
+                    <span className="text-neutral-500 text-xs">
+                      {inventory > 0 ? `${inventory} left` : "Out of stock"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProductClick(product);
+                    }}
+                    className="rounded-full border border-neutral-200 p-1.5 hover:bg-neutral-100 transition-colors"
+                    title="View product"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-neutral-600">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -862,57 +932,64 @@ export function CommerceStoreTemplate({
   const isCategoryPage = currentCategory !== null && currentCategory !== undefined;
 
   return (
-    <div className="bg-zinc-50 min-h-screen">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8" data-testid="category-container">
+    <div className="bg-neutral-100 min-h-screen">
+      <div className="flex flex-col py-6 mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 gap-4" data-testid="category-container">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-zinc-500 mb-6">
-          <button
-            onClick={handleHomeClick}
-            className="hover:text-zinc-900 transition-colors"
-          >
+        <nav className="flex items-center gap-1.5 text-sm text-neutral-500">
+          <button onClick={handleHomeClick} className="hover:text-zinc-900 transition-colors">
             Home
           </button>
-          <span className="text-zinc-400">/</span>
-          <span className="text-zinc-900 font-medium">{categoryName}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-neutral-400">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+          {isCategoryPage ? (
+            <span className="text-zinc-900 font-medium">{currentCategory?.name}</span>
+          ) : (
+            <span className="text-zinc-900 font-medium">All Products</span>
+          )}
         </nav>
 
-        {/* Page header */}
-        <div className="mb-8">
-          {isCategoryPage ? (
-            <>
-              <h1 className="text-2xl font-semibold text-zinc-900">{currentCategory?.name}</h1>
-              <p className="mt-1 text-sm text-zinc-500">
-                {runtime?.products?.length || 0} product{(runtime?.products?.length || 0) !== 1 ? 's' : ''}
-              </p>
-            </>
-          ) : runtime?.storeName ? (
-            <>
-              <h1 className="text-2xl font-semibold text-zinc-900">{runtime.storeName}</h1>
-              <p className="mt-1 text-sm text-zinc-500">Browse our products</p>
-            </>
-          ) : null}
-        </div>
+        <div className="flex flex-col small:flex-row small:items-start gap-3">
+          {/* Left rail - B2B starter RefinementList style */}
+          <div className="flex flex-col divide-neutral-200 small:w-1/5 w-full gap-3">
+            {/* Search + Sort container */}
+            <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-0 overflow-hidden">
+              <div className="px-4 py-3 border-b border-neutral-100">
+                <input
+                  type="text"
+                  placeholder={`Search in ${categoryName}...`}
+                  disabled
+                  className="w-full text-sm text-zinc-900 placeholder:text-neutral-400 bg-transparent focus:outline-none"
+                  title="Search coming soon"
+                />
+              </div>
+              <div className="px-4 py-3">
+                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Sort by</span>
+                <select className="w-full mt-1 text-sm text-zinc-900 bg-transparent focus:outline-none" disabled>
+                  <option>Latest Arrivals</option>
+                  <option>Price: Low to High</option>
+                  <option>Price: High to Low</option>
+                </select>
+              </div>
+            </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left rail */}
-          <aside className="w-full lg:w-56 flex-shrink-0">
-            <div className="space-y-6">
-              {/* Categories */}
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-                  Categories
-                </h3>
-                <ul className="space-y-1">
-                  {parentCategories.slice(0, 8).map((cat) => {
+            {/* Categories list */}
+            {parentCategories.length > 0 && (
+              <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] overflow-hidden">
+                <div className="px-4 py-3 border-b border-neutral-100">
+                  <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Categories</span>
+                </div>
+                <ul className="p-2">
+                  {parentCategories.slice(0, 12).map((cat) => {
                     const isSelected = currentCategory?.id === cat.id;
                     return (
                       <li key={cat.id}>
                         <button
                           onClick={() => runtime?.navigateToCategory(cat.handle)}
-                          className={`w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors ${
+                          className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
                             isSelected
-                              ? 'bg-zinc-900 text-white font-medium'
-                              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+                              ? 'bg-neutral-100 text-zinc-900 font-medium'
+                              : 'text-neutral-600 hover:text-zinc-900 hover:bg-neutral-50'
                           }`}
                         >
                           {cat.name}
@@ -922,27 +999,11 @@ export function CommerceStoreTemplate({
                   })}
                 </ul>
               </div>
-
-              {/* Collections */}
-              {runtime?.collections && runtime.collections.length > 0 && (
-                <div className="pt-6 border-t border-zinc-200">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-                    Collections
-                  </h3>
-                  <ul className="space-y-2">
-                    {runtime.collections.slice(0, 6).map((col) => (
-                      <li key={col.id} className="text-sm text-zinc-600">
-                        {col.title}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </aside>
+            )}
+          </div>
 
           {/* Right: Product grid */}
-          <div className="flex-1 bg-white rounded-lg border border-zinc-200 p-6">
+          <div className="w-full">
             {children}
           </div>
         </div>
@@ -955,6 +1016,7 @@ export function CommerceStoreTemplate({
  * CommerceProductDetail - Product detail page content
  * Displays current product from runtime data with variants and add-to-cart.
  * Starter-style: left gallery, right info/actions on neutral surface, facts section, related products.
+ * Matches Medusa Next.js starter: stronger visual weight for gallery, cleaner info panel.
  */
 export function CommerceProductDetail() {
   const runtime = useCommerceRuntime();
@@ -1028,103 +1090,172 @@ export function CommerceProductDetail() {
     <div className="flex flex-col gap-y-2 my-2">
       {/* Main product section - starter-style grid */}
       <div
-        className="content-container grid grid-cols-1 md:grid-cols-2 gap-2 w-full h-fit"
+        className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-2 w-full h-fit"
         data-testid="product-container"
       >
-        {/* Left: Visual/Gallery area - stronger visual weight */}
-        <div className="bg-neutral-50 p-6 flex items-center justify-center small:p-10 rounded-lg min-h-[400px]">
-          {currentProduct.thumbnail ? (
-            <img
-              src={currentProduct.thumbnail}
-              alt={currentProduct.title}
-              className="h-auto max-h-[500px] w-full object-contain rounded-md"
-            />
-          ) : (
-            // Placeholder when no image - starter style
-            <div className="h-80 w-full flex items-center justify-center bg-neutral-100 rounded-md">
-              <span className="text-zinc-400 text-sm">No image available</span>
+        {/* Left: Visual/Gallery area - B2B starter style */}
+        <div className="flex flex-col justify-center items-center bg-neutral-100 p-8 pt-4 gap-6 w-full min-h-[500px]">
+          <div className="relative w-full flex-1 flex items-center justify-center p-8">
+            {currentProduct.thumbnail ? (
+              <img
+                src={currentProduct.thumbnail}
+                alt={currentProduct.title}
+                className="max-h-[500px] w-full object-contain"
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-64">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-16 h-16 text-neutral-300">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
+                </svg>
+              </div>
+            )}
+          </div>
+          {/* Image thumbnails if multiple images exist */}
+          {currentProduct.images && currentProduct.images.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {currentProduct.images.map((img: { id: string; url: string }, idx: number) => (
+                <div key={img.id || idx} className="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden border border-neutral-200">
+                  <img src={img.url} alt="" className="w-full h-full object-contain" />
+                </div>
+              ))}
             </div>
           )}
         </div>
-        
-        {/* Right: Info/Actions panel on neutral surface - starter style */}
-        <div className="flex flex-col bg-neutral-100 w-full gap-6 items-start justify-center small:p-20 p-6 h-full">
-          {/* Product info */}
-          <div className="w-full">
-            <h1 className="text-3xl font-bold text-zinc-900">{currentProduct.title}</h1>
+
+        {/* Right: Info/Actions panel on neutral surface - B2B starter style */}
+        <div className="flex flex-col bg-neutral-100 w-full gap-6 items-start justify-center small:p-16 p-6 h-full">
+          {/* Product info - B2B starter uses large 2.5rem heading */}
+          <div id="product-info" className="w-full">
+            <h1 className="text-[2.5rem] leading-10 text-zinc-900 font-normal" data-testid="product-title">
+              {currentProduct.title}
+            </h1>
             {currentProduct.subtitle && (
-              <p className="mt-1 text-lg text-zinc-500">{currentProduct.subtitle}</p>
-            )}
-            {currentProduct.description && (
-              <p className="mt-4 text-base text-zinc-600">{currentProduct.description}</p>
+              <p className="mt-4 text-2xl text-neutral-500 whitespace-pre-line" data-testid="product-description">
+                {currentProduct.subtitle}
+              </p>
             )}
           </div>
 
-          {/* Variant selector */}
+          {/* Price display - B2B starter style */}
+          {selectedVariant && selectedVariant.prices && selectedVariant.prices.length > 0 && selectedVariant.prices[0].amount != null && (
+            <div className="flex flex-col text-neutral-950">
+              <span className="font-medium text-xl" data-testid="product-price">
+                From {selectedVariant.prices[0].currency_code?.toUpperCase() || "USD"}{" "}
+                {((selectedVariant.prices[0].amount || 0) / 100).toFixed(2)}
+              </span>
+              <span className="text-neutral-600 text-[0.6rem]">Excl. VAT</span>
+            </div>
+          )}
+
+          {/* Variant selector - B2B starter style table-like */}
           {variants.length > 1 && (
             <div className="w-full">
-              <label className="block text-sm font-medium text-zinc-700 mb-2">Select Variant</label>
-              <select
-                value={selectedVariantId || ""}
-                onChange={(e) => setSelectedVariantId(e.target.value)}
-                className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
-              >
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.title}
-                  </option>
-                ))}
-              </select>
+              <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-neutral-50 border-b border-neutral-200">
+                      <th className="text-left px-4 py-2 font-medium text-neutral-600">Variant</th>
+                      <th className="text-right px-4 py-2 font-medium text-neutral-600">Price</th>
+                      <th className="text-center px-4 py-2 font-medium text-neutral-600">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((v) => {
+                      const isSelected = (selectedVariantId || variants[0]?.id) === v.id;
+                      const price = v.prices?.[0];
+                      return (
+                        <tr
+                          key={v.id}
+                          className={`border-b border-neutral-200 last:border-b-0 cursor-pointer transition-colors ${
+                            isSelected ? "bg-neutral-50" : "hover:bg-neutral-50"
+                          }`}
+                          onClick={() => setSelectedVariantId(v.id)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                isSelected ? "border-zinc-900" : "border-neutral-300"
+                              }`}>
+                                {isSelected && <div className="w-2 h-2 rounded-full bg-zinc-900" />}
+                              </div>
+                              <span className="text-zinc-900">{v.title}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-zinc-900">
+                            {price && price.amount != null
+                              ? `${price.currency_code?.toUpperCase() || "USD"} ${((price.amount || 0) / 100).toFixed(2)}`
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isSelected && (
+                              <div className="flex items-center justify-center">
+                                <div className="flex items-center border border-neutral-200 rounded-md">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setQuantity(Math.max(1, quantity - 1)); }}
+                                    className="px-2 py-1 text-neutral-500 hover:text-zinc-900 hover:bg-neutral-100 transition-colors"
+                                  >-</button>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={quantity}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="w-12 text-center border-x border-neutral-200 py-1 bg-transparent text-zinc-900 focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setQuantity(quantity + 1); }}
+                                    className="px-2 py-1 text-neutral-500 hover:text-zinc-900 hover:bg-neutral-100 transition-colors"
+                                  >+</button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* Price display */}
-          {selectedVariant && selectedVariant.prices && selectedVariant.prices.length > 0 && selectedVariant.prices[0].amount != null && (
-            <div className="text-2xl font-semibold text-zinc-900">
-              {selectedVariant.prices[0].currency_code?.toUpperCase() || "USD"}{" "}
-              {((selectedVariant.prices[0].amount || 0) / 100).toFixed(2)}
+          {/* Single variant: just quantity */}
+          {variants.length <= 1 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-neutral-600">Quantity</span>
+              <div className="flex items-center border border-neutral-200 rounded-md">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="px-3 py-1.5 text-neutral-500 hover:text-zinc-900 hover:bg-neutral-100 transition-colors"
+                >-</button>
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-14 text-center border-x border-neutral-200 py-1.5 bg-transparent text-zinc-900 focus:outline-none"
+                />
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="px-3 py-1.5 text-neutral-500 hover:text-zinc-900 hover:bg-neutral-100 transition-colors"
+                >+</button>
+              </div>
             </div>
           )}
-
-          {/* Quantity selector */}
-          <div className="flex items-center gap-4">
-            <label className="block text-sm font-medium text-zinc-700">Quantity</label>
-            <div className="flex items-center border border-zinc-300 rounded-md">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="px-3 py-2 text-zinc-600 hover:bg-zinc-50"
-              >
-                -
-              </button>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 text-center border-none focus:outline-none focus:ring-0 bg-transparent"
-              />
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="px-3 py-2 text-zinc-600 hover:bg-zinc-50"
-              >
-                +
-              </button>
-            </div>
-          </div>
 
           {/* Add to cart actions */}
-          <div className="flex gap-4 w-full">
+          <div className="flex gap-3 w-full">
             <button
               onClick={handleAddToCart}
               disabled={adding || !selectedVariant}
-              className="flex-1 rounded-full bg-zinc-900 px-8 py-3 font-semibold text-white disabled:opacity-50 hover:bg-zinc-800 transition-colors"
+              className="flex-1 h-10 rounded-full bg-zinc-900 px-8 text-sm font-medium text-white disabled:opacity-50 hover:bg-zinc-800 transition-colors shadow-none"
             >
               {adding ? "Adding..." : "Add to Cart"}
             </button>
             {added && (
               <button
                 onClick={handleViewCart}
-                className="rounded-full border border-zinc-300 bg-white px-6 py-3 font-semibold text-zinc-900 hover:bg-zinc-50 transition-colors"
+                className="h-10 rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.1)] bg-white px-6 text-sm font-medium text-zinc-900 hover:bg-neutral-100 transition-colors"
               >
                 View Cart
               </button>
@@ -1132,67 +1263,118 @@ export function CommerceProductDetail() {
           </div>
 
           {runtime.cartError && (
-            <p className="mt-2 text-sm text-red-500">{runtime.cartError}</p>
+            <p className="mt-2 text-sm text-red-600">{runtime.cartError}</p>
           )}
         </div>
       </div>
 
-      {/* Product facts/details section - starter style tabs-like structure */}
-      <div className="content-container">
-        <div className="border-t border-zinc-200 pt-8">
-          <h2 className="text-xl font-semibold text-zinc-900 mb-4">Product Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Materials / Ingredients if available */}
-            <div className="bg-white rounded-lg border border-zinc-200 p-4">
-              <h3 className="text-sm font-semibold text-zinc-700 mb-2">Materials</h3>
-              <p className="text-sm text-zinc-500">
-                {currentProduct.metadata?.materials as string || "View product details for material information."}
-              </p>
+      {/* Product tabs/details section - B2B starter accordion style */}
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-y-2">
+          {/* Description accordion */}
+          <details className="bg-neutral-100 rounded-lg group" open>
+            <summary className="flex items-center justify-between cursor-pointer small:px-16 px-6 py-6 text-lg font-medium text-zinc-900">
+              Description
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-neutral-500 group-open:rotate-180 transition-transform">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </summary>
+            <div className="small:px-16 px-6 pb-8 text-sm text-neutral-700 leading-relaxed max-w-2xl">
+              {currentProduct.description || "No description available."}
             </div>
-            {/* Dimensions / specs */}
-            <div className="bg-white rounded-lg border border-zinc-200 p-4">
-              <h3 className="text-sm font-semibold text-zinc-700 mb-2">Specifications</h3>
-              <p className="text-sm text-zinc-500">
-                {currentProduct.metadata?.specifications as string || "View product details for specifications."}
-              </p>
+          </details>
+
+          {/* Specifications accordion */}
+          <details className="bg-neutral-100 rounded-lg group">
+            <summary className="flex items-center justify-between cursor-pointer small:px-16 px-6 py-6 text-lg font-medium text-zinc-900">
+              Specifications
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-neutral-500 group-open:rotate-180 transition-transform">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </summary>
+            <div className="small:px-16 px-6 pb-8">
+              <table className="w-full text-sm rounded-lg overflow-hidden border border-neutral-200">
+                <tbody>
+                  {currentProduct.weight && (
+                    <tr className="border-b border-neutral-200">
+                      <td className="px-4 py-3 border-r border-neutral-200 font-medium text-zinc-900">Weight</td>
+                      <td className="px-4 py-3 text-neutral-700">{currentProduct.weight} grams</td>
+                    </tr>
+                  )}
+                  {(currentProduct.height || currentProduct.width || currentProduct.length) && (
+                    <tr className="border-b border-neutral-200">
+                      <td className="px-4 py-3 border-r border-neutral-200 font-medium text-zinc-900">Dimensions</td>
+                      <td className="px-4 py-3 text-neutral-700">
+                        {currentProduct.height || "-"}mm x {currentProduct.width || "-"}mm x {currentProduct.length || "-"}mm
+                      </td>
+                    </tr>
+                  )}
+                  {currentProduct.metadata && Object.entries(currentProduct.metadata).map(([key, value]) => (
+                    <tr key={key} className="border-b border-neutral-200 last:border-b-0">
+                      <td className="px-4 py-3 border-r border-neutral-200 font-medium text-zinc-900">{key}</td>
+                      <td className="px-4 py-3 text-neutral-700">{value as string}</td>
+                    </tr>
+                  ))}
+                  {!currentProduct.weight && !currentProduct.height && !currentProduct.metadata && (
+                    <tr>
+                      <td className="px-4 py-3 text-neutral-500" colSpan={2}>No specifications available.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
+          </details>
         </div>
       </div>
 
-      {/* Related products section - starter style */}
+      {/* Related products section - B2B starter style */}
       {relatedProducts.length > 0 && (
-        <div 
-          className="content-container"
+        <div
+          className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 py-12"
           data-testid="related-products-container"
         >
-          <div className="border-t border-zinc-200 pt-8">
-            <h2 className="text-xl font-semibold text-zinc-900 mb-6">Related Products</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {relatedProducts.map((product) => (
+          <div className="flex justify-between mb-8">
+            <span className="text-base font-medium text-zinc-900">Related Products</span>
+          </div>
+          <ul className="grid grid-cols-1 small:grid-cols-4 gap-3">
+            {relatedProducts.map((product) => (
+              <li key={product.id}>
                 <div
-                  key={product.id}
-                  className="rounded-lg border border-zinc-200 bg-white p-3 cursor-pointer hover:border-zinc-400 hover:shadow-sm transition-all"
+                  className="flex flex-col gap-3 p-4 bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] cursor-pointer hover:shadow-[0_0_0_4px_rgba(0,0,0,0.1)] transition-shadow ease-in-out duration-150"
                   onClick={() => handleProductClick(product)}
                 >
-                  {product.thumbnail && (
-                    <img
-                      src={product.thumbnail}
-                      alt={product.title}
-                      className="mb-3 h-32 w-full rounded-md object-cover"
-                    />
+                  {product.thumbnail ? (
+                    <div className="aspect-square bg-neutral-50 rounded-md flex items-center justify-center p-4">
+                      <img
+                        src={product.thumbnail}
+                        alt={product.title}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-square bg-neutral-50 rounded-md flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-8 h-8 text-neutral-300">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
+                      </svg>
+                    </div>
                   )}
-                  <h3 className="text-sm font-semibold text-zinc-900 line-clamp-1">{product.title}</h3>
+                  <div className="flex flex-col">
+                    <span className="text-neutral-500 text-[10px] uppercase tracking-wider">Brand</span>
+                    <span className="text-sm font-medium text-zinc-900 line-clamp-1">{product.title}</span>
+                  </div>
                   {product.variants?.[0]?.prices?.[0] && product.variants[0].prices[0].amount != null && (
-                    <p className="mt-1 text-sm font-medium text-zinc-700">
-                      {product.variants[0].prices[0].currency_code?.toUpperCase() || "USD"}{" "}
-                      {((product.variants[0].prices[0].amount || 0) / 100).toFixed(2)}
-                    </p>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-zinc-900">
+                        {product.variants[0].prices[0].currency_code?.toUpperCase() || "USD"}{" "}
+                        {((product.variants[0].prices[0].amount || 0) / 100).toFixed(2)}
+                      </span>
+                      <span className="text-neutral-500 text-[10px]">Excl. VAT</span>
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -1209,17 +1391,17 @@ export function CommerceCart() {
   const [updating, setUpdating] = useState<string | null>(null);
 
   if (!runtime) {
-    return <div className="p-4 text-sm text-content-muted">Commerce context not available</div>;
+    return <div className="p-4 text-sm text-neutral-400">Commerce context not available</div>;
   }
 
   const { cart, cartLoading } = runtime;
 
   if (cartLoading && !cart) {
-    return <div className="p-4 text-sm text-content-muted">Loading cart...</div>;
+    return <div className="p-4 text-sm text-neutral-400">Loading cart...</div>;
   }
 
   if (!cart || !cart.items || cart.items.length === 0) {
-    return <div className="p-8 text-sm text-content-muted text-center">Your cart is empty</div>;
+    return <div className="p-8 text-sm text-neutral-400 text-center">Your cart is empty</div>;
   }
 
   const handleUpdateQuantity = async (lineId: string, newQuantity: number) => {
@@ -1246,114 +1428,140 @@ export function CommerceCart() {
     return `${cart.currency_code.toUpperCase()} ${(amount / 100).toFixed(2)}`;
   };
 
-  // B2B starter style: item list and summary separation - stronger layout
+  // B2B starter style cart layout
   return (
     <div className="small:py-12 py-6 bg-neutral-100">
-      <div className="content-container" data-testid="cart-container">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8" data-testid="cart-container">
         <div className="flex flex-col py-6 gap-y-6">
-          {/* Header with item count - starter style heading */}
-          <div className="pb-3 flex items-center border-b border-zinc-200">
-            <h2 className="text-neutral-950 text-2xl font-semibold">
-              You have {totalItems} items in your cart
-            </h2>
+          {/* Header */}
+          <div className="pb-3 flex items-center border-b border-neutral-200">
+            <h1 className="text-neutral-950 text-[2rem] leading-10 font-normal">
+              Cart
+            </h1>
           </div>
-          
-          {/* Grid: Items on left, Summary on right - starter grid proportions */}
-          <div className="grid grid-cols-1 small:grid-cols-[1fr_360px] gap-6">
-            {/* Left: Items list - stronger item cards */}
-            <div className="flex flex-col gap-y-4">
-              {cart.items.map((item) => (
-                <div 
-                  key={item.id} 
-                  className="flex items-center gap-6 rounded-lg border border-zinc-200 bg-white p-4 shadow-borders-base"
-                >
-                  {/* Thumbnail if available */}
-                  {item.thumbnail && (
-                    <img
-                      src={item.thumbnail}
-                      alt={item.title}
-                      className="h-20 w-20 rounded-md object-cover flex-shrink-0"
-                    />
-                  )}
-                  
-                  {/* Item details */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-zinc-900">{item.title}</h3>
-                    {item.variant && (
-                      <p className="text-sm text-zinc-500">{item.variant.title}</p>
-                    )}
-                    {item.description && (
-                      <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{item.description}</p>
-                    )}
-                  </div>
-                  
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                      disabled={updating === item.id}
-                      className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 hover:bg-zinc-50"
-                    >
-                      -
-                    </button>
-                    <span className="w-10 text-center text-sm">{item.quantity}</span>
-                    <button
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                      disabled={updating === item.id}
-                      className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 hover:bg-zinc-50"
-                    >
-                      +
-                    </button>
-                  </div>
-                  
-                  {/* Line total */}
-                  <div className="text-right w-24">
-                    <div className="font-semibold text-zinc-900">
-                      {formatCurrency(item.total || item.unit_price * item.quantity)}
+
+          <div className="grid grid-cols-1 small:grid-cols-[1fr_380px] gap-x-8">
+            {/* Left: Items list */}
+            <div>
+              <div className="pb-3 flex items-center justify-between border-b border-neutral-200 mb-4">
+                <span className="text-sm text-neutral-600">
+                  {totalItems} item{totalItems !== 1 ? "s" : ""} in cart
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-y-2">
+                {cart.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-4"
+                  >
+                    {/* Thumbnail */}
+                    <div className="flex-shrink-0 w-24 h-24 bg-neutral-50 rounded-md flex items-center justify-center overflow-hidden">
+                      {item.thumbnail ? (
+                        <img src={item.thumbnail} alt={item.title} className="w-full h-full object-contain p-1" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-8 h-8 text-neutral-300">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v13.5A1.5 1.5 0 003.75 21z" />
+                        </svg>
+                      )}
                     </div>
-                    {item.quantity > 1 && (
-                      <div className="text-xs text-zinc-500">
-                        {formatCurrency(item.unit_price)} each
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-zinc-900 line-clamp-1">{item.title}</h3>
+                        {item.variant && (
+                          <p className="text-xs text-neutral-500 mt-0.5">{item.variant.title}</p>
+                        )}
                       </div>
-                    )}
+
+                      {/* Quantity stepper - B2B starter pill style */}
+                      <div className="flex items-center gap-x-3 shadow-[0_0_0_1px_rgba(0,0,0,0.1)] rounded-full w-fit p-px mt-2">
+                        <button
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          disabled={updating === item.id}
+                          className="w-6 h-6 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 rounded-full text-sm disabled:opacity-50 transition-colors"
+                        >-</button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateQuantity(item.id, Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-10 h-6 text-center text-neutral-950 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-transparent shadow-none focus:outline-none"
+                        />
+                        <button
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          disabled={updating === item.id}
+                          className="w-6 h-6 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 rounded-full text-sm disabled:opacity-50 transition-colors"
+                        >+</button>
+                      </div>
+                    </div>
+
+                    {/* Price + Delete */}
+                    <div className="flex flex-col items-end justify-between">
+                      <button
+                        onClick={() => handleUpdateQuantity(item.id, 0)}
+                        disabled={updating === item.id}
+                        className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                        title="Remove item"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-zinc-900">
+                          {formatCurrency(item.total || item.unit_price * item.quantity)}
+                        </div>
+                        {item.quantity > 1 && (
+                          <div className="text-[11px] text-neutral-500">
+                            {formatCurrency(item.unit_price)} each
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            {/* Right: Summary area - starter style cleaner totals */}
-            <div className="relative">
-              <div className="flex flex-col gap-y-8 sticky top-20">
-                {/* Summary card - starter Container style */}
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h3 className="text-lg font-semibold text-zinc-900 mb-4">Order Summary</h3>
-                  
-                  {/* Totals - cleaner spacing like starter */}
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Subtotal</span>
-                      <span className="text-zinc-900">{formatCurrency(cart.subtotal)}</span>
+            {/* Right: Summary */}
+            <div className="relative mt-6 small:mt-0">
+              <div className="flex flex-col gap-y-4 sticky top-24">
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  {/* Totals */}
+                  <div className="flex flex-col gap-y-2 text-sm text-neutral-600">
+                    <div className="flex items-center justify-between">
+                      <span>Subtotal (excl. shipping and taxes)</span>
+                      <span className="text-zinc-900" data-testid="cart-item-subtotal">{formatCurrency(cart.subtotal || cart.item_subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Shipping</span>
+                      <span className="text-zinc-900" data-testid="cart-shipping">{formatCurrency(cart.shipping_total || 0)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-zinc-500">Shipping</span>
-                      <span className="text-zinc-900">Calculated at checkout</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Tax</span>
-                      <span className="text-zinc-900">Calculated at checkout</span>
-                    </div>
-                    <div className="flex justify-between pt-3 border-t border-zinc-200 font-medium">
-                      <span className="text-zinc-900">Total</span>
-                      <span className="text-zinc-900">{formatCurrency(cart.total)}</span>
+                      <span>Taxes</span>
+                      <span className="text-zinc-900" data-testid="cart-taxes">{formatCurrency(cart.tax_total || 0)}</span>
                     </div>
                   </div>
 
-                  {/* Checkout CTA - starter style rounded-full button */}
+                  <div className="my-4 h-px bg-neutral-200" />
+
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-zinc-900">Total</span>
+                    <span className="text-lg font-semibold text-zinc-900" data-testid="cart-total">
+                      {formatCurrency(cart.total)}
+                    </span>
+                  </div>
+
+                  <div className="my-4 h-px bg-neutral-200" />
+
+                  {/* Actions */}
                   <button
                     onClick={() => runtime.navigateToCheckout()}
-                    className="mt-6 w-full h-10 rounded-full bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800 shadow-borders-base transition-colors"
+                    className="w-full h-10 rounded-full bg-zinc-900 text-sm font-medium text-white hover:bg-zinc-800 transition-colors shadow-none"
                   >
-                    Proceed to Checkout
+                    Go to Checkout
                   </button>
                 </div>
               </div>
@@ -1477,23 +1685,23 @@ export function CommerceCheckout() {
     };
 
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-neutral-100">
         <div className="max-w-md">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-zinc-300 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto text-neutral-400 mb-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
           </svg>
           <h2 className="text-xl font-semibold text-zinc-900 mb-2">No items in cart</h2>
-          <p className="text-zinc-500 mb-6">You need to add items to your cart before proceeding to checkout.</p>
+          <p className="text-neutral-500 mb-6">You need to add items to your cart before proceeding to checkout.</p>
           <div className="flex gap-4 justify-center">
             <button
               onClick={() => runtime.navigateToCart()}
-              className="rounded-full bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800 transition-colors"
+              className="rounded-full bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-900-hover transition-colors"
             >
               View Cart
             </button>
             <button
               onClick={handleContinueShopping}
-              className="rounded-full border border-zinc-300 bg-white px-6 py-3 font-semibold text-zinc-900 hover:bg-zinc-50 transition-colors"
+              className="rounded-full border border-neutral-200 bg-white px-6 py-3 font-semibold text-zinc-900 hover:bg-neutral-100 transition-colors"
             >
               Continue Shopping
             </button>
@@ -1640,21 +1848,21 @@ export function CommerceCheckout() {
   // Find current step index
   const currentStepIndex = steps.findIndex(s => s.key === currentStep);
 
-  // B2B starter style: two-column form + summary with stepper
+  // B2B starter style checkout layout
   return (
     <div className="small:py-12 py-6 bg-neutral-100">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
           {/* Left column: Checkout form */}
           <div className="w-full grid grid-cols-1 gap-y-4">
-            {/* Back to cart link - starter style */}
+            {/* Back to cart link */}
             <a
               href="#"
               onClick={(e) => {
                 e.preventDefault();
                 runtime.navigateToCart();
               }}
-              className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-500"
+              className="flex items-center gap-2 text-sm text-neutral-500 hover:text-zinc-900 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -1662,19 +1870,18 @@ export function CommerceCheckout() {
               Back to shopping cart
             </a>
 
-            {/* Step indicator - starter style stepper */}
-            <div className="flex items-center gap-2 text-sm py-4">
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 text-sm py-3">
               {steps.map((step, index) => (
                 <Fragment key={step.key}>
-                  <span 
-                    className={index <= currentStepIndex 
-                      ? "text-zinc-900 font-medium" 
-                      : "text-zinc-400"}
+                  <button
+                    onClick={() => { if (index < currentStepIndex) setCurrentStep(step.key as typeof currentStep); }}
+                    className={`${index <= currentStepIndex ? "text-zinc-900 font-medium" : "text-neutral-400"} ${index < currentStepIndex ? "hover:underline cursor-pointer" : "cursor-default"}`}
                   >
                     {step.label}
-                  </span>
+                  </button>
                   {index < steps.length - 1 && (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-zinc-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-neutral-300">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                     </svg>
                   )}
@@ -1686,21 +1893,21 @@ export function CommerceCheckout() {
             {currentStep === "address" && (
               <div className="w-full grid grid-cols-1 gap-y-4">
                 {/* Contact Information section */}
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">Contact Information</h2>
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  <h2 className="text-base font-medium text-zinc-900 mb-4">Contact Information</h2>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email address"
                     required
-                    className="block w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                    className="block w-full rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                   />
                 </div>
 
                 {/* Shipping Address section */}
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">Shipping Address</h2>
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  <h2 className="text-base font-medium text-zinc-900 mb-4">Shipping Address</h2>
                   <div className="grid gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <input
@@ -1709,7 +1916,7 @@ export function CommerceCheckout() {
                         onChange={(e) => setShippingAddress({ ...shippingAddress, first_name: e.target.value })}
                         placeholder="First name"
                         required
-                        className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        className="rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                       />
                       <input
                         type="text"
@@ -1717,7 +1924,7 @@ export function CommerceCheckout() {
                         onChange={(e) => setShippingAddress({ ...shippingAddress, last_name: e.target.value })}
                         placeholder="Last name"
                         required
-                        className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        className="rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                       />
                     </div>
                     <input
@@ -1726,7 +1933,7 @@ export function CommerceCheckout() {
                       onChange={(e) => setShippingAddress({ ...shippingAddress, address_1: e.target.value })}
                       placeholder="Address"
                       required
-                      className="block w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                      className="block w-full rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                     />
                     <div className="grid grid-cols-2 gap-4">
                       <input
@@ -1735,7 +1942,7 @@ export function CommerceCheckout() {
                         onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
                         placeholder="City"
                         required
-                        className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        className="rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                       />
                       <input
                         type="text"
@@ -1743,14 +1950,14 @@ export function CommerceCheckout() {
                         onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
                         placeholder="Postal code"
                         required
-                        className="rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        className="rounded-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                       />
                     </div>
                     <select
                       value={shippingAddress.country_code}
                       onChange={(e) => setShippingAddress({ ...shippingAddress, country_code: e.target.value })}
                       required
-                      className="block w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                      className="block w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900/20"
                     >
                       <option value="">Select country</option>
                       {availableCountries.map((c) => (
@@ -1763,7 +1970,7 @@ export function CommerceCheckout() {
                 </div>
 
                 {error && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
@@ -1772,7 +1979,7 @@ export function CommerceCheckout() {
                   type="button"
                   onClick={handleSaveAddress}
                   disabled={loading}
-                  className="w-full h-10 rounded-full bg-zinc-900 px-6 py-3 font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                  className="w-full h-10 rounded-full bg-zinc-900 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-none"
                 >
                   {loading ? "Saving..." : "Continue to Shipping"}
                 </button>
@@ -1782,10 +1989,10 @@ export function CommerceCheckout() {
             {/* Step 2: Shipping Method */}
             {currentStep === "shipping" && (
               <div className="w-full grid grid-cols-1 gap-y-4">
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">Shipping Method</h2>
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  <h2 className="text-base font-medium text-zinc-900 mb-4">Shipping Method</h2>
                   {shippingOptions.length === 0 ? (
-                    <p className="text-zinc-500">No shipping options available for your address.</p>
+                    <p className="text-neutral-500">No shipping options available for your address.</p>
                   ) : (
                     <div className="space-y-3">
                       {shippingOptions.map((option) => (
@@ -1796,14 +2003,14 @@ export function CommerceCheckout() {
                           disabled={loading}
                           className={`w-full flex items-center justify-between rounded-md border p-4 text-left transition-colors ${
                             selectedShippingOption === option.id
-                              ? "border-zinc-900 bg-zinc-50"
-                              : "border-zinc-200 bg-white hover:border-zinc-400"
+                              ? "border-zinc-900 bg-neutral-50 ring-1 ring-zinc-900"
+                              : "border-neutral-200 bg-white hover:border-neutral-300"
                           }`}
                         >
                           <div>
                             <p className="font-medium text-zinc-900">{option.name}</p>
                             {option.description && (
-                              <p className="text-sm text-zinc-500">{option.description}</p>
+                              <p className="text-sm text-neutral-500">{option.description}</p>
                             )}
                           </div>
                           <span className="font-medium text-zinc-900">
@@ -1816,7 +2023,7 @@ export function CommerceCheckout() {
                 </div>
 
                 {error && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
@@ -1824,7 +2031,7 @@ export function CommerceCheckout() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep("address")}
-                  className="text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                  className="text-sm text-neutral-500 hover:text-zinc-900 flex items-center gap-1.5 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -1837,10 +2044,10 @@ export function CommerceCheckout() {
             {/* Step 3: Payment */}
             {currentStep === "payment" && (
               <div className="w-full grid grid-cols-1 gap-y-4">
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">Payment Method</h2>
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  <h2 className="text-base font-medium text-zinc-900 mb-4">Payment Method</h2>
                   {paymentProviders.length === 0 ? (
-                    <p className="text-zinc-500">No payment methods available.</p>
+                    <p className="text-neutral-500">No payment methods available.</p>
                   ) : (
                     <div className="space-y-3">
                       {paymentProviders.map((provider) => (
@@ -1851,8 +2058,8 @@ export function CommerceCheckout() {
                           disabled={loading}
                           className={`w-full flex items-center justify-between rounded-md border p-4 text-left transition-colors ${
                             selectedPaymentProvider === provider.id
-                              ? "border-zinc-900 bg-zinc-50"
-                              : "border-zinc-200 bg-white hover:border-zinc-400"
+                              ? "border-zinc-900 bg-neutral-50 ring-1 ring-zinc-900"
+                              : "border-neutral-200 bg-white hover:border-neutral-300"
                           }`}
                         >
                           <span className="font-medium text-zinc-900">
@@ -1867,7 +2074,7 @@ export function CommerceCheckout() {
                 </div>
 
                 {error && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
@@ -1875,7 +2082,7 @@ export function CommerceCheckout() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep("shipping")}
-                  className="text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                  className="text-sm text-neutral-500 hover:text-zinc-900 flex items-center gap-1.5 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -1888,18 +2095,18 @@ export function CommerceCheckout() {
             {/* Step 4: Review */}
             {currentStep === "review" && (
               <div className="w-full grid grid-cols-1 gap-y-4">
-                <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">Review Order</h2>
+                <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+                  <h2 className="text-base font-medium text-zinc-900 mb-4">Review Order</h2>
                   
                   {/* Contact summary */}
-                  <div className="mb-4 pb-4 border-b border-zinc-200">
-                    <p className="text-sm text-zinc-500">Contact</p>
+                  <div className="mb-4 pb-4 border-b border-neutral-200">
+                    <p className="text-sm text-neutral-500">Contact</p>
                     <p className="text-zinc-900">{email}</p>
                   </div>
 
                   {/* Address summary */}
-                  <div className="mb-4 pb-4 border-b border-zinc-200">
-                    <p className="text-sm text-zinc-500">Ship to</p>
+                  <div className="mb-4 pb-4 border-b border-neutral-200">
+                    <p className="text-sm text-neutral-500">Ship to</p>
                     <p className="text-zinc-900">
                       {shippingAddress.first_name} {shippingAddress.last_name}<br />
                       {shippingAddress.address_1}<br />
@@ -1909,8 +2116,8 @@ export function CommerceCheckout() {
                   </div>
 
                   {/* Shipping summary */}
-                  <div className="mb-4 pb-4 border-b border-zinc-200">
-                    <p className="text-sm text-zinc-500">Shipping</p>
+                  <div className="mb-4 pb-4 border-b border-neutral-200">
+                    <p className="text-sm text-neutral-500">Shipping</p>
                     <p className="text-zinc-900">
                       {shippingOptions.find(o => o.id === selectedShippingOption)?.name || "Selected shipping"}
                     </p>
@@ -1918,7 +2125,7 @@ export function CommerceCheckout() {
 
                   {/* Payment summary */}
                   <div>
-                    <p className="text-sm text-zinc-500">Payment</p>
+                    <p className="text-sm text-neutral-500">Payment</p>
                     <p className="text-zinc-900">
                       {selectedPaymentProvider === "pp_system_default" ? "Pay on Delivery" : 
                        selectedPaymentProvider === "manual" ? "Manual Payment" :
@@ -1928,7 +2135,7 @@ export function CommerceCheckout() {
                 </div>
 
                 {error && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
                     {error}
                   </div>
                 )}
@@ -1937,7 +2144,7 @@ export function CommerceCheckout() {
                   type="button"
                   onClick={handleCompleteCheckout}
                   disabled={loading}
-                  className="w-full h-10 rounded-full bg-zinc-900 px-6 py-3 font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                  className="w-full h-10 rounded-full bg-zinc-900 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-none"
                 >
                   {loading ? "Processing..." : "Complete Order"}
                 </button>
@@ -1945,7 +2152,7 @@ export function CommerceCheckout() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep("payment")}
-                  className="text-sm text-zinc-500 hover:text-zinc-900 flex items-center gap-1"
+                  className="text-sm text-neutral-500 hover:text-zinc-900 flex items-center gap-1.5 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -1958,16 +2165,16 @@ export function CommerceCheckout() {
 
           {/* Right column: Order summary - sticky - starter style */}
           <div className="lg:sticky lg:top-4 h-fit">
-            <div className="bg-white rounded-lg border border-zinc-200 p-6">
-              <h2 className="text-lg font-semibold text-zinc-900 mb-4">Order Summary</h2>
+            <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
+              <h2 className="text-base font-medium text-zinc-900 mb-4">Order Summary</h2>
               
               {/* Line items */}
-              <div className="space-y-3 mb-4 pb-4 border-b border-zinc-200">
+              <div className="space-y-3 mb-4 pb-4 border-b border-neutral-200">
                 {cart.items?.map((item) => (
                   <div key={item.id} className="flex items-start justify-between text-sm">
                     <div className="flex-1">
                       <p className="text-zinc-900 font-medium">{item.title}</p>
-                      <p className="text-zinc-500">Qty: {item.quantity}</p>
+                      <p className="text-neutral-500">Qty: {item.quantity}</p>
                     </div>
                     <p className="text-zinc-900">
                       {formatCurrency(item.unit_price, currencyCode)}
@@ -1979,16 +2186,16 @@ export function CommerceCheckout() {
               {/* Totals - cleaner like starter */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Subtotal</span>
+                  <span className="text-neutral-500">Subtotal</span>
                   <span className="text-zinc-900">{formatCurrency(subtotal, currencyCode)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Shipping</span>
+                  <span className="text-neutral-500">Shipping</span>
                   <span className="text-zinc-900">
                     {shippingTotal > 0 ? formatCurrency(shippingTotal, currencyCode) : "Calculated at checkout"}
                   </span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-zinc-200 font-medium">
+                <div className="flex justify-between pt-2 border-t border-neutral-200 font-medium">
                   <span className="text-zinc-900">Total</span>
                   <span className="text-zinc-900">{formatCurrency(total, currencyCode)}</span>
                 </div>
@@ -2023,14 +2230,14 @@ export function CommerceCategoryList() {
   };
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold text-content">Categories</h3>
-      <ul className="space-y-1">
+    <div className="space-y-3">
+      <h3 className="text-xl font-semibold text-zinc-900">Categories</h3>
+      <ul className="space-y-1.5">
         {categories.map((category) => (
           <li key={category.id}>
             <button
               onClick={() => handleCategoryClick(category)}
-              className="text-content-muted hover:text-content cursor-pointer bg-transparent border-none p-0 text-left"
+              className="text-neutral-500 hover:text-zinc-900 cursor-pointer bg-transparent border-none p-0 text-left transition-colors text-sm"
             >
               {category.name}
             </button>
@@ -2120,6 +2327,7 @@ export function CommerceCartSummary() {
 /**
  * CommerceStoreHeader - Store header with navigation and cart
  * B2B starter parity: tighter visual hierarchy, calmer nav rhythm, cleaner cart affordance.
+ * Matches Medusa Next.js starter: compact header, subtle nav links, minimal cart button.
  */
 export function CommerceStoreHeader({
   storeName: storeNameProp = "Store",
@@ -2133,6 +2341,7 @@ export function CommerceStoreHeader({
   const runtime = useCommerceRuntime();
   const funnelRuntime = useFunnelRuntime();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const storeName = runtime?.storeName || storeNameProp;
 
@@ -2169,74 +2378,118 @@ export function CommerceStoreHeader({
   const itemCount = cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
-          {/* Left: Brand + Nav */}
-          <div className="flex items-center gap-8">
-            <button
-              onClick={handleHomeClick}
-              className="text-base font-semibold text-zinc-900 hover:text-zinc-700 transition-colors"
-            >
-              {storeName}
-            </button>
+    <header className="sticky top-0 inset-x-0 z-50 bg-white text-zinc-900 border-b border-neutral-200">
+      <div className="flex w-full mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 justify-between items-center small:py-4 py-3">
+        {/* Left: Brand + Nav */}
+        <div className="flex items-center small:gap-6 gap-4">
+          <button
+            onClick={handleHomeClick}
+            className="flex items-center gap-2 hover:text-zinc-700 transition-colors"
+          >
+            {/* Store icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016A3.001 3.001 0 0021 9.349m-18 0a2.999 2.999 0 014.308-1.852A2.999 2.999 0 019.75 6h4.5a2.999 2.999 0 014.442 1.497A2.999 2.999 0 0121 9.349" />
+            </svg>
+            <span className="text-sm font-medium small:text-base">{storeName}</span>
+          </button>
 
-            {mainCategories.length > 0 && (
-              <nav className="hidden md:flex items-center gap-6">
-                {mainCategories.slice(0, 5).map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => handleCategoryClick(category)}
-                    className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </nav>
-            )}
-          </div>
-
-          {/* Right: Search + Cart */}
-          <div className="flex items-center gap-4">
-            {showSearch && (
-              <div className="hidden md:block">
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  disabled
-                  className="w-48 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 hover:cursor-not-allowed"
-                  title="Search coming soon"
-                />
-              </div>
-            )}
-
-            {showCart && (
-              <button
-                onClick={handleCartClick}
-                className="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50 transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="h-4 w-4 text-zinc-600"
+          {mainCategories.length > 0 && (
+            <nav className="hidden small:flex items-center gap-1">
+              {mainCategories.slice(0, 6).map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => handleCategoryClick(category)}
+                  className="text-sm hover:bg-neutral-100 rounded-full px-3 py-1.5 text-zinc-600 hover:text-zinc-900 transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.537M6.75 7.5h10.5m-10.5 0l-1.5 6.75a1.5 1.5 0 001.5 1.5h9a1.5 1.5 0 001.5-1.5l-1.5-6.75m-9 0h9"
-                  />
-                </svg>
-                <span className="text-zinc-900 font-medium">
-                  {itemCount > 0 ? `${itemCount}` : "0"}
+                  {category.name}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
+
+        {/* Right: Search + Cart */}
+        <div className="flex items-center gap-2">
+          {showSearch && (
+            <div className="relative hidden small:inline-flex">
+              <input
+                type="text"
+                placeholder="Search for products"
+                disabled
+                className="bg-neutral-100 text-zinc-900 px-4 py-2 rounded-full pr-10 text-sm shadow-sm hover:cursor-not-allowed"
+                title="Search coming soon"
+              />
+            </div>
+          )}
+
+          <div className="h-5 w-px bg-neutral-200 hidden small:block" />
+
+          {showCart && (
+            <button
+              onClick={handleCartClick}
+              className="relative flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-sm hover:bg-neutral-100 transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="h-5 w-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
+                />
+              </svg>
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-0.5 flex items-center justify-center bg-zinc-900 text-white text-[10px] font-medium rounded-full min-w-[18px] h-[18px] px-1">
+                  {itemCount}
                 </span>
-              </button>
-            )}
-          </div>
+              )}
+            </button>
+          )}
+
+          {/* Mobile menu toggle */}
+          {mainCategories.length > 0 && (
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="small:hidden p-1.5 rounded-md hover:bg-neutral-100"
+            >
+              {menuOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {menuOpen && mainCategories.length > 0 && (
+        <div className="small:hidden border-t border-neutral-200 bg-white px-4 py-3">
+          <nav className="flex flex-col gap-1">
+            {mainCategories.slice(0, 8).map((category) => (
+              <button
+                key={category.id}
+                onClick={() => {
+                  handleCategoryClick(category);
+                  setMenuOpen(false);
+                }}
+                className="text-left text-sm px-3 py-2 rounded-md text-zinc-600 hover:text-zinc-900 hover:bg-neutral-100 transition-colors"
+              >
+                {category.name}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
@@ -2244,6 +2497,7 @@ export function CommerceStoreHeader({
 /**
  * CommerceStoreFooter - Store footer with categories, collections, and links
  * B2B starter parity: cleaner columns, tighter spacing, calmer bottom row.
+ * Matches Medusa Next.js starter: compact footer with subtle links.
  */
 export function CommerceStoreFooter({
   storeName: storeNameProp = "Store",
@@ -2288,77 +2542,96 @@ export function CommerceStoreFooter({
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-zinc-200 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Main footer content */}
-        <div className="grid grid-cols-2 gap-8 py-10 sm:grid-cols-4">
+    <footer className="border-t border-neutral-200 w-full">
+      <div className="flex flex-col w-full mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        {/* Main footer content - B2B starter style: generous padding */}
+        <div className="flex flex-col gap-y-6 sm:flex-row items-start justify-between py-20 sm:py-32">
           {/* Brand */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="max-w-[200px]">
             <button
               onClick={handleHomeClick}
-              className="text-sm font-semibold text-zinc-900 hover:text-zinc-700 transition-colors"
+              className="text-lg font-semibold uppercase text-neutral-500 hover:text-zinc-900 transition-colors tracking-wider leading-snug text-left"
             >
               {storeName}
             </button>
           </div>
 
-          {/* Categories */}
-          {showCategories && mainCategories.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-                Categories
-              </h3>
-              <ul className="space-y-2" data-testid="footer-categories">
-                {mainCategories.slice(0, 5).map((category) => (
-                  <li key={category.id}>
-                    <button
-                      onClick={() => handleCategoryClick(category)}
-                      className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
-                      data-testid="category-link"
-                    >
-                      {category.name}
-                    </button>
-                  </li>
-                ))}
+          {/* Link columns */}
+          <div className="text-sm gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
+            {/* Categories */}
+            {showCategories && mainCategories.length > 0 && (
+              <div className="flex flex-col gap-y-3">
+                <span className="text-sm font-semibold text-zinc-900 uppercase">Categories</span>
+                <ul className="grid grid-cols-1 gap-2" data-testid="footer-categories">
+                  {mainCategories.slice(0, 6).map((category) => {
+                    const children = categories.filter(c => c.parent_category_id === category.id);
+                    return (
+                      <li key={category.id} className="flex flex-col gap-2 text-neutral-500 text-sm">
+                        <button
+                          onClick={() => handleCategoryClick(category)}
+                          className={`text-left hover:text-zinc-900 transition-colors ${children.length > 0 ? "font-medium" : ""}`}
+                          data-testid="category-link"
+                        >
+                          {category.name}
+                        </button>
+                        {children.length > 0 && (
+                          <ul className="grid grid-cols-1 ml-3 gap-2">
+                            {children.slice(0, 4).map((child) => (
+                              <li key={child.id}>
+                                <button
+                                  onClick={() => handleCategoryClick(child)}
+                                  className="text-left text-neutral-500 hover:text-zinc-900 transition-colors text-sm"
+                                >
+                                  {child.name}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/* Collections */}
+            {showCollections && collections.length > 0 && (
+              <div className="flex flex-col gap-y-3">
+                <span className="text-sm font-semibold text-zinc-900 uppercase">Collections</span>
+                <ul className="grid grid-cols-1 gap-2 text-neutral-500 text-sm">
+                  {collections.slice(0, 6).map((collection) => (
+                    <li key={collection.id}>
+                      <span className="hover:text-zinc-900 cursor-pointer transition-colors">
+                        {collection.title}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Company */}
+            <div className="flex flex-col gap-y-3">
+              <span className="text-sm font-semibold text-zinc-900 uppercase">{storeName}</span>
+              <ul className="grid grid-cols-1 gap-y-2 text-neutral-500 text-sm">
+                <li><span className="hover:text-zinc-900 cursor-pointer transition-colors">About</span></li>
+                <li><span className="hover:text-zinc-900 cursor-pointer transition-colors">Contact</span></li>
+                <li><span className="hover:text-zinc-900 cursor-pointer transition-colors">Terms of Service</span></li>
+                <li><span className="hover:text-zinc-900 cursor-pointer transition-colors">Privacy Policy</span></li>
               </ul>
             </div>
-          )}
-
-          {/* Collections */}
-          {showCollections && collections.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-                Collections
-              </h3>
-              <ul className="space-y-2">
-                {collections.slice(0, 5).map((collection) => (
-                  <li key={collection.id} className="text-sm text-zinc-600">
-                    {collection.title}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Company */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-              Company
-            </h3>
-            <ul className="space-y-2">
-              <li className="text-sm text-zinc-600">About</li>
-              <li className="text-sm text-zinc-600">Contact</li>
-              <li className="text-sm text-zinc-600">Terms</li>
-              <li className="text-sm text-zinc-600">Privacy</li>
-            </ul>
           </div>
         </div>
 
         {/* Bottom row */}
-        <div className="border-t border-zinc-200 py-6">
-          <p className="text-xs text-zinc-500">
+        <div className="flex w-full mb-16 justify-between text-neutral-400 border-t border-neutral-200 pt-6">
+          <span className="text-xs">
             © {currentYear} {storeName}. All rights reserved.
-          </p>
+          </span>
+          <span className="text-xs">
+            Powered by Medusa
+          </span>
         </div>
       </div>
     </footer>
