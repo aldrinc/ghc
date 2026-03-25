@@ -12,9 +12,14 @@ export interface CompanySwipeAsset {
   landing_page?: string;
   link_description?: string;
   ad_source_link?: string;
+  share_url?: string;
   brand_id?: string;
   external_ad_id?: string;
   external_platform_ad_id?: string;
+  days_active?: number;
+  used_count?: number;
+  performance_score?: number;
+  performance_score_data?: Record<string, any>;
   analysis_status?: string;
   analysis_error?: string;
   analysis_model?: string;
@@ -31,9 +36,20 @@ export interface CompanySwipeAsset {
   proof_type?: string;
   claim_risk?: string;
   product_image_policy?: string;
+  review_status?: "pending_review" | "approved" | "rejected" | "stale_after_sync" | string;
+  reviewed_at?: string;
+  reviewed_by_user_id?: string;
+  source_first_seen_at?: string;
+  source_last_seen_at?: string;
+  source_last_synced_at?: string;
+  source_payload_hash?: string;
+  source_content_changed_at?: string;
+  source_metadata_json?: Record<string, any>;
   active?: boolean;
   active_in_library?: boolean;
   ad_library_object?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
   snapshot?: Record<string, any>;
   extra_texts?: any[];
   media?: CompanySwipeMedia[];
@@ -55,6 +71,7 @@ export interface CompanySwipeMedia {
   id: string;
   org_id: string;
   swipe_asset_id: string;
+  media_asset_id?: string;
   external_media_id?: string;
   path?: string;
   url?: string;
@@ -96,4 +113,18 @@ export interface SwipeCollectionCloneRequest {
 
 export interface SwipeCollectionItemsRequest {
   swipeAssetIds: string[];
+}
+
+export interface SwipeReviewFilter {
+  source?: "gethookd" | "all";
+  reviewStatus?: "pending" | "approved" | "rejected" | "stale" | "all";
+  search?: string;
+  collectionId?: string;
+  changedSince?: "last_sync" | "last_7_days" | "all";
+  notInLaunchCollection?: boolean;
+}
+
+export interface SwipeReviewBulkRequest {
+  swipeAssetIds: string[];
+  collectionId?: string;
 }

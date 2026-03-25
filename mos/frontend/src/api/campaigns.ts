@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import { toast } from "@/components/ui/toast";
-import type { Campaign, StrategyV2LaunchRecord } from "@/types/common";
+import type { Campaign, CampaignSwipeDefault, StrategyV2LaunchRecord } from "@/types/common";
 import type { ExperimentSpec, Artifact } from "@/types/artifacts";
 import type {
   CampaignDeliveryConfig,
   CampaignDeliveryValidationResponse,
   CampaignLaunchContextReadiness,
 } from "@/types/delivery";
+export const CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY = (campaignId: string) =>
+  ["campaigns", campaignId, "swipe-collection"] as const;
 
 export function useCampaign(campaignId?: string) {
   const { get } = useApiClient();
@@ -103,6 +105,40 @@ export function useUpdateExperimentSpecs(campaignId?: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to update angle specs";
+      toast.error(message);
+    },
+  });
+}
+
+export function useCampaignSwipeCollection(campaignId?: string) {
+  const { get } = useApiClient();
+  return useQuery<CampaignSwipeDefault>({
+    queryKey: campaignId ? CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY(campaignId) : ["campaigns", "swipe-collection"],
+    queryFn: () => get(`/campaigns/${campaignId}/swipe-default`),
+    enabled: Boolean(campaignId),
+  });
+}
+
+export function useUpdateCampaignSwipeCollection(campaignId?: string) {
+  const { put } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (swipeCollectionId: string | null) => {
+      if (!campaignId) throw new Error("Campaign ID is required");
+      return put<CampaignSwipeDefault>(`/campaigns/${campaignId}/swipe-default`, {
+        swipeCollectionId: swipeCollectionId,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Default swipe collection updated");
+      if (campaignId) {
+        queryClient.invalidateQueries({ queryKey: ["campaigns", campaignId] });
+        queryClient.invalidateQueries({ queryKey: CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY(campaignId) });
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update default swipe collection";
       toast.error(message);
     },
   });

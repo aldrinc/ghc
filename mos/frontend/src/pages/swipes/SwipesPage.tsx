@@ -1,17 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSwipeCollection, useSwipeCollections } from "@/api/swipes";
-import { LibraryCard } from "@/components/library/LibraryCard";
+import { useMemo, useState } from "react";
+import { useCompanySwipes, useSwipeCollections, useSwipeReviewApi } from "@/api/swipes";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { normalizeSwipeToLibraryItem } from "@/lib/library";
 import { cn } from "@/lib/utils";
-import type { SwipeCollection } from "@/types/swipes";
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
-}
+import type { CompanySwipeAsset, SwipeReviewFilter } from "@/types/swipes";
 
 function getErrorMessage(err: unknown) {
   if (typeof err === "string") return err;
@@ -21,223 +17,256 @@ function getErrorMessage(err: unknown) {
   return "Request failed";
 }
 
-function resolvePreferredCollectionId(collections: SwipeCollection[]) {
-  return collections.find((collection) => collection.kind === "default")?.id || collections[0]?.id || "";
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function CollectionListSkeleton() {
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: 5 }).map((_, idx) => (
-        <div
-          key={idx}
-          className="rounded-xl border border-border bg-surface px-4 py-3 animate-pulse"
-        >
-          <div className="h-4 w-2/3 rounded bg-muted" />
-          <div className="mt-3 flex gap-2">
-            <div className="h-5 w-16 rounded-full bg-muted" />
-            <div className="h-5 w-20 rounded-full bg-muted" />
-          </div>
-          <div className="mt-3 h-3 w-1/2 rounded bg-muted" />
-        </div>
-      ))}
-    </div>
-  );
+function statusTone(status?: string) {
+  if (status === "approved") return "success" as const;
+  if (status === "rejected") return "danger" as const;
+  if (status === "stale_after_sync") return "warning" as const;
+  return "neutral" as const;
 }
 
-function SwipeGridSkeleton() {
-  return (
-    <div className="flex flex-wrap gap-3 sm:gap-4">
-      {Array.from({ length: 6 }).map((_, idx) => (
-        <div
-          key={idx}
-          className="w-full max-w-[360px] flex-none overflow-hidden rounded-2xl border border-border bg-surface animate-pulse"
-        >
-          <div className="aspect-[4/5] w-full bg-muted" />
-          <div className="space-y-2 px-3 pb-3 pt-3">
-            <div className="h-4 w-24 rounded-full bg-muted" />
-            <div className="h-3 w-3/4 rounded bg-muted" />
-            <div className="h-3 w-5/6 rounded bg-muted" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+function formatHostname(url?: string) {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
-function CollectionCard({
-  collection,
+function ReviewCard({
+  swipe,
   selected,
-  onClick,
+  onToggle,
 }: {
-  collection: SwipeCollection;
+  swipe: CompanySwipeAsset;
   selected: boolean;
-  onClick: () => void;
+  onToggle: () => void;
 }) {
-  const readyCount = collection.analysis_counts.ready || 0;
-
+  const item = useMemo(() => normalizeSwipeToLibraryItem(swipe), [swipe]);
+  const preview = item.media[0]?.thumbUrl || item.media[0]?.url;
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={onToggle}
       className={cn(
-        "w-full rounded-xl border px-4 py-3 text-left transition",
-        selected
-          ? "border-accent bg-accent/5 shadow-sm"
-          : "border-border bg-surface hover:border-accent/40 hover:bg-surface-2",
+        "relative rounded-2xl border bg-surface p-3 text-left transition",
+        selected ? "border-accent ring-1 ring-accent/30" : "border-border hover:border-accent/40",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-content">{collection.name}</div>
-          <div className="mt-1 text-xs text-content-muted">
-            Created {formatDate(collection.created_at)}
-          </div>
-        </div>
-        {selected ? <Badge tone="accent">Selected</Badge> : null}
+      <div className="absolute right-3 top-3">
+        <input type="checkbox" readOnly checked={selected} className="h-4 w-4 rounded border-border" />
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge tone="neutral">{collection.kind}</Badge>
-        <Badge tone="neutral">{collection.item_count} swipes</Badge>
-        <Badge tone={readyCount > 0 ? "success" : "neutral"}>{readyCount} ready</Badge>
-        <Badge tone={collection.writable ? "success" : "warning"}>
-          {collection.writable ? "Writable" : "Read-only"}
-        </Badge>
+      <div className="mb-3 aspect-[4/5] overflow-hidden rounded-xl border border-border bg-surface-2">
+        {preview ? (
+          <img src={preview} alt={swipe.title || "Swipe preview"} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-content-muted">No media</div>
+        )}
+      </div>
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={statusTone(swipe.review_status)}>{swipe.review_status || "unknown"}</Badge>
+          {swipe.analysis_status ? <Badge tone="neutral">{swipe.analysis_status}</Badge> : null}
+          {swipe.performance_score ? <Badge tone="neutral">Score {swipe.performance_score}</Badge> : null}
+          {swipe.days_active ? <Badge tone="neutral">{swipe.days_active}d active</Badge> : null}
+        </div>
+        <div className="text-sm font-semibold text-content line-clamp-2">{swipe.title || swipe.body || swipe.id}</div>
+        {swipe.body ? <div className="line-clamp-3 text-xs text-content-muted">{swipe.body}</div> : null}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-content-muted">
+          {swipe.platforms ? <span>{swipe.platforms}</span> : null}
+          {swipe.used_count ? <span>{swipe.used_count} used</span> : null}
+          {swipe.landing_page ? <span>{formatHostname(swipe.landing_page)}</span> : null}
+          <span>Synced {formatDate(swipe.source_last_synced_at)}</span>
+        </div>
       </div>
     </button>
   );
 }
 
 export function SwipesPage() {
-  const {
-    data: collections = [],
-    isLoading: collectionsLoading,
-    error: collectionsError,
-  } = useSwipeCollections();
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<SwipeReviewFilter>({
+    source: "gethookd",
+    reviewStatus: "pending",
+    changedSince: "all",
+  });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [targetCollectionId, setTargetCollectionId] = useState("");
+  const { data: swipes = [], isLoading, error } = useCompanySwipes(filters);
+  const { data: collections = [] } = useSwipeCollections();
+  const { approveSwipes, rejectSwipes, markPendingSwipes } = useSwipeReviewApi();
 
-  useEffect(() => {
-    if (collectionsLoading) return;
-    if (!collections.length) {
-      setSelectedCollectionId(null);
-      return;
-    }
-    if (selectedCollectionId && collections.some((collection) => collection.id === selectedCollectionId)) {
-      return;
-    }
-    setSelectedCollectionId(resolvePreferredCollectionId(collections));
-  }, [collections, collectionsLoading, selectedCollectionId]);
-
-  const selectedCollection = useMemo(
-    () => collections.find((collection) => collection.id === selectedCollectionId) ?? null,
-    [collections, selectedCollectionId],
-  );
-  const {
-    data: selectedCollectionDetail,
-    isLoading: collectionDetailLoading,
-    error: collectionDetailError,
-  } = useSwipeCollection(selectedCollectionId);
-
-  const items = useMemo(
-    () => (selectedCollectionDetail?.swipes || []).map(normalizeSwipeToLibraryItem),
-    [selectedCollectionDetail?.swipes],
-  );
-  const totalSavedSwipes = useMemo(
-    () => collections.reduce((sum, collection) => sum + collection.item_count, 0),
+  const launchableCollections = useMemo(
+    () => collections.filter((collection) => collection.kind === "uploaded" || collection.kind === "curated"),
     [collections],
   );
+
+  const stats = useMemo(
+    () => ({
+      total: swipes.length,
+      pending: swipes.filter((swipe) => swipe.review_status === "pending_review").length,
+      approved: swipes.filter((swipe) => swipe.review_status === "approved").length,
+      rejected: swipes.filter((swipe) => swipe.review_status === "rejected").length,
+      stale: swipes.filter((swipe) => swipe.review_status === "stale_after_sync").length,
+    }),
+    [swipes],
+  );
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const toggle = (swipeId: string) => {
+    setSelectedIds((current) =>
+      current.includes(swipeId) ? current.filter((id) => id !== swipeId) : [...current, swipeId],
+    );
+  };
+
+  const clearSelection = () => setSelectedIds([]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-content">Swipe collections</h2>
+          <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
           <p className="text-sm text-content-muted">
-            Browse every saved collection and inspect the exact swipes inside each set.
+            Review nightly-synced reference ads, then promote approved items into launchable collections.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge tone="neutral">{collections.length} collections</Badge>
-          <Badge tone="neutral">{totalSavedSwipes} saved swipes</Badge>
+          <Badge tone="neutral">{stats.total} total</Badge>
+          <Badge tone="warning">{stats.pending} pending</Badge>
+          <Badge tone="success">{stats.approved} approved</Badge>
+          <Badge tone="danger">{stats.rejected} rejected</Badge>
+          <Badge tone="warning">{stats.stale} stale</Badge>
         </div>
       </div>
 
-      {collectionsError ? (
-        <Callout variant="danger" size="sm" title="Failed to load swipe collections">
-          {getErrorMessage(collectionsError)}
+      <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="xl:col-span-2">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Search</div>
+            <Input
+              value={filters.search || ""}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Search title, body, or external id"
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Review status</div>
+            <Select
+              value={filters.reviewStatus || "all"}
+              onValueChange={(value) =>
+                setFilters((current) => ({ ...current, reviewStatus: value as SwipeReviewFilter["reviewStatus"] }))
+              }
+              options={[
+                { label: "All", value: "all" },
+                { label: "Pending", value: "pending" },
+                { label: "Approved", value: "approved" },
+                { label: "Rejected", value: "rejected" },
+                { label: "Stale", value: "stale" },
+              ]}
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Changed since</div>
+            <Select
+              value={filters.changedSince || "all"}
+              onValueChange={(value) =>
+                setFilters((current) => ({ ...current, changedSince: value as SwipeReviewFilter["changedSince"] }))
+              }
+              options={[
+                { label: "All", value: "all" },
+                { label: "Last sync", value: "last_sync" },
+                { label: "Last 7 days", value: "last_7_days" },
+              ]}
+            />
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-content-muted">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.notInLaunchCollection)}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, notInLaunchCollection: event.target.checked }))
+                }
+              />
+              Not in launch collection
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {selectedIds.length > 0 ? (
+        <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-sm text-content">
+              <span className="font-semibold">{selectedIds.length}</span> selected
+            </div>
+            <div className="min-w-[240px] flex-1">
+              <Select
+                value={targetCollectionId}
+                onValueChange={setTargetCollectionId}
+                options={[
+                  { label: "Add approved swipes to collection", value: "", disabled: true },
+                  ...launchableCollections.map((collection) => ({ label: collection.name, value: collection.id })),
+                ]}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!targetCollectionId) return;
+                approveSwipes.mutate({ swipeAssetIds: selectedIds, collectionId: targetCollectionId });
+                clearSelection();
+              }}
+              disabled={!targetCollectionId || approveSwipes.isPending}
+            >
+              Add to collection
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => { rejectSwipes.mutate({ swipeAssetIds: selectedIds }); clearSelection(); }}>
+              Reject
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => { markPendingSwipes.mutate({ swipeAssetIds: selectedIds }); clearSelection(); }}>
+              Mark pending
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load swipes">
+          {getErrorMessage(error)}
+        </Callout>
+      ) : null}
+      {approveSwipes.error ? (
+        <Callout variant="danger" size="sm" title="Approve failed">
+          {getErrorMessage(approveSwipes.error)}
         </Callout>
       ) : null}
 
-      {collectionDetailError ? (
-        <Callout variant="danger" size="sm" title="Failed to load selected collection">
-          {getErrorMessage(collectionDetailError)}
-        </Callout>
-      ) : null}
-
-      {!collectionsLoading && collections.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
-          No swipe collections exist yet. Create one from a campaign generation screen to start curating saved swipes.
+      {isLoading ? (
+        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">Loading swipes…</div>
+      ) : swipes.length ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {swipes.map((swipe) => (
+            <ReviewCard
+              key={swipe.id}
+              swipe={swipe}
+              selected={selectedIdSet.has(swipe.id)}
+              onToggle={() => toggle(swipe.id)}
+            />
+          ))}
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
-              All collections
-            </div>
-            {collectionsLoading ? (
-              <CollectionListSkeleton />
-            ) : (
-              collections.map((collection) => (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  selected={collection.id === selectedCollectionId}
-                  onClick={() => setSelectedCollectionId(collection.id)}
-                />
-              ))
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {selectedCollection ? (
-              <div className="rounded-2xl border border-border bg-surface p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-semibold text-content">{selectedCollection.name}</div>
-                    <div className="mt-1 text-sm text-content-muted">
-                      {selectedCollection.kind} collection · created {formatDate(selectedCollection.created_at)}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge tone="neutral">{selectedCollection.id.slice(0, 8)}</Badge>
-                    <Badge tone="neutral">{selectedCollection.item_count} swipes</Badge>
-                    <Badge tone={(selectedCollection.analysis_counts.ready || 0) > 0 ? "success" : "neutral"}>
-                      {selectedCollection.analysis_counts.ready || 0} ready
-                    </Badge>
-                    <Badge tone={selectedCollection.writable ? "success" : "warning"}>
-                      {selectedCollection.writable ? "Writable" : "Read-only"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {collectionDetailLoading ? (
-              <SwipeGridSkeleton />
-            ) : items.length > 0 ? (
-              <div className="flex flex-wrap gap-3 sm:gap-4">
-                {items.map((item) => (
-                  <div key={item.id} className="w-full max-w-[360px] flex-none">
-                    <LibraryCard item={item} />
-                  </div>
-                ))}
-              </div>
-            ) : selectedCollection ? (
-              <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
-                This collection does not contain any swipes yet.
-              </div>
-            ) : null}
-          </div>
+        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
+          No GetHookd swipes match the current filters.
         </div>
       )}
     </div>

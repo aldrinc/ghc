@@ -8,6 +8,11 @@ import {
   useSwipeCollections,
   useSwipeCollectionsApi,
 } from "@/api/swipes";
+import {
+  CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY,
+  useCampaignSwipeCollection,
+  useUpdateCampaignSwipeCollection,
+} from "@/api/campaigns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -18,7 +23,6 @@ import { normalizeSwipeToLibraryItem } from "@/lib/library";
 import { cn } from "@/lib/utils";
 import type { CompanySwipeAsset, SwipeCollection } from "@/types/swipes";
 
-const STORAGE_KEY_PREFIX = "campaign-swipe-collection";
 const CREATE_KIND_OPTIONS = [
   { label: "Curated", value: "curated" },
   { label: "Uploaded", value: "uploaded" },
@@ -41,16 +45,12 @@ function getErrorMessage(err: unknown) {
   return "Request failed";
 }
 
-function buildStorageKey(campaignId: string) {
-  return `${STORAGE_KEY_PREFIX}:${campaignId}`;
-}
-
 function resolvePreferredCollectionId(collections: SwipeCollection[], preferredId?: string | null) {
   if (!collections.length) return "";
   if (preferredId && collections.some((collection) => collection.id === preferredId)) {
     return preferredId;
   }
-  return collections.find((collection) => collection.kind === "default")?.id || collections[0]?.id || "";
+  return collections.find((collection) => collection.kind === "uploaded" || collection.kind === "curated")?.id || "";
 }
 
 function formatCollectionKind(kind?: string | null) {
@@ -165,6 +165,11 @@ export function SwipeCollectionSelector({
     isLoading: collectionsLoading,
     error: collectionsError,
   } = useSwipeCollections();
+  const {
+    data: campaignDefaultCollection,
+    isLoading: campaignDefaultLoading,
+  } = useCampaignSwipeCollection(campaignId);
+  const updateCampaignSwipeCollection = useUpdateCampaignSwipeCollection(campaignId);
 
   const selectedCollection = useMemo(
     () => collections.find((collection) => collection.id === value) ?? null,
@@ -195,32 +200,33 @@ export function SwipeCollectionSelector({
     data: companySwipes = [],
     isLoading: companySwipesLoading,
     error: companySwipesError,
-  } = useCompanySwipes(manageOpen && Boolean(selectedCollection?.writable));
+  } = useCompanySwipes(undefined, manageOpen && Boolean(selectedCollection?.writable));
 
+  // Sync with campaign's persisted default swipe collection (backend state)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (value) {
-      window.localStorage.setItem(buildStorageKey(campaignId), value);
-      return;
-    }
-    window.localStorage.removeItem(buildStorageKey(campaignId));
-  }, [campaignId, value]);
-
-  useEffect(() => {
-    if (collectionsLoading) return;
+    if (collectionsLoading || campaignDefaultLoading) return;
     if (!collections.length) {
       if (value) onChange("");
       return;
     }
     const currentIsValid = Boolean(value) && collections.some((collection) => collection.id === value);
     if (currentIsValid) return;
-    const storedValue =
-      typeof window !== "undefined" ? window.localStorage.getItem(buildStorageKey(campaignId)) : null;
-    const nextValue = resolvePreferredCollectionId(collections, storedValue);
-    if (nextValue && nextValue !== value) {
+    const defaultId = campaignDefaultCollection?.swipeCollectionId ?? null;
+    if (!defaultId) {
+      if (value) onChange("");
+      return;
+    }
+    const nextValue = resolvePreferredCollectionId(collections, defaultId);
+    if (nextValue !== value) {
       onChange(nextValue);
     }
-  }, [campaignId, collections, collectionsLoading, onChange, value]);
+  }, [campaignId, collections, collectionsLoading, campaignDefaultLoading, campaignDefaultCollection, onChange, value]);
+
+  // Persist selection to campaign when user explicitly changes it
+  const handleCollectionChange = (newCollectionId: string) => {
+    onChange(newCollectionId);
+    updateCampaignSwipeCollection.mutate(newCollectionId || null);
+  };
 
   useEffect(() => {
     if (!manageOpen) {
@@ -248,10 +254,13 @@ export function SwipeCollectionSelector({
       ...collections.map((collection) => {
         const readyCount = collection.analysis_counts.ready || 0;
         const badges = [`${collection.item_count} swipes`, `${readyCount} ready`];
+        const launchable = collection.kind === "uploaded" || collection.kind === "curated";
         if (!collection.writable) badges.push("read-only");
+        if (!launchable) badges.push("not launchable");
         return {
           label: `${collection.name} · ${badges.join(" · ")}`,
           value: collection.id,
+          disabled: !launchable,
         };
       }),
     ],
@@ -281,6 +290,10 @@ export function SwipeCollectionSelector({
       await queryClient.invalidateQueries({ queryKey: swipeCollectionDetailQueryKey(collectionId) });
     }
     await queryClient.invalidateQueries({ queryKey: ["swipes", "company"] });
+    // Also invalidate campaign swipe collection
+    if (campaignId) {
+      await queryClient.invalidateQueries({ queryKey: CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY(campaignId) });
+    }
   };
 
   const handleCreateCollection = async () => {
@@ -294,6 +307,8 @@ export function SwipeCollectionSelector({
     try {
       const created = await createSwipeCollection({ name, kind: createKind });
       await invalidateCollectionData(created.id);
+      // Persist as campaign default when creating new collection
+      await updateCampaignSwipeCollection.mutateAsync(created.id);
       onChange(created.id);
       setCreateName("");
       setCreateKind("curated");
@@ -321,6 +336,8 @@ export function SwipeCollectionSelector({
     try {
       const cloned = await cloneSwipeCollection(selectedCollection.id, { name });
       await invalidateCollectionData(cloned.id);
+      // Persist as campaign default when cloning collection
+      await updateCampaignSwipeCollection.mutateAsync(cloned.id);
       onChange(cloned.id);
       setCloneName("");
       setCloneOpen(false);
@@ -407,7 +424,7 @@ export function SwipeCollectionSelector({
           <Select
             value={value || ""}
             options={collectionOptions}
-            onValueChange={onChange}
+            onValueChange={handleCollectionChange}
             disabled={collectionsLoading || collections.length === 0}
           />
           {selectedCollection ? (

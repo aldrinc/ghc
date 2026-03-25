@@ -1,7 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
-import type { Client, GetHookdCredentials, GetHookdSyncFeed, GetHookdSyncFeedInput, GetHookdSyncFeedUpdateInput } from "@/types/common";
+import type {
+  Client,
+  GetHookdCredentials,
+  GetHookdSyncFeed,
+  GetHookdSyncFeedInput,
+  GetHookdSyncFeedUpdateInput,
+} from "@/types/common";
 import { toast } from "@/components/ui/toast";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
@@ -1153,7 +1159,6 @@ export function useDeleteClient() {
   });
 }
 
-// GetHookd API hooks
 export function useClientGetHookdCredentials(clientId?: string) {
   const { get } = useApiClient();
   return useQuery<GetHookdCredentials>({
@@ -1166,9 +1171,8 @@ export function useClientGetHookdCredentials(clientId?: string) {
 export function useUpdateClientGetHookdCredentials(clientId: string) {
   const { request } = useApiClient();
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (payload: { token: string }) => {
+    mutationFn: (payload: { apiToken: string }) => {
       if (!clientId) throw new Error("Client ID is required.");
       return request<GetHookdCredentials>(`/clients/${clientId}/gethookd/credentials`, {
         method: "PUT",
@@ -1198,7 +1202,6 @@ export function useClientGetHookdSyncFeeds(clientId?: string) {
 export function useCreateClientGetHookdSyncFeed(clientId: string) {
   const { post } = useApiClient();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (payload: GetHookdSyncFeedInput) => {
       if (!clientId) throw new Error("Client ID is required.");
@@ -1218,12 +1221,11 @@ export function useCreateClientGetHookdSyncFeed(clientId: string) {
 export function useUpdateClientGetHookdSyncFeed(clientId: string) {
   const { request } = useApiClient();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({ feedId, payload }: { feedId: string; payload: GetHookdSyncFeedUpdateInput }) => {
       if (!clientId) throw new Error("Client ID is required.");
       return request<GetHookdSyncFeed>(`/clients/${clientId}/gethookd/sync-feeds/${feedId}`, {
-        method: "PATCH",
+        method: "PUT",
         body: JSON.stringify(payload),
       });
     },
@@ -1241,7 +1243,6 @@ export function useUpdateClientGetHookdSyncFeed(clientId: string) {
 export function useDeleteClientGetHookdSyncFeed(clientId: string) {
   const { request } = useApiClient();
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (feedId: string) => {
       if (!clientId) throw new Error("Client ID is required.");

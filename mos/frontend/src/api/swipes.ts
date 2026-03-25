@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "./client";
 import type {
   ClientSwipeAsset,
@@ -8,12 +8,31 @@ import type {
   SwipeCollectionCreateRequest,
   SwipeCollectionDetail,
   SwipeCollectionItemsRequest,
+  SwipeReviewBulkRequest,
+  SwipeReviewFilter,
 } from "@/types/swipes";
 
 export const SWIPE_COLLECTIONS_QUERY_KEY = ["swipe-collections"] as const;
 
 export const swipeCollectionDetailQueryKey = (collectionId?: string | null) =>
   ["swipe-collection", collectionId] as const;
+
+function buildSwipeCompanyQuery(filters?: SwipeReviewFilter) {
+  const params = new URLSearchParams();
+  if (!filters) return "";
+  if (filters.collectionId) params.set("collection_id", filters.collectionId);
+  if (filters.source === "gethookd") params.set("source", "gethookd");
+  if (filters.reviewStatus && filters.reviewStatus !== "all") {
+    params.set("review_status", filters.reviewStatus);
+  }
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.changedSince && filters.changedSince !== "all") {
+    params.set("changed_since", filters.changedSince);
+  }
+  if (filters.notInLaunchCollection) params.set("not_in_launch_collection", "true");
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
 
 export function useClientSwipes(clientId?: string) {
   const { get } = useApiClient();
@@ -24,11 +43,11 @@ export function useClientSwipes(clientId?: string) {
   });
 }
 
-export function useCompanySwipes(enabled = true) {
+export function useCompanySwipes(filters?: SwipeReviewFilter, enabled = true) {
   const { get } = useApiClient();
   return useQuery<CompanySwipeAsset[]>({
-    queryKey: ["swipes", "company"],
-    queryFn: () => get("/swipes/company"),
+    queryKey: ["swipes", "company", filters],
+    queryFn: () => get(`/swipes/company${buildSwipeCompanyQuery(filters)}`),
     enabled,
   });
 }
@@ -53,7 +72,6 @@ export function useSwipeCollection(collectionId?: string | null, enabled = true)
 
 export function useSwipeCollectionsApi() {
   const { post, request } = useApiClient();
-
   return {
     createSwipeCollection: (payload: SwipeCollectionCreateRequest) =>
       post<SwipeCollection>("/swipes/collections", payload),
@@ -65,5 +83,26 @@ export function useSwipeCollectionsApi() {
       request<SwipeCollection>(`/swipes/collections/${collectionId}/items/${swipeAssetId}`, {
         method: "DELETE",
       }),
+  };
+}
+
+export function useSwipeReviewApi() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["swipes"] });
+    await queryClient.invalidateQueries({ queryKey: SWIPE_COLLECTIONS_QUERY_KEY });
+  };
+
+  const makeMutation = <TPath extends string>(path: TPath) =>
+    useMutation({
+      mutationFn: (payload: SwipeReviewBulkRequest) => post(path, payload),
+      onSuccess: () => void invalidate(),
+    });
+
+  return {
+    approveSwipes: makeMutation("/swipes/review/approve"),
+    rejectSwipes: makeMutation("/swipes/review/reject"),
+    markPendingSwipes: makeMutation("/swipes/review/mark-pending"),
   };
 }
