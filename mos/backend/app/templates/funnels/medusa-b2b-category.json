@@ -21,11 +21,32 @@
           "padding": "sm",
           "content": [
             {
-              "type": "CommerceStoreHeader",
+              "type": "StarterStoreHeader",
               "props": {
                 "storeName": "Honest Herbalist",
                 "showSearch": false,
                 "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterPromoBar",
+              "props": {
+                "message": "Free shipping on orders over $100",
+                "ctaLabel": "Shop Now",
+                "linkType": "funnelPage",
+                "targetPageId": "__PAGE_CATEGORY__"
               }
             }
           ]
@@ -91,7 +112,7 @@
           "padding": "lg",
           "content": [
             {
-              "type": "CommerceStoreFooter",
+              "type": "StarterStoreFooter",
               "props": {
                 "storeName": "Honest Herbalist",
                 "showCategories": true,

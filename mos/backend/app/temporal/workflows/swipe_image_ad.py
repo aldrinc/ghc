@@ -25,6 +25,11 @@ class SwipeImageAdInput:
     company_swipe_id: Optional[str] = None
     swipe_image_url: Optional[str] = None
     swipe_requires_product_image: Optional[bool] = None
+    swipe_context_mode: str = "workspace"
+    swipe_brand_name: Optional[str] = None
+    swipe_product_name: Optional[str] = None
+    swipe_angle: Optional[str] = None
+    swipe_hook: Optional[str] = None
     model: Optional[str] = None
     render_model_id: Optional[str] = None
     max_output_tokens: Optional[int] = None
@@ -52,6 +57,11 @@ class SwipeImageAdWorkflow:
             "company_swipe_id": input.company_swipe_id,
             "swipe_image_url": input.swipe_image_url,
             "swipe_requires_product_image": input.swipe_requires_product_image,
+            "swipe_context_mode": input.swipe_context_mode,
+            "swipe_brand_name": input.swipe_brand_name,
+            "swipe_product_name": input.swipe_product_name,
+            "swipe_angle": input.swipe_angle,
+            "swipe_hook": input.swipe_hook,
             "model": input.model,
             "render_model_id": input.render_model_id,
             "max_output_tokens": input.max_output_tokens,

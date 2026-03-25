@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
-import type { Client } from "@/types/common";
+import type { Client, GetHookdCredentials, GetHookdSyncFeed, GetHookdSyncFeedInput, GetHookdSyncFeedUpdateInput } from "@/types/common";
 import { toast } from "@/components/ui/toast";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
@@ -1148,6 +1148,113 @@ export function useDeleteClient() {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to delete workspace";
+      toast.error(message);
+    },
+  });
+}
+
+// GetHookd API hooks
+export function useClientGetHookdCredentials(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<GetHookdCredentials>({
+    queryKey: ["clients", "gethookd-credentials", clientId],
+    queryFn: () => get(`/clients/${clientId}/gethookd/credentials`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateClientGetHookdCredentials(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { token: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<GetHookdCredentials>(`/clients/${clientId}/gethookd/credentials`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("GetHookd token saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-credentials", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save GetHookd token";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientGetHookdSyncFeeds(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<GetHookdSyncFeed[]>({
+    queryKey: ["clients", "gethookd-sync-feeds", clientId],
+    queryFn: () => get(`/clients/${clientId}/gethookd/sync-feeds`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useCreateClientGetHookdSyncFeed(clientId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: GetHookdSyncFeedInput) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<GetHookdSyncFeed>(`/clients/${clientId}/gethookd/sync-feeds`, payload);
+    },
+    onSuccess: () => {
+      toast.success("Sync feed created");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create sync feed";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateClientGetHookdSyncFeed(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ feedId, payload }: { feedId: string; payload: GetHookdSyncFeedUpdateInput }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<GetHookdSyncFeed>(`/clients/${clientId}/gethookd/sync-feeds/${feedId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Sync feed updated");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update sync feed";
+      toast.error(message);
+    },
+  });
+}
+
+export function useDeleteClientGetHookdSyncFeed(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (feedId: string) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request(`/clients/${clientId}/gethookd/sync-feeds/${feedId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Sync feed deleted");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to delete sync feed";
       toast.error(message);
     },
   });

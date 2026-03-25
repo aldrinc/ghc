@@ -21,7 +21,7 @@
           "padding": "sm",
           "content": [
             {
-              "type": "CommerceStoreHeader",
+              "type": "StarterStoreHeader",
               "props": {
                 "storeName": "Honest Herbalist",
                 "showSearch": false,
@@ -38,55 +38,15 @@
           "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "lg",
+          "padding": "none",
           "content": [
             {
-              "type": "Columns",
+              "type": "StarterPromoBar",
               "props": {
-                "ratio": "1:1",
-                "gap": "lg",
-                "left": [
-                  {
-                    "type": "Heading",
-                    "props": {
-                      "text": "Resources for Herbal Practitioners",
-                      "level": 1,
-                      "align": "left"
-                    }
-                  },
-                  {
-                    "type": "Text",
-                    "props": {
-                      "text": "Practical tools and guides for working with herbal medicine. Our products include reference handbooks, worksheet pads, and quick-check reference materials.",
-                      "size": "lg",
-                      "tone": "muted",
-                      "align": "left"
-                    }
-                  },
-                  {
-                    "type": "Button",
-                    "props": {
-                      "label": "Browse Products",
-                      "variant": "primary",
-                      "size": "lg",
-                      "width": "auto",
-                      "align": "left",
-                      "linkType": "funnelPage",
-                      "targetPageId": "__PAGE_CATEGORY__"
-                    }
-                  }
-                ],
-                "right": [
-                  {
-                    "type": "Text",
-                    "props": {
-                      "text": "We offer practical tools for herbal practitioners and wellness professionals. Products include the Honest Herbalist Handbook, worksheet pads for client consultations, quick-check reference cards, and preparation guides.",
-                      "size": "md",
-                      "tone": "default",
-                      "align": "left"
-                    }
-                  }
-                ]
+                "message": "Free shipping on orders over $100",
+                "ctaLabel": "Shop Now",
+                "linkType": "funnelPage",
+                "targetPageId": "__PAGE_CATEGORY__"
               }
             }
           ]
@@ -96,22 +56,22 @@
         "type": "Section",
         "props": {
           "purpose": "section",
-          "layout": "contained",
+          "layout": "full",
           "containerWidth": "lg",
-          "variant": "muted",
+          "variant": "default",
           "padding": "lg",
           "content": [
             {
-              "type": "Heading",
+              "type": "StarterHomeHero",
               "props": {
-                "text": "Shop by Category",
-                "level": 2,
-                "align": "center"
+                "eyebrow": "Herbal Practice Resources",
+                "title": "Practical Tools for Herbal Practitioners",
+                "description": "Reference handbooks, worksheet pads, and quick-check materials for your practice.",
+                "primaryCtaLabel": "Browse Products",
+                "primaryLinkType": "funnelPage",
+                "primaryTargetPageId": "__PAGE_CATEGORY__",
+                "featuredProductHandles": []
               }
-            },
-            {
-              "type": "CommerceCategoryList",
-              "props": {}
             }
           ]
         }
@@ -126,17 +86,10 @@
           "padding": "lg",
           "content": [
             {
-              "type": "Heading",
+              "type": "StarterCollectionRails",
               "props": {
-                "text": "Featured Products",
-                "level": 2,
-                "align": "left"
-              }
-            },
-            {
-              "type": "CommerceProductGrid",
-              "props": {
-                "columns": 3
+                "maxCollections": 3,
+                "productsPerCollection": 4
               }
             }
           ]
@@ -152,7 +105,7 @@
           "padding": "lg",
           "content": [
             {
-              "type": "CommerceStoreFooter",
+              "type": "StarterStoreFooter",
               "props": {
                 "storeName": "Honest Herbalist",
                 "showCategories": true,

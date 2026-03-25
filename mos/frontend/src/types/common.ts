@@ -73,6 +73,35 @@ export interface StrategyV2LaunchRecord {
   created_at: string;
 }
 
+// GetHookd sync types
+export interface GetHookdCredentials {
+  isConfigured: boolean;
+  hasToken: boolean;
+  updatedAt?: string | null;
+}
+
+export interface GetHookdSyncFeed {
+  id: string;
+  clientId: string;
+  name: string;
+  sourceUrl: string;
+  webhookPath: string;
+  isActive: boolean;
+  lastSyncAt?: string | null;
+  lastSyncStatus?: "success" | "error" | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type GetHookdSyncFeedInput = {
+  name: string;
+  sourceUrl: string;
+  webhookPath: string;
+  isActive?: boolean;
+};
+
+export type GetHookdSyncFeedUpdateInput = Partial<GetHookdSyncFeedInput>;
+
 export interface ActivityLog {
   id: string;
   workflow_run_id: string;

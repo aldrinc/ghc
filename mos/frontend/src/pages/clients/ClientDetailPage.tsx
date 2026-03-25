@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { useClient } from "@/api/clients";
 import { useWorkflows } from "@/api/workflows";
 import { OnboardingWizard } from "@/components/clients/OnboardingWizard";
+import { GetHookdSettings } from "@/components/clients/GetHookdSettings";
 
 export function ClientDetailPage() {
   const { clientId } = useParams();
@@ -31,6 +32,7 @@ export function ClientDetailPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
             <TabsTrigger value="workflows">Workflows</TabsTrigger>
+            <TabsTrigger value="gethookd">GetHookd</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -101,6 +103,14 @@ export function ClientDetailPage() {
                 </Table>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="gethookd">
+            {clientId ? (
+              <GetHookdSettings clientId={clientId} />
+            ) : (
+              <div className="text-sm text-danger">Client ID is required.</div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

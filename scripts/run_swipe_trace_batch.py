@@ -31,6 +31,7 @@ from app.temporal.activities.asset_activities import _extract_brief, _validate_b
 from app.temporal.activities.swipe_image_ad_activities import (
     _build_swipe_stage1_prompt_input,
     _extract_brand_context,
+    _resolve_swipe_minimal_context,
     generate_swipe_image_ad_activity,
 )
 
@@ -106,6 +107,11 @@ def _resolve_shared_prompt_input(
     product_id: str,
     asset_brief_id: str,
     requirement_index: int,
+    swipe_context_mode: str,
+    swipe_brand_name: str | None,
+    swipe_angle: str | None,
+    swipe_hook: str | None,
+    swipe_product_name: str | None,
 ) -> dict[str, Any]:
     prompt_template, prompt_sha = load_swipe_to_image_ad_prompt()
     with session_scope() as session:
@@ -125,12 +131,6 @@ def _resolve_shared_prompt_input(
             asset_brief_id=asset_brief_id,
             brief=brief,
         )
-        brand_ctx = _extract_brand_context(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-        )
 
     requirements = brief.get("requirements") or []
     if not isinstance(requirements, list) or requirement_index < 0 or requirement_index >= len(requirements):
@@ -140,8 +140,31 @@ def _resolve_shared_prompt_input(
     requirement = requirements[requirement_index]
     if not isinstance(requirement, dict):
         raise RuntimeError("Asset brief requirement must be an object.")
-    angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
-    brand_name = str(brand_ctx.get("client_name") or "")
+    if swipe_context_mode == swipe_activities._SWIPE_CONTEXT_MODE_MINIMAL:
+        with session_scope() as session:
+            minimal_context = _resolve_swipe_minimal_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                brand_name_override=swipe_brand_name,
+                product_name_override=swipe_product_name,
+                angle_override=swipe_angle,
+                hook_override=swipe_hook,
+                channel_id=str(requirement.get("channel") or "meta").strip(),
+            )
+        angle = swipe_angle
+        brand_name = str(minimal_context["brand_name"])
+    else:
+        with session_scope() as session:
+            brand_ctx = _extract_brand_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+            )
+        angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
+        brand_name = str(brand_ctx.get("client_name") or "")
     prompt_input = _build_swipe_stage1_prompt_input(
         prompt_template=prompt_template,
         brand_name=brand_name,
@@ -171,6 +194,12 @@ def _run_stage1_trace(
     prompt_input_text: str,
     requested_model: str | None,
     requested_render_model_id: str | None,
+    requested_swipe_requires_product_image: bool | None,
+    requested_swipe_context_mode: str,
+    requested_swipe_brand_name: str | None,
+    requested_swipe_product_name: str | None,
+    requested_swipe_angle: str | None,
+    requested_swipe_hook: str | None,
 ) -> dict[str, Any]:
     model = (
         requested_model
@@ -227,7 +256,7 @@ def _run_stage1_trace(
         )
         resolved_requires_product_image, policy_source, source_filename = (
             swipe_activities._resolve_swipe_requires_product_image_policy(
-                explicit_requires_product_image=None,
+                explicit_requires_product_image=requested_swipe_requires_product_image,
                 swipe_source_url=swipe_source_url,
             )
         )
@@ -279,24 +308,44 @@ def _run_stage1_trace(
                 ),
             )
 
-        (
-            gemini_store_names,
-            gemini_rag_doc_keys,
-            gemini_rag_bundle_doc_keys,
-            gemini_rag_document_names,
-        ) = swipe_activities._resolve_swipe_stage1_gemini_file_search_context(
-            session=session,
-            org_id=org_id,
-            idea_workspace_id=campaign_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            funnel_id=funnel_id,
-            asset_brief_artifact_id=brief_artifact_id,
-        )
+        prompt_context_parts: list[Any] = []
+        if requested_swipe_context_mode == swipe_activities._SWIPE_CONTEXT_MODE_MINIMAL:
+            minimal_context = _resolve_swipe_minimal_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                brand_name_override=requested_swipe_brand_name,
+                product_name_override=requested_swipe_product_name,
+                angle_override=requested_swipe_angle,
+                hook_override=requested_swipe_hook,
+                channel_id=str(requirement.get("channel") or "meta").strip(),
+            )
+            prompt_context_parts.append(str(minimal_context["context_block"]))
+            gemini_store_names = []
+            gemini_rag_doc_keys = []
+            gemini_rag_bundle_doc_keys = []
+            gemini_rag_document_names = []
+        else:
+            (
+                gemini_store_names,
+                gemini_rag_doc_keys,
+                gemini_rag_bundle_doc_keys,
+                gemini_rag_document_names,
+            ) = swipe_activities._resolve_swipe_stage1_gemini_file_search_context(
+                session=session,
+                org_id=org_id,
+                idea_workspace_id=campaign_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                funnel_id=funnel_id,
+                asset_brief_artifact_id=brief_artifact_id,
+            )
 
     gemini_client = swipe_activities._ensure_gemini_client()
     contents: list[Any] = [
+        *prompt_context_parts,
         prompt_input_text,
         swipe_activities.genai_types.Part.from_bytes(data=swipe_bytes, mime_type=swipe_mime_type),
     ]
@@ -308,17 +357,19 @@ def _run_stage1_trace(
             )
         )
 
-    generate_config = swipe_activities.genai_types.GenerateContentConfig(
-        temperature=0.2,
-        max_output_tokens=max_output_tokens,
-        tools=[
+    generate_config_kwargs: dict[str, Any] = {
+        "temperature": 0.2,
+        "max_output_tokens": max_output_tokens,
+    }
+    if gemini_store_names:
+        generate_config_kwargs["tools"] = [
             swipe_activities.genai_types.Tool(
                 file_search=swipe_activities.genai_types.FileSearch(
                     file_search_store_names=gemini_store_names
                 )
             )
-        ],
-    )
+        ]
+    generate_config = swipe_activities.genai_types.GenerateContentConfig(**generate_config_kwargs)
     result = gemini_client.models.generate_content(
         model=model_name,
         contents=contents,
@@ -347,6 +398,7 @@ def _run_stage1_trace(
         "requiresProductImagePolicySource": policy_source,
         "productReferenceImageUrlsSelected": product_reference_image_urls,
         "productReferenceImageUrlsAvailable": all_product_reference_image_urls,
+        "productPromptImageAttached": product_prompt_image_bytes is not None,
         "productPromptImageSourceUrl": product_prompt_image_source_url,
         "rawMarkdown": raw_output,
         "outputPromptText": extracted_image_prompt_raw,
@@ -387,6 +439,17 @@ def _read_optional_text(path_value: str | None) -> str:
         return Path(path_value).read_text(encoding="utf-8")
     except OSError:
         return ""
+
+
+def _parse_optional_bool_arg(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise argparse.ArgumentTypeError(
+        f"Expected 'true' or 'false' for boolean flag, received {value!r}."
+    )
 
 
 def _render_index_html(*, output_root: Path, index_payload: dict[str, Any]) -> None:
@@ -433,6 +496,7 @@ def _render_index_html(*, output_root: Path, index_payload: dict[str, Any]) -> N
         stores = item.get("stageOneGeminiStoreNames") or []
         rag_docs = item.get("stageOneGeminiRagDocumentNames") or []
         product_refs = item.get("productReferenceImageUrlsSelected") or []
+        product_prompt_attached = item.get("productPromptImageAttached")
         source_panel = [
             '<div class="panel">',
             '<div class="panel-title">Source Image</div>',
@@ -504,6 +568,8 @@ def _render_index_html(*, output_root: Path, index_payload: dict[str, Any]) -> N
             f'    <div><b>Gemini stores</b><br/>{html.escape(", ".join(str(value) for value in stores) or "[none]")}</div>',
             f'    <div><b>RAG documents</b><br/>{html.escape(", ".join(str(value) for value in rag_docs) or "[none]")}</div>',
             f'    <div><b>Selected product refs</b><br/>{html.escape(", ".join(str(value) for value in product_refs) or "[none]")}</div>',
+            f'    <div><b>Product prompt attached</b><br/>{html.escape(str(product_prompt_attached))}</div>',
+            f'    <div><b>Product prompt source URL</b><br/>{html.escape(str(item.get("productPromptImageSourceUrl") or "[none]"))}</div>',
             f'    <div><b>Metadata JSON</b><br/>{metadata_link_html}</div>',
             f'    <div><b>Output Prompt File</b><br/>{output_prompt_link_html}</div>',
             f'    <div><b>Raw Gemini Markdown</b><br/>{raw_markdown_link_html}</div>',
@@ -587,6 +653,8 @@ def _render_index_html(*, output_root: Path, index_payload: dict[str, Any]) -> N
             f'      <div class="tile"><b>Angle</b><br/>{html.escape(str(run_info["angle"] or "[missing]"))}</div>',
             f'      <div class="tile"><b>Brief</b><br/>{html.escape(str(run_info["assetBriefId"]))}</div>',
             f'      <div class="tile"><b>Requirement Index</b><br/>{run_info["requirementIndex"]}</div>',
+            f'      <div class="tile"><b>Require Product Image</b><br/>{html.escape(str(run_info["swipeRequiresProductImage"]))}</div>',
+            f'      <div class="tile"><b>Context Mode</b><br/>{html.escape(str(run_info["swipeContextMode"]))}</div>',
             "    </div>",
             '    <div class="prompt-block">',
             "      <h2>Shared Stage One Input Prompt</h2>",
@@ -621,6 +689,16 @@ def main() -> int:
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--model", default=None)
     parser.add_argument("--render-model-id", default=None)
+    parser.add_argument("--swipe-requires-product-image", type=_parse_optional_bool_arg, default=None)
+    parser.add_argument(
+        "--swipe-context-mode",
+        choices=(swipe_activities._SWIPE_CONTEXT_MODE_WORKSPACE, swipe_activities._SWIPE_CONTEXT_MODE_MINIMAL),
+        default=swipe_activities._SWIPE_CONTEXT_MODE_WORKSPACE,
+    )
+    parser.add_argument("--swipe-brand-name", default=None)
+    parser.add_argument("--swipe-product-name", default=None)
+    parser.add_argument("--swipe-angle", default=None)
+    parser.add_argument("--swipe-hook", default=None)
     args = parser.parse_args()
 
     template_dir = Path(args.template_dir).expanduser().resolve()
@@ -645,6 +723,11 @@ def main() -> int:
         product_id=args.product_id,
         asset_brief_id=args.asset_brief_id,
         requirement_index=args.requirement_index,
+        swipe_context_mode=args.swipe_context_mode,
+        swipe_brand_name=args.swipe_brand_name,
+        swipe_angle=args.swipe_angle,
+        swipe_hook=args.swipe_hook,
+        swipe_product_name=args.swipe_product_name,
     )
     _write_text(output_root / "stage-one-input-prompt.txt", shared_prompt["promptInputText"])
 
@@ -688,6 +771,18 @@ def main() -> int:
                 params["model"] = args.model
             if args.render_model_id:
                 params["render_model_id"] = args.render_model_id
+            if args.swipe_requires_product_image is not None:
+                params["swipe_requires_product_image"] = args.swipe_requires_product_image
+            if args.swipe_context_mode:
+                params["swipe_context_mode"] = args.swipe_context_mode
+            if args.swipe_brand_name:
+                params["swipe_brand_name"] = args.swipe_brand_name
+            if args.swipe_product_name:
+                params["swipe_product_name"] = args.swipe_product_name
+            if args.swipe_angle:
+                params["swipe_angle"] = args.swipe_angle
+            if args.swipe_hook:
+                params["swipe_hook"] = args.swipe_hook
 
             try:
                 activity_result = generate_swipe_image_ad_activity(params)
@@ -747,11 +842,16 @@ def main() -> int:
                     "stageOneSourceFilename": ai_metadata.get("swipeSourceFilename"),
                     "stageOnePromptInputText": str(ai_metadata.get("swipePromptInputText") or shared_prompt["promptInputText"]),
                     "stageOneOutputPromptText": output_prompt,
+                    "swipeContextMode": ai_metadata.get("swipeContextMode") or activity_result.get("swipe_context_mode") or args.swipe_context_mode,
+                    "stageOneRequiresProductImage": ai_metadata.get("swipeRequiresProductImage"),
+                    "stageOneRequiresProductImagePolicySource": ai_metadata.get("swipeRequiresProductImagePolicySource"),
                     "stageOneRawMarkdownPath": str(raw_markdown_path),
                     "stageOneOutputPromptPath": str(output_prompt_path),
                     "metadataPath": str(metadata_path),
                     "productReferenceImageUrlsSelected": ai_metadata.get("swipeProductReferenceImageUrlsSelected") or [],
                     "productReferenceImageUrlsAvailable": ai_metadata.get("swipeProductReferenceImageUrlsAvailable") or [],
+                    "productPromptImageAttached": ai_metadata.get("swipePromptProductImageAttached"),
+                    "productPromptImageSourceUrl": ai_metadata.get("swipePromptProductImageSourceUrl"),
                 }
                 _write_json(metadata_path, item)
                 results.append(item)
@@ -798,6 +898,12 @@ def main() -> int:
                         prompt_input_text=shared_prompt["promptInputText"],
                         requested_model=args.model,
                         requested_render_model_id=args.render_model_id,
+                        requested_swipe_requires_product_image=args.swipe_requires_product_image,
+                        requested_swipe_context_mode=args.swipe_context_mode,
+                        requested_swipe_brand_name=args.swipe_brand_name,
+                        requested_swipe_product_name=args.swipe_product_name,
+                        requested_swipe_angle=args.swipe_angle,
+                        requested_swipe_hook=args.swipe_hook,
                     )
                 except Exception as stage1_exc:  # noqa: BLE001
                     stage1_trace_error = str(stage1_exc)
@@ -840,6 +946,7 @@ def main() -> int:
                             "productReferenceImageUrlsAvailable": stage1_trace[
                                 "productReferenceImageUrlsAvailable"
                             ],
+                            "productPromptImageAttached": stage1_trace["productPromptImageAttached"],
                             "productPromptImageSourceUrl": stage1_trace["productPromptImageSourceUrl"],
                         }
                     )
@@ -883,6 +990,12 @@ def main() -> int:
             "assetBriefId": args.asset_brief_id,
             "requirementIndex": args.requirement_index,
             "aspectRatio": args.aspect_ratio,
+            "swipeRequiresProductImage": args.swipe_requires_product_image,
+            "swipeContextMode": args.swipe_context_mode,
+            "swipeBrandName": args.swipe_brand_name,
+            "swipeProductName": args.swipe_product_name,
+            "swipeAngle": args.swipe_angle,
+            "swipeHook": args.swipe_hook,
             "promptTemplateSha256": shared_prompt["promptTemplateSha256"],
             "briefArtifactId": shared_prompt["briefArtifactId"],
             "briefCreativeConcept": shared_prompt["briefCreativeConcept"],
