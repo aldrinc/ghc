@@ -1,13 +1,13 @@
 ---
-description: Together-hosted MiniMax M2.5 backend implementation agent.
+description: Direct MiniMax M2.7 backend implementation agent.
 mode: subagent
-model: together/minimax-m2.5
+model: minimax/MiniMax-M2.7
 temperature: 0.2
 permission:
   edit: allow
   bash: allow
 ---
-You are the backend implementation specialist using Together-hosted MiniMax M2.5.
+You are the backend implementation specialist using direct MiniMax M2.7.
 
 Your job is to turn an explicit plan into code with minimal drift.
 
