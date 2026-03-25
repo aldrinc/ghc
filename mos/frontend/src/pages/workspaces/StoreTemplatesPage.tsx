@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Download,
   ExternalLink,
   Globe,
@@ -25,6 +27,7 @@ import {
   useCreateSiteImport,
   useGenerateVariants,
   useMutationPresets,
+  useSaveSiteImport,
   useSiteImportDetail,
   useSiteImportSnapshot,
   useSiteImports,
@@ -53,10 +56,14 @@ import type {
   MutationPresetPreview,
   NormalizedSection,
   ProvenanceEvent,
+  SaveSiteImportResponse,
   SiteImportDetail,
   StorefrontBindingPreviewRequirement,
   TemplateVariantDetailExtended,
 } from "@/types/storefrontTemplates";
+import { useNavigate } from "react-router-dom";
+import { ImportActivityPanel } from "@/components/import/ImportActivityPanel";
+import type { UpstreamTranscriptEntry, UpstreamVariantData } from "@/types/importActivity";
 
 function readProvenanceString(record: Record<string, unknown> | undefined, ...keys: string[]): string | undefined {
   if (!record) return undefined;
@@ -86,6 +93,13 @@ function formatSlot(slot: string): string {
     .join(" ");
 }
 
+function formatImportModelLabel(modelId?: string, modelSlot?: number): string | undefined {
+  if (modelId) return modelId;
+  if (modelSlot === 1) return "Slot 1 · Gemini";
+  if (modelSlot === 2) return "Slot 2 · Claude Opus";
+  return undefined;
+}
+
 function resolveFamilyDefaults(family?: string | null): { family: string; pageType: string } {
   if (family === "listicle-presell" || family === "pre-sales-listicle") {
     return { family: "listicle-presell", pageType: "pre_sell" };
@@ -98,6 +112,10 @@ function requirementTone(status: string): "success" | "warning" | "danger" | "ne
   if (status === "unsupported") return "danger";
   if (status === "missing") return "warning";
   return "neutral";
+}
+
+function isImportActiveStatus(status?: string | null): boolean {
+  return Boolean(status && ["queued", "capturing", "generating", "adapting", "running"].includes(status));
 }
 
 function RequirementRow({ requirement }: { requirement: StorefrontBindingPreviewRequirement }) {
@@ -449,6 +467,7 @@ function MedusaConnectionCard({ clientId, productId, onVariantCreated }: MedusaC
 }
 
 export function StoreTemplatesPage() {
+  const navigate = useNavigate();
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
   const { data: templates = [], isLoading: templatesLoading } = useStorefrontTemplates();
@@ -460,6 +479,8 @@ export function StoreTemplatesPage() {
   // Import state
   const [importUrl, setImportUrl] = useState("");
   const [importPageType, setImportPageType] = useState("");
+  const [importSiteFamilyHint, setImportSiteFamilyHint] = useState("");
+  const [showAdvancedImport, setShowAdvancedImport] = useState(false);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   const [showConvertForm, setShowConvertForm] = useState(false);
   const [convertName, setConvertName] = useState("");
@@ -467,6 +488,9 @@ export function StoreTemplatesPage() {
   const [convertPageType, setConvertPageType] = useState("product_detail");
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [convertReviewNotes, setConvertReviewNotes] = useState("");
+  const [saveSiteName, setSaveSiteName] = useState("");
+  const [saveSiteDescription, setSaveSiteDescription] = useState("");
+  const [saveResult, setSaveResult] = useState<SaveSiteImportResponse | null>(null);
 
   // Create draft from template state
   const [showDraftForm, setShowDraftForm] = useState(false);
@@ -484,6 +508,18 @@ export function StoreTemplatesPage() {
     { label: "Product Detail", value: "product_detail" },
     { label: "Pre-sell", value: "pre_sell" },
   ];
+  const importPageHintOptions = [
+    { label: "No page hint", value: "" },
+    { label: "Home", value: "home" },
+    { label: "Category", value: "category" },
+    { label: "Product detail", value: "product_detail" },
+    { label: "Cart", value: "cart" },
+    { label: "Checkout", value: "checkout" },
+  ];
+  const supportedSiteFamilyHints = [
+    { label: "No family hint", value: "" },
+    { label: "medusa-b2b-starter", value: "medusa-b2b-starter" },
+  ];
 
   const { data: imports = [], isLoading: importsLoading, refetch: refetchImports } = useSiteImports(
     workspace?.id
@@ -500,6 +536,68 @@ export function StoreTemplatesPage() {
 
   const createImport = useCreateSiteImport();
   const convertImport = useConvertImport();
+  const saveSiteImport = useSaveSiteImport();
+
+  const activityTranscript = useMemo<UpstreamTranscriptEntry[]>(() => {
+    if (!importDetail?.upstreamTranscript) return [];
+    return importDetail.upstreamTranscript.map((entry, index) => {
+      const typedEntry = entry as Record<string, unknown>;
+      const capturedAt = typeof typedEntry.capturedAt === "string" ? typedEntry.capturedAt : undefined;
+      return {
+        type: String(typedEntry.type || "status") as UpstreamTranscriptEntry["type"],
+        value: typeof typedEntry.value === "string" ? typedEntry.value : undefined,
+        data: typedEntry.data,
+        eventId: typeof typedEntry.eventId === "string" ? typedEntry.eventId : undefined,
+        variantIndex: Number(typedEntry.variantIndex ?? 0),
+        timestamp: capturedAt ? new Date(capturedAt).getTime() : index,
+      };
+    });
+  }, [importDetail?.upstreamTranscript]);
+
+  const activityVariants = useMemo<UpstreamVariantData[]>(() => {
+    if (!importDetail?.upstreamVariants) return [];
+    const metadataModels = Array.isArray(importDetail.upstreamMetadata?.variantModels)
+      ? (importDetail.upstreamMetadata.variantModels as string[])
+      : [];
+    return importDetail.upstreamVariants.map((variant, index) => {
+      const typedVariant = variant as Record<string, unknown>;
+      const variantIndex = Number(typedVariant.variantIndex ?? index);
+      const variantEvents = activityTranscript.filter((event) => event.variantIndex === variantIndex);
+      const firstEventTimestamp = variantEvents[0]?.timestamp;
+      const terminalEvent = [...variantEvents]
+        .reverse()
+        .find((event) => event.type === "variantComplete" || event.type === "variantError");
+      const modelSlot = typeof typedVariant.modelSlot === "number"
+        ? typedVariant.modelSlot
+        : typeof importDetail.modelSlots?.[variantIndex] === "number"
+          ? importDetail.modelSlots[variantIndex]
+          : undefined;
+      const rawStatus = String(typedVariant.status || "pending");
+      const status: UpstreamVariantData["status"] =
+        rawStatus === "completed"
+          ? "complete"
+          : rawStatus === "failed"
+            ? "error"
+            : rawStatus === "pending"
+              ? (isImportActiveStatus(importDetail?.status) ? "generating" : "paused")
+              : (rawStatus as UpstreamVariantData["status"]);
+      const modelId = typeof typedVariant.modelId === "string"
+        ? typedVariant.modelId
+        : typeof typedVariant.model === "string"
+          ? typedVariant.model
+          : typeof metadataModels[variantIndex] === "string"
+            ? metadataModels[variantIndex]
+            : undefined;
+      return {
+        variantIndex,
+        code: typeof typedVariant.code === "string" ? typedVariant.code : undefined,
+        status,
+        model: formatImportModelLabel(modelId, modelSlot),
+        requestStartedAt: firstEventTimestamp,
+        completedAt: terminalEvent?.timestamp,
+      };
+    });
+  }, [activityTranscript, importDetail?.status, importDetail?.upstreamMetadata, importDetail?.upstreamVariants]);
 
   useEffect(() => {
     if (!templates.length) return;
@@ -515,6 +613,7 @@ export function StoreTemplatesPage() {
   // Clear section selection when selected import changes
   useEffect(() => {
     setSelectedSectionIds([]);
+    setSaveResult(null);
   }, [selectedImportId]);
 
   useEffect(() => {
@@ -524,7 +623,18 @@ export function StoreTemplatesPage() {
     const defaults = resolveFamilyDefaults(selectedImport.suggestedTemplateFamily);
     setConvertFamily(defaults.family);
     setConvertPageType(defaults.pageType);
+    setSaveSiteName(selectedImport.title || selectedImport.sourceHostname || "Imported Site");
+    setSaveSiteDescription("");
   }, [selectedImportId, imports]);
+
+  useEffect(() => {
+    if (!selectedImportId || !isImportActiveStatus(importDetail?.status)) return;
+    const intervalId = window.setInterval(() => {
+      void refetchImports();
+      void refetchImportDetail();
+    }, 1500);
+    return () => window.clearInterval(intervalId);
+  }, [importDetail?.status, refetchImportDetail, refetchImports, selectedImportId]);
 
   const { data: templateDetail, error: templateDetailError } = useStorefrontTemplate(
     selectedTemplateId || undefined
@@ -565,13 +675,18 @@ export function StoreTemplatesPage() {
   const handleCreateImport = async () => {
     if (!importUrl || !workspace?.id) return;
     try {
-      await createImport.mutateAsync({
+      const createdImport = await createImport.mutateAsync({
         sourceUrl: importUrl,
         pageTypeHint: importPageType || undefined,
+        siteFamilyHint: importSiteFamilyHint || undefined,
         clientId: workspace.id,
       });
       setImportUrl("");
       setImportPageType("");
+      setImportSiteFamilyHint("");
+      setShowAdvancedImport(false);
+      setSelectedImportId(createdImport.id);
+      setActiveTab("imports");
       refetchImports();
     } catch (err) {
       console.error("Failed to create import:", err);
@@ -599,6 +714,22 @@ export function StoreTemplatesPage() {
       refetchImportDetail();
     } catch (err) {
       console.error("Failed to convert import:", err);
+    }
+  };
+
+  const handleSaveSiteImport = async () => {
+    if (!selectedImportId || !workspace?.id || !saveSiteName.trim()) return;
+    try {
+      const result = await saveSiteImport.mutateAsync({
+        importId: selectedImportId,
+        clientId: workspace.id,
+        siteName: saveSiteName.trim(),
+        description: saveSiteDescription.trim() || undefined,
+      });
+      setSaveResult(result);
+      refetchImportDetail();
+    } catch (err) {
+      console.error("Failed to save site import:", err);
     }
   };
 
@@ -630,7 +761,7 @@ export function StoreTemplatesPage() {
 
   const statusTone = (status: string): "success" | "warning" | "danger" | "neutral" => {
     if (status === "completed") return "success";
-    if (status === "running") return "warning";
+    if (["queued", "capturing", "generating", "adapting", "running"].includes(status)) return "warning";
     if (status === "failed") return "danger";
     return "neutral";
   };
@@ -1170,6 +1301,24 @@ export function StoreTemplatesPage() {
               </div>
 
               <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                  <div className="font-semibold text-content">Default import settings</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <div>
+                      <div className="font-medium text-content">Stack</div>
+                      <div>react_tailwind</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-content">Model slots</div>
+                      <div>1 = Gemini, 2 = Claude Opus</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-content">Import engine</div>
+                      <div>screenshot-to-code</div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-content">Source URL</label>
                   <Input
@@ -1182,13 +1331,45 @@ export function StoreTemplatesPage() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-content">Page type hint (optional)</label>
-                  <Input
-                    type="text"
-                    placeholder="e.g., product, collection, homepage"
-                    value={importPageType}
-                    onChange={(e) => setImportPageType(e.target.value)}
-                  />
+                  <Select value={importPageType} onValueChange={setImportPageType} options={importPageHintOptions} />
+                  <div className="text-xs text-content-muted">
+                    Use supported Marketi page roles only. This prevents adapter mismatches with unsupported shorthand values.
+                  </div>
                 </div>
+
+                {/* Advanced Options Toggle */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedImport((prev) => !prev)}
+                    className="flex items-center gap-1 text-xs text-content-muted hover:text-content"
+                  >
+                    {showAdvancedImport ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                    Advanced options
+                  </button>
+                </div>
+
+                {/* Advanced Options Panel */}
+                {showAdvancedImport && (
+                  <div className="space-y-3 rounded-xl border border-border bg-surface-2 px-3 py-3">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-content">Site family hint (optional)</label>
+                      <Select
+                        value={importSiteFamilyHint}
+                        onValueChange={setImportSiteFamilyHint}
+                        options={supportedSiteFamilyHints}
+                      />
+                      <div className="text-xs text-content-muted">
+                        Use a real site family id when the adapter cannot infer the family from screenshot-to-code output.
+                        Current supported runtime family: <span className="font-semibold text-content">medusa-b2b-starter</span>.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <Button
                   onClick={handleCreateImport}
@@ -1210,7 +1391,7 @@ export function StoreTemplatesPage() {
 
                 {createImport.isError && (
                   <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
-                    Failed to create import. Please check the URL and try again.
+                    {readQueryError(createImport.error, "Failed to create import. Please check the URL and try again.")}
                   </div>
                 )}
               </div>
@@ -1390,6 +1571,154 @@ export function StoreTemplatesPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Import progress</div>
+                      <div className="text-xs text-content-muted">
+                        Exact pipeline stage and backend-reported status for this run.
+                      </div>
+                    </div>
+                    <Badge tone={statusTone(importDetail.status)}>{importDetail.status}</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Input mode</div>
+                      <div className="mt-1">{importDetail.inputMode || "image"}</div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Model slots</div>
+                      <div className="mt-1">
+                        {importDetail.modelSlots.length ? importDetail.modelSlots.join(", ") : "Default slot set"}
+                      </div>
+                    </div>
+                  </div>
+                  {(importDetail.captureError || importDetail.generatorError) && (
+                    <div className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-3 text-sm text-danger">
+                      <div className="font-semibold">{importDetail.failureStage || "Import failed"}</div>
+                      <div className="mt-1">{importDetail.generatorError || importDetail.captureError}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Site-level review</div>
+                      <div className="text-xs text-content-muted">
+                        Adapter-backed family, entry page, completeness, and imported page set.
+                      </div>
+                    </div>
+                    {importDetail.savedSiteId ? <Badge tone="success">Saved</Badge> : null}
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Resolved family</div>
+                      <div className="mt-1">
+                        {importDetail.resolvedSiteFamily || importDetail.suggestedTemplateFamily || "Unresolved"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Family hint</div>
+                      <div className="mt-1">{importDetail.siteFamilyHint || "None"}</div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Entry page</div>
+                      <div className="mt-1">
+                        {String(importDetail.adaptedSite?.entry_page_type || importDetail.adaptedSite?.entryPageType || importDetail.resolvedPageType || "Unknown")}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Completeness</div>
+                      <div className="mt-1">
+                        {String(importDetail.adaptedSite?.completeness_state || importDetail.adaptedSite?.completenessState || "partial")}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                      <div className="font-semibold text-content">Imported pages</div>
+                      <div className="mt-1">{importDetail.adaptedPages.length || 0}</div>
+                    </div>
+                  </div>
+                  {importDetail.adaptedPages.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {importDetail.adaptedPages.map((page, index) => {
+                        const pageType = String(page.page_type || page.pageType || `page_${index + 1}`);
+                        const templateId = String(page.template_id || page.templateId || "unmapped");
+                        const outboundLinks = Array.isArray(page.outbound_links || page.outboundLinks)
+                          ? (page.outbound_links || page.outboundLinks)
+                          : [];
+                        return (
+                          <div key={`${pageType}-${index}`} className="rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-semibold text-content">{formatPageType(pageType)}</div>
+                                <div className="mt-1">Template: {templateId}</div>
+                              </div>
+                              <Badge tone="neutral">#{index + 1}</Badge>
+                            </div>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <div>
+                                <span className="font-semibold text-content">Slug:</span> {String(page.slug || "-")}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-content">Links:</span> {outboundLinks.length}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-content">Generated code:</span>{" "}
+                                {page.generated_code || page.generatedCode ? "Available" : "Unavailable"}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-content">Puck data:</span>{" "}
+                                {Object.keys((page.puck_data || page.puckData || {}) as Record<string, unknown>).length
+                                  ? "Available"
+                                  : "Unavailable"}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-dashed border-border px-3 py-4 text-sm text-content-muted">
+                      No adapter-backed page set is available yet.
+                    </div>
+                  )}
+                </div>
+
+                {/* Generator Activity Panel */}
+                <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-content">Generator activity</div>
+                      <div className="text-xs text-content-muted">
+                        Detailed screenshot-to-code progress and events.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-content-muted">
+                      <span>{importDetail.upstreamTranscript.length} events</span>
+                      <span>•</span>
+                      <span>{importDetail.upstreamVariants.length} variants</span>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <ImportActivityPanel
+                      transcript={activityTranscript}
+                      variants={activityVariants}
+                      isActive={isImportActiveStatus(importDetail.status)}
+                    />
+                  </div>
+                  {/* Metadata summary */}
+                  <div className="mt-4 rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                    <div className="font-semibold text-content">Generator metadata</div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <div>Generator: {String(importDetail.upstreamMetadata.generatorSystem || "screenshot-to-code")}</div>
+                      <div>Stack: {String(importDetail.upstreamMetadata.stack || "react_tailwind")}</div>
+                      <div>Variant count: {String(importDetail.upstreamMetadata.variantCount || importDetail.upstreamVariants.length)}</div>
+                      <div>Models: {Array.isArray(importDetail.upstreamMetadata.variantModels) ? importDetail.upstreamMetadata.variantModels.join(", ") : "-"}</div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Theme Candidate */}
                 {importDetail.themeCandidate && Object.keys(importDetail.themeCandidate).length > 0 && (
@@ -1593,6 +1922,67 @@ export function StoreTemplatesPage() {
                       </div>
                     </div>
                   </>
+                )}
+
+                {importDetail.status === "completed" && (
+                  <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-content">Save reviewed import as site</div>
+                        <div className="text-xs text-content-muted">
+                          Creates a new dedicated site runtime record from the adapter-backed page set.
+                        </div>
+                      </div>
+                      {importDetail.savedSiteId ? <Badge tone="success">Already saved</Badge> : null}
+                    </div>
+                    {saveResult ? (
+                      <div className="mt-3 rounded-xl border border-success/30 bg-success/5 px-3 py-3 text-sm text-success">
+                        <div className="font-semibold">Saved {saveResult.siteName}</div>
+                        <div className="mt-1">
+                          Created {saveResult.pageCount} page draft{saveResult.pageCount === 1 ? "" : "s"}
+                          {saveResult.entryPageType ? ` with entry page ${formatPageType(saveResult.entryPageType)}.` : "."}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => navigate("/workspaces/sites")}>Open Sites</Button>
+                          <Button size="sm" variant="outline" onClick={() => refetchImportDetail()}>Refresh Import</Button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {!importDetail.savedSiteId ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-content">Site name</label>
+                          <Input value={saveSiteName} onChange={(e) => setSaveSiteName(e.target.value)} placeholder="Imported site" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-content">Description (optional)</label>
+                          <Input value={saveSiteDescription} onChange={(e) => setSaveSiteDescription(e.target.value)} placeholder="What this import represents" />
+                        </div>
+                        <Button onClick={handleSaveSiteImport} disabled={!saveSiteName.trim() || saveSiteImport.isPending} className="w-full">
+                          {saveSiteImport.isPending ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              Saving site...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              Save as New Site
+                            </>
+                          )}
+                        </Button>
+                        {saveSiteImport.isError ? (
+                          <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-3 text-sm text-danger">
+                            {readQueryError(saveSiteImport.error, "Failed to save import as site.")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-border bg-surface-2 px-3 py-3 text-xs text-content-muted">
+                        Saved site id: <span className="font-semibold text-content">{importDetail.savedSiteId}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Convert Form */}

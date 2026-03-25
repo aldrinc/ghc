@@ -108,6 +108,7 @@ export type SiteImportSummary = {
   sourceUrl: string;
   sourceHostname?: string | null;
   pageTypeHint?: string | null;
+  siteFamilyHint?: string | null;
   status: string;
   title?: string | null;
   suggestedTemplateFamily?: string | null;
@@ -115,17 +116,55 @@ export type SiteImportSummary = {
   updatedAt: string;
 };
 
+export type UpstreamTranscriptSummaryEvent = {
+  type: string;
+  variantIndex: number;
+  captureIndex: number;
+  capturedAt?: string | null;
+  localSequence: number;
+  status?: string;
+  hasCode?: boolean;
+  codeLength?: number;
+  completed?: boolean;
+  model?: string;
+  error?: string;
+  models?: string[];
+  contentPreview?: string;
+  contentLength?: number;
+  source?: string;
+  title?: string;
+  toolName?: string;
+  ok?: boolean;
+};
+
 export type SiteImportDetail = {
   id: string;
   sourceUrl: string;
   sourceHostname?: string | null;
   pageTypeHint?: string | null;
+  siteFamilyHint?: string | null;
   status: string;
+  inputMode: string;
+  modelSlots: number[];
   title?: string | null;
   metaDescription?: string | null;
   suggestedTemplateFamily?: string | null;
+  resolvedSiteFamily?: string | null;
+  resolvedPageType?: string | null;
+  resolvedTemplateId?: string | null;
   themeCandidate: ThemeCandidate;
   normalizedSections: NormalizedSection[];
+  upstreamRequestPayload: Record<string, unknown>;
+  upstreamTranscript: Record<string, unknown>[];
+  upstreamTranscriptSummary: UpstreamTranscriptSummaryEvent[];
+  upstreamVariants: Record<string, unknown>[];
+  upstreamMetadata: Record<string, unknown>;
+  adaptedSite: Record<string, unknown>;
+  adaptedPages: Record<string, unknown>[];
+  adaptedPuckData: Record<string, unknown>;
+  generatorError?: string | null;
+  failureStage?: string | null;
+  savedSiteId?: string | null;
   synthesis?: SynthesisOutput;
   captureError?: string | null;
   createdAt: string;
@@ -183,6 +222,7 @@ export type TemplateStylePreset = {
 export type CreateSiteImportRequest = {
   sourceUrl: string;
   pageTypeHint?: string;
+  siteFamilyHint?: string;
 };
 
 export type ConvertImportRequest = {
@@ -191,6 +231,28 @@ export type ConvertImportRequest = {
   pageType: string;
   acceptedSectionIds: string[];
   reviewNotes?: string;
+};
+
+export type SaveSiteImportRequest = {
+  importId: string;
+  siteName: string;
+  description?: string;
+};
+
+export type SaveSiteImportCreatedPage = {
+  pageId: string;
+  pageType?: string | null;
+  templateId?: string | null;
+  versionId?: string | null;
+};
+
+export type SaveSiteImportResponse = {
+  siteId: string;
+  siteName: string;
+  pageCount: number;
+  entryPageType?: string | null;
+  createdPages: SaveSiteImportCreatedPage[];
+  createdAt: string;
 };
 
 // Synthesis Types
@@ -370,3 +432,16 @@ export type CreateDraftFromTemplateResponse = {
   variant: TemplateVariantDetailExtended;
   bindingPreview: StorefrontBindingPreview;
 };
+
+// Re-export import activity types for convenience
+export type {
+  ActivityEvent,
+  UpstreamEventType,
+  UpstreamTranscriptEntry,
+  UpstreamVariantData,
+  AgentEventMeta,
+  VariantResultMeta,
+  VariantErrorMeta,
+  VariantModelsData,
+  ToolEventData,
+} from "./importActivity";

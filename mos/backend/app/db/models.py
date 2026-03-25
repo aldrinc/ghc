@@ -310,6 +310,9 @@ class ProductOfferBonus(Base):
 
 class Campaign(Base):
     __tablename__ = "campaigns"
+    __table_args__ = (
+        sa.Index("idx_campaigns_default_swipe_collection", "default_swipe_collection_id"),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
@@ -338,6 +341,9 @@ class Campaign(Base):
     timeframe_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     budget_min: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     budget_max: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    default_swipe_collection_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("swipe_collections.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1550,6 +1556,13 @@ class CompanySwipeAsset(Base):
     __tablename__ = "company_swipe_assets"
     __table_args__ = (
         sa.Index("idx_company_swipe_assets_org_analysis_status", "org_id", "analysis_status"),
+        sa.Index("idx_company_swipe_assets_review_status", "review_status"),
+        sa.Index(
+            "idx_company_swipe_assets_origin_system_external_ad",
+            "org_id",
+            "origin_system",
+            "external_ad_id",
+        ),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -1633,6 +1646,26 @@ class CompanySwipeAsset(Base):
     proof_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     claim_risk: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     product_image_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # GetHookd sync review fields
+    review_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by_user_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    source_first_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_last_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_payload_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_content_changed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_metadata_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1643,11 +1676,22 @@ class CompanySwipeAsset(Base):
 
 class CompanySwipeMedia(Base):
     __tablename__ = "company_swipe_media"
+    __table_args__ = (
+        sa.Index(
+            "idx_company_swipe_media_swipe_asset_media_asset",
+            "swipe_asset_id",
+            "media_asset_id",
+            postgresql_where=sa.text("media_asset_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     swipe_asset_id: Mapped[str] = mapped_column(
         ForeignKey("company_swipe_assets.id", ondelete="CASCADE"), nullable=False
+    )
+    media_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
     )
     external_media_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1739,6 +1783,85 @@ class ClientSwipeAsset(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ClientGetHookdCredentials(Base):
+    __tablename__ = "client_gethookd_credentials"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_gethookd_credentials_org_client"),
+        sa.Index("idx_gethookd_credentials_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    credentials_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ClientGetHookdSyncFeed(Base):
+    __tablename__ = "client_gethookd_sync_feeds"
+    __table_args__ = (
+        sa.Index("idx_gethookd_sync_feeds_org_client", "org_id", "client_id"),
+        sa.Index("idx_gethookd_sync_feeds_org_client_enabled", "org_id", "client_id", "enabled"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    filters_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    max_pages_per_run: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    per_page: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class GetHookdSyncRun(Base):
+    __tablename__ = "gethookd_sync_runs"
+    __table_args__ = (
+        sa.Index("idx_gethookd_sync_runs_org_client", "org_id", "client_id"),
+        sa.Index("idx_gethookd_sync_runs_started_at", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    feeds_attempted: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    feeds_succeeded: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_new: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_updated: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_marked_stale: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    credits_used: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    error_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class WorkflowRun(Base):
@@ -2757,12 +2880,43 @@ class SiteImport(Base):
     )
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     source_hostname: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    input_mode: Mapped[str] = mapped_column(Text, nullable=False, server_default="image")
     page_type_hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    site_family_hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
     capture_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    generator_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     meta_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     suggested_template_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_site_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model_slots: Mapped[list[int]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    upstream_request_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    upstream_transcript: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    upstream_variants: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    upstream_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
     theme_candidate: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -2772,6 +2926,25 @@ class SiteImport(Base):
         JSONB,
         nullable=False,
         server_default=sa.text("'[]'::jsonb"),
+    )
+    adapted_site: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    adapted_pages: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    adapted_puck_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    saved_site_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("sites.id", ondelete="SET NULL"),
+        nullable=True,
     )
     review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -2807,6 +2980,149 @@ class SiteImportSnapshot(Base):
     desktop_screenshot_data_url: Mapped[str] = mapped_column(Text, nullable=False)
     mobile_screenshot_data_url: Mapped[str] = mapped_column(Text, nullable=False)
     capture_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class Site(Base):
+    __tablename__ = "sites"
+    __table_args__ = (
+        sa.Index("idx_sites_org_client", "org_id", "client_id"),
+        sa.Index("idx_sites_family", "site_family"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    site_import_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_imports.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    site_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    site_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    commerce_provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_hostname: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    entry_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    imported_page_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    completeness_state: Mapped[str] = mapped_column(Text, nullable=False, server_default="partial")
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePage(Base):
+    __tablename__ = "site_pages"
+    __table_args__ = (
+        sa.Index("idx_site_pages_site", "site_id"),
+        UniqueConstraint("site_id", "page_type", name="uq_site_pages_site_page_type"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_screenshot_refs: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    generated_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    adapted_puck_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    outbound_links: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePageVersion(Base):
+    __tablename__ = "site_page_versions"
+    __table_args__ = (sa.Index("idx_site_page_versions_page", "page_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    puck_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    provenance: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteLink(Base):
+    __tablename__ = "site_links"
+    __table_args__ = (sa.Index("idx_site_links_site", "site_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    from_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    to_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    from_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    to_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link_kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="internal")
+    meta: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),

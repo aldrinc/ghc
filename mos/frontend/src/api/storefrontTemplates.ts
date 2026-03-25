@@ -14,6 +14,8 @@ import type {
   GovernanceReport,
   MutationPresetPreview,
   MutationPresetSummary,
+  SaveSiteImportRequest,
+  SaveSiteImportResponse,
   SiteImportDetail,
   SiteImportSnapshot,
   SiteImportSummary,
@@ -126,6 +128,19 @@ export function useConvertImport() {
       const { importId, clientId, ...body } = request;
       return post<TemplateVariantDetail>(
         `/storefront/templates/imports/${importId}/convert?clientId=${clientId}`,
+        body
+      );
+    },
+  });
+}
+
+export function useSaveSiteImport() {
+  const { post } = useApiClient();
+  return useMutation({
+    mutationFn: (request: SaveSiteImportRequest & { clientId: string }) => {
+      const { importId, clientId, ...body } = request;
+      return post<SaveSiteImportResponse>(
+        `/storefront/templates/imports/${importId}/save?clientId=${clientId}`,
         body
       );
     },

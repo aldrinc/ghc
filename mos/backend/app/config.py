@@ -150,6 +150,9 @@ class Settings(BaseSettings):
     MEDUSA_INTERNAL_API_TOKEN: str | None = None
     MEDUSA_REQUEST_TIMEOUT_SECONDS: float = 30.0
 
+    SCREENSHOT_TO_CODE_WS_URL: str = "ws://127.0.0.1:7001/generate-code"
+    SITE_IMPORT_DEFAULT_MODEL_SLOT_COUNT: int = 1
+
     INTEGRATION_SECRETS_KEY: str | None = None
 
     META_GRAPH_API_VERSION: str | None = None

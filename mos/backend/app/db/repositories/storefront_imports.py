@@ -32,6 +32,10 @@ class StorefrontImportsRepository(Repository):
         )
         return self.session.scalars(stmt).first()
 
+    def get_import_by_id(self, *, site_import_id: str) -> SiteImport | None:
+        stmt = select(SiteImport).where(SiteImport.id == site_import_id)
+        return self.session.scalars(stmt).first()
+
     def get_import_snapshot(self, *, site_import_id: str) -> SiteImportSnapshot | None:
         stmt = select(SiteImportSnapshot).where(SiteImportSnapshot.site_import_id == site_import_id)
         return self.session.scalars(stmt).first()
@@ -43,7 +47,10 @@ class StorefrontImportsRepository(Repository):
         client_id: str,
         source_url: str,
         source_hostname: str | None,
+        input_mode: str,
         page_type_hint: str | None,
+        site_family_hint: str | None,
+        model_slots: list[int] | None,
         created_by_user_external_id: str | None,
     ) -> SiteImport:
         now = datetime.now(timezone.utc)
@@ -52,8 +59,11 @@ class StorefrontImportsRepository(Repository):
             client_id=client_id,
             source_url=source_url,
             source_hostname=source_hostname,
+            input_mode=input_mode,
             page_type_hint=page_type_hint,
-            status="running",
+            site_family_hint=site_family_hint,
+            status="queued",
+            model_slots=model_slots or [],
             created_by_user_external_id=created_by_user_external_id,
             created_at=now,
             updated_at=now,
@@ -86,6 +96,93 @@ class StorefrontImportsRepository(Repository):
         self.session.refresh(snapshot)
         return snapshot
 
+    def update_import_status(self, *, site_import: SiteImport, status: str) -> SiteImport:
+        site_import.status = status
+        site_import.updated_at = datetime.now(timezone.utc)
+        self.session.commit()
+        self.session.refresh(site_import)
+        return site_import
+
+    def store_upstream_generation(
+        self,
+        *,
+        site_import: SiteImport,
+        upstream_request_payload: dict[str, Any],
+        upstream_transcript: list[dict[str, Any]],
+        upstream_variants: list[dict[str, Any]],
+        upstream_metadata: dict[str, Any],
+    ) -> SiteImport:
+        site_import.upstream_request_payload = upstream_request_payload
+        site_import.upstream_transcript = upstream_transcript
+        site_import.upstream_variants = upstream_variants
+        site_import.upstream_metadata = upstream_metadata
+        site_import.updated_at = datetime.now(timezone.utc)
+        self.session.commit()
+        self.session.refresh(site_import)
+        return site_import
+
+    def store_upstream_request(
+        self,
+        *,
+        site_import: SiteImport,
+        upstream_request_payload: dict[str, Any],
+    ) -> SiteImport:
+        site_import.upstream_request_payload = upstream_request_payload
+        site_import.updated_at = datetime.now(timezone.utc)
+        self.session.commit()
+        self.session.refresh(site_import)
+        return site_import
+
+    def append_upstream_event(
+        self,
+        *,
+        site_import: SiteImport,
+        event: dict[str, Any],
+    ) -> SiteImport:
+        transcript = list(site_import.upstream_transcript or [])
+        transcript.append(event)
+        site_import.upstream_transcript = transcript
+
+        metadata = dict(site_import.upstream_metadata or {})
+        variants = list(site_import.upstream_variants or [])
+
+        event_type = event.get("type")
+        if event_type == "variantModels":
+            models = event.get("data", {}).get("models", [])
+            if isinstance(models, list):
+                metadata["variantModels"] = [str(model) for model in models]
+        elif event_type in {"status", "setCode", "variantComplete", "variantError"}:
+            variant_index = int(event.get("variantIndex", 0) or 0)
+            while len(variants) <= variant_index:
+                variants.append(
+                    {
+                        "variantIndex": len(variants),
+                        "code": None,
+                        "status": "pending",
+                    }
+                )
+            variant = dict(variants[variant_index])
+            if event_type == "status":
+                variant["latestStatus"] = event.get("value")
+            elif event_type == "setCode":
+                variant["code"] = event.get("value")
+            elif event_type == "variantComplete":
+                variant["status"] = "completed"
+                if isinstance(event.get("data"), dict):
+                    variant["completion"] = event.get("data")
+            elif event_type == "variantError":
+                variant["status"] = "failed"
+                variant["error"] = event.get("value")
+            variants[variant_index] = variant
+
+        metadata["transcriptEventCount"] = len(transcript)
+        site_import.upstream_metadata = metadata
+        site_import.upstream_variants = variants
+        site_import.updated_at = datetime.now(timezone.utc)
+        self.session.commit()
+        self.session.refresh(site_import)
+        return site_import
+
     def mark_import_completed(
         self,
         *,
@@ -93,24 +190,56 @@ class StorefrontImportsRepository(Repository):
         title: str | None,
         meta_description: str | None,
         suggested_template_family: str | None,
+        resolved_site_family: str | None,
+        resolved_page_type: str | None,
+        resolved_template_id: str | None,
         theme_candidate: dict[str, Any],
         normalized_sections: list[dict[str, Any]],
+        adapted_site: dict[str, Any],
+        adapted_pages: list[dict[str, Any]],
+        adapted_puck_data: dict[str, Any],
     ) -> SiteImport:
         site_import.status = "completed"
         site_import.title = title
         site_import.meta_description = meta_description
         site_import.suggested_template_family = suggested_template_family
+        site_import.resolved_site_family = resolved_site_family
+        site_import.resolved_page_type = resolved_page_type
+        site_import.resolved_template_id = resolved_template_id
         site_import.theme_candidate = theme_candidate
         site_import.normalized_sections = normalized_sections
+        site_import.adapted_site = adapted_site
+        site_import.adapted_pages = adapted_pages
+        site_import.adapted_puck_data = adapted_puck_data
         site_import.capture_error = None
+        site_import.generator_error = None
         site_import.updated_at = datetime.now(timezone.utc)
         self.session.commit()
         self.session.refresh(site_import)
         return site_import
 
-    def mark_import_failed(self, *, site_import: SiteImport, capture_error: str) -> SiteImport:
+    def mark_import_failed(
+        self,
+        *,
+        site_import: SiteImport,
+        error_message: str,
+        stage: str | None = None,
+    ) -> SiteImport:
         site_import.status = "failed"
-        site_import.capture_error = capture_error
+        if stage in {"generating", "adapting"}:
+            site_import.generator_error = error_message
+        else:
+            site_import.capture_error = error_message
+        current_metadata = dict(site_import.upstream_metadata or {})
+        current_metadata["failureStage"] = stage or "capturing"
+        site_import.upstream_metadata = current_metadata
+        site_import.updated_at = datetime.now(timezone.utc)
+        self.session.commit()
+        self.session.refresh(site_import)
+        return site_import
+
+    def mark_saved_site(self, *, site_import: SiteImport, saved_site_id: str) -> SiteImport:
+        site_import.saved_site_id = saved_site_id
         site_import.updated_at = datetime.now(timezone.utc)
         self.session.commit()
         self.session.refresh(site_import)

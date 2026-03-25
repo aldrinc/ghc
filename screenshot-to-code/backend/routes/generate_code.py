@@ -12,12 +12,16 @@ from config import (
     GEMINI_API_KEY,
     IS_DEBUG_ENABLED,
     IS_PROD,
+    MOS_IMPORT_MODEL_SLOT_1,
+    MOS_IMPORT_MODEL_SLOT_2,
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
     REPLICATE_API_KEY,
 )
 from custom_types import InputMode, OrchestrationMode
 from llm import (
+    ANTHROPIC_MODELS,
+    GEMINI_MODELS,
     Llm,
 )
 from loop.artifacts import ValidatedLoopArtifactStore
@@ -246,6 +250,8 @@ class ExtractedParams:
     history: List[PromptHistoryMessage]
     file_state: Dict[str, str] | None
     option_codes: List[str]
+    request_source: Literal["standard", "mos_import"] = "standard"
+    model_slots: List[int] | None = None
     orchestration_mode: OrchestrationMode = "standard"
     max_validation_iterations: int = DEFAULT_VALIDATED_LOOP_MAX_ITERATIONS
     validated_loop_reference_run_dir: str | None = None
@@ -309,9 +315,7 @@ class ParameterExtractionStage:
 
         orchestration_mode = params.get("orchestrationMode", "standard")
         if orchestration_mode not in get_args(OrchestrationMode):
-            await self.throw_error(
-                f"Invalid orchestration mode: {orchestration_mode}"
-            )
+            await self.throw_error(f"Invalid orchestration mode: {orchestration_mode}")
             raise ValueError(f"Invalid orchestration mode: {orchestration_mode}")
         validated_orchestration_mode = cast(OrchestrationMode, orchestration_mode)
 
@@ -366,6 +370,50 @@ class ParameterExtractionStage:
                 else:
                     option_codes.append(str(entry))
 
+        raw_request_source = params.get("requestSource", "standard")
+        if raw_request_source not in {"standard", "mos_import"}:
+            await self.throw_error(f"Invalid request source: {raw_request_source}")
+            raise ValueError(f"Invalid request source: {raw_request_source}")
+        request_source = cast(Literal["standard", "mos_import"], raw_request_source)
+
+        model_slots: List[int] | None = None
+        if request_source == "mos_import":
+            raw_model_slots = params.get("modelSlots")
+            if not isinstance(raw_model_slots, list) or len(raw_model_slots) == 0:
+                await self.throw_error(
+                    "MOS import requests must provide a non-empty modelSlots array."
+                )
+                raise ValueError(
+                    "MOS import requests must provide a non-empty modelSlots array."
+                )
+
+            validated_slots: List[int] = []
+            for raw_slot in raw_model_slots:
+                if not isinstance(raw_slot, int) or isinstance(raw_slot, bool):
+                    await self.throw_error(
+                        "MOS import modelSlots must be integers containing only slots 1 and/or 2."
+                    )
+                    raise ValueError(
+                        "MOS import modelSlots must be integers containing only slots 1 and/or 2."
+                    )
+                if raw_slot not in {1, 2}:
+                    await self.throw_error(
+                        f"Unsupported MOS import model slot: {raw_slot}. Only slots 1 and 2 are allowed."
+                    )
+                    raise ValueError(
+                        f"Unsupported MOS import model slot: {raw_slot}. Only slots 1 and 2 are allowed."
+                    )
+                if raw_slot in validated_slots:
+                    await self.throw_error(
+                        f"Duplicate MOS import model slot: {raw_slot}. Provide each slot at most once."
+                    )
+                    raise ValueError(
+                        f"Duplicate MOS import model slot: {raw_slot}. Provide each slot at most once."
+                    )
+                validated_slots.append(raw_slot)
+
+            model_slots = validated_slots
+
         return ExtractedParams(
             stack=validated_stack,
             input_mode=validated_input_mode,
@@ -379,6 +427,8 @@ class ParameterExtractionStage:
             history=history,
             file_state=file_state,
             option_codes=option_codes,
+            request_source=request_source,
+            model_slots=model_slots,
             orchestration_mode=validated_orchestration_mode,
             max_validation_iterations=max_validation_iterations,
             validated_loop_reference_run_dir=validated_loop_reference_run_dir,
@@ -413,17 +463,26 @@ class ModelSelectionStage:
         openai_api_key: str | None,
         anthropic_api_key: str | None,
         gemini_api_key: str | None = None,
+        request_source: Literal["standard", "mos_import"] = "standard",
+        model_slots: List[int] | None = None,
     ) -> List[Llm]:
         """Select appropriate models based on available API keys"""
         try:
-            variant_models = self._get_variant_models(
-                generation_type,
-                input_mode,
-                1,
-                openai_api_key,
-                anthropic_api_key,
-                gemini_api_key,
-            )
+            if request_source == "mos_import":
+                variant_models = self._get_mos_import_models(
+                    model_slots=model_slots,
+                    anthropic_api_key=anthropic_api_key,
+                    gemini_api_key=gemini_api_key,
+                )
+            else:
+                variant_models = self._get_variant_models(
+                    generation_type,
+                    input_mode,
+                    1,
+                    openai_api_key,
+                    anthropic_api_key,
+                    gemini_api_key,
+                )
 
             # Print the variant models (one per line)
             print("Variant models:")
@@ -431,6 +490,9 @@ class ModelSelectionStage:
                 print(f"Variant {index + 1}: {model.value}")
 
             return variant_models
+        except ValueError as exc:
+            await self.throw_error(str(exc))
+            raise
         except Exception:
             await self.throw_error(
                 "No OpenAI, Anthropic, or Gemini API key found. Please add the environment variable "
@@ -489,6 +551,42 @@ class ModelSelectionStage:
 
         return selected_models
 
+    def _get_mos_import_models(
+        self,
+        *,
+        model_slots: List[int] | None,
+        anthropic_api_key: str | None,
+        gemini_api_key: str | None,
+    ) -> List[Llm]:
+        if not model_slots:
+            raise ValueError(
+                "MOS import requests must provide at least one explicit model slot."
+            )
+
+        slot_models = {
+            1: MOS_IMPORT_MODEL_SLOT_1,
+            2: MOS_IMPORT_MODEL_SLOT_2,
+        }
+        selected_models: List[Llm] = []
+        for slot in model_slots:
+            if slot not in slot_models:
+                raise ValueError(
+                    f"Unsupported MOS import model slot: {slot}. Only slots 1 and 2 are allowed."
+                )
+
+            model = slot_models[slot]
+            if model in GEMINI_MODELS and not gemini_api_key:
+                raise ValueError(
+                    f"MOS import slot {slot} requires GEMINI_API_KEY for model {model.value}."
+                )
+            if model in ANTHROPIC_MODELS and not anthropic_api_key:
+                raise ValueError(
+                    f"MOS import slot {slot} requires ANTHROPIC_API_KEY for model {model.value}."
+                )
+            selected_models.append(model)
+
+        return selected_models
+
 
 class PromptCreationStage:
     """Handles prompt assembly for code generation"""
@@ -541,7 +639,10 @@ class AgenticGenerationStage:
 
     def __init__(
         self,
-        send_message: Callable[[MessageType, str | None, int, Dict[str, Any] | None, str | None], Coroutine[Any, Any, None]],
+        send_message: Callable[
+            [MessageType, str | None, int, Dict[str, Any] | None, str | None],
+            Coroutine[Any, Any, None],
+        ],
         openai_api_key: str | None,
         openai_base_url: str | None,
         anthropic_api_key: str | None,
@@ -567,9 +668,7 @@ class AgenticGenerationStage:
         tasks: List[asyncio.Task[str]] = []
         for index, model in enumerate(variant_models):
             tasks.append(
-                asyncio.create_task(
-                    self._run_variant(index, model, prompt_messages)
-                )
+                asyncio.create_task(self._run_variant(index, model, prompt_messages))
             )
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -590,6 +689,7 @@ class AgenticGenerationStage:
         prompt_messages: List[ChatCompletionMessageParam],
     ) -> str:
         try:
+
             async def send_runner_message(
                 type: str,
                 value: str | None,
@@ -821,7 +921,9 @@ class CodeGenerationMiddleware(Middleware):
                         and resume_state is not None
                         and resume_state.best_file_state is not None
                     ):
-                        context.extracted_params.file_state = resume_state.best_file_state
+                        context.extracted_params.file_state = (
+                            resume_state.best_file_state
+                        )
                 else:
                     reference_bundle = ReferenceBundle(
                         input_mode=context.extracted_params.input_mode,
@@ -902,6 +1004,8 @@ class CodeGenerationMiddleware(Middleware):
                 openai_api_key=context.extracted_params.openai_api_key,
                 anthropic_api_key=context.extracted_params.anthropic_api_key,
                 gemini_api_key=context.extracted_params.gemini_api_key,
+                request_source=context.extracted_params.request_source,
+                model_slots=context.extracted_params.model_slots,
             )
             if IS_DEBUG_ENABLED:
                 await context.send_message(
@@ -958,9 +1062,7 @@ class PostProcessingMiddleware(Middleware):
         self, context: PipelineContext, next_func: Callable[[], Awaitable[None]]
     ) -> None:
         post_processor = PostProcessingStage()
-        await post_processor.process_completions(
-            context.completions, context.websocket
-        )
+        await post_processor.process_completions(context.completions, context.websocket)
 
         await next_func()
 

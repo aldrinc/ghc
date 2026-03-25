@@ -116,6 +116,7 @@ class SiteImportSummary(BaseModel):
     sourceUrl: str
     sourceHostname: str | None = None
     pageTypeHint: str | None = None
+    siteFamilyHint: str | None = None
     status: str
     title: str | None = None
     suggestedTemplateFamily: str | None = None
@@ -128,12 +129,29 @@ class SiteImportDetail(BaseModel):
     sourceUrl: str
     sourceHostname: str | None = None
     pageTypeHint: str | None = None
+    siteFamilyHint: str | None = None
     status: str
+    inputMode: str = "image"
+    modelSlots: list[int] = Field(default_factory=list)
     title: str | None = None
     metaDescription: str | None = None
     suggestedTemplateFamily: str | None = None
+    resolvedSiteFamily: str | None = None
+    resolvedPageType: str | None = None
+    resolvedTemplateId: str | None = None
     themeCandidate: dict[str, Any] = Field(default_factory=dict)
     normalizedSections: list[NormalizedSection] = Field(default_factory=list)
+    upstreamRequestPayload: dict[str, Any] = Field(default_factory=dict)
+    upstreamTranscript: list[dict[str, Any]] = Field(default_factory=list)
+    upstreamTranscriptSummary: list[dict[str, Any]] = Field(default_factory=list)
+    upstreamVariants: list[dict[str, Any]] = Field(default_factory=list)
+    upstreamMetadata: dict[str, Any] = Field(default_factory=dict)
+    adaptedSite: dict[str, Any] = Field(default_factory=dict)
+    adaptedPages: list[dict[str, Any]] = Field(default_factory=list)
+    adaptedPuckData: dict[str, Any] = Field(default_factory=dict)
+    generatorError: str | None = None
+    failureStage: str | None = None
+    savedSiteId: str | None = None
     synthesis: SynthesisOutput | None = None
     captureError: str | None = None
     createdAt: datetime
@@ -152,6 +170,7 @@ class SiteImportSnapshotResponse(BaseModel):
 class CreateSiteImportRequest(BaseModel):
     sourceUrl: str = Field(..., min_length=1, description="URL of the site to import")
     pageTypeHint: str | None = None
+    siteFamilyHint: str | None = None
 
 
 class ConvertImportRequest(BaseModel):
@@ -160,6 +179,27 @@ class ConvertImportRequest(BaseModel):
     pageType: str
     acceptedSectionIds: list[str]
     reviewNotes: str | None = None
+
+
+class SaveSiteImportRequest(BaseModel):
+    siteName: str = Field(..., min_length=1)
+    description: str | None = None
+
+
+class SavedSitePageResponse(BaseModel):
+    pageId: str
+    pageType: str | None = None
+    templateId: str | None = None
+    versionId: str | None = None
+
+
+class SaveSiteImportResponse(BaseModel):
+    siteId: str
+    siteName: str
+    pageCount: int
+    entryPageType: str | None = None
+    createdPages: list[SavedSitePageResponse] = Field(default_factory=list)
+    createdAt: datetime
 
 
 class TemplateVariantSummary(BaseModel):

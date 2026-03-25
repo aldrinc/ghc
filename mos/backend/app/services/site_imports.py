@@ -7,9 +7,22 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
-from app.db.models import SiteImport, SiteImportSnapshot
+from app.db.base import SessionLocal
+from app.db.models import Site, SiteImport, SiteImportSnapshot, SiteLink, SitePage, SitePageVersion
 from app.db.repositories.storefront_imports import StorefrontImportsRepository
+from app.db.repositories.sites_runtime import SitesRuntimeRepository
+from app.services.site_import_adapter import (
+    AdapterResult,
+    adapt_generator_result,
+    DEFAULT_MODEL_SLOTS,
+    SiteImportAdapterError,
+)
 from app.services.site_import_capture import CaptureResult, capture_site
+from app.services.site_import_generator_client import (
+    GeneratorRunResult,
+    generate_react_tailwind_from_screenshot,
+    SiteImportGeneratorError,
+)
 from app.services.site_import_normalize import normalize_capture
 from app.services.template_synthesis import synthesize_import, SynthesisResult
 from app.services.template_variant_governance import (
@@ -51,53 +64,59 @@ class SiteImportError(Exception):
     pass
 
 
-async def create_import_job(
+def create_import_record(
     session: Session,
     *,
     org_id: str,
     client_id: str,
     source_url: str,
     page_type_hint: str | None,
+    site_family_hint: str | None,
     created_by_user_external_id: str | None,
+    model_slots: list[int] | None = None,
 ) -> SiteImport:
     """
     Create a new site import job.
 
-    This creates the import record and immediately runs the capture process.
+    This creates the import record and runs the full pipeline:
+    1. Capture website and take screenshots
+    2. Generate React/Tailwind code from screenshot
+    3. Adapt generated code to Site runtime format
     """
-    # Validate URL
     _validate_url(source_url)
-
-    # Extract hostname
     source_hostname = _extract_hostname(source_url)
-
-    # Create repository
+    slots = model_slots or DEFAULT_MODEL_SLOTS
     repo = StorefrontImportsRepository(session)
-
-    # Create import record
-    site_import = repo.create_import(
+    return repo.create_import(
         org_id=org_id,
         client_id=client_id,
         source_url=source_url,
         source_hostname=source_hostname,
+        input_mode="image",
         page_type_hint=page_type_hint,
+        site_family_hint=site_family_hint,
+        model_slots=slots,
         created_by_user_external_id=created_by_user_external_id,
     )
 
-    # Run capture
+
+async def _process_import_job_with_session(session: Session, *, site_import_id: str) -> None:
+    repo = StorefrontImportsRepository(session)
+    site_import = repo.get_import_by_id(site_import_id=site_import_id)
+    if site_import is None:
+        logger.error("Site import %s not found for processing", site_import_id)
+        return
+
+    source_url = site_import.source_url
+    page_type_hint = site_import.page_type_hint
+    site_family_hint = site_import.site_family_hint
+    slots = site_import.model_slots or DEFAULT_MODEL_SLOTS
+
+    current_stage = "capturing"
     try:
+        repo.update_import_status(site_import=site_import, status="capturing")
         capture_result = await capture_site(source_url)
 
-        # Normalize the capture
-        normalization_result = normalize_capture(
-            html_snapshot=capture_result.html_snapshot,
-            capture_metadata=capture_result.capture_metadata,
-            page_type_hint=page_type_hint,
-            title=capture_result.title,
-            meta_description=capture_result.meta_description,
-        )
-
-        # Create snapshot
         repo.create_snapshot(
             site_import=site_import,
             html_snapshot=capture_result.html_snapshot,
@@ -106,24 +125,115 @@ async def create_import_job(
             capture_metadata=capture_result.capture_metadata,
         )
 
-        # Mark import as completed with normalized data
-        repo.mark_import_completed(
-            site_import=site_import,
-            title=normalization_result.title,
-            meta_description=normalization_result.meta_description,
-            suggested_template_family=normalization_result.suggested_template_family,
-            theme_candidate=normalization_result.theme_candidate,
-            normalized_sections=normalization_result.normalized_sections,
+        captured_title = capture_result.title
+        captured_meta_description = capture_result.meta_description
+
+        current_stage = "generating"
+        repo.update_import_status(site_import=site_import, status="generating")
+
+        async def _persist_upstream_event(event: dict[str, Any]) -> None:
+            refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+            if refresh_import is None:
+                return
+            repo.append_upstream_event(site_import=refresh_import, event=event)
+
+        generator_result = await generate_react_tailwind_from_screenshot(
+            screenshot_data_url=capture_result.desktop_screenshot_data_url,
+            source_url=source_url,
+            page_type_hint=page_type_hint,
+            input_mode="image",
+            model_slots=slots,
+            on_event=_persist_upstream_event,
         )
 
-    except Exception as e:
-        logger.exception(f"Failed to capture site: {source_url}")
-        error_message = str(e) if str(e) else "Capture failed"
-        repo.mark_import_failed(site_import=site_import, capture_error=error_message)
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is None:
+            return
+        repo.store_upstream_generation(
+            site_import=refresh_import,
+            upstream_request_payload=generator_result.request_payload,
+            upstream_transcript=generator_result.transcript,
+            upstream_variants=generator_result.variants,
+            upstream_metadata=generator_result.metadata,
+        )
 
-    # Refresh to get updated state
-    session.refresh(site_import)
-    return site_import
+        current_stage = "adapting"
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is None:
+            return
+        repo.update_import_status(site_import=refresh_import, status="adapting")
+
+        adapter_result = adapt_generator_result(
+            generator_result=generator_result,
+            page_type_hint=page_type_hint,
+            site_family_hint=site_family_hint,
+        )
+
+        normalization_result = normalize_capture(
+            html_snapshot=capture_result.html_snapshot,
+            capture_metadata=capture_result.capture_metadata,
+            page_type_hint=page_type_hint,
+            title=captured_title,
+            meta_description=captured_meta_description,
+        )
+
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is None:
+            return
+        repo.mark_import_completed(
+            site_import=refresh_import,
+            title=captured_title,
+            meta_description=captured_meta_description,
+            suggested_template_family=getattr(
+                normalization_result,
+                "suggested_template_family",
+                adapter_result.resolved_site_family,
+            ),
+            resolved_site_family=adapter_result.resolved_site_family,
+            resolved_page_type=adapter_result.resolved_page_type,
+            resolved_template_id=adapter_result.resolved_template_id,
+            theme_candidate=normalization_result.theme_candidate,
+            normalized_sections=normalization_result.normalized_sections,
+            adapted_site=adapter_result.adapted_site,
+            adapted_pages=adapter_result.adapted_pages,
+            adapted_puck_data=adapter_result.adapted_puck_data,
+        )
+
+    except SiteImportGeneratorError as e:
+        logger.exception("Failed to generate from site: %s", source_url)
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is not None:
+            repo.mark_import_failed(
+                site_import=refresh_import,
+                error_message=str(e) if str(e) else "Generation failed",
+                stage="generating",
+            )
+    except SiteImportAdapterError as e:
+        logger.exception("Failed to adapt imported site: %s", source_url)
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is not None:
+            repo.mark_import_failed(
+                site_import=refresh_import,
+                error_message=str(e) if str(e) else "Adapter failed",
+                stage="adapting",
+            )
+    except Exception as e:
+        logger.exception("Failed to process import: %s", source_url)
+        refresh_import = repo.get_import_by_id(site_import_id=site_import_id)
+        if refresh_import is not None:
+            repo.mark_import_failed(
+                site_import=refresh_import,
+                error_message=str(e) if str(e) else "Processing failed",
+                stage=current_stage,
+            )
+
+
+async def process_import_job(*, site_import_id: str) -> None:
+    session = SessionLocal()
+    try:
+        await _process_import_job_with_session(session, site_import_id=site_import_id)
+    finally:
+        session.close()
 
 
 def list_imports(
@@ -158,6 +268,175 @@ def get_import_snapshot(
     """Get the snapshot for an import."""
     repo = StorefrontImportsRepository(session)
     return repo.get_import_snapshot(site_import_id=site_import_id)
+
+
+def save_import_as_site(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    site_import_id: str,
+    site_name: str,
+    description: str | None,
+    created_by_user_external_id: str | None,
+) -> dict[str, Any]:
+    """Persist a completed site import into the dedicated Site runtime.
+
+    Current save behavior is intentionally strict:
+    - create a NEW site only
+    - save all adapted pages in one transaction
+    - fail the entire save if any page cannot be created
+    """
+    imports_repo = StorefrontImportsRepository(session)
+    runtime_repo = SitesRuntimeRepository(session)
+
+    site_import = imports_repo.get_import(
+        org_id=org_id,
+        client_id=client_id,
+        site_import_id=site_import_id,
+    )
+    if site_import is None:
+        raise SiteImportError("Import not found")
+    if site_import.status != "completed":
+        raise SiteImportError(f"Cannot save import with status: {site_import.status}")
+    if site_import.saved_site_id:
+        raise SiteImportError(f"Import already saved to site {site_import.saved_site_id}")
+
+    adapted_site = site_import.adapted_site or {}
+    adapted_pages = site_import.adapted_pages or []
+    if not adapted_pages:
+        raise SiteImportError("Import has no adapted pages to save")
+
+    snapshot = imports_repo.get_import_snapshot(site_import_id=site_import_id)
+    screenshot_refs: list[str] = []
+    if snapshot is not None:
+        if snapshot.desktop_screenshot_data_url:
+            screenshot_refs.append(snapshot.desktop_screenshot_data_url)
+        if snapshot.mobile_screenshot_data_url:
+            screenshot_refs.append(snapshot.mobile_screenshot_data_url)
+
+    created_pages: list[dict[str, Any]] = []
+    page_type_to_id: dict[str, str] = {}
+
+    try:
+        site = runtime_repo.create_site(
+            org_id=org_id,
+            client_id=client_id,
+            site_import_id=site_import_id,
+            product_id=None,
+            name=site_name,
+            description=description,
+            site_type=(adapted_site.get("site_type") or adapted_site.get("siteType")),
+            site_family=(
+                adapted_site.get("site_family")
+                or adapted_site.get("siteFamily")
+                or site_import.resolved_site_family
+            ),
+            commerce_provider=(
+                adapted_site.get("commerce_provider") or adapted_site.get("commerceProvider")
+            ),
+            source_hostname=site_import.source_hostname,
+            entry_page_type=(
+                adapted_site.get("entry_page_type")
+                or adapted_site.get("entryPageType")
+                or site_import.resolved_page_type
+            ),
+            imported_page_count=len(adapted_pages),
+            completeness_state=(
+                adapted_site.get("completeness_state")
+                or adapted_site.get("completenessState")
+                or ("complete" if len(adapted_pages) > 0 else "partial")
+            ),
+            created_by_user_external_id=created_by_user_external_id,
+        )
+
+        for index, adapted_page in enumerate(adapted_pages):
+            page_type = adapted_page.get("page_type") or adapted_page.get("pageType")
+            template_id = adapted_page.get("template_id") or adapted_page.get("templateId")
+            page = runtime_repo.create_page(
+                site_id=str(site.id),
+                name=adapted_page.get("name") or page_type or f"Imported Page {index + 1}",
+                slug=adapted_page.get("slug") or (page_type or f"page-{index + 1}"),
+                page_type=page_type,
+                template_id=template_id,
+                ordering=int(adapted_page.get("ordering", index)),
+                source_url=site_import.source_url,
+                source_screenshot_refs=screenshot_refs,
+                generated_code=adapted_page.get("generated_code")
+                or adapted_page.get("generatedCode"),
+                adapted_puck_data=adapted_page.get("puck_data")
+                or adapted_page.get("puckData")
+                or {},
+                outbound_links=adapted_page.get("outbound_links")
+                or adapted_page.get("outboundLinks")
+                or [],
+            )
+            version = runtime_repo.create_page_version(
+                page_id=str(page.id),
+                puck_data=adapted_page.get("puck_data") or adapted_page.get("puckData") or {},
+                provenance={
+                    "source_type": "site_import",
+                    "site_import_id": site_import_id,
+                    "source_url": site_import.source_url,
+                    "source_hostname": site_import.source_hostname,
+                    "generator": site_import.upstream_metadata or {},
+                    "resolved_site_family": site_import.resolved_site_family,
+                    "resolved_page_type": page_type,
+                    "resolved_template_id": template_id,
+                },
+            )
+            if page_type:
+                page_type_to_id[page_type] = str(page.id)
+            created_pages.append(
+                {
+                    "pageId": str(page.id),
+                    "pageType": page_type,
+                    "templateId": template_id,
+                    "versionId": str(version.id),
+                    "outboundLinks": adapted_page.get("outbound_links")
+                    or adapted_page.get("outboundLinks")
+                    or [],
+                }
+            )
+
+        for created_page in created_pages:
+            for link in created_page.get("outboundLinks", []):
+                to_page_type = link.get("to_page_type") or link.get("toPageType")
+                runtime_repo.create_link(
+                    site_id=str(site.id),
+                    from_page_id=created_page["pageId"],
+                    to_page_id=page_type_to_id.get(to_page_type) if to_page_type else None,
+                    from_page_type=created_page.get("pageType"),
+                    to_page_type=to_page_type,
+                    label=link.get("label"),
+                    link_kind=link.get("link_kind") or link.get("linkKind") or "internal",
+                    meta=link,
+                )
+
+        site_import.saved_site_id = str(site.id)
+        site_import.updated_at = datetime.now(timezone.utc)
+        session.commit()
+        session.refresh(site)
+    except Exception as exc:
+        session.rollback()
+        raise SiteImportError("Failed to save import into site runtime.") from exc
+
+    return {
+        "siteId": str(site.id),
+        "siteName": site.name,
+        "pageCount": len(created_pages),
+        "entryPageType": site.entry_page_type,
+        "createdPages": [
+            {
+                "pageId": page["pageId"],
+                "pageType": page.get("pageType"),
+                "templateId": page.get("templateId"),
+                "versionId": page.get("versionId"),
+            }
+            for page in created_pages
+        ],
+        "createdAt": site.created_at,
+    }
 
 
 def convert_import_to_variant(

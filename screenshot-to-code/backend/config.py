@@ -1,5 +1,22 @@
 import os
 
+from llm import Llm
+
+
+def _read_llm_setting(env_name: str, default: Llm) -> Llm:
+    raw_value = os.environ.get(env_name)
+    if not raw_value:
+        return default
+
+    for candidate in Llm:
+        if raw_value in {candidate.name, candidate.value}:
+            return candidate
+
+    raise ValueError(
+        f"Unsupported {env_name}: {raw_value}. Expected one of the declared Llm enum names or values."
+    )
+
+
 NUM_VARIANTS = 4
 NUM_VARIANTS_VIDEO = 2
 DEFAULT_VALIDATED_LOOP_MAX_ITERATIONS = int(
@@ -21,6 +38,14 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", None)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", None)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", None)
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", None)
+MOS_IMPORT_MODEL_SLOT_1 = _read_llm_setting(
+    "MOS_IMPORT_MODEL_SLOT_1",
+    Llm.GEMINI_3_FLASH_PREVIEW_MINIMAL,
+)
+MOS_IMPORT_MODEL_SLOT_2 = _read_llm_setting(
+    "MOS_IMPORT_MODEL_SLOT_2",
+    Llm.CLAUDE_OPUS_4_6,
+)
 
 # Image generation (optional)
 REPLICATE_API_KEY = os.environ.get("REPLICATE_API_KEY", None)

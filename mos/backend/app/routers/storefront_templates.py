@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 import uuid
 from typing import Any
 
@@ -30,6 +32,9 @@ from app.schemas.storefront_templates import (
     NormalizedSection,
     ProvenanceEvent,
     PuckDataStructureResult,
+    SaveSiteImportRequest,
+    SaveSiteImportResponse,
+    SavedSitePageResponse,
     SiteImportDetail,
     SiteImportSnapshotResponse,
     SiteImportSummary,
@@ -54,12 +59,14 @@ from app.services.site_imports import (
     convert_import_to_variant,
     convert_import_to_variant_with_synthesis,
     create_draft_from_template,
-    create_import_job,
+    create_import_record,
     get_import_detail,
     get_import_snapshot,
     get_import_synthesis,
     list_imports,
     list_variant_drafts,
+    process_import_job,
+    save_import_as_site,
 )
 from app.services.storefront_templates import (
     StorefrontTemplateDescriptor,
@@ -92,6 +99,85 @@ def _get_workspace_or_404(session: Session, client_id: str, org_id: str) -> Clie
     if client is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found.")
     return client
+
+
+def _build_transcript_summary(raw_transcript: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Build a lightweight summary of the raw transcript for UI display.
+
+    This derives a summary while preserving the raw transcript. Each summary entry
+    includes a capture timestamp and key metadata from the original event.
+
+    Args:
+        raw_transcript: The raw transcript from screenshot-to-code.
+
+    Returns:
+        List of summary entries with timestamps and key metadata.
+    """
+    if not raw_transcript:
+        return []
+
+    summary: list[dict[str, Any]] = []
+
+    # Event types to include in summary (same as screenshot-to-code frontend)
+    significant_types = {
+        "status",
+        "setCode",
+        "variantComplete",
+        "variantError",
+        "variantModels",
+        "thinking",
+        "assistant",
+        "toolStart",
+        "toolResult",
+    }
+
+    for idx, event in enumerate(raw_transcript):
+        event_type = event.get("type", "")
+
+        # Include all significant event types
+        if event_type in significant_types:
+            summary_entry: dict[str, Any] = {
+                "type": event_type,
+                "variantIndex": event.get("variantIndex", 0),
+                "captureIndex": idx,
+                "capturedAt": event.get("capturedAt"),
+                "localSequence": event.get("localSequence", idx),
+            }
+
+            # Add type-specific summary data
+            if event_type == "status":
+                summary_entry["status"] = event.get("value", "")
+            elif event_type == "setCode":
+                # Don't include full code, just a preview
+                code = event.get("value", "")
+                summary_entry["hasCode"] = bool(code)
+                summary_entry["codeLength"] = len(code) if code else 0
+            elif event_type == "variantComplete":
+                summary_entry["completed"] = True
+                if isinstance(event.get("data"), dict):
+                    summary_entry["model"] = event["data"].get("model")
+            elif event_type == "variantError":
+                summary_entry["error"] = event.get("value", "")
+            elif event_type == "variantModels":
+                summary_entry["models"] = event.get("data", {}).get("models", [])
+            elif event_type in {"thinking", "assistant"}:
+                content = event.get("value", "")
+                if isinstance(content, str):
+                    summary_entry["contentPreview"] = content[:240]
+                    summary_entry["contentLength"] = len(content)
+                if isinstance(event.get("data"), dict):
+                    summary_entry["source"] = event["data"].get("source")
+                    summary_entry["title"] = event["data"].get("title")
+            elif event_type in {"toolStart", "toolResult"} and isinstance(event.get("data"), dict):
+                summary_entry["source"] = event["data"].get("source")
+                summary_entry["title"] = event["data"].get("title")
+                summary_entry["toolName"] = event["data"].get("name")
+                summary_entry["ok"] = event["data"].get("ok")
+
+            summary.append(summary_entry)
+
+    return summary
 
 
 def _validate_import_id(import_id: str) -> None:
@@ -134,20 +220,26 @@ async def create_import(
             detail=str(e),
         )
 
-    import_job = await create_import_job(
+    import_job = create_import_record(
         session,
         org_id=auth.org_id,
         client_id=clientId,
         source_url=request.sourceUrl,
         page_type_hint=request.pageTypeHint,
+        site_family_hint=request.siteFamilyHint,
         created_by_user_external_id=auth.user_id,
     )
+    threading.Thread(
+        target=lambda: asyncio.run(process_import_job(site_import_id=str(import_job.id))),
+        daemon=True,
+    ).start()
 
     return SiteImportSummary(
         id=str(import_job.id),
         sourceUrl=import_job.source_url,
         sourceHostname=import_job.source_hostname,
         pageTypeHint=import_job.page_type_hint,
+        siteFamilyHint=import_job.site_family_hint,
         status=import_job.status,
         title=import_job.title,
         suggestedTemplateFamily=import_job.suggested_template_family,
@@ -180,6 +272,7 @@ def list_imports_endpoint(
             sourceUrl=imp.source_url,
             sourceHostname=imp.source_hostname,
             pageTypeHint=imp.page_type_hint,
+            siteFamilyHint=imp.site_family_hint,
             status=imp.status,
             title=imp.title,
             suggestedTemplateFamily=imp.suggested_template_family,
@@ -288,21 +381,90 @@ def get_import_detail_endpoint(
                 synthesizedPuckData=synthesis.synthesizedPuckData,
             )
 
+    # Build transcript summary from raw transcript
+    raw_transcript = site_import.upstream_transcript or []
+    transcript_summary = _build_transcript_summary(raw_transcript)
+
     return SiteImportDetail(
         id=str(site_import.id),
         sourceUrl=site_import.source_url,
         sourceHostname=site_import.source_hostname,
         pageTypeHint=site_import.page_type_hint,
+        siteFamilyHint=site_import.site_family_hint,
         status=site_import.status,
+        inputMode=site_import.input_mode,
+        modelSlots=site_import.model_slots or [],
         title=site_import.title,
         metaDescription=site_import.meta_description,
         suggestedTemplateFamily=site_import.suggested_template_family,
+        resolvedSiteFamily=site_import.resolved_site_family,
+        resolvedPageType=site_import.resolved_page_type,
+        resolvedTemplateId=site_import.resolved_template_id,
         themeCandidate=site_import.theme_candidate or {},
         normalizedSections=normalized_sections,
+        upstreamRequestPayload=site_import.upstream_request_payload or {},
+        upstreamTranscript=raw_transcript,
+        upstreamTranscriptSummary=transcript_summary,
+        upstreamVariants=site_import.upstream_variants or [],
+        upstreamMetadata=site_import.upstream_metadata or {},
+        adaptedSite=site_import.adapted_site or {},
+        adaptedPages=site_import.adapted_pages or [],
+        adaptedPuckData=site_import.adapted_puck_data or {},
+        generatorError=site_import.generator_error,
+        failureStage=(site_import.upstream_metadata or {}).get("failureStage")
+        or (
+            "generating"
+            if site_import.generator_error
+            else ("capturing" if site_import.capture_error else None)
+        ),
+        savedSiteId=str(site_import.saved_site_id) if site_import.saved_site_id else None,
         captureError=site_import.capture_error,
         createdAt=site_import.created_at,
         updatedAt=site_import.updated_at,
         synthesis=synthesis_output,
+    )
+
+
+@router.post("/imports/{import_id}/save", response_model=SaveSiteImportResponse)
+def save_import_endpoint(
+    import_id: str,
+    request: SaveSiteImportRequest,
+    clientId: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SaveSiteImportResponse:
+    """Persist a completed adapter-backed import into the dedicated Site runtime."""
+    _get_workspace_or_404(session, clientId, auth.org_id)
+    _validate_import_id(import_id)
+
+    try:
+        result = save_import_as_site(
+            session,
+            org_id=auth.org_id,
+            client_id=clientId,
+            site_import_id=import_id,
+            site_name=request.siteName,
+            description=request.description,
+            created_by_user_external_id=auth.user_id,
+        )
+    except SiteImportError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return SaveSiteImportResponse(
+        siteId=result["siteId"],
+        siteName=result["siteName"],
+        pageCount=result["pageCount"],
+        entryPageType=result.get("entryPageType"),
+        createdPages=[
+            SavedSitePageResponse(
+                pageId=page["pageId"],
+                pageType=page.get("pageType"),
+                templateId=page.get("templateId"),
+                versionId=page.get("versionId"),
+            )
+            for page in result.get("createdPages", [])
+        ],
+        createdAt=result["createdAt"],
     )
 
 
