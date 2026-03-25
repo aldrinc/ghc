@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ease - AI-Native Behavioral Healthcare</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons (Lucide via unpkg for placeholder icons) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            dark: '#113122',
+                            light: '#CDE5D3',
+                        },
+                        secondary: {
+                            blue: '#A8C2C6',
+                        },
+                        bg: {
+                            white: '#FFFFFF',
+                            light: '#F9FAFB',
+                        },
+                        text: {
+                            gray: '#4B5563',
+                        },
+                        border: {
+                            gray: '#E5E7EB',
+                        },
+                        tag: {
+                            bg: '#E8F5E9',
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['Georgia', 'Times New Roman', 'serif'],
+                        sans: ['Inter', 'Helvetica Neue', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'dropdown': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    },
+                    animation: {
+                        'slide-up': 'slideUpFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                    },
+                    keyframes: {
+                        slideUpFade: {
+                            '0%': { opacity: '0', transform: 'translateY(40px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base styles to enforce typography strictness */
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #4B5563; /* text-gray */
+            background-color: #FFFFFF;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        h1, h2, h3, .font-serif-strict {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            color: #113122; /* primary-dark */
+        }
+
+        /* Utility for hiding scrollbars on custom scroll areas if needed */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* SVG Line drawing path styling */
+        .draw-path {
+            stroke: #113122;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+        }
+    </style>
+</head>
+<body class="relative">
+
+    <!-- ==========================================
+         HEADER / NAVIGATION
+         ========================================== -->
+    <header class="fixed top-0 left-0 w-full bg-white z-50 border-b border-border-gray">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            
+            <!-- Logo -->
+            <a href="#" class="flex items-center gap-2 text-primary-dark text-2xl font-serif font-bold">
+                <i data-lucide="leaf" class="w-6 h-6 text-primary-dark"></i>
+                ease
+            </a>
+
+            <!-- Desktop Nav -->
+            <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-primary-dark">
+                <a href="#" class="hover:opacity-70 transition-opacity">About</a>
+                <a href="#" class="hover:opacity-70 transition-opacity">Case Studies</a>
+                
+                <!-- Mega Menu: Resources -->
+                <div class="group relative py-8">
+                    <button class="flex items-center gap-1 hover:opacity-70 transition-opacity">
+                        Resources
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform group-hover:rotate-180"></i>
+                    </button>
+                    <!-- Dropdown Panel -->
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 w-[400px] bg-white shadow-dropdown rounded-xl border border-border-gray opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
+                        <div class="p-6 grid grid-cols-1 gap-6">
+                            <a href="#" class="block group/link">
+                                <h4 class="font-serif text-lg text-primary-dark group-hover/link:text-green-700">Blog</h4>
+                                <p class="text-sm text-text-gray mt-1 font-sans">Read our latest insights and industry news.</p>
+                            </a>
+                            <a href="#" class="block group/link">
+                                <h4 class="font-serif text-lg text-primary-dark group-hover/link:text-green-700">Glossary</h4>
+                                <p class="text-sm text-text-gray mt-1 font-sans">Understand key behavioral health terms.</p>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mega Menu: What We Offer -->
+                <div class="group relative py-8">
+                    <button class="flex items-center gap-1 hover:opacity-70 transition-opacity">
+                        What We Offer
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform group-hover:rotate-180"></i>
+                    </button>
+                    <!-- Dropdown Panel -->
+                    <div class="absolute top-full left-1/2 -translate-x-1/2 w-[500px] bg-white shadow-dropdown rounded-xl border border-border-gray opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
+                        <div class="p-6 grid grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-text-gray mb-3">Platform</h4>
+                                <a href="#" class="block py-2 hover:text-primary-dark">CRM</a>
+                                <a href="#" class="block py-2 hover:text-primary-dark">EHR</a>
+                                <a href="#" class="block py-2 hover:text-primary-dark">RCM</a>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-text-gray mb-3">Solutions</h4>
+                                <a href="#" class="block py-2 hover:text-primary-dark">For Admins</a>
+                                <a href="#" class="block py-2 hover:text-primary-dark">For Clinicians</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- CTA -->
+            <a href="#" class="hidden md:inline-flex items-center justify-center bg-primary-dark text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-opacity-90 transition-colors">
+                Book a Demo
+            </a>
+            
+            <!-- Mobile Menu Toggle (Visual only for template) -->
+            <button class="md:hidden text-primary-dark">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Space for fixed header -->
+    <div class="h-20"></div>
+
+    <main>
+        <!-- ==========================================
+             HERO SECTION
+             ========================================== -->
+        <section class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col lg:flex-row min-h-[700px] rounded-[2rem] overflow-hidden shadow-sm">
+                
+                <!-- Left Column (Content) -->
+                <div class="w-full lg:w-1/2 bg-primary-light p-12 lg:p-20 flex flex-col justify-center rounded-br-3xl lg:rounded-br-[4rem] relative z-10">
+                    <h1 class="text-5xl lg:text-[4.5rem] leading-[1.1] mb-6">
+                        Fewer clicks.<br>More care.
+                    </h1>
+                    <p class="text-lg lg:text-xl text-primary-dark/80 mb-10 max-w-md font-sans leading-relaxed">
+                        Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.
+                    </p>
+                    <div>
+                        <a href="#" class="inline-flex items-center gap-2 bg-primary-dark text-white px-8 py-4 rounded-full font-medium hover:bg-opacity-90 transition-transform hover:-translate-y-0.5">
+                            Request a Demo
+                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right Column (Visual UI Cards) -->
+                <div class="w-full lg:w-1/2 bg-secondary-blue p-12 lg:p-20 flex items-center justify-center rounded-bl-3xl lg:rounded-bl-[4rem] -mt-8 lg:mt-0 lg:-ml-8 relative">
+                    <!-- Cards Container -->
+                    <div class="w-full max-w-md relative h-[500px]" id="hero-cards-container">
+                        
+                        <!-- UI Card 1 (Bottom/Back) -->
+                        <div class="absolute top-0 left-0 w-full bg-white rounded-2xl shadow-lg p-6 border border-border-gray opacity-0 translate-y-10" style="animation: slideUpFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s forwards;">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="w-10 h-10 rounded-full bg-tag-bg flex items-center justify-center text-primary-dark">JD</div>
+                                <div>
+                                    <div class="font-bold text-sm text-primary-dark font-sans">John Doe</div>
+                                    <div class="text-xs text-text-gray font-sans">Intake Assessment</div>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="h-2 bg-bg-light rounded w-3/4"></div>
+                                <div class="h-2 bg-bg-light rounded w-full"></div>
+                                <div class="h-2 bg-bg-light rounded w-5/6"></div>
+                            </div>
+                        </div>
+
+                        <!-- UI Card 2 (Middle) -->
+                        <div class="absolute top-24 left-4 w-[95%] bg-white rounded-2xl shadow-xl p-6 border border-border-gray opacity-0 translate-y-10" style="animation: slideUpFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.4s forwards;">
+                            <div class="flex justify-between items-center mb-4">
+                                <div class="font-bold text-sm text-primary-dark font-sans">AI Progress Note</div>
+                                <span class="px-2 py-1 bg-tag-bg text-primary-dark text-xs rounded-full font-sans">Drafted</span>
+                            </div>
+                            <p class="text-xs text-text-gray font-sans leading-relaxed mb-4">
+                                Patient reported improved mood and sleep patterns over the last week. No adverse reactions to current medication...
+                            </p>
+                            <button class="w-full py-2 bg-primary-light text-primary-dark rounded-lg text-xs font-semibold font-sans">Review & Sign</button>
+                        </div>
+
+                        <!-- UI Card 3 (Top/Front) -->
+                        <div class="absolute top-52 -left-4 w-[105%] bg-white rounded-2xl shadow-2xl p-6 border border-border-gray opacity-0 translate-y-10" style="animation: slideUpFade 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.6s forwards;">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <div class="text-xs text-text-gray font-sans">Claim Status</div>
+                                    <div class="font-bold text-lg text-primary-dark font-sans">Approved</div>
+                                </div>
+                                <div class="w-12 h-12 bg-tag-bg rounded-full flex items-center justify-center">
+                                    <i data-lucide="check" class="w-6 h-6 text-primary-dark"></i>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-xs font-sans pt-4 border-t border-border-gray">
+                                <span class="text-text-gray">Amount</span>
+                                <span class="font-bold text-primary-dark">$450.00</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             INVESTORS SECTION
+             ========================================== -->
+        <section class="py-12 border-b border-border-gray/50">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <p class="text-sm font-medium text-text-gray uppercase tracking-widest mb-8 font-sans">
+                    Backed by leading investors
+                </p>
+                <!-- Logos Row -->
+                <div class="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale">
+                    <!-- Placeholders for actual logos -->
+                    <div class="font-serif font-bold text-xl">a16z</div>
+                    <div class="font-serif font-bold text-xl">abstract</div>
+                    <div class="font-serif font-bold text-xl">MAVEN</div>
+                    <div class="font-serif font-bold text-xl">BoxGroup</div>
+                    <div class="font-serif font-bold text-xl">F3</div>
+                    <div class="font-serif font-bold text-xl text-center leading-none">Sunflower<br><span class="text-xs">Capital</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             PLATFORM FEATURES SECTION
+             ========================================== -->
+        <section class="py-24 max-w-7xl mx-auto px-6">
+            <div class="flex flex-col lg:flex-row gap-16 items-start">
+                
+                <!-- Left: Text Columns -->
+                <div class="w-full lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-12">
+                    
+                    <!-- CRM Block -->
+                    <div>
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-tag-bg rounded-lg">
+                                <i data-lucide="users" class="w-5 h-5 text-primary-dark"></i>
+                            </div>
+                            <h3 class="text-2xl">CRM</h3>
+                        </div>
+                        <ul class="space-y-4 font-sans text-sm text-text-gray">
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Lead management</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Seamless EHR Connection</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Activity & Analytics</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Alumni & Refer-Out Connection</li>
+                        </ul>
+                    </div>
+
+                    <!-- EHR Block -->
+                    <div>
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-tag-bg rounded-lg">
+                                <i data-lucide="file-text" class="w-5 h-5 text-primary-dark"></i>
+                            </div>
+                            <h3 class="text-2xl">EHR</h3>
+                        </div>
+                        <ul class="space-y-4 font-sans text-sm text-text-gray">
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Clinical Notes & Assessments</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Treatment Planning</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> ePrescribe & Labs</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Patient Portal</li>
+                        </ul>
+                    </div>
+
+                    <!-- RCM Block -->
+                    <div class="md:col-span-2">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-tag-bg rounded-lg">
+                                <i data-lucide="credit-card" class="w-5 h-5 text-primary-dark"></i>
+                            </div>
+                            <h3 class="text-2xl">RCM</h3>
+                        </div>
+                        <ul class="space-y-4 font-sans text-sm text-text-gray columns-1 sm:columns-2 gap-8">
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Automated Billing</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Claims Tracking</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Revenue Reporting</li>
+                            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-secondary-blue mt-0.5 shrink-0"></i> Denial Management</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Right: Sticky Visual Mockup -->
+                <div class="w-full lg:w-1/2 sticky top-32 bg-bg-light rounded-[2rem] p-8 border border-border-gray shadow-sm h-[600px] flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="w-24 h-24 bg-white rounded-2xl shadow-md mx-auto mb-6 flex items-center justify-center border border-border-gray">
+                            <i data-lucide="layers" class="w-10 h-10 text-primary-light"></i>
+                        </div>
+                        <p class="font-sans text-sm text-text-gray max-w-xs mx-auto">
+                            Interactive platform mockup area. Updates state based on scroll position in a full implementation.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==========================================
+             CLINICAL SUPPORT SECTION (Sticky Layout)
+             ========================================== -->
+        <section class="py-24 bg-primary-light relative">
+            <div class="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row gap-16 items-start relative">
+                
+                <!-- Left: Scrolling Terms -->
+                <div class="w-full lg:w-1/2 space-y-24 py-32 lg:py-64">
+                    <!-- Repeated elements to create scroll height -->
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">Detox</h2>
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">SUD</h2>
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">Residential</h2>
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">PHP</h2>
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">MAT</h2>
+                    <h2 class="text-6xl md:text-8xl text-primary-dark opacity-40 hover:opacity-100 transition-opacity duration-300">IOP</h2>
+                </div>
+
+                <!-- Right: Sticky Stats/Info -->
+                <div class="w-full lg:w-1/2 sticky top-32 bg-white rounded-[2rem] p-10 md:p-16 shadow-xl z-10">
+                    <span class="inline-block px-4 py-1.5 bg-bg-light text-text-gray font-sans text-xs font-semibold rounded-full mb-8 uppercase tracking-wider">
+                        Clinical Support
+                    </span>
+                    <h3 class="text-3xl md:text-4xl leading-tight mb-8">
+                        Built to handle the complexity of modern behavioral healthcare.
+                    </h3>
+                    <p class="font-sans text-text-gray mb-12">
+                        Whether you operate a single outpatient clinic or a multi-state residential network, Ease adapts to your clinical workflows and compliance requirements.
+                    </p>
+                    
+                    <div class="grid grid-cols-2 gap-8 border-t border-border-gray pt-8">
+                        <div>
+                            <div class="text-4xl md:text-5xl font-serif text-primary-dark mb-2">10k+</div>
+                            <div class="font-sans text-sm text-text-gray">Patients Managed</div>
+                        </div>
+                        <div>
+                            <div class="text-4xl md:text-5xl font-serif text-primary-dark mb-2">99%</div>
+                            <div class="font-sans text-sm text-text-gray">Uptime SLA</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==========================================
+             PROBLEM / SOLUTION SECTION (Animated SVG)
+             ========================================== -->
+        <section class="py-32 bg-white relative overflow-hidden" id="problem-solution-section">
+            <div class="max-w-4xl mx-auto px-6 text-center mb-20 relative z-10">
+                <span class="inline-block px-4 py-1.5 bg-bg-light text-text-gray font-sans text-xs font-semibold rounded-full mb-6 uppercase tracking-wider">
+                    The problem
+                </span>
+                <p class="text-3xl md:text-[2.5rem] leading-[1.3] text-primary-dark">
+                    Fragmented CRM, EHR, and RCM systems are inefficient. They slow intake, burden staff, and hide revenue leakage.
+                </p>
+            </div>
+
+            <!-- SVG Animation Container -->
+            <div class="w-full h-[300px] relative max-w-7xl mx-auto my-12 hidden md:block" aria-hidden="true">
+                <!-- Fallback background line if JS fails -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-10">
+                    <div class="w-full h-[2px] bg-primary-dark"></div>
+                </div>
+                
+                <svg width="100%" height="100%" viewBox="0 0 1000 300" preserveAspectRatio="none" class="absolute inset-0">
+                    <!-- 3 Lines starting apart and converging -->
+                    <path id="path-top" class="draw-path" d="M 0,50 C 400,50 600,150 1000,150" />
+                    <path id="path-mid" class="draw-path" d="M 0,150 C 400,150 600,150 1000,150" />
+                    <path id="path-bot" class="draw-path" d="M 0,250 C 400,250 600,150 1000,150" />
+                </svg>
+            </div>
+            <!-- Mobile spacer fallback -->
+            <div class="md:hidden h-16 w-full flex flex-col items-center justify-center gap-2">
+                <div class="w-1 h-1 rounded-full bg-primary-dark opacity-20"></div>
+                <div class="w-1 h-1 rounded-full bg-primary-dark opacity-50"></div>
+                <div class="w-1 h-1 rounded-full bg-primary-dark opacity-100"></div>
+            </div>
+
+            <div class="max-w-4xl mx-auto px-6 text-center mt-20 relative z-10">
+                <span class="inline-block px-4 py-1.5 bg-bg-light text-text-gray font-sans text-xs font-semibold rounded-full mb-6 uppercase tracking-wider">
+                    The solution
+                </span>
+                <p class="text-3xl md:text-[2.5rem] leading-[1.3] text-primary-dark">
+                    Instead of bouncing between CRM, EHR, and RCM systems, Ease provides one AI-powered system for referrals, clinical notes, and billing.
+                </p>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             BENEFITS SECTION
+             ========================================== -->
+        <section class="py-24 bg-bg-light">
+            <div class="max-w-7xl mx-auto px-6">
+                
+                <div class="text-center mb-16">
+                    <span class="inline-block px-4 py-1.5 bg-white border border-border-gray text-text-gray font-sans text-xs font-semibold rounded-full mb-6 uppercase tracking-wider shadow-sm">
+                        Why Ease
+                    </span>
+                    <h2 class="text-4xl md:text-5xl max-w-2xl mx-auto">
+                        A super-powered system, working together.
+                    </h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <!-- Card 1 -->
+                    <div class="bg-tag-bg rounded-2xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                        <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 text-primary-dark">
+                            <i data-lucide="square" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-2xl mb-4">See everything in one place.</h3>
+                        <p class="font-sans text-sm text-text-gray leading-relaxed">
+                            Consolidate tools, reduce spend, and gain unified reporting without painful integrations.
+                        </p>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div class="bg-tag-bg rounded-2xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                        <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 text-primary-dark">
+                            <i data-lucide="check-square" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-2xl mb-4">Get more done, more easily.</h3>
+                        <p class="font-sans text-sm text-text-gray leading-relaxed">
+                            AI support helps admins, clinicians, supervisors, and billers complete important tasks in less time.
+                        </p>
+                    </div>
+
+                    <!-- Card 3 -->
+                    <div class="bg-tag-bg rounded-2xl p-8 hover:-translate-y-1 transition-transform duration-300">
+                        <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 text-primary-dark">
+                            <i data-lucide="layers" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-2xl mb-4">Scale with confidence.</h3>
+                        <p class="font-sans text-sm text-text-gray leading-relaxed">
+                            Built on modern architecture that grows with your organization, ensuring data security and compliance at every step.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Simple Footer for completion -->
+    <footer class="bg-primary-dark text-white py-12">
+        <div class="max-w-7xl mx-auto px-6 text-center font-sans text-sm opacity-60">
+            &copy; 2024 Ease Healthcare. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- ==========================================
+         SCRIPTS FOR INTERACTIONS
+         ========================================== -->
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // ----------------------------------------------------
+        // SVG Scroll Drawing Animation logic
+        // ----------------------------------------------------
+        document.addEventListener('DOMContentLoaded', () => {
+            const section = document.getElementById('problem-solution-section');
+            const paths = section.querySelectorAll('.draw-path');
+            
+            // Set up initial path dasharrays
+            const pathLengths = [];
+            paths.forEach((path, i) => {
+                const length = path.getTotalLength();
+                pathLengths.push(length);
+                path.style.strokeDasharray = length;
+                path.style.strokeDashoffset = length; // start fully hidden
+            });
+
+            // Scroll listener for drawing lines
+            const handleScroll = () => {
+                if (!section) return;
+                
+                const rect = section.getBoundingClientRect();
+                const windowHeight = window.innerHeight;
+                
+                // Calculate how far through the section we have scrolled
+                // Start drawing when top of section enters bottom of viewport
+                // Finish drawing when center of section hits center of viewport
+                
+                const startPoint = windowHeight;
+                const endPoint = windowHeight / 2;
+                
+                let progress = 0;
+                
+                if (rect.top <= startPoint) {
+                    const scrolledPastStart = startPoint - rect.top;
+                    const totalScrollDistance = startPoint - endPoint + (rect.height / 2); // Roughly to center of section
+                    
+                    progress = scrolledPastStart / totalScrollDistance;
+                    
+                    // Clamp between 0 and 1
+                    progress = Math.max(0, Math.min(1, progress));
+                }
+
+                // Update paths
+                paths.forEach((path, i) => {
+                    const length = pathLengths[i];
+                    // At progress 0, offset is length (hidden)
+                    // At progress 1, offset is 0 (fully drawn)
+                    path.style.strokeDashoffset = length - (length * progress);
+                });
+            };
+
+            window.addEventListener('scroll', handleScroll);
+            // Initial call in case it's already in view on load
+            handleScroll();
+        });
+
+        // ----------------------------------------------------
+        // Replay Hero Animations if scrolled out and back in (Optional polish)
+        // Currently handled purely by CSS on load as per standard practice,
+        // but could use IntersectionObserver to re-trigger if desired.
+        // ----------------------------------------------------
+    </script>
+</body>
+</html>

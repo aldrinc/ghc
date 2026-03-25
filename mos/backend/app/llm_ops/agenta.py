@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 import os
 import threading
 from dataclasses import dataclass
 from typing import Any
+
+import httpx
 
 from app.config import settings
 
@@ -28,20 +29,12 @@ _INIT_LOCK = threading.Lock()
 _PROMPT_CACHE_LOCK = threading.Lock()
 _AGENTA_INITIALIZED = False
 _PROMPT_CACHE: dict[AgentaPromptReference, tuple[str, str]] = {}
+_AGENTA_API_URL: str | None = None
+_AGENTA_TIMEOUT_SECONDS = 60.0
 
 
 def agenta_enabled() -> bool:
     return bool(settings.AGENTA_ENABLED)
-
-
-def _load_agenta_module() -> Any:
-    try:
-        return importlib.import_module("agenta")
-    except Exception as exc:  # noqa: BLE001
-        raise AgentaConfigError(
-            "AGENTA_ENABLED is true but the `agenta` package is not available. "
-            "Install dependency `agenta` and retry."
-        ) from exc
 
 
 def _validate_enabled_settings() -> None:
@@ -59,8 +52,21 @@ def _validate_enabled_settings() -> None:
         )
 
 
+def _normalized_agenta_api_url() -> str:
+    explicit_api_url = os.getenv("AGENTA_API_INTERNAL_URL") or os.getenv("AGENTA_API_URL")
+    if explicit_api_url and explicit_api_url.strip():
+        return explicit_api_url.strip().rstrip("/")
+
+    host = str(settings.AGENTA_HOST).strip()
+    if not host:
+        raise AgentaConfigError(
+            "AGENTA_ENABLED is true but AGENTA_HOST is not configured."
+        )
+    return f"{host.rstrip('/')}/api"
+
+
 def initialize_agenta() -> None:
-    global _AGENTA_INITIALIZED
+    global _AGENTA_API_URL, _AGENTA_INITIALIZED
 
     if _AGENTA_INITIALIZED:
         return
@@ -71,21 +77,13 @@ def initialize_agenta() -> None:
         if _AGENTA_INITIALIZED:
             return
         _validate_enabled_settings()
-        ag = _load_agenta_module()
-
-        # The SDK reads auth/host from env.
-        os.environ["AGENTA_API_KEY"] = str(settings.AGENTA_API_KEY)
-        os.environ["AGENTA_HOST"] = str(settings.AGENTA_HOST)
-        try:
-            ag.init()
-        except Exception as exc:  # noqa: BLE001
-            raise AgentaConfigError(f"Failed to initialize Agenta SDK: {exc}") from exc
+        _AGENTA_API_URL = _normalized_agenta_api_url()
         _AGENTA_INITIALIZED = True
 
 
 def shutdown_agenta() -> None:
     """
-    Placeholder for future SDK cleanup hooks.
+    Placeholder for future client cleanup hooks.
     """
 
 
@@ -182,23 +180,67 @@ def _resolve_parameter_path(payload: Any, parameter_path: str) -> Any:
     return current
 
 
-def _fetch_prompt_from_registry(reference: AgentaPromptReference) -> tuple[str, str]:
-    initialize_agenta()
-    ag = _load_agenta_module()
+def _reference_payload(
+    *,
+    slug: str | None = None,
+    version: int | None = None,
+    id: str | None = None,
+) -> dict[str, Any] | None:
+    if slug is None and version is None and id is None:
+        return None
 
-    kwargs: dict[str, Any] = {"app_slug": reference.app_slug}
-    if reference.variant_slug is not None:
-        kwargs["variant_slug"] = reference.variant_slug
-    if reference.variant_version is not None:
-        kwargs["variant_version"] = reference.variant_version
-    if reference.environment_slug is not None:
-        kwargs["environment_slug"] = reference.environment_slug
-    if reference.environment_version is not None:
-        kwargs["environment_version"] = reference.environment_version
+    payload: dict[str, Any] = {}
+    if slug is not None:
+        payload["slug"] = slug
+    if version is not None:
+        payload["version"] = version
+    if id is not None:
+        payload["id"] = id
+    return payload
+
+
+def _fetch_config_from_registry(reference: AgentaPromptReference) -> dict[str, Any]:
+    initialize_agenta()
+
+    if _AGENTA_API_URL is None:
+        raise AgentaConfigError("Agenta client is not initialized.")
+
+    request_body = {
+        "variant_ref": _reference_payload(
+            slug=reference.variant_slug,
+            version=reference.variant_version,
+        ),
+        "environment_ref": _reference_payload(
+            slug=reference.environment_slug,
+            version=reference.environment_version,
+        ),
+        "application_ref": _reference_payload(slug=reference.app_slug),
+    }
 
     try:
-        config = ag.ConfigManager.get_from_registry(**kwargs)
-    except Exception as exc:  # noqa: BLE001
+        with httpx.Client(
+            follow_redirects=True,
+            timeout=_AGENTA_TIMEOUT_SECONDS,
+        ) as client:
+            response = client.post(
+                f"{_AGENTA_API_URL}/variants/configs/fetch",
+                headers={
+                    "Authorization": str(settings.AGENTA_API_KEY),
+                    "Content-Type": "application/json",
+                },
+                json=request_body,
+            )
+            response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text.strip()
+        raise AgentaConfigError(
+            "Failed to fetch prompt config from Agenta registry "
+            f"(app_slug={reference.app_slug}, variant_slug={reference.variant_slug}, "
+            f"variant_version={reference.variant_version}, environment_slug={reference.environment_slug}, "
+            f"environment_version={reference.environment_version}, status_code={exc.response.status_code}): "
+            f"{body or exc}"
+        ) from exc
+    except httpx.HTTPError as exc:
         raise AgentaConfigError(
             "Failed to fetch prompt config from Agenta registry "
             f"(app_slug={reference.app_slug}, variant_slug={reference.variant_slug}, "
@@ -206,6 +248,29 @@ def _fetch_prompt_from_registry(reference: AgentaPromptReference) -> tuple[str, 
             f"environment_version={reference.environment_version}): {exc}"
         ) from exc
 
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise AgentaConfigError(
+            "Agenta returned a non-JSON response while fetching prompt config "
+            f"for app_slug={reference.app_slug}."
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise AgentaConfigError(
+            "Agenta returned an invalid config payload; expected an object response."
+        )
+
+    params = payload.get("params")
+    if not isinstance(params, dict):
+        raise AgentaConfigError(
+            "Agenta returned an invalid config payload; expected object field 'params'."
+        )
+    return params
+
+
+def _fetch_prompt_from_registry(reference: AgentaPromptReference) -> tuple[str, str]:
+    config = _fetch_config_from_registry(reference)
     value = _resolve_parameter_path(config, reference.parameter_path)
     if not isinstance(value, str) or not value.strip():
         raise AgentaConfigError(

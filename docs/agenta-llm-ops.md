@@ -13,8 +13,8 @@ MOS now supports Agenta as the prompt management layer while keeping Langfuse as
 - If `AGENTA_ENABLED=false`:
   - Prompt templates are loaded from local files as before.
 - If `AGENTA_ENABLED=true`:
-  - Agenta SDK is initialized at API and Temporal worker startup.
-  - Prompt templates are fetched from Agenta using `AGENTA_PROMPT_REGISTRY`.
+  - The backend validates Agenta config at API and Temporal worker startup.
+  - Prompt templates are fetched directly from Agenta's config API using `AGENTA_PROMPT_REGISTRY`.
   - Missing config, fetch failures, or invalid prompt values raise explicit errors.
 
 ## Prompt Keys Currently Managed

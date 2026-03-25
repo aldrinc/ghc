@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import sys
-import types
 
 import pytest
 
@@ -62,29 +60,21 @@ def test_ad_breakdown_prompt_fetches_from_agenta_registry(monkeypatch):
         },
     )
 
-    init_calls: list[int] = []
-    registry_calls: list[dict[str, object]] = []
+    registry_calls: list[agenta_ops.AgentaPromptReference] = []
 
-    class _FakeConfigManager:
-        @staticmethod
-        def get_from_registry(**kwargs):
-            registry_calls.append(kwargs)
-            return {"template": "Prompt text from Agenta"}
+    def _fake_fetch(reference: agenta_ops.AgentaPromptReference) -> dict[str, object]:
+        registry_calls.append(reference)
+        return {"template": "Prompt text from Agenta"}
 
-    fake_agenta_module = types.SimpleNamespace(
-        init=lambda: init_calls.append(1),
-        ConfigManager=_FakeConfigManager,
-    )
-    monkeypatch.setitem(sys.modules, "agenta", fake_agenta_module)
+    monkeypatch.setattr(agenta_ops, "_fetch_config_from_registry", _fake_fetch)
 
     text, sha = ad_breakdown.load_ad_breakdown_prompt()
 
     assert text == "Prompt text from Agenta"
     assert sha == hashlib.sha256("Prompt text from Agenta".encode("utf-8")).hexdigest()
-    assert init_calls == [1]
     assert len(registry_calls) == 1
-    assert registry_calls[0]["app_slug"] == "ad-breakdown"
-    assert registry_calls[0]["environment_slug"] == "production"
+    assert registry_calls[0].app_slug == "ad-breakdown"
+    assert registry_calls[0].environment_slug == "production"
 
     # Cached second call should not hit registry again.
     text_2, sha_2 = ad_breakdown.load_ad_breakdown_prompt()
@@ -109,16 +99,10 @@ def test_precanon_prompt_utils_fetches_from_agenta_registry(monkeypatch):
         },
     )
 
-    class _FakeConfigManager:
-        @staticmethod
-        def get_from_registry(**_kwargs):
-            return {"template": "Research prompt from Agenta"}
+    def _fake_fetch(_reference: agenta_ops.AgentaPromptReference) -> dict[str, object]:
+        return {"template": "Research prompt from Agenta"}
 
-    fake_agenta_module = types.SimpleNamespace(
-        init=lambda: None,
-        ConfigManager=_FakeConfigManager,
-    )
-    monkeypatch.setitem(sys.modules, "agenta", fake_agenta_module)
+    monkeypatch.setattr(agenta_ops, "_fetch_config_from_registry", _fake_fetch)
 
     text, sha = prompt_utils.read_prompt_file("01_competitor_research.md")
 

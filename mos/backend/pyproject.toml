@@ -38,7 +38,6 @@ dependencies = [
   "google-genai",
   "anthropic>=0.76.0",
   "openai>=1.52.0",
-  "agenta",
   "langfuse>=3.14.3",
   "stripe",
   "boto3>=1.35.0",

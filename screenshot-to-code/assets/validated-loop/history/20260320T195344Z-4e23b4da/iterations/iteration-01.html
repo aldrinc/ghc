@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ease — AI-native behavioral healthcare</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+
+<script>
+/* ========== THEME TOKENS ========== */
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'primary-dark': '#113320',
+        'surface-green': '#CDE5D3',
+        'surface-blue': '#A8C2C6',
+        'surface-white': '#FFFFFF',
+        'text-main': '#113320',
+        'text-muted': '#556B5D',
+      },
+      fontFamily: {
+        heading: ["'Playfair Display'", 'Georgia', 'serif'],
+        body: ["'Inter'", 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        'hero-heading': ['4rem', { lineHeight: '1.1' }],
+        'hero-body': ['1.125rem', { lineHeight: '1.5' }],
+      },
+      spacing: {
+        'section-py': '4rem',
+        'container-px': '2rem',
+        'card-p': '3rem',
+        'gap-hero': '1.5rem',
+      },
+      borderRadius: {
+        'button': '9999px',
+        'card-sm': '1rem',
+        'card-lg': '2rem',
+      },
+      boxShadow: {
+        'ui-card': '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+      },
+    },
+  },
+};
+</script>
+
+<style>
+  /* ========== ANIMATION SYSTEM ========== */
+  :root {
+    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+    --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-slow: 800ms;
+    --duration-med: 500ms;
+    --stagger-delay: 150ms;
+  }
+
+  /* Initial hidden state for all animated elements */
+  [data-animate] {
+    opacity: 0;
+  }
+  [data-animate="slide-up"] {
+    transform: translateY(40px);
+  }
+  [data-animate="fade-in"] {
+    transform: translateY(0);
+  }
+
+  /* Active animation classes */
+  [data-animate].animate-active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  [data-animate="slide-up"].animate-active {
+    transition: opacity var(--duration-slow) var(--ease-smooth),
+                transform var(--duration-slow) var(--ease-spring);
+  }
+  [data-animate="fade-in"].animate-active {
+    transition: opacity var(--duration-med) ease-out;
+  }
+
+  /* Smooth base styles */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Prevent horizontal scroll */
+  html, body {
+    overflow-x: hidden;
+  }
+
+  /* Button hover */
+  .btn-primary:hover {
+    background-color: #1a4a30;
+  }
+  .btn-outline:hover {
+    background-color: rgba(17, 51, 32, 0.08);
+  }
+</style>
+</head>
+
+<body class="bg-white font-body text-text-main">
+
+<!-- ========== HEADER ========== -->
+<header data-animate="fade-in" class="w-full sticky top-0 z-50 bg-white/80 backdrop-blur-sm">
+  <div class="max-w-[1380px] mx-auto px-container-px py-5 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="#" class="font-heading text-[1.65rem] font-semibold text-primary-dark italic" id="logo-text">ease</a>
+
+    <!-- Nav Links -->
+    <nav class="hidden md:flex items-center gap-8">
+      <a href="#" class="text-sm font-medium text-text-main hover:text-primary-dark/70 transition-colors nav-link">About</a>
+      <a href="#" class="text-sm font-medium text-text-main hover:text-primary-dark/70 transition-colors nav-link">Case Studies</a>
+      <a href="#" class="text-sm font-medium text-text-main hover:text-primary-dark/70 transition-colors nav-link">Resources</a>
+      <a href="#" class="text-sm font-medium text-text-main hover:text-primary-dark/70 transition-colors nav-link">What We Offer</a>
+    </nav>
+
+    <!-- CTA Button -->
+    <a href="#" class="btn-primary text-sm font-medium bg-primary-dark text-white rounded-button px-5 py-2.5 transition-all" id="header-cta">Book a Demo</a>
+  </div>
+</header>
+
+<!-- ========== HERO SECTION ========== -->
+<section class="max-w-[1380px] mx-auto px-container-px pt-4 pb-section-py">
+  <div class="grid grid-cols-1 lg:grid-cols-[38%_1fr] gap-gap-hero min-h-[560px]">
+
+    <!-- Left Card: Value Proposition -->
+    <div data-animate="slide-up" class="bg-surface-green rounded-card-lg p-card-p flex flex-col justify-between relative overflow-hidden">
+      <div>
+        <h1 class="font-heading text-[3.5rem] lg:text-hero-heading text-primary-dark mb-6 leading-[1.08] tracking-[-0.02em]" id="hero-heading">
+          Fewer clicks.<br>More care.
+        </h1>
+        <p class="text-[1.05rem] lg:text-hero-body text-text-muted max-w-[380px] leading-[1.6]" id="hero-body">
+          Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.
+        </p>
+      </div>
+      <div data-animate="slide-up" class="mt-10">
+        <a href="#" class="btn-primary inline-flex items-center gap-2 bg-primary-dark text-white text-sm font-medium rounded-button px-7 py-3.5 transition-all" id="hero-cta">
+          Request a Demo
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Card: UI Mockups -->
+    <div data-animate="slide-up" class="bg-surface-blue rounded-card-lg p-8 relative overflow-hidden min-h-[540px]">
+      <!-- Subtle pattern overlay -->
+      <div class="absolute inset-0 opacity-[0.04]" style="background-image: radial-gradient(circle at 1px 1px, #113320 1px, transparent 0); background-size: 24px 24px;"></div>
+
+      <!-- CRM Card (Front/Top) -->
+      <div data-animate="slide-up" data-card="crm" class="absolute top-[55%] -translate-y-1/2 left-4 w-[230px] bg-white rounded-card-sm shadow-ui-card z-10 overflow-hidden">
+        <div class="p-4">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-surface-green flex items-center justify-center overflow-hidden">
+              <svg class="w-6 h-6 text-primary-dark" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-text-main">Emma Smith</p>
+              <p class="text-xs text-text-muted">New Patient Intake</p>
+            </div>
+          </div>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-text-muted">Status</span>
+              <span class="text-xs font-medium text-primary-dark bg-surface-green/60 px-2 py-0.5 rounded-full">Active</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-text-muted">Insurance</span>
+              <span class="text-xs font-medium text-text-main">Verified ✓</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-text-muted">Next Step</span>
+              <span class="text-xs font-medium text-text-main">Schedule</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-primary-dark/5 px-4 py-2.5 flex items-center justify-between">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-primary-dark/60">CRM</span>
+          <div class="flex gap-1">
+            <div class="w-1.5 h-1.5 rounded-full bg-primary-dark/30"></div>
+            <div class="w-1.5 h-1.5 rounded-full bg-primary-dark/30"></div>
+            <div class="w-1.5 h-1.5 rounded-full bg-primary-dark/30"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EHR Card (Middle) -->
+      <div data-animate="slide-up" data-card="ehr" class="absolute top-[42%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-[260px] bg-white rounded-card-sm shadow-2xl z-20 scale-105 overflow-hidden">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-primary-dark/60">EHR</span>
+            <span class="text-xs text-text-muted">Today</span>
+          </div>
+          <div class="mb-3">
+            <p class="text-sm font-semibold text-text-main mb-1">Clinical Notes</p>
+            <p class="text-xs text-text-muted leading-relaxed">Patient presents with generalized anxiety. Recommend CBT protocol with bi-weekly sessions...</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-surface-green/40 rounded-lg p-2 text-center">
+              <p class="text-lg font-semibold text-primary-dark">92</p>
+              <p class="text-[10px] text-text-muted">PHQ-9</p>
+            </div>
+            <div class="bg-surface-blue/40 rounded-lg p-2 text-center">
+              <p class="text-lg font-semibold text-primary-dark">7</p>
+              <p class="text-[10px] text-text-muted">GAD-7</p>
+            </div>
+            <div class="bg-yellow-100/60 rounded-lg p-2 text-center">
+              <p class="text-lg font-semibold text-primary-dark">85</p>
+              <p class="text-[10px] text-text-muted">WHODAS</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RCM Card (Back/Bottom) -->
+      <div data-animate="slide-up" data-card="rcm" class="absolute top-[55%] -translate-y-1/2 right-4 w-[240px] bg-white rounded-card-sm shadow-ui-card z-10 overflow-hidden">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-primary-dark/60">RCM</span>
+
+          </div>
+          <div class="mb-3">
+<p class="text-[1.75rem] font-semibold text-primary-dark leading-tight">$225,390</p>
+          </div>
+          <!-- Mini chart placeholder -->
+          <div class="mt-3 flex items-end gap-1.5 h-12">
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:40%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:60%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:45%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:85%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:55%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:70%"></div>
+            <div class="w-full bg-surface-blue/30 rounded-t" style="height:50%"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== INVESTOR LOGOS ========== -->
+<section data-animate="fade-in" class="max-w-[1380px] mx-auto px-container-px pb-section-py">
+  <div class="text-center">
+    <p class="text-sm text-text-muted mb-8 tracking-wide" id="investors-heading">Backed by leading investors</p>
+    <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+      <!-- Logo 1: Andreessen Horowitz -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 160 28" fill="none">
+          <text x="0" y="20" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#113320">andreessen</text>
+          <text x="95" y="20" font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#113320">horowitz</text>
+        </svg>
+      </div>
+      <!-- Logo 2: Abstract -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 100 28" fill="none">
+          <rect x="2" y="4" width="20" height="20" rx="4" stroke="#113320" stroke-width="2"/>
+          <text x="28" y="20" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#113320">Abstract</text>
+        </svg>
+      </div>
+      <!-- Logo 3: Maven -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 80 28" fill="none">
+          <text x="0" y="20" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#113320">Maven</text>
+        </svg>
+      </div>
+      <!-- Logo 4: BoxGroup -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 110 28" fill="none">
+          <rect x="2" y="6" width="16" height="16" rx="2" stroke="#113320" stroke-width="2"/>
+          <text x="24" y="20" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#113320">BoxGroup</text>
+        </svg>
+      </div>
+      <!-- Logo 5: F3 -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 40 28" fill="none">
+          <text x="0" y="20" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#113320">F3</text>
+        </svg>
+      </div>
+      <!-- Logo 6: Sunflower Capital -->
+      <div class="investor-logo opacity-60 hover:opacity-100 transition-opacity">
+        <svg class="h-7 w-auto" viewBox="0 0 160 28" fill="none">
+          <circle cx="10" cy="14" r="8" stroke="#113320" stroke-width="2"/>
+          <line x1="10" y1="6" x2="10" y2="3" stroke="#113320" stroke-width="1.5"/>
+          <line x1="10" y1="22" x2="10" y2="25" stroke="#113320" stroke-width="1.5"/>
+          <line x1="4" y1="8" x2="2" y2="6" stroke="#113320" stroke-width="1.5"/>
+          <line x1="16" y1="20" x2="18" y2="22" stroke="#113320" stroke-width="1.5"/>
+          <line x1="16" y1="8" x2="18" y2="6" stroke="#113320" stroke-width="1.5"/>
+          <line x1="4" y1="20" x2="2" y2="22" stroke="#113320" stroke-width="1.5"/>
+          <text x="24" y="19" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#113320">Sunflower Capital</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ANIMATION CONTROLLER ========== -->
+<script>
+/* ========== PAGE COPY (easily editable) ========== */
+const PAGE_COPY = {
+  logo: 'ease',
+  navLinks: ['About', 'Case Studies', 'Resources', 'What We Offer'],
+  headerCta: 'Book a Demo',
+  heroHeading: 'Fewer clicks.<br>More care.',
+  heroBody: 'Admit more patients, reduce staff burden, and get paid faster with an AI-native system built for behavioral healthcare.',
+  heroCta: 'Request a Demo',
+  investorsHeading: 'Backed by leading investors',
+};
+
+/* ========== ANIMATION SEQUENCE ========== */
+const ANIMATION_SEQUENCE = [
+  { selector: 'header[data-animate]',            delay: 0 },
+  { selector: '.bg-surface-green[data-animate]', delay: 300 },
+  { selector: '.bg-surface-blue[data-animate]',  delay: 300 },
+  { selector: '.bg-surface-green [data-animate]',delay: 600 },
+  { selector: '[data-card="crm"]',               delay: 700 },
+  { selector: '[data-card="ehr"]',               delay: 850 },
+  { selector: '[data-card="rcm"]',               delay: 1000 },
+  { selector: 'section:last-of-type[data-animate]', delay: 1200 },
+];
+
+function runAnimations() {
+  ANIMATION_SEQUENCE.forEach(({ selector, delay }) => {
+    const els = document.querySelectorAll(selector);
+    els.forEach((el, i) => {
+      setTimeout(() => {
+        el.classList.add('animate-active');
+      }, delay + (i * 50));
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  /* Small delay to ensure fonts/styles are ready */
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      runAnimations();
+    });
+  });
+});
+</script>
+
+</body>
+</html>
