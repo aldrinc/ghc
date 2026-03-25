@@ -1106,6 +1106,112 @@ def test_generate_swipe_stage1_copy_pack_hydrates_meta_fields_from_selected_vari
     assert retry_feedbacks == [None]
 
 
+def test_extract_meta_fields_from_selected_variation_markdown_accepts_meta_labels_and_variation_prefix():
+    extracted = swipe_activity._extract_meta_fields_from_selected_variation_markdown(
+        formatted_variations_markdown=(
+            "```text\n"
+            "- **Variation 1: The Dismissal Warning**\n\n"
+            "- **Meta Primary Text:**\n"
+            "They brushed off the question like it did not matter.\n\n"
+            "Now there is one detail she refuses to ignore.\n\n"
+            "`Meta Headline:` What They Refused To Look At\n"
+            "`Meta Description:` Read the warning before it disappears.\n"
+            "`Meta CTA:` Learn More\n\n"
+            "---\n\n"
+            "**Variation 2: Another Angle**\n"
+            "```"
+        ),
+        selected_variation="Variation 1",
+    )
+
+    assert extracted == {
+        "metaPrimaryText": (
+            "They brushed off the question like it did not matter.\n\n"
+            "Now there is one detail she refuses to ignore."
+        ),
+        "metaHeadline": "What They Refused To Look At",
+        "metaDescription": "Read the warning before it disappears.",
+        "metaCta": "Learn More",
+    }
+
+
+def test_generate_swipe_stage1_copy_pack_hydrates_meta_alias_fields_before_validation(monkeypatch):
+    monkeypatch.setattr(swipe_activity, "_build_swipe_copy_stage1_prompt", lambda **_kwargs: "prompt")
+    monkeypatch.setattr(swipe_activity, "_resolve_destination_type", lambda **_kwargs: "presell")
+    monkeypatch.setattr(
+        swipe_activity,
+        "_call_swipe_copy_gemini_json_message",
+        lambda **_kwargs: {
+            "parsed": {
+                "selectedVariation": "Variation 1",
+                "formattedVariationsMarkdown": (
+                    "```text\n"
+                    "**Variation 1: The Dismissal Warning**\n\n"
+                    "**Primary Text:**\n"
+                    "They dismissed the concern before they even looked closer.\n\n"
+                    "Now there is one question she wishes she asked sooner.\n\n"
+                    "**Headline:** The Question They Skipped\n"
+                    "**Description:** Read the warning before it's gone.\n"
+                    "**CTA:** Learn More\n"
+                    "```"
+                ),
+                "primaryText": (
+                    "They dismissed the concern before they even looked closer.\n\n"
+                    "Now there is one question she wishes she asked sooner."
+                ),
+                "headline": "The Question They Skipped",
+                "description": "Read the warning before it's gone.",
+                "cta": "Learn More",
+                "claimsGuardrails": ["Do not promise medical outcomes."],
+            },
+            "text": "",
+            "stop_reason": "STOP",
+            "output_tokens": 444,
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_validate_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
+    )
+
+    validated, response, model = swipe_activity._generate_swipe_stage1_copy_pack(
+        session=object(),
+        brief={"id": "brief-1"},
+        requirement_index=0,
+        requirement={
+            "channel": "facebook",
+            "format": "image_ad",
+            "angle": "Doctor-dismissal backlash",
+            "hook": "Hidden issue",
+            "funnelStage": "mid",
+        },
+        copy_model="models/gemini-2.5-flash",
+        gemini_store_names=["fileSearchStores/context-store"],
+        swipe_bytes=b"image-bytes",
+        swipe_mime_type="image/png",
+        swipe_source_url="https://example.com/swipe.png",
+        swipe_source_label="10.png",
+        product_prompt_image_bytes=None,
+        product_prompt_image_mime_type=None,
+    )
+
+    assert validated.meta_primary_text == (
+        "They dismissed the concern before they even looked closer.\n\n"
+        "Now there is one question she wishes she asked sooner."
+    )
+    assert validated.meta_headline == "The Question They Skipped"
+    assert validated.meta_description == "Read the warning before it's gone."
+    assert validated.meta_cta == "Learn More"
+    assert response["output_tokens"] == 444
+    assert model == "models/gemini-2.5-flash"
+
+
 def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypatch):
     captured: dict[str, object] = {}
 

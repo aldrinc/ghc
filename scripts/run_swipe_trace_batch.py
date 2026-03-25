@@ -202,7 +202,7 @@ def _run_stage1_trace(
             campaign_id=campaign_id,
             asset_brief_id=asset_brief_id,
         )
-        funnel_id = _validate_brief_scope(
+        execution_scope = _validate_brief_scope(
             session=session,
             org_id=org_id,
             client_id=client_id,
@@ -210,6 +210,7 @@ def _run_stage1_trace(
             asset_brief_id=asset_brief_id,
             brief=brief,
         )
+        funnel_id = execution_scope.funnel_id
         requirements_raw = brief.get("requirements") or []
         if not isinstance(requirements_raw, list) or requirement_index < 0 or requirement_index >= len(requirements_raw):
             raise RuntimeError(
@@ -900,7 +901,7 @@ def main() -> int:
     }
     _write_json(output_root / "index.json", index_payload)
     _render_index_html(output_root=output_root, index_payload=index_payload)
-    return 0
+    return 1 if failure_manifest else 0
 
 
 if __name__ == "__main__":
