@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    GETHOOKD_ORIGIN_SYSTEM,
     ClientSwipeAsset,
     CompanySwipeAsset,
     CompanySwipeBrand,
@@ -19,16 +20,22 @@ from app.db.models import (
 
 DEFAULT_SWIPE_COLLECTION_KIND = "default"
 DEFAULT_SWIPE_COLLECTION_NAME = "Default"
-GETHOOKD_INBOX_KIND = "gethookd_inbox"
+GETHOOKD_INBOX_COLLECTION_KIND = "gethookd_inbox"
+GETHOOKD_INBOX_KIND = GETHOOKD_INBOX_COLLECTION_KIND
 GETHOOKD_INBOX_NAME = "GetHookd"
-GETHOOKD_ORIGIN_SYSTEM = "gethookd_public_api"
 WRITABLE_SWIPE_COLLECTION_KINDS = {"uploaded", "curated"}
 
-# Review status constants
-REVIEW_STATUS_PENDING = "pending_review"
-REVIEW_STATUS_APPROVED = "approved"
-REVIEW_STATUS_REJECTED = "rejected"
-REVIEW_STATUS_STALE = "stale_after_sync"
+# GetHookd-specific constants
+GETHOOKD_REVIEW_STATUS_PENDING = "pending_review"
+GETHOOKD_REVIEW_STATUS_APPROVED = "approved"
+GETHOOKD_REVIEW_STATUS_REJECTED = "rejected"
+GETHOOKD_REVIEW_STATUS_STALE = "stale_after_sync"
+
+# Backward-compatible aliases for older call sites.
+REVIEW_STATUS_PENDING = GETHOOKD_REVIEW_STATUS_PENDING
+REVIEW_STATUS_APPROVED = GETHOOKD_REVIEW_STATUS_APPROVED
+REVIEW_STATUS_REJECTED = GETHOOKD_REVIEW_STATUS_REJECTED
+REVIEW_STATUS_STALE = GETHOOKD_REVIEW_STATUS_STALE
 
 
 class CompanySwipesRepository:
@@ -114,14 +121,18 @@ class CompanySwipesRepository:
         reviewed_by_user_id: Optional[str] = None,
     ) -> Optional[CompanySwipeAsset]:
         """Set review status on a swipe asset."""
-        now = datetime.now(timezone.utc)
-        return self.update_asset(
-            org_id=org_id,
-            swipe_id=swipe_id,
-            review_status=review_status,
-            reviewed_at=now,
-            reviewed_by_user_id=reviewed_by_user_id,
-        )
+        swipe = self.get_asset(org_id=org_id, swipe_id=swipe_id)
+        if swipe is None:
+            return None
+        swipe.review_status = review_status
+        if review_status == REVIEW_STATUS_PENDING:
+            swipe.reviewed_at = None
+            swipe.reviewed_by_user_id = None
+        else:
+            swipe.reviewed_at = datetime.now(timezone.utc)
+            swipe.reviewed_by_user_id = reviewed_by_user_id
+        self.session.flush()
+        return swipe
 
     def approve_asset(
         self,
@@ -171,6 +182,15 @@ class CompanySwipesRepository:
         self.session.add(media)
         self.session.flush()
         return media
+
+    def delete_media_for_asset(self, *, org_id: str, swipe_asset_id: str) -> None:
+        stmt = select(CompanySwipeMedia).where(
+            CompanySwipeMedia.org_id == org_id,
+            CompanySwipeMedia.swipe_asset_id == swipe_asset_id,
+        )
+        for media in self.session.scalars(stmt).all():
+            self.session.delete(media)
+        self.session.flush()
 
     def list_brands(self, org_id: str) -> list[CompanySwipeBrand]:
         stmt = select(CompanySwipeBrand).where(CompanySwipeBrand.org_id == org_id)
@@ -241,6 +261,129 @@ class CompanySwipesRepository:
             grouped[str(media.swipe_asset_id)].append(media)
         return dict(grouped)
 
+    def list_assets_with_review_filters(
+        self,
+        *,
+        org_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        collection_id: str | None = None,
+        review_status: str | None = None,
+        origin_system: str | None = None,
+        search: str | None = None,
+        changed_since_days: int | None = None,
+        not_in_writable_collections: bool = False,
+        exclude_gethookd: bool = False,
+    ) -> list[CompanySwipeAsset]:
+        stmt = select(CompanySwipeAsset).where(CompanySwipeAsset.org_id == org_id)
+
+        if collection_id:
+            stmt = stmt.join(
+                SwipeCollectionItem,
+                SwipeCollectionItem.swipe_asset_id == CompanySwipeAsset.id,
+            ).where(
+                SwipeCollectionItem.org_id == org_id,
+                SwipeCollectionItem.collection_id == collection_id,
+            )
+
+        if review_status is not None:
+            stmt = stmt.where(CompanySwipeAsset.review_status == review_status)
+
+        if origin_system is not None:
+            stmt = stmt.where(CompanySwipeAsset.origin_system == origin_system)
+
+        if search:
+            search_like = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    CompanySwipeAsset.title.ilike(search_like),
+                    CompanySwipeAsset.body.ilike(search_like),
+                    CompanySwipeAsset.external_ad_id.ilike(search_like),
+                )
+            )
+
+        if changed_since_days is not None and changed_since_days > 0:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=changed_since_days)
+            stmt = stmt.where(
+                or_(
+                    CompanySwipeAsset.source_last_synced_at >= cutoff,
+                    CompanySwipeAsset.source_content_changed_at >= cutoff,
+                )
+            )
+
+        if not_in_writable_collections:
+            stmt = stmt.where(
+                ~CompanySwipeAsset.id.in_(
+                    select(SwipeCollectionItem.swipe_asset_id)
+                    .join(SwipeCollection, SwipeCollection.id == SwipeCollectionItem.collection_id)
+                    .where(
+                        SwipeCollectionItem.org_id == org_id,
+                        SwipeCollection.kind.in_(tuple(WRITABLE_SWIPE_COLLECTION_KINDS)),
+                    )
+                )
+            )
+
+        if exclude_gethookd:
+            stmt = stmt.where(CompanySwipeAsset.origin_system != GETHOOKD_ORIGIN_SYSTEM)
+
+        stmt = stmt.order_by(CompanySwipeAsset.created_at.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(stmt).all())
+
+    def get_gethookd_inbox_assets(
+        self,
+        *,
+        org_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        review_status: str | None = None,
+    ) -> list[CompanySwipeAsset]:
+        stmt = select(CompanySwipeAsset).where(
+            CompanySwipeAsset.org_id == org_id,
+            CompanySwipeAsset.origin_system == GETHOOKD_ORIGIN_SYSTEM,
+        )
+        if review_status is not None:
+            stmt = stmt.where(CompanySwipeAsset.review_status == review_status)
+        stmt = stmt.order_by(CompanySwipeAsset.created_at.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(stmt).all())
+
+    def approve_swipe(
+        self,
+        *,
+        org_id: str,
+        swipe_id: str,
+        reviewed_by_user_id: str | None = None,
+    ) -> CompanySwipeAsset | None:
+        return self.approve_asset(
+            org_id=org_id,
+            swipe_id=swipe_id,
+            reviewed_by_user_id=reviewed_by_user_id,
+        )
+
+    def reject_swipe(
+        self,
+        *,
+        org_id: str,
+        swipe_id: str,
+        reviewed_by_user_id: str | None = None,
+    ) -> CompanySwipeAsset | None:
+        return self.reject_asset(
+            org_id=org_id,
+            swipe_id=swipe_id,
+            reviewed_by_user_id=reviewed_by_user_id,
+        )
+
+    def mark_swipe_pending(
+        self,
+        *,
+        org_id: str,
+        swipe_id: str,
+        reviewed_by_user_id: str | None = None,
+    ) -> CompanySwipeAsset | None:
+        return self.mark_pending(
+            org_id=org_id,
+            swipe_id=swipe_id,
+        )
+
 
 class SwipeCollectionsRepository:
     def __init__(self, session: Session) -> None:
@@ -264,6 +407,7 @@ class SwipeCollectionsRepository:
                 select(CompanySwipeAsset.id).where(
                     CompanySwipeAsset.org_id == org_id,
                     CompanySwipeAsset.source_kind != "upload",
+                    # Exclude GetHookd assets from default collection
                     CompanySwipeAsset.origin_system != GETHOOKD_ORIGIN_SYSTEM,
                 )
             ).all()
@@ -291,48 +435,6 @@ class SwipeCollectionsRepository:
         self.session.commit()
         self.session.refresh(collection)
         return collection
-
-    def ensure_gethookd_collection(self, *, org_id: str) -> SwipeCollection:
-        """Ensure the system-managed GetHookd inbox collection exists."""
-        collection = self.get_by_kind(org_id=org_id, kind=GETHOOKD_INBOX_KIND)
-        if collection is None:
-            collection = SwipeCollection(
-                org_id=org_id,
-                name=GETHOOKD_INBOX_NAME,
-                kind=GETHOOKD_INBOX_KIND,
-            )
-            self.session.add(collection)
-            self.session.flush()
-            self.session.commit()
-            self.session.refresh(collection)
-        return collection
-
-    def add_item_if_missing(
-        self,
-        *,
-        org_id: str,
-        collection_id: str,
-        swipe_asset_id: str,
-    ) -> bool:
-        """Add a single asset to a collection if not already present."""
-        existing = self.session.scalar(
-            select(SwipeCollectionItem).where(
-                SwipeCollectionItem.org_id == org_id,
-                SwipeCollectionItem.collection_id == collection_id,
-                SwipeCollectionItem.swipe_asset_id == swipe_asset_id,
-            )
-        )
-        if existing:
-            return False
-        self.session.add(
-            SwipeCollectionItem(
-                org_id=org_id,
-                collection_id=collection_id,
-                swipe_asset_id=swipe_asset_id,
-            )
-        )
-        self.session.commit()
-        return True
 
     def list(self, *, org_id: str) -> list[SwipeCollection]:
         self.ensure_default_collection(org_id=org_id)
@@ -362,6 +464,45 @@ class SwipeCollectionsRepository:
             SwipeCollection.kind == kind,
         )
         return self.session.scalars(stmt).first()
+
+    def ensure_gethookd_collection(self, *, org_id: str) -> SwipeCollection:
+        """Ensure the system-managed GetHookd inbox collection exists."""
+        collection = self.get_by_kind(org_id=org_id, kind=GETHOOKD_INBOX_KIND)
+        if collection is None:
+            collection = SwipeCollection(
+                org_id=org_id,
+                name=GETHOOKD_INBOX_NAME,
+                kind=GETHOOKD_INBOX_KIND,
+            )
+            self.session.add(collection)
+            self.session.flush()
+        return collection
+
+    def add_item_if_missing(
+        self,
+        *,
+        org_id: str,
+        collection_id: str,
+        swipe_asset_id: str,
+    ) -> bool:
+        """Add an item to a collection if not already present."""
+        existing = self.session.scalar(
+            select(SwipeCollectionItem).where(
+                SwipeCollectionItem.org_id == org_id,
+                SwipeCollectionItem.collection_id == collection_id,
+                SwipeCollectionItem.swipe_asset_id == swipe_asset_id,
+            )
+        )
+        if existing is not None:
+            return False
+        item = SwipeCollectionItem(
+            org_id=org_id,
+            collection_id=collection_id,
+            swipe_asset_id=swipe_asset_id,
+        )
+        self.session.add(item)
+        self.session.flush()
+        return True
 
     def create(
         self,
@@ -425,7 +566,23 @@ class SwipeCollectionsRepository:
         self.session.refresh(cloned)
         return cloned
 
-    def add_items(self, *, org_id: str, collection_id: str, swipe_asset_ids: list[str]) -> None:
+    def add_items(
+        self,
+        *,
+        org_id: str,
+        collection_id: str,
+        swipe_asset_ids: list[str],
+        mark_approved: bool = False,
+        reviewed_by_user_id: str | None = None,
+    ) -> None:
+        """Add items to a collection.
+
+        Args:
+            org_id: Organization ID
+            collection_id: Collection ID
+            swipe_asset_ids: List of swipe asset IDs to add
+            mark_approved: If True, mark GetHookd assets as approved when adding to collection
+        """
         existing = {
             str(asset_id)
             for asset_id in self.session.scalars(
@@ -436,6 +593,19 @@ class SwipeCollectionsRepository:
                 )
             ).all()
         }
+
+        # Get swipe assets to update (for clearing stale status)
+        assets_to_update = list(
+            self.session.scalars(
+                select(CompanySwipeAsset).where(
+                    CompanySwipeAsset.org_id == org_id,
+                    CompanySwipeAsset.id.in_(swipe_asset_ids),
+                    CompanySwipeAsset.origin_system == GETHOOKD_ORIGIN_SYSTEM,
+                )
+            ).all()
+        )
+
+        now = datetime.now(timezone.utc)
         for swipe_asset_id in swipe_asset_ids:
             if swipe_asset_id in existing:
                 continue
@@ -446,6 +616,18 @@ class SwipeCollectionsRepository:
                     swipe_asset_id=swipe_asset_id,
                 )
             )
+
+            # Clear stale status when adding to a writable collection
+            for asset in assets_to_update:
+                if str(asset.id) == swipe_asset_id:
+                    asset.source_last_synced_at = now
+                    if mark_approved:
+                        asset.review_status = GETHOOKD_REVIEW_STATUS_APPROVED
+                        asset.reviewed_at = now
+                        asset.reviewed_by_user_id = reviewed_by_user_id
+                        asset.source_content_changed_at = None
+                    break
+
         self.session.commit()
 
     def remove_item(self, *, org_id: str, collection_id: str, swipe_asset_id: str) -> bool:

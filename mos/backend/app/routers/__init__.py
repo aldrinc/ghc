@@ -28,6 +28,7 @@ from app.routers import (
     meta_ads,
     paid_ads_qa,
     storefront_templates,
+    gethookd,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "meta_ads",
     "paid_ads_qa",
     "storefront_templates",
+    "gethookd",
 ]

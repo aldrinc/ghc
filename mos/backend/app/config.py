@@ -212,6 +212,15 @@ class Settings(BaseSettings):
     FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_HEARTBEAT_TIMEOUT_MINUTES: int = 30
     FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_MAX_ATTEMPTS: int = 2
 
+    # GetHookd sync configuration
+    GETHOOKD_API_BASE_URL: str = "https://app.gethookd.ai/api/v1"
+    GETHOOKD_API_KEY: str | None = None
+    GETHOOKD_TIMEOUT_SECONDS: float = 30.0
+    GETHOOKD_EXPLORE_PAGE_SIZE: int = 100
+    GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 5
+    GETHOOKD_SYNC_SCHEDULE_ID: str = "gethookd-nightly-sync"
+    GETHOOKD_SYNC_SCHEDULE_CRON: str = "0 3 * * *"
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:

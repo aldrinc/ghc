@@ -19,11 +19,15 @@ from app.config import settings
 from app.db.deps import get_session
 from app.db.models import Campaign, SwipeCollectionItem, WorkflowRun
 from app.db.repositories.swipes import (
+    GETHOOKD_INBOX_COLLECTION_KIND,
+    GETHOOKD_ORIGIN_SYSTEM,
+    GETHOOKD_REVIEW_STATUS_PENDING,
     WRITABLE_SWIPE_COLLECTION_KINDS,
     CompanySwipesRepository,
     ClientSwipesRepository,
     SwipeCollectionsRepository,
 )
+from app.schemas.gethookd import SwipeReviewBulkRequest
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.swipe_assets import (
     ClientSwipeAssetModel,
@@ -42,7 +46,11 @@ from app.schemas.swipe_image_ads import (
     SwipeTemplateTestimonialsGenerateRequest,
     SwipeTemplateTestimonialsGenerateResponse,
 )
-from app.services.media_storage import IMMUTABLE_CACHE_CONTROL, MediaStorage, MediaStorageConfigurationError
+from app.services.media_storage import (
+    IMMUTABLE_CACHE_CONTROL,
+    MediaStorage,
+    MediaStorageConfigurationError,
+)
 from app.services.funnels import create_funnel_upload_asset
 from app.services.meta_review import clean_optional_text, load_campaign_asset_brief_map
 from app.temporal.client import get_temporal_client
@@ -98,7 +106,9 @@ def _infer_swipe_placement_shape(width: int, height: int) -> str | None:
     return best_key
 
 
-def _store_swipe_upload_media(*, content_bytes: bytes, filename: str | None, content_type: str) -> _StoredSwipeUpload:
+def _store_swipe_upload_media(
+    *, content_bytes: bytes, filename: str | None, content_type: str
+) -> _StoredSwipeUpload:
     try:
         storage = MediaStorage()
     except MediaStorageConfigurationError as exc:
@@ -119,7 +129,9 @@ def _store_swipe_upload_media(*, content_bytes: bytes, filename: str | None, con
         with Image.open(io.BytesIO(content_bytes)) as image:
             width, height = image.size
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded swipe image is invalid.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded swipe image is invalid."
+        ) from exc
     return _StoredSwipeUpload(
         storage_key=key,
         mime_type=content_type,
@@ -152,6 +164,9 @@ def _serialize_media(media) -> CompanySwipeMediaModel:
         "id": str(media.id),
         "org_id": str(media.org_id),
         "swipe_asset_id": str(media.swipe_asset_id),
+        "media_asset_id": str(media.media_asset_id)
+        if getattr(media, "media_asset_id", None)
+        else None,
         "external_media_id": media.external_media_id,
         "path": media.path,
         "url": access_url,
@@ -185,6 +200,11 @@ def _serialize_asset(asset, media_map: dict[str, list]) -> CompanySwipeAssetMode
         "landing_page": asset.landing_page,
         "link_description": asset.link_description,
         "ad_source_link": asset.ad_source_link,
+        "share_url": asset.share_url,
+        "days_active": asset.days_active,
+        "used_count": asset.used_count,
+        "performance_score": asset.performance_score,
+        "performance_score_data": asset.performance_score_data,
         "analysis_status": asset.analysis_status,
         "analysis_error": asset.analysis_error,
         "analysis_model": asset.analysis_model,
@@ -201,19 +221,34 @@ def _serialize_asset(asset, media_map: dict[str, list]) -> CompanySwipeAssetMode
         "proof_type": asset.proof_type,
         "claim_risk": asset.claim_risk,
         "product_image_policy": asset.product_image_policy,
+        "review_status": asset.review_status,
+        "reviewed_at": asset.reviewed_at,
+        "reviewed_by_user_id": asset.reviewed_by_user_id,
+        "source_first_seen_at": asset.source_first_seen_at,
+        "source_last_seen_at": asset.source_last_seen_at,
+        "source_last_synced_at": asset.source_last_synced_at,
+        "source_payload_hash": asset.source_payload_hash,
+        "source_content_changed_at": asset.source_content_changed_at,
+        "source_metadata_json": asset.source_metadata_json,
+        "created_at": asset.created_at,
+        "updated_at": asset.updated_at,
         "media": [_serialize_media(item) for item in media_map.get(str(asset.id), [])],
     }
     return CompanySwipeAssetModel.model_validate(payload)
 
 
-def _serialize_collection(*, collection, item_count: int, analysis_counts: dict[str, int]) -> SwipeCollectionModel:
+def _serialize_collection(
+    *, collection, item_count: int, analysis_counts: dict[str, int]
+) -> SwipeCollectionModel:
     payload = {
         "id": str(collection.id),
         "org_id": str(collection.org_id),
         "name": collection.name,
         "kind": collection.kind,
         "cloned_from_collection_id": (
-            str(collection.cloned_from_collection_id) if collection.cloned_from_collection_id else None
+            str(collection.cloned_from_collection_id)
+            if collection.cloned_from_collection_id
+            else None
         ),
         "created_by_user_id": collection.created_by_user_id,
         "created_at": collection.created_at,
@@ -401,12 +436,43 @@ async def _start_swipe_image_ad_run(
 
 @router.get("/company")
 def list_company_swipes(
+    collection_id: str | None = None,
+    source: str | None = None,
+    review_status: str | None = None,
+    search: str | None = None,
+    changed_since: str | None = None,
+    not_in_launch_collection: bool = False,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> list[dict]:
     repo = CompanySwipesRepository(session)
-    assets = repo.list_assets(org_id=auth.org_id, limit=500, offset=0)
-    media_map = repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets])
+    changed_since_days: int | None = None
+    if changed_since == "last_7_days":
+        changed_since_days = 7
+    elif changed_since == "last_sync":
+        changed_since_days = 1
+
+    normalized_review_status = review_status if review_status not in {None, "all"} else None
+    if normalized_review_status == "stale":
+        normalized_review_status = "stale_after_sync"
+    if normalized_review_status == "pending":
+        normalized_review_status = "pending_review"
+
+    origin_system = GETHOOKD_ORIGIN_SYSTEM if source == "gethookd" else None
+    assets = repo.list_assets_with_review_filters(
+        org_id=auth.org_id,
+        limit=500,
+        offset=0,
+        collection_id=collection_id,
+        review_status=normalized_review_status,
+        origin_system=origin_system,
+        search=search,
+        changed_since_days=changed_since_days,
+        not_in_writable_collections=bool(not_in_launch_collection),
+    )
+    media_map = repo.list_media_for_assets(
+        org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets]
+    )
     return jsonable_encoder([_serialize_asset(asset, media_map) for asset in assets])
 
 
@@ -433,7 +499,9 @@ def list_swipe_collections(
             _serialize_collection(
                 collection=collection,
                 item_count=item_counts.get(str(collection.id), 0),
-                analysis_counts=repo.analysis_counts(org_id=auth.org_id, collection_id=str(collection.id)),
+                analysis_counts=repo.analysis_counts(
+                    org_id=auth.org_id, collection_id=str(collection.id)
+                ),
             )
             for collection in collections
         ]
@@ -469,7 +537,9 @@ def get_swipe_collection(
     collections_repo = SwipeCollectionsRepository(session)
     collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     if collection is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
     company_repo = CompanySwipesRepository(session)
     assets = company_repo.list_assets(
         org_id=auth.org_id,
@@ -477,15 +547,23 @@ def get_swipe_collection(
         offset=offset,
         collection_id=collection_id,
     )
-    media_map = company_repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets])
+    media_map = company_repo.list_media_for_assets(
+        org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets]
+    )
     detail = SwipeCollectionDetailModel.model_validate(
         {
             **_serialize_collection(
                 collection=collection,
-                item_count=collections_repo.item_count(org_id=auth.org_id, collection_id=collection_id),
-                analysis_counts=collections_repo.analysis_counts(org_id=auth.org_id, collection_id=collection_id),
+                item_count=collections_repo.item_count(
+                    org_id=auth.org_id, collection_id=collection_id
+                ),
+                analysis_counts=collections_repo.analysis_counts(
+                    org_id=auth.org_id, collection_id=collection_id
+                ),
             ).model_dump(mode="json"),
-            "swipes": [_serialize_asset(asset, media_map).model_dump(mode="json") for asset in assets],
+            "swipes": [
+                _serialize_asset(asset, media_map).model_dump(mode="json") for asset in assets
+            ],
         }
     )
     return jsonable_encoder(detail)
@@ -508,13 +586,17 @@ def clone_swipe_collection(
         )
     except ValueError as exc:
         detail = str(exc)
-        status_code = status.HTTP_404_NOT_FOUND if "not found" in detail.lower() else status.HTTP_409_CONFLICT
+        status_code = (
+            status.HTTP_404_NOT_FOUND if "not found" in detail.lower() else status.HTTP_409_CONFLICT
+        )
         raise HTTPException(status_code=status_code, detail=detail) from exc
     return jsonable_encoder(
         _serialize_collection(
             collection=collection,
             item_count=repo.item_count(org_id=auth.org_id, collection_id=str(collection.id)),
-            analysis_counts=repo.analysis_counts(org_id=auth.org_id, collection_id=str(collection.id)),
+            analysis_counts=repo.analysis_counts(
+                org_id=auth.org_id, collection_id=str(collection.id)
+            ),
         )
     )
 
@@ -529,7 +611,9 @@ def add_swipes_to_collection(
     collections_repo = SwipeCollectionsRepository(session)
     collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     if collection is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
     if collection.kind not in WRITABLE_SWIPE_COLLECTION_KINDS:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -544,19 +628,26 @@ def add_swipes_to_collection(
     if missing_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": "Some swipe assets were not found.", "missingSwipeAssetIds": missing_ids},
+            detail={
+                "message": "Some swipe assets were not found.",
+                "missingSwipeAssetIds": missing_ids,
+            },
         )
     collections_repo.add_items(
         org_id=auth.org_id,
         collection_id=collection_id,
         swipe_asset_ids=payload.swipe_asset_ids,
+        mark_approved=True,
+        reviewed_by_user_id=auth.user_id,
     )
     refreshed = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     return jsonable_encoder(
         _serialize_collection(
             collection=refreshed,
             item_count=collections_repo.item_count(org_id=auth.org_id, collection_id=collection_id),
-            analysis_counts=collections_repo.analysis_counts(org_id=auth.org_id, collection_id=collection_id),
+            analysis_counts=collections_repo.analysis_counts(
+                org_id=auth.org_id, collection_id=collection_id
+            ),
         )
     )
 
@@ -571,7 +662,9 @@ def remove_swipe_from_collection(
     collections_repo = SwipeCollectionsRepository(session)
     collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     if collection is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
     if collection.kind not in WRITABLE_SWIPE_COLLECTION_KINDS:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -583,13 +676,17 @@ def remove_swipe_from_collection(
         swipe_asset_id=swipe_asset_id,
     )
     if not removed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe asset is not in this collection")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe asset is not in this collection"
+        )
     refreshed = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     return jsonable_encoder(
         _serialize_collection(
             collection=refreshed,
             item_count=collections_repo.item_count(org_id=auth.org_id, collection_id=collection_id),
-            analysis_counts=collections_repo.analysis_counts(org_id=auth.org_id, collection_id=collection_id),
+            analysis_counts=collections_repo.analysis_counts(
+                org_id=auth.org_id, collection_id=collection_id
+            ),
         )
     )
 
@@ -602,7 +699,9 @@ async def upload_swipes_to_collection(
     session: Session = Depends(get_session),
 ) -> dict:
     if not files:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one file is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="At least one file is required."
+        )
     if not str(settings.SWIPE_TAXONOMY_MODEL or "").strip():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -612,7 +711,9 @@ async def upload_swipes_to_collection(
     collections_repo = SwipeCollectionsRepository(session)
     collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
     if collection is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
     if collection.kind not in WRITABLE_SWIPE_COLLECTION_KINDS:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -693,9 +794,14 @@ async def upload_swipes_to_collection(
             )
             session.commit()
 
-    assets = [company_repo.get_asset(org_id=auth.org_id, swipe_id=swipe_asset_id) for swipe_asset_id in created_asset_ids]
+    assets = [
+        company_repo.get_asset(org_id=auth.org_id, swipe_id=swipe_asset_id)
+        for swipe_asset_id in created_asset_ids
+    ]
     serialized_assets = []
-    media_map = company_repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=created_asset_ids)
+    media_map = company_repo.list_media_for_assets(
+        org_id=auth.org_id, swipe_asset_ids=created_asset_ids
+    )
     for asset in assets:
         if asset is None:
             continue
@@ -720,7 +826,9 @@ def list_swipes(
     if collection_id:
         collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
         if collection is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+            )
     company_repo = CompanySwipesRepository(session)
     assets = company_repo.list_assets(
         org_id=auth.org_id,
@@ -728,7 +836,9 @@ def list_swipes(
         offset=offset,
         collection_id=collection_id,
     )
-    media_map = company_repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets])
+    media_map = company_repo.list_media_for_assets(
+        org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets]
+    )
     return jsonable_encoder([_serialize_asset(asset, media_map) for asset in assets])
 
 
@@ -894,3 +1004,167 @@ def update_swipe(
     session.commit()
     media_map = repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[swipe_id])
     return jsonable_encoder(_serialize_asset(asset, media_map))
+
+
+# === GetHookd review endpoints ===
+
+
+@router.get("/gethookd/inbox")
+def get_gethookd_inbox(
+    limit: int = 50,
+    offset: int = 0,
+    review_status: str | None = None,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """Get GetHookd inbox assets (origin_system = 'gethookd')."""
+    repo = CompanySwipesRepository(session)
+    normalized_review_status = review_status
+    if normalized_review_status == "pending":
+        normalized_review_status = GETHOOKD_REVIEW_STATUS_PENDING
+    elif normalized_review_status == "stale":
+        normalized_review_status = "stale_after_sync"
+    assets = repo.get_gethookd_inbox_assets(
+        org_id=auth.org_id,
+        limit=limit,
+        offset=offset,
+        review_status=normalized_review_status,
+    )
+    media_map = repo.list_media_for_assets(
+        org_id=auth.org_id,
+        swipe_asset_ids=[str(asset.id) for asset in assets],
+    )
+    return jsonable_encoder([_serialize_asset(asset, media_map) for asset in assets])
+
+
+@router.post("/gethookd/{swipe_id}/approve")
+def approve_swipe(
+    swipe_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Approve a swipe asset from GetHookd inbox."""
+    repo = CompanySwipesRepository(session)
+    asset = repo.approve_swipe(
+        org_id=auth.org_id,
+        swipe_id=swipe_id,
+        reviewed_by_user_id=auth.user_id,
+    )
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe asset not found")
+    session.commit()
+    media_map = repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[swipe_id])
+    return jsonable_encoder(_serialize_asset(asset, media_map))
+
+
+@router.post("/gethookd/{swipe_id}/reject")
+def reject_swipe(
+    swipe_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Reject a swipe asset from GetHookd inbox."""
+    repo = CompanySwipesRepository(session)
+    asset = repo.reject_swipe(
+        org_id=auth.org_id,
+        swipe_id=swipe_id,
+        reviewed_by_user_id=auth.user_id,
+    )
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe asset not found")
+    session.commit()
+    media_map = repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[swipe_id])
+    return jsonable_encoder(_serialize_asset(asset, media_map))
+
+
+@router.post("/gethookd/{swipe_id}/mark-pending")
+def mark_swipe_pending(
+    swipe_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Mark a swipe asset as pending review."""
+    repo = CompanySwipesRepository(session)
+    asset = repo.mark_swipe_pending(
+        org_id=auth.org_id,
+        swipe_id=swipe_id,
+        reviewed_by_user_id=auth.user_id,
+    )
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Swipe asset not found")
+    session.commit()
+    media_map = repo.list_media_for_assets(org_id=auth.org_id, swipe_asset_ids=[swipe_id])
+    return jsonable_encoder(_serialize_asset(asset, media_map))
+
+
+def _require_writable_collection(*, auth: AuthContext, session: Session, collection_id: str):
+    collection = SwipeCollectionsRepository(session).get(
+        org_id=auth.org_id, collection_id=collection_id
+    )
+    if collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
+    if collection.kind not in WRITABLE_SWIPE_COLLECTION_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only curated or uploaded collections can receive reviewed swipes.",
+        )
+    return collection
+
+
+@router.post("/review/approve")
+def approve_swipes_for_review(
+    payload: SwipeReviewBulkRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    if not payload.collection_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="collectionId is required."
+        )
+    collection = _require_writable_collection(
+        auth=auth, session=session, collection_id=payload.collection_id
+    )
+    SwipeCollectionsRepository(session).add_items(
+        org_id=auth.org_id,
+        collection_id=str(collection.id),
+        swipe_asset_ids=payload.swipe_asset_ids,
+        mark_approved=True,
+        reviewed_by_user_id=auth.user_id,
+    )
+    return {"approvedCount": len(payload.swipe_asset_ids), "collectionId": str(collection.id)}
+
+
+@router.post("/review/reject")
+def reject_swipes_for_review(
+    payload: SwipeReviewBulkRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    repo = CompanySwipesRepository(session)
+    updated = 0
+    for swipe_id in payload.swipe_asset_ids:
+        asset = repo.reject_swipe(
+            org_id=auth.org_id, swipe_id=swipe_id, reviewed_by_user_id=auth.user_id
+        )
+        if asset is not None:
+            updated += 1
+    session.commit()
+    return {"rejectedCount": updated}
+
+
+@router.post("/review/mark-pending")
+def mark_swipes_pending_for_review(
+    payload: SwipeReviewBulkRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    repo = CompanySwipesRepository(session)
+    updated = 0
+    for swipe_id in payload.swipe_asset_ids:
+        asset = repo.mark_swipe_pending(org_id=auth.org_id, swipe_id=swipe_id)
+        if asset is not None:
+            updated += 1
+    session.commit()
+    return {"pendingCount": updated}

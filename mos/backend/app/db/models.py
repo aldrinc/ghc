@@ -1558,10 +1558,12 @@ class CompanySwipeAsset(Base):
         sa.Index("idx_company_swipe_assets_org_analysis_status", "org_id", "analysis_status"),
         sa.Index("idx_company_swipe_assets_review_status", "review_status"),
         sa.Index(
-            "idx_company_swipe_assets_origin_system_external_ad",
+            "uq_company_swipe_assets_org_origin_external_ad",
             "org_id",
             "origin_system",
             "external_ad_id",
+            unique=True,
+            postgresql_where=sa.text("external_ad_id IS NOT NULL"),
         ),
     )
 
@@ -1649,9 +1651,7 @@ class CompanySwipeAsset(Base):
     # GetHookd sync review fields
     review_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    reviewed_by_user_id: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    reviewed_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_first_seen_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -1678,9 +1678,10 @@ class CompanySwipeMedia(Base):
     __tablename__ = "company_swipe_media"
     __table_args__ = (
         sa.Index(
-            "idx_company_swipe_media_swipe_asset_media_asset",
+            "uq_company_swipe_media_swipe_asset_media_asset",
             "swipe_asset_id",
             "media_asset_id",
+            unique=True,
             postgresql_where=sa.text("media_asset_id IS NOT NULL"),
         ),
     )
@@ -3820,3 +3821,87 @@ class AdTeardownAssertionEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# === GetHookd sync backend models ===
+
+GETHOOKD_ORIGIN_SYSTEM = "gethookd_public_api"
+
+
+class ClientGetHookdCredentials(Base):
+    __tablename__ = "client_gethookd_credentials"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_gethookd_credentials_org_client"),
+        sa.Index("idx_gethookd_credentials_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    credentials_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ClientGetHookdSyncFeed(Base):
+    __tablename__ = "client_gethookd_sync_feeds"
+    __table_args__ = (
+        sa.Index("idx_gethookd_sync_feeds_org_client", "org_id", "client_id"),
+        sa.Index("idx_gethookd_sync_feeds_org_client_enabled", "org_id", "client_id", "enabled"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    filters_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    max_pages_per_run: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    per_page: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class GetHookdSyncRun(Base):
+    __tablename__ = "gethookd_sync_runs"
+    __table_args__ = (
+        sa.Index("idx_gethookd_sync_runs_org_client", "org_id", "client_id"),
+        sa.Index("idx_gethookd_sync_runs_started_at", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    feeds_attempted: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    feeds_succeeded: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_new: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_updated: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_marked_stale: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    assets_failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    credits_used: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    error_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
