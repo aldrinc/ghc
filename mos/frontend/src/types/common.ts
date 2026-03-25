@@ -16,7 +16,41 @@ export interface Campaign {
   name: string;
   channels?: string[];
   asset_brief_types?: AssetBriefType[];
+  default_swipe_collection_id?: string | null;
 }
+
+export interface CampaignSwipeDefault {
+  swipeCollectionId: string | null;
+  swipeCollectionName: string | null;
+  readySwipeCount: number;
+}
+
+export interface GetHookdCredentials {
+  hasCredentials: boolean;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+}
+
+export interface GetHookdSyncFeed {
+  id: string;
+  name: string;
+  enabled: boolean;
+  filters: Record<string, any>;
+  maxPagesPerRun: number;
+  perPage: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetHookdSyncFeedInput {
+  name: string;
+  enabled?: boolean;
+  filters: Record<string, any>;
+  maxPagesPerRun?: number;
+  perPage?: number;
+}
+
+export interface GetHookdSyncFeedUpdateInput extends Partial<GetHookdSyncFeedInput> {}
 
 export interface WorkflowRun {
   id: string;
@@ -72,35 +106,6 @@ export interface StrategyV2LaunchRecord {
   created_by_user?: string | null;
   created_at: string;
 }
-
-// GetHookd sync types
-export interface GetHookdCredentials {
-  isConfigured: boolean;
-  hasToken: boolean;
-  updatedAt?: string | null;
-}
-
-export interface GetHookdSyncFeed {
-  id: string;
-  clientId: string;
-  name: string;
-  sourceUrl: string;
-  webhookPath: string;
-  isActive: boolean;
-  lastSyncAt?: string | null;
-  lastSyncStatus?: "success" | "error" | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type GetHookdSyncFeedInput = {
-  name: string;
-  sourceUrl: string;
-  webhookPath: string;
-  isActive?: boolean;
-};
-
-export type GetHookdSyncFeedUpdateInput = Partial<GetHookdSyncFeedInput>;
 
 export interface ActivityLog {
   id: string;

@@ -26,6 +26,7 @@ class CompanySwipeMediaModel(BaseModel):
     id: str
     org_id: str
     swipe_asset_id: str
+    media_asset_id: str | None = None
     external_media_id: str | None = None
     path: str | None = None
     url: str | None = None
@@ -58,6 +59,11 @@ class CompanySwipeAssetModel(BaseModel):
     landing_page: str | None = None
     link_description: str | None = None
     ad_source_link: str | None = None
+    share_url: str | None = None
+    days_active: int | None = None
+    used_count: int | None = None
+    performance_score: int | None = None
+    performance_score_data: dict | None = None
     analysis_status: str
     analysis_error: str | None = None
     analysis_model: str | None = None
@@ -74,6 +80,17 @@ class CompanySwipeAssetModel(BaseModel):
     proof_type: str | None = None
     claim_risk: str | None = None
     product_image_policy: str | None = None
+    review_status: str | None = None
+    reviewed_at: datetime | None = None
+    reviewed_by_user_id: str | None = None
+    source_first_seen_at: datetime | None = None
+    source_last_seen_at: datetime | None = None
+    source_last_synced_at: datetime | None = None
+    source_payload_hash: str | None = None
+    source_content_changed_at: datetime | None = None
+    source_metadata_json: dict | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     media: list[CompanySwipeMediaModel] = Field(default_factory=list)
 
 
@@ -241,7 +258,10 @@ class SwipeAssetUpdateRequest(BaseModel):
         | None
     ) = None
     product_presence: (
-        Literal["hero_product", "in_use_product", "contextual_product", "packaging_only", "no_product"] | None
+        Literal[
+            "hero_product", "in_use_product", "contextual_product", "packaging_only", "no_product"
+        ]
+        | None
     ) = None
     proof_type: (
         Literal[
@@ -259,7 +279,9 @@ class SwipeAssetUpdateRequest(BaseModel):
         | None
     ) = None
     claim_risk: Literal["low", "medium", "high", "regulated"] | None = None
-    product_image_policy: Literal["requires_product_image", "no_product_image", "either"] | None = None
+    product_image_policy: Literal["requires_product_image", "no_product_image", "either"] | None = (
+        None
+    )
 
 
 class SwipeCollectionUploadResponse(BaseModel):
@@ -338,7 +360,10 @@ class SwipeTaxonomyGeminiOutput(BaseModel):
         | None
     ) = None
     product_presence: (
-        Literal["hero_product", "in_use_product", "contextual_product", "packaging_only", "no_product"] | None
+        Literal[
+            "hero_product", "in_use_product", "contextual_product", "packaging_only", "no_product"
+        ]
+        | None
     ) = None
     proof_type: (
         Literal[
@@ -356,4 +381,6 @@ class SwipeTaxonomyGeminiOutput(BaseModel):
         | None
     ) = None
     claim_risk: Literal["low", "medium", "high", "regulated"] | None = None
-    product_image_policy: Literal["requires_product_image", "no_product_image", "either"] | None = None
+    product_image_policy: Literal["requires_product_image", "no_product_image", "either"] | None = (
+        None
+    )

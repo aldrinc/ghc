@@ -42,6 +42,7 @@ from app.routers import (
     deploy,
     paid_ads_qa,
     storefront_templates,
+    gethookd,
     sites,
 )
 
@@ -171,6 +172,7 @@ def create_app() -> FastAPI:
     app.include_router(gemini.router)
     app.include_router(deploy.router)
     app.include_router(storefront_templates.router)
+    app.include_router(gethookd.router)
     app.include_router(sites.router)
 
     return app

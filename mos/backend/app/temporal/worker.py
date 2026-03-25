@@ -32,6 +32,7 @@ from app.temporal.workflows.strategy_v2_launch import (
     StrategyV2AngleCampaignLaunchWorkflow,
     StrategyV2AngleIterationWorkflow,
 )
+from app.temporal.workflows.gethookd_nightly_sync import GetHookdNightlySyncWorkflow
 from app.temporal.activities import placeholders as placeholder_activities
 from app.temporal.activities.client_onboarding_activities import (
     build_client_canon_activity,
@@ -130,6 +131,9 @@ from app.temporal.activities.strategy_v2_launch_activities import (
     create_strategy_v2_launch_artifacts_activity,
     persist_strategy_v2_launch_record_activity,
 )
+from app.temporal.activities.gethookd_sync_activities import (
+    gethookd_sync_workspace_activity,
+)
 
 
 async def main() -> None:
@@ -158,6 +162,7 @@ async def main() -> None:
             StrategyV2Workflow,
             StrategyV2AngleCampaignLaunchWorkflow,
             StrategyV2AngleIterationWorkflow,
+            GetHookdNightlySyncWorkflow,
         ]
         primary_activities = [
             placeholder_activities.noop_activity,
@@ -233,6 +238,7 @@ async def main() -> None:
             mark_strategy_v2_failed_activity,
             create_strategy_v2_launch_artifacts_activity,
             persist_strategy_v2_launch_record_activity,
+            gethookd_sync_workspace_activity,
         ]
 
         with (

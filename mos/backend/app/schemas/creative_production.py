@@ -11,8 +11,8 @@ class CreativeProductionRequest(BaseModel):
         validation_alias="assetBriefIds",
         serialization_alias="assetBriefIds",
     )
-    swipe_collection_id: str = Field(
-        ...,
+    swipe_collection_id: str | None = Field(
+        default=None,
         validation_alias="swipeCollectionId",
         serialization_alias="swipeCollectionId",
     )
@@ -41,8 +41,10 @@ class CreativeProductionRequest(BaseModel):
 
     @field_validator("swipe_collection_id")
     @classmethod
-    def _validate_swipe_collection_id(cls, value: str) -> str:
+    def _validate_swipe_collection_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         cleaned = str(value or "").strip()
         if not cleaned:
-            raise ValueError("swipeCollectionId is required.")
+            return None
         return cleaned

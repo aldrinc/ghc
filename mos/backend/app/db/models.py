@@ -1558,10 +1558,12 @@ class CompanySwipeAsset(Base):
         sa.Index("idx_company_swipe_assets_org_analysis_status", "org_id", "analysis_status"),
         sa.Index("idx_company_swipe_assets_review_status", "review_status"),
         sa.Index(
-            "idx_company_swipe_assets_origin_system_external_ad",
+            "uq_company_swipe_assets_org_origin_external_ad",
             "org_id",
             "origin_system",
             "external_ad_id",
+            unique=True,
+            postgresql_where=sa.text("external_ad_id IS NOT NULL"),
         ),
     )
 
@@ -1649,9 +1651,7 @@ class CompanySwipeAsset(Base):
     # GetHookd sync review fields
     review_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    reviewed_by_user_id: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    reviewed_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_first_seen_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -1678,9 +1678,10 @@ class CompanySwipeMedia(Base):
     __tablename__ = "company_swipe_media"
     __table_args__ = (
         sa.Index(
-            "idx_company_swipe_media_swipe_asset_media_asset",
+            "uq_company_swipe_media_swipe_asset_media_asset",
             "swipe_asset_id",
             "media_asset_id",
+            unique=True,
             postgresql_where=sa.text("media_asset_id IS NOT NULL"),
         ),
     )
@@ -1783,6 +1784,9 @@ class ClientSwipeAsset(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+GETHOOKD_ORIGIN_SYSTEM = "gethookd_public_api"
 
 
 class ClientGetHookdCredentials(Base):
@@ -3820,3 +3824,4 @@ class AdTeardownAssertionEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
