@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { MedusaCategory, MedusaCollection, MedusaProduct } from "@/types/commerce";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { buildPublicFunnelPath } from "@/funnels/runtimeRouting";
@@ -147,13 +147,33 @@ export function StarterStoreHeader({
 }) {
   const runtime = useCommerceRuntime();
   const funnelRuntime = useFunnelRuntime();
+  const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const storeName = runtime?.storeName || storeNameProp;
   const mainCategories = starterRootCategories(runtime?.categories || []).slice(0, 6);
   const cartCount = runtime?.cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
   const homePath = resolvePagePathByType({ pageType: "home", funnelRuntime });
+  const catalogPath = resolvePagePathByType({ pageType: "category", funnelRuntime });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setSearchQuery(params.get("q") || "");
+  }, [location.search]);
+
+  const handleSearchSubmit = () => {
+    if (!catalogPath) {
+      return;
+    }
+    const params = new URLSearchParams();
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    }
+    navigate(`${catalogPath}${params.toString() ? `?${params.toString()}` : ""}`);
+  };
 
   return (
     <header
@@ -177,7 +197,7 @@ export function StarterStoreHeader({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium uppercase tracking-[0.28em] text-zinc-900">{storeName}</span>
-              <span className="block truncate text-[11px] uppercase tracking-[0.2em] text-neutral-500">Medusa B2B starter shell</span>
+              <span className="block truncate text-[11px] uppercase tracking-[0.2em] text-neutral-500">Clinical reference store</span>
             </span>
           </button>
 
@@ -199,12 +219,32 @@ export function StarterStoreHeader({
 
         <div className="flex items-center gap-2 sm:gap-3">
           {showSearch ? (
-            <div className="hidden items-center rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-500 lg:flex">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="mr-2 h-4 w-4">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleSearchSubmit();
+              }}
+              className="hidden items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 lg:flex"
+              role="search"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 text-neutral-500">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.85-5.4a7.25 7.25 0 11-14.5 0 7.25 7.25 0 0114.5 0Z" />
               </svg>
-              <span title="Search UI is visual-only in this rollout">Search for products</span>
-            </div>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search books, pads, and guides"
+                className="w-52 bg-transparent text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none"
+                aria-label="Search products"
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-white px-3 py-1 text-xs font-medium text-zinc-900 transition hover:bg-neutral-100"
+              >
+                Search
+              </button>
+            </form>
           ) : null}
 
           {showCart ? (
@@ -391,6 +431,7 @@ export function StarterHomeHero({
           funnelRuntime,
         })
       : null;
+  const heroUsesSingleProductLayout = resolvedProducts.length === 1;
 
   return (
     <section className="border-b border-neutral-200 bg-[#f4f1eb] font-sans text-zinc-900" data-testid="starter-home-hero">
@@ -418,34 +459,56 @@ export function StarterHomeHero({
           ) : null}
         </div>
 
-        <div className="relative min-h-[440px]" data-testid="starter-home-hero-media">
+        <div className={`relative min-h-[440px] ${heroUsesSingleProductLayout ? "flex items-center justify-center" : ""}`} data-testid="starter-home-hero-media">
           <div className="absolute inset-0 rounded-[2rem] border border-white/70 bg-white/40" />
-          {resolvedProducts.map((product, index) => {
-            const imageUrl = starterProductImage(product);
-            return (
-              <article
-                key={product.id}
-                className={`absolute overflow-hidden rounded-[1.75rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] ${
-                  index === 0
-                    ? "left-[6%] top-[8%] w-[56%]"
-                    : index === 1
-                      ? "right-[4%] top-[12%] w-[34%]"
-                      : "bottom-[6%] right-[16%] w-[44%]"
-                }`}
-              >
-                <div className="aspect-[4/5] bg-[#f8f6f2] p-6">
-                  <img src={imageUrl || undefined} alt={product.title} className="h-full w-full object-contain" />
-                </div>
-                <div className="border-t border-neutral-200 px-5 py-4">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">Featured product</p>
-                  <p className="mt-2 text-sm font-medium text-zinc-900">{product.title}</p>
-                  {starterPriceLabel(product) ? (
-                    <p className="mt-1 text-sm text-neutral-600">From {starterPriceLabel(product)}</p>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+          {heroUsesSingleProductLayout ? (
+            <article className="relative z-[1] w-full max-w-[28rem] overflow-hidden rounded-[1.9rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+              <div className="aspect-[4/5] bg-[#f8f6f2] p-8">
+                <img
+                  src={starterProductImage(resolvedProducts[0]) || undefined}
+                  alt={resolvedProducts[0].title}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div className="border-t border-neutral-200 px-6 py-5">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">Featured product</p>
+                <p className="mt-2 text-lg font-medium text-zinc-900">{resolvedProducts[0].title}</p>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                  The live Honest Herbalist catalog currently has one fully merchandised product with attached artwork. The rest of the range is still visible in the catalog while media is being added.
+                </p>
+                {starterPriceLabel(resolvedProducts[0]) ? (
+                  <p className="mt-4 text-sm text-neutral-600">From {starterPriceLabel(resolvedProducts[0])}</p>
+                ) : null}
+              </div>
+            </article>
+          ) : (
+            resolvedProducts.map((product, index) => {
+              const imageUrl = starterProductImage(product);
+              return (
+                <article
+                  key={product.id}
+                  className={`absolute overflow-hidden rounded-[1.75rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] ${
+                    index === 0
+                      ? "left-[6%] top-[8%] w-[56%]"
+                      : index === 1
+                        ? "right-[4%] top-[12%] w-[34%]"
+                        : "bottom-[6%] right-[16%] w-[44%]"
+                  }`}
+                >
+                  <div className="aspect-[4/5] bg-[#f8f6f2] p-6">
+                    <img src={imageUrl || undefined} alt={product.title} className="h-full w-full object-contain" />
+                  </div>
+                  <div className="border-t border-neutral-200 px-5 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">Featured product</p>
+                    <p className="mt-2 text-sm font-medium text-zinc-900">{product.title}</p>
+                    {starterPriceLabel(product) ? (
+                      <p className="mt-1 text-sm text-neutral-600">From {starterPriceLabel(product)}</p>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </section>
@@ -506,7 +569,7 @@ export function StarterCollectionRails({
                 <p className="text-xs uppercase tracking-[0.24em] text-neutral-500">Collection</p>
                 <h2 className="mt-3 text-2xl font-normal tracking-[-0.04em] text-zinc-900">{collection.title}</h2>
               </div>
-              <p className="text-sm text-neutral-500">Real Medusa collection merchandising</p>
+              <p className="text-sm text-neutral-500">Merchandised directly from the live Medusa catalog</p>
             </div>
 
             <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -571,9 +634,9 @@ export function StarterStoreFooter({
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="max-w-sm">
             <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">{storeName}</p>
-            <h2 className="mt-4 text-3xl font-normal tracking-[-0.04em] text-zinc-900">Starter-aligned storefront shell inside Marketi.</h2>
+            <h2 className="mt-4 text-3xl font-normal tracking-[-0.04em] text-zinc-900">Practical references for herbal consultations and patient prep.</h2>
             <p className="mt-4 text-sm leading-7 text-neutral-600">
-              Browse the live Honest Herbalist catalog with the shared Medusa B2B starter rhythm: catalog, cart, and checkout in one coherent public runtime.
+              Browse the live Honest Herbalist catalog across books, worksheet pads, and clinical quick-check guides without sample storefront data mixed in.
             </p>
           </div>
 
@@ -611,7 +674,7 @@ export function StarterStoreFooter({
                     </li>
                   ))
                 ) : (
-                  <li className="text-sm text-neutral-500">Collection rails publish only when real Medusa collections are attached.</li>
+                  <li className="text-sm text-neutral-500">Collections appear after products are merchandised in Medusa.</li>
                 )}
               </ul>
             </div>
@@ -633,7 +696,7 @@ export function StarterStoreFooter({
 
         <div className="mt-12 flex flex-col gap-3 border-t border-neutral-200 pt-6 text-xs uppercase tracking-[0.2em] text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} {storeName}</span>
-          <span>Powered by Medusa · Rendered through Marketi</span>
+          <span>Powered by Honest Herbalist · Medusa · Marketi</span>
         </div>
       </div>
     </footer>

@@ -35,6 +35,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models import (
+    Asset,
     Client,
     ClientMedusaConfig,
     Funnel,
@@ -77,6 +78,7 @@ DATABASE_URL = os.environ.get(
 MEDUSA_BASE_URL = os.environ.get("MEDUSA_BASE_URL", "http://localhost:9000")
 MEDUSA_ADMIN_EMAIL = os.environ.get("MEDUSA_ADMIN_EMAIL", "admin@test.com")
 MEDUSA_ADMIN_PASSWORD = os.environ.get("MEDUSA_ADMIN_PASSWORD", "supersecret")
+PUBLIC_ASSET_BASE_URL = os.environ.get("PUBLIC_ASSET_BASE_URL", "http://localhost:8008").rstrip("/")
 
 # Honest Herbalist workspace name patterns
 HONEST_HERBALIST_NAMES = [
@@ -162,6 +164,142 @@ def find_handbook_product(session, client_id: str) -> Product | None:
 
     # Fall back to first product by created_at
     return products[0]
+
+
+def is_validation_product(product: Product) -> bool:
+    handle = str(product.handle or "").strip().lower()
+    title = str(product.title or "").strip().lower()
+    return "swipe-validation" in handle or "swipe validation" in title
+
+
+def clear_validation_and_duplicate_medusa_links(session, products: list[Product]) -> None:
+    """Clear invalid/stale Medusa mappings before syncing.
+
+    The Honest Herbalist workspace currently contains a synthetic validation product
+    that must not leak into the storefront. We also defensively clear duplicate
+    Medusa product IDs so one bad record does not shadow the real product mapping.
+    """
+
+    seen_medusa_ids: dict[str, Product] = {}
+
+    for product in sorted(products, key=lambda item: (item.created_at, str(item.id))):
+        if is_validation_product(product):
+            if product.medusa_product_id:
+                print(
+                    f"  Clearing validation-only product '{product.title}' from Medusa mapping ({product.medusa_product_id})"
+                )
+                product.medusa_product_id = None
+                session.add(product)
+            continue
+
+        medusa_product_id = str(product.medusa_product_id or "").strip()
+        if not medusa_product_id:
+            continue
+
+        existing = seen_medusa_ids.get(medusa_product_id)
+        if existing is None:
+            seen_medusa_ids[medusa_product_id] = product
+            continue
+
+        print(
+            "  Clearing duplicate Medusa mapping "
+            f"'{medusa_product_id}' from '{product.title}' (keeping '{existing.title}')"
+        )
+        product.medusa_product_id = None
+        session.add(product)
+
+
+def ensure_featured_collection(base_url: str, admin_token: str) -> str:
+    """Get or create the shared Featured collection."""
+    import httpx
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {admin_token}",
+    }
+
+    response = httpx.get(f"{base_url}/admin/collections", headers=headers, timeout=30.0)
+    response.raise_for_status()
+    collections = response.json().get("collections", [])
+    for collection in collections:
+        if collection.get("handle") == "featured":
+            return collection["id"]
+
+    create_response = httpx.post(
+        f"{base_url}/admin/collections",
+        headers=headers,
+        json={"title": "Featured", "handle": "featured"},
+        timeout=30.0,
+    )
+    create_response.raise_for_status()
+    payload = create_response.json()
+    collection = payload.get("collection") or payload
+    collection_id = collection.get("id")
+    if not collection_id:
+        raise RuntimeError("Medusa did not return a collection ID for Featured.")
+    return collection_id
+
+
+def public_asset_url_for_product(session, product: Product) -> str | None:
+    if not product.primary_asset_id:
+        return None
+    asset = session.get(Asset, product.primary_asset_id)
+    if not asset or not asset.public_id:
+        return None
+    return f"{PUBLIC_ASSET_BASE_URL}/public/assets/{asset.public_id}"
+
+
+def sync_honest_herbalist_merchandising(
+    session,
+    client: Client,
+    base_url: str,
+    admin_token: str,
+) -> None:
+    """Attach real media and collection merchandising for the storefront."""
+    import httpx
+
+    featured_collection_id = ensure_featured_collection(base_url, admin_token)
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {admin_token}",
+    }
+
+    products = (
+        session.execute(select(Product).where(Product.client_id == client.id).order_by(Product.created_at))
+        .scalars()
+        .all()
+    )
+
+    for product in products:
+        if is_validation_product(product):
+            continue
+        if not product.medusa_product_id:
+            continue
+
+        product_asset_url = public_asset_url_for_product(session, product)
+        payload: dict[str, object] = {}
+
+        if product_asset_url:
+            payload["thumbnail"] = product_asset_url
+            payload["images"] = [{"url": product_asset_url}]
+
+        if "handbook" in product.title.lower():
+            payload["collection_id"] = featured_collection_id
+
+        if not payload:
+            continue
+
+        response = httpx.post(
+            f"{base_url}/admin/products/{product.medusa_product_id}",
+            headers=headers,
+            json=payload,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        print(
+            f"  Updated merchandising for '{product.title}'"
+            + (f" with asset {product_asset_url}" if product_asset_url else "")
+        )
 
 
 def get_or_create_publishable_key(base_url: str, admin_token: str) -> str:
@@ -431,6 +569,10 @@ def sync_products_to_medusa(
     synced_count = 0
     for product in products:
         try:
+            if is_validation_product(product):
+                print(f"  Skipping validation-only product '{product.title}'")
+                continue
+
             # Generate handle if missing
             if not product.handle:
                 generated_handle = slugify_title(product.title)
@@ -1162,6 +1304,14 @@ def main():
             print("  (Handbook product - preferred for storefront review)")
         print()
 
+        workspace_products = (
+            session.execute(select(Product).where(Product.client_id == client.id).order_by(Product.created_at))
+            .scalars()
+            .all()
+        )
+        clear_validation_and_duplicate_medusa_links(session, workspace_products)
+        session.commit()
+
         # Login to Medusa
         print(f"Logging into Medusa at {MEDUSA_BASE_URL}...")
         admin_token_result = medusa_admin_login(
@@ -1219,6 +1369,16 @@ def main():
         )
         session.commit()
         print(f"Synced {synced} products")
+        print()
+
+        print("Updating Honest Herbalist merchandising in Medusa...")
+        sync_honest_herbalist_merchandising(
+            session=session,
+            client=client,
+            base_url=MEDUSA_BASE_URL,
+            admin_token=admin_token_result.token,
+        )
+        session.commit()
         print()
 
         # Archive old sites and create fresh one

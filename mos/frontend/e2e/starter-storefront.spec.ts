@@ -87,9 +87,11 @@ function buildProducts({ withCollectionData = true }: { withCollectionData?: boo
 function buildSiteCommerce({
   slug,
   withCollectionData = true,
+  cartHasItems = true,
 }: {
   slug: "home" | "category" | "product";
   withCollectionData?: boolean;
+  cartHasItems?: boolean;
 }) {
   const products = buildProducts({ withCollectionData });
   return {
@@ -117,32 +119,34 @@ function buildSiteCommerce({
     ],
     currentCategory: slug === "category" ? { id: "cat-books", name: "Books", handle: "books" } : null,
     currentProduct: slug === "product" ? products[0] : null,
-    cart: {
-      id: "cart-1",
-      region_id: "reg-us",
-      currency_code: "usd",
-      subtotal: 5700,
-      shipping_total: 900,
-      tax_total: 0,
-      total: 6600,
-      items: [
-        {
-          id: "line-1",
-          cart_id: "cart-1",
-          title: products[0].title,
-          variant_id: "variant-handbook",
-          quantity: 1,
-          unit_price: 3900,
-          total: 3900,
-          thumbnail: products[0].thumbnail,
-          variant: { id: "variant-handbook", title: "Standard", prices: [] },
-        },
-      ],
-    },
+    cart: cartHasItems
+      ? {
+          id: "cart-1",
+          region_id: "reg-us",
+          currency_code: "usd",
+          subtotal: 5700,
+          shipping_total: 900,
+          tax_total: 0,
+          total: 6600,
+          items: [
+            {
+              id: "line-1",
+              cart_id: "cart-1",
+              title: products[0].title,
+              variant_id: "variant-handbook",
+              quantity: 1,
+              unit_price: 3900,
+              total: 3900,
+              thumbnail: products[0].thumbnail,
+              variant: { id: "variant-handbook", title: "Standard", prices: [] },
+            },
+          ],
+        }
+      : null,
   };
 }
 
-function buildPage(slug: "home" | "category" | "product") {
+function buildPage(slug: "home" | "category" | "product" | "cart") {
   const pageMap = {
     "page-home": "home",
     "page-category": "category",
@@ -290,6 +294,23 @@ function buildPage(slug: "home" | "category" | "product") {
     ]);
   }
 
+  if (slug === "cart") {
+    content = content.concat([
+      {
+        type: "Section",
+        props: {
+          purpose: "section",
+          layout: "contained",
+          containerWidth: "lg",
+          variant: "default",
+          padding: "lg",
+          content: [{ type: "CommerceCart", props: {} }],
+        },
+      },
+      footer,
+    ]);
+  }
+
   return {
     productSlug: PRODUCT_SLUG,
     funnelId: "funnel-1",
@@ -311,8 +332,9 @@ function buildPage(slug: "home" | "category" | "product") {
   };
 }
 
-async function mockStorefront(page: Page, options?: { withCollectionData?: boolean }) {
+async function mockStorefront(page: Page, options?: { withCollectionData?: boolean; cartHasItems?: boolean }) {
   const withCollectionData = options?.withCollectionData !== false;
+  const cartHasItems = options?.cartHasItems !== false;
 
   await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/meta`, async (route) => {
     await route.fulfill({ json: { productSlug: PRODUCT_SLUG, funnelSlug: FUNNEL_SLUG, funnelId: "funnel-1", publicationId: "publication-1", entrySlug: "home", pages: [] } });
@@ -324,7 +346,7 @@ async function mockStorefront(page: Page, options?: { withCollectionData?: boole
 
   await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/pages/*`, async (route) => {
     const slug = new URL(route.request().url()).pathname.split("/").pop();
-    if (slug === "home" || slug === "category" || slug === "product") {
+    if (slug === "home" || slug === "category" || slug === "product" || slug === "cart") {
       await route.fulfill({ json: buildPage(slug) });
       return;
     }
@@ -333,8 +355,15 @@ async function mockStorefront(page: Page, options?: { withCollectionData?: boole
 
   await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/site/commerce*`, async (route) => {
     const url = new URL(route.request().url());
-    const slug = url.searchParams.get("product_handle") ? "product" : url.searchParams.get("category") ? "category" : "home";
-    await route.fulfill({ json: buildSiteCommerce({ slug, withCollectionData }) });
+    const pathname = url.pathname;
+    const slug = pathname.endsWith("/cart")
+      ? "cart"
+      : url.searchParams.get("product_handle")
+        ? "product"
+        : url.searchParams.get("category")
+          ? "category"
+          : "home";
+    await route.fulfill({ json: buildSiteCommerce({ slug: slug === "cart" ? "home" : slug, withCollectionData, cartHasItems }) });
   });
 
   await page.route("**/public/events", async (route) => {
@@ -376,6 +405,28 @@ test.describe("starter storefront parity", () => {
     await expect(page.getByTestId("starter-store-footer")).toBeVisible();
   });
 
+  test("supports catalog search without a full document reload", async ({ page }) => {
+    const documentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document") {
+        documentRequests.push(request.url());
+      }
+    });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/category`);
+    await page.waitForLoadState("networkidle");
+    const requestCountAfterInitialLoad = documentRequests.length;
+
+    const searchInput = page.getByRole("searchbox", { name: "Search products" });
+    await searchInput.fill("worksheet");
+    await searchInput.press("Enter");
+    await page.waitForURL(/q=worksheet/);
+
+    await expect(page.getByText('"What I’m Taking" Doctor-Visit Worksheet Pad')).toBeVisible();
+    await expect(page.getByText("The Honest Herbalist Handbook")).toHaveCount(0);
+    expect(documentRequests).toHaveLength(requestCountAfterInitialLoad);
+  });
+
   test("renders product detail shell with starter header and footer", async ({ page }) => {
     await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/product?product=the-honest-herbalist-handbook`);
 
@@ -384,6 +435,30 @@ test.describe("starter storefront parity", () => {
     await expect(page.getByTestId("product-title")).toContainText("The Honest Herbalist Handbook");
     await expect(page.getByTestId("starter-store-footer")).toBeVisible();
     await expect(page).toHaveScreenshot("starter-pdp-desktop.png", { fullPage: true });
+  });
+
+  test("renders empty cart state without a dead checkout CTA", async ({ page }) => {
+    await mockStorefront(page, { cartHasItems: false });
+
+    const documentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document") {
+        documentRequests.push(request.url());
+      }
+    });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/cart`);
+    await page.waitForLoadState("networkidle");
+    const requestCountAfterInitialLoad = documentRequests.length;
+
+    await expect(page.getByText("Your cart is empty")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue Shopping" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /proceed to checkout/i })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Continue Shopping" }).click();
+    await page.waitForURL(/\/category$/);
+    await expect(page.getByTestId("category-container")).toBeVisible();
+    expect(documentRequests).toHaveLength(requestCountAfterInitialLoad);
   });
 });
 

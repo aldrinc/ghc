@@ -7,7 +7,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode, Fragment } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type {
   MedusaProduct,
   MedusaCart,
@@ -73,6 +73,8 @@ type CommerceRuntimeContextValue = {
   refreshCollections: () => Promise<void>;
 
   // Navigation helpers
+  navigateToHome: () => void;
+  navigateToCatalog: (options?: { searchQuery?: string; sort?: string }) => void;
   navigateToProduct: (productHandle: string) => void;
   navigateToCategory: (categoryHandle: string) => void;
   navigateToCart: () => void;
@@ -83,6 +85,97 @@ const CommerceRuntimeContext = createContext<CommerceRuntimeContextValue | null>
 
 export function useCommerceRuntime(): CommerceRuntimeContextValue | null {
   return useContext(CommerceRuntimeContext);
+}
+
+type CatalogSortOption = "latest" | "price_asc" | "price_desc" | "title_asc";
+
+function normalizeCatalogSort(value: string | null | undefined): CatalogSortOption {
+  switch (value) {
+    case "price_asc":
+    case "price_desc":
+    case "title_asc":
+      return value;
+    default:
+      return "latest";
+  }
+}
+
+function parseCatalogPriceAmount(amount: unknown): number | null {
+  if (typeof amount === "number" && !Number.isNaN(amount)) {
+    return amount;
+  }
+  if (typeof amount === "string") {
+    const parsed = Number.parseFloat(amount);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function firstCatalogProductPriceAmount(product: MedusaProduct): number | null {
+  for (const variant of product.variants || []) {
+    for (const price of variant.prices || []) {
+      const amount = parseCatalogPriceAmount(price?.amount);
+      if (amount !== null) {
+        return amount;
+      }
+    }
+  }
+  return null;
+}
+
+function filterCatalogProducts(
+  products: MedusaProduct[],
+  {
+    searchQuery,
+    sort,
+  }: {
+    searchQuery: string;
+    sort: CatalogSortOption;
+  },
+): MedusaProduct[] {
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filtered = normalizedQuery
+    ? products.filter((product) => {
+        const haystack = [product.title, product.description, product.handle]
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : products;
+
+  const sorted = [...filtered];
+  sorted.sort((left, right) => {
+    if (sort === "title_asc") {
+      return left.title.localeCompare(right.title);
+    }
+
+    if (sort === "price_asc" || sort === "price_desc") {
+      const leftAmount = firstCatalogProductPriceAmount(left);
+      const rightAmount = firstCatalogProductPriceAmount(right);
+      if (leftAmount === null && rightAmount === null) {
+        return left.title.localeCompare(right.title);
+      }
+      if (leftAmount === null) {
+        return 1;
+      }
+      if (rightAmount === null) {
+        return -1;
+      }
+      return sort === "price_asc" ? leftAmount - rightAmount : rightAmount - leftAmount;
+    }
+
+    const leftTimestamp = Date.parse(left.created_at || "");
+    const rightTimestamp = Date.parse(right.created_at || "");
+    if (!Number.isNaN(leftTimestamp) && !Number.isNaN(rightTimestamp) && leftTimestamp !== rightTimestamp) {
+      return rightTimestamp - leftTimestamp;
+    }
+    return left.title.localeCompare(right.title);
+  });
+
+  return sorted;
 }
 
 // =============================================================================
@@ -568,80 +661,100 @@ export function CommerceRuntimeProvider({
     [funnelRuntime]
   );
 
-  const navigateToProduct = useCallback(
-    (productHandle: string) => {
-      if (!funnelRuntime) return;
-      const productSlug = resolvePageSlugByType("product_detail");
-      if (!productSlug) {
-        console.error("Product detail page not found in site");
-        return;
+  const buildSitePath = useCallback(
+    (pageType: string, params?: Record<string, string | null | undefined>): string | null => {
+      if (!funnelRuntime) return null;
+      const pageSlug = resolvePageSlugByType(pageType);
+      if (!pageSlug) {
+        return null;
       }
       const path = buildPublicFunnelPath({
         productSlug: funnelRuntime.productSlug,
         funnelSlug: funnelRuntime.funnelSlug,
-        slug: productSlug,
+        slug: pageSlug,
         bundleMode: funnelRuntime.bundleMode,
       });
-      navigate(`${path}?product=${encodeURIComponent(productHandle)}`);
+      const searchParams = new URLSearchParams();
+      Object.entries(params || {}).forEach(([key, value]) => {
+        const cleanedValue = typeof value === "string" ? value.trim() : value;
+        if (cleanedValue) {
+          searchParams.set(key, cleanedValue);
+        }
+      });
+      return searchParams.size > 0 ? `${path}?${searchParams.toString()}` : path;
     },
-    [funnelRuntime, resolvePageSlugByType, navigate]
+    [funnelRuntime, resolvePageSlugByType]
+  );
+
+  const navigateToHome = useCallback(() => {
+    const path = buildSitePath("home");
+    if (!path) {
+      console.error("Home page not found in site");
+      return;
+    }
+    navigate(path);
+  }, [buildSitePath, navigate]);
+
+  const navigateToCatalog = useCallback(
+    (options?: { searchQuery?: string; sort?: string }) => {
+      const path = buildSitePath("category", {
+        q: options?.searchQuery,
+        sort: options?.sort,
+      });
+      if (!path) {
+        console.error("Category page not found in site");
+        return;
+      }
+      navigate(path);
+    },
+    [buildSitePath, navigate]
+  );
+
+  const navigateToProduct = useCallback(
+    (productHandle: string) => {
+      const path = buildSitePath("product_detail", {
+        product: productHandle,
+      });
+      if (!path) {
+        console.error("Product detail page not found in site");
+        return;
+      }
+      navigate(path);
+    },
+    [buildSitePath, navigate]
   );
 
   const navigateToCategory = useCallback(
     (categoryHandle: string) => {
-      if (!funnelRuntime) return;
-      const categorySlug = resolvePageSlugByType("category");
-      if (!categorySlug) {
+      const path = buildSitePath("category", {
+        category: categoryHandle,
+      });
+      if (!path) {
         console.error("Category page not found in site");
         return;
       }
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: categorySlug,
-        bundleMode: funnelRuntime.bundleMode,
-      });
-      navigate(`${path}?category=${encodeURIComponent(categoryHandle)}`);
+      navigate(path);
     },
-    [funnelRuntime, resolvePageSlugByType, navigate]
+    [buildSitePath, navigate]
   );
 
   const navigateToCart = useCallback(() => {
-    if (!funnelRuntime) {
-      console.error("[CommerceRuntime] navigateToCart - no funnelRuntime!");
-      return;
-    }
-    const cartSlug = resolvePageSlugByType("cart");
-    console.log("[CommerceRuntime] navigateToCart - resolved cartSlug:", cartSlug, "bundleMode:", funnelRuntime.bundleMode);
-    if (!cartSlug) {
+    const path = buildSitePath("cart");
+    if (!path) {
       console.error("Cart page not found in site");
       return;
     }
-    const path = buildPublicFunnelPath({
-      productSlug: funnelRuntime.productSlug,
-      funnelSlug: funnelRuntime.funnelSlug,
-      slug: cartSlug,
-      bundleMode: funnelRuntime.bundleMode,
-    });
-    console.log("[CommerceRuntime] navigateToCart - navigating to:", path);
     navigate(path);
-  }, [funnelRuntime, resolvePageSlugByType, navigate]);
+  }, [buildSitePath, navigate]);
 
   const navigateToCheckout = useCallback(() => {
-    if (!funnelRuntime) return;
-    const checkoutSlug = resolvePageSlugByType("checkout");
-    if (!checkoutSlug) {
+    const path = buildSitePath("checkout");
+    if (!path) {
       console.error("Checkout page not found in site");
       return;
     }
-    const path = buildPublicFunnelPath({
-      productSlug: funnelRuntime.productSlug,
-      funnelSlug: funnelRuntime.funnelSlug,
-      slug: checkoutSlug,
-      bundleMode: funnelRuntime.bundleMode,
-    });
     navigate(path);
-  }, [funnelRuntime, resolvePageSlugByType, navigate]);
+  }, [buildSitePath, navigate]);
 
   const contextValue: CommerceRuntimeContextValue = {
     siteFamily,
@@ -670,6 +783,8 @@ export function CommerceRuntimeProvider({
     refreshProducts,
     refreshCategories,
     refreshCollections,
+    navigateToHome,
+    navigateToCatalog,
     navigateToProduct,
     navigateToCategory,
     navigateToCart,
@@ -742,16 +857,24 @@ export function CommerceCatalogHero({ title, description }: { title?: string; de
  */
 export function CommerceProductGrid({ columns = 3 }: { columns?: number }) {
   const runtime = useCommerceRuntime();
+  const location = useLocation();
   if (!runtime) {
     return <div className="p-4 text-sm text-neutral-500">Commerce context not available</div>;
   }
 
   const { products } = runtime;
+  const searchParams = new URLSearchParams(location.search);
+  const searchQuery = searchParams.get("q") || "";
+  const sort = normalizeCatalogSort(searchParams.get("sort"));
+  const visibleProducts = filterCatalogProducts(products, {
+    searchQuery,
+    sort,
+  });
 
-  if (products.length === 0) {
+  if (visibleProducts.length === 0) {
     return (
       <div className="rounded-lg bg-white p-8 text-center text-sm text-neutral-500 shadow-sm">
-        No products found.
+        {searchQuery.trim() ? `No products matched "${searchQuery.trim()}".` : "No products found."}
       </div>
     );
   }
@@ -812,7 +935,7 @@ export function CommerceProductGrid({ columns = 3 }: { columns?: number }) {
 
   return (
     <ul className={`font-sans grid grid-cols-1 ${gridCols} gap-3`} data-testid="products-list">
-      {products.map((product) => {
+      {visibleProducts.map((product) => {
         const inventory = getInventoryQuantity(product);
         const priceStr = formatPrice(product);
         return (
@@ -907,27 +1030,44 @@ export function CommerceStoreTemplate({
   children: ReactNode;
 }) {
   const runtime = useCommerceRuntime();
-  const funnelRuntime = useFunnelRuntime();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchInput, setSearchInput] = useState("");
 
   const { currentCategory, categories } = runtime || {};
   const categoryName = currentCategory?.name || "All Products";
   const parentCategories = categories?.filter((c) => !c.parent_category_id) || [];
+  const searchParams = new URLSearchParams(location.search);
+  const activeSearchQuery = searchParams.get("q") || "";
+  const activeSort = normalizeCatalogSort(searchParams.get("sort"));
 
-  const handleHomeClick = () => {
-    if (!funnelRuntime) return;
-    const homeSlug = Object.entries(funnelRuntime.pageTypeMap || {}).find(
-      ([, type]) => type === "home"
-    )?.[0];
-    if (homeSlug && funnelRuntime.pageMap[homeSlug]) {
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: funnelRuntime.pageMap[homeSlug],
-        bundleMode: funnelRuntime.bundleMode,
-      });
-      window.location.href = path;
-    }
-  };
+  useEffect(() => {
+    setSearchInput(activeSearchQuery);
+  }, [activeSearchQuery]);
+
+  const updateCatalogControls = useCallback(
+    (updates: { q?: string; sort?: CatalogSortOption | null }) => {
+      const nextParams = new URLSearchParams(location.search);
+      if (updates.q !== undefined) {
+        const trimmed = updates.q.trim();
+        if (trimmed) {
+          nextParams.set("q", trimmed);
+        } else {
+          nextParams.delete("q");
+        }
+      }
+      if (updates.sort !== undefined) {
+        if (!updates.sort || updates.sort === "latest") {
+          nextParams.delete("sort");
+        } else {
+          nextParams.set("sort", updates.sort);
+        }
+      }
+      const nextQuery = nextParams.toString();
+      navigate(`${location.pathname}${nextQuery ? `?${nextQuery}` : ""}`, { replace: true });
+    },
+    [location.pathname, location.search, navigate]
+  );
 
   const isCategoryPage = currentCategory !== null && currentCategory !== undefined;
 
@@ -936,7 +1076,7 @@ export function CommerceStoreTemplate({
       <div className="flex flex-col py-6 mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 gap-4" data-testid="category-container">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-neutral-500">
-          <button onClick={handleHomeClick} className="hover:text-zinc-900 transition-colors">
+          <button onClick={() => runtime?.navigateToHome()} className="hover:text-zinc-900 transition-colors">
             Home
           </button>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-neutral-400">
@@ -954,21 +1094,45 @@ export function CommerceStoreTemplate({
           <div className="flex flex-col divide-neutral-200 small:w-1/5 w-full gap-3">
             {/* Search + Sort container */}
             <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-0 overflow-hidden">
-              <div className="px-4 py-3 border-b border-neutral-100">
-                <input
-                  type="text"
-                  placeholder={`Search in ${categoryName}...`}
-                  disabled
-                  className="w-full text-sm text-zinc-900 placeholder:text-neutral-400 bg-transparent focus:outline-none"
-                  title="Search coming soon"
-                />
-              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  updateCatalogControls({ q: searchInput });
+                }}
+                className="px-4 py-3 border-b border-neutral-100"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder={`Search in ${categoryName}...`}
+                    className="w-full text-sm text-zinc-900 placeholder:text-neutral-400 bg-transparent focus:outline-none"
+                    aria-label={`Search in ${categoryName}`}
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-full border border-neutral-200 px-3 py-1 text-xs font-medium text-zinc-900 transition hover:bg-neutral-50"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </form>
               <div className="px-4 py-3">
                 <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Sort by</span>
-                <select className="w-full mt-1 text-sm text-zinc-900 bg-transparent focus:outline-none" disabled>
-                  <option>Latest Arrivals</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
+                <select
+                  value={activeSort}
+                  onChange={(event) =>
+                    updateCatalogControls({
+                      sort: normalizeCatalogSort(event.target.value),
+                    })
+                  }
+                  className="w-full mt-1 text-sm text-zinc-900 bg-transparent focus:outline-none"
+                >
+                  <option value="latest">Latest Arrivals</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="title_asc">Alphabetical</option>
                 </select>
               </div>
             </div>
@@ -1401,7 +1565,22 @@ export function CommerceCart() {
   }
 
   if (!cart || !cart.items || cart.items.length === 0) {
-    return <div className="p-8 text-sm text-neutral-400 text-center">Your cart is empty</div>;
+    return (
+      <div className="rounded-[1.5rem] border border-neutral-200 bg-white px-6 py-12 text-center shadow-[0_0_0_1px_rgba(0,0,0,0.04)]">
+        <p className="text-xs uppercase tracking-[0.24em] text-neutral-500">Cart</p>
+        <h2 className="mt-4 text-2xl font-normal text-zinc-900">Your cart is empty</h2>
+        <p className="mt-3 text-sm leading-6 text-neutral-500">
+          Browse the live catalog and add an item before continuing to checkout.
+        </p>
+        <button
+          type="button"
+          onClick={() => runtime.navigateToCatalog()}
+          className="mt-6 inline-flex rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
+        >
+          Continue Shopping
+        </button>
+      </div>
+    );
   }
 
   const handleUpdateQuantity = async (lineId: string, newQuantity: number) => {
@@ -1605,8 +1784,6 @@ export function CommerceCheckout() {
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
-  const funnelRuntime = useFunnelRuntime();
-
   if (!runtime) {
     return <div className="p-4 text-sm text-content-muted">Commerce context not available</div>;
   }
@@ -1666,24 +1843,6 @@ export function CommerceCheckout() {
   // Empty state when no cart - rendered AFTER all hooks are declared
   // to maintain stable hook order across all renders
   if (!cart) {
-    // Clearer empty state with navigation back to shopping
-    const handleContinueShopping = () => {
-      if (funnelRuntime) {
-        const homeSlug = Object.entries(funnelRuntime.pageTypeMap || {}).find(
-          ([, type]) => type === "home"
-        )?.[0];
-        if (homeSlug && funnelRuntime.pageMap[homeSlug]) {
-          const path = buildPublicFunnelPath({
-            productSlug: funnelRuntime.productSlug,
-            funnelSlug: funnelRuntime.funnelSlug,
-            slug: funnelRuntime.pageMap[homeSlug],
-            bundleMode: funnelRuntime.bundleMode,
-          });
-          window.location.href = path;
-        }
-      }
-    };
-
     return (
       <div className="font-sans flex flex-col items-center justify-center py-16 px-4 text-center bg-neutral-100">
         <div className="max-w-md">
@@ -1694,13 +1853,7 @@ export function CommerceCheckout() {
           <p className="text-neutral-500 mb-6">You need to add items to your cart before proceeding to checkout.</p>
           <div className="flex gap-4 justify-center">
             <button
-              onClick={() => runtime.navigateToCart()}
-              className="rounded-full bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-900-hover transition-colors"
-            >
-              View Cart
-            </button>
-            <button
-              onClick={handleContinueShopping}
+              onClick={() => runtime.navigateToCatalog()}
               className="rounded-full border border-neutral-200 bg-white px-6 py-3 font-semibold text-zinc-900 hover:bg-neutral-100 transition-colors"
             >
               Continue Shopping
@@ -2254,35 +2407,18 @@ export function CommerceCategoryList() {
  */
 export function CommerceCategoryHeading() {
   const runtime = useCommerceRuntime();
-  const funnelRuntime = useFunnelRuntime();
 
   if (!runtime) {
     return null;
   }
 
-  const { currentCategory, categories } = runtime;
+  const { currentCategory } = runtime;
   const categoryName = currentCategory?.name || "All Products";
-
-  const handleHomeClick = () => {
-    if (!funnelRuntime) return;
-    const homeSlug = Object.entries(funnelRuntime.pageTypeMap || {}).find(
-      ([, type]) => type === "home"
-    )?.[0];
-    if (homeSlug && funnelRuntime.pageMap[homeSlug]) {
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: funnelRuntime.pageMap[homeSlug],
-        bundleMode: funnelRuntime.bundleMode,
-      });
-      window.location.href = path;
-    }
-  };
 
   return (
     <div className="flex items-center gap-2 text-sm text-zinc-500 py-4">
       <button
-        onClick={handleHomeClick}
+        onClick={() => runtime.navigateToHome()}
         className="hover:text-zinc-700 transition-colors"
       >
         Home

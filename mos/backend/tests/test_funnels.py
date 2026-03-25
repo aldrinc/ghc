@@ -9,6 +9,7 @@ from app.config import settings
 from app.db.enums import FunnelDomainStatusEnum
 from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain, FunnelPage, PaidAdsPlatformProfile
 from app.db.repositories.funnels import FunnelsRepository
+from app.services.funnels import extract_internal_links, rewrite_internal_target_ids
 from app.services.paid_ads_qa import RULESET_VERSION
 from app.services import deploy as deploy_service
 
@@ -231,6 +232,88 @@ def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_clien
     assert meta.status_code == 200
     assert meta.json()["productSlug"] == product_slug
     assert meta.json()["funnelSlug"] == route_slug
+
+
+def test_rewrite_internal_target_ids_updates_starter_specific_page_target_fields() -> None:
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "funnelPage",
+                    "primaryTargetPageId": "__PAGE_CATEGORY__",
+                    "primaryCtaLabel": "Browse catalog",
+                },
+            },
+            {
+                "type": "Button",
+                "props": {
+                    "linkType": "funnelPage",
+                    "targetPageId": "__PAGE_CART__",
+                    "label": "Go to cart",
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    rewritten = rewrite_internal_target_ids(
+        puck_data,
+        {
+            "__PAGE_CATEGORY__": "page-category-real",
+            "__PAGE_CART__": "page-cart-real",
+        },
+    )
+
+    hero_props = rewritten["content"][0]["props"]
+    button_props = rewritten["content"][1]["props"]
+
+    assert hero_props["primaryTargetPageId"] == "page-category-real"
+    assert button_props["targetPageId"] == "page-cart-real"
+
+
+def test_extract_internal_links_includes_starter_specific_page_target_fields() -> None:
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "id": "hero-block",
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "funnelPage",
+                    "primaryTargetPageId": "page-category-real",
+                    "primaryCtaLabel": "Browse catalog",
+                },
+            },
+            {
+                "id": "button-block",
+                "type": "Button",
+                "props": {
+                    "linkType": "funnelPage",
+                    "targetPageId": "page-cart-real",
+                    "label": "Go to cart",
+                },
+            },
+            {
+                "id": "external-hero-block",
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "external",
+                    "primaryTargetPageId": "should-not-be-extracted",
+                    "primaryCtaLabel": "External",
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    links = extract_internal_links(puck_data)
+
+    assert [(link.to_page_id, link.label, link.meta["targetKey"]) for link in links] == [
+        ("page-category-real", "Browse catalog", "primaryTargetPageId"),
+        ("page-cart-real", "Go to cart", "targetPageId"),
+    ]
 
 
 def test_public_funnel_exposes_only_canonical_presales_slug(api_client: TestClient, db_session):

@@ -71,9 +71,7 @@
                 "primaryLinkType": "funnelPage",
                 "primaryTargetPageId": "__PAGE_CATEGORY__",
                 "featuredProductHandles": [
-                  "the-honest-herbalist-handbook",
-                  "what-im-taking-doctor-visit-worksheet-pad",
-                  "preprocedure-stop-supplements-pause-list-2week-prep-guide"
+                  "the-honest-herbalist-handbook"
                 ]
               }
             }
@@ -92,8 +90,43 @@
             {
               "type": "StarterCollectionRails",
               "props": {
-                "maxCollections": 3,
-                "productsPerCollection": 4
+                "maxCollections": 2,
+                "productsPerCollection": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "contained",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "lg",
+          "content": [
+            {
+              "type": "Heading",
+              "props": {
+                "text": "Catalog preview",
+                "level": 2,
+                "align": "left"
+              }
+            },
+            {
+              "type": "Text",
+              "props": {
+                "text": "Browse the live Honest Herbalist products below. Items without attached artwork remain visible in the catalog so the storefront stays honest about current merchandising coverage.",
+                "size": "md",
+                "tone": "muted",
+                "align": "left"
+              }
+            },
+            {
+              "type": "CommerceProductGrid",
+              "props": {
+                "columns": 4
               }
             }
           ]

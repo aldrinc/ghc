@@ -227,8 +227,9 @@ def _get_funnel_or_404(
     funnel = _resolve_funnel_by_route_token(session=session, funnel_token=funnel_slug)
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
-    if funnel.status == FunnelStatusEnum.disabled:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Funnel disabled")
+    if funnel.status in {FunnelStatusEnum.disabled, FunnelStatusEnum.archived}:
+        detail = "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=detail)
     if not funnel.product_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -253,8 +254,9 @@ def _get_funnel_by_slug_or_404(*, session: Session, funnel_slug: str) -> Funnel:
     funnel = _resolve_funnel_by_route_token(session=session, funnel_token=funnel_slug)
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
-    if funnel.status == FunnelStatusEnum.disabled:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Funnel disabled")
+    if funnel.status in {FunnelStatusEnum.disabled, FunnelStatusEnum.archived}:
+        detail = "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=detail)
     return funnel
 
 
@@ -270,6 +272,35 @@ def _publication_id_for_public_response(funnel: Funnel) -> str:
 def _normalize_variant_provider(provider: str | None) -> str | None:
     cleaned = str(provider or "").strip().lower()
     return cleaned or None
+
+
+def _is_validation_workspace_product(product: Product) -> bool:
+    handle = str(product.handle or "").strip().lower()
+    title = str(product.title or "").strip().lower()
+    return "swipe-validation" in handle or "swipe validation" in title
+
+
+def _dedupe_workspace_products_by_medusa_id(
+    workspace_products: list[Product],
+) -> tuple[list[Product], list[str]]:
+    deduped: list[Product] = []
+    duplicate_errors: list[str] = []
+    seen_medusa_ids: dict[str, Product] = {}
+
+    for product in workspace_products:
+        medusa_product_id = str(product.medusa_product_id or "").strip()
+        if not medusa_product_id:
+            deduped.append(product)
+            continue
+        if medusa_product_id in seen_medusa_ids:
+            duplicate_errors.append(
+                f"Excluded duplicate workspace mapping for Medusa product '{medusa_product_id}' ({product.title})."
+            )
+            continue
+        seen_medusa_ids[medusa_product_id] = product
+        deduped.append(product)
+
+    return deduped, duplicate_errors
 
 
 def _is_checkout_ready_variant(variant: ProductVariant) -> bool:
@@ -1306,10 +1337,28 @@ def public_site_commerce(
                         Product.client_id == UUID(client_id),
                         Product.medusa_product_id.isnot(None),
                     )
+                    .order_by(Product.created_at.asc(), Product.id.asc())
                 )
                 .scalars()
                 .all()
             )
+
+            validation_products = [
+                product for product in workspace_products if _is_validation_workspace_product(product)
+            ]
+            if validation_products:
+                errors.append(
+                    "Excluded validation-only workspace products from the public storefront: "
+                    + ", ".join(product.title for product in validation_products)
+                )
+            workspace_products = [
+                product for product in workspace_products if not _is_validation_workspace_product(product)
+            ]
+
+            workspace_products, duplicate_product_errors = _dedupe_workspace_products_by_medusa_id(
+                workspace_products
+            )
+            errors.extend(duplicate_product_errors)
 
             # Extract Medusa product IDs
             medusa_product_ids = [

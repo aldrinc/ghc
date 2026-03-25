@@ -71,53 +71,6 @@
       {
         "type": "Section",
         "props": {
-          "purpose": "section",
-          "layout": "contained",
-          "containerWidth": "lg",
-          "variant": "muted",
-          "padding": "md",
-          "content": [
-            {
-              "type": "Columns",
-              "props": {
-                "ratio": "1:1",
-                "gap": "md",
-                "left": [
-                  {
-                    "type": "Button",
-                    "props": {
-                      "label": "Continue Shopping",
-                      "variant": "secondary",
-                      "size": "lg",
-                      "width": "full",
-                      "align": "left",
-                      "linkType": "funnelPage",
-                      "targetPageId": "__PAGE_CATEGORY__"
-                    }
-                  }
-                ],
-                "right": [
-                  {
-                    "type": "Button",
-                    "props": {
-                      "label": "Proceed to Checkout",
-                      "variant": "primary",
-                      "size": "lg",
-                      "width": "full",
-                      "align": "left",
-                      "linkType": "funnelPage",
-                      "targetPageId": "__PAGE_CHECKOUT__"
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      },
-      {
-        "type": "Section",
-        "props": {
           "purpose": "footer",
           "layout": "full",
           "containerWidth": "lg",

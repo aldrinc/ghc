@@ -281,10 +281,12 @@ export function PublicFunnelPage() {
   const navigate = useNavigate();
   const [meta, setMeta] = useState<PublicFunnelMeta | null>(null);
   const [page, setPage] = useState<PublicFunnelPageType | null>(null);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
   const [siteCommerce, setSiteCommerce] = useState<SiteCommerceData | null>(null);
+  const [siteCommerceLoading, setSiteCommerceLoading] = useState(false);
   const [siteCommerceError, setSiteCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
   const handledCheckoutReturnRef = useRef<string | null>(null);
@@ -351,7 +353,7 @@ export function PublicFunnelPage() {
       return;
     }
     console.log("[PublicFunnelPage] Fetching site commerce for:", productSlug, funnelSlug);
-    setSiteCommerce(null);
+    setSiteCommerceLoading(true);
     setSiteCommerceError(null);
 
     const params = new URLSearchParams();
@@ -383,6 +385,9 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         console.error("[PublicFunnelPage] Site commerce error:", err);
         setSiteCommerceError(err instanceof Error ? err.message : "Unable to load site commerce data");
+      })
+      .finally(() => {
+        setSiteCommerceLoading(false);
       });
   }, [funnelSlug, productSlug, isSite, productHandle, productId, cartId, categoryHandle]);
 
@@ -393,7 +398,7 @@ export function PublicFunnelPage() {
       return;
     }
     setError(null);
-    setPage(null);
+    setPageLoading(true);
     const fetchUrl = `${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/pages/${encodeURIComponent(effectiveSlug)}`;
     console.log("[PublicFunnelPage] Fetching page:", fetchUrl);
     fetch(fetchUrl)
@@ -424,6 +429,9 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         console.error("[PublicFunnelPage] Page fetch error:", err);
         setError(err instanceof Error ? err.message : "Unable to load funnel page");
+      })
+      .finally(() => {
+        setPageLoading(false);
       });
   }, [bundleMode, effectiveSlug, funnelSlug, navigate, productSlug]);
 
@@ -571,6 +579,9 @@ export function PublicFunnelPage() {
   if (isSite) {
     return (
       <div className="min-h-screen bg-surface" data-public-funnel-page="true">
+        {pageLoading || siteCommerceLoading ? (
+          <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-zinc-900/80 animate-pulse" aria-hidden="true" />
+        ) : null}
         <FunnelRuntimeProvider
           value={{
             productSlug,
@@ -620,6 +631,7 @@ export function PublicFunnelPage() {
   // Non-site funnel: use existing FunnelRuntimeProvider only
   return (
     <div className="min-h-screen bg-surface" data-public-funnel-page="true">
+      {pageLoading ? <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-zinc-900/80 animate-pulse" aria-hidden="true" /> : null}
       <FunnelRuntimeProvider
         value={{
           productSlug,

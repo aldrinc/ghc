@@ -74,29 +74,63 @@ class InternalLink:
     meta: dict[str, Any] | None = None
 
 
+def _iter_target_page_references(container: dict[str, Any]):
+    for key, target in container.items():
+        if not isinstance(key, str) or (key != "targetPageId" and not key.endswith("TargetPageId")):
+            continue
+        if not isinstance(target, str) or not target:
+            continue
+        prefix = "" if key == "targetPageId" else key[: -len("TargetPageId")]
+        link_type_keys = [f"{prefix}LinkType"] if prefix else ["linkType"]
+        if prefix:
+            link_type_keys.append("linkType")
+        link_type = None
+        for link_type_key in link_type_keys:
+            candidate = container.get(link_type_key)
+            if isinstance(candidate, str) and candidate:
+                link_type = candidate
+                break
+        if link_type != "funnelPage":
+            continue
+        label_candidates = ["label"] if not prefix else [f"{prefix}CtaLabel", f"{prefix}Label", "label"]
+        label = None
+        for label_key in label_candidates:
+            candidate = container.get(label_key)
+            if isinstance(candidate, str) and candidate:
+                label = candidate
+                break
+        yield key, target, label
+
+
 def extract_internal_links(puck_data: dict[str, Any]) -> list[InternalLink]:
     links: list[InternalLink] = []
+    seen: set[tuple[str | None, str, str]] = set()
     for obj in _walk_json(puck_data):
         if not isinstance(obj, dict):
             continue
-        if obj.get("type") != "Button":
+        if "type" not in obj and "props" not in obj:
             continue
-        props = obj.get("props") if isinstance(obj.get("props"), dict) else {}
-        if props.get("linkType") != "funnelPage":
-            continue
-        target = props.get("targetPageId")
-        if not isinstance(target, str) or not target:
-            continue
-        label = props.get("label")
-        if not isinstance(label, str):
-            label = None
         meta: dict[str, Any] = {}
         block_id = obj.get("id")
         if not isinstance(block_id, str) or not block_id:
+            props = obj.get("props") if isinstance(obj.get("props"), dict) else {}
             block_id = props.get("id") if isinstance(props.get("id"), str) else None
         if isinstance(block_id, str) and block_id:
             meta["blockId"] = block_id
-        links.append(InternalLink(to_page_id=target, label=label, kind="cta", meta=meta))
+        containers = []
+        props = obj.get("props")
+        if isinstance(props, dict):
+            containers.append(props)
+        containers.append({key: value for key, value in obj.items() if key != "props"})
+        for container in containers:
+            for target_key, target, label in _iter_target_page_references(container):
+                dedupe_key = (block_id if isinstance(block_id, str) and block_id else None, target_key, target)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                link_meta = dict(meta)
+                link_meta["targetKey"] = target_key
+                links.append(InternalLink(to_page_id=target, label=label, kind="cta", meta=link_meta))
     return links
 
 
@@ -105,15 +139,26 @@ def rewrite_internal_target_ids(puck_data: dict[str, Any], id_map: dict[str, str
     for obj in _walk_json(cloned):
         if not isinstance(obj, dict):
             continue
-        if "targetPageId" in obj and isinstance(obj["targetPageId"], str):
-            old = obj["targetPageId"]
-            if old in id_map:
-                obj["targetPageId"] = id_map[old]
+        for key, value in list(obj.items()):
+            if (
+                not isinstance(key, str)
+                or (key != "targetPageId" and not key.endswith("TargetPageId"))
+                or not isinstance(value, str)
+            ):
+                continue
+            if value in id_map:
+                obj[key] = id_map[value]
         props = obj.get("props")
-        if isinstance(props, dict) and "targetPageId" in props and isinstance(props["targetPageId"], str):
-            old = props["targetPageId"]
-            if old in id_map:
-                props["targetPageId"] = id_map[old]
+        if isinstance(props, dict):
+            for key, value in list(props.items()):
+                if (
+                    not isinstance(key, str)
+                    or (key != "targetPageId" and not key.endswith("TargetPageId"))
+                    or not isinstance(value, str)
+                ):
+                    continue
+                if value in id_map:
+                    props[key] = id_map[value]
     return cloned
 
 
