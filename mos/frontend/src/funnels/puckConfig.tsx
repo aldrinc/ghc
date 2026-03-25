@@ -52,12 +52,14 @@ import {
   CommerceStoreHeader,
   CommerceStoreFooter,
   CommerceStoreTemplate,
+} from "@/components/commerce/CommerceBlocks";
+import {
   StarterStoreHeader,
   StarterPromoBar,
   StarterHomeHero,
   StarterCollectionRails,
   StarterStoreFooter,
-} from "@/components/commerce/CommerceBlocks";
+} from "@/components/commerce/StarterStorefrontBlocks";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -147,7 +149,8 @@ function containerWidthClass(width?: ContainerWidth): string {
   }
 }
 
-function sectionPaddingClass(padding?: "sm" | "md" | "lg"): { inner: string; outerY: string } {
+function sectionPaddingClass(padding?: "none" | "sm" | "md" | "lg"): { inner: string; outerY: string } {
+  if (padding === "none") return { inner: "p-0", outerY: "py-0" };
   if (padding === "lg") return { inner: "p-10", outerY: "py-16" };
   if (padding === "sm") return { inner: "p-5", outerY: "py-10" };
   return { inner: "p-7", outerY: "py-12" };
@@ -368,6 +371,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           padding: {
             type: "select",
             options: [
+              { label: "None", value: "none" },
               { label: "Small", value: "sm" },
               { label: "Medium", value: "md" },
               { label: "Large", value: "lg" },
@@ -388,7 +392,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           layout?: "full" | "contained" | "card";
           containerWidth?: ContainerWidth;
           variant?: "default" | "muted";
-          padding?: "sm" | "md" | "lg";
+          padding?: "none" | "sm" | "md" | "lg";
           content?: (props?: Record<string, unknown>) => ReactNode;
         }) => {
           const resolvedPurpose = purpose || "section";
@@ -1114,24 +1118,17 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           />
         )),
       },
-      CommerceStoreTemplate: {
-        fields: {},
-        defaultProps: {},
-        render: withBlockBoundary("CommerceStoreTemplate", (props: Record<string, unknown>) => (
-          <CommerceStoreTemplate {...props} />
-        )),
-      },
       StarterStoreHeader: {
         fields: {
           storeName: { type: "text" },
           showSearch: { type: "checkbox" },
           showCart: { type: "checkbox" },
         },
-        defaultProps: { storeName: "Store", showSearch: false, showCart: true },
+        defaultProps: { storeName: "Store", showSearch: true, showCart: true },
         render: withBlockBoundary("StarterStoreHeader", (props: Record<string, unknown>) => (
           <StarterStoreHeader
             storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
-            showSearch={props.showSearch === true}
+            showSearch={props.showSearch !== false}
             showCart={props.showCart !== false}
           />
         )),
@@ -1140,16 +1137,36 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         fields: {
           message: { type: "text" },
           ctaLabel: { type: "text" },
-          linkType: { type: "select", options: [{ label: "Funnel Page", value: "funnelPage" }, { label: "Next Page", value: "nextPage" }, { label: "External", value: "external" }] },
-          targetPageId: { type: "text" },
+          linkType: {
+            type: "select",
+            options: [
+              { label: "Funnel page", value: "funnelPage" },
+              { label: "Next page", value: "nextPage" },
+              { label: "External URL", value: "external" },
+            ],
+          },
+          targetPageId: {
+            type: "select",
+            options: [{ label: "Select a page", value: "" }, ...pageOptions],
+          },
           href: { type: "text" },
         },
-        defaultProps: { message: "Free shipping on orders over $100", ctaLabel: "Shop Now", linkType: "funnelPage" },
+        defaultProps: {
+          message: "Practical tools for herbal practitioners and wellness professionals.",
+          ctaLabel: "Browse catalog",
+          linkType: "funnelPage",
+          targetPageId: "",
+          href: "",
+        },
         render: withBlockBoundary("StarterPromoBar", (props: Record<string, unknown>) => (
           <StarterPromoBar
-            message={typeof props.message === "string" ? props.message : "Free shipping on orders over $100"}
+            message={typeof props.message === "string" ? props.message : undefined}
             ctaLabel={typeof props.ctaLabel === "string" ? props.ctaLabel : undefined}
-            linkType={(props.linkType as "funnelPage" | "nextPage" | "external") || "funnelPage"}
+            linkType={
+              props.linkType === "external" || props.linkType === "nextPage" || props.linkType === "funnelPage"
+                ? props.linkType
+                : undefined
+            }
             targetPageId={typeof props.targetPageId === "string" ? props.targetPageId : undefined}
             href={typeof props.href === "string" ? props.href : undefined}
           />
@@ -1159,36 +1176,67 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         fields: {
           eyebrow: { type: "text" },
           title: { type: "text" },
-          description: { type: "text" },
+          description: { type: "textarea" },
           primaryCtaLabel: { type: "text" },
-          primaryLinkType: { type: "select", options: [{ label: "Funnel Page", value: "funnelPage" }, { label: "Next Page", value: "nextPage" }, { label: "External", value: "external" }] },
-          primaryTargetPageId: { type: "text" },
+          primaryLinkType: {
+            type: "select",
+            options: [
+              { label: "Funnel page", value: "funnelPage" },
+              { label: "Next page", value: "nextPage" },
+              { label: "External URL", value: "external" },
+            ],
+          },
+          primaryTargetPageId: {
+            type: "select",
+            options: [{ label: "Select a page", value: "" }, ...pageOptions],
+          },
           primaryHref: { type: "text" },
-          featuredProductHandles: { type: "text" },
+          featuredProductHandles: {
+            type: "array",
+            arrayFields: {
+              value: { type: "text" },
+            },
+            defaultItemProps: { value: "" },
+          },
         },
         defaultProps: {
-          eyebrow: "New Collection",
-          title: "Discover Our Products",
-          description: "Quality items for your everyday needs.",
-          primaryCtaLabel: "Shop Now",
+          eyebrow: "Honest Herbalist",
+          title: "Practical tools for herbal practitioners",
+          description: "Explore reference materials, worksheet pads, and client-facing tools grounded in the live catalog.",
+          primaryCtaLabel: "Browse catalog",
           primaryLinkType: "funnelPage",
-          featuredProductHandles: "",
+          primaryTargetPageId: "",
+          primaryHref: "",
+          featuredProductHandles: [{ value: "the-honest-herbalist-handbook" }],
         },
-        render: withBlockBoundary("StarterHomeHero", (props: Record<string, unknown>) => {
-          const handles = typeof props.featuredProductHandles === "string" ? props.featuredProductHandles.split(",").map((h: string) => h.trim()).filter(Boolean) : [];
-          return (
-            <StarterHomeHero
-              eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : "New Collection"}
-              title={typeof props.title === "string" ? props.title : "Discover Our Products"}
-              description={typeof props.description === "string" ? props.description : "Quality items for your everyday needs."}
-              primaryCtaLabel={typeof props.primaryCtaLabel === "string" ? props.primaryCtaLabel : "Shop Now"}
-              primaryLinkType={(props.primaryLinkType as "funnelPage" | "nextPage" | "external") || "funnelPage"}
-              primaryTargetPageId={typeof props.primaryTargetPageId === "string" ? props.primaryTargetPageId : undefined}
-              primaryHref={typeof props.primaryHref === "string" ? props.primaryHref : undefined}
-              featuredProductHandles={handles}
-            />
-          );
-        }),
+        render: withBlockBoundary("StarterHomeHero", (props: Record<string, unknown>) => (
+          <StarterHomeHero
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            description={typeof props.description === "string" ? props.description : undefined}
+            primaryCtaLabel={typeof props.primaryCtaLabel === "string" ? props.primaryCtaLabel : undefined}
+            primaryLinkType={
+              props.primaryLinkType === "external" || props.primaryLinkType === "nextPage" || props.primaryLinkType === "funnelPage"
+                ? props.primaryLinkType
+                : undefined
+            }
+            primaryTargetPageId={typeof props.primaryTargetPageId === "string" ? props.primaryTargetPageId : undefined}
+            primaryHref={typeof props.primaryHref === "string" ? props.primaryHref : undefined}
+            featuredProductHandles={
+              Array.isArray(props.featuredProductHandles)
+                ? props.featuredProductHandles
+                    .map((item) => {
+                      if (typeof item === "string") return item;
+                      if (item && typeof item === "object" && typeof (item as { value?: unknown }).value === "string") {
+                        return (item as { value: string }).value;
+                      }
+                      return "";
+                    })
+                    .filter(Boolean)
+                : undefined
+            }
+          />
+        )),
       },
       StarterCollectionRails: {
         fields: {
@@ -1216,6 +1264,17 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
             showCategories={props.showCategories !== false}
             showCollections={props.showCollections !== false}
           />
+        )),
+      },
+      CommerceStoreTemplate: {
+        fields: {
+          content: { type: "slot" },
+        },
+        defaultProps: {},
+        render: withBlockBoundary("CommerceStoreTemplate", (props: Record<string, unknown>) => (
+          <CommerceStoreTemplate>
+            {typeof props.content === "function" ? props.content({ className: "space-y-5" }) : null}
+          </CommerceStoreTemplate>
         )),
       },
       Spacer: {

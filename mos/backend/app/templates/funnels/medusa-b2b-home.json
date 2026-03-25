@@ -18,13 +18,13 @@
           "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "sm",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreHeader",
               "props": {
                 "storeName": "Honest Herbalist",
-                "showSearch": false,
+                "showSearch": true,
                 "showCart": true
               }
             }
@@ -43,8 +43,8 @@
             {
               "type": "StarterPromoBar",
               "props": {
-                "message": "Free shipping on orders over $100",
-                "ctaLabel": "Shop Now",
+                "message": "Practical tools for herbal practitioners and wellness professionals.",
+                "ctaLabel": "Browse catalog",
                 "linkType": "funnelPage",
                 "targetPageId": "__PAGE_CATEGORY__"
               }
@@ -59,18 +59,22 @@
           "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "lg",
+          "padding": "none",
           "content": [
             {
               "type": "StarterHomeHero",
               "props": {
-                "eyebrow": "Herbal Practice Resources",
-                "title": "Practical Tools for Herbal Practitioners",
-                "description": "Reference handbooks, worksheet pads, and quick-check materials for your practice.",
-                "primaryCtaLabel": "Browse Products",
+                "eyebrow": "Honest Herbalist",
+                "title": "Practical tools for herbal practitioners",
+                "description": "Reference materials, worksheet pads, and quick-check resources for clinical conversations and herbal practice workflows.",
+                "primaryCtaLabel": "Browse products",
                 "primaryLinkType": "funnelPage",
                 "primaryTargetPageId": "__PAGE_CATEGORY__",
-                "featuredProductHandles": []
+                "featuredProductHandles": [
+                  "the-honest-herbalist-handbook",
+                  "what-im-taking-doctor-visit-worksheet-pad",
+                  "preprocedure-stop-supplements-pause-list-2week-prep-guide"
+                ]
               }
             }
           ]
@@ -80,10 +84,10 @@
         "type": "Section",
         "props": {
           "purpose": "section",
-          "layout": "contained",
+          "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "lg",
+          "padding": "none",
           "content": [
             {
               "type": "StarterCollectionRails",
@@ -101,8 +105,8 @@
           "purpose": "footer",
           "layout": "full",
           "containerWidth": "lg",
-          "variant": "muted",
-          "padding": "lg",
+          "variant": "default",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreFooter",

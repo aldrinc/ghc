@@ -18,13 +18,13 @@
           "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "sm",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreHeader",
               "props": {
                 "storeName": "Honest Herbalist",
-                "showSearch": false,
+                "showSearch": true,
                 "showCart": true
               }
             }
@@ -43,8 +43,8 @@
             {
               "type": "StarterPromoBar",
               "props": {
-                "message": "Free shipping on orders over $100",
-                "ctaLabel": "Shop Now",
+                "message": "Starter-aligned shell with live product detail data.",
+                "ctaLabel": "Browse catalog",
                 "linkType": "funnelPage",
                 "targetPageId": "__PAGE_CATEGORY__"
               }
@@ -74,8 +74,8 @@
           "purpose": "footer",
           "layout": "full",
           "containerWidth": "lg",
-          "variant": "muted",
-          "padding": "lg",
+          "variant": "default",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreFooter",

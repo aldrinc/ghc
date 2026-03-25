@@ -18,13 +18,13 @@
           "layout": "full",
           "containerWidth": "lg",
           "variant": "default",
-          "padding": "sm",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreHeader",
               "props": {
                 "storeName": "Honest Herbalist",
-                "showSearch": false,
+                "showSearch": true,
                 "showCart": true
               }
             }
@@ -43,27 +43,11 @@
             {
               "type": "StarterPromoBar",
               "props": {
-                "message": "Free shipping on orders over $100",
-                "ctaLabel": "Shop Now",
+                "message": "Starter-aligned shell with live category navigation.",
+                "ctaLabel": "Browse catalog",
                 "linkType": "funnelPage",
                 "targetPageId": "__PAGE_CATEGORY__"
               }
-            }
-          ]
-        }
-      },
-      {
-        "type": "Section",
-        "props": {
-          "purpose": "section",
-          "layout": "full",
-          "containerWidth": "lg",
-          "variant": "default",
-          "padding": "none",
-          "content": [
-            {
-              "type": "CommerceCategoryHeading",
-              "props": {}
             }
           ]
         }
@@ -78,25 +62,16 @@
           "padding": "lg",
           "content": [
             {
-              "type": "CommerceCategoryList",
-              "props": {}
-            }
-          ]
-        }
-      },
-      {
-        "type": "Section",
-        "props": {
-          "purpose": "section",
-          "layout": "full",
-          "containerWidth": "lg",
-          "variant": "default",
-          "padding": "lg",
-          "content": [
-            {
-              "type": "CommerceProductGrid",
+              "type": "CommerceStoreTemplate",
               "props": {
-                "columns": 3
+                "content": [
+                  {
+                    "type": "CommerceProductGrid",
+                    "props": {
+                      "columns": 3
+                    }
+                  }
+                ]
               }
             }
           ]
@@ -108,8 +83,8 @@
           "purpose": "footer",
           "layout": "full",
           "containerWidth": "lg",
-          "variant": "muted",
-          "padding": "lg",
+          "variant": "default",
+          "padding": "none",
           "content": [
             {
               "type": "StarterStoreFooter",

@@ -570,7 +570,7 @@ export function PublicFunnelPage() {
   // Site experience: wrap with CommerceRuntimeProvider
   if (isSite) {
     return (
-      <div className="min-h-screen bg-surface">
+      <div className="min-h-screen bg-surface" data-public-funnel-page="true">
         <FunnelRuntimeProvider
           value={{
             productSlug,
@@ -619,7 +619,7 @@ export function PublicFunnelPage() {
 
   // Non-site funnel: use existing FunnelRuntimeProvider only
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface" data-public-funnel-page="true">
       <FunnelRuntimeProvider
         value={{
           productSlug,
