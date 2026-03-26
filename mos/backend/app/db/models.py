@@ -2995,11 +2995,285 @@ class SiteImportSnapshot(Base):
     )
 
 
+class SiteTemplate(Base):
+    """Canonical table for site templates, seeded from built-in site blueprints."""
+
+    __tablename__ = "site_templates"
+    __table_args__ = (sa.Index("idx_site_templates_family", "family"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    family: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    site_type: Mapped[str] = mapped_column(Text, nullable=False)
+    commerce_provider: Mapped[str] = mapped_column(Text, nullable=False)
+    is_system_template: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    provenance_notes: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteTemplatePage(Base):
+    """Canonical template page definitions linked to site_templates."""
+
+    __tablename__ = "site_template_pages"
+    __table_args__ = (
+        sa.Index("idx_site_template_pages_template", "site_template_id"),
+        UniqueConstraint(
+            "site_template_id", "page_type", name="uq_site_template_pages_template_type"
+        ),
+        UniqueConstraint(
+            "site_template_id", "ordering", name="uq_site_template_pages_template_ordering"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_template_id: Mapped[str] = mapped_column(
+        ForeignKey("site_templates.id", ondelete="CASCADE"), nullable=False
+    )
+    page_type: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    is_entry: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    provenance_notes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteTemplateLink(Base):
+    """Canonical template link definitions linked to site_templates."""
+
+    __tablename__ = "site_template_links"
+    __table_args__ = (sa.Index("idx_site_template_links_template", "site_template_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_template_id: Mapped[str] = mapped_column(
+        ForeignKey("site_templates.id", ondelete="CASCADE"), nullable=False
+    )
+    from_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    to_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link_kind: Mapped[str] = mapped_column(Text, nullable=False, server_default="internal")
+    meta: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteTemplateFunnel(Base):
+    """Canonical template funnel definitions linked to site_templates."""
+
+    __tablename__ = "site_template_funnels"
+    __table_args__ = (sa.Index("idx_site_template_funnels_template", "site_template_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_template_id: Mapped[str] = mapped_column(
+        ForeignKey("site_templates.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    funnel_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="checkout")
+    entry_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provenance_notes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteTemplateFunnelStep(Base):
+    """Canonical template funnel step definitions linked to site_template_funnels."""
+
+    __tablename__ = "site_template_funnel_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "site_template_funnel_id",
+            "ordering",
+            name="uq_site_template_funnel_steps_funnel_ordering",
+        ),
+        sa.Index("idx_site_template_funnel_steps_funnel", "site_template_funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_template_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_template_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    page_type: Mapped[str] = mapped_column(Text, nullable=False)
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    step_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cta_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteFunnel(Base):
+    """Canonical site-scoped funnel runtime table."""
+
+    __tablename__ = "site_funnels"
+    __table_args__ = (
+        sa.Index("idx_site_funnels_site", "site_id"),
+        sa.Index("idx_site_funnels_site_entry_page", "site_id", "entry_page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    funnel_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="checkout")
+    entry_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    selected_offer_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("product_offers.id", ondelete="SET NULL"), nullable=True
+    )
+    tracking_config: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteFunnelStep(Base):
+    """Canonical table for ordered page references inside a site funnel."""
+
+    __tablename__ = "site_funnel_steps"
+    __table_args__ = (
+        UniqueConstraint("site_funnel_id", "ordering", name="uq_site_funnel_steps_funnel_ordering"),
+        sa.Index("idx_site_funnel_steps_funnel", "site_funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    site_page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    step_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cta_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteProductPageBinding(Base):
+    """Binding between a site, product, and optionally a specific page role."""
+
+    __tablename__ = "site_product_page_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "site_id",
+            "product_id",
+            "page_role",
+            "site_funnel_id",
+            name="uq_site_product_bindings_site_product_role_funnel",
+        ),
+        sa.Index("idx_site_product_bindings_site", "site_id"),
+        sa.Index("idx_site_product_bindings_product", "product_id"),
+        sa.Index("idx_site_product_bindings_site_page", "site_page_id"),
+        sa.Index("idx_site_product_bindings_site_funnel", "site_funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    site_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=True
+    )
+    site_funnel_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_funnels.id", ondelete="CASCADE"), nullable=True
+    )
+    page_role: Mapped[str] = mapped_column(Text, nullable=False)
+    variant_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    binding_context: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SiteImportApplication(Base):
+    """Audit trail for explicit site import apply actions."""
+
+    __tablename__ = "site_import_applications"
+    __table_args__ = (
+        sa.Index("idx_site_import_applications_import", "site_import_id"),
+        sa.Index("idx_site_import_applications_action", "action"),
+        sa.Index("idx_site_import_applications_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_import_id: Mapped[str] = mapped_column(
+        ForeignKey("site_imports.id", ondelete="CASCADE"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    site_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    site_page_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    site_template_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    template_variant_id: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    error_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    result_summary: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class Site(Base):
     __tablename__ = "sites"
     __table_args__ = (
         sa.Index("idx_sites_org_client", "org_id", "client_id"),
         sa.Index("idx_sites_family", "site_family"),
+        UniqueConstraint("route_slug", name="uq_sites_route_slug"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -3011,6 +3285,14 @@ class Site(Base):
         ForeignKey("site_imports.id", ondelete="SET NULL"),
         nullable=True,
     )
+    design_system_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("design_systems.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    site_template_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"),
         nullable=True,
@@ -3018,9 +3300,19 @@ class Site(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    route_slug: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    primary_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     site_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     site_family: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     commerce_provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    entry_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    active_site_publication_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     source_hostname: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     entry_page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     imported_page_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
@@ -3042,16 +3334,25 @@ class SitePage(Base):
     __tablename__ = "site_pages"
     __table_args__ = (
         sa.Index("idx_site_pages_site", "site_id"),
-        UniqueConstraint("site_id", "page_type", name="uq_site_pages_site_page_type"),
+        sa.Index("idx_site_pages_status", "status"),
+        UniqueConstraint("site_id", "slug", name="uq_site_pages_site_slug"),
     )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    design_system_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("design_systems.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     page_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    is_system_page: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_screenshot_refs: Mapped[list[str]] = mapped_column(
         JSONB,
@@ -3096,6 +3397,10 @@ class SitePageVersion(Base):
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
     )
+    source_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ai_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    diff_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -3130,6 +3435,225 @@ class SiteLink(Base):
         JSONB,
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublication(Base):
+    """Immutable snapshot of site state at publish time."""
+
+    __tablename__ = "site_publications"
+    __table_args__ = (
+        sa.Index("idx_site_publications_site", "site_id"),
+        UniqueConstraint("site_id", "created_at", name="uq_site_publications_site_created"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    entry_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationPage(Base):
+    """Immutable snapshot of a site page at publish time."""
+
+    __tablename__ = "site_publication_pages"
+    __table_args__ = (
+        sa.Index("idx_site_publication_pages_pub", "publication_id"),
+        sa.Index(
+            "idx_site_publication_pages_pub_page",
+            "publication_id",
+            "page_id",
+        ),
+        UniqueConstraint(
+            "publication_id", "slug_at_publish", name="uq_site_publication_pages_pub_slug"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    page_version_id: Mapped[str] = mapped_column(
+        ForeignKey("site_page_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    title_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_type_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_role_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ordering_at_publish: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    og_image_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationLink(Base):
+    """Immutable snapshot of a site link at publish time."""
+
+    __tablename__ = "site_publication_links"
+    __table_args__ = (
+        sa.Index(
+            "idx_site_publication_links_pub_from",
+            "publication_id",
+            "from_page_id_at_publish",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    site_link_id: Mapped[str] = mapped_column(
+        ForeignKey("site_links.id", ondelete="CASCADE"), nullable=False
+    )
+    from_page_id_at_publish: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    to_page_id_at_publish: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    from_page_slug_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    to_page_slug_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    label_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link_kind_at_publish: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="internal"
+    )
+    meta_at_publish: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationFunnel(Base):
+    """Immutable snapshot of a site funnel at publish time."""
+
+    __tablename__ = "site_publication_funnels"
+    __table_args__ = (
+        sa.Index("idx_site_publication_funnels_pub", "publication_id"),
+        UniqueConstraint(
+            "publication_id",
+            "site_funnel_id",
+            name="uq_site_publication_funnels_pub_funnel",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    name_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    funnel_type_at_publish: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="checkout"
+    )
+    entry_page_id_at_publish: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationFunnelStep(Base):
+    """Immutable snapshot of a site funnel step at publish time."""
+
+    __tablename__ = "site_publication_funnel_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_funnel_id",
+            "ordering_at_publish",
+            name="uq_site_publication_funnel_steps_pub_funnel_ordering",
+        ),
+        sa.Index(
+            "idx_site_publication_funnel_steps_pub_funnel",
+            "publication_funnel_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publication_funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    site_funnel_step_id: Mapped[str] = mapped_column(
+        ForeignKey("site_funnel_steps.id", ondelete="CASCADE"), nullable=False
+    )
+    page_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    ordering_at_publish: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    step_role_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cta_label_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SitePublicationProductBinding(Base):
+    """Immutable snapshot of a site product binding at publish time."""
+
+    __tablename__ = "site_publication_product_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_id",
+            "site_product_binding_id",
+            name="uq_site_publication_product_bindings_pub_binding",
+        ),
+        sa.Index(
+            "idx_site_publication_product_bindings_pub",
+            "publication_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("site_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    site_product_binding_id: Mapped[str] = mapped_column(
+        ForeignKey("site_product_page_bindings.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id_at_publish: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    page_id_at_publish: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    page_role_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    variant_ids_at_publish: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    binding_context_at_publish: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    priority_at_publish: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    active_at_publish: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("true")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -3824,4 +4348,3 @@ class AdTeardownAssertionEvidence(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-

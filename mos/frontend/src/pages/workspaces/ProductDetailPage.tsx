@@ -28,6 +28,7 @@ import {
   useUpdateVariant,
   useUploadProductAssets,
 } from "@/api/products";
+import { useProductSiteBindings, useProductSites } from "@/api/siteProductBindings";
 import { toast } from "@/components/ui/toast";
 import type { ProductAsset, ProductOffer, ProductVariant } from "@/types/products";
 import {
@@ -152,6 +153,8 @@ export function ProductDetailPage() {
 
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
+  const { data: productSiteBindings = [] } = useProductSiteBindings(productDetail?.id || productId || undefined);
+  const { data: productSites = [] } = useProductSites(productDetail?.id || productId || undefined);
   const productClientId = productDetail?.client_id;
   const { data: shopifyStatus } = useClientShopifyStatus(productClientId);
   const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
@@ -879,6 +882,60 @@ export function ProductDetailPage() {
                   {productDetail.disclaimers?.length ? productDetail.disclaimers.join(", ") : "—"}
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-content-muted">Site Experiences</div>
+                <div className="text-xs text-content-muted">
+                  Review where this product is used across sites and jump into the assigned PDP experience.
+                </div>
+              </div>
+              {!productSites.length ? (
+                <div className="text-sm text-content-muted">This product is not assigned to any site yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {productSites.map((siteUsage) => {
+                    const binding = productSiteBindings.find((item) => item.siteId === siteUsage.siteId);
+                    return (
+                      <div
+                        key={siteUsage.siteId}
+                        className="rounded-md border border-border bg-surface p-3 text-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="font-semibold text-content">{siteUsage.siteName}</div>
+                            <div className="mt-1 text-xs text-content-muted">
+                              {binding?.page
+                                ? `Assigned page: ${binding.page.name} (/${binding.page.slug})`
+                                : "No PDP page assigned yet"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => navigate(`/workspaces/sites/${siteUsage.siteId}`)}
+                            >
+                              {binding ? "Change assignment" : "Assign page"}
+                            </Button>
+                            {binding?.sitePageId ? (
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  navigate(`/workspaces/sites/${siteUsage.siteId}/pages/${binding.sitePageId}`)
+                                }
+                              >
+                                Open page
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">

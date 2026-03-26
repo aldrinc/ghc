@@ -6,8 +6,10 @@ export type AppRoute = {
 export const appRoutes: AppRoute[] = [
   { path: "/workspaces/overview", label: "Workspace Overview" },
   { path: "/workspaces/brand", label: "Brand Settings" },
-  { path: "/workspaces/store-templates", label: "Store Templates" },
   { path: "/workspaces/sites", label: "Sites" },
+  { path: "/workspaces/sites/templates", label: "Site Templates" },
+  { path: "/workspaces/sites/imports", label: "Site Imports" },
+  { path: "/workspaces/sites/:siteId/funnels", label: "Site Funnels" },
   { path: "/workspaces/products", label: "Products" },
   { path: "/strategy", label: "Strategy" },
   { path: "/campaigns", label: "Campaigns" },

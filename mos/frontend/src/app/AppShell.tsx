@@ -94,7 +94,7 @@ const WORKSPACE_NAV: NavSection = {
     { title: "Overview", path: "/workspaces/overview", icon: LayoutDashboard },
     { title: "Strategy", path: "/strategy", icon: ListChecks },
     { title: "Brand", path: "/workspaces/brand", icon: Settings2 },
-    { title: "Store Templates", path: "/workspaces/store-templates", icon: LayoutTemplate },
+    { title: "Sites", path: "/workspaces/sites", icon: LayoutTemplate },
     { title: "Commerce", path: "/commerce", icon: ShoppingBag },
     { title: "Products", path: "/workspaces/products", icon: Package },
   ],
