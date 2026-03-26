@@ -332,6 +332,58 @@ function buildPage(slug: "home" | "category" | "product" | "cart") {
   };
 }
 
+function buildB2CPage(slug: "cart" | "checkout" | "order/confirmed") {
+  const pageMap = {
+    "page-cart": "cart",
+    "page-checkout": "checkout",
+    "page-order-confirmed": "order/confirmed",
+  };
+  const pageTypeMap = {
+    "page-cart": "cart",
+    "page-checkout": "checkout",
+    "page-order-confirmed": "order_confirmed",
+  };
+
+  const content = [
+    {
+      type: "Section",
+      props: {
+        purpose: "section",
+        layout: "full",
+        containerWidth: "xl",
+        variant: "default",
+        padding: "none",
+        content: [
+          {
+            type: slug === "cart" ? "MedusaB2CCartPage" : slug === "checkout" ? "MedusaB2CCheckoutPage" : "MedusaB2COrderConfirmedPage",
+            props: {},
+          },
+        ],
+      },
+    },
+  ];
+
+  return {
+    productSlug: PRODUCT_SLUG,
+    funnelId: "funnel-1",
+    publicationId: "publication-1",
+    pageId: slug === "cart" ? "page-cart" : slug === "checkout" ? "page-checkout" : "page-order-confirmed",
+    slug,
+    stage: "custom",
+    puckData: {
+      root: { props: { title: `B2C ${slug}`, description: `B2C ${slug} page` } },
+      content,
+      zones: {},
+    },
+    pageMap,
+    pageStageMap: Object.fromEntries(Object.keys(pageMap).map((key) => [key, "custom"])),
+    pageTypeMap,
+    metadata: { title: `B2C ${slug}`, description: `B2C ${slug} page`, lang: "en", brandName: "Honest Herbalist" },
+    tracking: null,
+    nextPageId: slug === "cart" ? "page-checkout" : null,
+  };
+}
+
 async function mockStorefront(page: Page, options?: { withCollectionData?: boolean; cartHasItems?: boolean }) {
   const withCollectionData = options?.withCollectionData !== false;
   const cartHasItems = options?.cartHasItems !== false;
@@ -364,6 +416,237 @@ async function mockStorefront(page: Page, options?: { withCollectionData?: boole
           ? "category"
           : "home";
     await route.fulfill({ json: buildSiteCommerce({ slug: slug === "cart" ? "home" : slug, withCollectionData, cartHasItems }) });
+  });
+
+  await page.route("**/public/events", async (route) => {
+    await route.fulfill({ status: 204, body: "" });
+  });
+}
+
+async function mockB2CCheckout(
+  page: Page,
+  options?: { cartHasItems?: boolean; paymentRedirect?: boolean; shippingOptionFailure?: boolean },
+) {
+  const cartHasItems = options?.cartHasItems !== false;
+  const paymentRedirect = options?.paymentRedirect === true;
+  const shippingOptionFailure = options?.shippingOptionFailure === true;
+  const backendUrl = "https://medusa.test";
+
+  let cart = {
+    id: "cart-b2c-1",
+    region_id: "reg-us",
+    currency_code: "usd",
+    email: "",
+    shipping_address: undefined,
+    billing_address: undefined,
+    shipping_methods: [] as Array<{ id: string; shipping_option_id: string; price: number }>,
+    subtotal: cartHasItems ? 3900 : 0,
+    shipping_total: 0,
+    tax_total: 0,
+    total: cartHasItems ? 3900 : 0,
+    items: cartHasItems
+      ? [
+          {
+            id: "line-1",
+            cart_id: "cart-b2c-1",
+            title: "The Honest Herbalist Handbook",
+            variant_id: "variant-handbook",
+            quantity: 1,
+            unit_price: 3900,
+            total: 3900,
+            variant: { id: "variant-handbook", title: "Standard", prices: [] },
+          },
+        ]
+      : [],
+  };
+
+  await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/meta`, async (route) => {
+    await route.fulfill({
+      json: {
+        productSlug: PRODUCT_SLUG,
+        funnelSlug: FUNNEL_SLUG,
+        funnelId: "funnel-1",
+        publicationId: "publication-1",
+        entrySlug: "checkout",
+        pages: [],
+        medusaRuntimeConfig: {
+          backendUrl,
+          publishableKey: "pk_test_123",
+          defaultCountryCode: "us",
+        },
+      },
+    });
+  });
+
+  await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/commerce`, async (route) => {
+    await route.fulfill({ json: { productSlug: PRODUCT_SLUG, funnelSlug: FUNNEL_SLUG, funnelId: "funnel-1", product: { id: "legacy", title: "Legacy", variants: [], variants_count: 0 } } });
+  });
+
+  await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/pages/**`, async (route) => {
+    const url = new URL(route.request().url());
+    const requestedSlug = decodeURIComponent(url.pathname.split(`/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/pages/`)[1] || "");
+    if (requestedSlug === "cart" || requestedSlug === "checkout" || requestedSlug === "order/confirmed") {
+      await route.fulfill({ json: buildB2CPage(requestedSlug as "cart" | "checkout" | "order/confirmed") });
+      return;
+    }
+    await route.abort();
+  });
+
+  await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/site/commerce*`, async (route) => {
+    await route.fulfill({
+      json: {
+        siteFamily: "medusa-b2c-starter",
+        commerceProvider: "medusa",
+        storeName: "Honest Herbalist",
+        regions: [
+          {
+            id: "reg-us",
+            name: "United States",
+            currency_code: "usd",
+            countries: [{ iso_2: "us", display_name: "United States" }],
+          },
+        ],
+        products: [],
+        collections: [],
+        categories: [],
+        currentCategory: null,
+        currentProduct: null,
+        cart,
+      },
+    });
+  });
+
+  await page.route(`${backendUrl}/**`, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const method = request.method();
+
+    if (method === "GET" && path.endsWith("/store/regions")) {
+      await route.fulfill({
+        json: {
+          regions: [
+            {
+              id: "reg-us",
+              name: "United States",
+              currency_code: "usd",
+              countries: [{ iso_2: "us", display_name: "United States" }],
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (method === "GET" && path.includes("/store/collections")) {
+      await route.fulfill({ json: { collections: [] } });
+      return;
+    }
+
+    if (method === "GET" && (path.includes("/store/product-categories") || path.includes("/store/categories") || path.includes("/store/category"))) {
+      await route.fulfill({ json: { product_categories: [] } });
+      return;
+    }
+
+    if (method === "POST" && /\/store\/carts\/?$/.test(path)) {
+      await route.fulfill({ json: { cart } });
+      return;
+    }
+
+    if (method === "GET" && path.includes(`/store/carts/${cart.id}`)) {
+      await route.fulfill({ json: { cart } });
+      return;
+    }
+
+    if (method === "POST" && path.includes(`/store/carts/${cart.id}`) && path.includes("shipping-method")) {
+      const payload = request.postDataJSON() as { option_id?: string };
+      cart = {
+        ...cart,
+        shipping_methods: [{ id: "sm-1", shipping_option_id: payload.option_id || "ship-standard", price: 900 }],
+        shipping_total: 900,
+        total: cart.subtotal + 900,
+      };
+      await route.fulfill({ json: { cart } });
+      return;
+    }
+
+    if (method === "POST" && path.includes(`/store/carts/${cart.id}`) && path.includes("complete")) {
+      await route.fulfill({ json: { type: "order", order: { id: "order-b2c-1" } } });
+      return;
+    }
+
+    if (method === "POST" && path.includes(`/store/carts/${cart.id}`)) {
+      const payload = request.postDataJSON() as {
+        email?: string;
+        shipping_address?: typeof cart.shipping_address;
+        billing_address?: typeof cart.billing_address;
+      };
+      cart = {
+        ...cart,
+        email: payload.email ?? cart.email,
+        shipping_address: payload.shipping_address ?? cart.shipping_address,
+        billing_address: payload.billing_address ?? cart.billing_address,
+      };
+      await route.fulfill({ json: { cart } });
+      return;
+    }
+
+    if (method === "GET" && path.includes("shipping-options")) {
+      if (shippingOptionFailure) {
+        await route.fulfill({ status: 500, json: { message: "Shipping service unavailable" } });
+        return;
+      }
+      await route.fulfill({
+        json: {
+          shipping_options: [
+            { id: "ship-standard", name: "Standard Shipping", amount: 900, currency_code: "usd", region_id: "reg-us", price_type: "flat" },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (method === "GET" && path.includes("payment") && path.includes("provider")) {
+      await route.fulfill({
+        json: {
+          payment_providers: [{ id: paymentRedirect ? "paypal" : "manual_test" }],
+        },
+      });
+      return;
+    }
+
+    if (method === "POST" && path.includes("payment")) {
+      const payload = request.postDataJSON() as { provider_id?: string };
+      await route.fulfill({
+        json: {
+          payment_collection: {
+            id: "paycol-1",
+            status: "authorized",
+            amount: cart.total,
+            currency_code: "usd",
+            payment_sessions: [
+              {
+                id: "session-1",
+                provider_id: payload.provider_id || (paymentRedirect ? "paypal" : "manual_test"),
+                status: "pending",
+                amount: cart.total,
+                data: paymentRedirect ? { redirect_url: "https://payments.test/checkout" } : {},
+              },
+            ],
+          },
+        },
+      });
+      return;
+    }
+
+    await route.abort();
+  });
+
+  await page.route("https://payments.test/**", async (route) => {
+    await route.fulfill({
+      contentType: "text/html",
+      body: "<html><body><h1>Redirected to provider</h1></body></html>",
+    });
   });
 
   await page.route("**/public/events", async (route) => {
@@ -459,6 +742,144 @@ test.describe("starter storefront parity", () => {
     await page.waitForURL(/\/category$/);
     await expect(page.getByTestId("category-container")).toBeVisible();
     expect(documentRequests).toHaveLength(requestCountAfterInitialLoad);
+  });
+});
+
+test.describe("b2c checkout parity", () => {
+  test("protects the checkout route when the cart is empty", async ({ page }) => {
+    await mockB2CCheckout(page, { cartHasItems: false });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("b2c-checkout-empty-state")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back to cart" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Back to cart" }).click();
+    await page.waitForURL(new RegExp(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/cart$`));
+  });
+
+  test("unlocks shipping and payment progressively and completes checkout", async ({ page }) => {
+    await mockB2CCheckout(page);
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("b2c-checkout-contact")).toBeVisible();
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$39.00");
+    await expect(page.getByTestId("b2c-checkout-shipping")).toContainText("Save a valid delivery address to load shipping options.");
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+
+    await expect(page.getByTestId("b2c-shipping-options")).toBeVisible();
+    await page.getByText("Standard Shipping").click();
+
+    await expect(page.getByTestId("b2c-payment-providers")).toBeVisible();
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$48.00");
+    await page.getByText("Manual Test").click();
+    await page.getByTestId("b2c-complete-checkout").click();
+
+    await page.waitForURL(new RegExp(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/order/order-b2c-1/confirmed$`));
+  });
+
+  test("re-locks shipping totals and payment after delivery details change", async ({ page }) => {
+    await mockB2CCheckout(page);
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+    await page.getByText("Standard Shipping").click();
+
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$48.00");
+    await expect(page.getByTestId("b2c-payment-providers")).toBeVisible();
+
+    await deliverySection.getByLabel("Address").fill("456 Updated Avenue");
+    await page.getByTestId("b2c-save-delivery").click();
+
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("Calculated next");
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$39.00");
+    await expect(page.getByTestId("b2c-checkout-payment")).toContainText("Choose a shipping method before selecting a payment option.");
+  });
+
+  test("disables checkout completion when delivery fields are edited after shipping selection", async ({ page }) => {
+    await mockB2CCheckout(page);
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+    await page.getByText("Standard Shipping").click();
+    await page.getByText("Manual Test").click();
+
+    await expect(page.getByTestId("b2c-complete-checkout")).toBeEnabled();
+
+    await deliverySection.getByLabel("Address").fill("789 Unsaved Update");
+
+    await expect(page.getByTestId("b2c-complete-checkout")).toBeDisabled();
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("Calculated next");
+    await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$39.00");
+  });
+
+  test("renders inline shipping API failures", async ({ page }) => {
+    await mockB2CCheckout(page, { shippingOptionFailure: true });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+
+    await expect(page.getByTestId("b2c-checkout-shipping")).toContainText("Shipping service unavailable");
+  });
+
+  test("redirect-capable providers send the buyer to the provider flow", async ({ page }) => {
+    await mockB2CCheckout(page, { paymentRedirect: true });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+    await page.getByText("Standard Shipping").click();
+    await page.getByTestId("b2c-payment-providers").getByText("Paypal", { exact: true }).click();
+    await page.getByTestId("b2c-complete-checkout").click();
+
+    await page.waitForURL("https://payments.test/checkout");
+    await expect(page.getByText("Redirected to provider")).toBeVisible();
   });
 });
 

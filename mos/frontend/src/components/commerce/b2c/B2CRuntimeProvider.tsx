@@ -75,6 +75,7 @@ import {
   requestOrderTransfer,
   acceptOrderTransfer,
   declineOrderTransfer,
+  createCart as createMedusaCart,
   type ProductListOptions,
   type UpdateCustomerInput,
   type CreateAddressInput,
@@ -104,6 +105,55 @@ export type B2CPageType =
   | "order_transfer"
   | "order_transfer_accept"
   | "order_transfer_decline";
+
+// =============================================================================
+// Checkout Types
+// =============================================================================
+
+/**
+ * Supported checkout mutation steps.
+ * Each step maps to a specific cart update operation.
+ */
+export type CheckoutStep =
+  | "update_email"
+  | "update_shipping_address"
+  | "update_billing_address"
+  | "set_shipping_method"
+  | "init_payment_session";
+
+/**
+ * Data payload for each checkout step.
+ */
+export type CheckoutStepData =
+  | { step: "update_email"; email: string }
+  | { step: "update_shipping_address"; address: Record<string, unknown> }
+  | { step: "update_billing_address"; address: Record<string, unknown> }
+  | { step: "set_shipping_method"; optionId: string }
+  | { step: "init_payment_session"; providerId: string };
+
+/**
+ * Country/region checkout contract.
+ * Documents the explicit constraints on country-driven cart behavior.
+ */
+export type CountryCheckoutContract = {
+  /**
+   * Country is seeded at cart creation and cannot be safely changed mid-checkout.
+   * Attempting to do so would invalidate region-dependent state (shipping options,
+   * payment providers, tax calculations). If you need a different country, create
+   * a new cart or inform the user to start fresh.
+   */
+  countryMidCheckoutBehavior: "error";
+  /**
+   * Supported: passing country at cart creation via regionId or countryCode.
+   * Not supported: live country replacement during an active checkout session.
+   */
+  countryChangeSupported: false;
+  /**
+   * Cart region is determined at creation time from the default region or explicit regionId.
+   * Region determines: currency, available shipping options, payment providers, tax rules.
+   */
+  regionDeterminedAt: "cart_creation";
+};
 
 export type B2CRuntimeContextValue = {
   // Configuration
@@ -157,6 +207,11 @@ export type B2CRuntimeContextValue = {
   removeCartItem: (lineId: string) => Promise<void>;
   updateCartEmail: (email: string) => Promise<void>;
   updateCartShippingAddress: (address: Record<string, unknown>) => Promise<void>;
+  updateCartBillingAddress: (address: Record<string, unknown>) => Promise<void>;
+
+  // Actions: Checkout (consolidated mutations)
+  // Note: init_payment_session returns MedusaPaymentCollection; all other steps return MedusaCart
+  performCheckoutAction: (step: CheckoutStep, data: CheckoutStepData) => Promise<MedusaCart | MedusaPaymentCollection>;
 
   // Actions: Shipping
   getShippingOptions: () => Promise<MedusaShippingOption[]>;
@@ -429,11 +484,23 @@ export function B2CRuntimeProvider({
   // Actions: Cart
   // =============================================================================
 
+  /**
+   * Create a new cart.
+   *
+   * Country/Region contract:
+   * - If regionId is provided, cart is created with that region.
+   * - If no regionId, cart is created with the session's default country code.
+   * - Country cannot be changed mid-checkout (would invalidate region-dependent state).
+   *   If user needs different country/region, they must start a fresh cart.
+   */
   const createCart = useCallback(async (regionId?: string) => {
     setCartLoading(true);
     setCartError(null);
     try {
-      const newCart = await getOrCreateCart();
+      // Pass regionId to createCart; if not provided, getOrCreateCart uses session country code
+      const newCart = regionId
+        ? await createMedusaCart({ regionId })
+        : await getOrCreateCart();
       setCart(newCart);
       return newCart;
     } catch (err) {
@@ -542,6 +609,90 @@ export function B2CRuntimeProvider({
     }
   }, []);
 
+  const updateCartBillingAddress = useCallback(async (address: Record<string, unknown>) => {
+    const cartId = getCartId();
+    if (!cartId) return;
+    setCartLoading(true);
+    try {
+      const updatedCart = await updateCart(cartId, { billingAddress: address });
+      setCart(updatedCart);
+    } catch (err) {
+      setCartError(err instanceof Error ? err.message : "Failed to update billing address");
+      throw err;
+    } finally {
+      setCartLoading(false);
+    }
+  }, []);
+
+  /**
+   * Consolidated checkout action helper.
+   * Performs a checkout step mutation and returns the updated cart state.
+   * Use this instead of manually chaining fetch/update/setCart in checkout components.
+   *
+   * Supported steps:
+   * - update_email: Set cart email
+   * - update_shipping_address: Set shipping address
+   * - update_billing_address: Set billing address
+   * - set_shipping_method: Add shipping method to cart
+   * - init_payment_session: Initialize payment session (returns payment collection, not cart)
+   *
+   * Note: init_payment_session returns a MedusaPaymentCollection, not a MedusaCart.
+   * The cart state is NOT updated by this step - you must handle the payment collection
+   * in your checkout UI.
+   */
+  const performCheckoutAction = useCallback(async (
+    step: CheckoutStep,
+    data: CheckoutStepData
+  ): Promise<MedusaCart | MedusaPaymentCollection> => {
+    const cartId = getCartId();
+    if (!cartId) throw new Error("No cart available for checkout action");
+
+    setCartLoading(true);
+    setCartError(null);
+
+    try {
+      switch (step) {
+        case "update_email": {
+          if (data.step !== "update_email") throw new Error("Invalid step data");
+          const updatedCart = await updateCart(cartId, { email: data.email });
+          setCart(updatedCart);
+          return updatedCart;
+        }
+        case "update_shipping_address": {
+          if (data.step !== "update_shipping_address") throw new Error("Invalid step data");
+          const updatedCart = await updateCart(cartId, { shippingAddress: data.address });
+          setCart(updatedCart);
+          return updatedCart;
+        }
+        case "update_billing_address": {
+          if (data.step !== "update_billing_address") throw new Error("Invalid step data");
+          const updatedCart = await updateCart(cartId, { billingAddress: data.address });
+          setCart(updatedCart);
+          return updatedCart;
+        }
+        case "set_shipping_method": {
+          if (data.step !== "set_shipping_method") throw new Error("Invalid step data");
+          const updatedCart = await addShippingMethod(cartId, data.optionId);
+          setCart(updatedCart);
+          return updatedCart;
+        }
+        case "init_payment_session": {
+          if (data.step !== "init_payment_session") throw new Error("Invalid step data");
+          // Payment session doesn't update cart - caller handles the payment collection
+          return await initializePaymentSession(cartId, data.providerId);
+        }
+        default:
+          throw new Error(`Unknown checkout step: ${step satisfies never}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Checkout action failed: ${step}`;
+      setCartError(message);
+      throw err;
+    } finally {
+      setCartLoading(false);
+    }
+  }, [addShippingMethod, updateCart]);
+
   // =============================================================================
   // Actions: Shipping
   // =============================================================================
@@ -559,6 +710,9 @@ export function B2CRuntimeProvider({
     try {
       const updatedCart = await addShippingMethod(cartId, optionId);
       setCart(updatedCart);
+    } catch (err) {
+      setCartError(err instanceof Error ? err.message : "Failed to select shipping method");
+      throw err;
     } finally {
       setCartLoading(false);
     }
@@ -580,7 +734,12 @@ export function B2CRuntimeProvider({
   const initPaymentSession = useCallback(async (providerId: string) => {
     const cartId = getCartId();
     if (!cartId) throw new Error("No cart available");
-    return initializePaymentSession(cartId, providerId);
+    setCartLoading(true);
+    try {
+      return await initializePaymentSession(cartId, providerId);
+    } finally {
+      setCartLoading(false);
+    }
   }, []);
 
   const completeCheckoutAction = useCallback(async () => {
@@ -906,6 +1065,8 @@ export function B2CRuntimeProvider({
     removeCartItem,
     updateCartEmail,
     updateCartShippingAddress,
+    updateCartBillingAddress,
+    performCheckoutAction,
     getShippingOptions,
     selectShippingMethod,
     getPaymentProviders,

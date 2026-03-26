@@ -372,7 +372,11 @@ export async function deleteCartLineItem(
 export async function listShippingOptions(cartId: string): Promise<MedusaShippingOption[]> {
   try {
     const client = getMedusaClient();
-    const response = await client.store.fulfillment.listShippingOptions({ cart_id: cartId });
+    const cart = await getCart(cartId);
+    if (!cart) {
+      throw new Error("Cart not found");
+    }
+    const response = await client.store.fulfillment.listCartOptions({ cart_id: cart.id });
     return response.shipping_options as MedusaShippingOption[];
   } catch (error) {
     return handleApiError(error);
@@ -423,7 +427,11 @@ export async function initializePaymentSession(
 ): Promise<MedusaPaymentCollection> {
   try {
     const client = getMedusaClient();
-    const response = await client.store.payment.initiatePaymentSession(cartId, {
+    const cart = await getCart(cartId);
+    if (!cart) {
+      throw new Error("Cart not found");
+    }
+    const response = await client.store.payment.initiatePaymentSession(cart, {
       provider_id: providerId,
     });
     return response.payment_collection as MedusaPaymentCollection;
