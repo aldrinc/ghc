@@ -111,6 +111,7 @@ class ArtifactTypeEnum(str, Enum):
     experiment_report = "experiment_report"
     playbook = "playbook"
     funnel_runtime_bundle = "funnel_runtime_bundle"
+    site_runtime_bundle = "site_runtime_bundle"
     strategy_v2_step_payload = "strategy_v2_step_payload"
     strategy_v2_stage0 = "strategy_v2_stage0"
     strategy_v2_stage1 = "strategy_v2_stage1"

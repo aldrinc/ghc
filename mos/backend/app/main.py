@@ -28,6 +28,7 @@ from app.routers import (
     products,
     funnels,
     public_funnels,
+    public_sites,
     explore,
     deep_research,
     experiments,
@@ -44,6 +45,11 @@ from app.routers import (
     storefront_templates,
     gethookd,
     sites,
+    site_templates,
+    page_templates,
+    site_funnels,
+    site_product_bindings,
+    site_imports,
 )
 
 logger = logging.getLogger(__name__)
@@ -156,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(agent_runs.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)
+    app.include_router(public_sites.router)
     app.include_router(experiments.router)
     app.include_router(explore.router)
     app.include_router(swipes.router)
@@ -174,6 +181,13 @@ def create_app() -> FastAPI:
     app.include_router(storefront_templates.router)
     app.include_router(gethookd.router)
     app.include_router(sites.router)
+    app.include_router(site_templates.router)
+    app.include_router(page_templates.router)
+    app.include_router(site_funnels.router)
+    app.include_router(site_funnels.workspace_router)
+    app.include_router(site_product_bindings.router)
+    app.include_router(site_product_bindings.products_router)
+    app.include_router(site_imports.router)
 
     return app
 

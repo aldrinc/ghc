@@ -1,7 +1,7 @@
 """Site management API endpoints.
 
-This module provides endpoints for managing Site-based experiences backed by the existing
-funnel/page runtime. Sites are funnels with experience_kind='site' and additional metadata.
+This module provides endpoints for managing Site-based experiences backed by the dedicated
+site runtime (Site/SitePage/SitePageVersion), not the funnel runtime.
 """
 
 from __future__ import annotations
@@ -10,19 +10,21 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.enums import FunnelPageVersionStatusEnum, FunnelPageVersionSourceEnum, FunnelStatusEnum
-from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product
-from app.db.repositories.funnels import (
-    FunnelsRepository,
-    FunnelPagesRepository,
-    FunnelPageVersionsRepository,
+from app.db.models import (
+    DesignSystem,
+    Product,
+    Site,
+    SitePage,
+    SitePageVersion,
+    Client,
 )
+from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.schemas.sites import (
     SiteFamilySummary,
     SiteFamilyDetail,
@@ -31,15 +33,18 @@ from app.schemas.sites import (
     SiteDetail,
     SitePageDetail,
     SitePageBlueprintSummary,
+    SitePageUpdateRequest,
+    SitePageVersionCreateRequest,
+    SitePageEditorResponse,
+    SitePageVersionSummary,
 )
 from app.services.site_blueprints import (
     list_site_families,
     get_site_family,
-    get_entry_page_blueprint,
 )
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
 from app.services.design_systems import resolve_design_system_tokens
-from app.services.funnels import default_puck_data, rewrite_internal_target_ids
+from app.services.funnels import rewrite_internal_target_ids
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -52,6 +57,36 @@ def _parse_uuid_or_400(value: str, field_name: str) -> UUID:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{field_name} must be a valid UUID.",
         ) from exc
+
+
+def _resolve_site_design_system_tokens(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    site: Site,
+    page: SitePage | None = None,
+) -> dict[str, Any] | None:
+    design_system_id = None
+    if page and page.design_system_id:
+        design_system_id = str(page.design_system_id)
+    elif site.design_system_id:
+        design_system_id = str(site.design_system_id)
+
+    if design_system_id:
+        design_system = session.scalars(
+            select(DesignSystem).where(
+                DesignSystem.org_id == UUID(org_id),
+                DesignSystem.id == UUID(design_system_id),
+            )
+        ).first()
+        return design_system.tokens if design_system else None
+
+    return resolve_design_system_tokens(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+    )
 
 
 # Placeholder page IDs used in templates - these are rewritten to real page IDs after creation
@@ -120,8 +155,8 @@ def create_site(
 ) -> dict[str, Any]:
     """Create a new site from a site family blueprint.
 
-    This endpoint requires a product context because the existing funnel runtime
-    requires funnels to have a product_id for publication and public rendering.
+    This endpoint creates a site in the dedicated site runtime (Site/SitePage/SitePageVersion)
+    instead of using the funnel runtime. productId is now optional.
     """
     # Validate the site family
     descriptor = get_site_family(payload.family)
@@ -131,32 +166,42 @@ def create_site(
             detail=f"Unknown site family: '{payload.family}'.",
         )
 
-    # Validate product exists and belongs to the workspace
-    if not payload.productId:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="productId is required. Sites require a product context for publication.",
-        )
-
     client_uuid = _parse_uuid_or_400(payload.clientId, "clientId")
-    product_uuid = _parse_uuid_or_400(payload.productId, "productId")
 
-    product = session.scalars(
-        select(Product).where(
-            Product.org_id == UUID(auth.org_id),
-            Product.client_id == client_uuid,
-            Product.id == product_uuid,
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == client_uuid,
         )
     ).first()
 
-    if not product:
+    if not client:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found or does not belong to this workspace.",
+            detail="Workspace not found or does not belong to this organization.",
         )
+
+    # Validate product if provided
+    product_uuid = None
+    if payload.productId:
+        product_uuid = _parse_uuid_or_400(payload.productId, "productId")
+        product = session.scalars(
+            select(Product).where(
+                Product.org_id == UUID(auth.org_id),
+                Product.client_id == client_uuid,
+                Product.id == product_uuid,
+            )
+        ).first()
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found or does not belong to this workspace.",
+            )
 
     # Resolve design system tokens if provided
     design_system_tokens = None
+    design_system_id = None
     if payload.designSystemId:
         from app.routers.funnels import _validate_design_system
 
@@ -167,6 +212,7 @@ def create_site(
             design_system_id=payload.designSystemId,
         )
         design_system_tokens = design_system.tokens
+        design_system_id = str(design_system.id)
     else:
         design_system_tokens = resolve_design_system_tokens(
             session=session,
@@ -175,32 +221,26 @@ def create_site(
         )
 
     try:
-        # Create the funnel (site) row
-        funnels_repo = FunnelsRepository(session)
-        pages_repo = FunnelPagesRepository(session)
-        versions_repo = FunnelPageVersionsRepository(session)
+        sites_repo = SitesRuntimeRepository(session)
 
         # Generate unique route slug for the site
-        route_slug = funnels_repo._generate_unique_route_slug(
+        route_slug = sites_repo._generate_unique_route_slug(
             desired_slug=payload.name or f"{descriptor.family}-site"
         )
 
-        # Create the funnel row directly (not using repository.create to avoid auto-commit)
-        site_funnel = Funnel(
-            org_id=UUID(auth.org_id),
-            client_id=client_uuid,
+        # Create the site row
+        site = sites_repo.create_site(
+            org_id=str(UUID(auth.org_id)),
+            client_id=str(client_uuid),
             name=payload.name,
             description=payload.description or f"{descriptor.name} site",
-            status=FunnelStatusEnum.draft,
-            route_slug=route_slug,
-            experience_kind="site",
             site_type=descriptor.site_type,
             site_family=descriptor.family,
             commerce_provider=descriptor.commerce_provider,
-            product_id=product_uuid,
+            route_slug=route_slug,
+            design_system_id=design_system_id,
+            product_id=str(product_uuid) if product_uuid else None,
         )
-        session.add(site_funnel)
-        session.flush()  # Get the ID without committing
 
         # Create pages from blueprints
         created_pages: list[dict[str, Any]] = []
@@ -210,46 +250,64 @@ def create_site(
         for blueprint in descriptor.page_blueprints:
             # Get the template for this page
             template = get_funnel_template(blueprint.template_id)
-            if template:
-                try:
-                    template_puck_data = apply_template_assets(
-                        session=session,
-                        org_id=auth.org_id,
-                        client_id=payload.clientId,
-                        template=template,
-                        design_system_tokens=design_system_tokens,
-                    )
-                except ValueError:
-                    template_puck_data = default_puck_data()
-            else:
-                template_puck_data = default_puck_data()
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        f"Site family '{descriptor.family}' references unknown template "
+                        f"'{blueprint.template_id}' for page '{blueprint.page_type}'."
+                    ),
+                )
+
+            try:
+                template_puck_data = apply_template_assets(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=payload.clientId,
+                    template=template,
+                    design_system_tokens=design_system_tokens,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        f"Failed to hydrate template '{blueprint.template_id}' for "
+                        f"page '{blueprint.page_type}': {exc}"
+                    ),
+                ) from exc
 
             # Create the page
-            page = FunnelPage(
-                funnel_id=site_funnel.id,
+            page = sites_repo.create_page(
+                site_id=str(site.id),
                 name=blueprint.name,
                 slug=blueprint.slug,
                 ordering=blueprint.ordering,
                 template_id=blueprint.template_id,
-                design_system_id=UUID(payload.designSystemId) if payload.designSystemId else None,
+                design_system_id=design_system_id,
                 page_type=blueprint.page_type,
+                adapted_puck_data=template_puck_data,
             )
-            session.add(page)
-            session.flush()
 
             # Track page ID for link rewriting
             page_id_map[blueprint.page_type] = str(page.id)
 
             # Create the initial draft version
-            version = FunnelPageVersion(
-                page_id=page.id,
-                status=FunnelPageVersionStatusEnum.draft,
+            version = sites_repo.create_page_version(
+                page_id=str(page.id),
                 puck_data=template_puck_data,
-                source=FunnelPageVersionSourceEnum.human,
-                created_at=datetime.now(timezone.utc),
+                provenance={"source": "blueprint"},
+                status="draft",
+                source_type="site_template",
+                source_id=descriptor.family,
             )
-            session.add(version)
-            session.flush()
+            approved_version = sites_repo.create_page_version(
+                page_id=str(page.id),
+                puck_data=template_puck_data,
+                provenance={"source": "blueprint"},
+                status="approved",
+                source_type="site_template",
+                source_id=descriptor.family,
+            )
 
             # Track entry page
             if blueprint.is_entry:
@@ -263,8 +321,10 @@ def create_site(
                     "pageType": blueprint.page_type,
                     "templateId": blueprint.template_id,
                     "ordering": blueprint.ordering,
+                    "designSystemId": design_system_id,
                     "isEntry": blueprint.is_entry,
                     "latestDraftVersionId": str(version.id),
+                    "latestApprovedVersionId": str(approved_version.id),
                 }
             )
 
@@ -277,50 +337,52 @@ def create_site(
 
         # Rewrite internal links in all page puck_data
         for page_data in created_pages:
-            page_id = UUID(page_data["id"])
-            page = session.scalars(select(FunnelPage).where(FunnelPage.id == page_id)).first()
+            page_id = page_data["id"]
+            page = sites_repo.get_page(site_id=str(site.id), page_id=page_id)
             if not page:
                 continue
 
-            version = versions_repo.latest_for_page(
-                page_id=str(page_id), status=FunnelPageVersionStatusEnum.draft
+            # Rewrite puck_data with real page IDs
+            rewritten_puck_data = rewrite_internal_target_ids(
+                page.adapted_puck_data, placeholder_id_map
             )
-            if not version:
-                continue
+            page.adapted_puck_data = rewritten_puck_data
+            sites_repo.update_page(page=page)
 
-            # Rewrite placeholder IDs to real page IDs
-            rewritten_puck_data = rewrite_internal_target_ids(version.puck_data, placeholder_id_map)
+            for page_version in sites_repo.list_versions_for_page(page_id=page_id):
+                page_version.puck_data = rewritten_puck_data
+                session.add(page_version)
 
-            # Update the version with rewritten puck_data
-            version.puck_data = rewritten_puck_data
-            session.add(version)
-
-        # Set entry page
+        # Set entry page on site
         if entry_page_id:
-            site_funnel.entry_page_id = entry_page_id
-            session.add(site_funnel)
+            site.entry_page_id = entry_page_id
+            sites_repo.update_site(site=site)
 
         # Commit all changes atomically
         session.commit()
-        session.refresh(site_funnel)
+        session.refresh(site)
 
         return {
-            "id": str(site_funnel.id),
-            "clientId": str(site_funnel.client_id),
-            "name": site_funnel.name,
-            "description": site_funnel.description,
-            "status": site_funnel.status.value,
-            "experienceKind": site_funnel.experience_kind,
-            "siteType": site_funnel.site_type,
-            "siteFamily": site_funnel.site_family,
-            "commerceProvider": site_funnel.commerce_provider,
-            "productId": str(site_funnel.product_id) if site_funnel.product_id else None,
+            "id": str(site.id),
+            "clientId": str(site.client_id),
+            "name": site.name,
+            "description": site.description,
+            "status": site.status,
+            "siteType": site.site_type,
+            "siteFamily": site.site_family,
+            "commerceProvider": site.commerce_provider,
+            "productId": str(site.product_id) if site.product_id else None,
+            "designSystemId": str(site.design_system_id) if site.design_system_id else None,
+            "routeSlug": site.route_slug,
             "entryPageId": entry_page_id,
             "pages": created_pages,
-            "createdAt": site_funnel.created_at.isoformat(),
-            "updatedAt": site_funnel.updated_at.isoformat(),
+            "createdAt": site.created_at.isoformat(),
+            "updatedAt": site.updated_at.isoformat(),
         }
 
+    except HTTPException:
+        session.rollback()
+        raise
     except Exception as exc:
         session.rollback()
         raise HTTPException(
@@ -337,8 +399,6 @@ def list_sites(
 ) -> list[dict[str, Any]]:
     """List all sites for a workspace."""
     # Validate workspace ownership
-    from app.db.models import Client
-
     client = session.scalars(
         select(Client).where(
             Client.org_id == UUID(auth.org_id),
@@ -352,32 +412,27 @@ def list_sites(
             detail="Workspace not found or does not belong to this organization.",
         )
 
-    # Query funnels with experience_kind='site'
-    sites = session.scalars(
-        select(Funnel)
-        .where(
-            Funnel.org_id == UUID(auth.org_id),
-            Funnel.client_id == UUID(clientId),
-            Funnel.experience_kind == "site",
-        )
-        .order_by(Funnel.created_at.desc())
-    ).all()
+    # Query sites from the dedicated site runtime
+    sites_repo = SitesRuntimeRepository(session)
+    sites = sites_repo.list_sites(org_id=str(UUID(auth.org_id)), client_id=str(UUID(clientId)))
 
     return [
         {
-            "id": str(site.id),
-            "clientId": str(site.client_id),
-            "name": site.name,
-            "description": site.description,
-            "status": site.status.value,
-            "siteType": site.site_type,
-            "siteFamily": site.site_family,
-            "commerceProvider": site.commerce_provider,
-            "productId": str(site.product_id) if site.product_id else None,
-            "createdAt": site.created_at.isoformat(),
-            "updatedAt": site.updated_at.isoformat(),
+            "id": str(s.id),
+            "clientId": str(s.client_id),
+            "name": s.name,
+            "description": s.description,
+            "status": s.status,
+            "siteType": s.site_type,
+            "siteFamily": s.site_family,
+            "commerceProvider": s.commerce_provider,
+            "productId": str(s.product_id) if s.product_id else None,
+            "designSystemId": str(s.design_system_id) if s.design_system_id else None,
+            "routeSlug": s.route_slug,
+            "createdAt": s.created_at.isoformat(),
+            "updatedAt": s.updated_at.isoformat(),
         }
-        for site in sites
+        for s in sites
     ]
 
 
@@ -390,8 +445,6 @@ def get_site(
 ) -> SiteDetail:
     """Get detailed information about a specific site."""
     # Validate workspace ownership
-    from app.db.models import Client
-
     client = session.scalars(
         select(Client).where(
             Client.org_id == UUID(auth.org_id),
@@ -405,59 +458,35 @@ def get_site(
             detail="Workspace not found or does not belong to this organization.",
         )
 
-    # Get the funnel (site)
-    site_funnel = session.scalars(
-        select(Funnel).where(
-            Funnel.org_id == UUID(auth.org_id),
-            Funnel.id == _parse_uuid_or_400(site_id, "site_id"),
-        )
-    ).first()
+    # Get the site from dedicated site runtime
+    sites_repo = SitesRuntimeRepository(session)
 
-    if not site_funnel:
+    # First check if site exists in this org (regardless of client)
+    site = sites_repo.get_site_by_id(
+        org_id=str(UUID(auth.org_id)),
+        site_id=site_id,
+    )
+
+    if not site:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Site not found.",
         )
 
-    # Verify it's a site
-    if site_funnel.experience_kind != "site":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Not a site.",
-        )
-
-    # Verify client matches
-    if str(site_funnel.client_id) != clientId:
+    # Check if site belongs to the specified workspace
+    if str(site.client_id) != clientId:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Site does not belong to this workspace.",
         )
 
     # Get pages
-    pages = session.scalars(
-        select(FunnelPage)
-        .where(FunnelPage.funnel_id == site_funnel.id)
-        .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
-    ).all()
+    pages = sites_repo.list_pages(site_id=str(site.id))
 
     page_summaries = []
     for page in pages:
-        draft = session.scalars(
-            select(FunnelPageVersion)
-            .where(
-                FunnelPageVersion.page_id == page.id,
-                FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
-            )
-            .order_by(FunnelPageVersion.created_at.desc())
-        ).first()
-        approved = session.scalars(
-            select(FunnelPageVersion)
-            .where(
-                FunnelPageVersion.page_id == page.id,
-                FunnelPageVersion.status == FunnelPageVersionStatusEnum.approved,
-            )
-            .order_by(FunnelPageVersion.created_at.desc())
-        ).first()
+        draft = sites_repo.latest_version_for_page(page_id=str(page.id), status="draft")
+        approved = sites_repo.latest_version_for_page(page_id=str(page.id), status="approved")
         page_summaries.append(
             SitePageDetail(
                 id=str(page.id),
@@ -466,27 +495,466 @@ def get_site(
                 pageType=page.page_type,
                 templateId=page.template_id,
                 ordering=page.ordering,
-                isEntry=str(page.id) == str(site_funnel.entry_page_id)
-                if site_funnel.entry_page_id
-                else False,
+                designSystemId=str(page.design_system_id) if page.design_system_id else None,
+                isEntry=str(page.id) == str(site.entry_page_id) if site.entry_page_id else False,
                 latestDraftVersionId=str(draft.id) if draft else None,
                 latestApprovedVersionId=str(approved.id) if approved else None,
             )
         )
 
     return SiteDetail(
-        id=str(site_funnel.id),
-        clientId=str(site_funnel.client_id),
-        name=site_funnel.name,
-        description=site_funnel.description,
-        status=site_funnel.status.value,
-        experienceKind=site_funnel.experience_kind,
-        siteType=site_funnel.site_type,
-        siteFamily=site_funnel.site_family,
-        commerceProvider=site_funnel.commerce_provider,
-        productId=str(site_funnel.product_id) if site_funnel.product_id else None,
-        entryPageId=str(site_funnel.entry_page_id) if site_funnel.entry_page_id else None,
+        id=str(site.id),
+        clientId=str(site.client_id),
+        name=site.name,
+        description=site.description,
+        status=site.status,
+        siteType=site.site_type,
+        siteFamily=site.site_family,
+        commerceProvider=site.commerce_provider,
+        productId=str(site.product_id) if site.product_id else None,
+        designSystemId=str(site.design_system_id) if site.design_system_id else None,
+        routeSlug=site.route_slug,
+        entryPageId=str(site.entry_page_id) if site.entry_page_id else None,
         pages=page_summaries,
-        createdAt=site_funnel.created_at.isoformat(),
-        updatedAt=site_funnel.updated_at.isoformat(),
+        createdAt=site.created_at.isoformat(),
+        updatedAt=site.updated_at.isoformat(),
     )
+
+
+@router.get("/{site_id}/pages/{page_id}", response_model=SitePageEditorResponse)
+def get_site_page(
+    site_id: str,
+    page_id: str,
+    clientId: str = Query(..., description="Workspace ID"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SitePageEditorResponse:
+    """Get site page with latest draft and approved versions for the page editor."""
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    # Get the site
+    sites_repo = SitesRuntimeRepository(session)
+    site = sites_repo.get_site(
+        org_id=str(UUID(auth.org_id)),
+        client_id=str(UUID(clientId)),
+        site_id=site_id,
+    )
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Get the page
+    page = sites_repo.get_page(site_id=site_id, page_id=page_id)
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found.",
+        )
+
+    # Get latest draft and approved versions
+    latest_draft = sites_repo.latest_version_for_page(page_id=str(page.id), status="draft")
+    latest_approved = sites_repo.latest_version_for_page(page_id=str(page.id), status="approved")
+
+    design_system_tokens = _resolve_site_design_system_tokens(
+        session=session,
+        org_id=auth.org_id,
+        client_id=clientId,
+        site=site,
+        page=page,
+    )
+
+    return SitePageEditorResponse(
+        site={
+            "id": str(site.id),
+            "name": site.name,
+            "routeSlug": site.route_slug,
+            "siteFamily": site.site_family,
+            "siteType": site.site_type,
+            "commerceProvider": site.commerce_provider,
+            "productId": str(site.product_id) if site.product_id else None,
+            "designSystemId": str(site.design_system_id) if site.design_system_id else None,
+        },
+        page={
+            "id": str(page.id),
+            "siteId": str(page.site_id),
+            "name": page.name,
+            "slug": page.slug,
+            "pageType": page.page_type,
+            "templateId": page.template_id,
+            "ordering": page.ordering,
+            "designSystemId": str(page.design_system_id) if page.design_system_id else None,
+        },
+        latestDraft={
+            "id": str(latest_draft.id),
+            "status": latest_draft.status,
+            "puckData": latest_draft.puck_data,
+            "createdAt": latest_draft.created_at.isoformat(),
+        }
+        if latest_draft
+        else None,
+        latestApproved={
+            "id": str(latest_approved.id),
+            "status": latest_approved.status,
+            "puckData": latest_approved.puck_data,
+            "createdAt": latest_approved.created_at.isoformat(),
+        }
+        if latest_approved
+        else None,
+        designSystemTokens=design_system_tokens,
+    )
+
+
+@router.patch("/{site_id}/pages/{page_id}", response_model=SitePageEditorResponse)
+def update_site_page(
+    site_id: str,
+    page_id: str,
+    payload: SitePageUpdateRequest,
+    clientId: str = Query(..., description="Workspace ID"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SitePageEditorResponse:
+    """Update a site page (name, slug, designSystemId)."""
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    # Get the site
+    sites_repo = SitesRuntimeRepository(session)
+    site = sites_repo.get_site(
+        org_id=str(UUID(auth.org_id)),
+        client_id=str(UUID(clientId)),
+        site_id=site_id,
+    )
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Get the page
+    page = sites_repo.get_page(site_id=site_id, page_id=page_id)
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found.",
+        )
+
+    # Validate slug uniqueness if being changed
+    if payload.slug and payload.slug != page.slug:
+        if not sites_repo.check_slug_unique(
+            site_id=site_id, slug=payload.slug, exclude_page_id=str(page.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Slug '{payload.slug}' is already in use on this site.",
+            )
+
+    # Validate design system if being changed (including explicit clear)
+    if "designSystemId" in payload.model_fields_set:
+        if payload.designSystemId is None:
+            page.design_system_id = None
+        else:
+            from app.routers.funnels import _validate_design_system
+
+            _validate_design_system(
+                session=session,
+                org_id=auth.org_id,
+                client_id=clientId,
+                design_system_id=payload.designSystemId,
+            )
+            page.design_system_id = str(
+                _parse_uuid_or_400(payload.designSystemId, "designSystemId")
+            )
+
+    # Update fields
+    if payload.name:
+        page.name = payload.name
+    if payload.slug:
+        page.slug = payload.slug
+
+    page = sites_repo.update_page(page=page)
+    session.commit()
+
+    # Get latest versions
+    latest_draft = sites_repo.latest_version_for_page(page_id=str(page.id), status="draft")
+    latest_approved = sites_repo.latest_version_for_page(page_id=str(page.id), status="approved")
+
+    design_system_tokens = _resolve_site_design_system_tokens(
+        session=session,
+        org_id=auth.org_id,
+        client_id=clientId,
+        site=site,
+        page=page,
+    )
+
+    return SitePageEditorResponse(
+        site={
+            "id": str(site.id),
+            "name": site.name,
+            "routeSlug": site.route_slug,
+            "siteFamily": site.site_family,
+            "siteType": site.site_type,
+            "commerceProvider": site.commerce_provider,
+            "productId": str(site.product_id) if site.product_id else None,
+            "designSystemId": str(site.design_system_id) if site.design_system_id else None,
+        },
+        page={
+            "id": str(page.id),
+            "siteId": str(page.site_id),
+            "name": page.name,
+            "slug": page.slug,
+            "pageType": page.page_type,
+            "templateId": page.template_id,
+            "ordering": page.ordering,
+            "designSystemId": str(page.design_system_id) if page.design_system_id else None,
+        },
+        latestDraft={
+            "id": str(latest_draft.id),
+            "status": latest_draft.status,
+            "puckData": latest_draft.puck_data,
+            "createdAt": latest_draft.created_at.isoformat(),
+        }
+        if latest_draft
+        else None,
+        latestApproved={
+            "id": str(latest_approved.id),
+            "status": latest_approved.status,
+            "puckData": latest_approved.puck_data,
+            "createdAt": latest_approved.created_at.isoformat(),
+        }
+        if latest_approved
+        else None,
+        designSystemTokens=design_system_tokens,
+    )
+
+
+@router.post("/{site_id}/pages/{page_id}/versions", response_model=SitePageVersionSummary)
+def create_site_page_version(
+    site_id: str,
+    page_id: str,
+    payload: SitePageVersionCreateRequest,
+    clientId: str = Query(..., description="Workspace ID"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Create a new version for a site page."""
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    # Get the site
+    sites_repo = SitesRuntimeRepository(session)
+    site = sites_repo.get_site(
+        org_id=str(UUID(auth.org_id)),
+        client_id=str(UUID(clientId)),
+        site_id=site_id,
+    )
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Get the page
+    page = sites_repo.get_page(site_id=site_id, page_id=page_id)
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found.",
+        )
+
+    # Validate status
+    valid_statuses = ["draft", "approved"]
+    if payload.status not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
+        )
+
+    # Create the new version
+    version = sites_repo.create_page_version(
+        page_id=str(page.id),
+        puck_data=payload.puckData,
+        provenance=payload.provenance or {"source": "editor"},
+        status=payload.status,
+    )
+
+    session.commit()
+    session.refresh(version)
+
+    return {
+        "id": str(version.id),
+        "status": version.status,
+        "puckData": version.puck_data,
+        "createdAt": version.created_at.isoformat(),
+    }
+
+
+@router.post("/{site_id}/publish", response_model=dict[str, Any])
+def publish_site(
+    site_id: str,
+    clientId: str = Query(..., description="Workspace ID"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Publish a site, creating an immutable snapshot and runtime artifact.
+
+    This endpoint:
+    - Validates the site exists and belongs to the workspace
+    - Validates all pages have publishable versions
+    - Validates funnel steps point to valid site pages
+    - Validates product bindings point to existing products/pages
+    - Creates an immutable snapshot in site_publications* tables
+    - Persists a site_runtime_bundle artifact
+    - Returns publish metadata
+    """
+    from sqlalchemy import select
+
+    from app.db.models import Client, Artifact
+    from app.schemas.sites import SitePublishResponse
+    from app.services.site_publications import (
+        SitePublicationError,
+        validate_site_for_publish,
+        create_site_publication,
+        list_site_publication_pages,
+        list_site_publication_funnels,
+        list_site_publication_product_bindings,
+    )
+    from app.services.deploy import (
+        persist_site_runtime_bundle_artifact,
+    )
+
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    # Get the site
+    sites_repo = SitesRuntimeRepository(session)
+    site = sites_repo.get_site(
+        org_id=str(UUID(auth.org_id)),
+        client_id=str(UUID(clientId)),
+        site_id=site_id,
+    )
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Validate site is ready for publishing
+    try:
+        validate_site_for_publish(
+            session=session,
+            site_id=site_id,
+            org_id=str(UUID(auth.org_id)),
+        )
+    except SitePublicationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    # Create immutable publication snapshot
+    try:
+        publication = create_site_publication(
+            session=session,
+            site_id=site_id,
+            created_by=auth.user_id,
+            meta={
+                "clientId": clientId,
+                "publishedBy": auth.user_id,
+            },
+        )
+    except SitePublicationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create publication snapshot: {exc}",
+        )
+
+    # Persist site_runtime_bundle artifact
+    try:
+        artifact_result = persist_site_runtime_bundle_artifact(
+            session=session,
+            org_id=str(UUID(auth.org_id)),
+            site_id=site_id,
+            publication_id=publication.id,
+            created_by_user_id=auth.user_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to persist runtime artifact: {exc}",
+        )
+
+    # Get counts for response
+    page_count = len(list_site_publication_pages(session, publication_id=publication.id))
+    funnel_count = len(list_site_publication_funnels(session, publication_id=publication.id))
+    binding_count = len(
+        list_site_publication_product_bindings(session, publication_id=publication.id)
+    )
+
+    site.active_site_publication_id = publication.id
+    site.status = "published"
+    session.add(site)
+
+    session.commit()
+
+    return SitePublishResponse(
+        publicationId=str(publication.id),
+        artifactId=str(artifact_result["artifact_id"]),
+        artifactVersion=artifact_result["artifact_version"],
+        siteId=site_id,
+        routeSlug=site.route_slug or "",
+        pageCount=page_count,
+        funnelCount=funnel_count,
+        productBindingCount=binding_count,
+        publishedAt=publication.created_at.isoformat(),
+    ).model_dump()
