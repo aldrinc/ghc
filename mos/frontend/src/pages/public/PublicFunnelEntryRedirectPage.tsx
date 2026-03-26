@@ -42,12 +42,19 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
-        const entryPath = buildPublicFunnelPath({
-          productSlug,
-          funnelSlug,
-          slug: meta.entrySlug,
-          bundleMode,
-        });
+        const entryPath = meta.medusaRuntimeConfig?.defaultCountryCode
+          ? buildPublicFunnelPath({
+              productSlug,
+              funnelSlug,
+              sitePath: meta.medusaRuntimeConfig.defaultCountryCode,
+              bundleMode,
+            })
+          : buildPublicFunnelPath({
+              productSlug,
+              funnelSlug,
+              slug: meta.entrySlug,
+              bundleMode,
+            });
         navigate(
           `${entryPath}${location.search}${location.hash}`,
           { replace: true },

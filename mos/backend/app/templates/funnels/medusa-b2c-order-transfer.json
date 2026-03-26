@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-order-transfer",
+  "name": "Medusa B2C Order Transfer",
+  "description": "Order transfer landing page for gift/transfer flows.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Order Transfer",
+        "description": "Transfer order"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2COrderTransferPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

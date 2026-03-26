@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-home",
+  "name": "Medusa B2C Home",
+  "description": "B2C storefront homepage with featured products and categories.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Storefront",
+        "description": "B2C ecommerce storefront"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CHomePage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

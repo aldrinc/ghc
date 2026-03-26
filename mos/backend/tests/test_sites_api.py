@@ -104,6 +104,70 @@ def test_get_site_family_not_found(api_client: TestClient):
     assert response.status_code == 404
 
 
+def test_list_site_families_includes_medusa_b2c_starter(api_client: TestClient):
+    """Test that listing site families includes the medusa-b2c-starter family."""
+    response = api_client.get("/sites/families")
+
+    assert response.status_code == 200
+    families = response.json()
+    family_ids = {f["family"] for f in families}
+
+    assert "medusa-b2c-starter" in family_ids
+
+    # Verify the medusa-b2c-starter family has expected properties
+    b2c_family = next(f for f in families if f["family"] == "medusa-b2c-starter")
+    assert b2c_family["name"] == "Medusa B2C Starter"
+    assert b2c_family["siteType"] == "ecommerce"
+    assert b2c_family["commerceProvider"] == "medusa"
+    # B2C has 16 page types: home, store, collection, category, product_detail, cart,
+    # checkout, account_dashboard, account_profile, account_addresses, account_orders,
+    # account_order_detail, order_confirmed, order_transfer, order_transfer_accept, order_transfer_decline
+    assert b2c_family["pageCount"] == 16
+
+
+def test_get_medusa_b2c_starter_family_detail(api_client: TestClient):
+    """Test that getting medusa-b2c-starter family detail returns all 16 page blueprints."""
+    response = api_client.get("/sites/families/medusa-b2c-starter")
+
+    assert response.status_code == 200
+    family = response.json()
+
+    assert family["family"] == "medusa-b2c-starter"
+    assert family["name"] == "Medusa B2C Starter"
+    assert len(family["pageBlueprints"]) == 16
+
+    # Verify all expected page types
+    page_types = {bp["pageType"] for bp in family["pageBlueprints"]}
+    expected_page_types = {
+        "home",
+        "store",
+        "collection",
+        "category",
+        "product_detail",
+        "cart",
+        "checkout",
+        "account_dashboard",
+        "account_profile",
+        "account_addresses",
+        "account_orders",
+        "account_order_detail",
+        "order_confirmed",
+        "order_transfer",
+        "order_transfer_accept",
+        "order_transfer_decline",
+    }
+    assert page_types == expected_page_types
+
+    # Verify entry page is home
+    entry_pages = [bp for bp in family["pageBlueprints"] if bp["isEntry"]]
+    assert len(entry_pages) == 1
+    assert entry_pages[0]["pageType"] == "home"
+
+    # Verify provenance notes mention B2C starter
+    assert len(family["provenanceNotes"]) > 0
+    assert any("B2C" in note or "b2c" in note.lower() for note in family["provenanceNotes"])
+
+
 def test_create_site_requires_product(api_client: TestClient):
     """Test that creating a site without a product returns a validation error."""
     client_id = _create_client(api_client, name="Test Site Workspace")

@@ -113,9 +113,165 @@ MEDUSA_B2B_STARTER_BLUEPRINT = SiteFamilyDescriptor(
 )
 
 
+# Medusa B2C Starter page blueprints
+# These are truthful shells grounded in the Medusa B2C starter feature set:
+# - home, store, collection, category, product_detail
+# - cart, checkout
+# - account_dashboard, account_profile, account_addresses, account_orders, account_order_detail
+# - order_confirmed, order_transfer, order_transfer_accept, order_transfer_decline
+#
+# Source: medusajs/nextjs-starter-medusa commit 56c4a6fa2a0432430007ffa912a34573b665cf19
+
+MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
+    family="medusa-b2c-starter",
+    name="Medusa B2C Starter",
+    description="A B2C ecommerce starter template with full storefront, cart, checkout, and customer account flows.",
+    site_type="ecommerce",
+    commerce_provider="medusa",
+    page_blueprints=(
+        SitePageBlueprint(
+            page_type="home",
+            template_id="medusa-b2c-home",
+            name="Home",
+            slug="home",
+            description="Homepage with featured products, categories, and store navigation.",
+            ordering=0,
+            is_entry=True,
+        ),
+        SitePageBlueprint(
+            page_type="store",
+            template_id="medusa-b2c-store",
+            name="All Products",
+            slug="store",
+            description="All products store page with full product listing.",
+            ordering=1,
+        ),
+        SitePageBlueprint(
+            page_type="collection",
+            template_id="medusa-b2c-collection",
+            name="Collection",
+            slug="collection",
+            description="Product collection page with filtering.",
+            ordering=2,
+        ),
+        SitePageBlueprint(
+            page_type="category",
+            template_id="medusa-b2c-category",
+            name="Category",
+            slug="category",
+            description="Product category page with nested subcategory support.",
+            ordering=3,
+        ),
+        SitePageBlueprint(
+            page_type="product_detail",
+            template_id="medusa-b2c-product",
+            name="Product Detail",
+            slug="product",
+            description="Product detail page with gallery, pricing, variants, and add-to-cart.",
+            ordering=4,
+        ),
+        SitePageBlueprint(
+            page_type="cart",
+            template_id="medusa-b2c-cart",
+            name="Cart",
+            slug="cart",
+            description="Shopping cart with quantity adjustments and checkout initiation.",
+            ordering=5,
+        ),
+        SitePageBlueprint(
+            page_type="checkout",
+            template_id="medusa-b2c-checkout",
+            name="Checkout",
+            slug="checkout",
+            description="Checkout flow with shipping, payment, and order confirmation.",
+            ordering=6,
+        ),
+        SitePageBlueprint(
+            page_type="account_dashboard",
+            template_id="medusa-b2c-account-dashboard",
+            name="Account Dashboard",
+            slug="account",
+            description="Customer account overview with login/register.",
+            ordering=7,
+        ),
+        SitePageBlueprint(
+            page_type="account_profile",
+            template_id="medusa-b2c-account-profile",
+            name="Account Profile",
+            slug="account/profile",
+            description="Customer profile management.",
+            ordering=8,
+        ),
+        SitePageBlueprint(
+            page_type="account_addresses",
+            template_id="medusa-b2c-account-addresses",
+            name="Account Addresses",
+            slug="account/addresses",
+            description="Customer address book management.",
+            ordering=9,
+        ),
+        SitePageBlueprint(
+            page_type="account_orders",
+            template_id="medusa-b2c-account-orders",
+            name="Account Orders",
+            slug="account/orders",
+            description="Customer orders list.",
+            ordering=10,
+        ),
+        SitePageBlueprint(
+            page_type="account_order_detail",
+            template_id="medusa-b2c-account-order-detail",
+            name="Order Detail",
+            slug="account/orders/details",
+            description="Single order detail view.",
+            ordering=11,
+        ),
+        SitePageBlueprint(
+            page_type="order_confirmed",
+            template_id="medusa-b2c-order-confirmed",
+            name="Order Confirmed",
+            slug="order/confirmed",
+            description="Order confirmation page after successful checkout.",
+            ordering=12,
+        ),
+        SitePageBlueprint(
+            page_type="order_transfer",
+            template_id="medusa-b2c-order-transfer",
+            name="Order Transfer",
+            slug="order/transfer",
+            description="Order transfer landing page for gift/transfer flows.",
+            ordering=13,
+        ),
+        SitePageBlueprint(
+            page_type="order_transfer_accept",
+            template_id="medusa-b2c-order-transfer-accept",
+            name="Accept Transfer",
+            slug="order/transfer/accept",
+            description="Accept order transfer action page.",
+            ordering=14,
+        ),
+        SitePageBlueprint(
+            page_type="order_transfer_decline",
+            template_id="medusa-b2c-order-transfer-decline",
+            name="Decline Transfer",
+            slug="order/transfer/decline",
+            description="Decline order transfer action page.",
+            ordering=15,
+        ),
+    ),
+    provenance_notes=(
+        "Derived from Medusa B2C starter feature set (medusajs/nextjs-starter-medusa).",
+        "Supports full storefront, cart, checkout, and customer account flows.",
+        "No fake reviews or unsupported business claims.",
+        "Account, address, order, and transfer flows included.",
+    ),
+)
+
+
 # Registry of all site families
 SITE_FAMILIES: dict[str, SiteFamilyDescriptor] = {
     "medusa-b2b-starter": MEDUSA_B2B_STARTER_BLUEPRINT,
+    "medusa-b2c-starter": MEDUSA_B2C_STARTER_BLUEPRINT,
 }
 
 

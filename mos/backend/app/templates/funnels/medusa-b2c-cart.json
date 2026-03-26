@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-cart",
+  "name": "Medusa B2C Cart",
+  "description": "Shopping cart with quantity adjustments and checkout initiation.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Cart",
+        "description": "Shopping cart"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CCartPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

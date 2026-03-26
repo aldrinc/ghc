@@ -103,3 +103,26 @@ class SiteDetail(BaseModel):
     pages: list[SitePageDetail]
     createdAt: str
     updatedAt: str
+
+
+class MedusaRuntimeConfig(BaseModel):
+    """Runtime Medusa configuration for direct frontend access.
+
+    This exposes workspace-level Medusa config to the frontend so that
+    the Medusa JS SDK can be initialized directly without using MOS
+    as a commerce proxy.
+
+    Returns null config when Medusa is not configured for the workspace.
+    """
+
+    baseUrl: Optional[str] = None
+    publishableKey: Optional[str] = None
+    available: bool = False
+
+
+class SiteMedusaConfigResponse(BaseModel):
+    """Response containing site metadata and optional Medusa runtime config."""
+
+    siteFamily: Optional[str] = None
+    commerceProvider: Optional[str] = None
+    medusaConfig: Optional[MedusaRuntimeConfig] = None

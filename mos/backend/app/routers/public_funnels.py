@@ -50,6 +50,7 @@ from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import normalize_route_token, require_product_route_slug
+from app.services.medusa_connection import get_client_medusa_config
 from app.services.medusa_store_runtime import (
     MedusaStoreConfig,
     get_medusa_store_config,
@@ -133,29 +134,87 @@ def _public_page_stage(
 
 # Site page types for commerce experiences
 # These map to the page_type field in site blueprints
-SITE_PAGE_TYPES = {"home", "category", "product_detail", "cart", "checkout"}
+SITE_PAGE_TYPES = {
+    "home",
+    "store",
+    "collection",
+    "category",
+    "product_detail",
+    "cart",
+    "checkout",
+    "account_dashboard",
+    "account_profile",
+    "account_addresses",
+    "account_orders",
+    "account_order_detail",
+    "order_confirmed",
+    "order_transfer",
+    "order_transfer_accept",
+    "order_transfer_decline",
+}
 
 
 def _site_page_type(*, slug: str | None = None, template_id: str | None = None) -> str | None:
     """Determine the site page type for commerce experiences.
 
-    Returns the page_type (home, category, product_detail, cart, checkout)
-    if this is a site page, or None if not a recognized site page type.
+    Returns the page_type if this is a recognized site page type,
+    or None if not a recognized site page type.
     """
     normalized_template_id = clean_optional_text(template_id)
     if not normalized_template_id:
         return None
 
     # Map template IDs to site page types
+    # B2B templates
     template_to_page_type = {
         "medusa-b2b-home": "home",
         "medusa-b2b-category": "category",
         "medusa-b2b-pdp": "product_detail",
         "medusa-b2b-cart": "cart",
         "medusa-b2b-checkout": "checkout",
+        # B2C templates
+        "medusa-b2c-home": "home",
+        "medusa-b2c-store": "store",
+        "medusa-b2c-collection": "collection",
+        "medusa-b2c-category": "category",
+        "medusa-b2c-product": "product_detail",
+        "medusa-b2c-cart": "cart",
+        "medusa-b2c-checkout": "checkout",
+        "medusa-b2c-account-dashboard": "account_dashboard",
+        "medusa-b2c-account-profile": "account_profile",
+        "medusa-b2c-account-addresses": "account_addresses",
+        "medusa-b2c-account-orders": "account_orders",
+        "medusa-b2c-account-order-detail": "account_order_detail",
+        "medusa-b2c-order-confirmed": "order_confirmed",
+        "medusa-b2c-order-transfer": "order_transfer",
+        "medusa-b2c-order-transfer-accept": "order_transfer_accept",
+        "medusa-b2c-order-transfer-decline": "order_transfer_decline",
     }
 
     return template_to_page_type.get(normalized_template_id)
+
+
+def _resolve_public_medusa_runtime_config(
+    *, session: Session, funnel: Funnel
+) -> dict[str, Any] | None:
+    if clean_optional_text(funnel.site_family) != "medusa-b2c-starter":
+        return None
+
+    config = get_client_medusa_config(
+        session=session,
+        org_id=str(funnel.org_id),
+        client_id=str(funnel.client_id),
+    )
+    if not config or not clean_optional_text(config.base_url):
+        return None
+    if not clean_optional_text(config.publishable_key_encrypted):
+        return None
+
+    return {
+        "backendUrl": clean_optional_text(config.base_url),
+        "publishableKey": clean_optional_text(config.publishable_key_encrypted),
+        "defaultCountryCode": "us",
+    }
 
 
 def _canonical_public_page_slug(
@@ -228,7 +287,9 @@ def _get_funnel_or_404(
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     if funnel.status in {FunnelStatusEnum.disabled, FunnelStatusEnum.archived}:
-        detail = "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        detail = (
+            "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        )
         raise HTTPException(status_code=status.HTTP_410_GONE, detail=detail)
     if not funnel.product_id:
         raise HTTPException(
@@ -255,7 +316,9 @@ def _get_funnel_by_slug_or_404(*, session: Session, funnel_slug: str) -> Funnel:
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     if funnel.status in {FunnelStatusEnum.disabled, FunnelStatusEnum.archived}:
-        detail = "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        detail = (
+            "Funnel archived" if funnel.status == FunnelStatusEnum.archived else "Funnel disabled"
+        )
         raise HTTPException(status_code=status.HTTP_410_GONE, detail=detail)
     return funnel
 
@@ -518,6 +581,10 @@ def public_funnel_meta(
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "entrySlug": entry_slug,
+            "medusaRuntimeConfig": _resolve_public_medusa_runtime_config(
+                session=session,
+                funnel=funnel,
+            ),
             "pages": [
                 {
                     "pageId": str(pp.page_id),
@@ -573,11 +640,15 @@ def public_funnel_meta(
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "entrySlug": entry_slug,
+        "medusaRuntimeConfig": _resolve_public_medusa_runtime_config(
+            session=session,
+            funnel=funnel,
+        ),
         "pages": [{"pageId": page_id, "slug": slug} for page_id, slug in public_page_map.items()],
     }
 
 
-@router.get("/funnels/{product_slug}/{funnel_slug}/pages/{slug}")
+@router.get("/funnels/{product_slug}/{funnel_slug}/pages/{slug:path}")
 def public_funnel_page(
     product_slug: str,
     funnel_slug: str,
@@ -1333,7 +1404,8 @@ def public_site_commerce(
             # Query local mOS products with medusa_product_id for this workspace
             workspace_products = (
                 session.execute(
-                    select(Product).where(
+                    select(Product)
+                    .where(
                         Product.client_id == UUID(client_id),
                         Product.medusa_product_id.isnot(None),
                     )
@@ -1344,7 +1416,9 @@ def public_site_commerce(
             )
 
             validation_products = [
-                product for product in workspace_products if _is_validation_workspace_product(product)
+                product
+                for product in workspace_products
+                if _is_validation_workspace_product(product)
             ]
             if validation_products:
                 errors.append(
@@ -1352,7 +1426,9 @@ def public_site_commerce(
                     + ", ".join(product.title for product in validation_products)
                 )
             workspace_products = [
-                product for product in workspace_products if not _is_validation_workspace_product(product)
+                product
+                for product in workspace_products
+                if not _is_validation_workspace_product(product)
             ]
 
             workspace_products, duplicate_product_errors = _dedupe_workspace_products_by_medusa_id(

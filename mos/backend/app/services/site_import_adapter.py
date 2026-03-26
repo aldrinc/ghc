@@ -33,13 +33,24 @@ PAGE_TYPE_HINT_ALIASES = {
     "home": "home",
     "homepage": "home",
     "landing": "home",
+    "store": "store",
+    "collection": "collection",
     "category": "category",
-    "collection": "category",
     "product": "product_detail",
     "pdp": "product_detail",
     "product_detail": "product_detail",
     "cart": "cart",
     "checkout": "checkout",
+    "account": "account_dashboard",
+    "account_dashboard": "account_dashboard",
+    "account_profile": "account_profile",
+    "account_addresses": "account_addresses",
+    "account_orders": "account_orders",
+    "account_order_detail": "account_order_detail",
+    "order_confirmed": "order_confirmed",
+    "order_transfer": "order_transfer",
+    "order_transfer_accept": "order_transfer_accept",
+    "order_transfer_decline": "order_transfer_decline",
 }
 
 
@@ -219,7 +230,7 @@ def _infer_site_family_from_content(code: str | None) -> str:
 
     code_lower = code.lower()
 
-    # Check for B2B indicators
+    # Check for B2B indicators (checked first as more specific)
     if any(
         marker in code_lower
         for marker in [
@@ -234,6 +245,23 @@ def _infer_site_family_from_content(code: str | None) -> str:
         ]
     ):
         return "medusa-b2b-starter"
+
+    # Check for B2C indicators (generic storefront/retail markers)
+    if any(
+        marker in code_lower
+        for marker in [
+            "b2c",
+            "retail",
+            "storefront",
+            "customer account",
+            "order history",
+            "shipping address",
+            "gift card",
+            "loyalty",
+            "medusab2c",
+        ]
+    ):
+        return "medusa-b2c-starter"
 
     # No evidence found - raise error instead of silent default
     raise SiteImportAdapterError(

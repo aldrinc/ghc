@@ -60,6 +60,24 @@ import {
   StarterCollectionRails,
   StarterStoreFooter,
 } from "@/components/commerce/StarterStorefrontBlocks";
+import {
+  MedusaB2CHomePage,
+  MedusaB2CStorePage,
+  MedusaB2CCollectionPage,
+  MedusaB2CCategoryPage,
+  MedusaB2CProductPage,
+  MedusaB2CCartPage,
+  MedusaB2CCheckoutPage,
+  MedusaB2CAccountDashboardPage,
+  MedusaB2CAccountProfilePage,
+  MedusaB2CAccountAddressesPage,
+  MedusaB2CAccountOrdersPage,
+  MedusaB2CAccountOrderDetailPage,
+  MedusaB2COrderConfirmedPage,
+  MedusaB2COrderTransferPage,
+  MedusaB2COrderTransferAcceptPage,
+  MedusaB2COrderTransferDeclinePage,
+} from "@/components/commerce/b2c";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -344,31 +362,57 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
               { label: "Footer", value: "footer" },
             ],
           },
-          layout: {
+          // Modern Section props - bandWidth replaces layout
+          bandWidth: {
             type: "select",
             options: [
-              { label: "Full width", value: "full" },
+              { label: "Full bleed", value: "full" },
               { label: "Contained", value: "contained" },
-              { label: "Card", value: "card" },
             ],
           },
-          containerWidth: {
+          // Modern Section props - contentWidth replaces containerWidth
+          contentWidth: {
             type: "select",
             options: [
+              { label: "Small (640px)", value: "sm" },
+              { label: "Medium (768px)", value: "md" },
+              { label: "Large (1024px)", value: "lg" },
+              { label: "Extra large (1280px)", value: "xl" },
+              { label: "Full width", value: "full" },
+            ],
+          },
+          // Modern Section props - contentAlign
+          contentAlign: {
+            type: "select",
+            options: [
+              { label: "Left", value: "left" },
+              { label: "Center", value: "center" },
+              { label: "Right", value: "right" },
+            ],
+          },
+          // Modern Section props - surface replaces variant
+          surface: {
+            type: "select",
+            options: [
+              { label: "Default", value: "default" },
+              { label: "Muted", value: "muted" },
+              { label: "Primary", value: "primary" },
+              { label: "Dark", value: "dark" },
+            ],
+          },
+          // Modern Section props - padY replaces padding (vertical)
+          padY: {
+            type: "select",
+            options: [
+              { label: "None", value: "none" },
               { label: "Small", value: "sm" },
               { label: "Medium", value: "md" },
               { label: "Large", value: "lg" },
               { label: "Extra large", value: "xl" },
             ],
           },
-          variant: {
-            type: "select",
-            options: [
-              { label: "Default", value: "default" },
-              { label: "Muted", value: "muted" },
-            ],
-          },
-          padding: {
+          // Modern Section props - padX (horizontal)
+          padX: {
             type: "select",
             options: [
               { label: "None", value: "none" },
@@ -379,58 +423,106 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           },
           content: { type: "slot" },
         },
-        defaultProps: { purpose: "section", layout: "full", containerWidth: "lg", variant: "default", padding: "md" },
+        defaultProps: {
+          purpose: "section",
+          bandWidth: "contained",
+          contentWidth: "lg",
+          contentAlign: "left",
+          surface: "default",
+          padY: "md",
+          padX: "md",
+        },
         render: ({
           purpose,
-          layout,
-          containerWidth,
-          variant,
-          padding,
+          bandWidth,
+          contentWidth,
+          contentAlign,
+          surface,
+          padY,
+          padX,
           content,
         }: {
           purpose?: "header" | "section" | "footer";
-          layout?: "full" | "contained" | "card";
-          containerWidth?: ContainerWidth;
-          variant?: "default" | "muted";
-          padding?: "none" | "sm" | "md" | "lg";
+          bandWidth?: "full" | "contained";
+          contentWidth?: "sm" | "md" | "lg" | "xl" | "full";
+          contentAlign?: "left" | "center" | "right";
+          surface?: "default" | "muted" | "primary" | "dark";
+          padY?: "none" | "sm" | "md" | "lg" | "xl";
+          padX?: "none" | "sm" | "md" | "lg";
           content?: (props?: Record<string, unknown>) => ReactNode;
         }) => {
           const resolvedPurpose = purpose || "section";
-          const resolvedLayout = layout || (resolvedPurpose === "section" ? "card" : "full");
 
-          const effectivePadding =
-            padding || (resolvedPurpose === "header" ? "sm" : resolvedPurpose === "footer" ? "md" : "md");
-          const { inner, outerY } = sectionPaddingClass(effectivePadding);
-          const outerYClass = resolvedPurpose === "header" ? "py-4" : outerY;
+          // Resolve surface (background) style
+          const surfaceClass =
+            surface === "muted"
+              ? "bg-surface-2"
+              : surface === "primary"
+                ? "bg-primary text-primary-foreground"
+                : surface === "dark"
+                  ? "bg-zinc-900 text-white"
+                  : "bg-surface";
 
-          const effectiveVariant = variant || (resolvedPurpose === "footer" ? "muted" : "default");
-          const bg = effectiveVariant === "muted" ? "bg-surface-2" : "bg-surface";
+          // Resolve content width
+          const widthClass =
+            contentWidth === "sm"
+              ? "max-w-xl"
+              : contentWidth === "md"
+                ? "max-w-3xl"
+                : contentWidth === "lg"
+                  ? "max-w-5xl"
+                  : contentWidth === "xl"
+                    ? "max-w-7xl"
+                    : "w-full";
 
-          const container = containerWidthClass(containerWidth);
-          const innerContent = content ? content({ className: "space-y-5" }) : null;
+          // Resolve vertical padding
+          const padYClass =
+            padY === "none"
+              ? "py-0"
+              : padY === "sm"
+                ? "py-4"
+                : padY === "lg"
+                  ? "py-16"
+                  : padY === "xl"
+                    ? "py-24"
+                    : "py-10";
 
-          if (resolvedLayout === "full") {
+          // Resolve horizontal padding
+          const padXClass =
+            padX === "none"
+              ? "px-0"
+              : padX === "sm"
+                ? "px-3"
+                : padX === "lg"
+                  ? "px-8"
+                  : "px-6";
+
+          // Resolve content alignment
+          const alignClass =
+            contentAlign === "center"
+              ? "text-center"
+              : contentAlign === "right"
+                ? "text-right"
+                : "text-left";
+
+          const innerContent = content ? content({ className: `space-y-5 ${alignClass}` }) : null;
+
+          // Full bleed: background extends full width, content is contained
+          if (bandWidth === "full") {
             return (
-              <section className={`${bg} ${outerYClass}`}>
-                <div className={`mx-auto w-full ${container} px-6`}>{innerContent}</div>
+              <section className={`${surfaceClass} ${padYClass}`}>
+                <div className={`mx-auto ${widthClass} ${padXClass}`}>{innerContent}</div>
               </section>
             );
           }
 
-          if (resolvedLayout === "contained") {
-            return (
-              <section className={`${outerYClass}`}>
-                <div className={`mx-auto w-full ${container} px-6`}>
-                  <div className={`${bg} ${inner}`}>{innerContent}</div>
-                </div>
-              </section>
-            );
-          }
-
+          // Contained: both background and content are contained
           return (
-            <section className={`${outerYClass}`}>
-              <div className={`mx-auto w-full ${container} px-6`}>
-                <div className={`rounded-2xl border border-border ${bg} shadow-sm ${inner}`}>{innerContent}</div>
+            <section className={`${padYClass}`}>
+              <div className={`mx-auto ${widthClass} ${padXClass}`}>
+                <div className={`rounded-2xl border border-border ${surfaceClass} shadow-sm p-6`}>
+                  {innerContent}
+                </div>
               </div>
             </section>
           );
@@ -1276,6 +1368,86 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
             {typeof props.content === "function" ? props.content({ className: "space-y-5" }) : null}
           </CommerceStoreTemplate>
         )),
+      },
+      MedusaB2CHomePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CHomePage", () => <MedusaB2CHomePage />),
+      },
+      MedusaB2CStorePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CStorePage", () => <MedusaB2CStorePage />),
+      },
+      MedusaB2CCollectionPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCollectionPage", () => <MedusaB2CCollectionPage />),
+      },
+      MedusaB2CCategoryPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCategoryPage", () => <MedusaB2CCategoryPage />),
+      },
+      MedusaB2CProductPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CProductPage", () => <MedusaB2CProductPage />),
+      },
+      MedusaB2CCartPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCartPage", () => <MedusaB2CCartPage />),
+      },
+      MedusaB2CCheckoutPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCheckoutPage", () => <MedusaB2CCheckoutPage />),
+      },
+      MedusaB2CAccountDashboardPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountDashboardPage", () => <MedusaB2CAccountDashboardPage />),
+      },
+      MedusaB2CAccountProfilePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountProfilePage", () => <MedusaB2CAccountProfilePage />),
+      },
+      MedusaB2CAccountAddressesPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountAddressesPage", () => <MedusaB2CAccountAddressesPage />),
+      },
+      MedusaB2CAccountOrdersPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountOrdersPage", () => <MedusaB2CAccountOrdersPage />),
+      },
+      MedusaB2CAccountOrderDetailPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountOrderDetailPage", () => <MedusaB2CAccountOrderDetailPage />),
+      },
+      MedusaB2COrderConfirmedPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderConfirmedPage", () => <MedusaB2COrderConfirmedPage />),
+      },
+      MedusaB2COrderTransferPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferPage", () => <MedusaB2COrderTransferPage />),
+      },
+      MedusaB2COrderTransferAcceptPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferAcceptPage", () => <MedusaB2COrderTransferAcceptPage />),
+      },
+      MedusaB2COrderTransferDeclinePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferDeclinePage", () => <MedusaB2COrderTransferDeclinePage />),
       },
       Spacer: {
         fields: {

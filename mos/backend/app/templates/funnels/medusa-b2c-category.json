@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-category",
+  "name": "Medusa B2C Category",
+  "description": "Product category page with nested subcategory support.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Category",
+        "description": "Browse category"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CCategoryPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

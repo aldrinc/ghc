@@ -31,6 +31,8 @@ from app.schemas.sites import (
     SiteDetail,
     SitePageDetail,
     SitePageBlueprintSummary,
+    SiteMedusaConfigResponse,
+    MedusaRuntimeConfig,
 )
 from app.services.site_blueprints import (
     list_site_families,
@@ -489,4 +491,87 @@ def get_site(
         pages=page_summaries,
         createdAt=site_funnel.created_at.isoformat(),
         updatedAt=site_funnel.updated_at.isoformat(),
+    )
+
+
+@router.get("/{site_id}/medusa-config", response_model=SiteMedusaConfigResponse)
+def get_site_medusa_config(
+    site_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteMedusaConfigResponse:
+    """Get Medusa runtime configuration for a site.
+
+    This endpoint exposes workspace-level Medusa config (base URL and publishable key)
+    for direct frontend access. The frontend uses this to initialize the Medusa JS SDK
+    without going through MOS as a commerce proxy.
+
+    Returns null medusaConfig when:
+    - Site is not found
+    - Site family is not 'medusa-b2c-starter'
+    - Medusa is not configured for the workspace
+
+    This is intentional: we only expose Medusa config to frontends for B2C storefronts
+    that are designed to talk to Medusa directly.
+    """
+    site_uuid = _parse_uuid_or_400(site_id, "site_id")
+
+    # Get the site (funnel with experience_kind='site')
+    # Sites are scoped to org_id only - client_id filtering happens at repository level
+    site_funnel = session.scalars(
+        select(Funnel).where(
+            Funnel.id == site_uuid,
+            Funnel.org_id == UUID(auth.org_id),
+        )
+    ).first()
+
+    if not site_funnel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Only expose Medusa config for medusa-b2c-starter family
+    if site_funnel.site_family != "medusa-b2c-starter":
+        return SiteMedusaConfigResponse(
+            siteFamily=site_funnel.site_family,
+            commerceProvider=site_funnel.commerce_provider,
+            medusaConfig=None,
+        )
+
+    # Get workspace Medusa config
+    from app.services.medusa_connection import get_client_medusa_config
+
+    client_uuid = site_funnel.client_id
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(site_funnel.org_id),
+        client_id=str(client_uuid),
+    )
+
+    if not medusa_config or not medusa_config.base_url:
+        return SiteMedusaConfigResponse(
+            siteFamily=site_funnel.site_family,
+            commerceProvider=site_funnel.commerce_provider,
+            medusaConfig=MedusaRuntimeConfig(available=False),
+        )
+
+    if not medusa_config.publishable_key_encrypted:
+        return SiteMedusaConfigResponse(
+            siteFamily=site_funnel.site_family,
+            commerceProvider=site_funnel.commerce_provider,
+            medusaConfig=MedusaRuntimeConfig(
+                baseUrl=medusa_config.base_url,
+                available=False,
+            ),
+        )
+
+    return SiteMedusaConfigResponse(
+        siteFamily=site_funnel.site_family,
+        commerceProvider=site_funnel.commerce_provider,
+        medusaConfig=MedusaRuntimeConfig(
+            baseUrl=medusa_config.base_url,
+            publishableKey=medusa_config.publishable_key_encrypted,
+            available=True,
+        ),
     )
