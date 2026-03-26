@@ -10,6 +10,7 @@
 
 import { useEffect } from "react";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import { B2CStarterShell } from "./B2CStarterShell";
 
 export type MedusaB2CHomePageProps = {
   /** Hero title override */
@@ -56,7 +57,7 @@ export function MedusaB2CHomePage({
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <B2CStarterShell>
       <main>
         {/* Hero Section */}
         <section className="relative bg-neutral-100 py-24 px-4 sm:px-6 lg:px-8">
@@ -162,6 +163,6 @@ export function MedusaB2CHomePage({
           </div>
         </section>
       </main>
-    </div>
+    </B2CStarterShell>
   );
 }

@@ -1,4 +1,5 @@
 import type { Data } from "@measured/puck";
+import { normalizeImportedRuntimeSectionTypes } from "@/components/imported-site/importedRuntime";
 import { defaultFunnelPuckData } from "@/funnels/puckConfig";
 
 type NormalizePuckDataOptions = {
@@ -443,6 +444,7 @@ export function normalizePuckData(input: unknown, options?: NormalizePuckDataOpt
   cloned.content = migrateSalesPdpTemplate(cloned.content as unknown[]);
   cloned.content = migratePreSalesTemplate(cloned.content as unknown[]);
   migratePreSalesListicleBlockConfigs(cloned, options);
+  normalizeImportedRuntimeSectionTypes(cloned);
 
   const seen = new Set<string>();
   const walk = (value: unknown) => {

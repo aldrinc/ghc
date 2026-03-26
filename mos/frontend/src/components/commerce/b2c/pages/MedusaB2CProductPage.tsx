@@ -11,8 +11,9 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
-import { parseSitePath } from "@/funnels/runtimeRouting";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import { B2CStarterShell } from "./B2CStarterShell";
+import { resolveB2CSitePath } from "./sitePath";
 
 export type MedusaB2CProductPageProps = {
   /** Product handle (overrides URL param) */
@@ -35,16 +36,7 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  const pathHandle = (() => {
-    const hostedPrefix = `/f/${runtime?.productSlug || ""}/${runtime?.funnelSlug || ""}/`;
-    const bundlePrefix = `/${runtime?.productSlug || ""}/${runtime?.funnelSlug || ""}/`;
-    const stripped = location.pathname.startsWith(hostedPrefix)
-      ? location.pathname.slice(hostedPrefix.length)
-      : location.pathname.startsWith(bundlePrefix)
-        ? location.pathname.slice(bundlePrefix.length)
-        : "";
-    return parseSitePath(stripped).handle;
-  })();
+  const pathHandle = resolveB2CSitePath(location.pathname, runtime).handle;
 
   // Load product on mount
   useEffect(() => {
@@ -81,11 +73,13 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
 
   if (!currentProduct) {
     return (
-      <div className="min-h-screen bg-white py-16 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-neutral-500">Product not found</p>
+      <B2CStarterShell>
+        <div className="py-16 px-4">
+          <div className="max-w-7xl mx-auto text-center">
+            <p className="text-neutral-500">Product not found</p>
+          </div>
         </div>
-      </div>
+      </B2CStarterShell>
     );
   }
 
@@ -94,7 +88,7 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
   const price = selectedVariant?.prices?.[0];
 
   return (
-    <div className="min-h-screen bg-white">
+    <B2CStarterShell>
       <main className="py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -199,6 +193,6 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
           </div>
         </div>
       </main>
-    </div>
+    </B2CStarterShell>
   );
 }

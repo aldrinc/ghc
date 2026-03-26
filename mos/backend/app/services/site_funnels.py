@@ -157,7 +157,7 @@ def update_funnel(
         raise SiteFunnelError(f"Funnel not found: {funnel_id}")
 
     # Validate status if provided
-    valid_statuses = ["draft", "active", "archived"]
+    valid_statuses = ["draft", "active", "paused", "archived"]
     if status and status not in valid_statuses:
         raise SiteFunnelError(f"Invalid status. Must be one of: {valid_statuses}")
 

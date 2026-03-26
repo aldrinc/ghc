@@ -1,6 +1,9 @@
 import { Puck } from "@measured/puck";
 import type { Data } from "@measured/puck";
-import { useSite, useSitePage, useUpdateSitePage, useCreateSitePageVersion } from "@/api/sites";
+import { useProducts } from "@/api/products";
+import { useSiteProductBindings } from "@/api/siteProductBindings";
+import { useSite, useSitePage, useUpdateSitePage, useCreateSitePageVersion, useSiteMedusaConfig } from "@/api/sites";
+import { B2CRuntimeProvider } from "@/components/commerce/b2c/B2CRuntimeProvider";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -8,11 +11,16 @@ import { DialogContent, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
 import { useDesignSystems } from "@/api/designSystems";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
+import { buildRuntimePageMap, buildRuntimePageStageMap, buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
+import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { setMedusaRuntimeConfig } from "@/lib/medusa";
+import { buildSitePagePreviewPath, buildSitePreviewPath } from "@/pages/workspaces/sites/sitePreviewRouting";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -22,7 +30,10 @@ export function SitePageEditorPage() {
   const { siteId, pageId } = useParams<{ siteId: string; pageId: string }>();
   const { workspace } = useWorkspace();
   const { data: site } = useSite(siteId);
+  const { data: products = [] } = useProducts(workspace?.id);
   const { data: pageDetail, isLoading } = useSitePage(siteId, pageId);
+  const { data: productBindings = [] } = useSiteProductBindings(siteId || null);
+  const { data: medusaConfig } = useSiteMedusaConfig(siteId);
   const updatePage = useUpdateSitePage(siteId, pageId);
   const createVersion = useCreateSitePageVersion(siteId, pageId);
 
@@ -71,10 +82,77 @@ export function SitePageEditorPage() {
   );
 
   const config = useMemo(() => createFunnelPuckConfig(pageOptions), [pageOptionsKey]);
-  const runtimePageMap = useMemo(() => {
-    const entries = site?.pages?.map((p) => [p.id, p.slug]) ?? [];
-    return Object.fromEntries(entries);
-  }, [site?.pages]);
+  const runtimePages = useMemo(() => site?.pages ?? [], [site?.pages]);
+  const runtimePageMap = useMemo(() => buildRuntimePageMap(runtimePages), [runtimePages]);
+  const runtimePageStageMap = useMemo(() => buildRuntimePageStageMap(runtimePages), [runtimePages]);
+  const runtimePageTypeMap = useMemo(() => buildRuntimePageTypeMap(runtimePages), [runtimePages]);
+  const productsById = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products]
+  );
+  const primaryProductHandle = useMemo(
+    () => (site?.productId ? productsById.get(site.productId)?.handle?.trim() || null : null),
+    [productsById, site?.productId]
+  );
+  const productHandlesByPageId = useMemo(() => {
+    const next = new Map<string, string>();
+    const sortedBindings = [...productBindings]
+      .filter((binding) => binding.active)
+      .sort((left, right) => {
+        if (left.priority !== right.priority) {
+          return left.priority - right.priority;
+        }
+        return left.createdAt.localeCompare(right.createdAt);
+      });
+
+    for (const binding of sortedBindings) {
+      if (next.has(binding.sitePageId)) {
+        continue;
+      }
+      const productHandle = productsById.get(binding.productId)?.handle?.trim();
+      if (productHandle) {
+        next.set(binding.sitePageId, productHandle);
+      }
+    }
+
+    return next;
+  }, [productBindings, productsById]);
+  const previewPage = useMemo(() => {
+    if (!pageDetail) {
+      return null;
+    }
+
+    return {
+      id: pageDetail.page.id,
+      name: metaName || pageDetail.page.name,
+      slug: metaSlug || pageDetail.page.slug,
+      pageType: pageDetail.page.pageType,
+      templateId: pageDetail.page.templateId,
+      ordering: pageDetail.page.ordering,
+      isEntry: site?.entryPageId === pageDetail.page.id,
+      latestDraftVersionId: pageDetail.latestDraft?.id || null,
+      latestApprovedVersionId: pageDetail.latestApproved?.id || null,
+    };
+  }, [metaName, metaSlug, pageDetail, site?.entryPageId]);
+  const previewPageHref = useMemo(
+    () =>
+      siteId && previewPage
+        ? buildSitePagePreviewPath(siteId, previewPage, {
+            siteFamily: site?.siteFamily,
+            productHandle: productHandlesByPageId.get(previewPage.id) || primaryProductHandle,
+          })
+        : null,
+    [previewPage, primaryProductHandle, productHandlesByPageId, site?.siteFamily, siteId]
+  );
+  const previewProductSlug = useMemo(
+    () => shortUuidRouteToken(site?.productId || site?.id || ""),
+    [site?.id, site?.productId]
+  );
+  const previewFunnelSlug = useMemo(
+    () => site?.routeSlug || shortUuidRouteToken(site?.id || ""),
+    [site?.id, site?.routeSlug]
+  );
+  const isB2CSiteEditor = site?.siteFamily === "medusa-b2c-starter" && Object.keys(runtimePageTypeMap).length > 0;
 
   const currentPageLabel = useMemo(() => {
     const page = site?.pages?.find((p) => p.id === pageId);
@@ -114,6 +192,22 @@ export function SitePageEditorPage() {
     setDraftDesignSystemId(metaDesignSystemId || "");
   }, [settingsOpen, metaName, metaSlug, metaDesignSystemId]);
 
+  useEffect(() => {
+    const runtimeConfig = medusaConfig?.medusaConfig;
+    if (!runtimeConfig?.available || !runtimeConfig.baseUrl || !runtimeConfig.publishableKey) {
+      setMedusaRuntimeConfig(null);
+      return () => setMedusaRuntimeConfig(null);
+    }
+
+    setMedusaRuntimeConfig({
+      backendUrl: runtimeConfig.baseUrl,
+      publishableKey: runtimeConfig.publishableKey,
+      defaultCountryCode: "us",
+    });
+
+    return () => setMedusaRuntimeConfig(null);
+  }, [medusaConfig?.medusaConfig]);
+
   const { data: designSystems = [] } = useDesignSystems(workspace?.id);
   const designSystemOptions = useMemo(() => {
     return [
@@ -125,6 +219,13 @@ export function SitePageEditorPage() {
   const handleSaveDraft = () => {
     if (!siteId || !pageId) return;
     createVersion.mutate({ puckData: data, status: "draft" });
+  };
+  const openPreview = () => {
+    if (!previewPageHref) {
+      toast.error("This page needs a concrete storefront route before it can be previewed from the workspace.");
+      return;
+    }
+    window.open(previewPageHref, "_blank", "noreferrer");
   };
 
   if (isLoading || !pageDetail) {
@@ -179,6 +280,12 @@ export function SitePageEditorPage() {
               ) : null}
               <MenuSeparator />
               <MenuItem onClick={() => setSettingsOpen(true)}>Edit settings</MenuItem>
+              <MenuItem
+                onClick={openPreview}
+                className={!previewPageHref ? "opacity-60" : undefined}
+              >
+                Open preview
+              </MenuItem>
               <MenuSeparator />
               <MenuItem
                 onClick={handleSaveDraft}
@@ -255,11 +362,11 @@ export function SitePageEditorPage() {
       <div className="ds-card ds-card--md p-0 overflow-hidden">
         <FunnelRuntimeProvider
           value={{
-            productSlug: "",
-            funnelSlug: site?.routeSlug || siteId || "",
+            productSlug: previewProductSlug || "preview-product",
+            funnelSlug: previewFunnelSlug || "preview-site",
             pageMap: runtimePageMap,
-            pageStageMap: {},
-            pageTypeMap: {},
+            pageStageMap: runtimePageStageMap,
+            pageTypeMap: runtimePageTypeMap,
             bundleMode: false,
             entrySlug: null,
             pageStage: undefined,
@@ -268,17 +375,33 @@ export function SitePageEditorPage() {
             commerceError: null,
             pageId: pageDetail.page.id,
             nextPageId: null,
+            resolvePagePath: (slug: string) => buildSitePreviewPath(site?.id || siteId || "", slug),
+            resolveSitePath: (sitePath: string) => buildSitePreviewPath(site?.id || siteId || "", sitePath),
           }}
         >
-          <Puck
-            key={puckKey}
-            config={config}
-            data={data}
-            onChange={setData}
-            ui={editorUi}
-            viewports={editorViewports}
-            plugins={plugins}
-          />
+          {isB2CSiteEditor ? (
+            <B2CRuntimeProvider siteFamily="medusa-b2c-starter" siteName={site?.name || null}>
+              <Puck
+                key={puckKey}
+                config={config}
+                data={data}
+                onChange={setData}
+                ui={editorUi}
+                viewports={editorViewports}
+                plugins={plugins}
+              />
+            </B2CRuntimeProvider>
+          ) : (
+            <Puck
+              key={puckKey}
+              config={config}
+              data={data}
+              onChange={setData}
+              ui={editorUi}
+              viewports={editorViewports}
+              plugins={plugins}
+            />
+          )}
         </FunnelRuntimeProvider>
       </div>
     </div>

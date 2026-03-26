@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -41,6 +42,7 @@ from app.services.template_variant_governance import (
     build_convert_provenance,
     build_template_draft_provenance,
 )
+from app.services.funnel_templates import apply_template_assets, get_funnel_template
 from app.services.puck_data_validation import (
     LegacySectionPropError,
     validate_puck_data_no_legacy_section_props,
@@ -100,6 +102,146 @@ def _collect_screenshot_refs(snapshot: SiteImportSnapshot | None) -> list[str]:
         if snapshot.mobile_screenshot_data_url:
             screenshot_refs.append(snapshot.mobile_screenshot_data_url)
     return screenshot_refs
+
+
+_PLACEHOLDER_IMPORT_BLOCK_TYPES = {"ProductCard", "ProductCollection", "Cart", "Checkout"}
+
+
+def _import_page_raw_puck_data(adapted_page: dict[str, Any]) -> dict[str, Any]:
+    raw_puck_data = adapted_page.get("puck_data") or adapted_page.get("puckData") or {}
+    if not isinstance(raw_puck_data, dict):
+        return {}
+    return deepcopy(raw_puck_data)
+
+
+def _should_materialize_template_puck_data(puck_data: dict[str, Any]) -> bool:
+    content = puck_data.get("content")
+    if not isinstance(content, list) or not content:
+        return True
+
+    top_level_types = [
+        item.get("type")
+        for item in content
+        if isinstance(item, dict) and isinstance(item.get("type"), str)
+    ]
+    if not top_level_types:
+        return True
+
+    if any(block_type in _PLACEHOLDER_IMPORT_BLOCK_TYPES for block_type in top_level_types):
+        return True
+
+    has_structural_blocks = any(
+        block_type == "Section" or "Page" in block_type for block_type in top_level_types
+    )
+    return not has_structural_blocks
+
+
+def _migrate_legacy_section_props(node: Any) -> None:
+    if isinstance(node, dict):
+        if node.get("type") == "Section" and isinstance(node.get("props"), dict):
+            props = node["props"]
+            layout = props.get("layout")
+            container_width = props.get("containerWidth")
+            variant = props.get("variant")
+            padding = props.get("padding")
+
+            if "bandWidth" not in props and isinstance(layout, str):
+                props["bandWidth"] = "full" if layout == "full" else "contained"
+            if "contentWidth" not in props and isinstance(container_width, str):
+                props["contentWidth"] = container_width
+            if "surface" not in props and isinstance(variant, str):
+                props["surface"] = {
+                    "default": "default",
+                    "muted": "muted",
+                    "primary": "primary",
+                    "dark": "dark",
+                }.get(variant, "default")
+            if "padY" not in props and isinstance(padding, str):
+                props["padY"] = {"none": "none", "sm": "sm", "md": "md", "lg": "lg"}.get(
+                    padding, "md"
+                )
+            if "padX" not in props and isinstance(padding, str):
+                props["padX"] = {"none": "none", "sm": "sm", "md": "md", "lg": "lg"}.get(
+                    padding, "md"
+                )
+
+            props.pop("layout", None)
+            props.pop("containerWidth", None)
+            props.pop("variant", None)
+            props.pop("padding", None)
+
+        for value in node.values():
+            _migrate_legacy_section_props(value)
+        return
+
+    if isinstance(node, list):
+        for item in node:
+            _migrate_legacy_section_props(item)
+
+
+def _apply_import_root_metadata(
+    puck_data: dict[str, Any],
+    *,
+    adapted_page: dict[str, Any],
+    source_url: str,
+) -> None:
+    root = puck_data.setdefault("root", {})
+    if not isinstance(root, dict):
+        root = {}
+        puck_data["root"] = root
+    props = root.setdefault("props", {})
+    if not isinstance(props, dict):
+        props = {}
+        root["props"] = props
+
+    if not isinstance(props.get("title"), str) or not props.get("title"):
+        props["title"] = (
+            adapted_page.get("name")
+            or adapted_page.get("page_type")
+            or adapted_page.get("pageType")
+            or "Imported Page"
+        )
+    if not isinstance(props.get("description"), str):
+        props["description"] = source_url
+
+
+def _materialize_import_page_puck_data(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    adapted_page: dict[str, Any],
+    source_url: str,
+) -> dict[str, Any]:
+    raw_puck_data = _import_page_raw_puck_data(adapted_page)
+    puck_data = raw_puck_data
+
+    if _should_materialize_template_puck_data(raw_puck_data):
+        template_id = adapted_page.get("template_id") or adapted_page.get("templateId")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise SiteImportError(
+                "Imported page does not contain editor-renderable Puck data and is missing a template_id for reconstruction."
+            )
+
+        template = get_funnel_template(template_id.strip())
+        if template is None:
+            raise SiteImportError(
+                f"Imported page references unknown template '{template_id.strip()}'."
+            )
+        puck_data = apply_template_assets(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            template=template,
+        )
+
+    _migrate_legacy_section_props(puck_data)
+    _apply_import_root_metadata(
+        puck_data,
+        adapted_page=adapted_page,
+        source_url=source_url,
+    )
+    return puck_data
 
 
 def create_import_record(
@@ -345,9 +487,17 @@ def save_import_as_site(
     if not adapted_pages:
         raise SiteImportError("Import has no adapted pages to save")
 
+    materialized_puck_data: list[dict[str, Any]] = []
+
     # Validate all adapted pages for legacy Section props before saving
     for idx, adapted_page in enumerate(adapted_pages):
-        puck_data = adapted_page.get("puck_data") or adapted_page.get("puckData") or {}
+        puck_data = _materialize_import_page_puck_data(
+            session,
+            org_id=org_id,
+            client_id=client_id,
+            adapted_page=adapted_page,
+            source_url=site_import.source_url,
+        )
         page_label = f"page[{idx}]"  # Human-friendly label for errors
         try:
             validate_puck_data_no_legacy_section_props(puck_data)
@@ -356,6 +506,7 @@ def save_import_as_site(
                 f"Cannot save import: legacy Section prop '{e.prop_name}' found in {page_label}. "
                 f"These props are no longer supported. Use design-system tokens instead."
             ) from e
+        materialized_puck_data.append(puck_data)
 
     snapshot = imports_repo.get_import_snapshot(site_import_id=site_import_id)
     screenshot_refs: list[str] = []
@@ -401,6 +552,7 @@ def save_import_as_site(
         )
 
         for index, adapted_page in enumerate(adapted_pages):
+            puck_data = materialized_puck_data[index]
             page_type = adapted_page.get("page_type") or adapted_page.get("pageType")
             template_id = adapted_page.get("template_id") or adapted_page.get("templateId")
             page = runtime_repo.create_page(
@@ -414,16 +566,14 @@ def save_import_as_site(
                 source_screenshot_refs=screenshot_refs,
                 generated_code=adapted_page.get("generated_code")
                 or adapted_page.get("generatedCode"),
-                adapted_puck_data=adapted_page.get("puck_data")
-                or adapted_page.get("puckData")
-                or {},
+                adapted_puck_data=puck_data,
                 outbound_links=adapted_page.get("outbound_links")
                 or adapted_page.get("outboundLinks")
                 or [],
             )
             version = runtime_repo.create_page_version(
                 page_id=str(page.id),
-                puck_data=adapted_page.get("puck_data") or adapted_page.get("puckData") or {},
+                puck_data=puck_data,
                 provenance={
                     "source_type": "site_import",
                     "site_import_id": site_import_id,
@@ -517,9 +667,20 @@ def add_import_pages_to_site(
     screenshot_refs = _collect_screenshot_refs(snapshot)
     created_pages: list[dict[str, Any]] = []
     page_type_to_id: dict[str, str] = {}
+    materialized_puck_data = [
+        _materialize_import_page_puck_data(
+            session,
+            org_id=org_id,
+            client_id=client_id,
+            adapted_page=adapted_page,
+            source_url=site_import.source_url,
+        )
+        for adapted_page in adapted_pages
+    ]
 
     try:
         for index, adapted_page in enumerate(adapted_pages):
+            puck_data = materialized_puck_data[index]
             page_type = adapted_page.get("page_type") or adapted_page.get("pageType")
             slug = adapted_page.get("slug") or (page_type or f"page-{index + 1}")
             if not runtime_repo.check_slug_unique(site_id=site_id, slug=slug):
@@ -540,16 +701,14 @@ def add_import_pages_to_site(
                 source_screenshot_refs=screenshot_refs,
                 generated_code=adapted_page.get("generated_code")
                 or adapted_page.get("generatedCode"),
-                adapted_puck_data=adapted_page.get("puck_data")
-                or adapted_page.get("puckData")
-                or {},
+                adapted_puck_data=puck_data,
                 outbound_links=adapted_page.get("outbound_links")
                 or adapted_page.get("outboundLinks")
                 or [],
             )
             version = runtime_repo.create_page_version(
                 page_id=str(page.id),
-                puck_data=adapted_page.get("puck_data") or adapted_page.get("puckData") or {},
+                puck_data=puck_data,
                 provenance={
                     "source_type": "site_import",
                     "site_import_id": site_import_id,

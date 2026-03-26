@@ -51,6 +51,7 @@ import {
   listCategories,
   getProductByHandle,
   getCategoryByHandle,
+  createCart as createMedusaCart,
   getOrCreateCart,
   getCart,
   updateCart,
@@ -80,8 +81,7 @@ import {
   type CreateAddressInput,
   type UpdateAddressInput,
 } from "@/lib/medusa";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
-import { buildPublicFunnelPath } from "@/funnels/runtimeRouting";
+import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
 
 // =============================================================================
 // Types
@@ -112,6 +112,7 @@ export type B2CRuntimeContextValue = {
 
   // Site metadata
   siteFamily: string;
+  siteName: string | null;
   countryCode: string;
   locale: string | null;
 
@@ -226,6 +227,7 @@ export function useB2CRuntime(): B2CRuntimeContextValue {
 export type B2CRuntimeProviderProps = {
   children: ReactNode;
   siteFamily: string;
+  siteName?: string | null;
   initialCountryCode?: string;
   initialLocale?: string | null;
 };
@@ -233,6 +235,7 @@ export type B2CRuntimeProviderProps = {
 export function B2CRuntimeProvider({
   children,
   siteFamily,
+  siteName = null,
   initialCountryCode,
   initialLocale,
 }: B2CRuntimeProviderProps): ReactNode {
@@ -433,7 +436,9 @@ export function B2CRuntimeProvider({
     setCartLoading(true);
     setCartError(null);
     try {
-      const newCart = await getOrCreateCart();
+      const newCart = regionId
+        ? await createMedusaCart({ regionId, countryCode })
+        : await getOrCreateCart();
       setCart(newCart);
       return newCart;
     } catch (err) {
@@ -443,7 +448,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [countryCode]);
 
   const refreshCart = useCallback(async () => {
     const cartId = getCartId();
@@ -792,14 +797,7 @@ export function B2CRuntimeProvider({
         return null;
     }
 
-    const path = buildPublicFunnelPath({
-      productSlug: funnelRuntime.productSlug,
-      funnelSlug: funnelRuntime.funnelSlug,
-      bundleMode: funnelRuntime.bundleMode || false,
-      sitePath,
-    });
-
-    return path;
+    return resolveRuntimeSitePath(funnelRuntime, sitePath);
   }, [countryCode, funnelRuntime]);
 
   const navigateToHome = useCallback(() => {
@@ -875,6 +873,7 @@ export function B2CRuntimeProvider({
     isConfigured,
     configError,
     siteFamily,
+    siteName,
     countryCode,
     locale,
     regions,

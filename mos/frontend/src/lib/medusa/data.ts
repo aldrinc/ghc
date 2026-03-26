@@ -5,7 +5,7 @@
  * They replace the MOS commerce proxy for catalog, cart, and customer operations.
  */
 
-import { getMedusaClient } from "./config";
+import { getMedusaClient, getMedusaRuntimeConfig } from "./config";
 import { getCartId, setCartId, getAuthToken, setAuthToken, getCountryCode } from "./session";
 import type {
   MedusaProduct,
@@ -224,6 +224,33 @@ export async function getCategoryByHandle(handle: string): Promise<MedusaCategor
 // Cart
 // =============================================================================
 
+async function resolveCartRegionId(options: {
+  regionId?: string;
+  countryCode?: string;
+}): Promise<string> {
+  const explicitRegionId = options.regionId?.trim();
+  if (explicitRegionId) {
+    return explicitRegionId;
+  }
+
+  const configuredRegionId = getMedusaRuntimeConfig()?.defaultRegionId?.trim();
+  if (configuredRegionId) {
+    return configuredRegionId;
+  }
+
+  const normalizedCountryCode = (options.countryCode || getCountryCode()).trim().toLowerCase();
+  const regions = await listRegions();
+  const matchingRegion = regions.find((region) =>
+    region.countries?.some((country) => country.iso_2.toLowerCase() === normalizedCountryCode)
+  );
+
+  if (!matchingRegion) {
+    throw new MedusaApiError(`No Medusa region is configured for country code '${normalizedCountryCode}'.`);
+  }
+
+  return matchingRegion.id;
+}
+
 /**
  * Create a new cart in Medusa.
  */
@@ -233,13 +260,11 @@ export async function createCart(options: {
 } = {}): Promise<MedusaCart> {
   try {
     const client = getMedusaClient();
-    const countryCode = options.countryCode || getCountryCode();
-    
+    const regionId = await resolveCartRegionId(options);
     const response = await client.store.cart.create({
-      region_id: options.regionId,
-      country_code: countryCode,
+      region_id: regionId,
     });
-    
+
     const cart = response.cart as MedusaCart;
     setCartId(cart.id);
     return cart;

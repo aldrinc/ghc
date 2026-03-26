@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Config } from "@measured/puck";
 import { Link } from "react-router-dom";
-import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
+import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
   navigationClickEventForStages,
   resolvePublicFunnelStage,
@@ -98,6 +99,8 @@ type FunnelRuntimeContextValue = {
   nextPageId?: string | null;
   visitorId?: string | null;
   sessionId?: string | null;
+  resolvePagePath?: (slug: string) => string;
+  resolveSitePath?: (sitePath: string) => string;
 };
 
 const FunnelRuntimeContext = createContext<FunnelRuntimeContextValue | null>(null);
@@ -121,10 +124,29 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
   if (!normalizedSlug) {
     return "#";
   }
+  if (runtime.resolvePagePath) {
+    return runtime.resolvePagePath(normalizedSlug);
+  }
   if (runtime.bundleMode) {
     return `/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
   return `/f/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
+}
+
+export function resolveRuntimeSitePath(runtime: FunnelRuntimeContextValue, sitePath: string): string {
+  const normalizedSitePath = (sitePath || "").trim().replace(/^\/+/, "");
+  if (!normalizedSitePath) {
+    return "#";
+  }
+  if (runtime.resolveSitePath) {
+    return runtime.resolveSitePath(normalizedSitePath);
+  }
+  return buildPublicFunnelPath({
+    productSlug: runtime.productSlug,
+    funnelSlug: runtime.funnelSlug,
+    bundleMode: runtime.bundleMode || false,
+    sitePath: normalizedSitePath,
+  });
 }
 
 type PageOption = { label: string; value: string };
@@ -1454,6 +1476,18 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           height: { type: "number" },
         },
         render: ({ height }: { height?: number }) => <div style={{ height: Math.max(0, height || 24) }} />,
+      },
+      ImportedRuntimeSection: {
+        fields: {},
+        render: withBlockBoundary("ImportedRuntimeSection", (props: Record<string, unknown>) => (
+          <ImportedRuntimeSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            originalType={typeof props.originalType === "string" ? props.originalType : undefined}
+            runtimeSource={typeof props.runtimeSource === "string" ? props.runtimeSource : undefined}
+            headAssets={props.headAssets}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+          />
+        )),
       },
     },
   };

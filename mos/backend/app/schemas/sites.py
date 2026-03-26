@@ -85,6 +85,8 @@ class SiteSummary(BaseModel):
     productId: Optional[str] = None
     designSystemId: Optional[str] = None
     routeSlug: Optional[str] = None
+    primaryDomain: Optional[str] = None
+    templateId: Optional[str] = None
     createdAt: str
     updatedAt: str
 
@@ -118,6 +120,8 @@ class SiteDetail(BaseModel):
     productId: Optional[str] = None
     designSystemId: Optional[str] = None
     routeSlug: Optional[str] = None
+    primaryDomain: Optional[str] = None
+    templateId: Optional[str] = None
     entryPageId: Optional[str] = None
     pages: list[SitePageDetail]
     createdAt: str

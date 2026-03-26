@@ -356,6 +356,7 @@ export function PublicFunnelPage() {
     () => getOrCreateId(sessionStorage, `funnel_session_id:${productSlug || "unknown"}:${funnelSlug || "unknown"}`),
     [funnelSlug, productSlug],
   );
+  const pageMetadata = useMemo(() => resolvePageMetadata(page), [page]);
   const normalizedPuckData = useMemo(() => {
     if (!page) return null;
     return normalizePuckData(page.puckData, { designSystemTokens: page.designSystemTokens ?? null });
@@ -571,18 +572,18 @@ export function PublicFunnelPage() {
 
   useEffect(() => {
     if (!page) return;
-    setPageMetadata(resolvePageMetadata(page));
+    setPageMetadata(pageMetadata);
     return () => {
       clearManagedMetaTags();
     };
-  }, [page]);
+  }, [page, pageMetadata]);
 
   useEffect(() => {
-    setPageFavicon(resolvePageMetadata(page)?.brandName ?? null);
+    setPageFavicon(pageMetadata?.brandName ?? null);
     return () => {
       clearManagedFavicons();
     };
-  }, [page]);
+  }, [pageMetadata]);
 
   useEffect(() => {
     const metaPixelId = page?.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
@@ -674,6 +675,7 @@ export function PublicFunnelPage() {
           {useB2CRuntime ? (
             <B2CRuntimeProvider
               siteFamily="medusa-b2c-starter"
+              siteName={pageMetadata?.brandName || pageMetadata?.title || null}
               initialCountryCode={parsedRouteSitePath.countryCode || undefined}
             >
               <DesignSystemProvider tokens={page.designSystemTokens}>

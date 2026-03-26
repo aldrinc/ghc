@@ -19,8 +19,7 @@ import type {
   MedusaPaymentCollection,
   SiteCommerceCompleteResponse,
 } from "@/types/commerce";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
-import { buildPublicFunnelPath, isStandaloneBundleMode } from "@/funnels/runtimeRouting";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
 
 // =============================================================================
 // Commerce Runtime Context
@@ -668,12 +667,7 @@ export function CommerceRuntimeProvider({
       if (!pageSlug) {
         return null;
       }
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: pageSlug,
-        bundleMode: funnelRuntime.bundleMode,
-      });
+      const path = resolveRuntimePagePath(funnelRuntime, pageSlug);
       const searchParams = new URLSearchParams();
       Object.entries(params || {}).forEach(([key, value]) => {
         const cleanedValue = typeof value === "string" ? value.trim() : value;
@@ -2487,12 +2481,7 @@ export function CommerceStoreHeader({
       ([, type]) => type === "home"
     )?.[0];
     if (homeSlug && funnelRuntime.pageMap[homeSlug]) {
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: funnelRuntime.pageMap[homeSlug],
-        bundleMode: funnelRuntime.bundleMode,
-      });
+      const path = resolveRuntimePagePath(funnelRuntime, funnelRuntime.pageMap[homeSlug]);
       navigate(path);
     }
   };
@@ -2659,12 +2648,7 @@ export function CommerceStoreFooter({
       ([, type]) => type === "home"
     )?.[0];
     if (homeSlug && funnelRuntime.pageMap[homeSlug]) {
-      const path = buildPublicFunnelPath({
-        productSlug: funnelRuntime.productSlug,
-        funnelSlug: funnelRuntime.funnelSlug,
-        slug: funnelRuntime.pageMap[homeSlug],
-        bundleMode: funnelRuntime.bundleMode,
-      });
+      const path = resolveRuntimePagePath(funnelRuntime, funnelRuntime.pageMap[homeSlug]);
       navigate(path);
     }
   };

@@ -1,6 +1,7 @@
 export { MedusaB2CHomePage } from "./MedusaB2CHomePage";
 export { MedusaB2CStorePage } from "./MedusaB2CStorePage";
 export { MedusaB2CProductPage } from "./MedusaB2CProductPage";
+export { B2CStarterShell } from "./B2CStarterShell";
 export {
   MedusaB2CCollectionPage,
   MedusaB2CCategoryPage,

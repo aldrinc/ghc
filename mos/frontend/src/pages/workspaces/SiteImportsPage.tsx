@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Download, Loader2, Plus, ExternalLink } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Plus, ExternalLink } from "lucide-react";
 
 import { useSiteImports, useSiteImport, useCreateSiteImport, useApplySiteImport } from "@/api/siteImports";
 import { useSites } from "@/api/sites";
@@ -69,6 +69,23 @@ export function SiteImportsPage() {
       <PageHeader
         title="Site Imports"
         description="Capture reference sites, then apply them as sites, pages, or reusable templates."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/workspaces/sites")}>
+              <ArrowLeft className="h-4 w-4" />
+              Back to Sites
+            </Button>
+            {selectedImport?.savedSiteId ? (
+              <Button
+                variant="secondary"
+                onClick={() => navigate(`/workspaces/sites/${selectedImport.savedSiteId}`)}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Imported Site
+              </Button>
+            ) : null}
+          </div>
+        }
       >
         <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-content-muted">
           <Badge tone="neutral">Workspace: {workspace.name}</Badge>

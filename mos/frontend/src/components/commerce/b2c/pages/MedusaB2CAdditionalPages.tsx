@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
-import { parseSitePath } from "@/funnels/runtimeRouting";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
 import type { MedusaOrder, MedusaCustomerAddress } from "@/types/commerce";
+import { B2CStarterShell } from "./B2CStarterShell";
+import { resolveB2CSitePath } from "./sitePath";
 
-function PageShell({ title, description, children }: { title: string; description?: string; children?: React.ReactNode }) {
+function PageShell({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white">
+    <B2CStarterShell>
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
         <header className="space-y-2 border-b border-zinc-200 pb-4">
           <h1 className="text-3xl font-medium text-zinc-950">{title}</h1>
@@ -15,7 +16,7 @@ function PageShell({ title, description, children }: { title: string; descriptio
         </header>
         {children}
       </main>
-    </div>
+    </B2CStarterShell>
   );
 }
 
@@ -38,16 +39,10 @@ function formatDate(dateString?: string): string {
 function useResolvedSitePath() {
   const location = useLocation();
   const runtime = useFunnelRuntime();
-  return useMemo(() => {
-    const hostedPrefix = `/f/${runtime?.productSlug || ""}/${runtime?.funnelSlug || ""}/`;
-    const bundlePrefix = `/${runtime?.productSlug || ""}/${runtime?.funnelSlug || ""}/`;
-    const stripped = location.pathname.startsWith(hostedPrefix)
-      ? location.pathname.slice(hostedPrefix.length)
-      : location.pathname.startsWith(bundlePrefix)
-        ? location.pathname.slice(bundlePrefix.length)
-        : "";
-    return parseSitePath(stripped);
-  }, [location.pathname, runtime?.funnelSlug, runtime?.productSlug]);
+  return useMemo(
+    () => resolveB2CSitePath(location.pathname, runtime),
+    [location.pathname, runtime],
+  );
 }
 
 // =============================================================================

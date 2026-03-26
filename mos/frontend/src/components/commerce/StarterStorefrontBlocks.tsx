@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MedusaCategory, MedusaCollection, MedusaProduct } from "@/types/commerce";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
-import { buildPublicFunnelPath } from "@/funnels/runtimeRouting";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
 import { useCommerceRuntime } from "@/components/commerce/CommerceBlocks";
 
 type StarterLinkType = "funnelPage" | "nextPage" | "external";
@@ -35,12 +34,7 @@ function resolvePagePathById({
   if (!slug) {
     throw new Error(`Starter shell could not resolve internal page target '${pageId}'.`);
   }
-  return buildPublicFunnelPath({
-    productSlug: funnelRuntime.productSlug,
-    funnelSlug: funnelRuntime.funnelSlug,
-    slug,
-    bundleMode: funnelRuntime.bundleMode,
-  });
+  return resolveRuntimePagePath(funnelRuntime, slug);
 }
 
 function resolvePagePathByType({

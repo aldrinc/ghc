@@ -20,6 +20,7 @@ import { SiteImportsPage } from "@/pages/workspaces/SiteImportsPage";
 import { SiteDetailPage } from "@/pages/workspaces/SiteDetailPage";
 import { SitePageEditorPage } from "@/pages/workspaces/SitePageEditorPage";
 import { SiteFunnelDetailPage } from "@/pages/workspaces/sites/SiteFunnelDetailPage";
+import { SitePagePreviewPage } from "@/pages/workspaces/sites/SitePagePreviewPage";
 import { WorkflowsPage } from "@/pages/workflows/WorkflowsPage";
 import { WorkflowDetailPage } from "@/pages/workflows/WorkflowDetailPage";
 import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
@@ -89,6 +90,16 @@ function App() {
             element={
               <RequireAuth>
                 <WorkspaceOnboardingPage />
+              </RequireAuth>
+            }
+          />
+        )}
+        {standaloneBundleMode ? null : (
+          <Route
+            path="/workspaces/sites/:siteId/preview/*"
+            element={
+              <RequireAuth>
+                <SitePagePreviewPage />
               </RequireAuth>
             }
           />

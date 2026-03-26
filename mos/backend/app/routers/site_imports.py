@@ -13,6 +13,7 @@ from typing import Any
 from uuid import uuid4, UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -105,7 +106,7 @@ def _write_application(
         site_template_id=site_template_id,
         template_variant_id=template_variant_id,
         error_detail=error_detail,
-        result_summary=result_summary or {},
+        result_summary=jsonable_encoder(result_summary or {}),
         created_by_user_external_id=created_by_user_external_id,
         created_at=now,
     )

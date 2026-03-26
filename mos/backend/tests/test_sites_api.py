@@ -349,6 +349,82 @@ def test_create_site_has_correct_site_metadata(api_client: TestClient, db_sessio
         assert version.puck_data is not None
 
 
+def test_create_site_funnel_succeeds(api_client: TestClient):
+    """Site funnels should be creatable directly from a site."""
+    client_id = _create_client(api_client, name="Site Funnel Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Bound Product")
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Funnel Site",
+            "productId": product_id,
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+    entry_page = next(page for page in site["pages"] if page["isEntry"])
+
+    response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={
+            "name": "Main Checkout Funnel",
+            "description": "Primary on-site funnel",
+            "entryPageId": entry_page["id"],
+            "productId": product_id,
+            "trackingConfig": {"provider": "ga4", "measurementId": "G-TEST123"},
+        },
+    )
+
+    assert response.status_code == 201
+    funnel = response.json()
+    assert funnel["siteId"] == site["id"]
+    assert funnel["name"] == "Main Checkout Funnel"
+    assert funnel["description"] == "Primary on-site funnel"
+    assert funnel["status"] == "draft"
+    assert funnel["entryPageId"] == entry_page["id"]
+    assert funnel["productId"] == product_id
+    assert funnel["trackingConfig"] == {"provider": "ga4", "measurementId": "G-TEST123"}
+    assert funnel["steps"] == []
+
+    list_response = api_client.get(f"/sites/{site['id']}/funnels?clientId={client_id}")
+    assert list_response.status_code == 200
+    funnels = list_response.json()
+    assert len(funnels) == 1
+    assert funnels[0]["id"] == funnel["id"]
+
+
+def test_update_site_funnel_accepts_paused_status(api_client: TestClient):
+    """Site funnel status should accept paused to match the frontend workflow."""
+    client_id = _create_client(api_client, name="Paused Funnel Workspace")
+    site_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Paused Funnel Site",
+        },
+    )
+    assert site_response.status_code == 201
+    site = site_response.json()
+
+    create_response = api_client.post(
+        f"/sites/{site['id']}/funnels?clientId={client_id}",
+        json={"name": "Lifecycle Funnel"},
+    )
+    assert create_response.status_code == 201
+    funnel = create_response.json()
+
+    update_response = api_client.patch(
+        f"/sites/{site['id']}/funnels/{funnel['id']}?clientId={client_id}",
+        json={"status": "paused"},
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["status"] == "paused"
+
+
 def test_create_site_rewrites_internal_page_links(api_client: TestClient, db_session):
     """Test that created site rewrites placeholder page IDs to real page IDs."""
     client_id = _create_client(api_client, name="Link Rewrite Workspace")

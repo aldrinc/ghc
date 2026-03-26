@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "@/api/client";
+import { useApiClient, type ApiError } from "@/api/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { toast } from "@/components/ui/toast";
+
+function getMutationErrorMessage(err: ApiError | Error, fallback: string): string {
+  const candidate = err as { message?: unknown };
+  return typeof candidate.message === "string" && candidate.message ? candidate.message : fallback;
+}
 
 export interface SiteFunnel {
   id: string;
@@ -93,9 +99,17 @@ export function useCreateSiteFunnel(siteId: string | null | undefined) {
 
   return useMutation({
     mutationFn: (request: Omit<CreateSiteFunnelRequest, "siteId">) =>
-      post<SiteFunnel>(`/sites/${siteId}/funnels?clientId=${workspace!.id}`, { ...request, siteId: siteId! }),
+      post<SiteFunnelDetail>(`/sites/${siteId}/funnels?clientId=${workspace!.id}`, {
+        ...request,
+        siteId: siteId!,
+      }),
     onSuccess: () => {
+      toast.success("Site funnel created");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels"] });
+      queryClient.invalidateQueries({ queryKey: ["sites", "funnels", "workspace", workspace?.id] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to create site funnel"));
     },
   });
 }
@@ -108,13 +122,18 @@ export function useUpdateSiteFunnel(siteId: string | null | undefined, funnelId:
 
   return useMutation({
     mutationFn: (payload: UpdateSiteFunnelRequest) =>
-      request<SiteFunnel>(`/sites/${siteId}/funnels/${funnelId}?clientId=${workspace!.id}`, {
+      request<SiteFunnelDetail>(`/sites/${siteId}/funnels/${funnelId}?clientId=${workspace!.id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
+      toast.success("Site funnel updated");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels"] });
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+      queryClient.invalidateQueries({ queryKey: ["sites", "funnels", "workspace", workspace?.id] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to update site funnel"));
     },
   });
 }
@@ -131,7 +150,12 @@ export function useDeleteSiteFunnel(siteId: string | null | undefined) {
         method: "DELETE",
       }),
     onSuccess: () => {
+      toast.success("Site funnel deleted");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels"] });
+      queryClient.invalidateQueries({ queryKey: ["sites", "funnels", "workspace", workspace?.id] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to delete site funnel"));
     },
   });
 }
@@ -146,7 +170,11 @@ export function useCreateSiteFunnelStep(siteId: string | null | undefined, funne
     mutationFn: (request: CreateSiteFunnelStepRequest) =>
       post<SiteFunnelStep>(`/sites/${siteId}/funnels/${funnelId}/steps?clientId=${workspace!.id}`, request),
     onSuccess: () => {
+      toast.success("Funnel step added");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to add funnel step"));
     },
   });
 }
@@ -163,7 +191,11 @@ export function useDeleteSiteFunnelStep(siteId: string | null | undefined, funne
         method: "DELETE",
       }),
     onSuccess: () => {
+      toast.success("Funnel step removed");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to remove funnel step"));
     },
   });
 }

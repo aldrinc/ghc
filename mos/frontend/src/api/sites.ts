@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useApiClient } from "@/api/client";
 import type { Data } from "@measured/puck";
+import type { MedusaRuntimeConfig } from "@/lib/medusa";
 
 interface SiteFamilySummary {
   family: string;
@@ -50,7 +51,7 @@ interface SiteSummary {
   updatedAt: string;
 }
 
-interface SitePage {
+export interface SitePage {
   id: string;
   name: string;
   slug: string;
@@ -73,7 +74,7 @@ interface SitePageVersion {
   sourceId?: string | null;
 }
 
-interface SiteDetail {
+export interface SiteDetail {
   id: string;
   clientId: string;
   name: string;
@@ -94,7 +95,7 @@ interface SiteDetail {
   updatedAt: string;
 }
 
-interface SitePageDetail {
+export interface SitePageDetail {
   site: {
     id: string;
     name: string;
@@ -138,6 +139,15 @@ interface UpdateSitePageRequest {
 interface CreateSitePageVersionRequest {
   puckData: Data;
   status?: "draft" | "approved";
+}
+
+export interface SiteMedusaConfigResponse {
+  siteFamily: string | null;
+  commerceProvider: string | null;
+  medusaConfig: (Pick<MedusaRuntimeConfig, "publishableKey"> & {
+    baseUrl?: string | null;
+    available: boolean;
+  }) | null;
 }
 
 export function useSiteFamilies() {
@@ -232,5 +242,14 @@ export function useCreateSitePageVersion(siteId: string | null | undefined, page
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "pages", pageId] });
       queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id ?? null, siteId] });
     },
+  });
+}
+
+export function useSiteMedusaConfig(siteId: string | null | undefined) {
+  const { get } = useApiClient();
+  return useQuery<SiteMedusaConfigResponse>({
+    queryKey: ["sites", siteId, "medusa-config"],
+    queryFn: () => get<SiteMedusaConfigResponse>(`/sites/${siteId}/medusa-config`),
+    enabled: !!siteId,
   });
 }

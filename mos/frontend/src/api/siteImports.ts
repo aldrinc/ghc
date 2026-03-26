@@ -10,6 +10,7 @@ export interface SiteImport {
   status: "queued" | "capturing" | "generating" | "adapting" | "completed" | "failed";
   title: string | null;
   suggestedTemplateFamily: string | null;
+  savedSiteId?: string | null;
   detectedPageCount: number | null;
   createdAt: string;
   updatedAt: string;
@@ -50,10 +51,14 @@ export interface ApplySiteImportRequest {
   siteTemplateId?: string;
   targetSiteId?: string;
   name?: string;
+  description?: string;
+  family?: string;
+  pageType?: string;
+  acceptedSectionIds?: string[];
+  reviewNotes?: string;
 }
 
 export interface ApplySiteImportResponse {
-  applicationId: string;
   siteId?: string;
   siteTemplateId?: string;
   pageTemplateId?: string;
@@ -103,10 +108,63 @@ export function useApplySiteImport(importId: string | null | undefined) {
   const { workspace } = useWorkspace();
 
   return useMutation({
-    mutationFn: (request: ApplySiteImportRequest) =>
-      post<ApplySiteImportResponse>(`/site-imports/${importId}/apply?clientId=${workspace!.id}`, request),
+    mutationFn: async (request: ApplySiteImportRequest) => {
+      if (!importId) throw new Error("Import ID is required.");
+      if (!workspace?.id) throw new Error("Workspace is required.");
+
+      const basePath = `/site-imports/${importId}`;
+      const clientQuery = `?clientId=${workspace.id}`;
+
+      if (request.action === "create-site") {
+        if (!request.name?.trim()) throw new Error("Site name is required.");
+        const result = await post<{ siteId: string }>(`${basePath}/create-site${clientQuery}`, {
+          siteName: request.name.trim(),
+          description: request.description,
+        });
+        return { siteId: result.siteId };
+      }
+
+      if (request.action === "add-pages") {
+        if (!request.targetSiteId) throw new Error("Target site is required.");
+        const result = await post<{ siteId: string }>(`${basePath}/add-pages${clientQuery}`, {
+          siteId: request.targetSiteId,
+        });
+        return { siteId: result.siteId };
+      }
+
+      if (request.action === "create-site-template") {
+        if (!request.name?.trim() || !request.family) {
+          throw new Error("Template name and family are required.");
+        }
+        const result = await post<{ siteTemplateId: string }>(
+          `${basePath}/create-site-template${clientQuery}`,
+          {
+            name: request.name.trim(),
+            family: request.family,
+            description: request.description,
+          },
+        );
+        return { siteTemplateId: result.siteTemplateId };
+      }
+
+      if (!request.name?.trim() || !request.family || !request.pageType) {
+        throw new Error("Template name, family, and page type are required.");
+      }
+      const result = await post<{ variantId: string }>(
+        `${basePath}/create-page-template${clientQuery}`,
+        {
+          name: request.name.trim(),
+          family: request.family,
+          pageType: request.pageType,
+          acceptedSectionIds: request.acceptedSectionIds || [],
+          reviewNotes: request.reviewNotes,
+        },
+      );
+      return { pageTemplateId: result.variantId };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["site-imports", importId] });
+      queryClient.invalidateQueries({ queryKey: ["site-imports", workspace?.id] });
       queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id] });
       queryClient.invalidateQueries({ queryKey: ["site-templates", workspace?.id] });
     },

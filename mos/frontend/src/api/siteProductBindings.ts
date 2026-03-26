@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "@/api/client";
+import { useApiClient, type ApiError } from "@/api/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { toast } from "@/components/ui/toast";
+
+function getMutationErrorMessage(err: ApiError | Error, fallback: string): string {
+  const candidate = err as { message?: unknown };
+  return typeof candidate.message === "string" && candidate.message ? candidate.message : fallback;
+}
 
 export interface SiteProductPageBinding {
   id: string;
@@ -80,12 +86,18 @@ export function useCreateSiteProductBinding(siteId: string | null | undefined) {
 
   return useMutation({
     mutationFn: (request: Omit<CreateSiteProductBindingRequest, "siteId">) =>
-      post<SiteProductPageBinding>(`/sites/${siteId}/product-bindings?clientId=${workspace!.id}`, {
+      post<SiteProductBindingDetail>(`/sites/${siteId}/product-bindings?clientId=${workspace!.id}`, {
         ...request,
         siteId: siteId!,
       }),
-    onSuccess: () => {
+    onSuccess: (_binding, variables) => {
+      toast.success("Product binding created");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "product-bindings"] });
+      queryClient.invalidateQueries({ queryKey: ["products", variables.productId, "site-bindings"] });
+      queryClient.invalidateQueries({ queryKey: ["products", variables.productId, "sites"] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to create product binding"));
     },
   });
 }
@@ -98,12 +110,16 @@ export function useUpdateSiteProductBinding(siteId: string | null | undefined, b
 
   return useMutation({
     mutationFn: (payload: UpdateSiteProductBindingRequest) =>
-      request<SiteProductPageBinding>(`/sites/${siteId}/product-bindings/${bindingId}?clientId=${workspace!.id}`, {
+      request<SiteProductBindingDetail>(`/sites/${siteId}/product-bindings/${bindingId}?clientId=${workspace!.id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
+      toast.success("Product binding updated");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "product-bindings"] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to update product binding"));
     },
   });
 }
@@ -120,7 +136,11 @@ export function useDeleteSiteProductBinding(siteId: string | null | undefined) {
         method: "DELETE",
       }),
     onSuccess: () => {
+      toast.success("Product binding removed");
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "product-bindings"] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to remove product binding"));
     },
   });
 }

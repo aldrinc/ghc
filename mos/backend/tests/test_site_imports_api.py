@@ -969,6 +969,57 @@ def test_save_import_as_site_creates_site_runtime_records(
 
 @patch("app.services.site_imports.capture_site")
 @patch("app.services.site_imports.normalize_capture")
+def test_canonical_create_site_materializes_editor_visible_puck_data(
+    mock_normalize, mock_capture, api_client, mock_capture_result, mock_normalize_result
+):
+    mock_capture.return_value = type(
+        "CaptureResult",
+        (),
+        mock_capture_result,
+    )()
+    mock_normalize.return_value = type("NormalizationResult", (), mock_normalize_result)()
+
+    response = api_client.post(
+        "/clients", json={"name": "Canonical Import Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    response = api_client.post(
+        f"/site-imports?clientId={client_id}",
+        json={"sourceUrl": "https://example.com"},
+    )
+    assert response.status_code == 201
+    import_id = response.json()["id"]
+
+    _wait_for_import_terminal_state(api_client, client_id=client_id, import_id=import_id)
+
+    response = api_client.post(
+        f"/site-imports/{import_id}/create-site?clientId={client_id}",
+        json={"siteName": "Imported Canonical Site", "description": "Saved from canonical route"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+
+    site_response = api_client.get(f"/sites/{payload['siteId']}?clientId={client_id}")
+    assert site_response.status_code == 200
+    site_payload = site_response.json()
+    assert len(site_payload["pages"]) == 1
+    page_id = site_payload["pages"][0]["id"]
+
+    editor_response = api_client.get(
+        f"/sites/{payload['siteId']}/pages/{page_id}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    editor_payload = editor_response.json()
+    draft = editor_payload["latestDraft"]
+    assert draft is not None
+    assert len(draft["puckData"]["content"]) > 0
+    assert draft["puckData"]["content"][0]["type"] == "Section"
+
+
+@patch("app.services.site_imports.capture_site")
+@patch("app.services.site_imports.normalize_capture")
 def test_create_import_with_site_family_hint(
     mock_normalize, mock_capture, api_client, mock_capture_result, mock_normalize_result
 ):

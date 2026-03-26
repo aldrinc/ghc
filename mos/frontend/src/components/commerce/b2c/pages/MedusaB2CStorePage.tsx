@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import { B2CStarterShell } from "./B2CStarterShell";
 
 export type MedusaB2CStorePageProps = {
   /** Page title override */
@@ -27,7 +28,6 @@ export function MedusaB2CStorePage({ title, defaultCategory }: MedusaB2CStorePag
     productsError,
     refreshProducts,
     navigateToProduct,
-    navigateToCategory,
     currentCategory,
     loadCategoryByHandle,
   } = useB2CRuntime();
@@ -73,7 +73,7 @@ export function MedusaB2CStorePage({ title, defaultCategory }: MedusaB2CStorePag
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <B2CStarterShell>
       <main className="py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-medium text-zinc-900 mb-8">{displayTitle}</h1>
@@ -170,6 +170,6 @@ export function MedusaB2CStorePage({ title, defaultCategory }: MedusaB2CStorePag
           </div>
         </div>
       </main>
-    </div>
+    </B2CStarterShell>
   );
 }
