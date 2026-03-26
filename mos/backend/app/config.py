@@ -150,6 +150,12 @@ class Settings(BaseSettings):
     MEDUSA_INTERNAL_API_TOKEN: str | None = None
     MEDUSA_REQUEST_TIMEOUT_SECONDS: float = 30.0
 
+    # Public Medusa runtime config for B2C storefronts.
+    MEDUSA_PUBLIC_BACKEND_URL: str | None = None
+    MEDUSA_PUBLIC_PUBLISHABLE_KEY: str | None = None
+    MEDUSA_PUBLIC_DEFAULT_REGION_ID: str | None = None
+    MEDUSA_PUBLIC_DEFAULT_COUNTRY_CODE: str = "us"
+
     SCREENSHOT_TO_CODE_WS_URL: str = "ws://127.0.0.1:7001/generate-code"
     SITE_IMPORT_DEFAULT_MODEL_SLOT_COUNT: int = 1
 
@@ -216,8 +222,8 @@ class Settings(BaseSettings):
     GETHOOKD_API_BASE_URL: str = "https://app.gethookd.ai/api/v1"
     GETHOOKD_API_KEY: str | None = None
     GETHOOKD_TIMEOUT_SECONDS: float = 30.0
-    GETHOOKD_EXPLORE_PAGE_SIZE: int = 100
-    GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 5
+    GETHOOKD_EXPLORE_PAGE_SIZE: int = 10
+    GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 1
     GETHOOKD_SYNC_SCHEDULE_ID: str = "gethookd-nightly-sync"
     GETHOOKD_SYNC_SCHEDULE_CRON: str = "0 3 * * *"
 

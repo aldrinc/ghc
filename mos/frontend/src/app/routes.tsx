@@ -4,9 +4,16 @@ export type AppRoute = {
 };
 
 export const appRoutes: AppRoute[] = [
+  { path: "/workspaces/sites/imports/:importId", label: "Site Import" },
+  { path: "/workspaces/sites/imports", label: "Site Imports" },
+  { path: "/workspaces/sites/templates/:templateId", label: "Site Template" },
+  { path: "/workspaces/sites/templates", label: "Site Templates" },
+  { path: "/workspaces/sites/:siteId/pages/:pageId", label: "Site Page Editor" },
+  { path: "/workspaces/sites/:siteId/funnels/:funnelId", label: "Site Funnel" },
+  { path: "/workspaces/sites/:siteId/funnels", label: "Site Funnels" },
+  { path: "/workspaces/sites/:siteId", label: "Site Detail" },
   { path: "/workspaces/overview", label: "Workspace Overview" },
   { path: "/workspaces/brand", label: "Brand Settings" },
-  { path: "/workspaces/store-templates", label: "Store Templates" },
   { path: "/workspaces/sites", label: "Sites" },
   { path: "/workspaces/products", label: "Products" },
   { path: "/strategy", label: "Strategy" },

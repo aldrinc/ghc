@@ -17,6 +17,7 @@ from temporalio import activity
 
 from app.config import settings
 from app.db.deps import get_session
+from app.db.enums import AdChannelEnum
 from app.db.enums import MediaAssetTypeEnum
 from app.db.models import CompanySwipeAsset, CompanySwipeMedia
 from app.db.repositories.gethookd import (
@@ -91,6 +92,7 @@ def _build_remote_media_inputs(
                 metadata={
                     "swipe_asset_id": swipe_asset_id,
                     "role": "primary" if idx == 0 else "secondary",
+                    "thumbnail_url": media_item.get("thumbnail_url") or media_item.get("preview_url"),
                     "gethookd_media": media_item,
                 },
             )
@@ -130,15 +132,20 @@ def _sync_swipe_media(
         return
     if replace_existing:
         swipes_repo.delete_media_for_asset(org_id=org_id, swipe_asset_id=swipe_asset_id)
+    attached_media_asset_ids: set[str] = set()
     for remote_media in remote_media_inputs:
         remote_result = remote_media_service.upsert_and_mirror(
-            channel="meta",
+            channel=AdChannelEnum.META_ADS_LIBRARY,
             remote_media=remote_media,
         )
+        media_asset_id = str(remote_result.media_asset_id or "").strip()
+        if not media_asset_id or media_asset_id in attached_media_asset_ids:
+            continue
+        attached_media_asset_ids.add(media_asset_id)
         swipes_repo.create_media(
             org_id=org_id,
             swipe_asset_id=swipe_asset_id,
-            media_asset_id=remote_result.media_asset_id,
+            media_asset_id=media_asset_id,
             url=remote_media.source_url,
             type=remote_media.asset_type.value,
         )
@@ -293,10 +300,11 @@ async def gethookd_sync_workspace_activity(
                     sort_column=feed.filters_json.get("sort_column", "days_active"),
                     sort_direction=feed.filters_json.get("sort_direction", "desc"),
                     ads_per_brand_limit=feed.filters_json.get("ads_per_brand_limit", 3),
+                    active_ads_count=feed.filters_json.get("active_ads_count"),
                 )
 
-                max_pages = feed.max_pages_per_run or 5
-                per_page = feed.per_page or 100
+                max_pages = feed.max_pages_per_run or settings.GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN
+                per_page = feed.per_page or settings.GETHOOKD_EXPLORE_PAGE_SIZE
 
                 feed_assets_new = 0
                 feed_assets_updated = 0

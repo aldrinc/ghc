@@ -4,11 +4,23 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.base import SessionLocal
-from app.db.models import Site, SiteImport, SiteImportSnapshot, SiteLink, SitePage, SitePageVersion
+from app.db.models import (
+    Site,
+    SiteImport,
+    SiteImportSnapshot,
+    SiteLink,
+    SitePage,
+    SitePageVersion,
+    SiteTemplate,
+    SiteTemplatePage,
+    SiteTemplateLink,
+)
 from app.db.repositories.storefront_imports import StorefrontImportsRepository
 from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.services.site_import_adapter import (
@@ -28,6 +40,10 @@ from app.services.template_synthesis import synthesize_import, SynthesisResult
 from app.services.template_variant_governance import (
     build_convert_provenance,
     build_template_draft_provenance,
+)
+from app.services.puck_data_validation import (
+    LegacySectionPropError,
+    validate_puck_data_no_legacy_section_props,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +78,28 @@ class SiteImportError(Exception):
     """Error during site import."""
 
     pass
+
+
+def _load_completed_import(
+    session: Session, *, org_id: str, client_id: str, site_import_id: str
+) -> SiteImport:
+    repo = StorefrontImportsRepository(session)
+    site_import = repo.get_import(org_id=org_id, client_id=client_id, site_import_id=site_import_id)
+    if site_import is None:
+        raise SiteImportError("Import not found")
+    if site_import.status != "completed":
+        raise SiteImportError(f"Cannot apply import with status: {site_import.status}")
+    return site_import
+
+
+def _collect_screenshot_refs(snapshot: SiteImportSnapshot | None) -> list[str]:
+    screenshot_refs: list[str] = []
+    if snapshot is not None:
+        if snapshot.desktop_screenshot_data_url:
+            screenshot_refs.append(snapshot.desktop_screenshot_data_url)
+        if snapshot.mobile_screenshot_data_url:
+            screenshot_refs.append(snapshot.mobile_screenshot_data_url)
+    return screenshot_refs
 
 
 def create_import_record(
@@ -307,6 +345,18 @@ def save_import_as_site(
     if not adapted_pages:
         raise SiteImportError("Import has no adapted pages to save")
 
+    # Validate all adapted pages for legacy Section props before saving
+    for idx, adapted_page in enumerate(adapted_pages):
+        puck_data = adapted_page.get("puck_data") or adapted_page.get("puckData") or {}
+        page_label = f"page[{idx}]"  # Human-friendly label for errors
+        try:
+            validate_puck_data_no_legacy_section_props(puck_data)
+        except LegacySectionPropError as e:
+            raise SiteImportError(
+                f"Cannot save import: legacy Section prop '{e.prop_name}' found in {page_label}. "
+                f"These props are no longer supported. Use design-system tokens instead."
+            ) from e
+
     snapshot = imports_repo.get_import_snapshot(site_import_id=site_import_id)
     screenshot_refs: list[str] = []
     if snapshot is not None:
@@ -436,6 +486,232 @@ def save_import_as_site(
             for page in created_pages
         ],
         "createdAt": site.created_at,
+    }
+
+
+def add_import_pages_to_site(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    site_import_id: str,
+    site_id: str,
+    created_by_user_external_id: str | None,
+) -> dict[str, Any]:
+    """Add imported pages into an existing site runtime with explicit collision errors."""
+    imports_repo = StorefrontImportsRepository(session)
+    runtime_repo = SitesRuntimeRepository(session)
+
+    site_import = _load_completed_import(
+        session, org_id=org_id, client_id=client_id, site_import_id=site_import_id
+    )
+    site = runtime_repo.get_site(org_id=org_id, client_id=client_id, site_id=site_id)
+    if site is None:
+        raise SiteImportError("Target site not found")
+
+    adapted_pages = site_import.adapted_pages or []
+    if not adapted_pages:
+        raise SiteImportError("Import has no adapted pages to add")
+
+    snapshot = imports_repo.get_import_snapshot(site_import_id=site_import_id)
+    screenshot_refs = _collect_screenshot_refs(snapshot)
+    created_pages: list[dict[str, Any]] = []
+    page_type_to_id: dict[str, str] = {}
+
+    try:
+        for index, adapted_page in enumerate(adapted_pages):
+            page_type = adapted_page.get("page_type") or adapted_page.get("pageType")
+            slug = adapted_page.get("slug") or (page_type or f"page-{index + 1}")
+            if not runtime_repo.check_slug_unique(site_id=site_id, slug=slug):
+                raise SiteImportError(
+                    f"Slug collision for '{slug}'. Choose explicit collision handling."
+                )
+            template_id = adapted_page.get("template_id") or adapted_page.get("templateId")
+            page = runtime_repo.create_page(
+                site_id=site_id,
+                name=adapted_page.get("name") or page_type or f"Imported Page {index + 1}",
+                slug=slug,
+                page_type=page_type,
+                page_role=page_type,
+                template_id=template_id,
+                page_template_id=template_id,
+                ordering=int(adapted_page.get("ordering", index)),
+                source_url=site_import.source_url,
+                source_screenshot_refs=screenshot_refs,
+                generated_code=adapted_page.get("generated_code")
+                or adapted_page.get("generatedCode"),
+                adapted_puck_data=adapted_page.get("puck_data")
+                or adapted_page.get("puckData")
+                or {},
+                outbound_links=adapted_page.get("outbound_links")
+                or adapted_page.get("outboundLinks")
+                or [],
+            )
+            version = runtime_repo.create_page_version(
+                page_id=str(page.id),
+                puck_data=adapted_page.get("puck_data") or adapted_page.get("puckData") or {},
+                provenance={
+                    "source_type": "site_import",
+                    "site_import_id": site_import_id,
+                    "source_url": site_import.source_url,
+                    "source_hostname": site_import.source_hostname,
+                    "generator": site_import.upstream_metadata or {},
+                },
+                status="draft",
+                source_type="site_import",
+                source_id=site_import_id,
+            )
+            if page_type:
+                page_type_to_id[page_type] = str(page.id)
+            created_pages.append(
+                {
+                    "pageId": str(page.id),
+                    "pageType": page_type,
+                    "templateId": template_id,
+                    "versionId": str(version.id),
+                    "outboundLinks": adapted_page.get("outbound_links")
+                    or adapted_page.get("outboundLinks")
+                    or [],
+                }
+            )
+        for created_page in created_pages:
+            for link in created_page.get("outboundLinks", []):
+                to_page_type = link.get("to_page_type") or link.get("toPageType")
+                runtime_repo.create_link(
+                    site_id=site_id,
+                    from_page_id=created_page["pageId"],
+                    to_page_id=page_type_to_id.get(to_page_type) if to_page_type else None,
+                    from_page_type=created_page.get("pageType"),
+                    to_page_type=to_page_type,
+                    label=link.get("label"),
+                    link_kind=link.get("link_kind") or link.get("linkKind") or "internal",
+                    meta=link,
+                )
+
+        site.updated_at = datetime.now(timezone.utc)
+        session.add(site)
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        if isinstance(exc, SiteImportError):
+            raise
+        raise SiteImportError("Failed to add imported pages into site runtime.") from exc
+
+    return {
+        "siteId": site_id,
+        "pageCount": len(created_pages),
+        "createdPages": [
+            {
+                "pageId": page["pageId"],
+                "pageType": page.get("pageType"),
+                "templateId": page.get("templateId"),
+                "versionId": page.get("versionId"),
+            }
+            for page in created_pages
+        ],
+    }
+
+
+def create_import_as_site_template(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    site_import_id: str,
+    name: str,
+    family: str,
+    description: str | None,
+    created_by_user_external_id: str | None,
+) -> dict[str, Any]:
+    """Persist an import as a reusable multi-page site template."""
+    imports_repo = StorefrontImportsRepository(session)
+    site_import = _load_completed_import(
+        session, org_id=org_id, client_id=client_id, site_import_id=site_import_id
+    )
+    adapted_site = site_import.adapted_site or {}
+    adapted_pages = site_import.adapted_pages or []
+    if not adapted_pages:
+        raise SiteImportError("Import has no adapted pages to save")
+
+    existing = session.scalars(
+        select(SiteTemplate).where(SiteTemplate.family == family, SiteTemplate.name == name)
+    ).first()
+    if existing:
+        raise SiteImportError(
+            f"A site template named '{name}' already exists for family '{family}'."
+        )
+
+    try:
+        template = SiteTemplate(
+            id=str(uuid4()),
+            family=family,
+            name=name,
+            description=description,
+            site_type=(adapted_site.get("site_type") or adapted_site.get("siteType") or "generic"),
+            commerce_provider=(
+                adapted_site.get("commerce_provider")
+                or adapted_site.get("commerceProvider")
+                or "none"
+            ),
+            is_system_template=False,
+            provenance_notes=[f"Created from site import {site_import_id}"],
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(template)
+        session.flush()
+
+        created_pages: list[SiteTemplatePage] = []
+        for index, adapted_page in enumerate(adapted_pages):
+            page_type = (
+                adapted_page.get("page_type") or adapted_page.get("pageType") or f"page_{index + 1}"
+            )
+            page = SiteTemplatePage(
+                id=str(uuid4()),
+                site_template_id=str(template.id),
+                page_type=page_type,
+                name=adapted_page.get("name") or page_type,
+                slug=adapted_page.get("slug") or page_type,
+                description=adapted_page.get("description"),
+                page_template_id=adapted_page.get("template_id") or adapted_page.get("templateId"),
+                ordering=int(adapted_page.get("ordering", index)),
+                is_entry=index == 0,
+                provenance_notes=[],
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(page)
+            created_pages.append(page)
+
+        for adapted_page in adapted_pages:
+            for link in (
+                adapted_page.get("outbound_links") or adapted_page.get("outboundLinks") or []
+            ):
+                session.add(
+                    SiteTemplateLink(
+                        id=str(uuid4()),
+                        site_template_id=str(template.id),
+                        from_page_type=adapted_page.get("page_type")
+                        or adapted_page.get("pageType"),
+                        to_page_type=link.get("to_page_type") or link.get("toPageType"),
+                        label=link.get("label"),
+                        link_kind=link.get("link_kind") or link.get("linkKind") or "internal",
+                        meta=link,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                )
+
+        session.commit()
+        session.refresh(template)
+    except Exception as exc:
+        session.rollback()
+        raise SiteImportError("Failed to persist site template from import.") from exc
+
+    return {
+        "siteTemplateId": str(template.id),
+        "name": template.name,
+        "family": template.family,
+        "pageCount": len(created_pages),
+        "funnelCount": 0,
+        "createdAt": template.created_at,
     }
 
 

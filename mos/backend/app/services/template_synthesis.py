@@ -13,6 +13,7 @@ FAMILY_TO_TEMPLATE_ID: dict[str, str] = {
     "listicle-presell": "pre-sales-listicle",
     "pre-sales-listicle": "pre-sales-listicle",
     "medusa-b2b-starter": "medusa-b2b-starter",
+    "medusa-b2c-starter": "medusa-b2c-starter",
 }
 
 # Supported families - explicit list for validation
@@ -21,6 +22,7 @@ SUPPORTED_FAMILIES: set[str] = {
     "listicle-presell",
     "pre-sales-listicle",
     "medusa-b2b-starter",
+    "medusa-b2c-starter",
 }
 
 
@@ -103,6 +105,40 @@ FAMILY_BLOCKS: dict[str, list[str]] = {
         "CommerceCheckout",
         "CommerceCategoryList",
         "CommerceCartSummary",
+    ],
+    # Full B2C storefront blocks for Medusa B2C site family
+    "medusa-b2c-starter": [
+        # Shell blocks
+        "MedusaB2CHomePage",
+        "MedusaB2CStorePage",
+        "MedusaB2CCollectionPage",
+        "MedusaB2CCategoryPage",
+        "MedusaB2CProductPage",
+        "MedusaB2CCartPage",
+        "MedusaB2CCheckoutPage",
+        "MedusaB2CAccountDashboardPage",
+        "MedusaB2CAccountProfilePage",
+        "MedusaB2CAccountAddressesPage",
+        "MedusaB2CAccountOrdersPage",
+        "MedusaB2CAccountOrderDetailPage",
+        "MedusaB2COrderConfirmedPage",
+        "MedusaB2COrderTransferPage",
+        "MedusaB2COrderTransferAcceptPage",
+        "MedusaB2COrderTransferDeclinePage",
+        # Commerce primitives (shared)
+        "CommerceCatalogHero",
+        "CommerceProductGrid",
+        "CommerceProductDetail",
+        "CommerceCart",
+        "CommerceCartSummary",
+        "CommerceCheckout",
+        "CommerceCategoryList",
+        "Section",
+        "Columns",
+        "Heading",
+        "Text",
+        "Button",
+        "Image",
     ],
 }
 
@@ -253,6 +289,12 @@ def synthesize_import(
     # If no family provided, use default (sales-pdp) for preview purposes
     if family is None:
         family = "sales-pdp"
+
+    if family == "medusa-b2c-starter":
+        raise UnsupportedFamilyError(
+            "Import synthesis for 'medusa-b2c-starter' is intentionally blocked until dedicated B2C section-to-block mappings are implemented. "
+            "Use explicit B2C page blueprints/templates instead of generic import synthesis for now."
+        )
 
     # Map family to template ID
     template_id = FAMILY_TO_TEMPLATE_ID.get(family, family)

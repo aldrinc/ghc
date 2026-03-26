@@ -111,6 +111,7 @@ class ArtifactTypeEnum(str, Enum):
     experiment_report = "experiment_report"
     playbook = "playbook"
     funnel_runtime_bundle = "funnel_runtime_bundle"
+    site_runtime_bundle = "site_runtime_bundle"
     strategy_v2_step_payload = "strategy_v2_step_payload"
     strategy_v2_stage0 = "strategy_v2_stage0"
     strategy_v2_stage1 = "strategy_v2_stage1"
@@ -283,6 +284,7 @@ class SiteTypeEnum(str, Enum):
 
 class SiteFamilyEnum(str, Enum):
     medusa_b2b_starter = "medusa-b2b-starter"
+    medusa_b2c_starter = "medusa-b2c-starter"
 
 
 class CommerceProviderEnum(str, Enum):
@@ -292,9 +294,21 @@ class CommerceProviderEnum(str, Enum):
 
 class SitePageTypeEnum(str, Enum):
     home = "home"
+    store = "store"
+    collection = "collection"
     category = "category"
     product_detail = "product_detail"
     cart = "cart"
+    checkout = "checkout"
+    account_dashboard = "account_dashboard"
+    account_profile = "account_profile"
+    account_addresses = "account_addresses"
+    account_orders = "account_orders"
+    account_order_detail = "account_order_detail"
+    order_confirmed = "order_confirmed"
+    order_transfer = "order_transfer"
+    order_transfer_accept = "order_transfer_accept"
+    order_transfer_decline = "order_transfer_decline"
     account = "account"
     quote = "quote"
     approval = "approval"

@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-account-addresses",
+  "name": "Medusa B2C Account Addresses",
+  "description": "Customer address book management.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Addresses",
+        "description": "Address book"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CAccountAddressesPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

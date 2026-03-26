@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-collection",
+  "name": "Medusa B2C Collection",
+  "description": "Product collection page with filtering.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Collection",
+        "description": "Browse collection"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CCollectionPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

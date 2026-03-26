@@ -4,6 +4,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 
+from app.config import settings
 from app.db.models import ClientGetHookdCredentials, ClientGetHookdSyncFeed, GetHookdSyncRun
 
 
@@ -106,8 +107,8 @@ class GetHookdSyncFeedsRepository:
         client_id: str,
         name: str,
         filters_json: dict,
-        max_pages_per_run: int = 5,
-        per_page: int = 100,
+        max_pages_per_run: int = settings.GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN,
+        per_page: int = settings.GETHOOKD_EXPLORE_PAGE_SIZE,
     ) -> ClientGetHookdSyncFeed:
         feed = ClientGetHookdSyncFeed(
             org_id=org_id,

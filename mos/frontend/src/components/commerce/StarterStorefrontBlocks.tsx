@@ -136,6 +136,8 @@ function starterShellLinkClass(isMuted = false): string {
     : "text-sm text-zinc-700 transition-colors hover:text-zinc-900";
 }
 
+const STARTER_CONTENT_CONTAINER_CLASS = "mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8";
+
 export function StarterStoreHeader({
   storeName: storeNameProp = "Store",
   showSearch = true,
@@ -180,7 +182,7 @@ export function StarterStoreHeader({
       className="sticky top-0 z-50 border-b border-neutral-200 bg-white/95 font-sans text-zinc-900 backdrop-blur"
       data-testid="starter-store-header"
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
+      <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex items-center justify-between gap-4 py-3 lg:py-4`}>
         <div className="flex min-w-0 items-center gap-4 lg:gap-8">
           <button
             type="button"
@@ -335,7 +337,7 @@ export function StarterPromoBar({
 
   return (
     <div className="bg-zinc-950 text-white" data-testid="starter-promo-bar">
-      <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-2 px-4 py-3 text-center font-sans sm:flex-row sm:px-6 lg:px-8">
+      <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex flex-col items-center justify-between gap-2 py-3 text-center font-sans sm:flex-row`}>
         <p className="text-xs uppercase tracking-[0.24em] text-neutral-200 sm:text-[11px]">{message}</p>
         {hasAction && actionHref ? (
           <button
@@ -387,7 +389,7 @@ export function StarterHomeHero({
   if ((runtime.products || []).length === 0) {
     return (
       <section className="border-b border-neutral-200 bg-[#f4f1eb] font-sans text-zinc-900" data-testid="starter-home-hero">
-        <div className="mx-auto flex min-h-[420px] max-w-[1440px] items-center justify-center px-4 py-16 text-sm uppercase tracking-[0.24em] text-neutral-500 sm:px-6 lg:px-8">
+        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex min-h-[420px] items-center justify-center py-16 text-sm uppercase tracking-[0.24em] text-neutral-500`}>
           Loading starter hero…
         </div>
       </section>
@@ -435,7 +437,7 @@ export function StarterHomeHero({
 
   return (
     <section className="border-b border-neutral-200 bg-[#f4f1eb] font-sans text-zinc-900" data-testid="starter-home-hero">
-      <div className="mx-auto grid min-h-[620px] max-w-[1440px] items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:px-8 lg:py-20">
+      <div className={`${STARTER_CONTENT_CONTAINER_CLASS} grid min-h-[620px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:py-20`}>
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:items-start lg:text-left">
           <span className="text-xs font-medium uppercase tracking-[0.32em] text-neutral-500">{eyebrow}</span>
           <h1 className="mt-6 max-w-[12ch] text-5xl font-normal tracking-[-0.05em] text-zinc-900 sm:text-6xl">
@@ -531,7 +533,7 @@ export function StarterCollectionRails({
   if ((runtime.products || []).length === 0 && (runtime.collections || []).length === 0) {
     return (
       <div className="bg-white font-sans" data-testid="starter-collection-rails">
-        <div className="mx-auto max-w-[1440px] px-4 py-14 text-sm uppercase tracking-[0.24em] text-neutral-500 sm:px-6 lg:px-8">
+        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 text-sm uppercase tracking-[0.24em] text-neutral-500`}>
           Loading collection rails…
         </div>
       </div>
@@ -563,7 +565,7 @@ export function StarterCollectionRails({
     <div className="bg-white font-sans" data-testid="starter-collection-rails">
       {groupedCollections.map(({ collection, products }) => (
         <section key={collection.id} className="border-b border-neutral-200 last:border-b-0">
-          <div className="mx-auto max-w-[1440px] px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+          <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
             <div className="mb-8 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-neutral-500">Collection</p>
@@ -630,7 +632,7 @@ export function StarterStoreFooter({
 
   return (
     <footer className="border-t border-neutral-200 bg-[#faf7f2] font-sans text-zinc-900" data-testid="starter-store-footer">
-      <div className="mx-auto max-w-[1440px] px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+      <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="max-w-sm">
             <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">{storeName}</p>

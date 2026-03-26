@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useCreateProduct, useProducts } from "@/api/products";
+import { useSites } from "@/api/sites";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 
 function parseList(value: string) {
@@ -22,6 +24,7 @@ export function ProductsPage() {
   const { selectProduct } = useProductContext();
   const navigate = useNavigate();
   const { data: products = [], isLoading } = useProducts(workspace?.id);
+  const { data: sites = [] } = useSites();
   const createProduct = useCreateProduct();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -33,6 +36,28 @@ export function ProductsPage() {
   const [featureBullets, setFeatureBullets] = useState("");
   const [guaranteeText, setGuaranteeText] = useState("");
   const [disclaimers, setDisclaimers] = useState("");
+
+  // Calculate site usage for each product
+  const productSiteUsage = useMemo(() => {
+    const usage: Record<string, { siteCount: number; hasPdpBinding: boolean }> = {};
+    products.forEach((product) => {
+      // Count sites that reference this product
+      const sitesWithProduct = sites.filter((site) =>
+        site.productId === product.id ||
+        // Check if any pages reference this product
+        site.pages?.some((page) => page.productId === product.id)
+      );
+      usage[product.id] = {
+        siteCount: sitesWithProduct.length,
+        hasPdpBinding: sitesWithProduct.some((site) =>
+          site.pages?.some((page) =>
+            page.productId === product.id && page.pageType === "product_detail"
+          )
+        ),
+      };
+    });
+    return usage;
+  }, [products, sites]);
 
   const canCreate = useMemo(() => Boolean(workspace && title.trim()), [workspace, title]);
 
@@ -103,51 +128,66 @@ export function ProductsPage() {
                   <TableHeadCell>Title</TableHeadCell>
                   <TableHeadCell>Type</TableHeadCell>
                   <TableHeadCell>Benefits</TableHeadCell>
-                  <TableHeadCell>Disclaimers</TableHeadCell>
+                  <TableHeadCell>Sites</TableHeadCell>
+                  <TableHeadCell>PDP</TableHeadCell>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
-                  <TableRow
-                    key={product.id}
-                    hover
-                    className="cursor-pointer"
-                    onClick={() => {
-                      selectProduct(product.id, {
-                        title: product.title,
-                        client_id: product.client_id,
-                        product_type: product.product_type ?? null,
-                      });
-                      const productRouteToken = shortUuidRouteToken(product.id);
-                      navigate(`/workspaces/products/${productRouteToken || product.id}`);
-                    }}
-                  >
-                    <TableCell>
-                      <div className="h-12 w-12 rounded-md border border-border bg-surface-2 overflow-hidden flex items-center justify-center">
-                        {product.primary_asset_url ? (
-                          <img
-                            src={product.primary_asset_url}
-                            alt={product.title}
-                            className="h-full w-full object-cover"
-                          />
+                {products.map((product) => {
+                  const usage = productSiteUsage[product.id] || { siteCount: 0, hasPdpBinding: false };
+                  return (
+                    <TableRow
+                      key={product.id}
+                      hover
+                      className="cursor-pointer"
+                      onClick={() => {
+                        selectProduct(product.id, {
+                          title: product.title,
+                          client_id: product.client_id,
+                          product_type: product.product_type ?? null,
+                        });
+                        const productRouteToken = shortUuidRouteToken(product.id);
+                        navigate(`/workspaces/products/${productRouteToken || product.id}`);
+                      }}
+                    >
+                      <TableCell>
+                        <div className="h-12 w-12 rounded-md border border-border bg-surface-2 overflow-hidden flex items-center justify-center">
+                          {product.primary_asset_url ? (
+                            <img
+                              src={product.primary_asset_url}
+                              alt={product.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-[10px] font-semibold uppercase text-content-muted">No image</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-content">{product.title}</TableCell>
+                      <TableCell className="text-xs text-content-muted">{product.product_type || "—"}</TableCell>
+                      <TableCell className="text-xs text-content-muted">
+                        {product.primary_benefits?.length ? product.primary_benefits.length : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {usage.siteCount > 0 ? (
+                          <Badge tone="accent">{usage.siteCount} site{usage.siteCount !== 1 ? "s" : ""}</Badge>
                         ) : (
-                          <div className="text-[10px] font-semibold uppercase text-content-muted">No image</div>
+                          <span className="text-content-muted">—</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-semibold text-content">{product.title}</TableCell>
-                    <TableCell className="text-xs text-content-muted">{product.product_type || "—"}</TableCell>
-                    <TableCell className="text-xs text-content-muted">
-                      {product.primary_benefits?.length ? product.primary_benefits.length : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-content-muted">
-                      {product.disclaimers?.length ? product.disclaimers.length : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {usage.hasPdpBinding ? (
+                          <Badge tone="success">Assigned</Badge>
+                        ) : (
+                          <span className="text-content-muted">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {!products.length && (
                   <TableRow>
-                    <TableCell className="px-3 py-4 text-sm text-content-muted" colSpan={5}>
+                    <TableCell className="px-3 py-4 text-sm text-content-muted" colSpan={6}>
                       No products yet. Create one to begin.
                     </TableCell>
                   </TableRow>

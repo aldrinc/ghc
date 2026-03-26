@@ -5,6 +5,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.config import settings
+
+
+DEFAULT_GETHOOKD_MAX_PAGES_PER_RUN = max(
+    int(getattr(settings, "GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN", 1) or 1), 1
+)
+DEFAULT_GETHOOKD_PER_PAGE = max(int(getattr(settings, "GETHOOKD_EXPLORE_PAGE_SIZE", 10) or 10), 1)
 
 class GetHookdCredentialsRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -49,11 +56,15 @@ class GetHookdSyncFeedBase(BaseModel):
         serialization_alias="filters",
     )
     max_pages_per_run: int = Field(
-        default=5,
+        default=DEFAULT_GETHOOKD_MAX_PAGES_PER_RUN,
         validation_alias="maxPagesPerRun",
         serialization_alias="maxPagesPerRun",
     )
-    per_page: int = Field(default=100, validation_alias="perPage", serialization_alias="perPage")
+    per_page: int = Field(
+        default=DEFAULT_GETHOOKD_PER_PAGE,
+        validation_alias="perPage",
+        serialization_alias="perPage",
+    )
 
     @field_validator("name")
     @classmethod

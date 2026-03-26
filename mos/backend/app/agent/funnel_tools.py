@@ -687,8 +687,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if not template_mode:
             layout_guidance = (
                 "Layout guidance:\n"
-                "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
-                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+                "- Default to Section.bandWidth='bleed' for most sections (do not place bare Heading/Text directly at the root)\n"
+                "- For standard content sections, use contentWidth='xl', contentAlign='center', surface='none', padY='md', and padX='md'\n"
+                "- For storefront shell sections whose child block owns the inner container (for example starter headers, promo bars, heroes, and footers), use contentWidth='none'\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             )
         else:
@@ -705,13 +706,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         else:
             available_components_block = (
                 "Available primitives (component types) and their props:\n"
-                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+                "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
                 "   - purpose: 'header' | 'section' | 'footer'\n"
-                "   - layout: 'full' | 'contained' | 'card'\n"
-                "     - full = full-width background, content constrained to containerWidth\n"
-                "     - contained = background constrained to containerWidth (no card styling)\n"
-                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+                "   - bandWidth: 'bleed' | 'page' | 'narrow'\n"
+                "   - contentWidth: 'none' | 'prose' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'\n"
+                "   - contentAlign: 'left' | 'center' | 'right'\n"
+                "   - surface: 'none' | 'subtle' | 'card'\n"
+                "   - padY / padX: 'none' | 'sm' | 'md' | 'lg' | 'xl'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
                 "   - left/right are slots: ComponentData[]\n"
@@ -1013,12 +1014,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             requirements: list[str] = []
             if missing_header:
                 requirements.append(
-                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                    "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', contentAlign='center', surface='none', padY='sm', and padX='md'."
                 )
                 requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
             if missing_footer:
                 requirements.append(
-                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                    "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', contentAlign='center', surface='none', variant='muted', padY='md', and padX='md'."
                 )
                 requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 

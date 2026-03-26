@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Loader2, AlertTriangle, Rocket } from "lucide-react";
+import { CheckCircle2, Loader2, AlertTriangle, Rocket, Globe, LayoutTemplate, Download, Funnel } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
@@ -8,10 +8,15 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { useWorkflows, useWorkflowDetail } from "@/api/workflows";
 import { useLatestArtifact } from "@/api/artifacts";
+import { useSites } from "@/api/sites";
+import { useSiteTemplates } from "@/api/siteTemplates";
+import { useSiteImports } from "@/api/siteImports";
+import { useWorkspaceSiteFunnels } from "@/api/siteFunnels";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
   GATE_LABELS,
   GATE_EXPLANATIONS,
@@ -86,6 +91,16 @@ export function WorkspaceOverviewPage() {
     isLoading: workflowsLoading,
     refetch: refetchWorkflows,
   } = useWorkflows();
+
+  // Site system metrics
+  const { data: sites = [], isLoading: sitesLoading } = useSites();
+  const { data: siteTemplates = [], isLoading: templatesLoading } = useSiteTemplates();
+  const { data: siteImports = [], isLoading: importsLoading } = useSiteImports();
+  const { data: siteFunnels = [], isLoading: funnelsLoading } = useWorkspaceSiteFunnels();
+
+  const activeImports = siteImports.filter((imp) =>
+    ["queued", "capturing", "generating", "adapting", "running"].includes(imp.status)
+  );
 
   const workspaceWorkflows = useMemo(
     () =>
@@ -242,6 +257,47 @@ export function WorkspaceOverviewPage() {
         </div>
       }
     />
+  );
+
+  /* --- Site Metrics Card --- */
+  const siteMetricsCard = (
+    <div className="ds-card ds-card--md">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-content">Sites</div>
+        <Button variant="link" size="xs" className="px-0" onClick={() => navigate("/workspaces/sites")}>
+          Manage →
+        </Button>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+          <div className="text-xs text-content-muted">Templates</div>
+          <div className="text-lg font-semibold text-content">
+            {templatesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : siteTemplates.length}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+          <div className="text-xs text-content-muted">Sites</div>
+          <div className="text-lg font-semibold text-content">
+            {sitesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : sites.length}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+          <div className="text-xs text-content-muted">Funnels</div>
+          <div className="text-lg font-semibold text-content">
+            {funnelsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : siteFunnels.length}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-surface-2 px-3 py-2">
+          <div className="text-xs text-content-muted">Imports</div>
+          <div className="text-lg font-semibold text-content">
+            {importsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : activeImports.length}
+            {activeImports.length > 0 && (
+              <Badge tone="warning" className="ml-2 text-xs">active</Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   /* --- three-card grid (original layout) --- */
@@ -593,6 +649,10 @@ export function WorkspaceOverviewPage() {
   return (
     <div className="space-y-4">
       {header}
+      {/* Site Metrics */}
+      <div className="grid gap-4 md:grid-cols-4">
+        {siteMetricsCard}
+      </div>
       {modeBody}
     </div>
   );

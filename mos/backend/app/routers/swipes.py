@@ -160,6 +160,46 @@ def _build_media_access_url(media) -> str | None:
 
 def _serialize_media(media) -> CompanySwipeMediaModel:
     access_url = _build_media_access_url(media)
+    resolved_asset_type = getattr(media, "_resolved_asset_type", None)
+    asset_type_value = (
+        getattr(resolved_asset_type, "value", None)
+        if resolved_asset_type is not None
+        else str(getattr(media, "type", "") or "").strip().lower()
+    )
+    is_video = asset_type_value == "video"
+    metadata = getattr(media, "_resolved_media_metadata", {}) or {}
+    preview_key = getattr(media, "_resolved_preview_storage_key", None)
+    media_key = getattr(media, "_resolved_storage_key", None)
+    if not preview_key and not is_video:
+        preview_key = media_key
+
+    preview_url = None
+    media_url = None
+    if preview_key or media_key:
+        try:
+            storage = MediaStorage()
+            preview_bucket = (
+                getattr(media, "_resolved_preview_bucket", None)
+                or getattr(media, "_resolved_bucket", None)
+                or storage.preview_bucket
+            )
+            media_bucket = getattr(media, "_resolved_bucket", None) or storage.bucket
+            preview_url = (
+                storage.presign_get(bucket=preview_bucket, key=preview_key) if preview_key else None
+            )
+            media_url = storage.presign_get(bucket=media_bucket, key=media_key) if media_key else None
+        except MediaStorageConfigurationError:
+            preview_url = None
+            media_url = None
+
+    thumbnail_url = (
+        preview_url
+        or media.thumbnail_url
+        or metadata.get("thumbnail_url")
+        or metadata.get("preview_url")
+        or metadata.get("poster_url")
+        or metadata.get("preview_image_url")
+    )
     payload = {
         "id": str(media.id),
         "org_id": str(media.org_id),
@@ -169,15 +209,15 @@ def _serialize_media(media) -> CompanySwipeMediaModel:
         else None,
         "external_media_id": media.external_media_id,
         "path": media.path,
-        "url": access_url,
+        "url": media_url or access_url,
         "thumbnail_path": media.thumbnail_path,
-        "thumbnail_url": media.thumbnail_url or access_url,
+        "thumbnail_url": thumbnail_url,
         "disk": media.disk,
         "type": media.type,
         "mime_type": media.mime_type,
         "size_bytes": media.size_bytes,
         "video_length": media.video_length,
-        "download_url": access_url,
+        "download_url": media_url or access_url,
     }
     return CompanySwipeMediaModel.model_validate(payload)
 

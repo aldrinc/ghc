@@ -5,6 +5,7 @@ from app.routers import (
     assets,
     funnels,
     public_funnels,
+    public_sites,
     swipes,
     experiments,
     workflows,
@@ -29,6 +30,11 @@ from app.routers import (
     paid_ads_qa,
     storefront_templates,
     gethookd,
+    site_templates,
+    page_templates,
+    site_funnels,
+    site_product_bindings,
+    site_imports,
 )
 
 __all__ = [
@@ -39,6 +45,7 @@ __all__ = [
     "assets",
     "funnels",
     "public_funnels",
+    "public_sites",
     "brands",
     "design_systems",
     "products",
@@ -60,4 +67,9 @@ __all__ = [
     "paid_ads_qa",
     "storefront_templates",
     "gethookd",
+    "site_templates",
+    "page_templates",
+    "site_funnels",
+    "site_product_bindings",
+    "site_imports",
 ]
