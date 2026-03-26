@@ -4,6 +4,8 @@
 
 Port `medusajs/nextjs-starter-medusa` into Marketi as a new `medusa-b2c-starter` site family implemented in React + Vite.
 
+This plan is the canonical import contract for Medusa family templates.
+
 The storefront should talk to Medusa directly.
 
 Do not proxy routine storefront commerce traffic through MOS endpoints.
@@ -115,6 +117,108 @@ No implementation should claim parity against "latest starter behavior" without 
 - No silent fallbacks for unsupported flows. Fail clearly.
 - No storefront commerce proxy through MOS unless explicitly approved later.
 - No "visual-only parity" signoff if account or order flows are missing.
+
+## Canonical Import Contract
+
+### No Legacy Section Schema
+
+Legacy `Section` props are removed from the supported page schema:
+
+- `layout`
+- `containerWidth`
+- `padding`
+
+Use only the modern layout fields on `Section.props`:
+
+- `bandWidth`
+- `contentWidth`
+- `contentAlign`
+- `surface`
+- `padY`
+- `padX`
+
+Operational rules:
+
+- Do not rely on a runtime migration layer to translate old keys. That path is intentionally removed.
+- Backend request validation and frontend normalization should reject legacy `Section` keys with a clear error.
+- Existing stored page versions must be migrated before they are rendered or edited again.
+- If an import payload contains legacy `Section` keys, treat it as invalid source data. Fix the payload or migrate it deliberately. Do not silently reinterpret it.
+
+### Section Defaults For Medusa Imports
+
+| Section use | Required `Section.props` | Why |
+| --- | --- | --- |
+| Shell section owned by a family block | `bandWidth: "bleed"`, `contentWidth: "none"`, `contentAlign: "center"`, `surface: "none"`, `padY: "none"`, `padX: "none"` | Prevents outer width clamps and double padding when the imported block already owns its inner container |
+| Standard content section | `bandWidth: "bleed"`, `contentWidth: "xl"`, `contentAlign: "center"`, `surface: "none"`, `padY: "md"`, `padX: "md"` | Gives normal readable page sections a consistent modern frame |
+| Intentional emphasis/card section | `bandWidth: "bleed"`, `contentWidth: "xl"`, `contentAlign: "center"`, `surface: "card"`, `padY: "md"`, `padX: "md"` | Opt-in card treatment only when the design explicitly calls for it |
+
+For Medusa starter-family imports, treat these blocks as shell-owned and keep them on `contentWidth: "none"`:
+
+- header and footer shells
+- promo bars
+- hero sections
+- store/category wrappers
+- product detail shells
+- cart shells
+- checkout shells
+
+The practical rule is simple:
+
+- if the imported Medusa family block already renders its own container, spacing, or full-width shell, the outer `Section` must stay full-bleed and unclamped
+- do not add another container on top of it
+
+### B2C Import Procedure
+
+1. Pin the upstream Medusa B2C starter commit before any translation work starts.
+2. Register the import explicitly as `medusa-b2c-starter`.
+3. Pass explicit page-role metadata during import. Do not rely on family inference alone.
+4. Translate every page to canonical Puck JSON using only the modern `Section` schema.
+5. Keep imported Medusa shell blocks on `contentWidth: "none"` so the React/Vite family implementation owns the inner frame.
+6. Fail the import if a page cannot be mapped cleanly to a supported B2C page type.
+7. Validate the stored page JSON and live route width before signoff.
+
+Required import metadata:
+
+- `siteFamilyHint: "medusa-b2c-starter"`
+- `pageTypeHint` per page, for example:
+- `home`
+- `store`
+- `collection`
+- `category`
+- `product_detail`
+- `cart`
+- `checkout`
+- `account_dashboard`
+- `account_profile`
+- `account_addresses`
+- `account_orders`
+- `account_order_detail`
+- `order_confirmed`
+- `order_transfer`
+- `order_transfer_accept`
+- `order_transfer_decline`
+
+### Import Validation Checklist
+
+Before signoff, confirm all of the following:
+
+- canonical template JSON contains no `layout`, `containerWidth`, or `padding` keys on any `Section`
+- stored published page JSON contains no legacy `Section` keys
+- shell sections render full width, with the family block owning the inner container
+- no imported page is depending on design-system width defaults to decide page structure
+- B2C page-role mapping is explicit, not inferred from screenshot similarity alone
+
+Useful checks:
+
+```bash
+rg -n '"(layout|containerWidth|padding)"' mos/backend/app/templates/funnels
+```
+
+```bash
+curl -sS http://localhost:8008/public/funnels/<product-slug>/<funnel-slug>/pages/<page-slug> | jq '.puckData.content'
+```
+
+If either check shows legacy `Section` keys, the import is not ready.
 
 ## Current State In Marketi
 
@@ -645,11 +749,12 @@ Make the new family importable only after the runtime exists.
 - add family registration for `medusa-b2c-starter`
 - map imported page roles to new page blueprint types
 - extend screenshot-to-code adaptation to understand B2C page roles
+- enforce the canonical modern `Section` schema during import
 - fail clearly when imported content cannot be mapped cleanly
 
 ### Deliverable
 
-The import system can target B2C starter pages without pretending unsupported sections are valid.
+The import system can target B2C starter pages without pretending unsupported sections are valid or silently reviving legacy layout props.
 
 ## File-Level Change Map
 

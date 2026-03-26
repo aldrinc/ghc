@@ -135,3 +135,8 @@ def validate_puck_data_no_legacy_section_props(puck_data: dict[str, Any]) -> Non
     if errors:
         # Raise the first error (most actionable)
         raise errors[0]
+
+
+def assert_no_legacy_section_props(puck_data: dict[str, Any]) -> None:
+    """Backward-compatible assertion wrapper used by existing callers."""
+    validate_puck_data_no_legacy_section_props(puck_data)

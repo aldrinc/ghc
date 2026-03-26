@@ -31,11 +31,26 @@ export interface GetHookdCredentials {
   lastValidationError?: string | null;
 }
 
+export interface GetHookdSyncFeedFilters {
+  query?: string;
+  platforms?: string;
+  niche?: string;
+  ad_format?: string;
+  location?: string;
+  language?: string;
+  performance_scores?: string;
+  status?: string;
+  sort_column?: string;
+  sort_direction?: string;
+  ads_per_brand_limit?: number;
+  active_ads_count?: number;
+}
+
 export interface GetHookdSyncFeed {
   id: string;
   name: string;
   enabled: boolean;
-  filters: Record<string, any>;
+  filters: GetHookdSyncFeedFilters;
   maxPagesPerRun: number;
   perPage: number;
   createdAt: string;
@@ -45,7 +60,7 @@ export interface GetHookdSyncFeed {
 export interface GetHookdSyncFeedInput {
   name: string;
   enabled?: boolean;
-  filters: Record<string, any>;
+  filters: GetHookdSyncFeedFilters;
   maxPagesPerRun?: number;
   perPage?: number;
 }

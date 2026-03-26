@@ -14,6 +14,7 @@ from app.db.models import (
     CompanySwipeAsset,
     CompanySwipeBrand,
     CompanySwipeMedia,
+    MediaAsset,
     SwipeCollection,
     SwipeCollectionItem,
 )
@@ -249,15 +250,30 @@ class CompanySwipesRepository:
         if not ids:
             return {}
         stmt = (
-            select(CompanySwipeMedia)
+            select(CompanySwipeMedia, MediaAsset)
             .where(
                 CompanySwipeMedia.org_id == org_id,
                 CompanySwipeMedia.swipe_asset_id.in_(ids),
             )
+            .outerjoin(MediaAsset, MediaAsset.id == CompanySwipeMedia.media_asset_id)
             .order_by(CompanySwipeMedia.created_at.asc())
         )
         grouped: dict[str, list[CompanySwipeMedia]] = defaultdict(list)
-        for media in self.session.scalars(stmt).all():
+        for media, media_asset in self.session.execute(stmt).all():
+            setattr(media, "_resolved_asset_type", getattr(media_asset, "asset_type", None))
+            setattr(media, "_resolved_storage_key", getattr(media_asset, "storage_key", None))
+            setattr(
+                media,
+                "_resolved_preview_storage_key",
+                getattr(media_asset, "preview_storage_key", None),
+            )
+            setattr(media, "_resolved_bucket", getattr(media_asset, "bucket", None))
+            setattr(
+                media,
+                "_resolved_preview_bucket",
+                getattr(media_asset, "preview_bucket", None),
+            )
+            setattr(media, "_resolved_media_metadata", getattr(media_asset, "metadata_json", {}) or {})
             grouped[str(media.swipe_asset_id)].append(media)
         return dict(grouped)
 

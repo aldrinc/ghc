@@ -39,6 +39,7 @@ from app.services.funnels import _walk_json as walk_json  # reuse internal helpe
 from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
 from app.services.funnel_templates import get_funnel_template
 from app.services.media_storage import MediaStorage
+from app.services.puck_data_validation import assert_no_legacy_section_props
 from app.services.product_types import canonical_product_type
 
 
@@ -4025,7 +4026,9 @@ def _sanitize_puck_data(data: Any) -> dict[str, Any]:
         content = []
     if not isinstance(zones, dict):
         zones = {}
-    return {"root": root, "content": content, "zones": zones}
+    sanitized = {"root": root, "content": content, "zones": zones}
+    assert_no_legacy_section_props(sanitized)
+    return sanitized
 
 
 def _ensure_block_ids(puck_data: dict[str, Any]) -> None:
@@ -4495,10 +4498,13 @@ def _inject_header_footer_if_missing(
             "Section",
             {
                 "purpose": "header",
-                "layout": "full",
-                "containerWidth": "lg",
+                "bandWidth": "bleed",
+                "contentWidth": "xl",
+                "contentAlign": "center",
+                "surface": "none",
                 "variant": "default",
-                "padding": "sm",
+                "padY": "sm",
+                "padX": "md",
                 "content": [
                     _make_component(
                         "Columns",
@@ -4524,10 +4530,13 @@ def _inject_header_footer_if_missing(
             "Section",
             {
                 "purpose": "footer",
-                "layout": "full",
-                "containerWidth": "lg",
+                "bandWidth": "bleed",
+                "contentWidth": "xl",
+                "contentAlign": "center",
+                "surface": "none",
                 "variant": "muted",
-                "padding": "md",
+                "padY": "md",
+                "padX": "md",
                 "content": footer_items,
             },
         )
@@ -5350,8 +5359,8 @@ def generate_funnel_page_draft(
             "- Be specific and scannable (short paragraphs, bullets)\n"
             "- Use ethical persuasion; avoid fear-mongering\n\n"
             "Layout guidance:\n"
-            "- Default to Section.layout='full' for most sections (full-width background)\n"
-            "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+            "- Default to Section with bandWidth='bleed' and contentWidth='xl' for most sections\n"
+            "- Use contentWidth='2xl' if you need wider content, or contentWidth='none' for full-bleed blocks\n"
             "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
             f"{context_guidance}"
@@ -5368,13 +5377,14 @@ def generate_funnel_page_draft(
             "- props should include a string id (unique per component)\n\n"
             "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
             "Available primitives (component types) and their props:\n"
-            "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+            "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
             "   - purpose: 'header' | 'section' | 'footer'\n"
-            "   - layout: 'full' | 'contained' | 'card'\n"
-            "     - full = full-width background, content constrained to containerWidth\n"
-            "     - contained = background constrained to containerWidth (no card styling)\n"
-            "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-            "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+            "   - bandWidth: 'bleed' (edge-to-edge, default) | 'page' (max 1440px) | 'narrow' (max 1024px)\n"
+            "   - contentWidth: 'none' (fill band) | 'prose' | 'sm' | 'md' | 'lg' | 'xl' (default) | '2xl' | 'full'\n"
+            "   - contentAlign: 'center' (default) | 'left' | 'right'\n"
+            "   - surface: 'none' (default) | 'subtle' (tinted bg) | 'card' (bordered + raised)\n"
+            "   - padY: 'none' | 'sm' | 'md' (default) | 'lg' | 'xl'\n"
+            "   - padX: 'none' | 'sm' | 'md' (default) | 'lg'\n"
             "   - content is a slot: ComponentData[]\n"
             "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
             "   - left/right are slots: ComponentData[]\n"
@@ -5602,12 +5612,12 @@ def generate_funnel_page_draft(
         requirements: list[str] = []
         if missing_header:
             requirements.append(
-                "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', padY='sm', padX='md'."
             )
             requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
         if missing_footer:
             requirements.append(
-                "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', variant='muted', padY='md', padX='md'."
             )
             requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 
@@ -6121,8 +6131,8 @@ def stream_funnel_page_draft(
                 "- Be specific and scannable (short paragraphs, bullets)\n"
                 "- Use ethical persuasion; avoid fear-mongering\n\n"
                 "Layout guidance:\n"
-                "- Default to Section.layout='full' for most sections (full-width background)\n"
-                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+                "- Default to Section with bandWidth='bleed' and contentWidth='xl' for most sections\n"
+                "- Use contentWidth='2xl' if you need wider content, or contentWidth='none' for full-bleed blocks\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
                 "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
                 f"{product_guidance}"
@@ -6137,13 +6147,14 @@ def stream_funnel_page_draft(
 	                "- props should include a string id (unique per component)\n\n"
 	                "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
 	                "Available primitives (component types) and their props:\n"
-	                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+	                "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
 	                "   - purpose: 'header' | 'section' | 'footer'\n"
-	                "   - layout: 'full' | 'contained' | 'card'\n"
-	                "     - full = full-width background, content constrained to containerWidth\n"
-	                "     - contained = background constrained to containerWidth (no card styling)\n"
-	                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+	                "   - bandWidth: 'bleed' (edge-to-edge, default) | 'page' (max 1440px) | 'narrow' (max 1024px)\n"
+	                "   - contentWidth: 'none' (fill band) | 'prose' | 'sm' | 'md' | 'lg' | 'xl' (default) | '2xl' | 'full'\n"
+	                "   - contentAlign: 'center' (default) | 'left' | 'right'\n"
+	                "   - surface: 'none' (default) | 'subtle' (tinted bg) | 'card' (bordered + raised)\n"
+	                "   - padY: 'none' | 'sm' | 'md' (default) | 'lg' | 'xl'\n"
+	                "   - padX: 'none' | 'sm' | 'md' (default) | 'lg'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
                 "   - left/right are slots: ComponentData[]\n"
@@ -6349,14 +6360,14 @@ def stream_funnel_page_draft(
             requirements: list[str] = []
             if missing_header:
                 requirements.append(
-                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                    "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', padY='sm', padX='md'."
                 )
                 requirements.append(
                     "- Header content should include brand + navigation Buttons (link to internal pages when available)."
                 )
             if missing_footer:
                 requirements.append(
-                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                    "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', variant='muted', padY='md', padX='md'."
                 )
                 requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 

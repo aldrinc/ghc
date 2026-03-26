@@ -1073,7 +1073,7 @@ export function CommerceStoreTemplate({
 
   return (
     <div className="font-sans bg-neutral-100 min-h-screen">
-      <div className="flex flex-col py-6 mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 gap-4" data-testid="category-container">
+      <div className="flex w-full flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8" data-testid="category-container">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-neutral-500">
           <button onClick={() => runtime?.navigateToHome()} className="hover:text-zinc-900 transition-colors">
@@ -1254,7 +1254,7 @@ export function CommerceProductDetail() {
     <div className="font-sans flex flex-col gap-y-2 my-2">
       {/* Main product section - starter-style grid */}
       <div
-        className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-2 w-full h-fit"
+        className="grid h-fit w-full grid-cols-1 gap-2 px-4 sm:px-6 lg:px-8 md:grid-cols-2"
         data-testid="product-container"
       >
         {/* Left: Visual/Gallery area - B2B starter style */}
@@ -1433,7 +1433,7 @@ export function CommerceProductDetail() {
       </div>
 
       {/* Product tabs/details section - B2B starter accordion style */}
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-y-2">
           {/* Description accordion */}
           <details className="bg-neutral-100 rounded-lg group" open>
@@ -1494,7 +1494,7 @@ export function CommerceProductDetail() {
       {/* Related products section - B2B starter style */}
       {relatedProducts.length > 0 && (
         <div
-          className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 py-12"
+          className="w-full px-4 py-12 sm:px-6 lg:px-8"
           data-testid="related-products-container"
         >
           <div className="flex justify-between mb-8">
@@ -1610,7 +1610,7 @@ export function CommerceCart() {
   // B2B starter style cart layout
   return (
     <div className="font-sans small:py-12 py-6 bg-neutral-100">
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8" data-testid="cart-container">
+      <div className="w-full px-4 sm:px-6 lg:px-8" data-testid="cart-container">
         <div className="flex flex-col py-6 gap-y-6">
           {/* Header */}
           <div className="pb-3 flex items-center border-b border-neutral-200">
@@ -2004,8 +2004,8 @@ export function CommerceCheckout() {
   // B2B starter style checkout layout
   return (
     <div className="font-sans small:py-12 py-6 bg-neutral-100">
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_400px]">
           {/* Left column: Checkout form */}
           <div className="w-full grid grid-cols-1 gap-y-4">
             {/* Back to cart link */}
@@ -2515,7 +2515,7 @@ export function CommerceStoreHeader({
 
   return (
     <header className="sticky top-0 inset-x-0 z-50 bg-white text-zinc-900 border-b border-neutral-200">
-      <div className="flex w-full mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 justify-between items-center small:py-4 py-3">
+      <div className="flex w-full items-center justify-between px-4 py-3 sm:px-6 lg:px-8 small:py-4">
         {/* Left: Brand + Nav */}
         <div className="flex items-center small:gap-6 gap-4">
           <button
@@ -2679,7 +2679,7 @@ export function CommerceStoreFooter({
 
   return (
     <footer className="border-t border-neutral-200 w-full">
-      <div className="flex flex-col w-full mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+      <div className="flex w-full flex-col px-4 sm:px-6 lg:px-8">
         {/* Main footer content - B2B starter style: generous padding */}
         <div className="flex flex-col gap-y-6 sm:flex-row items-start justify-between py-20 sm:py-32">
           {/* Brand */}

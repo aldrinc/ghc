@@ -4,6 +4,35 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MEDUSA_DIR="$ROOT/.tmp/medusa-b2b-starter/backend"
+TMP_ROOT="$ROOT/.tmp/runtime"
+TMPDIR_ROOT="$TMP_ROOT/tmp"
+COREPACK_HOME_ROOT="$TMP_ROOT/corepack"
+YARN_GLOBAL_ROOT="$TMP_ROOT/yarn-global"
+
+fail() {
+    echo "[medusa] error: $*" >&2
+    exit 1
+}
+
+prepare_runtime_dirs() {
+    mkdir -p "$TMPDIR_ROOT" "$COREPACK_HOME_ROOT" "$YARN_GLOBAL_ROOT"
+    chmod 700 "$TMPDIR_ROOT" "$COREPACK_HOME_ROOT" "$YARN_GLOBAL_ROOT" 2>/dev/null || true
+    export TMPDIR="$TMPDIR_ROOT/"
+    export COREPACK_HOME="$COREPACK_HOME_ROOT"
+    export YARN_GLOBAL_FOLDER="$YARN_GLOBAL_ROOT"
+}
+
+run_yarn() {
+    if command -v corepack >/dev/null 2>&1; then
+        corepack yarn "$@"
+        return
+    fi
+    if command -v yarn >/dev/null 2>&1; then
+        yarn "$@"
+        return
+    fi
+    fail "Neither corepack nor yarn is available on PATH."
+}
 
 echo "================================================"
 echo "Starting Medusa B2B Backend"
@@ -12,17 +41,19 @@ echo ""
 
 # Check if Medusa directory exists
 if [ ! -d "$MEDUSA_DIR" ]; then
-    echo "ERROR: Medusa B2B starter not found at $MEDUSA_DIR"
+    echo "[medusa] error: Medusa B2B starter not found at $MEDUSA_DIR"
     echo "Please clone it first:"
     echo "  git clone https://github.com/medusajs/medusa-starter-b2b.git .tmp/medusa-b2b-starter"
     exit 1
 fi
 
+prepare_runtime_dirs
+
 # Check if node_modules exists
 if [ ! -d "$MEDUSA_DIR/node_modules" ]; then
     echo "Installing Medusa dependencies..."
     cd "$MEDUSA_DIR"
-    yarn install
+    run_yarn install
 fi
 
 # Check if Redis is running
@@ -49,4 +80,11 @@ echo "Admin credentials: admin@test.com / supersecret"
 echo ""
 
 cd "$MEDUSA_DIR"
-yarn dev
+if ! command -v node >/dev/null 2>&1; then
+    fail "node is not available on PATH. Ensure your Node 20+ environment is active before starting Medusa."
+fi
+if [ ! -x "$MEDUSA_DIR/node_modules/.bin/medusa" ]; then
+    fail "Medusa CLI is missing at $MEDUSA_DIR/node_modules/.bin/medusa. Reinstall dependencies."
+fi
+
+exec "$MEDUSA_DIR/node_modules/.bin/medusa" develop

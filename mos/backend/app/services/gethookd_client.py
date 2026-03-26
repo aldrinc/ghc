@@ -88,6 +88,7 @@ class GetHookdExploreFilters:
     sort_column: str = "days_active"
     sort_direction: str = "desc"
     ads_per_brand_limit: int = 3
+    active_ads_count: Optional[int] = None
 
 
 class GetHookdClient:
@@ -147,7 +148,7 @@ class GetHookdClient:
         *,
         filters: GetHookdExploreFilters,
         page: int = 1,
-        per_page: int = 100,
+        per_page: int = settings.GETHOOKD_EXPLORE_PAGE_SIZE,
     ) -> list[GetHookdAdResult]:
         """
         Fetch ads from GetHookd Explore API.
@@ -179,6 +180,8 @@ class GetHookdClient:
             params["sort_direction"] = filters.sort_direction
         if filters.ads_per_brand_limit:
             params["ads_per_brand_limit"] = filters.ads_per_brand_limit
+        if filters.active_ads_count:
+            params["active_ads_count"] = filters.active_ads_count
 
         try:
             with httpx.Client(timeout=self.timeout_seconds) as client:
@@ -211,7 +214,8 @@ class GetHookdClient:
                     raise GetHookdClientError(
                         "GetHookd explore response returned an invalid data payload"
                     )
-                return self._parse_results(results)
+                parsed = self._parse_results(results)
+                return parsed[: max(int(per_page or 0), 0)]
         except httpx.HTTPError as exc:
             raise GetHookdClientError(f"Failed to fetch ads: {exc}") from exc
 

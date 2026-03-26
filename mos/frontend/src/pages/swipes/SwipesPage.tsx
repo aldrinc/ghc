@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useCompanySwipes, useSwipeCollections, useSwipeReviewApi } from "@/api/swipes";
+import { AssetReviewGrid } from "@/components/review/AssetReviewGrid";
+import { SwipeDetailPanel } from "@/components/review/SwipeDetailPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { normalizeSwipeToLibraryItem } from "@/lib/library";
-import { cn } from "@/lib/utils";
-import type { CompanySwipeAsset, SwipeReviewFilter } from "@/types/swipes";
+import { normalizeSwipeToAssetReviewItem } from "@/lib/assetReviewNormalizers";
+import type { AssetReviewItem } from "@/types/assetReview";
 
 function getErrorMessage(err: unknown) {
   if (typeof err === "string") return err;
@@ -17,118 +17,78 @@ function getErrorMessage(err: unknown) {
   return "Request failed";
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
-
-function statusTone(status?: string) {
-  if (status === "approved") return "success" as const;
-  if (status === "rejected") return "danger" as const;
-  if (status === "stale_after_sync") return "warning" as const;
-  return "neutral" as const;
-}
-
-function formatHostname(url?: string) {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}
-
-function ReviewCard({
-  swipe,
-  selected,
-  onToggle,
-}: {
-  swipe: CompanySwipeAsset;
-  selected: boolean;
-  onToggle: () => void;
-}) {
-  const item = useMemo(() => normalizeSwipeToLibraryItem(swipe), [swipe]);
-  const preview = item.media[0]?.thumbUrl || item.media[0]?.url;
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={cn(
-        "relative rounded-2xl border bg-surface p-3 text-left transition",
-        selected ? "border-accent ring-1 ring-accent/30" : "border-border hover:border-accent/40",
-      )}
-    >
-      <div className="absolute right-3 top-3">
-        <input type="checkbox" readOnly checked={selected} className="h-4 w-4 rounded border-border" />
-      </div>
-      <div className="mb-3 aspect-[4/5] overflow-hidden rounded-xl border border-border bg-surface-2">
-        {preview ? (
-          <img src={preview} alt={swipe.title || "Swipe preview"} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-content-muted">No media</div>
-        )}
-      </div>
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <Badge tone={statusTone(swipe.review_status)}>{swipe.review_status || "unknown"}</Badge>
-          {swipe.analysis_status ? <Badge tone="neutral">{swipe.analysis_status}</Badge> : null}
-          {swipe.performance_score ? <Badge tone="neutral">Score {swipe.performance_score}</Badge> : null}
-          {swipe.days_active ? <Badge tone="neutral">{swipe.days_active}d active</Badge> : null}
-        </div>
-        <div className="text-sm font-semibold text-content line-clamp-2">{swipe.title || swipe.body || swipe.id}</div>
-        {swipe.body ? <div className="line-clamp-3 text-xs text-content-muted">{swipe.body}</div> : null}
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-content-muted">
-          {swipe.platforms ? <span>{swipe.platforms}</span> : null}
-          {swipe.used_count ? <span>{swipe.used_count} used</span> : null}
-          {swipe.landing_page ? <span>{formatHostname(swipe.landing_page)}</span> : null}
-          <span>Synced {formatDate(swipe.source_last_synced_at)}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 export function SwipesPage() {
-  const [filters, setFilters] = useState<SwipeReviewFilter>({
-    source: "gethookd",
-    reviewStatus: "pending",
-    changedSince: "all",
-  });
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [targetCollectionId, setTargetCollectionId] = useState("");
-  const { data: swipes = [], isLoading, error } = useCompanySwipes(filters);
+  const [detailItem, setDetailItem] = useState<AssetReviewItem | null>(null);
+
+  const { data: swipes = [], isLoading, error } = useCompanySwipes({ source: "gethookd" });
   const { data: collections = [] } = useSwipeCollections();
   const { approveSwipes, rejectSwipes, markPendingSwipes } = useSwipeReviewApi();
 
   const launchableCollections = useMemo(
-    () => collections.filter((collection) => collection.kind === "uploaded" || collection.kind === "curated"),
+    () => collections.filter((c) => c.kind === "uploaded" || c.kind === "curated"),
     [collections],
   );
+
+  const reviewItems = useMemo(
+    () => swipes.map(normalizeSwipeToAssetReviewItem),
+    [swipes],
+  );
+
+  const availablePlatforms = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of reviewItems) {
+      for (const p of item.platform) set.add(p);
+    }
+    return Array.from(set).sort();
+  }, [reviewItems]);
 
   const stats = useMemo(
     () => ({
       total: swipes.length,
-      pending: swipes.filter((swipe) => swipe.review_status === "pending_review").length,
-      approved: swipes.filter((swipe) => swipe.review_status === "approved").length,
-      rejected: swipes.filter((swipe) => swipe.review_status === "rejected").length,
-      stale: swipes.filter((swipe) => swipe.review_status === "stale_after_sync").length,
+      pending: swipes.filter((s) => s.review_status === "pending_review").length,
+      approved: swipes.filter((s) => s.review_status === "approved").length,
+      rejected: swipes.filter((s) => s.review_status === "rejected").length,
+      stale: swipes.filter((s) => s.review_status === "stale_after_sync").length,
     }),
     [swipes],
   );
 
-  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
-  const toggle = (swipeId: string) => {
-    setSelectedIds((current) =>
-      current.includes(swipeId) ? current.filter((id) => id !== swipeId) : [...current, swipeId],
-    );
-  };
+  const handleCardClick = useCallback((item: AssetReviewItem) => {
+    setDetailItem(item);
+  }, []);
 
-  const clearSelection = () => setSelectedIds([]);
+  const handleSingleApprove = useCallback(
+    (id: string) => {
+      if (!targetCollectionId) return;
+      approveSwipes.mutate({ swipeAssetIds: [id], collectionId: targetCollectionId });
+      setDetailItem(null);
+    },
+    [targetCollectionId, approveSwipes],
+  );
+
+  const handleSingleReject = useCallback(
+    (id: string) => {
+      rejectSwipes.mutate({ swipeAssetIds: [id] });
+      setDetailItem(null);
+    },
+    [rejectSwipes],
+  );
+
+  const handleSingleMarkPending = useCallback(
+    (id: string) => {
+      markPendingSwipes.mutate({ swipeAssetIds: [id] });
+      setDetailItem(null);
+    },
+    [markPendingSwipes],
+  );
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
@@ -145,66 +105,12 @@ export function SwipesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div className="xl:col-span-2">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Search</div>
-            <Input
-              value={filters.search || ""}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Search title, body, or external id"
-            />
-          </div>
-          <div>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Review status</div>
-            <Select
-              value={filters.reviewStatus || "all"}
-              onValueChange={(value) =>
-                setFilters((current) => ({ ...current, reviewStatus: value as SwipeReviewFilter["reviewStatus"] }))
-              }
-              options={[
-                { label: "All", value: "all" },
-                { label: "Pending", value: "pending" },
-                { label: "Approved", value: "approved" },
-                { label: "Rejected", value: "rejected" },
-                { label: "Stale", value: "stale" },
-              ]}
-            />
-          </div>
-          <div>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Changed since</div>
-            <Select
-              value={filters.changedSince || "all"}
-              onValueChange={(value) =>
-                setFilters((current) => ({ ...current, changedSince: value as SwipeReviewFilter["changedSince"] }))
-              }
-              options={[
-                { label: "All", value: "all" },
-                { label: "Last sync", value: "last_sync" },
-                { label: "Last 7 days", value: "last_7_days" },
-              ]}
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-content-muted">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.notInLaunchCollection)}
-                onChange={(event) =>
-                  setFilters((current) => ({ ...current, notInLaunchCollection: event.target.checked }))
-                }
-              />
-              Not in launch collection
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {selectedIds.length > 0 ? (
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 ? (
         <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-content">
-              <span className="font-semibold">{selectedIds.length}</span> selected
+              <span className="font-semibold">{selectedIds.size}</span> selected
             </div>
             <div className="min-w-[240px] flex-1">
               <Select
@@ -212,7 +118,7 @@ export function SwipesPage() {
                 onValueChange={setTargetCollectionId}
                 options={[
                   { label: "Add approved swipes to collection", value: "", disabled: true },
-                  ...launchableCollections.map((collection) => ({ label: collection.name, value: collection.id })),
+                  ...launchableCollections.map((c) => ({ label: c.name, value: c.id })),
                 ]}
               />
             </div>
@@ -220,17 +126,34 @@ export function SwipesPage() {
               size="sm"
               onClick={() => {
                 if (!targetCollectionId) return;
-                approveSwipes.mutate({ swipeAssetIds: selectedIds, collectionId: targetCollectionId });
+                approveSwipes.mutate({
+                  swipeAssetIds: Array.from(selectedIds),
+                  collectionId: targetCollectionId,
+                });
                 clearSelection();
               }}
               disabled={!targetCollectionId || approveSwipes.isPending}
             >
               Add to collection
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => { rejectSwipes.mutate({ swipeAssetIds: selectedIds }); clearSelection(); }}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                rejectSwipes.mutate({ swipeAssetIds: Array.from(selectedIds) });
+                clearSelection();
+              }}
+            >
               Reject
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => { markPendingSwipes.mutate({ swipeAssetIds: selectedIds }); clearSelection(); }}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                markPendingSwipes.mutate({ swipeAssetIds: Array.from(selectedIds) });
+                clearSelection();
+              }}
+            >
               Mark pending
             </Button>
             <Button size="sm" variant="ghost" onClick={clearSelection}>
@@ -240,6 +163,7 @@ export function SwipesPage() {
         </div>
       ) : null}
 
+      {/* Errors */}
       {error ? (
         <Callout variant="danger" size="sm" title="Failed to load swipes">
           {getErrorMessage(error)}
@@ -251,24 +175,31 @@ export function SwipesPage() {
         </Callout>
       ) : null}
 
+      {/* Grid */}
       {isLoading ? (
-        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">Loading swipes…</div>
-      ) : swipes.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {swipes.map((swipe) => (
-            <ReviewCard
-              key={swipe.id}
-              swipe={swipe}
-              selected={selectedIdSet.has(swipe.id)}
-              onToggle={() => toggle(swipe.id)}
-            />
-          ))}
+        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
+          Loading swipes…
         </div>
       ) : (
-        <div className="rounded-2xl border border-border bg-surface px-5 py-8 text-sm text-content-muted">
-          No GetHookd swipes match the current filters.
-        </div>
+        <AssetReviewGrid
+          items={reviewItems}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          onCardClick={handleCardClick}
+          availablePlatforms={availablePlatforms}
+          emptyMessage="No GetHookd swipes match the current filters."
+        />
       )}
+
+      {/* Detail panel */}
+      <SwipeDetailPanel
+        item={detailItem}
+        open={detailItem !== null}
+        onClose={() => setDetailItem(null)}
+        onApprove={targetCollectionId ? handleSingleApprove : undefined}
+        onReject={handleSingleReject}
+        onMarkPending={handleSingleMarkPending}
+      />
     </div>
   );
 }

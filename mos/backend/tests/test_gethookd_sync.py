@@ -10,17 +10,20 @@ These tests verify:
 
 from __future__ import annotations
 
+import asyncio
 import httpx
 import pytest
 from sqlalchemy import select
 from unittest.mock import patch
 
+from app.db.enums import AdChannelEnum, MediaMirrorStatusEnum
 from app.db.models import (
     GETHOOKD_ORIGIN_SYSTEM,
     ClientGetHookdCredentials,
     ClientGetHookdSyncFeed,
     CompanySwipeAsset,
     CompanySwipeMedia,
+    MediaAsset,
     SwipeCollection,
     SwipeCollectionItem,
 )
@@ -37,6 +40,7 @@ from app.temporal.activities import gethookd_sync_activities as gethookd_sync_ac
 from app.temporal.activities.gethookd_sync_activities import (
     GetHookdSyncActivityInput,
     GetHookdSyncActivityOutput,
+    _sync_swipe_media,
     gethookd_sync_workspace_activity,
 )
 from tests.conftest import TEST_ORG_ID
@@ -193,7 +197,7 @@ class TestGetHookdClient:
         assert captured["url"] == "https://app.gethookd.ai/api/v1/explore"
         assert captured["params"] == {
             "page": 1,
-            "per_page": 100,
+            "per_page": 10,
             "query": "skincare",
             "platform": "facebook",
             "ad-format": "video",
@@ -206,6 +210,55 @@ class TestGetHookdClient:
         assert len(results) == 1
         assert results[0].brand_id == "2016485295279615"
         assert results[0].media[0]["url"] == "https://example.com/video.mp4"
+
+    def test_explore_caps_results_to_requested_per_page(self):
+        """Client should enforce a hard local cap when the upstream over-returns."""
+        captured: dict[str, object] = {}
+        dummy_client = self._http_client_factory(
+            {
+                "errors": False,
+                "data": [
+                    {"id": 1, "platform": "facebook"},
+                    {"id": 2, "platform": "facebook"},
+                ],
+            },
+            captured,
+        )
+
+        with patch.object(gethookd_client_module.httpx, "Client", dummy_client), patch.object(
+            gethookd_client_module.settings,
+            "GETHOOKD_API_BASE_URL",
+            "https://app.gethookd.ai/api/v1",
+        ):
+            client = GetHookdClient(api_token="token")
+            results = client.explore(filters=GetHookdExploreFilters(), per_page=1)
+
+        assert len(results) == 1
+
+    def test_explore_supports_active_ads_count_filter(self):
+        """Explore requests should pass through the minimum active brand ads filter."""
+        captured: dict[str, object] = {}
+        dummy_client = self._http_client_factory({"errors": False, "data": []}, captured)
+
+        with patch.object(gethookd_client_module.httpx, "Client", dummy_client), patch.object(
+            gethookd_client_module.settings,
+            "GETHOOKD_API_BASE_URL",
+            "https://app.gethookd.ai/api/v1",
+        ):
+            client = GetHookdClient(api_token="token")
+            client.explore(
+                filters=GetHookdExploreFilters(
+                    niche="30",
+                    performance_scores="growing,optimized,winning",
+                    ads_per_brand_limit=4,
+                    active_ads_count=2000,
+                )
+            )
+
+        assert captured["params"]["niche"] == "30"
+        assert captured["params"]["performance_scores"] == "growing,optimized,winning"
+        assert captured["params"]["ads_per_brand_limit"] == 4
+        assert captured["params"]["active_ads_count"] == 2000
 
 
 class TestGetHookdActivityInput:
@@ -239,11 +292,60 @@ class TestGetHookdActivityInput:
         assert output.error_summary is None
 
 
+def test_sync_swipe_media_skips_duplicate_mirrored_media_asset_ids() -> None:
+    created_media: list[dict[str, object]] = []
+
+    class FakeSwipesRepo:
+        def delete_media_for_asset(self, *, org_id: str, swipe_asset_id: str) -> None:
+            raise AssertionError("delete_media_for_asset should not be called")
+
+        def create_media(self, **fields):
+            created_media.append(fields)
+
+    class FakeRemoteMediaService:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def upsert_and_mirror(self, *, channel, remote_media):
+            self.calls += 1
+            return RemoteMediaOutput(
+                media_asset_id="same-media-asset",
+                storage_key=None,
+                preview_storage_key=None,
+                sha256=None,
+                mirror_status="succeeded",
+            )
+
+    remote_media_service = FakeRemoteMediaService()
+    _sync_swipe_media(
+        swipes_repo=FakeSwipesRepo(),
+        remote_media_service=remote_media_service,
+        org_id="org-1",
+        swipe_asset_id="swipe-1",
+        remote_media_inputs=[
+            gethookd_sync_activities_module.RemoteMediaInput(
+                source_url="https://example.com/a.mp4",
+                asset_type=gethookd_sync_activities_module.MediaAssetTypeEnum.VIDEO,
+                metadata={},
+            ),
+            gethookd_sync_activities_module.RemoteMediaInput(
+                source_url="https://example.com/b.mp4",
+                asset_type=gethookd_sync_activities_module.MediaAssetTypeEnum.VIDEO,
+                metadata={},
+            ),
+        ],
+        replace_existing=False,
+    )
+
+    assert remote_media_service.calls == 2
+    assert len(created_media) == 1
+    assert created_media[0]["media_asset_id"] == "same-media-asset"
+
+
 class TestGetHookdScheduleReconciliation:
     """Tests for schedule reconciliation logic."""
 
-    @pytest.mark.asyncio
-    async def test_should_create_schedule_when_valid(self):
+    def test_should_create_schedule_when_valid(self):
         """Should create schedule when credentials and feeds exist."""
         # This tests the logic - actual Temporal calls would be mocked
         has_valid_credentials = True
@@ -253,8 +355,7 @@ class TestGetHookdScheduleReconciliation:
 
         assert should_have_schedule is True
 
-    @pytest.mark.asyncio
-    async def test_should_not_create_schedule_without_credentials(self):
+    def test_should_not_create_schedule_without_credentials(self):
         """Should not create schedule without valid credentials."""
         has_valid_credentials = False
         has_enabled_feeds = True
@@ -263,8 +364,7 @@ class TestGetHookdScheduleReconciliation:
 
         assert should_have_schedule is False
 
-    @pytest.mark.asyncio
-    async def test_should_not_create_schedule_without_feeds(self):
+    def test_should_not_create_schedule_without_feeds(self):
         """Should not create schedule without enabled feeds."""
         has_valid_credentials = True
         has_enabled_feeds = False
@@ -273,8 +373,7 @@ class TestGetHookdScheduleReconciliation:
 
         assert should_have_schedule is False
 
-    @pytest.mark.asyncio
-    async def test_should_delete_schedule_when_config_invalid(self):
+    def test_should_delete_schedule_when_config_invalid(self):
         """Should delete schedule when credentials or feeds removed."""
         has_valid_credentials = False
         has_enabled_feeds = False
@@ -362,8 +461,7 @@ class TestGetHookdCreativeChangeDetection:
         assert creative_changed is True
 
 
-@pytest.mark.asyncio
-async def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership(
+def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership(
     db_session,
     seed_data,
     monkeypatch,
@@ -455,8 +553,21 @@ async def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_memb
             self.session = session
 
         def upsert_and_mirror(self, *, channel, remote_media):
+            mirrored = self.session.scalar(
+                select(MediaAsset).where(MediaAsset.source_url == remote_media.source_url)
+            )
+            if mirrored is None:
+                mirrored = MediaAsset(
+                    channel=AdChannelEnum.META_ADS_LIBRARY,
+                    asset_type=remote_media.asset_type,
+                    source_url=remote_media.source_url,
+                    mirror_status=MediaMirrorStatusEnum.succeeded,
+                    metadata_json=remote_media.metadata or {},
+                )
+                self.session.add(mirrored)
+                self.session.flush()
             return RemoteMediaOutput(
-                media_asset_id=None,
+                media_asset_id=str(mirrored.id),
                 storage_key=None,
                 preview_storage_key=None,
                 sha256=None,
@@ -485,10 +596,12 @@ async def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_memb
         FakeRemoteMediaService,
     )
 
-    result = await gethookd_sync_workspace_activity(
-        GetHookdSyncActivityInput(
-            org_id=str(TEST_ORG_ID),
-            client_id=str(client.id),
+    result = asyncio.run(
+        gethookd_sync_workspace_activity(
+            GetHookdSyncActivityInput(
+                org_id=str(TEST_ORG_ID),
+                client_id=str(client.id),
+            )
         )
     )
 
