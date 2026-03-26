@@ -3,6 +3,7 @@ import { useFunnels, useCreateFunnel, useDeleteFunnel } from "@/api/funnels";
 import { useProduct } from "@/api/products";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
+import { useWorkspaceSiteFunnels } from "@/api/siteFunnels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -13,6 +14,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
+import { Globe, Funnel as FunnelIcon } from "lucide-react";
 
 export function FunnelsPage() {
   const navigate = useNavigate();
@@ -20,7 +22,8 @@ export function FunnelsPage() {
   const { product } = useProductContext();
   const clientId = workspace?.id;
   const { data: productDetail } = useProduct(product?.id);
-  const { data: funnels = [], isLoading } = useFunnels({ clientId, productId: product?.id });
+  const { data: legacyFunnels = [], isLoading: legacyLoading } = useFunnels({ clientId, productId: product?.id });
+  const { data: siteFunnels = [], isLoading: siteFunnelsLoading } = useWorkspaceSiteFunnels();
   const createFunnel = useCreateFunnel();
   const deleteFunnel = useDeleteFunnel();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,8 +50,9 @@ export function FunnelsPage() {
 
   const statusTone = useMemo(() => {
     return (status: string) => {
-      if (status === "published") return "success" as const;
-      if (status === "disabled") return "danger" as const;
+      if (status === "published" || status === "active") return "success" as const;
+      if (status === "disabled" || status === "archived") return "danger" as const;
+      if (status === "draft") return "warning" as const;
       return "neutral" as const;
     };
   }, []);
@@ -100,16 +104,16 @@ export function FunnelsPage() {
     }
   };
 
+  const isLoading = legacyLoading || siteFunnelsLoading;
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Funnels"
         description={
           workspace
-            ? product?.title
-              ? `Build and publish funnels for ${workspace.name} · ${product.title}.`
-              : `Select a product to build funnels for ${workspace.name}.`
-            : "Select a workspace to create and manage funnels."
+            ? "Cross-site funnel index and marketing funnels workspace."
+            : "Select a workspace to view and manage funnels."
         }
         actions={
           <Button onClick={() => setIsModalOpen(true)} size="sm" disabled={!workspace || !product?.id}>
@@ -124,64 +128,131 @@ export function FunnelsPage() {
           description="Choose a workspace to start building funnels."
           actions={<InlineWorkspacePicker />}
         />
-      ) : !product ? (
-        <EmptyState title="No product selected" description="Choose a product from the header to view or create funnels." />
       ) : (
-        <div className="ds-card ds-card--md p-0 shadow-none">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div>
-              <div className="text-sm font-semibold text-content">Funnels</div>
-              <div className="text-xs text-content-muted">
-                {funnels.length} in {workspace.name} · {product.title}
+        <div className="space-y-6">
+          {/* Site-scoped Funnels Section */}
+          <div className="ds-card ds-card--md p-0 shadow-none">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-content flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Site Funnels
+                </div>
+                <div className="text-xs text-content-muted">
+                  Funnels attached to sites in {workspace.name}
+                </div>
               </div>
+              <Badge tone="neutral">{siteFunnels.length}</Badge>
             </div>
-            <div className="text-xs text-content-muted">Unlisted links (v1)</div>
-          </div>
-          {isLoading ? (
-            <div className="p-4 text-sm text-content-muted">Loading funnels…</div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {funnels.map((funnel) => (
-                <li key={funnel.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <Link to={`/research/funnels/${funnel.id}`} className="font-semibold text-content hover:underline">
-                        {funnel.name}
-                      </Link>
-                      <div className="flex items-center gap-2 text-xs text-content-muted">
-                        <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
-                        {funnel.campaign_id ? <span>Campaign-linked</span> : <span>No campaign</span>}
+            {siteFunnelsLoading ? (
+              <div className="p-4 text-sm text-content-muted">Loading site funnels…</div>
+            ) : siteFunnels.length === 0 ? (
+              <div className="p-4 text-sm text-content-muted">
+                No site funnels yet. Create funnels from within a site's detail page.
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {siteFunnels.map((funnel) => (
+                  <li key={funnel.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Link 
+                            to={`/workspaces/sites/${funnel.siteId}/funnels/${funnel.id}`} 
+                            className="font-semibold text-content hover:underline"
+                          >
+                            {funnel.name}
+                          </Link>
+                          <Badge tone={statusTone(funnel.status)} className="text-xs">{funnel.status}</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-content-muted">
+                          <span>Site: {funnel.siteName || funnel.siteId.slice(0, 8)}...</span>
+                          {funnel.productId && <span>• Product: {funnel.productId.slice(0, 8)}...</span>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-xs text-content-muted">
-                      <div>
-                        Public:{" "}
-                        <span className="font-mono">
-                          {productRouteSlug ? `/f/${productRouteSlug}/${shortUuidRouteToken(funnel.id)}` : "Route unavailable"}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-end gap-2">
-                        <Button variant="secondary" size="xs" onClick={() => navigate(`/research/funnels/${funnel.id}`)}>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="secondary" 
+                          size="xs" 
+                          onClick={() => navigate(`/workspaces/sites/${funnel.siteId}/funnels/${funnel.id}`)}
+                        >
                           Open
                         </Button>
-                        <Button
-                          variant="destructive"
-                          size="xs"
-                          onClick={() => void requestDelete(funnel)}
-                          disabled={deleteFunnel.isPending}
-                        >
-                          {deletePendingId === funnel.id ? "Deleting…" : "Delete"}
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-              {!funnels.length && (
-                <li className="px-4 py-3 text-sm text-content-muted">No funnels yet. Create one to start.</li>
-              )}
-            </ul>
-          )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Legacy Funnels Section */}
+          <div className="ds-card ds-card--md p-0 shadow-none">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-content flex items-center gap-2">
+                  <FunnelIcon className="h-4 w-4" />
+                  Legacy Funnels
+                </div>
+                <div className="text-xs text-content-muted">
+                  {product?.title 
+                    ? `Funnels for ${workspace.name} · ${product.title}`
+                    : `Product-scoped funnels in ${workspace.name}`
+                  }
+                </div>
+              </div>
+              <div className="text-xs text-content-muted">Unlisted links (v1)</div>
+            </div>
+            {!product ? (
+              <div className="p-4 text-sm text-content-muted">
+                Select a product to view legacy funnels.
+              </div>
+            ) : isLoading ? (
+              <div className="p-4 text-sm text-content-muted">Loading funnels…</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {legacyFunnels.map((funnel) => (
+                  <li key={funnel.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <Link to={`/research/funnels/${funnel.id}`} className="font-semibold text-content hover:underline">
+                          {funnel.name}
+                        </Link>
+                        <div className="flex items-center gap-2 text-xs text-content-muted">
+                          <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
+                          {funnel.campaign_id ? <span>Campaign-linked</span> : <span>No campaign</span>}
+                        </div>
+                      </div>
+                      <div className="text-xs text-content-muted">
+                        <div>
+                          Public:{" "}
+                          <span className="font-mono">
+                            {productRouteSlug ? `/f/${productRouteSlug}/${shortUuidRouteToken(funnel.id)}` : "Route unavailable"}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <Button variant="secondary" size="xs" onClick={() => navigate(`/research/funnels/${funnel.id}`)}>
+                            Open
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="xs"
+                            onClick={() => void requestDelete(funnel)}
+                            disabled={deleteFunnel.isPending}
+                          >
+                            {deletePendingId === funnel.id ? "Deleting…" : "Delete"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {!legacyFunnels.length && (
+                  <li className="px-4 py-3 text-sm text-content-muted">No legacy funnels.</li>
+                )}
+              </ul>
+            )}
+          </div>
         </div>
       )}
 

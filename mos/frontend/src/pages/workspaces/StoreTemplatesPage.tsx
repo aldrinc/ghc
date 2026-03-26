@@ -61,7 +61,7 @@ import type {
   StorefrontBindingPreviewRequirement,
   TemplateVariantDetailExtended,
 } from "@/types/storefrontTemplates";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ImportActivityPanel } from "@/components/import/ImportActivityPanel";
 import type { UpstreamTranscriptEntry, UpstreamVariantData } from "@/types/importActivity";
 
@@ -467,14 +467,18 @@ function MedusaConnectionCard({ clientId, productId, onVariantCreated }: MedusaC
 }
 
 export function StoreTemplatesPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
+  const siteImportsMode = location.pathname.startsWith("/workspaces/sites/imports");
   const { data: templates = [], isLoading: templatesLoading } = useStorefrontTemplates();
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [selectedProductVariantId, setSelectedProductVariantId] = useState("");
   const [selectedTemplateVariantId, setSelectedTemplateVariantId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"templates" | "imports">("templates");
+  const [activeTab, setActiveTab] = useState<"templates" | "imports">(
+    siteImportsMode ? "imports" : "templates"
+  );
 
   // Import state
   const [importUrl, setImportUrl] = useState("");
@@ -605,6 +609,10 @@ export function StoreTemplatesPage() {
       setSelectedTemplateId(templates[0]?.id || "");
     }
   }, [selectedTemplateId, templates]);
+
+  useEffect(() => {
+    setActiveTab(siteImportsMode ? "imports" : "templates");
+  }, [siteImportsMode]);
 
   useEffect(() => {
     setSelectedProductVariantId("");
@@ -769,10 +777,21 @@ export function StoreTemplatesPage() {
   if (!workspace) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Store templates" description="Select a workspace to browse template families." />
+        <PageHeader
+          title={siteImportsMode ? "Site Imports" : "Store templates"}
+          description={
+            siteImportsMode
+              ? "Select a workspace to capture or review site imports."
+              : "Select a workspace to browse template families."
+          }
+        />
         <EmptyState
           title="No workspace selected"
-          description="Choose a workspace to browse storefront templates and Medusa binding readiness."
+          description={
+            siteImportsMode
+              ? "Choose a workspace to manage site imports."
+              : "Choose a workspace to browse storefront templates and Medusa binding readiness."
+          }
         />
       </div>
     );
@@ -781,8 +800,12 @@ export function StoreTemplatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Store templates"
-        description="Browse the first storefront-ready template families derived from the existing funnel system."
+        title={siteImportsMode ? "Site Imports" : "Store templates"}
+        description={
+          siteImportsMode
+            ? "Capture, review, and save imported sites from the Sites area."
+            : "Browse the first storefront-ready template families derived from the existing funnel system."
+        }
       >
         <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-content-muted">
           <Badge tone="accent">Workspace: {workspace.name}</Badge>
@@ -794,7 +817,13 @@ export function StoreTemplatesPage() {
       <div className="flex gap-2 border-b border-border">
         <button
           type="button"
-          onClick={() => setActiveTab("templates")}
+          onClick={() => {
+            if (siteImportsMode) {
+              navigate("/workspaces/sites/templates");
+              return;
+            }
+            setActiveTab("templates");
+          }}
           className={cn(
             "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
             activeTab === "templates"
@@ -807,7 +836,12 @@ export function StoreTemplatesPage() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("imports")}
+          onClick={() => {
+            if (siteImportsMode) {
+              navigate("/workspaces/sites/imports");
+            }
+            setActiveTab("imports");
+          }}
           className={cn(
             "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
             activeTab === "imports"

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { SignInPage } from "@/pages/auth/SignInPage";
-import { Navigate, Route, Routes, BrowserRouter } from "react-router-dom";
+import { Navigate, Route, Routes, BrowserRouter, useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { DocumentsPage } from "@/pages/research/DocumentsPage";
 import { ResearchPage } from "@/pages/research/ResearchPage";
@@ -15,9 +15,11 @@ import { WorkspaceOverviewPage } from "@/pages/workspaces/WorkspaceOverviewPage"
 import { BrandDesignSystemPage } from "@/pages/workspaces/BrandDesignSystemPage";
 import { ProductsPage } from "@/pages/workspaces/ProductsPage";
 import { ProductDetailPage } from "@/pages/workspaces/ProductDetailPage";
-import { StoreTemplatesPage } from "@/pages/workspaces/StoreTemplatesPage";
 import { SitesPage } from "@/pages/workspaces/SitesPage";
+import { SiteImportsPage } from "@/pages/workspaces/SiteImportsPage";
 import { SiteDetailPage } from "@/pages/workspaces/SiteDetailPage";
+import { SitePageEditorPage } from "@/pages/workspaces/SitePageEditorPage";
+import { SiteFunnelDetailPage } from "@/pages/workspaces/sites/SiteFunnelDetailPage";
 import { WorkflowsPage } from "@/pages/workflows/WorkflowsPage";
 import { WorkflowDetailPage } from "@/pages/workflows/WorkflowDetailPage";
 import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
@@ -52,6 +54,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
       </SignedOut>
     </>
   );
+}
+
+function LegacySiteImportRedirect() {
+  const { importId } = useParams<{ importId: string }>();
+  return <Navigate to={`/workspaces/sites/imports/${importId}`} replace />;
 }
 
 function App() {
@@ -98,15 +105,27 @@ function App() {
             <Route index element={<Navigate to="/workspaces/overview" replace />} />
             <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
             <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
-            <Route path="workspaces/store-templates" element={<StoreTemplatesPage />} />
+            {/* Sites - canonical workspace destination */}
             <Route path="workspaces/sites" element={<SitesPage />} />
+            <Route path="workspaces/sites/templates" element={<SitesPage />} />
+            <Route path="workspaces/sites/templates/:templateId" element={<SitesPage />} />
+            <Route path="workspaces/sites/imports" element={<SiteImportsPage />} />
+            <Route path="workspaces/sites/imports/:importId" element={<SiteImportsPage />} />
             <Route path="workspaces/sites/:siteId" element={<SiteDetailPage />} />
+            <Route path="workspaces/sites/:siteId/pages/:pageId" element={<SitePageEditorPage />} />
+            <Route path="workspaces/sites/:siteId/funnels" element={<SiteDetailPage />} />
+            <Route path="workspaces/sites/:siteId/funnels/:funnelId" element={<SiteFunnelDetailPage />} />
+            {/* Legacy redirects */}
+            <Route path="workspaces/store-templates" element={<Navigate to="/workspaces/sites" replace />} />
+            <Route path="workspaces/store-templates/import/:importId" element={<LegacySiteImportRedirect />} />
+            <Route path="workspaces/imports/*" element={<Navigate to="/workspaces/sites/imports" replace />} />
             <Route path="workspaces/products" element={<ProductsPage />} />
             <Route path="workspaces/products/:productId" element={<ProductDetailPage />} />
             <Route path="research/documents" element={<DocumentsPage />} />
             <Route path="research" element={<ResearchPage />} />
             <Route path="research/competitors" element={<Navigate to="/research?tab=brands" replace />} />
             <Route path="research/ad-library" element={<Navigate to="/research?tab=ads" replace />} />
+            {/* Research Funnels - cross-site funnel index */}
             <Route path="research/funnels" element={<FunnelsPage />} />
             <Route path="research/funnels/:funnelId" element={<FunnelDetailPage />} />
             <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />

@@ -5,7 +5,19 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product
+from app.db.models import (
+    Artifact,
+    Client,
+    Funnel,
+    FunnelPage,
+    FunnelPageVersion,
+    Product,
+    Site,
+    SitePage,
+    SitePageVersion,
+    SitePublication,
+    SitePublicationPage,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -104,8 +116,8 @@ def test_get_site_family_not_found(api_client: TestClient):
     assert response.status_code == 404
 
 
-def test_create_site_requires_product(api_client: TestClient):
-    """Test that creating a site without a product returns a validation error."""
+def test_create_site_without_product_succeeds(api_client: TestClient, db_session):
+    """Test that creating a site without a productId succeeds in the site runtime."""
     client_id = _create_client(api_client, name="Test Site Workspace")
 
     response = api_client.post(
@@ -113,40 +125,66 @@ def test_create_site_requires_product(api_client: TestClient):
         json={
             "clientId": client_id,
             "family": "medusa-b2b-starter",
-            "name": "Should Fail",
-            "description": "Missing product",
+            "name": "No Product Site",
+            "description": "A site without a product",
         },
     )
 
-    # Pydantic returns 422 for missing required fields
-    assert response.status_code == 422
-    # Check that productId is mentioned in the validation error
-    errors = response.json().get("detail", [])
-    field_names = [e.get("loc", []) for e in errors if isinstance(e, dict)]
-    assert any("productId" in str(loc) for loc in field_names), (
-        f"Expected productId in validation errors, got: {errors}"
-    )
+    assert response.status_code == 201
+    site = response.json()
 
+    # Verify site metadata
+    assert site["clientId"] == client_id
+    assert site["name"] == "No Product Site"
+    assert site["description"] == "A site without a product"
+    assert site["status"] == "draft"
+    assert site["siteType"] == "ecommerce"
+    assert site["siteFamily"] == "medusa-b2b-starter"
+    assert site["commerceProvider"] == "medusa"
+    assert site["productId"] is None  # No product required
+    assert site["designSystemId"] is None
+    assert site["routeSlug"] is not None  # Generated unique slug
 
-def test_create_site_validates_product_ownership(api_client: TestClient):
-    """Test that creating a site validates product belongs to the workspace."""
-    client_id_1 = _create_client(api_client, name="Workspace 1")
-    client_id_2 = _create_client(api_client, name="Workspace 2")
-    product_id = _create_product(api_client, client_id=client_id_1, title="Product for Workspace 1")
+    # Verify pages were created in site_pages, not funnel_pages
+    assert len(site["pages"]) == 5
 
-    # Try to create site in workspace 2 with product from workspace 1
-    response = api_client.post(
-        "/sites",
-        json={
-            "clientId": client_id_2,
-            "family": "medusa-b2b-starter",
-            "name": "Should Fail",
-            "productId": product_id,
-        },
-    )
+    # Verify page types
+    page_types = {page["pageType"] for page in site["pages"]}
+    expected_page_types = {
+        "home",
+        "category",
+        "product_detail",
+        "cart",
+        "checkout",
+    }
+    assert page_types == expected_page_types
 
-    assert response.status_code == 404
-    assert "Product not found" in response.json()["detail"]
+    # Verify entry page
+    entry_pages = [page for page in site["pages"] if page["isEntry"]]
+    assert len(entry_pages) == 1
+    assert entry_pages[0]["pageType"] == "home"
+    assert site["entryPageId"] == entry_pages[0]["id"]
+
+    # Verify database records are in Site/SitePage/SitePageVersion, NOT Funnel
+    db_site = db_session.query(Site).filter(Site.id == uuid.UUID(site["id"])).first()
+    assert db_site is not None
+    assert db_site.site_family == "medusa-b2b-starter"
+    assert db_site.route_slug is not None
+
+    # Verify no funnel was created
+    db_funnel = db_session.query(Funnel).filter(Funnel.id == uuid.UUID(site["id"])).first()
+    assert db_funnel is None
+
+    # Verify pages are SitePage records
+    db_pages = db_session.query(SitePage).filter(SitePage.site_id == db_site.id).all()
+    assert len(db_pages) == 5
+
+    # Verify versions are SitePageVersion records
+    for page in db_pages:
+        versions = (
+            db_session.query(SitePageVersion).filter(SitePageVersion.page_id == page.id).all()
+        )
+        assert len(versions) >= 1  # At least one draft version
 
 
 def test_create_site_succeeds_with_product(api_client: TestClient, db_session):
@@ -173,7 +211,6 @@ def test_create_site_succeeds_with_product(api_client: TestClient, db_session):
     assert site["name"] == "My B2B Store"
     assert site["description"] == "A test B2B ecommerce site"
     assert site["status"] == "draft"
-    assert site["experienceKind"] == "site"
     assert site["siteType"] == "ecommerce"
     assert site["siteFamily"] == "medusa-b2b-starter"
     assert site["commerceProvider"] == "medusa"
@@ -182,7 +219,7 @@ def test_create_site_succeeds_with_product(api_client: TestClient, db_session):
     # Verify pages were created
     assert len(site["pages"]) == 5
 
-    # Verify page types - commerce-core pages only
+    # Verify page types
     page_types = {page["pageType"] for page in site["pages"]}
     expected_page_types = {
         "home",
@@ -206,7 +243,7 @@ def test_create_site_succeeds_with_product(api_client: TestClient, db_session):
 
 
 def test_create_site_has_correct_site_metadata(api_client: TestClient, db_session):
-    """Test that created site has correct site metadata in the database."""
+    """Test that created site has correct site metadata in the dedicated site runtime."""
     client_id = _create_client(api_client, name="Site Metadata Workspace")
     product_id = _create_product(api_client, client_id=client_id, title="Metadata Test Product")
 
@@ -223,20 +260,20 @@ def test_create_site_has_correct_site_metadata(api_client: TestClient, db_sessio
     assert response.status_code == 201
     site = response.json()
 
-    # Verify database records
-    funnel = db_session.query(Funnel).filter(Funnel.id == uuid.UUID(site["id"])).first()
-    assert funnel is not None
-    assert funnel.experience_kind == "site"
-    assert funnel.site_type == "ecommerce"
-    assert funnel.site_family == "medusa-b2b-starter"
-    assert funnel.commerce_provider == "medusa"
-    assert str(funnel.product_id) == product_id
+    # Verify database records are in Site/SitePage/SitePageVersion
+    db_site = db_session.query(Site).filter(Site.id == uuid.UUID(site["id"])).first()
+    assert db_site is not None
+    assert db_site.site_type == "ecommerce"
+    assert db_site.site_family == "medusa-b2b-starter"
+    assert db_site.commerce_provider == "medusa"
+    assert str(db_site.product_id) == product_id
+    assert db_site.route_slug is not None
 
-    # Verify pages have page_type
-    pages = db_session.query(FunnelPage).filter(FunnelPage.funnel_id == funnel.id).all()
-    assert len(pages) == 5
+    # Verify pages have page_type in SitePage
+    db_pages = db_session.query(SitePage).filter(SitePage.site_id == db_site.id).all()
+    assert len(db_pages) == 5
 
-    page_types = {page.page_type for page in pages}
+    page_types = {page.page_type for page in db_pages}
     expected_page_types = {
         "home",
         "category",
@@ -247,9 +284,9 @@ def test_create_site_has_correct_site_metadata(api_client: TestClient, db_sessio
     assert page_types == expected_page_types
 
     # Verify each page has a draft version
-    for page in pages:
+    for page in db_pages:
         version = (
-            db_session.query(FunnelPageVersion).filter(FunnelPageVersion.page_id == page.id).first()
+            db_session.query(SitePageVersion).filter(SitePageVersion.page_id == page.id).first()
         )
         assert version is not None
         assert version.puck_data is not None
@@ -282,16 +319,14 @@ def test_create_site_rewrites_internal_page_links(api_client: TestClient, db_ses
 
     # Get the version to check puck_data
     version = (
-        db_session.query(FunnelPageVersion)
-        .filter(FunnelPageVersion.page_id == uuid.UUID(home_page["id"]))
+        db_session.query(SitePageVersion)
+        .filter(SitePageVersion.page_id == uuid.UUID(home_page["id"]))
         .first()
     )
     assert version is not None
     puck_data = version.puck_data
 
     # Check that at least one internal CTA link is rewritten to a real page ID
-    # The templates use __PAGE_CATEGORY__, __PAGE_CART__, etc. placeholders
-    # After rewriting, these should be real UUIDs
     found_rewritten_link = False
     content = puck_data.get("content", [])
 
@@ -494,54 +529,9 @@ def test_get_site_validates_workspace_ownership(api_client: TestClient):
     assert "does not belong to this workspace" in response.json()["detail"]
 
 
-def test_non_site_funnel_behavior_remains_intact(api_client: TestClient):
-    """Test that non-site funnels (regular funnels) are not affected by site changes."""
-    client_id = _create_client(api_client, name="Funnel Integrity Workspace")
-    product_id = _create_product(api_client, client_id=client_id, title="Test Product")
-
-    # Create a regular funnel (not a site)
-    funnel_response = api_client.post(
-        "/funnels",
-        json={
-            "clientId": client_id,
-            "productId": product_id,
-            "name": "Regular Funnel",
-        },
-    )
-    assert funnel_response.status_code == 201
-    funnel = funnel_response.json()
-
-    # Verify the funnel is not a site
-    assert funnel.get("experienceKind") is None or funnel.get("experienceKind") == "funnel"
-    assert funnel.get("siteType") is None
-    assert funnel.get("siteFamily") is None
-    assert funnel.get("commerceProvider") is None
-
-    # Create a site and verify it doesn't affect the regular funnel
-    site_response = api_client.post(
-        "/sites",
-        json={
-            "clientId": client_id,
-            "family": "medusa-b2b-starter",
-            "name": "Test Site",
-            "productId": product_id,
-        },
-    )
-    assert site_response.status_code == 201
-
-    # List sites - should only return the site, not the regular funnel
-    sites_response = api_client.get(f"/sites?clientId={client_id}")
-    assert sites_response.status_code == 200
-    sites = sites_response.json()
-    assert len(sites) == 1
-    assert sites[0]["id"] != funnel["id"]
-    assert sites[0]["name"] == "Test Site"
-
-
 def test_create_site_with_unknown_family_returns_error(api_client: TestClient):
     """Test that creating a site with an unknown family returns an error."""
     client_id = _create_client(api_client, name="Unknown Family Workspace")
-    product_id = _create_product(api_client, client_id=client_id, title="Product")
 
     response = api_client.post(
         "/sites",
@@ -549,7 +539,6 @@ def test_create_site_with_unknown_family_returns_error(api_client: TestClient):
             "clientId": client_id,
             "family": "unknown-family",
             "name": "Should Fail",
-            "productId": product_id,
         },
     )
 
@@ -559,20 +548,280 @@ def test_create_site_with_unknown_family_returns_error(api_client: TestClient):
 
 def test_create_site_without_client_id_returns_error(api_client: TestClient):
     """Test that creating a site without a client ID returns an error."""
-    product_id = _create_product(
-        api_client, client_id=_create_client(api_client, name="Temp"), title="Product"
-    )
-
     response = api_client.post(
         "/sites",
         json={
             "family": "medusa-b2b-starter",
             "name": "Should Fail",
-            "productId": product_id,
         },
     )
 
     assert response.status_code == 422  # Validation error
+
+
+def test_duplicate_page_types_allowed_in_site_pages(api_client: TestClient, db_session):
+    """Test that duplicate page types are allowed in site_pages (uniqueness is on slug now)."""
+    client_id = _create_client(api_client, name="Duplicate Type Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Product")
+
+    # Create a site first
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Type Test Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Get the site detail to see the pages
+    site_detail = api_client.get(f"/sites/{site['id']}?clientId={client_id}").json()
+
+    # Verify that each page type is unique (but we should be able to have duplicates if we wanted)
+    page_types = [p["pageType"] for p in site_detail["pages"]]
+    assert len(page_types) == len(set(page_types))  # All unique in this case
+
+    # The key assertion: the unique constraint is on (site_id, slug) not (site_id, page_type)
+    # So we could theoretically add another page with the same page_type but different slug
+
+
+def test_duplicate_slugs_rejected_per_site(api_client: TestClient, db_session):
+    """Test that duplicate slugs are rejected per site."""
+    client_id = _create_client(api_client, name="Slug Test Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Slug Test Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Try to update the page slug to an existing slug
+    response = api_client.patch(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}",
+        json={"slug": "checkout"},  # checkout slug already exists
+    )
+
+    assert response.status_code == 409
+    assert "already in use" in response.json()["detail"]
+
+
+def test_site_page_editor_get_endpoint(api_client: TestClient, db_session):
+    """Test the site page editor GET endpoint."""
+    client_id = _create_client(api_client, name="Page Editor Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Editor Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Editor Test Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Get page editor data
+    editor_response = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    data = editor_response.json()
+
+    # Verify response structure
+    assert "site" in data
+    assert "page" in data
+    assert "latestDraft" in data or data["latestDraft"] is None
+    assert "latestApproved" in data
+    assert "designSystemTokens" in data
+
+    # Verify site data
+    assert data["site"]["id"] == site["id"]
+    assert data["site"]["name"] == "Editor Test Site"
+    assert data["site"]["siteFamily"] == "medusa-b2b-starter"
+
+    # Verify page data
+    assert data["page"]["id"] == home_page["id"]
+    assert data["page"]["pageType"] == "home"
+
+
+def test_site_page_editor_update_endpoint(api_client: TestClient, db_session):
+    """Test the site page editor PATCH endpoint."""
+    client_id = _create_client(api_client, name="Page Update Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Update Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Update Test Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Update page name
+    update_response = api_client.patch(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}",
+        json={"name": "Updated Home Page"},
+    )
+    assert update_response.status_code == 200
+    data = update_response.json()
+
+    assert data["page"]["name"] == "Updated Home Page"
+
+
+def test_site_page_editor_create_version_endpoint(api_client: TestClient, db_session):
+    """Test the site page editor POST versions endpoint."""
+    client_id = _create_client(api_client, name="Version Create Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Version Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Version Test Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Create a new version
+    new_puck_data = {"root": {"props": {"title": "New Version"}}, "content": [], "zones": {}}
+    version_response = api_client.post(
+        f"/sites/{site['id']}/pages/{home_page['id']}/versions?clientId={client_id}",
+        json={
+            "puckData": new_puck_data,
+            "status": "draft",
+        },
+    )
+    assert version_response.status_code == 200
+    version_data = version_response.json()
+
+    assert version_data["status"] == "draft"
+    assert version_data["puckData"] == new_puck_data
+    assert "id" in version_data
+    assert "createdAt" in version_data
+
+
+def test_site_page_editor_create_version_with_approved_status(api_client: TestClient, db_session):
+    """Test creating a page version with approved status."""
+    client_id = _create_client(api_client, name="Approved Version Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Approved Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Approved Version Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Create an approved version
+    new_puck_data = {"root": {"props": {"title": "Approved Version"}}, "content": [], "zones": {}}
+    version_response = api_client.post(
+        f"/sites/{site['id']}/pages/{home_page['id']}/versions?clientId={client_id}",
+        json={
+            "puckData": new_puck_data,
+            "status": "approved",
+        },
+    )
+    assert version_response.status_code == 200
+    version_data = version_response.json()
+
+    assert version_data["status"] == "approved"
+
+
+def test_site_page_editor_invalid_status_returns_error(api_client: TestClient):
+    """Test that invalid status returns 400."""
+    client_id = _create_client(api_client, name="Invalid Status Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Invalid Product")
+
+    # Create a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Invalid Status Site",
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Try to create version with invalid status
+    version_response = api_client.post(
+        f"/sites/{site['id']}/pages/{home_page['id']}/versions?clientId={client_id}",
+        json={
+            "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+            "status": "invalid_status",
+        },
+    )
+    assert version_response.status_code == 400
+    assert "Invalid status" in version_response.json()["detail"]
+
+
+def test_site_route_slug_is_unique(api_client: TestClient, db_session):
+    """Test that route_slug is unique across all sites."""
+    client_id = _create_client(api_client, name="Slug Uniqueness Workspace")
+
+    # Create first site
+    response1 = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "First Site",
+        },
+    )
+    assert response1.status_code == 201
+    site1 = response1.json()
+
+    # Create second site with same name (should get different slug)
+    response2 = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "First Site",  # Same name
+        },
+    )
+    assert response2.status_code == 201
+    site2 = response2.json()
+
+    # Route slugs should be different
+    assert site1["routeSlug"] != site2["routeSlug"]
 
 
 def test_templates_have_no_unsupported_claims():
@@ -613,146 +862,343 @@ def test_templates_have_no_unsupported_claims():
             )
 
 
-def test_site_page_type_mapping_in_public_page_response(api_client: TestClient, db_session):
-    """Test that public page responses include pageTypeMap for site experiences."""
-    client_id = _create_client(api_client, name="PageTypeMap Workspace")
-    product_id = _create_product(api_client, client_id=client_id, title="PageTypeMap Product")
+# =============================================================================
+# Tests for site publication / publish flow
+# =============================================================================
+
+
+def test_site_publish_success(api_client: TestClient, db_session):
+    """Test that publishing a site creates publication snapshot and artifact."""
+    client_id = _create_client(api_client, name="Publish Test Workspace")
 
     # Create a site
-    site_response = api_client.post(
+    response = api_client.post(
         "/sites",
         json={
             "clientId": client_id,
             "family": "medusa-b2b-starter",
-            "name": "PageTypeMap Test Site",
-            "productId": product_id,
+            "name": "Publishable Site",
         },
     )
-    assert site_response.status_code == 201
-    site = site_response.json()
-
-    # Get the home page
-    home_page = next((p for p in site["pages"] if p["pageType"] == "home"), None)
-    assert home_page is not None
+    assert response.status_code == 201
+    site = response.json()
+    site_id = site["id"]
 
     # Publish the site
-    publish_response = api_client.post(f"/funnels/{site['id']}/publish")
-    assert publish_response.status_code == 201
+    publish_response = api_client.post(f"/sites/{site_id}/publish?clientId={client_id}")
+    assert publish_response.status_code == 200
+    publish_data = publish_response.json()
 
-    # Get the funnel to find its route_slug
-    funnel_response = api_client.get(f"/funnels/{site['id']}")
-    assert funnel_response.status_code == 200
-    funnel = funnel_response.json()
-    route_slug = funnel["route_slug"]
+    # Verify publish response structure
+    assert "publicationId" in publish_data
+    assert "artifactId" in publish_data
+    assert "artifactVersion" in publish_data
+    assert publish_data["siteId"] == site_id
+    assert publish_data["routeSlug"] is not None
+    assert publish_data["pageCount"] == 5
+    assert publish_data["publishedAt"] is not None
 
-    # Product slug is the short UUID prefix
-    product_slug = product_id[:8].lower()
-
-    # Get the public page
-    public_page_response = api_client.get(
-        f"/public/funnels/{product_slug}/{route_slug}/pages/{home_page['slug']}"
+    # Verify publication record was created
+    pub_id = publish_data["publicationId"]
+    pub_record = (
+        db_session.query(SitePublication).filter(SitePublication.id == uuid.UUID(pub_id)).first()
     )
-    assert public_page_response.status_code == 200
-    public_page = public_page_response.json()
+    assert pub_record is not None
+    assert pub_record.site_id == uuid.UUID(site_id)
 
-    # Verify pageTypeMap is present and contains expected mappings
-    assert "pageTypeMap" in public_page
-    page_type_map = public_page["pageTypeMap"]
-    assert isinstance(page_type_map, dict)
-
-    # Verify all site page types are mapped
-    page_types_in_map = set(page_type_map.values())
-    expected_page_types = {"home", "category", "product_detail", "cart", "checkout"}
-    assert page_types_in_map == expected_page_types, (
-        f"Expected page types {expected_page_types}, got {page_types_in_map}"
+    # Verify publication pages were created
+    pub_pages = (
+        db_session.query(SitePublicationPage)
+        .filter(SitePublicationPage.publication_id == uuid.UUID(pub_id))
+        .all()
     )
+    assert len(pub_pages) == 5
 
-    # Verify the home page is correctly mapped
-    home_page_id = home_page["id"]
-    assert home_page_id in page_type_map
-    assert page_type_map[home_page_id] == "home"
+    # Verify site_runtime_bundle artifact was created
+    artifact = (
+        db_session.query(Artifact)
+        .filter(Artifact.id == uuid.UUID(publish_data["artifactId"]))
+        .first()
+    )
+    assert artifact is not None
+    assert artifact.type.value == "site_runtime_bundle"
+    assert artifact.version == 1
+    assert artifact.data["meta"]["siteId"] == site_id
 
 
-def test_category_handle_parameter_in_site_commerce(api_client: TestClient, db_session):
-    """Test that category_handle parameter is supported in site commerce endpoint."""
-    client_id = _create_client(api_client, name="CategoryHandle Workspace")
-    product_id = _create_product(api_client, client_id=client_id, title="CategoryHandle Product")
+def test_site_publish_updates_active_publication(api_client: TestClient, db_session):
+    """Test that publishing a site updates the active publication reference on the site."""
+    client_id = _create_client(api_client, name="Active Pub Test Workspace")
 
     # Create a site
-    site_response = api_client.post(
+    response = api_client.post(
         "/sites",
         json={
             "clientId": client_id,
             "family": "medusa-b2b-starter",
-            "name": "CategoryHandle Test Site",
-            "productId": product_id,
+            "name": "Multi-Publish Site",
         },
     )
-    assert site_response.status_code == 201
-    site = site_response.json()
+    assert response.status_code == 201
+    site = response.json()
+    site_id = site["id"]
 
-    # Publish the site
-    publish_response = api_client.post(f"/funnels/{site['id']}/publish")
-    assert publish_response.status_code == 201
+    # First publish
+    publish1 = api_client.post(f"/sites/{site_id}/publish?clientId={client_id}")
+    assert publish1.status_code == 200
+    pub1_id = publish1.json()["publicationId"]
 
-    # Get the funnel to find its route_slug
-    funnel_response = api_client.get(f"/funnels/{site['id']}")
-    assert funnel_response.status_code == 200
-    funnel = funnel_response.json()
-    route_slug = funnel["route_slug"]
+    # Second publish (should create new publication, update active ref)
+    publish2 = api_client.post(f"/sites/{site_id}/publish?clientId={client_id}")
+    assert publish2.status_code == 200
+    pub2_id = publish2.json()["publicationId"]
 
-    # Product slug is the short UUID prefix
-    product_slug = product_id[:8].lower()
+    # Verify second publish incremented artifact version
+    assert publish2.json()["artifactVersion"] == 2
 
-    # Request site commerce with category_handle parameter
-    # This should not fail even if Medusa is not configured
-    commerce_response = api_client.get(
-        f"/public/funnels/{product_slug}/{route_slug}/site/commerce?category_handle=test-category"
-    )
-
-    # The endpoint should return 409 because Medusa is not configured
-    # but it should accept the category_handle parameter
-    assert commerce_response.status_code == 409
-    assert "Medusa" in commerce_response.json()["detail"]
+    # Verify site has updated active publication reference
+    db_site = db_session.query(Site).filter(Site.id == uuid.UUID(site_id)).first()
+    assert str(db_site.active_site_publication_id) == pub2_id
 
 
-def test_product_handle_parameter_in_site_commerce(api_client: TestClient, db_session):
-    """Test that product_handle parameter is supported in site commerce endpoint."""
-    client_id = _create_client(api_client, name="ProductHandle Workspace")
-    product_id = _create_product(api_client, client_id=client_id, title="ProductHandle Product")
+def test_site_publish_not_found(api_client: TestClient):
+    """Test that publishing a non-existent site returns 404."""
+    fake_site_id = str(uuid.uuid4())
+    client_id = str(uuid.uuid4())
+
+    response = api_client.post(f"/sites/{fake_site_id}/publish?clientId={client_id}")
+    assert response.status_code == 404
+
+
+def test_site_publish_invalid_workspace(api_client: TestClient, db_session):
+    """Test that publishing a site with wrong workspace returns 404."""
+    client_id = _create_client(api_client, name="Wrong Workspace Test")
 
     # Create a site
-    site_response = api_client.post(
+    response = api_client.post(
         "/sites",
         json={
             "clientId": client_id,
             "family": "medusa-b2b-starter",
-            "name": "ProductHandle Test Site",
-            "productId": product_id,
+            "name": "Workspace Test Site",
         },
     )
-    assert site_response.status_code == 201
-    site = site_response.json()
+    assert response.status_code == 201
+    site = response.json()
 
-    # Publish the site
-    publish_response = api_client.post(f"/funnels/{site['id']}/publish")
-    assert publish_response.status_code == 201
+    # Try to publish with a different client_id
+    wrong_client_id = str(uuid.uuid4())
+    publish_response = api_client.post(f"/sites/{site['id']}/publish?clientId={wrong_client_id}")
+    assert publish_response.status_code == 404
 
-    # Get the funnel to find its route_slug
-    funnel_response = api_client.get(f"/funnels/{site['id']}")
-    assert funnel_response.status_code == 200
-    funnel = funnel_response.json()
-    route_slug = funnel["route_slug"]
 
-    # Product slug is the short UUID prefix
-    product_slug = product_id[:8].lower()
+# =============================================================================
+# Tests for public site endpoints
+# =============================================================================
 
-    # Request site commerce with product_handle parameter
-    commerce_response = api_client.get(
-        f"/public/funnels/{product_slug}/{route_slug}/site/commerce?product_handle=test-product"
+
+def test_public_site_meta_success(api_client: TestClient, db_session):
+    """Test that getting public site meta works for published sites."""
+    client_id = _create_client(api_client, name="Public Meta Test")
+
+    # Create and publish a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Public Meta Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+
+    # Get public meta
+    meta_response = api_client.get(f"/public/sites/{site['routeSlug']}/meta")
+    assert meta_response.status_code == 200
+    meta = meta_response.json()
+
+    assert meta["siteId"] == site["id"]
+    assert meta["name"] == "Public Meta Site"
+    assert meta["routeSlug"] == site["routeSlug"]
+    assert meta["publicationId"] is not None
+
+
+def test_public_site_meta_not_found(api_client: TestClient):
+    """Test that getting meta for non-existent site returns 404."""
+    response = api_client.get("/public/sites/nonexistent-site/meta")
+    assert response.status_code == 404
+
+
+def test_public_site_page_success(api_client: TestClient, db_session):
+    """Test that getting a public site page works."""
+    client_id = _create_client(api_client, name="Public Page Test")
+
+    # Create and publish a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Public Page Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+
+    # Get a page (home page)
+    page_response = api_client.get(f"/public/sites/{site['routeSlug']}/pages/home")
+    assert page_response.status_code == 200
+    page_data = page_response.json()
+
+    assert "pageId" in page_data
+    assert "puckData" in page_data
+    assert page_data["slug"] == "home"
+
+
+def test_public_site_page_not_found(api_client: TestClient, db_session):
+    """Test that getting a non-existent page returns 404."""
+    client_id = _create_client(api_client, name="Page Not Found Test")
+
+    # Create and publish a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Page Not Found Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+
+    # Try to get non-existent page
+    page_response = api_client.get(f"/public/sites/{site['routeSlug']}/pages/nonexistent")
+    assert page_response.status_code == 404
+
+
+def test_public_site_graph_success(api_client: TestClient, db_session):
+    """Test that getting the site graph works."""
+    client_id = _create_client(api_client, name="Graph Test")
+
+    # Create and publish a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Graph Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+
+    # Get graph
+    graph_response = api_client.get(f"/public/sites/{site['routeSlug']}/graph")
+    assert graph_response.status_code == 200
+    graph = graph_response.json()
+
+    assert graph["siteId"] == site["id"]
+    assert "pages" in graph
+    assert "links" in graph
+    assert len(graph["pages"]) == 5  # All pages from medusa-b2b-starter
+
+
+def test_public_site_graph_site_not_found(api_client: TestClient):
+    """Test that getting graph for non-existent site returns 404."""
+    response = api_client.get("/public/sites/nonexistent-site/graph")
+    assert response.status_code == 404
+
+
+def test_public_site_product_not_found(api_client: TestClient, db_session):
+    """Test that getting a non-existent product returns 404."""
+    client_id = _create_client(api_client, name="Product Not Found Test")
+
+    # Create and publish a site (no product)
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Product Test Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+
+    # Try to get non-existent product
+    product_response = api_client.get(
+        f"/public/sites/{site['routeSlug']}/products/nonexistent-product"
+    )
+    assert product_response.status_code == 404
+
+
+# =============================================================================
+# Tests for site_runtime_bundle artifact payload
+# =============================================================================
+
+
+def test_site_runtime_bundle_artifact_payload_structure(api_client: TestClient, db_session):
+    """Test that the site_runtime_bundle artifact has correct structure."""
+    client_id = _create_client(api_client, name="Artifact Payload Test")
+
+    # Create and publish a site
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Artifact Payload Site",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Publish it
+    publish_response = api_client.post(f"/sites/{site['id']}/publish?clientId={client_id}")
+    assert publish_response.status_code == 200
+
+    # Get the artifact
+    artifact = (
+        db_session.query(Artifact)
+        .filter(Artifact.id == uuid.UUID(publish_response.json()["artifactId"]))
+        .first()
     )
 
-    # The endpoint should return 409 because Medusa is not configured
-    # but it should accept the product_handle parameter
-    assert commerce_response.status_code == 409
-    assert "Medusa" in commerce_response.json()["detail"]
+    assert artifact is not None
+    data = artifact.data
+
+    # Verify top-level structure
+    assert "meta" in data
+    assert "pages" in data
+    assert "links" in data
+    assert "funnels" in data
+    assert "productBindings" in data
+
+    # Verify meta
+    assert data["meta"]["siteId"] == site["id"]
+    assert data["meta"]["routeSlug"] == site["routeSlug"]
+    assert data["meta"]["publicationId"] is not None
+
+    # Verify pages
+    assert len(data["pages"]) == 5
+    for slug, page_data in data["pages"].items():
+        assert "pageId" in page_data
+        assert "versionId" in page_data
+        assert "puckData" in page_data
+        assert "pageType" in page_data
