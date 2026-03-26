@@ -1,7 +1,7 @@
 """Add site runtime canonical tables and fields
 
 Revision ID: 0078_site_runtime_canonical
-Revises: 0076_gethookd_sync_backend
+Revises: 0077_remove_legacy_section_props
 Create Date: 2026-03-25 00:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers, used by Alembic.
 revision = "0078_site_runtime_canonical"
-down_revision = "0076_gethookd_sync_backend"
+down_revision = "0077_remove_legacy_section_props"
 branch_labels = None
 depends_on = None
 

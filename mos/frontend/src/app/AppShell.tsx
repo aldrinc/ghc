@@ -247,6 +247,25 @@ function NavigationMenu({ label, items, strategyNeedsInput }: NavSection & { str
   );
 }
 
+function matchesRoutePattern(routePath: string, pathname: string) {
+  const normalize = (value: string) => value.replace(/\/+$/, "") || "/";
+  const routeSegments = normalize(routePath).split("/").filter(Boolean);
+  const pathSegments = normalize(pathname).split("/").filter(Boolean);
+
+  if (routeSegments.length > pathSegments.length) return false;
+
+  return routeSegments.every((segment, index) => {
+    if (segment.startsWith(":")) return Boolean(pathSegments[index]);
+    return segment === pathSegments[index];
+  });
+}
+
+function routeSpecificity(routePath: string) {
+  const segments = routePath.split("/").filter(Boolean);
+  const exactSegments = segments.filter((segment) => !segment.startsWith(":")).length;
+  return { segmentCount: segments.length, exactSegments };
+}
+
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -267,7 +286,22 @@ export function AppShell() {
   const strategyNeedsInput = journey.phase === "strategy-needs-input";
 
   const activeRoute = useMemo(
-    () => appRoutes.find((route) => location.pathname.startsWith(route.path)),
+    () =>
+      appRoutes.reduce<AppRoute | null>((best, route) => {
+        if (!matchesRoutePattern(route.path, location.pathname)) return best;
+        if (!best) return route;
+
+        const candidate = routeSpecificity(route.path);
+        const current = routeSpecificity(best.path);
+        if (candidate.segmentCount > current.segmentCount) return route;
+        if (
+          candidate.segmentCount === current.segmentCount &&
+          candidate.exactSegments > current.exactSegments
+        ) {
+          return route;
+        }
+        return best;
+      }, null),
     [location.pathname],
   );
   const routeLabel = activeRoute?.label ?? "Overview";

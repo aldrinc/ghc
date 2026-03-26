@@ -225,7 +225,7 @@ export function SiteImportsPage() {
 
               <div className="flex items-center gap-2 text-xs text-content-muted">
                 <Download className="h-4 w-4" />
-                Canonical site-import actions are available here; legacy storefront template routes remain compatibility-only.
+                Imports now live under Sites. Legacy storefront-template routes only redirect here for compatibility.
               </div>
             </>
           )}
