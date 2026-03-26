@@ -37,6 +37,8 @@ from app.schemas.sites import (
     SitePageVersionCreateRequest,
     SitePageEditorResponse,
     SitePageVersionSummary,
+    SiteMedusaConfigResponse,
+    MedusaRuntimeConfig,
 )
 from app.services.site_blueprints import (
     list_site_families,
@@ -958,3 +960,71 @@ def publish_site(
         productBindingCount=binding_count,
         publishedAt=publication.created_at.isoformat(),
     ).model_dump()
+
+
+@router.get("/{site_id}/medusa-config", response_model=SiteMedusaConfigResponse)
+def get_site_medusa_config(
+    site_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteMedusaConfigResponse:
+    """Get Medusa runtime configuration for a canonical site.
+
+    This exposes workspace-level Medusa config for B2C storefronts that are
+    designed to call Medusa directly from the browser runtime.
+    """
+    site_uuid = _parse_uuid_or_400(site_id, "site_id")
+    site = session.scalars(
+        select(Site).where(
+            Site.id == site_uuid,
+            Site.org_id == UUID(auth.org_id),
+        )
+    ).first()
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    if site.site_family != "medusa-b2c-starter":
+        return SiteMedusaConfigResponse(
+            siteFamily=site.site_family,
+            commerceProvider=site.commerce_provider,
+            medusaConfig=None,
+        )
+
+    from app.services.medusa_connection import get_client_medusa_config
+
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+
+    if not medusa_config or not medusa_config.base_url:
+        return SiteMedusaConfigResponse(
+            siteFamily=site.site_family,
+            commerceProvider=site.commerce_provider,
+            medusaConfig=MedusaRuntimeConfig(available=False),
+        )
+
+    if not medusa_config.publishable_key_encrypted:
+        return SiteMedusaConfigResponse(
+            siteFamily=site.site_family,
+            commerceProvider=site.commerce_provider,
+            medusaConfig=MedusaRuntimeConfig(
+                baseUrl=medusa_config.base_url,
+                available=False,
+            ),
+        )
+
+    return SiteMedusaConfigResponse(
+        siteFamily=site.site_family,
+        commerceProvider=site.commerce_provider,
+        medusaConfig=MedusaRuntimeConfig(
+            baseUrl=medusa_config.base_url,
+            publishableKey=medusa_config.publishable_key_encrypted,
+            available=True,
+        ),
+    )

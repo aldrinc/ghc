@@ -1,6 +1,7 @@
 export type FunnelStatus = "draft" | "published" | "disabled" | "archived";
 
 import type { DesignSystemTokens } from "@/types/designSystems";
+import type { MedusaRuntimeConfig } from "@/lib/medusa/config";
 
 export type Funnel = {
   id: string;
@@ -68,12 +69,29 @@ export type PublicFunnelMeta = {
   publicationId: string;
   entrySlug: string;
   pages: { pageId: string; slug: string }[];
+  medusaRuntimeConfig?: MedusaRuntimeConfig | null;
 };
 
 export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
 
 // Site page types for commerce experiences
-export type SitePageType = "home" | "category" | "product_detail" | "cart" | "checkout";
+export type SitePageType =
+  | "home"
+  | "store"
+  | "collection"
+  | "category"
+  | "product_detail"
+  | "cart"
+  | "checkout"
+  | "account_dashboard"
+  | "account_profile"
+  | "account_addresses"
+  | "account_orders"
+  | "account_order_detail"
+  | "order_confirmed"
+  | "order_transfer"
+  | "order_transfer_accept"
+  | "order_transfer_decline";
 
 export type PublicFunnelPage = {
   productSlug: string;

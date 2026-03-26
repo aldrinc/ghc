@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-account-orders",
+  "name": "Medusa B2C Account Orders",
+  "description": "Customer orders list.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Orders",
+        "description": "Order history"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CAccountOrdersPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

@@ -158,3 +158,19 @@ class SitePublishResponse(BaseModel):
     funnelCount: int
     productBindingCount: int
     publishedAt: str
+
+
+class MedusaRuntimeConfig(BaseModel):
+    """Runtime Medusa configuration for direct frontend access."""
+
+    baseUrl: Optional[str] = None
+    publishableKey: Optional[str] = None
+    available: bool = False
+
+
+class SiteMedusaConfigResponse(BaseModel):
+    """Response containing site metadata and optional Medusa runtime config."""
+
+    siteFamily: Optional[str] = None
+    commerceProvider: Optional[str] = None
+    medusaConfig: Optional[MedusaRuntimeConfig] = None

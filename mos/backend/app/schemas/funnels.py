@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.services.puck_data_validation import (
+    LegacySectionPropError,
+    validate_puck_data_no_legacy_section_props,
+)
 
 
 class FunnelCreateRequest(BaseModel):
@@ -73,14 +78,29 @@ class FunnelPageUpdateRequest(BaseModel):
 class FunnelPageSaveDraftRequest(BaseModel):
     puckData: dict[str, Any]
 
+    @model_validator(mode="after")
+    def validate_no_legacy_section_props(self) -> "FunnelPageSaveDraftRequest":
+        """Reject Puck data containing legacy Section props."""
+        try:
+            validate_puck_data_no_legacy_section_props(self.puckData)
+        except LegacySectionPropError as e:
+            raise ValueError(str(e)) from e
+        return self
+
 
 class PublicFunnelMetaResponse(BaseModel):
+    class MedusaRuntimeConfig(BaseModel):
+        backendUrl: str
+        publishableKey: str
+        defaultCountryCode: Optional[str] = None
+
     productSlug: str
     funnelSlug: str
     funnelId: str
     publicationId: str
     entrySlug: str
     pages: list[dict[str, str]]
+    medusaRuntimeConfig: Optional[MedusaRuntimeConfig] = None
 
 
 class PublicFunnelPageResponse(BaseModel):

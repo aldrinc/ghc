@@ -69,9 +69,9 @@ function App() {
       <Routes>
         {standaloneBundleMode ? <Route path="/" element={<PublicFunnelRootRedirectPage />} /> : null}
         {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} /> : null}
-        {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
+        {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/*" element={<PublicFunnelPage />} /> : null}
         <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
-        <Route path="/f/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
+        <Route path="/f/:productSlug/:funnelSlug/*" element={<PublicFunnelPage />} />
         {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignInPage />} />}
         {standaloneBundleMode ? null : (
           <Route

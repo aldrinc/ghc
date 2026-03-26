@@ -118,6 +118,61 @@ def test_get_site_family_not_found(api_client: TestClient):
     assert response.status_code == 404
 
 
+def test_list_site_families_includes_medusa_b2c_starter(api_client: TestClient):
+    """Listing families should include the Medusa B2C starter."""
+    response = api_client.get("/sites/families")
+
+    assert response.status_code == 200
+    families = response.json()
+    family_ids = {f["family"] for f in families}
+
+    assert "medusa-b2c-starter" in family_ids
+
+    b2c_family = next(f for f in families if f["family"] == "medusa-b2c-starter")
+    assert b2c_family["name"] == "Medusa B2C Starter"
+    assert b2c_family["siteType"] == "ecommerce"
+    assert b2c_family["commerceProvider"] == "medusa"
+    assert b2c_family["pageCount"] == 16
+
+
+def test_get_medusa_b2c_starter_family_detail(api_client: TestClient):
+    """The Medusa B2C starter should expose all expected page blueprints."""
+    response = api_client.get("/sites/families/medusa-b2c-starter")
+
+    assert response.status_code == 200
+    family = response.json()
+
+    assert family["family"] == "medusa-b2c-starter"
+    assert family["name"] == "Medusa B2C Starter"
+    assert len(family["pageBlueprints"]) == 16
+
+    expected_page_types = {
+        "home",
+        "store",
+        "collection",
+        "category",
+        "product_detail",
+        "cart",
+        "checkout",
+        "account_dashboard",
+        "account_profile",
+        "account_addresses",
+        "account_orders",
+        "account_order_detail",
+        "order_confirmed",
+        "order_transfer",
+        "order_transfer_accept",
+        "order_transfer_decline",
+    }
+    page_types = {bp["pageType"] for bp in family["pageBlueprints"]}
+    assert page_types == expected_page_types
+
+    entry_pages = [bp for bp in family["pageBlueprints"] if bp["isEntry"]]
+    assert len(entry_pages) == 1
+    assert entry_pages[0]["pageType"] == "home"
+    assert any("B2C" in note or "b2c" in note.lower() for note in family["provenanceNotes"])
+
+
 def test_create_site_without_product_succeeds(api_client: TestClient, db_session):
     """Test that creating a site without a productId succeeds in the site runtime."""
     client_id = _create_client(api_client, name="Test Site Workspace")
@@ -431,6 +486,34 @@ def test_create_site_generates_all_expected_pages_with_correct_page_types(api_cl
         assert page["slug"] == expected["slug"]
         assert page["ordering"] == expected["ordering"]
         assert page["isEntry"] == expected["isEntry"]
+
+
+def test_site_medusa_config_returns_unavailable_for_b2c_site_without_workspace_config(
+    api_client: TestClient,
+):
+    """B2C sites should expose the runtime config shape even without workspace config."""
+    client_id = _create_client(api_client, name="B2C Config Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2c-starter",
+            "name": "My B2C Store",
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    config_response = api_client.get(f"/sites/{site['id']}/medusa-config")
+    assert config_response.status_code == 200
+    payload = config_response.json()
+
+    assert payload["siteFamily"] == "medusa-b2c-starter"
+    assert payload["commerceProvider"] == "medusa"
+    assert payload["medusaConfig"]["available"] is False
+    assert payload["medusaConfig"]["baseUrl"] is None
+    assert payload["medusaConfig"]["publishableKey"] is None
 
 
 def test_list_sites_returns_only_sites_for_workspace(api_client: TestClient):

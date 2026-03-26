@@ -167,6 +167,59 @@ export type MedusaPaymentCollection = {
   payment_sessions?: MedusaPaymentSession[];
 };
 
+export type MedusaCustomerAddress = {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  address_1?: string;
+  address_2?: string;
+  city?: string;
+  province?: string;
+  postal_code?: string;
+  country_code?: string;
+  phone?: string;
+  is_default_shipping?: boolean;
+  is_default_billing?: boolean;
+};
+
+export type MedusaCustomer = {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  has_account?: boolean;
+  addresses?: MedusaCustomerAddress[];
+};
+
+export type MedusaOrderItem = {
+  id: string;
+  title: string;
+  quantity: number;
+  unit_price?: number;
+  subtotal?: number;
+  total?: number;
+  variant_title?: string;
+  thumbnail?: string;
+};
+
+export type MedusaOrder = {
+  id: string;
+  display_id?: number;
+  status?: string;
+  email?: string;
+  currency_code?: string;
+  created_at?: string;
+  total?: number;
+  subtotal?: number;
+  shipping_total?: number;
+  tax_total?: number;
+  items?: MedusaOrderItem[];
+  shipping_address?: MedusaCartAddress;
+  billing_address?: MedusaCartAddress;
+};
+
 // =============================================================================
 // Site Commerce API Types
 // =============================================================================

@@ -41,6 +41,10 @@ from app.services.template_variant_governance import (
     build_convert_provenance,
     build_template_draft_provenance,
 )
+from app.services.puck_data_validation import (
+    LegacySectionPropError,
+    validate_puck_data_no_legacy_section_props,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +344,18 @@ def save_import_as_site(
     adapted_pages = site_import.adapted_pages or []
     if not adapted_pages:
         raise SiteImportError("Import has no adapted pages to save")
+
+    # Validate all adapted pages for legacy Section props before saving
+    for idx, adapted_page in enumerate(adapted_pages):
+        puck_data = adapted_page.get("puck_data") or adapted_page.get("puckData") or {}
+        page_label = f"page[{idx}]"  # Human-friendly label for errors
+        try:
+            validate_puck_data_no_legacy_section_props(puck_data)
+        except LegacySectionPropError as e:
+            raise SiteImportError(
+                f"Cannot save import: legacy Section prop '{e.prop_name}' found in {page_label}. "
+                f"These props are no longer supported. Use design-system tokens instead."
+            ) from e
 
     snapshot = imports_repo.get_import_snapshot(site_import_id=site_import_id)
     screenshot_refs: list[str] = []

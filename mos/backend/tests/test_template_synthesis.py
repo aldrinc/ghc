@@ -1133,3 +1133,71 @@ def test_synthesize_import_footer_dedupes_shell_and_mapped_footer():
     page_content = page_block.get("props", {}).get("content", [])
     footer_blocks = [b for b in page_content if b.get("type") == "SalesPdpFooter"]
     assert len(footer_blocks) == 1
+
+
+def test_b2c_family_blocks_defined():
+    """Test that family blocks are defined for medusa-b2c-starter family."""
+    from app.services.template_synthesis import FAMILY_BLOCKS
+
+    assert "medusa-b2c-starter" in FAMILY_BLOCKS
+    b2c_blocks = FAMILY_BLOCKS["medusa-b2c-starter"]
+
+    # Verify all expected B2C page shell blocks are present
+    expected_blocks = [
+        "MedusaB2CHomePage",
+        "MedusaB2CStorePage",
+        "MedusaB2CCollectionPage",
+        "MedusaB2CCategoryPage",
+        "MedusaB2CProductPage",
+        "MedusaB2CCartPage",
+        "MedusaB2CCheckoutPage",
+        "MedusaB2CAccountDashboardPage",
+        "MedusaB2CAccountProfilePage",
+        "MedusaB2CAccountAddressesPage",
+        "MedusaB2CAccountOrdersPage",
+        "MedusaB2CAccountOrderDetailPage",
+        "MedusaB2COrderConfirmedPage",
+        "MedusaB2COrderTransferPage",
+        "MedusaB2COrderTransferAcceptPage",
+        "MedusaB2COrderTransferDeclinePage",
+    ]
+    for block in expected_blocks:
+        assert block in b2c_blocks, (
+            f"Expected block {block} not found in medusa-b2c-starter family blocks"
+        )
+
+
+def test_b2c_starter_in_supported_families():
+    """Test that medusa-b2c-starter is in SUPPORTED_FAMILIES."""
+    from app.services.template_synthesis import SUPPORTED_FAMILIES
+
+    assert "medusa-b2c-starter" in SUPPORTED_FAMILIES
+
+
+def test_b2c_starter_in_family_to_template_id():
+    """Test that medusa-b2c-starter maps to medusa-b2c-starter template ID."""
+    from app.services.template_synthesis import FAMILY_TO_TEMPLATE_ID
+
+    assert FAMILY_TO_TEMPLATE_ID.get("medusa-b2c-starter") == "medusa-b2c-starter"
+
+
+def test_b2c_synthesis_is_explicitly_blocked_until_mappings_exist():
+    with pytest.raises(UnsupportedFamilyError) as exc_info:
+        synthesize_import(
+            normalized_sections=[
+                {
+                    "id": "section_001",
+                    "sectionType": "hero",
+                    "confidence": 0.9,
+                    "keyText": ["Welcome"],
+                    "keyMedia": [],
+                    "keyStyles": {},
+                }
+            ],
+            theme_candidate={"palette": {}, "fonts": {}, "spacing": {}, "cta": {}},
+            suggested_family="medusa-b2c-starter",
+            target_family="medusa-b2c-starter",
+            target_page_type="home",
+        )
+
+    assert "intentionally blocked" in str(exc_info.value)
