@@ -46,6 +46,7 @@ from app.services.creative_service_client import (
 )
 from app.services.campaign_destinations import (
     campaign_delivery_snapshot,
+    destination_label_for_type,
     requirement_destination_type,
     resolve_campaign_delivery_destination,
 )
@@ -81,6 +82,13 @@ _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
 _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
 _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE: Tuple[int, threading.BoundedSemaphore] | None = None
+_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES: Dict[str, str] = {
+    "swipe_stage1_campaign_asset_brief": "Swipe Stage1 Campaign Asset Brief",
+    "swipe_stage1_campaign_loaded_copy": "Swipe Stage1 Campaign Loaded Copy",
+    "swipe_stage1_campaign_creative_context": "Swipe Stage1 Campaign Creative Context",
+    "swipe_stage1_strategy_v2_copy": "Swipe Stage1 Strategy V2 Copy",
+    "swipe_stage1_strategy_v2_copy_context": "Swipe Stage1 Strategy V2 Copy Context",
+}
 
 
 def _resolve_swipe_gemini_timeout_seconds() -> int:
@@ -1635,18 +1643,94 @@ def _build_swipe_stage1_prompt_input(
     prompt_template: str,
     brand_name: str,
     angle: str | None,
+    destination_context: str | None = None,
 ) -> str:
     if not isinstance(prompt_template, str) or not prompt_template.strip():
         raise ValueError("swipe stage-1 prompt template is required and must be non-empty.")
     clean_brand = _normalize_prompt_value(brand_name)
     clean_angle = _normalize_prompt_value(angle)
-    return (
-        f"{prompt_template.strip()}\n\n"
-        "RUNTIME INPUTS (INJECTED)\n"
-        f"Brand: {clean_brand}\n"
-        f"Angle: {clean_angle}\n"
-        "Competitor swipe image is attached as image input."
+    runtime_lines = [
+        prompt_template.strip(),
+        "",
+        "RUNTIME INPUTS (INJECTED)",
+        f"Brand: {clean_brand}",
+        f"Angle: {clean_angle}",
+    ]
+    if isinstance(destination_context, str) and destination_context.strip():
+        runtime_lines.append(destination_context.strip())
+    runtime_lines.append("Competitor swipe image is attached as image input.")
+    return "\n".join(runtime_lines)
+
+
+def _build_swipe_stage1_destination_context(
+    *,
+    destination_type_slug: str | None,
+    resolved_destination_url: str | None,
+    gemini_rag_doc_keys: list[str],
+) -> str | None:
+    normalized_doc_keys = {
+        str(doc_key).strip()
+        for doc_key in gemini_rag_doc_keys
+        if isinstance(doc_key, str) and str(doc_key).strip()
+    }
+    if not normalized_doc_keys:
+        return None
+
+    lines: list[str] = []
+    normalized_destination_type = (
+        str(destination_type_slug).strip().lower() if isinstance(destination_type_slug, str) else ""
     )
+    destination_label = destination_label_for_type(normalized_destination_type)
+    if destination_label:
+        lines.append(f"Destination page type: {destination_label} ({normalized_destination_type})")
+    if isinstance(resolved_destination_url, str) and resolved_destination_url.strip():
+        lines.append(f"Resolved destination URL: {resolved_destination_url.strip()}")
+
+    asset_brief_doc_key = "swipe_stage1_campaign_asset_brief"
+    if asset_brief_doc_key in normalized_doc_keys:
+        lines.append(
+            "Artifact that defines the post-click destination in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[asset_brief_doc_key]}"
+        )
+
+    copy_doc_key: str | None = None
+    for candidate in ("swipe_stage1_campaign_loaded_copy", "swipe_stage1_strategy_v2_copy"):
+        if candidate in normalized_doc_keys:
+            copy_doc_key = candidate
+            break
+    if copy_doc_key is not None:
+        lines.append(
+            "Primary destination-page artifact in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[copy_doc_key]}"
+        )
+        if normalized_destination_type == "pre-sales":
+            lines.append(
+                "Within that artifact, use the presell or pre-sales page content as the post-click continuity anchor."
+            )
+        elif normalized_destination_type == "sales":
+            lines.append("Within that artifact, use the sales page content as the post-click continuity anchor.")
+
+    supporting_doc_key: str | None = None
+    for candidate in ("swipe_stage1_campaign_creative_context", "swipe_stage1_strategy_v2_copy_context"):
+        if candidate in normalized_doc_keys:
+            supporting_doc_key = candidate
+            break
+    if supporting_doc_key is not None:
+        lines.append(
+            "Supporting destination-page artifact in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[supporting_doc_key]}"
+        )
+
+    if copy_doc_key is not None or supporting_doc_key is not None:
+        lines.append("Use Gemini File Search to inspect those destination-page artifacts before writing the image concept.")
+        lines.append(
+            "If you reference a named person, title, domain, or claim, pull it from those artifacts instead of inventing it."
+        )
+        lines.append(
+            "Do not reveal critical elements on the downstream page like the narrative devices used to sell."
+        )
+
+    return "\n".join(lines) if lines else None
 
 
 def _resolve_swipe_copy_platform(*, channel_id: str) -> str:
@@ -3448,31 +3532,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_product_references_v1",
             *reference_signature_parts,
         )
-        rendered_prompt_template = _build_swipe_stage1_prompt_input(
-            prompt_template=prompt_template,
-            brand_name=str(client_name),
-            angle=angle,
-        )
-        rendered_prompt_signature = _stable_idempotency_key(
-            "swipe_prompt_input_v1",
-            rendered_prompt_template,
-        )
-
-        product_prompt_image_bytes: bytes | None = None
-        product_prompt_image_mime_type: str | None = None
-        product_prompt_image_source_url: str | None = None
-        product_prompt_image_sha256: str | None = None
-        product_prompt_image_size_bytes: int | None = None
-        if product_reference_image_urls:
-            product_prompt_image_source_url = product_reference_image_urls[0]
-            product_prompt_image_bytes, product_prompt_image_mime_type = _download_bytes(
-                product_prompt_image_source_url,
-                max_bytes=int(os.getenv("SWIPE_IMAGE_MAX_BYTES", str(18 * 1024 * 1024))),
-                timeout_seconds=float(os.getenv("SWIPE_IMAGE_DOWNLOAD_TIMEOUT", "30")),
-            )
-            product_prompt_image_sha256 = hashlib.sha256(product_prompt_image_bytes).hexdigest()
-            product_prompt_image_size_bytes = len(product_prompt_image_bytes)
-
         # The Gemini input must be only the rendered swipe prompt template plus the competitor image.
         # File Search attaches foundational documents as external context.
         (
@@ -3501,6 +3560,38 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             ad_copy_pack_artifact_id=ad_copy_pack_artifact_id,
             ad_copy_pack_id=ad_copy_pack_id,
         )
+        destination_context = _build_swipe_stage1_destination_context(
+            destination_type_slug=destination_type_slug,
+            resolved_destination_url=(
+                destination_resolution.resolved_url if destination_resolution is not None else None
+            ),
+            gemini_rag_doc_keys=gemini_rag_doc_keys,
+        )
+        rendered_prompt_template = _build_swipe_stage1_prompt_input(
+            prompt_template=prompt_template,
+            brand_name=str(client_name),
+            angle=angle,
+            destination_context=destination_context,
+        )
+        rendered_prompt_signature = _stable_idempotency_key(
+            "swipe_prompt_input_v1",
+            rendered_prompt_template,
+        )
+
+        product_prompt_image_bytes: bytes | None = None
+        product_prompt_image_mime_type: str | None = None
+        product_prompt_image_source_url: str | None = None
+        product_prompt_image_sha256: str | None = None
+        product_prompt_image_size_bytes: int | None = None
+        if product_reference_image_urls:
+            product_prompt_image_source_url = product_reference_image_urls[0]
+            product_prompt_image_bytes, product_prompt_image_mime_type = _download_bytes(
+                product_prompt_image_source_url,
+                max_bytes=int(os.getenv("SWIPE_IMAGE_MAX_BYTES", str(18 * 1024 * 1024))),
+                timeout_seconds=float(os.getenv("SWIPE_IMAGE_DOWNLOAD_TIMEOUT", "30")),
+            )
+            product_prompt_image_sha256 = hashlib.sha256(product_prompt_image_bytes).hexdigest()
+            product_prompt_image_size_bytes = len(product_prompt_image_bytes)
 
         # Run Gemini vision with File Search context to generate the generation-ready image prompt.
         gemini_client = _ensure_gemini_client()
