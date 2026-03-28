@@ -19,3 +19,9 @@ frontend/.env.local
 
 #Rodney
 .rodney
+
+# Generated validated-loop artifacts
+assets/validated-loop/best/
+assets/validated-loop/current/
+assets/validated-loop/history/*
+!assets/validated-loop/history/.gitkeep
