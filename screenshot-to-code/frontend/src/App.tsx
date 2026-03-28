@@ -9,7 +9,7 @@ import TermsOfServiceDialog from "./components/TermsOfServiceDialog";
 import { USER_CLOSE_WEB_SOCKET_CODE } from "./constants";
 import toast from "react-hot-toast";
 import { nanoid } from "nanoid";
-import { Stack } from "./lib/stacks";
+import { DEFAULT_STACK, Stack } from "./lib/stacks";
 import { CodeGenerationModel } from "./lib/models";
 import useBrowserTabIndicator from "./hooks/useBrowserTabIndicator";
 import { LuChevronLeft } from "react-icons/lu";
@@ -152,7 +152,7 @@ function App() {
       screenshotOneApiKey: null,
       isImageGenerationEnabled: true,
       editorTheme: EditorTheme.COBALT,
-      generatedCodeConfig: Stack.HTML_TAILWIND,
+      generatedCodeConfig: DEFAULT_STACK,
       codeGenerationModel: DEFAULT_CODE_GENERATION_MODEL,
       // Only relevant for hosted version
       isTermOfServiceAccepted: false,
@@ -187,7 +187,7 @@ function App() {
     if (!settings.generatedCodeConfig) {
       setSettings((prev) => ({
         ...prev,
-        generatedCodeConfig: Stack.HTML_TAILWIND,
+        generatedCodeConfig: DEFAULT_STACK,
       }));
     }
   }, [settings.generatedCodeConfig, setSettings]);
@@ -705,7 +705,8 @@ function App() {
   async function doCreate(
     referenceImages: string[],
     inputMode: "image" | "video",
-    textPrompt: string = ""
+    textPrompt: string = "",
+    referenceUrl?: string
   ) {
     // Reset any existing state
     reset();
@@ -766,6 +767,7 @@ function App() {
           text: textPrompt,
           images: inputMode === "image" ? media : [],
           videos: inputMode === "video" ? media : [],
+          referenceUrl,
         },
         variantHistory,
       });
@@ -957,7 +959,12 @@ function App() {
     if (continuationCandidate.mode === "validated_loop" && hasReferenceMedia) {
       doGenerateCode({
         ...continuationRequest,
+        orchestrationMode: "validated_loop",
         validatedLoopReferenceRunDir: continuationCandidate.savedRunDir,
+        validatedLoopDesignSystemMode: continuationCandidate.savedRunDir
+          ? "reuse_if_available"
+          : "generate",
+        validatedLoopDesignSystemRunDir: continuationCandidate.savedRunDir,
       });
       return;
     }

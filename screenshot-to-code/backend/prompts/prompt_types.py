@@ -1,5 +1,7 @@
 from typing import List, Literal, TypedDict
 
+from typing_extensions import NotRequired
+
 
 class UserTurnInput(TypedDict):
     """Normalized current user turn payload from the request."""
@@ -7,6 +9,7 @@ class UserTurnInput(TypedDict):
     text: str
     images: List[str]
     videos: List[str]
+    reference_url: NotRequired[str]
 
 
 class PromptHistoryMessage(TypedDict):

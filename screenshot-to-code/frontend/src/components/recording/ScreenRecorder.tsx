@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { ScreenRecorderState } from "../../types";
 import { blobToBase64DataUrl } from "./utils";
@@ -6,6 +6,12 @@ import fixWebmDuration from "webm-duration-fix";
 import toast from "react-hot-toast";
 import OutputSettingsSection from "../settings/OutputSettingsSection";
 import { Stack } from "../../lib/stacks";
+import {
+  formatAcceptedVideoDurationLabel,
+  formatAcceptedVideoSizeLabel,
+  MAX_UPLOADED_VIDEO_DURATION_SECONDS,
+  MAX_UPLOADED_VIDEO_SIZE_BYTES,
+} from "../../lib/video-limits";
 
 interface Props {
   screenRecorderState: ScreenRecorderState;
@@ -25,13 +31,20 @@ function ScreenRecorder({
   stack,
   setStack,
 }: Props) {
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
   const [screenRecordingDataUrl, setScreenRecordingDataUrl] = useState<
     string | null
   >(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const startScreenRecording = async () => {
     try {
@@ -40,13 +53,13 @@ function ScreenRecorder({
         video: true,
         audio: { echoCancellation: true },
       });
-      setMediaStream(stream);
+      mediaStreamRef.current = stream;
 
       // TODO: Test across different browsers
       // Create the media recorder
       const options = { mimeType: "video/webm" };
       const mediaRecorder = new MediaRecorder(stream, options);
-      setMediaRecorder(mediaRecorder);
+      mediaRecorderRef.current = mediaRecorder;
 
       const chunks: BlobPart[] = [];
 
@@ -55,12 +68,26 @@ function ScreenRecorder({
 
       // When media recorder is stopped, create a data URL
       mediaRecorder.onstop = async () => {
+        if (recordingTimeoutRef.current !== null) {
+          window.clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
+
         // TODO: Do I need to fix duration if it's not a webm?
         const completeBlob = await fixWebmDuration(
           new Blob(chunks, {
             type: options.mimeType,
           })
         );
+
+        if (completeBlob.size > MAX_UPLOADED_VIDEO_SIZE_BYTES) {
+          toast.error(
+            `Recordings must stay under ${formatAcceptedVideoSizeLabel()}.`
+          );
+          setScreenRecordingDataUrl(null);
+          setScreenRecorderState(ScreenRecorderState.INITIAL);
+          return;
+        }
 
         const dataUrl = await blobToBase64DataUrl(completeBlob);
 
@@ -70,6 +97,12 @@ function ScreenRecorder({
 
       // Start recording
       mediaRecorder.start();
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        toast.error(
+          `Screen recordings are limited to ${formatAcceptedVideoDurationLabel()}. Stopping now.`
+        );
+        stopScreenRecording();
+      }, MAX_UPLOADED_VIDEO_DURATION_SECONDS * 1000);
       setScreenRecorderState(ScreenRecorderState.RECORDING);
     } catch (error) {
       toast.error("Could not start screen recording");
@@ -78,17 +111,25 @@ function ScreenRecorder({
   };
 
   const stopScreenRecording = () => {
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+
     // Stop the recorder
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      setMediaRecorder(null);
+    const activeRecorder = mediaRecorderRef.current;
+    if (activeRecorder) {
+      activeRecorder.stop();
+      mediaRecorderRef.current = null;
     }
 
     // Stop the screen sharing stream
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => {
+    const activeStream = mediaStreamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => {
         track.stop();
       });
+      mediaStreamRef.current = null;
     }
   };
 

@@ -4,6 +4,8 @@ from loop.prompts import (
     compact_requirements_for_prompt,
     compact_validation_report_for_prompt,
     reference_summary,
+    summarize_design_system_preflight_for_prompt,
+    summarize_live_reference_for_prompt,
     summarize_html_landmarks,
     truncate_html_context,
     truncate_json_context,
@@ -78,6 +80,22 @@ Latest validator report from the previous block:
 <prior_validation>
 {truncate_json_context(prior_validation_json)}
 </prior_validation>"""
+    live_reference_block = ""
+    if reference_bundle.live_reference is not None:
+        live_reference_block = f"""
+
+Live browser inspection context:
+<live_reference>
+{summarize_live_reference_for_prompt(reference_bundle.live_reference)}
+</live_reference>"""
+    design_system_block = ""
+    if reference_bundle.design_system_preflight is not None:
+        design_system_block = f"""
+
+Required design-system preflight:
+<design_system_preflight>
+{summarize_design_system_preflight_for_prompt(reference_bundle.design_system_preflight)}
+</design_system_preflight>"""
 
     return f"""
 {selected_stack}
@@ -89,6 +107,8 @@ be used by a separate execution model and a separate validation model.
 {template_policy}
 {judgment_policy}
 {frontend_policy}
+{design_system_block}
+{live_reference_block}
 {current_html_block}
 {current_html_landmarks_block}
 {prior_requirements_block}
@@ -106,11 +126,26 @@ Analysis requirements:
 - Put special emphasis on how the output should remain easy to re-theme and easy to edit.
 - Populate `hard_constraints` with non-negotiable fidelity requirements that the executor must satisfy first.
 - Populate `preserve_requirements` only with things that are already very close to the reference. If something is merely acceptable or loosely similar, do not preserve it; call it out as work remaining instead.
-- Populate `section_requirements` top-to-bottom so the executor can build the page in a stable order.
+- Populate `page_outline` with the full top-to-bottom page scan in reading order before you finalize the executor blueprint. This should be the analyzer's explicit ledger of every major visible section or page region from header through the final closing state.
+- Populate `closing_sections` with the final 3-5 major sections or page regions visible near the bottom of the page so the closing state cannot be forgotten after the hero/product areas are planned.
+- Set `footer_present` explicitly to `true` or `false`; do not leave it implied. If the page has any footer, newsletter signup, social links, legal links, or final contact area, capture that in `footer_description` even if the exact section naming is ambiguous.
+- Populate `coverage_notes` with any ambiguity, merges, or lower-page risks that could cause a section to be omitted. If you are unsure whether two lower-page blocks should be split, say so here instead of silently collapsing them.
+- Populate `section_requirements` exhaustively, top-to-bottom, so the executor can build the entire page in a stable order. Every major visible section from the opening viewport through the final page/footer state should appear exactly once here.
+- Never leave `section_requirements` empty when reference media, a live reference, or a reference URL is provided. If the exact marketing names are unclear, still emit provisional but explicit section names in top-to-bottom order.
+- Keep section names stable and distinct, because each `section_requirements` entry becomes a canonical section ID used for executor DOM markers and validator coverage checks.
+- `page_outline`, `closing_sections`, and `section_requirements` must agree with each other. If `page_outline` includes a footer, newsletter, social proof block, comparison, FAQ, closing CTA, or legal region, then `section_requirements` must represent that region explicitly instead of stopping early.
+- If `execution_plan`, `acceptance_criteria`, or later video checkpoints mention a section or scene, that section must also exist in `section_requirements`; do not let later-page sections live only in freeform planning text.
+- If the reference clearly shows additional lower-page sections, comparison tables, testimonials, FAQs, footers, or other major scenes, include them explicitly instead of collapsing them into a generic earlier section.
+- Treat thin but visually distinct bands, icon rows, badge strips, newsletter strips, social-proof rails, or separator sections as standalone page sections when they have their own background, spacing, icon set, copy group, or interaction pattern. Do not absorb them into the larger product, testimonial, CTA, or footer section next to them.
+- If a narrow section sits between two larger blocks and carries its own icons, badges, headlines, repeated items, or CTA treatment, it must appear as its own `section_requirements` entry instead of being merged away.
+- Before finalizing the JSON, mentally rescan the reference from top to bottom and confirm the final visible page state is represented. Do not stop planning at the last product, testimonial, comparison, or FAQ block if the reference still shows more content below it.
+- If the reference contains a footer or a closing newsletter/community/legal region, that ending state must appear somewhere in `page_outline`, `closing_sections`, `footer_description`, and `section_requirements`.
 - Populate `design_tokens` with reusable color, typography, spacing, radius, shadow, and motion guidance.
 - Populate `execution_plan` with an ordered build checklist the executor can follow directly. If current HTML is provided, make it a delta-aware plan that calls out what to preserve and what to change next.
 - When visible text is legible, include exact text in the appropriate fields instead of paraphrasing.
 - When something is ambiguous, put that ambiguity in `known_unknowns` rather than guessing.
+- When live browser inspection context is provided, treat the extracted design-system data as high-confidence evidence for fonts, colors, spacing, radii, shadows, layout containers, and component styling. Use uploaded screenshots/videos and browser renders together when resolving conflicts.
+- When a required design-system preflight is provided, treat it as mandatory styling and component guidance, not optional inspiration.
 - Keep acceptance criteria measurable and specific enough for visual QA.
 - Do not summarize motion vaguely. For video, describe exactly what animates, when it starts, what causes it to start, how it moves, and what the final resting state should be.
 - Do not treat a polished hero sequence as sufficient if the reference video clearly includes additional states or later sections that must also be recreated.

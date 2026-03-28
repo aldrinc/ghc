@@ -89,18 +89,28 @@ def _make_responses_schema_strict(schema: Dict[str, Any]) -> Dict[str, Any]:
                 for prop in properties.values():
                     if isinstance(prop, dict):
                         transform(prop, in_object_property=True)
-            return
 
-        if node_type == "array":
+        elif node_type == "array":
             if in_object_property:
                 node["type"] = _nullable_type(node_type)
             items = node.get("items")
             if isinstance(items, dict):
                 transform(items, in_object_property=False)
-            return
 
-        if in_object_property and node_type is not None:
+        elif in_object_property and node_type is not None:
             node["type"] = _nullable_type(node_type)
+
+        for key, value in node.items():
+            if key == "properties" and isinstance(value, dict):
+                continue
+            if key == "items" and isinstance(value, dict):
+                continue
+            if isinstance(value, dict):
+                transform(value, in_object_property=False)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        transform(item, in_object_property=False)
 
     transform(schema_copy, in_object_property=False)
     return schema_copy

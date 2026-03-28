@@ -19,6 +19,7 @@ function buildCommit(overrides?: Partial<AiCreateCommit>): AiCreateCommit {
       text: "Create this page",
       images: [],
       videos: [],
+      referenceUrl: undefined,
     },
     variants: [
       {
@@ -207,6 +208,21 @@ describe("validated loop helpers", () => {
     );
   });
 
+  it("treats a saved reference URL as reference media for continuation", () => {
+    const commit = buildAnyCommit({
+      type: "ai_edit",
+      inputMode: "text",
+      inputs: {
+        text: "",
+        images: [],
+        videos: [],
+        referenceUrl: "https://example.com/reference",
+      },
+    });
+
+    expect(hasReferenceMediaForContinuation(commit)).toBe(true);
+  });
+
   it("builds a continuation prompt that resumes from current code and saved media", () => {
     const commit = buildAnyCommit({
       type: "ai_edit",
@@ -230,5 +246,22 @@ describe("validated loop helpers", () => {
     );
     expect(continuationPrompt.images).toEqual([]);
     expect(continuationPrompt.videos).toEqual([]);
+  });
+
+  it("preserves the reference URL on continuation prompts", () => {
+    const commit = buildAnyCommit({
+      type: "ai_edit",
+      inputMode: "image",
+      inputs: {
+        text: "Match the marketing page.",
+        images: ["data:image/png;base64,AAAA"],
+        videos: [],
+        referenceUrl: "https://example.com/live-page",
+      },
+    }) as Extract<Commit, { type: "ai_edit" }>;
+
+    const continuationPrompt = buildContinuationPrompt(commit);
+
+    expect(continuationPrompt.referenceUrl).toBe("https://example.com/live-page");
   });
 });

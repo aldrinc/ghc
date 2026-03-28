@@ -9,6 +9,8 @@ export enum Stack {
   IONIC_TAILWIND = "ionic_tailwind",
 }
 
+export const DEFAULT_STACK = Stack.REACT_TAILWIND;
+
 export const STACK_DESCRIPTIONS: {
   [key in Stack]: { components: string[]; inBeta: boolean };
 } = {

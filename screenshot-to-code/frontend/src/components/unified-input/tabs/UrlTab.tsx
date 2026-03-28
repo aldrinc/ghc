@@ -12,6 +12,7 @@ interface Props {
     urls: string[],
     inputMode: "image" | "video",
     textPrompt?: string,
+    referenceUrl?: string,
   ) => void;
   stack: Stack;
   setStack: (stack: Stack) => void;
@@ -74,7 +75,7 @@ function UrlTab({ doCreate, screenshotOneApiKey, stack, setStack }: Props) {
       }
 
       const res = await response.json();
-      doCreate([res.url], "image");
+      doCreate([res.url], "image", "", trimmedReferenceUrl);
     } catch (error) {
       console.error(error);
       toast.error("Failed to capture screenshot. Check console for details.");

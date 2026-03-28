@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from loop.contracts import LoopResumeState, ReferenceBundle, RequirementsSpec, ValidationReport
+from loop.contracts import (
+    DesignSystemPreflight,
+    LoopResumeState,
+    ReferenceBundle,
+    RequirementsSpec,
+    ValidationReport,
+)
 
 
 def _utc_timestamp() -> str:
@@ -51,6 +57,26 @@ class ValidatedLoopArtifactStore:
         current_reference.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         run_reference = Path(self.paths.run_dir) / "reference_bundle.json"
         run_reference.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def persist_design_system_artifacts(
+        self, *, design_system_json: str, design_system_html: str
+    ) -> tuple[str, str]:
+        current_dir = self._current_dir / "design-system"
+        run_dir = Path(self.paths.run_dir) / "design-system"
+        current_dir.mkdir(parents=True, exist_ok=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        current_json_path = current_dir / "design-system.json"
+        current_html_path = current_dir / "design-system.html"
+        run_json_path = run_dir / "design-system.json"
+        run_html_path = run_dir / "design-system.html"
+
+        current_json_path.write_text(design_system_json, encoding="utf-8")
+        current_html_path.write_text(design_system_html, encoding="utf-8")
+        run_json_path.write_text(design_system_json, encoding="utf-8")
+        run_html_path.write_text(design_system_html, encoding="utf-8")
+
+        return str(run_json_path), str(run_html_path)
 
     @staticmethod
     def load_reference_bundle(run_dir: str) -> ReferenceBundle:
@@ -149,3 +175,62 @@ class ValidatedLoopArtifactStore:
                 "stop_reason": payload.get("stopReason"),
             }
         )
+
+
+def load_design_system_preflight_from_run_dir(run_dir: str) -> DesignSystemPreflight:
+    """Load design system preflight JSON from a run directory.
+
+    Raises:
+        FileNotFoundError: If the design-system.json does not exist in the run dir.
+        ValueError: If the JSON content is invalid or fails validation.
+    """
+    design_system_path = Path(run_dir) / "design-system" / "design-system.json"
+    if not design_system_path.exists():
+        raise FileNotFoundError(
+            f"Design system preflight not found at {design_system_path}. "
+            "Ensure the run directory contains a completed design-system preflight."
+        )
+    try:
+        payload = json.loads(design_system_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Design system preflight at {design_system_path} contains invalid JSON."
+        ) from exc
+    try:
+        return DesignSystemPreflight.model_validate(payload)
+    except Exception as exc:
+        raise ValueError(
+            f"Design system preflight at {design_system_path} failed validation."
+        ) from exc
+
+
+def load_design_system_preflight_from_current_cache(
+    repo_root: Path | None = None,
+) -> DesignSystemPreflight | None:
+    """Load design system preflight from the current cache if available.
+
+    Returns None if no current design system preflight exists.
+    """
+    root = repo_root or Path(__file__).resolve().parents[2]
+    current_ds_path = root / "assets" / "validated-loop" / "current" / "design-system" / "design-system.json"
+    if not current_ds_path.exists():
+        return None
+    try:
+        payload = json.loads(current_ds_path.read_text(encoding="utf-8"))
+        return DesignSystemPreflight.model_validate(payload)
+    except Exception:
+        return None
+
+
+def load_reference_bundle_from_current_cache(
+    repo_root: Path | None = None,
+) -> ReferenceBundle | None:
+    root = repo_root or Path(__file__).resolve().parents[2]
+    reference_path = root / "assets" / "validated-loop" / "current" / "reference_bundle.json"
+    if not reference_path.exists():
+        return None
+    try:
+        payload = json.loads(reference_path.read_text(encoding="utf-8"))
+        return ReferenceBundle.model_validate(payload)
+    except Exception:
+        return None
