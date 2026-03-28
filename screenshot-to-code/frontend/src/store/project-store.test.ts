@@ -131,6 +131,7 @@ describe("toPersistedProjectState", () => {
         text: "Create this page",
         images: ["data:image/png;base64,abc"],
         videos: ["data:video/mp4;base64,xyz"],
+        referenceUrl: "https://example.com/reference",
       },
       variants: [
         {
@@ -176,6 +177,9 @@ describe("toPersistedProjectState", () => {
     expect(persisted.assetsById).toEqual({});
     expect(persistedCommit.inputs?.images).toEqual([]);
     expect(persistedCommit.inputs?.videos).toEqual([]);
+    expect(persistedCommit.inputs?.referenceUrl).toBe(
+      "https://example.com/reference"
+    );
     expect(persistedEvent?.input).toBeUndefined();
     expect(persistedEvent?.output).toBeUndefined();
   });

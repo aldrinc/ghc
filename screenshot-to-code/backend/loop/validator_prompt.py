@@ -1,6 +1,17 @@
-from loop.contracts import ReferenceBundle, RequirementsSpec
+import json
+
+from loop.contracts import ReferenceBundle, RequirementsSpec, ValidationReport
 from loop.frontend_developer_policy import build_frontend_developer_policy
-from loop.prompts import reference_summary, summarize_html_landmarks
+from loop.prompts import (
+    build_live_design_system_rules,
+    compact_validation_report_for_prompt,
+    compact_validator_requirements_for_prompt,
+    reference_summary,
+    summarize_design_system_preflight_for_prompt,
+    summarize_html_landmarks,
+    summarize_live_reference_for_prompt,
+    truncate_html_context,
+)
 from prompts.policies import build_judgment_policy
 
 VALIDATOR_SYSTEM_INSTRUCTION = """
@@ -18,20 +29,105 @@ or motion mismatches remaining.
 Return only structured JSON matching the requested schema.
 """.strip()
 
+_FUNCTIONALITY_FIRST_FOCUS_CUES = (
+    "don't care about images",
+    "dont care about images",
+    "ignore images",
+    "ignore imagery",
+    "only care about features",
+    "only care about the features",
+    "only care about functionality",
+    "only care about the functionality",
+    "features and functionality",
+    "feature functionality",
+    "functionality-first",
+    "feature-first",
+    "focus on functionality",
+)
+
+
+def is_functionality_first_focus(
+    reference_bundle: ReferenceBundle,
+    requirements: RequirementsSpec | None = None,
+) -> bool:
+    texts = [reference_bundle.user_text]
+    if requirements is not None:
+        texts.extend(
+            [
+                requirements.summary,
+                requirements.template_goal,
+                *requirements.coverage_notes[:3],
+            ]
+        )
+    haystack = " ".join(text.strip().lower() for text in texts if text.strip())
+    return any(cue in haystack for cue in _FUNCTIONALITY_FIRST_FOCUS_CUES)
+
 
 def build_validator_prompt(
     reference_bundle: ReferenceBundle,
     requirements: RequirementsSpec,
     current_html: str,
     iteration: int,
+    prior_validation: ValidationReport | None = None,
 ) -> str:
     judgment_policy = build_judgment_policy()
     frontend_policy = build_frontend_developer_policy()
-    requirements_json = requirements.model_dump_json(indent=2)
+    requirements_json = json.dumps(
+        compact_validator_requirements_for_prompt(requirements), indent=2
+    )
+    truncated_html = truncate_html_context(current_html)
     dom_landmarks = summarize_html_landmarks(current_html)
+    prior_validation_block = ""
+    if prior_validation is not None:
+        prior_validation_json = json.dumps(
+            compact_validation_report_for_prompt(prior_validation).model_dump(
+                mode="json"
+            ),
+            indent=2,
+        )
+        prior_validation_block = f"""
+
+Prior validation delta checklist:
+<prior_validation>
+{prior_validation_json}
+</prior_validation>"""
+    live_reference_block = ""
+    if reference_bundle.live_reference is not None:
+        live_reference_block = f"""
+
+Live browser inspection context:
+<live_reference>
+{summarize_live_reference_for_prompt(reference_bundle.live_reference)}
+</live_reference>"""
+    live_design_system_rules = build_live_design_system_rules(
+        reference_bundle, requirements
+    )
+    functionality_first_focus = is_functionality_first_focus(
+        reference_bundle, requirements
+    )
+    design_system_block = ""
+    if reference_bundle.design_system_preflight is not None:
+        design_system_block = f"""
+
+Required design-system preflight:
+<design_system_preflight>
+{summarize_design_system_preflight_for_prompt(reference_bundle.design_system_preflight)}
+</design_system_preflight>"""
+    validation_focus_block = ""
+    if functionality_first_focus:
+        validation_focus_block = """
+
+Feature/functionality-first validation mode:
+- Prioritize section completeness, feature presence, interaction correctness, state transitions, and editability over pixel-perfect imagery.
+- Treat missing or substituted images as `imagery` issues, not `behavior` or `structure` issues, unless they hide required content or break an interaction.
+- Imagery mismatches should primarily affect `visual_fidelity_score`; they should not by themselves force low behavior/editability scores or block PASS when sections and interactions are otherwise correct.
+- If all required sections are present and the interactive features work correctly, do not keep the verdict at REVISE solely because imagery differs from the reference.
+"""
     return f"""
 You are the validation layer for a screenshot-to-code system.
 Compare the reference media against the rendered candidate screenshots and the current HTML.
+The current HTML block may be truncated for context-window efficiency, so prefer current HTML landmarks when targeting fixes.
+When prior validation is provided, use it as the main delta checklist for this round while still catching any obvious regressions or new blockers.
 
 This is validation iteration {iteration}.
 
@@ -39,10 +135,11 @@ Requirements spec:
 <requirements_spec>
 {requirements_json}
 </requirements_spec>
+{prior_validation_block}
 
 Current HTML:
 <current_html>
-{current_html}
+{truncated_html}
 </current_html>
 
 Current HTML landmarks:
@@ -52,6 +149,10 @@ Current HTML landmarks:
 
 {judgment_policy}
 {frontend_policy}
+{design_system_block}
+{live_reference_block}
+{live_design_system_rules}
+{validation_focus_block}
 
 Validation goals:
 
@@ -59,20 +160,31 @@ Validation goals:
 - Judge behavior fidelity using the requirements spec.
 - Score visual fidelity, behavior fidelity, animation fidelity, and editability separately.
 - Judge whether `hard_constraints` and `section_requirements` are being satisfied.
+- Return a `section_results` entry for every item in `section_requirements`, preserving the same top-to-bottom order. Use exactly one status per section: `present`, `partial`, or `missing`.
+- Treat section coverage as a gating requirement: if any required section is `missing` or `partial`, keep the verdict at REVISE and make the first patch instructions restore coverage before polishing already-good sections.
+- Use each `section_results.quality_score` to judge the quality of that specific section only after deciding whether the section is fully present.
+- When the current HTML contains exact `data-section-id="<section_id>"` markers that match `section_requirements.section_id`, treat those markers as authoritative evidence that the section root exists in the implementation. Do not mark that section as `missing`.
+- If the reference clearly contains a major section or later-page scene that is not represented in `section_requirements`, report that as a `structure` issue and say the supervisor blueprint is incomplete rather than silently accepting the smaller checklist.
 - Judge whether the current code remains easy to modify for theme, styling, imagery, and copy.
+- When `prior_validation` is present, first verify whether the previously reported issues and patch instructions are now resolved, partially resolved, or still broken.
 - For each issue, use exactly one of these categories: `layout`, `styling`, `copy`, `imagery`, `behavior`, `animation`, or `structure`.
 - Return PASS only when the candidate is very close and there are no critical issues left.
 - If it is not ready, return specific patch instructions that the executor model can apply directly.
 - Populate `strengths` with specific things the executor should preserve because they are already close enough.
 - Make `patch_instructions` ordered, localized, and executor-ready. Each instruction should say what to change, where to change it, and what existing behavior or structure should remain intact.
 - Every `patch_instruction` and every issue `fix_instructions` field must point to a concrete target in the current HTML: a selector, `id`, class name, `data-*` attribute, nearby text snippet, or exact element description that an executor can find without guessing.
-- Prefer concrete targets drawn from `current_html_landmarks` whenever possible. If the HTML lacks a clean selector, anchor the fix to the nearest stable nearby text snippet from the current HTML.
+- The `current_html` block may be truncated. Prefer concrete targets drawn from `current_html_landmarks` whenever possible. If the HTML lacks a clean selector, anchor the fix to the nearest stable nearby text snippet from the current HTML.
 - Avoid abstract guidance like “improve spacing” or “fix the layout”. Instead say exactly which element, which classes/styles/content need to change, and what they should become.
 - Compare against the actual current HTML and avoid vague “rebuild” guidance unless a localized fix is truly impossible.
+- Do not ignore new regressions just because they were not present in `prior_validation`.
 - Be conservative with scores. If there are still obvious visual mismatches, missing sections, wrong styling, wrong imagery, wrong copy, missing interactions, or noticeably incorrect motion, do not score the run in the high 0.90s.
+- Do not return PASS when any required section is `missing` or `partial`, even if the sections that do exist look strong.
 - Treat 0.90+ as “nearly complete”, 0.95+ as “extremely close”, and 0.98+ as “ready to ship”. Use materially lower scores whenever meaningful work remains.
 - If any issue would require a user to immediately notice and ask for another round, it should not receive a high-0.90s score.
 - Prefer the settled render as the source of truth for final-state layout, visibility, and overlap checks. Use the earlier render only as supplemental evidence when reasoning about entrance timing or missing animated elements.
+- When live browser inspection context is present, use the extracted design system and browser renders as high-confidence evidence for typography, colors, spacing, component styling, and page-level layout containers.
+- When a required design-system preflight is present, treat it as mandatory review criteria for typography, colors, spacing, layout, visible components, and motion intent.
+- When live browser inspection context is present, do not return PASS if the candidate substitutes different font-family names, omits centralized theme tokens, or fails to apply the extracted design system in code.
 - For video input, be strict about animation fidelity. Missing or materially different motion, timing, easing, sequencing, sticky behavior, scroll choreography, hover transitions, or reveal order must keep the verdict at REVISE.
 - For video input, use the provided timeline checkpoint renders to judge coverage across the full reference sequence. If the candidate only matches the opening portion of the video but misses later states, scenes, transitions, or scroll-driven moments, keep the verdict at REVISE.
 - Do not treat a strong first impression as sufficient if the reference video contains additional content or states beyond what the candidate timeline renders successfully represent.

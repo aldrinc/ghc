@@ -12,7 +12,7 @@ import {
 import { Textarea } from "./ui/textarea";
 import OutputSettingsSection from "./settings/OutputSettingsSection";
 import toast from "react-hot-toast";
-import { Stack } from "../lib/stacks";
+import { DEFAULT_STACK, Stack } from "../lib/stacks";
 
 interface Props {
   importFromCode: (code: string, stack: Stack) => void;
@@ -20,7 +20,7 @@ interface Props {
 
 function ImportCodeSection({ importFromCode }: Props) {
   const [code, setCode] = useState("");
-  const [stack, setStack] = useState<Stack | undefined>(undefined);
+  const [stack, setStack] = useState<Stack | undefined>(DEFAULT_STACK);
 
   const doImport = () => {
     if (code === "") {

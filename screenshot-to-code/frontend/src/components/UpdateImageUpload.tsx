@@ -3,6 +3,13 @@ import { toast } from "react-hot-toast";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { LuPlus } from "react-icons/lu";
 import DataUrlVideoPreview from "./DataUrlVideoPreview";
+import {
+  formatAcceptedVideoDurationLabel,
+  formatAcceptedVideoSizeLabel,
+  getVideoFileDurationSeconds,
+  MAX_UPLOADED_VIDEO_DURATION_SECONDS,
+  MAX_UPLOADED_VIDEO_SIZE_BYTES,
+} from "../lib/video-limits";
 
 const MAX_UPDATE_IMAGES = 5;
 const VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm"];
@@ -145,6 +152,24 @@ function UpdateImageUpload({
           }
 
           const [video] = fileList;
+          if (video.size > MAX_UPLOADED_VIDEO_SIZE_BYTES) {
+            toast.error(
+              `Videos must be ${formatAcceptedVideoSizeLabel()} or smaller.`
+            );
+            return;
+          }
+
+          const durationSeconds = await getVideoFileDurationSeconds(video);
+          if (
+            durationSeconds !== null &&
+            durationSeconds > MAX_UPLOADED_VIDEO_DURATION_SECONDS
+          ) {
+            toast.error(
+              `Videos must be ${formatAcceptedVideoDurationLabel()} or shorter.`
+            );
+            return;
+          }
+
           const [videoDataUrl] = await Promise.all([fileToDataURL(video)]);
           setUpdateImages([]);
           setUpdateVideos([videoDataUrl]);

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import puppeteer, { Browser, ElementHandle, Page } from "puppeteer";
-import { Stack } from "../lib/stacks";
+import { DEFAULT_STACK, Stack } from "../lib/stacks";
 import { CodeGenerationModel } from "../lib/models";
 
 declare global {
@@ -30,7 +30,7 @@ const SIMPLE_HTML = path.join(FIXTURES_PATH, "simple_page.html");
 // Results
 const RESULTS_DIR = path.join(TESTS_ROOT_PATH, "results");
 
-const defaultStacks = [Stack.HTML_TAILWIND];
+const defaultStacks = [DEFAULT_STACK];
 const stacks = process.env.QA_STACKS
   ? process.env.QA_STACKS.split(",").map((stack) => stack.trim() as Stack)
   : defaultStacks;

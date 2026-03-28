@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 from typing import Any, Sequence, TypeVar, cast
 
 from google import genai
@@ -51,9 +52,136 @@ def _coerce_structured_response(
 
     response_text = getattr(response, "text", None)
     if isinstance(response_text, str) and response_text.strip():
-        return response_schema.model_validate_json(response_text)
+        return _coerce_structured_response_text(response_text, response_schema)
 
     raise ValueError("Gemini did not return parseable structured output")
+
+
+def _coerce_structured_response_text(
+    response_text: str,
+    response_schema: type[StructuredModel],
+) -> StructuredModel:
+    last_error: Exception | None = None
+    for candidate in _strict_json_candidates(response_text):
+        try:
+            return response_schema.model_validate_json(candidate)
+        except ValidationError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
+    raise ValueError("Gemini did not return parseable structured output")
+
+
+def _coerce_repaired_structured_response_text(
+    response_text: str,
+    response_schema: type[StructuredModel],
+) -> StructuredModel:
+    last_error: Exception | None = None
+    for candidate in _json_repair_candidates(response_text):
+        try:
+            return response_schema.model_validate_json(candidate)
+        except ValidationError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
+    raise ValueError("Gemini did not return parseable structured output")
+
+
+def _json_repair_candidates(response_text: str) -> list[str]:
+    candidates: list[str] = []
+
+    def add(candidate: str) -> None:
+        normalized = candidate.strip()
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+
+    add(response_text)
+    extracted = _extract_json_object(response_text)
+    if extracted is not None:
+        add(extracted)
+
+    add(_close_truncated_json(response_text))
+    if extracted is not None:
+        add(_close_truncated_json(extracted))
+    return candidates
+
+
+def _strict_json_candidates(response_text: str) -> list[str]:
+    candidates: list[str] = []
+
+    def add(candidate: str) -> None:
+        normalized = candidate.strip()
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+
+    add(response_text)
+    extracted = _extract_json_object(response_text)
+    if extracted is not None:
+        add(extracted)
+    return candidates
+
+
+def _extract_json_object(response_text: str) -> str | None:
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", response_text, re.DOTALL)
+    if fenced_match is not None:
+        return fenced_match.group(1)
+
+    start = response_text.find("{")
+    end = response_text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    return response_text[start : end + 1]
+
+
+def _close_truncated_json(response_text: str) -> str:
+    text = response_text.strip()
+    if not text:
+        return text
+
+    chars: list[str] = []
+    stack: list[str] = []
+    in_string = False
+    escape = False
+
+    for char in text:
+        chars.append(char)
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            stack.append("}")
+        elif char == "[":
+            stack.append("]")
+        elif char in {"}", "]"} and stack:
+            if stack[-1] == char:
+                stack.pop()
+
+    repaired = "".join(chars).rstrip()
+    while repaired and repaired[-1] in {":", ","}:
+        repaired = repaired[:-1].rstrip()
+
+    if in_string:
+        repaired += '"'
+
+    while stack:
+        closer = stack.pop()
+        repaired = repaired.rstrip()
+        if repaired.endswith(","):
+            repaired = repaired[:-1].rstrip()
+        repaired += closer
+
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+    return repaired
 
 
 def _schema_instruction(response_schema: type[StructuredModel]) -> dict[str, str]:
@@ -74,6 +202,22 @@ def _repair_instruction(
         + "\n\nPrevious invalid JSON:\n"
         + invalid_response_text
     )
+
+
+def _retry_instruction(response_schema: type[StructuredModel]) -> dict[str, str]:
+    return text_part(
+        "Start over and return only valid compact JSON matching this schema. "
+        "Do not include markdown, commentary, or partial strings. "
+        "If necessary, omit lower-priority optional detail rather than returning invalid JSON.\n\n"
+        "Schema:\n"
+        + json.dumps(response_schema.model_json_schema(), indent=2)
+    )
+
+
+def _is_malformed_json_error(exc: Exception) -> bool:
+    if isinstance(exc, ValidationError):
+        return any(error.get("type") == "json_invalid" for error in exc.errors())
+    return isinstance(exc, ValueError)
 
 
 async def generate_structured_output(
@@ -109,7 +253,10 @@ async def generate_structured_output(
     )
     try:
         return _coerce_structured_response(response, response_schema)
-    except (ValidationError, ValueError):
+    except (ValidationError, ValueError) as exc:
+        if not _is_malformed_json_error(exc):
+            raise
+
         invalid_response_text = getattr(response, "text", None)
         if not isinstance(invalid_response_text, str) or not invalid_response_text.strip():
             raise
@@ -139,4 +286,50 @@ async def generate_structured_output(
                 ),
             ),
         )
-        return _coerce_structured_response(repair_response, response_schema)
+        try:
+            return _coerce_structured_response(repair_response, response_schema)
+        except (ValidationError, ValueError) as repair_exc:
+            if not _is_malformed_json_error(repair_exc):
+                raise
+
+            retry_response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=cast(Any, [_retry_instruction(response_schema), *parts]),
+                    )
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "You return valid structured JSON only. "
+                        "When output size is at risk, prefer a shorter but valid answer over an invalid or truncated one."
+                    ),
+                    temperature=0.0,
+                    max_output_tokens=max_output_tokens,
+                    response_mime_type="application/json",
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level=cast(Any, thinking_level),
+                        include_thoughts=False,
+                    ),
+                ),
+            )
+            try:
+                return _coerce_structured_response(retry_response, response_schema)
+            except (ValidationError, ValueError) as retry_exc:
+                if not _is_malformed_json_error(retry_exc):
+                    raise
+
+                for fallback_text in (
+                    getattr(retry_response, "text", None),
+                    getattr(repair_response, "text", None),
+                ):
+                    if isinstance(fallback_text, str) and fallback_text.strip():
+                        try:
+                            return _coerce_repaired_structured_response_text(
+                                fallback_text,
+                                response_schema,
+                            )
+                        except (ValidationError, ValueError):
+                            continue
+                raise

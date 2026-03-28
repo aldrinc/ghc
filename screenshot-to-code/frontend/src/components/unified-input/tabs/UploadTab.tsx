@@ -7,6 +7,15 @@ import { ScreenRecorderState } from "../../../types";
 import ScreenRecorder from "../../recording/ScreenRecorder";
 import OutputSettingsSection from "../../settings/OutputSettingsSection";
 import { Stack } from "../../../lib/stacks";
+import {
+  formatAcceptedImageSizeLabel,
+  formatAcceptedVideoDurationLabel,
+  formatAcceptedVideoSizeLabel,
+  getVideoFileDurationSeconds,
+  MAX_UPLOADED_IMAGE_SIZE_BYTES,
+  MAX_UPLOADED_VIDEO_DURATION_SECONDS,
+  MAX_UPLOADED_VIDEO_SIZE_BYTES,
+} from "../../../lib/video-limits";
 
 function fileToDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -44,7 +53,8 @@ interface Props {
   doCreate: (
     referenceImages: string[],
     inputMode: "image" | "video",
-    textPrompt?: string
+    textPrompt?: string,
+    referenceUrl?: string
   ) => void;
   stack: Stack;
   setStack: (stack: Stack) => void;
@@ -143,6 +153,41 @@ function UploadTab({ doCreate, stack, setStack }: Props) {
         filesToAdd = acceptedFiles.slice(0, remainingSlots);
       }
 
+      if (incomingHasVideo) {
+        const [videoFile] = filesToAdd;
+        if (!videoFile) {
+          return;
+        }
+
+        if (videoFile.size > MAX_UPLOADED_VIDEO_SIZE_BYTES) {
+          toast.error(
+            `Videos must be ${formatAcceptedVideoSizeLabel()} or smaller.`
+          );
+          return;
+        }
+
+        const durationSeconds = await getVideoFileDurationSeconds(videoFile);
+        if (
+          durationSeconds !== null &&
+          durationSeconds > MAX_UPLOADED_VIDEO_DURATION_SECONDS
+        ) {
+          toast.error(
+            `Videos must be ${formatAcceptedVideoDurationLabel()} or shorter.`
+          );
+          return;
+        }
+      } else {
+        const oversizedImage = filesToAdd.find(
+          (file) => file.size > MAX_UPLOADED_IMAGE_SIZE_BYTES
+        );
+        if (oversizedImage) {
+          toast.error(
+            `Screenshots must be ${formatAcceptedImageSizeLabel()} or smaller.`
+          );
+          return;
+        }
+      }
+
       const newFiles = filesToAdd.map((file: File) =>
         Object.assign(file, {
           preview: URL.createObjectURL(file),
@@ -188,7 +233,6 @@ function UploadTab({ doCreate, stack, setStack }: Props) {
     open,
   } = useDropzone({
     maxFiles: MAX_FILES,
-    maxSize: 1024 * 1024 * 20,
     noClick: true,
     accept: {
       "image/png": [".png"],
@@ -207,7 +251,7 @@ function UploadTab({ doCreate, stack, setStack }: Props) {
       }
 
       if (firstError.code === "file-too-large") {
-        toast.error("One or more files exceed the 20MB limit.");
+        toast.error("One or more files exceed the allowed upload limit.");
         return;
       }
 
@@ -307,9 +351,12 @@ function UploadTab({ doCreate, stack, setStack }: Props) {
               <p className="text-gray-700 dark:text-zinc-200 font-medium">
                 Drop up to {MAX_FILES} screenshots or a single video
               </p>
+              <p className="text-xs text-gray-400 dark:text-zinc-500 mt-2">
+                Videos can be up to {formatAcceptedVideoSizeLabel()} and {formatAcceptedVideoDurationLabel()}.
+              </p>
             </div>
             <p className="text-xs text-gray-400 dark:text-zinc-500 mt-2">
-              Supports PNG, JPG, MP4, MOV, WebM (max 20MB each, 30s video)
+              Supports PNG, JPG, MP4, MOV, WebM ({formatAcceptedImageSizeLabel()} screenshots, {formatAcceptedVideoSizeLabel()} / {formatAcceptedVideoDurationLabel()} videos)
             </p>
             <button
               type="button"

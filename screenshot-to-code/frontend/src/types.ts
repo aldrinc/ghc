@@ -51,6 +51,7 @@ export interface PromptContent {
   text: string;
   images: string[]; // Array of data URLs
   videos?: string[]; // Array of data URLs
+  referenceUrl?: string;
   selectedElementHtml?: string; // Raw HTML of selected element (for display only)
 }
 
@@ -67,6 +68,11 @@ export interface CodeGenerationParams {
   orchestrationMode?: "standard" | "validated_loop";
   maxValidationIterations?: number;
   validatedLoopReferenceRunDir?: string;
+  validatedLoopDesignSystemMode?:
+    | "generate"
+    | "reuse_if_available"
+    | "require_reuse";
+  validatedLoopDesignSystemRunDir?: string;
   prompt: PromptContent;
   history?: PromptHistoryMessage[];
   fileState?: {

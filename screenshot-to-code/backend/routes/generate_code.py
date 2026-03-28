@@ -21,7 +21,7 @@ from llm import (
     Llm,
 )
 from loop.artifacts import ValidatedLoopArtifactStore
-from loop.contracts import ReferenceBundle
+from loop.contracts import DesignSystemReuseMode, ReferenceBundle
 from loop.orchestrator import ValidationLoopOrchestrator
 from typing import (
     Any,
@@ -249,6 +249,8 @@ class ExtractedParams:
     orchestration_mode: OrchestrationMode = "standard"
     max_validation_iterations: int = DEFAULT_VALIDATED_LOOP_MAX_ITERATIONS
     validated_loop_reference_run_dir: str | None = None
+    validated_loop_design_system_mode: DesignSystemReuseMode = "generate"
+    validated_loop_design_system_run_dir: str | None = None
 
 
 class ParameterExtractionStage:
@@ -338,6 +340,46 @@ class ParameterExtractionStage:
             else None
         )
 
+        raw_design_system_mode = params.get(
+            "validatedLoopDesignSystemMode",
+            "generate",
+        )
+        design_system_mode_aliases: dict[str, DesignSystemReuseMode] = {
+            "generate": "generate",
+            "fresh": "generate",
+            "reuse_if_available": "reuse_if_available",
+            "reuse": "reuse_if_available",
+            "require_reuse": "require_reuse",
+        }
+        if isinstance(raw_design_system_mode, str):
+            normalized_design_system_mode = design_system_mode_aliases.get(
+                raw_design_system_mode.strip().lower()
+            )
+            if normalized_design_system_mode is None:
+                await self.throw_error(
+                    "Invalid validated loop design-system mode: "
+                    f"{raw_design_system_mode}"
+                )
+                raise ValueError(
+                    "Invalid validated loop design-system mode: "
+                    f"{raw_design_system_mode}"
+                )
+        else:
+            await self.throw_error(
+                "Invalid validated loop design-system mode: expected a string value."
+            )
+            raise ValueError(
+                "Invalid validated loop design-system mode: expected a string value."
+            )
+
+        raw_design_system_run_dir = params.get("validatedLoopDesignSystemRunDir")
+        validated_loop_design_system_run_dir = (
+            raw_design_system_run_dir
+            if isinstance(raw_design_system_run_dir, str)
+            and raw_design_system_run_dir.strip()
+            else None
+        )
+
         # Extract prompt content
         prompt: UserTurnInput = parse_prompt_content(params.get("prompt"))
 
@@ -382,6 +424,8 @@ class ParameterExtractionStage:
             orchestration_mode=validated_orchestration_mode,
             max_validation_iterations=max_validation_iterations,
             validated_loop_reference_run_dir=validated_loop_reference_run_dir,
+            validated_loop_design_system_mode=normalized_design_system_mode,
+            validated_loop_design_system_run_dir=validated_loop_design_system_run_dir,
         )
 
     def _get_from_settings_dialog_or_env(
@@ -786,13 +830,6 @@ class CodeGenerationMiddleware(Middleware):
                         "Please add GEMINI_API_KEY to backend/.env or in the settings dialog."
                     )
                     return
-                if not context.extracted_params.anthropic_api_key:
-                    await context.throw_error(
-                        "Validated loop mode requires an Anthropic API key for the executor. "
-                        "Please add ANTHROPIC_API_KEY to backend/.env or in the settings dialog."
-                    )
-                    return
-
                 reference_bundle: ReferenceBundle
                 resume_state = None
                 prompt_has_reference_media = bool(
@@ -815,6 +852,12 @@ class CodeGenerationMiddleware(Middleware):
                         user_text=context.extracted_params.prompt["text"],
                         images=reference_bundle.images,
                         videos=reference_bundle.videos,
+                        reference_url=(
+                            context.extracted_params.prompt.get("reference_url", "")
+                            or reference_bundle.reference_url
+                        ),
+                        live_reference=reference_bundle.live_reference,
+                        design_system_preflight=reference_bundle.design_system_preflight,
                     )
                     if (
                         context.extracted_params.file_state is None
@@ -829,6 +872,9 @@ class CodeGenerationMiddleware(Middleware):
                         user_text=context.extracted_params.prompt["text"],
                         images=context.extracted_params.prompt["images"],
                         videos=context.extracted_params.prompt["videos"],
+                        reference_url=context.extracted_params.prompt.get(
+                            "reference_url", ""
+                        ),
                     )
 
                 loop_orchestrator = ValidationLoopOrchestrator(
@@ -840,6 +886,8 @@ class CodeGenerationMiddleware(Middleware):
                     should_generate_images=context.extracted_params.should_generate_images,
                     option_codes=context.extracted_params.option_codes,
                     max_iterations=context.extracted_params.max_validation_iterations,
+                    design_system_reuse_mode=context.extracted_params.validated_loop_design_system_mode,
+                    design_system_reuse_run_dir=context.extracted_params.validated_loop_design_system_run_dir,
                 )
                 context.variant_models = [loop_orchestrator.executor_model]
 

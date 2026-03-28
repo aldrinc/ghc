@@ -12,14 +12,16 @@ def _to_string_list(value: object) -> List[str]:
 
 def parse_prompt_content(raw_prompt: object) -> UserTurnInput:
     if not isinstance(raw_prompt, dict):
-        return {"text": "", "images": [], "videos": []}
+        return {"text": "", "images": [], "videos": [], "reference_url": ""}
 
     prompt_dict = cast(dict[str, object], raw_prompt)
     text = prompt_dict.get("text")
+    reference_url = prompt_dict.get("referenceUrl")
     return {
         "text": text if isinstance(text, str) else "",
         "images": _to_string_list(prompt_dict.get("images")),
         "videos": _to_string_list(prompt_dict.get("videos")),
+        "reference_url": reference_url if isinstance(reference_url, str) else "",
     }
 
 

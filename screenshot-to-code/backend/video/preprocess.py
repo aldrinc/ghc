@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from video.utils import get_video_bytes_and_mime_type
+from video.validation import validate_video_data_url_limits
 
 NORMALIZED_VIDEO_MIME_TYPE = "video/mp4"
 NORMALIZED_VIDEO_SUFFIX = ".mp4"
@@ -18,7 +18,9 @@ def normalize_video_data_urls_for_llm(video_data_urls: list[str]) -> list[str]:
 
 
 def normalize_video_data_url_for_llm(video_data_url: str) -> str:
-    video_bytes, mime_type = get_video_bytes_and_mime_type(video_data_url)
+    video_bytes, mime_type, _duration_seconds = validate_video_data_url_limits(
+        video_data_url
+    )
     input_suffix = mimetypes.guess_extension(mime_type) or ".bin"
 
     with tempfile.TemporaryDirectory(prefix="s2c-video-") as temp_dir_name:
