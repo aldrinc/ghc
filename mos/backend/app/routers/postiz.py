@@ -63,6 +63,20 @@ from app.services.postiz_client import (
 router = APIRouter(prefix="/clients/{client_id}/postiz", tags=["postiz"])
 
 
+class _SettingsProxy:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(app_config.settings, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(app_config.settings, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        setattr(app_config.settings, name, None)
+
+
+settings = _SettingsProxy()
+
+
 def _require_client(session: Session, *, org_id: str, client_id: str) -> None:
     client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
     if client is None:
@@ -262,7 +276,7 @@ def _resolve_mos_user_email(
 
 
 def _derive_postiz_browser_password(*, user_id: str, email: str) -> str:
-    secret = app_config.settings.POSTIZ_BROWSER_LOGIN_SECRET
+    secret = settings.POSTIZ_BROWSER_LOGIN_SECRET
     if not secret:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -376,7 +390,7 @@ def get_credentials(
         PostizCredentialsResponse.model_validate(
             {
                 "hasCredentials": creds is not None,
-                "baseUrl": creds.base_url if creds else app_config.settings.POSTIZ_DEFAULT_BASE_URL,
+                "baseUrl": creds.base_url if creds else settings.POSTIZ_DEFAULT_BASE_URL,
                 "authType": creds.auth_type if creds else None,
                 "lastValidatedAt": getattr(creds, "last_validated_at", None),
                 "lastValidationError": getattr(creds, "last_validation_error", None),
@@ -527,7 +541,7 @@ def prepare_postiz_browser_launch(
 
     creds_repo = PostizCredentialsRepository(session)
     creds = creds_repo.get(org_id=auth.org_id, client_id=client_id)
-    resolved_base_url = creds.base_url if creds else app_config.settings.POSTIZ_DEFAULT_BASE_URL
+    resolved_base_url = creds.base_url if creds else settings.POSTIZ_DEFAULT_BASE_URL
     if not resolved_base_url:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
