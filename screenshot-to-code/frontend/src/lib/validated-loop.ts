@@ -22,7 +22,11 @@ export type ContinuationCandidate = {
 };
 
 function hasPromptReferenceMedia(prompt?: PromptContent | null): boolean {
-  return Boolean(prompt?.images.length || (prompt?.videos?.length ?? 0) > 0);
+  return Boolean(
+    prompt?.images.length ||
+      (prompt?.videos?.length ?? 0) > 0 ||
+      prompt?.referenceUrl?.trim()
+  );
 }
 
 export function hasReferenceMediaForContinuation(

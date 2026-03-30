@@ -393,8 +393,27 @@ def _strip_markdown_code_fence(value: str) -> str:
 
 def _normalize_swipe_variation_line(value: str) -> str:
     stripped = value.strip()
+    stripped = re.sub(r"^(?:[-*+]\s+)+", "", stripped)
+    stripped = stripped.strip("`")
     if stripped.startswith("**") and stripped.endswith("**") and len(stripped) >= 4:
         stripped = stripped[2:-2].strip()
+    return re.sub(r"\s+", " ", stripped).strip()
+
+
+def _variation_heading_key(value: str) -> str | None:
+    normalized = _normalize_swipe_variation_line(value).lower()
+    if not normalized:
+        return None
+    match = re.match(r"^variation\s+(\d+)\b", normalized)
+    if match:
+        return f"variation {match.group(1)}"
+    return normalized
+
+
+def _normalize_swipe_markdown_field_line(value: str) -> str:
+    stripped = value.strip()
+    stripped = re.sub(r"^(?:[-*+]\s+)+", "", stripped)
+    stripped = stripped.replace("**", "").replace("__", "").replace("`", "")
     return re.sub(r"\s+", " ", stripped).strip()
 
 
@@ -406,32 +425,44 @@ def _extract_meta_fields_from_selected_variation_markdown(
     body = _strip_markdown_code_fence(formatted_variations_markdown)
     lines = body.splitlines()
     selected_heading = _normalize_swipe_variation_line(selected_variation).lower()
+    selected_heading_key = _variation_heading_key(selected_variation)
     if not selected_heading:
         return {}
 
     field_map = {
         "primary text": "metaPrimaryText",
+        "meta primary text": "metaPrimaryText",
         "headline": "metaHeadline",
+        "meta headline": "metaHeadline",
         "description": "metaDescription",
+        "meta description": "metaDescription",
         "cta": "metaCta",
+        "meta cta": "metaCta",
     }
     extracted: Dict[str, List[str]] = {}
     in_selected_block = False
     current_field: str | None = None
     field_start_pattern = re.compile(
-        r"^\s*(?:\*\*)?(Primary Text|Headline|Description|CTA):(?:\*\*)?\s*(.*)$",
+        r"^(meta\s+primary text|primary text|meta headline|headline|meta description|description|meta cta|cta)\s*[:\-]\s*(.*)$",
         flags=re.IGNORECASE,
     )
 
     for raw_line in lines:
         normalized_line = _normalize_swipe_variation_line(raw_line)
         lower_line = normalized_line.lower()
+        heading_key = _variation_heading_key(raw_line)
 
         if lower_line.startswith("variation "):
             if in_selected_block:
-                if lower_line != selected_heading:
+                if (
+                    lower_line != selected_heading
+                    and heading_key is not None
+                    and heading_key != selected_heading_key
+                ):
                     break
-            elif lower_line == selected_heading:
+            elif lower_line == selected_heading or (
+                heading_key is not None and heading_key == selected_heading_key
+            ):
                 in_selected_block = True
             continue
 
@@ -441,7 +472,7 @@ def _extract_meta_fields_from_selected_variation_markdown(
         if normalized_line == "---":
             break
 
-        field_match = field_start_pattern.match(raw_line)
+        field_match = field_start_pattern.match(_normalize_swipe_markdown_field_line(raw_line))
         if field_match:
             field_name = field_map[field_match.group(1).strip().lower()]
             initial_value = field_match.group(2).strip()
@@ -466,29 +497,56 @@ def _extract_meta_fields_from_selected_variation_markdown(
     return normalized
 
 
+def _hydrate_swipe_copy_platform_fields_from_aliases(*, parsed: Dict[str, Any], platform: str) -> Dict[str, Any]:
+    normalized_platform = (platform or "").strip().lower()
+    if normalized_platform != "meta":
+        return parsed
+
+    alias_map = {
+        "metaPrimaryText": ("primaryText", "primary_text", "meta_primary_text"),
+        "metaHeadline": ("headline", "meta_headline"),
+        "metaDescription": ("description", "meta_description"),
+        "metaCta": ("cta", "metaCTA", "meta_cta"),
+    }
+    hydrated = dict(parsed)
+    for target_key, alias_keys in alias_map.items():
+        if _optional_clean_string(hydrated.get(target_key)) is not None:
+            for alias_key in alias_keys:
+                hydrated.pop(alias_key, None)
+            continue
+        for alias_key in alias_keys:
+            alias_value = _optional_clean_string(hydrated.get(alias_key))
+            if alias_value is not None:
+                hydrated[target_key] = alias_value
+                break
+        for alias_key in alias_keys:
+            hydrated.pop(alias_key, None)
+    return hydrated
+
+
 def _hydrate_missing_swipe_copy_platform_fields(*, parsed: Dict[str, Any], platform: str) -> Dict[str, Any]:
     normalized_platform = (platform or "").strip().lower()
     if normalized_platform != "meta":
         return parsed
 
+    hydrated = _hydrate_swipe_copy_platform_fields_from_aliases(parsed=parsed, platform=platform)
     required_meta_keys = ("metaPrimaryText", "metaHeadline", "metaDescription", "metaCta")
-    missing_keys = [key for key in required_meta_keys if _optional_clean_string(parsed.get(key)) is None]
+    missing_keys = [key for key in required_meta_keys if _optional_clean_string(hydrated.get(key)) is None]
     if not missing_keys:
-        return parsed
+        return hydrated
 
-    formatted_variations_markdown = _optional_clean_string(parsed.get("formattedVariationsMarkdown"))
-    selected_variation = _optional_clean_string(parsed.get("selectedVariation"))
+    formatted_variations_markdown = _optional_clean_string(hydrated.get("formattedVariationsMarkdown"))
+    selected_variation = _optional_clean_string(hydrated.get("selectedVariation"))
     if not formatted_variations_markdown or not selected_variation:
-        return parsed
+        return hydrated
 
     inferred = _extract_meta_fields_from_selected_variation_markdown(
         formatted_variations_markdown=formatted_variations_markdown,
         selected_variation=selected_variation,
     )
     if not inferred:
-        return parsed
+        return hydrated
 
-    hydrated = dict(parsed)
     for key in missing_keys:
         inferred_value = _optional_clean_string(inferred.get(key))
         if inferred_value is not None:
@@ -2881,6 +2939,21 @@ def _call_swipe_copy_gemini_json_message(
     }
 
 
+def _is_retryable_swipe_copy_contract_error(message: str) -> bool:
+    normalized = str(message or "").strip().lower()
+    if not normalized:
+        return False
+    return any(
+        needle in normalized
+        for needle in (
+            "copy response was not valid json",
+            "copy response did not contain a valid json object",
+            "copy generation returned a non-dict parsed payload",
+            "copy generation returned a non-object json payload",
+        )
+    )
+
+
 def _audit_swipe_copy_blind_angle_blackout(
     *,
     copy_pack: SwipeAdCopyPack,
@@ -3047,23 +3120,34 @@ def _generate_swipe_stage1_copy_pack(
                     ),
                 ]
             )
-        response = _call_swipe_copy_gemini_json_message(
-            model=copy_model,
-            system_instruction=(
-                "Generate swipe-specific direct response ad copy. Use the attached project documents as the source of truth. "
-                "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
-                "Return JSON only."
-            ),
-            contents=contents,
-            store_names=gemini_store_names,
-            max_tokens=6000,
-            temperature=0.2,
-            response_schema=SwipeAdCopyPack,
-        )
-        last_response = response
-        parsed = response.get("parsed")
-        if not isinstance(parsed, dict):
-            raise RuntimeError("Swipe Stage 1 copy generation returned a non-dict parsed payload.")
+        try:
+            response = _call_swipe_copy_gemini_json_message(
+                model=copy_model,
+                system_instruction=(
+                    "Generate swipe-specific direct response ad copy. Use the attached project documents as the source of truth. "
+                    "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
+                    "Return JSON only."
+                ),
+                contents=contents,
+                store_names=gemini_store_names,
+                max_tokens=6000,
+                temperature=0.2,
+                response_schema=SwipeAdCopyPack,
+            )
+            last_response = response
+            parsed = response.get("parsed")
+            if not isinstance(parsed, dict):
+                raise RuntimeError("Swipe Stage 1 copy generation returned a non-dict parsed payload.")
+        except RuntimeError as exc:
+            if not _is_retryable_swipe_copy_contract_error(str(exc)):
+                raise
+            if attempt >= 5:
+                raise RuntimeError(str(exc)) from exc
+            retry_feedback = (
+                f"{exc} Return only a single valid JSON object matching the required schema. "
+                "Do not add markdown fences, bullets, prose, placeholder labels, or text before or after the JSON."
+            )
+            continue
         parsed = _hydrate_missing_swipe_copy_platform_fields(parsed=parsed, platform=platform)
 
         merged_payload = dict(parsed)
@@ -3208,25 +3292,37 @@ def _generate_rendered_asset_swipe_copy_pack(
                     ),
                 ]
             )
-        response = _call_swipe_copy_gemini_json_message(
-            model=copy_model,
-            system_instruction=(
-                "Generate swipe-specific direct response ad copy from the attached rendered ad asset. "
-                "Use the attached project documents and requirement copy baseline as the source of truth. "
-                "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
-                "Return JSON only."
-            ),
-            contents=contents,
-            store_names=gemini_store_names,
-            max_tokens=6000,
-            temperature=0.2,
-            response_schema=SwipeAdCopyPack,
-        )
-        last_response = response
-        parsed = response.get("parsed")
-        if not isinstance(parsed, dict):
-            raise RuntimeError("Rendered-asset swipe copy generation returned a non-dict parsed payload.")
+        try:
+            response = _call_swipe_copy_gemini_json_message(
+                model=copy_model,
+                system_instruction=(
+                    "Generate swipe-specific direct response ad copy from the attached rendered ad asset. "
+                    "Use the attached project documents and requirement copy baseline as the source of truth. "
+                    "Do not invent unsupported claims, product facts, pricing, guarantees, or scientific proof. "
+                    "Return JSON only."
+                ),
+                contents=contents,
+                store_names=gemini_store_names,
+                max_tokens=6000,
+                temperature=0.2,
+                response_schema=SwipeAdCopyPack,
+            )
+            last_response = response
+            parsed = response.get("parsed")
+            if not isinstance(parsed, dict):
+                raise RuntimeError("Rendered-asset swipe copy generation returned a non-dict parsed payload.")
+        except RuntimeError as exc:
+            if not _is_retryable_swipe_copy_contract_error(str(exc)):
+                raise
+            if attempt >= 5:
+                raise RuntimeError(str(exc)) from exc
+            retry_feedback = (
+                f"{exc} Return only a single valid JSON object matching the required schema. "
+                "Do not add markdown fences, bullets, prose, placeholder labels, or text before or after the JSON."
+            )
+            continue
 
+        parsed = _hydrate_missing_swipe_copy_platform_fields(parsed=parsed, platform=platform)
         merged_payload = dict(parsed)
         merged_payload.update(
             {
@@ -3650,7 +3746,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_product_references_v1",
             *reference_signature_parts,
         )
-
         prompt_context_parts: list[str] = []
         minimal_context_block: str | None = None
         if swipe_context_mode == _SWIPE_CONTEXT_MODE_MINIMAL:
@@ -3716,7 +3811,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             ),
             gemini_rag_doc_keys=gemini_rag_doc_keys,
         )
-
         rendered_prompt_template = _build_swipe_stage1_prompt_input(
             prompt_template=prompt_template,
             brand_name=str(client_name),

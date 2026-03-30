@@ -1,8 +1,10 @@
 # pyright: reportUnknownVariableType=false
+import re
 from typing import Literal, Mapping, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from llm import Llm
 from prompts.prompt_types import Stack
 
 
@@ -33,10 +35,74 @@ class DesignTokenSet(BaseModel):
     motion: list[str] = Field(default_factory=list)
 
 
+class LiveReferenceRender(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    data_url: str
+    viewport: ViewportSpec = Field(default_factory=ViewportSpec)
+
+
+class LiveReferenceDesignSystem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page_title: str = ""
+    typography: list[str] = Field(default_factory=list)
+    colors: list[str] = Field(default_factory=list)
+    spacing: list[str] = Field(default_factory=list)
+    radii: list[str] = Field(default_factory=list)
+    shadows: list[str] = Field(default_factory=list)
+    layout: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    raw_observations: list[str] = Field(default_factory=list)
+
+
+class LiveReferenceContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    design_system: LiveReferenceDesignSystem = Field(
+        default_factory=LiveReferenceDesignSystem
+    )
+    renders: list[LiveReferenceRender] = Field(default_factory=list)
+
+
+class DesignSystemPreflight(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = ""
+    summary: str = ""
+    philosophy: list[str] = Field(default_factory=list)
+    typography: list[str] = Field(default_factory=list)
+    section_typography: list[str] = Field(default_factory=list)
+    colors: list[str] = Field(default_factory=list)
+    spacing: list[str] = Field(default_factory=list)
+    radii: list[str] = Field(default_factory=list)
+    layout: list[str] = Field(default_factory=list)
+    section_sizing: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    motion: list[str] = Field(default_factory=list)
+    motion_components: list[str] = Field(default_factory=list)
+    brand: list[str] = Field(default_factory=list)
+    source_notes: list[str] = Field(default_factory=list)
+    html_artifact_path: str = ""
+    json_artifact_path: str = ""
+    renderer: Literal["local_html", "paper_mcp"] = "local_html"
+    paper_mcp_status: Literal["not_configured", "rendered", "failed"] = (
+        "not_configured"
+    )
+
+
+def _normalize_section_id(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return normalized.strip("-")
+
+
 class SectionRequirement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    section_id: str = ""
     purpose: str = ""
     layout: str = ""
     must_include: list[str] = Field(default_factory=list)
@@ -46,6 +112,11 @@ class SectionRequirement(BaseModel):
     behaviors: list[str] = Field(default_factory=list)
     editable_fields: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def derive_section_id(self) -> "SectionRequirement":
+        self.section_id = _normalize_section_id(self.section_id or self.name)
+        return self
+
 
 class RequirementsSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -53,6 +124,11 @@ class RequirementsSpec(BaseModel):
     summary: str = ""
     template_goal: str = ""
     viewport: ViewportSpec = Field(default_factory=ViewportSpec)
+    page_outline: list[str] = Field(default_factory=list)
+    closing_sections: list[str] = Field(default_factory=list)
+    footer_present: bool | None = None
+    footer_description: str = ""
+    coverage_notes: list[str] = Field(default_factory=list)
     hard_constraints: list[str] = Field(default_factory=list)
     preserve_requirements: list[str] = Field(default_factory=list)
     design_tokens: DesignTokenSet = Field(default_factory=DesignTokenSet)
@@ -78,6 +154,16 @@ class ReferenceBundle(BaseModel):
     user_text: str = ""
     images: list[str] = Field(default_factory=list)
     videos: list[str] = Field(default_factory=list)
+    reference_url: str = ""
+    live_reference: LiveReferenceContext | None = None
+    design_system_preflight: DesignSystemPreflight | None = None
+
+
+DesignSystemReuseMode = Literal[
+    "generate",
+    "reuse_if_available",
+    "require_reuse",
+]
 
 
 class RenderArtifact(BaseModel):
@@ -110,6 +196,7 @@ ValidationIssueCategory = Literal[
     "structure",
 ]
 ValidationVerdict = Literal["pass", "revise", "blocked"]
+SectionValidationStatus = Literal["present", "partial", "missing"]
 
 _SEVERITY_NORMALIZATION: dict[str, ValidationSeverity] = {
     "critical": "critical",
@@ -166,6 +253,23 @@ _VERDICT_NORMALIZATION: dict[str, ValidationVerdict] = {
     "blocked": "blocked",
     "fail": "blocked",
     "failed": "blocked",
+}
+_SECTION_STATUS_NORMALIZATION: dict[str, SectionValidationStatus] = {
+    "present": "present",
+    "complete": "present",
+    "completed": "present",
+    "covered": "present",
+    "implemented": "present",
+    "partial": "partial",
+    "partially_complete": "partial",
+    "partially_implemented": "partial",
+    "incomplete": "partial",
+    "needs_work": "partial",
+    "missing": "missing",
+    "absent": "missing",
+    "omitted": "missing",
+    "not_present": "missing",
+    "not_found": "missing",
 }
 
 
@@ -227,6 +331,35 @@ class ValidationIssue(BaseModel):
         )
 
 
+class SectionValidationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    section_id: str = ""
+    status: SectionValidationStatus = "present"
+    quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    summary: str = ""
+    fix_instructions: str = ""
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: object) -> SectionValidationStatus:
+        return cast(
+            SectionValidationStatus,
+            _normalize_text_enum(value, _SECTION_STATUS_NORMALIZATION, "present"),
+        )
+
+    @field_validator("quality_score", mode="before")
+    @classmethod
+    def normalize_quality_score(cls, value: object) -> object:
+        return _normalize_score(value)
+
+    @model_validator(mode="after")
+    def derive_section_id(self) -> "SectionValidationResult":
+        self.section_id = _normalize_section_id(self.section_id or self.name)
+        return self
+
+
 class ValidationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -238,6 +371,7 @@ class ValidationReport(BaseModel):
     editability_score: float = Field(default=0.0, ge=0.0, le=1.0)
     summary: str = ""
     strengths: list[str] = Field(default_factory=list)
+    section_results: list[SectionValidationResult] = Field(default_factory=list)
     issues: list[ValidationIssue] = Field(default_factory=list)
     patch_instructions: list[str] = Field(default_factory=list)
 
@@ -288,3 +422,6 @@ class LoopRunResult(BaseModel):
     stop_reason: Literal["pass", "max_iterations", "blocked"]
     saved_code_path: str | None = None
     saved_run_dir: str | None = None
+    analyzer_model: Llm | None = None
+    executor_model: Llm | None = None
+    validator_model: Llm | None = None

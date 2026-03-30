@@ -248,6 +248,10 @@ function sanitizePersistedCommit(commit: Commit): Commit {
       ) || "",
       images: [],
       videos: [],
+      referenceUrl: truncatePersistedText(
+        commit.inputs.referenceUrl,
+        PERSISTED_PROMPT_TEXT_MAX_LENGTH
+      ),
       selectedElementHtml: truncatePersistedText(
         commit.inputs.selectedElementHtml,
         PERSISTED_PROMPT_TEXT_MAX_LENGTH

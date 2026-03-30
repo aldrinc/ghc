@@ -1,14 +1,14 @@
 from llm import Llm
+from loop.analyzer_prompt import (
+    ANALYZER_SYSTEM_INSTRUCTION,
+    build_analyzer_prompt,
+)
 from loop.contracts import ReferenceBundle, RequirementsSpec, ValidationReport
 from loop.gemini import (
     GeminiPart,
     data_url_to_part,
     generate_structured_output,
     text_part,
-)
-from loop.analyzer_prompt import (
-    ANALYZER_SYSTEM_INSTRUCTION,
-    build_analyzer_prompt,
 )
 
 
@@ -39,11 +39,28 @@ class LoopAnalyzer:
             parts.append(text_part(f"Reference image {index}:"))
             parts.append(data_url_to_part(image))
 
+        if reference_bundle.live_reference is not None:
+            for index, render in enumerate(reference_bundle.live_reference.renders, start=1):
+                parts.append(
+                    text_part(
+                        f"Live browser render {index} ({render.label}) from {reference_bundle.live_reference.url}:"
+                    )
+                )
+                parts.append(data_url_to_part(render.data_url))
+
         for index, video in enumerate(reference_bundle.videos, start=1):
             parts.append(text_part(f"Reference video {index}:"))
             parts.append(data_url_to_part(video))
 
-        if reference_bundle.input_mode == "text":
+        if (
+            reference_bundle.input_mode == "text"
+            and not reference_bundle.images
+            and not reference_bundle.videos
+            and (
+                reference_bundle.live_reference is None
+                or not reference_bundle.live_reference.renders
+            )
+        ):
             parts.append(text_part("There is no reference media for this request."))
 
         return await generate_structured_output(

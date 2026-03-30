@@ -4,7 +4,7 @@ import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 import OutputSettingsSection from "../../settings/OutputSettingsSection";
 import toast from "react-hot-toast";
-import { Stack } from "../../../lib/stacks";
+import { DEFAULT_STACK, Stack } from "../../../lib/stacks";
 
 interface Props {
   importFromCode: (code: string, stack: Stack) => void;
@@ -12,7 +12,7 @@ interface Props {
 
 function ImportTab({ importFromCode }: Props) {
   const [code, setCode] = useState("");
-  const [stack, setStack] = useState<Stack | undefined>(undefined);
+  const [stack, setStack] = useState<Stack | undefined>(DEFAULT_STACK);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 

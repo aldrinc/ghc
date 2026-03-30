@@ -1,4 +1,5 @@
 import uuid
+from hashlib import sha256
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from config import (
@@ -7,19 +8,55 @@ from config import (
     VIDEO_VALIDATED_LOOP_BEHAVIOR_PASS_SCORE,
     VIDEO_VALIDATED_LOOP_PASS_SCORE,
 )
-from loop.artifacts import ValidatedLoopArtifactStore
+from loop.artifacts import (
+    ValidatedLoopArtifactStore,
+    load_design_system_preflight_from_current_cache,
+    load_design_system_preflight_from_run_dir,
+    load_reference_bundle_from_current_cache,
+)
 from loop.analyzer import LoopAnalyzer
 from loop.contracts import (
+    DesignSystemReuseMode,
+    DesignSystemPreflight,
     LoopIterationRecord,
     LoopResumeState,
     LoopRunResult,
     ReferenceBundle,
     RequirementsSpec,
     ValidationReport,
+    ViewportSpec,
 )
+from loop.design_system_preflight import (
+    DesignSystemDocumentRenderer,
+    DesignSystemPreflightBuilder,
+)
+from loop.execution_blocks import plan_execution_blocks, summarize_execution_blocks
 from loop.executor import LoopExecutor
+from loop.live_reference import LiveReferenceExtractor
 from loop.renderer import HtmlPreviewRenderer
 from loop.validator import LoopValidator
+
+
+def _live_reference_viewport(reference_bundle: ReferenceBundle) -> ViewportSpec:
+    if reference_bundle.input_mode == "video":
+        return ViewportSpec(width=1440, height=1024, device="desktop")
+    return ViewportSpec(width=1440, height=1024, device="desktop")
+
+
+def _needs_design_system_preflight(reference_bundle: ReferenceBundle) -> bool:
+    return bool(
+        reference_bundle.input_mode == "video"
+        or reference_bundle.live_reference is not None
+        or reference_bundle.reference_url.strip()
+    )
+
+
+def _requires_explicit_section_blueprint(reference_bundle: ReferenceBundle) -> bool:
+    return bool(
+        reference_bundle.input_mode == "video"
+        or reference_bundle.live_reference is not None
+        or reference_bundle.reference_url.strip()
+    )
 
 
 class ValidationLoopOrchestrator:
@@ -34,18 +71,32 @@ class ValidationLoopOrchestrator:
         should_generate_images: bool,
         option_codes: list[str] | None,
         max_iterations: int,
+        design_system_reuse_mode: DesignSystemReuseMode = "generate",
+        design_system_reuse_run_dir: str | None = None,
         renderer: HtmlPreviewRenderer | None = None,
         analyzer: LoopAnalyzer | None = None,
         validator: LoopValidator | None = None,
         executor: LoopExecutor | None = None,
         artifact_store: ValidatedLoopArtifactStore | None = None,
+        live_reference_extractor: LiveReferenceExtractor | None = None,
+        design_system_builder: DesignSystemPreflightBuilder | None = None,
+        design_system_renderer: DesignSystemDocumentRenderer | None = None,
     ) -> None:
         self._send_message = send_message
         self._max_iterations = max_iterations
+        self._design_system_reuse_mode = design_system_reuse_mode
+        self._design_system_reuse_run_dir = design_system_reuse_run_dir
         self._analyzer = analyzer or LoopAnalyzer(gemini_api_key)
         self._validator = validator or LoopValidator(gemini_api_key)
         self._renderer = renderer or HtmlPreviewRenderer()
         self._artifact_store = artifact_store or ValidatedLoopArtifactStore()
+        self._live_reference_extractor = live_reference_extractor or LiveReferenceExtractor()
+        self._design_system_builder = design_system_builder or DesignSystemPreflightBuilder(
+            gemini_api_key
+        )
+        self._design_system_renderer = (
+            design_system_renderer or DesignSystemDocumentRenderer()
+        )
         self._executor = executor or LoopExecutor(
             send_message=send_message,
             openai_api_key=openai_api_key,
@@ -63,6 +114,8 @@ class ValidationLoopOrchestrator:
         initial_file_state: dict[str, str] | None,
         resume_state: LoopResumeState | None = None,
     ) -> LoopRunResult:
+        reference_bundle = await self._enrich_live_reference(reference_bundle)
+        reference_bundle = await self._ensure_design_system_preflight(reference_bundle)
         await self._status(
             "Persisting validated loop code to "
             f"{self._artifact_store.paths.current_file_path}."
@@ -110,6 +163,10 @@ class ValidationLoopOrchestrator:
                 reference_bundle,
                 current_file_state.get("content", "") if current_file_state else None,
             )
+        requirements = await self._ensure_actionable_requirements(
+            requirements,
+            reference_bundle=reference_bundle,
+        )
         await self._send_supervisor_assistant(
             title="Supervisor: Requirements draft ready",
             content=self._summarize_requirements(requirements),
@@ -140,14 +197,34 @@ class ValidationLoopOrchestrator:
                 ),
             )
             await self._status(
-                f"Iteration {iteration}/{self._max_iterations}: executing with Claude Opus 4.6."
+                f"Iteration {iteration}/{self._max_iterations}: executing with Gemini 3.1 Pro."
             )
+            execution_blocks = plan_execution_blocks(
+                reference_bundle=reference_bundle,
+                requirements=requirements,
+                file_state=current_file_state,
+                validation_report=validation_report,
+            )
+            if len(execution_blocks) > 1:
+                await self._send_supervisor_thinking(
+                    title=f"Supervisor: Execution blocks for iteration {iteration}",
+                    content=(
+                        "Splitting the implementation into smaller executor blocks so the coding agent keeps the full-page plan while staying within the model context budget."
+                    ),
+                )
+                await self._status(
+                    f"Iteration {iteration}/{self._max_iterations}: executing in {len(execution_blocks)} scoped blocks.",
+                    data={
+                        "executionBlocks": summarize_execution_blocks(execution_blocks),
+                    },
+                )
             last_code = await self._executor.execute(
                 reference_bundle=reference_bundle,
                 requirements=requirements,
                 file_state=current_file_state,
                 validation_report=validation_report,
                 iteration=iteration,
+                execution_blocks=execution_blocks,
             )
 
             if not last_code.strip():
@@ -185,12 +262,14 @@ class ValidationLoopOrchestrator:
                     "and edit."
                 ),
             )
+            prior_validation_for_iteration = validation_report
             validation_report = await self._validator.validate(
                 reference_bundle=reference_bundle,
                 requirements=requirements,
                 render_artifact=render_artifact,
                 current_html=last_code,
                 iteration=iteration,
+                prior_validation=prior_validation_for_iteration,
             )
             iterations.append(
                 LoopIterationRecord(
@@ -260,6 +339,9 @@ class ValidationLoopOrchestrator:
                     stop_reason="pass",
                     saved_code_path=self._artifact_store.paths.best_file_path,
                     saved_run_dir=self._artifact_store.paths.run_dir,
+                    analyzer_model=self._analyzer.model,
+                    executor_model=self._executor.model,
+                    validator_model=self._validator.model,
                 )
 
             if validation_report.verdict == "pass":
@@ -293,6 +375,9 @@ class ValidationLoopOrchestrator:
                     stop_reason="blocked",
                     saved_code_path=self._artifact_store.paths.best_file_path,
                     saved_run_dir=self._artifact_store.paths.run_dir,
+                    analyzer_model=self._analyzer.model,
+                    executor_model=self._executor.model,
+                    validator_model=self._validator.model,
                 )
 
             current_file_state = {"path": "index.html", "content": last_code}
@@ -317,10 +402,37 @@ class ValidationLoopOrchestrator:
             stop_reason="max_iterations",
             saved_code_path=self._artifact_store.paths.best_file_path,
             saved_run_dir=self._artifact_store.paths.run_dir,
+            analyzer_model=self._analyzer.model,
+            executor_model=self._executor.model,
+            validator_model=self._validator.model,
         )
 
     async def _status(self, message: str, data: dict[str, object] | None = None) -> None:
         await self._send_message("status", message, 0, data, None)
+
+    async def _ensure_actionable_requirements(
+        self,
+        requirements: RequirementsSpec,
+        *,
+        reference_bundle: ReferenceBundle,
+    ) -> RequirementsSpec:
+        if not _requires_explicit_section_blueprint(reference_bundle):
+            return requirements
+
+        section_count = sum(
+            1 for section in requirements.section_requirements if section.name.strip()
+        )
+        if section_count > 0:
+            return requirements
+
+        await self._status(
+            "Analysis failed: the supervisor returned no section blueprint for this video/live-reference run."
+        )
+        raise RuntimeError(
+            "Validated loop analysis failed: the supervisor returned no `section_requirements` "
+            "for a video/live-reference run. Refusing to execute because that would allow section "
+            "coverage regressions. Fix the analyzer output and rerun."
+        )
 
     async def _send_supervisor_thinking(self, *, title: str, content: str) -> None:
         await self._send_message(
@@ -348,6 +460,231 @@ class ValidationLoopOrchestrator:
 
     def _next_event_id(self, prefix: str) -> str:
         return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+    async def _enrich_live_reference(
+        self, reference_bundle: ReferenceBundle
+    ) -> ReferenceBundle:
+        if (
+            not reference_bundle.reference_url.strip()
+            or reference_bundle.live_reference is not None
+        ):
+            return reference_bundle
+
+        await self._status(
+            "Inspecting live reference URL via Chrome DevTools and capturing example renders.",
+            data={"referenceUrl": reference_bundle.reference_url},
+        )
+        try:
+            live_reference = await self._live_reference_extractor.extract(
+                url=reference_bundle.reference_url,
+                viewport=_live_reference_viewport(reference_bundle),
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "Live reference URL inspection failed: " + str(exc)
+            ) from exc
+
+        await self._status(
+            "Captured live reference renders and extracted design-system details.",
+            data={
+                "referenceUrl": reference_bundle.reference_url,
+                "renderCount": len(live_reference.renders),
+            },
+        )
+        return reference_bundle.model_copy(update={"live_reference": live_reference})
+
+    async def _ensure_design_system_preflight(
+        self, reference_bundle: ReferenceBundle
+    ) -> ReferenceBundle:
+        if reference_bundle.design_system_preflight is not None:
+            persisted_design_system = self._persist_design_system_preflight_artifacts(
+                reference_bundle.design_system_preflight
+            )
+            await self._status(
+                "Design-system preflight ready.",
+                data={
+                    "artifactPath": persisted_design_system.html_artifact_path,
+                    "runDir": self._artifact_store.paths.run_dir,
+                },
+            )
+            return reference_bundle.model_copy(
+                update={"design_system_preflight": persisted_design_system}
+            )
+
+        reused_design_system = self._resolve_reusable_design_system(reference_bundle)
+        if reused_design_system is not None:
+            persisted_design_system = self._persist_design_system_preflight_artifacts(
+                reused_design_system
+            )
+            await self._status(
+                "Reusing saved design-system preflight artifact.",
+                data={
+                    "artifactPath": persisted_design_system.html_artifact_path,
+                    "runDir": self._artifact_store.paths.run_dir,
+                    "reuseMode": self._design_system_reuse_mode,
+                },
+            )
+            return reference_bundle.model_copy(
+                update={"design_system_preflight": persisted_design_system}
+            )
+
+        if self._design_system_reuse_mode == "require_reuse":
+            raise RuntimeError(
+                "Validated loop was configured to require a reusable design-system preflight, "
+                "but no compatible saved artifact was available."
+            )
+
+        if not _needs_design_system_preflight(reference_bundle):
+            await self._status(
+                "Skipping design-system preflight generation for this simple run.",
+                data={
+                    "reason": "No video input, live reference, or reference URL was provided.",
+                    "runDir": self._artifact_store.paths.run_dir,
+                },
+            )
+            return reference_bundle
+
+        await self._status(
+            "Generating required design-system preflight artifact.",
+            data={"runDir": self._artifact_store.paths.run_dir},
+        )
+        design_system = await self._design_system_builder.build(reference_bundle)
+        persisted_design_system = self._persist_design_system_preflight_artifacts(
+            design_system
+        )
+        await self._status(
+            "Design-system preflight ready.",
+            data={
+                "artifactPath": persisted_design_system.html_artifact_path,
+                "runDir": self._artifact_store.paths.run_dir,
+            },
+        )
+        return reference_bundle.model_copy(
+            update={"design_system_preflight": persisted_design_system}
+        )
+
+    def _resolve_reusable_design_system(
+        self, reference_bundle: ReferenceBundle
+    ) -> DesignSystemPreflight | None:
+        if self._design_system_reuse_mode == "generate":
+            return None
+
+        candidate_errors: list[str] = []
+
+        explicit_run_dir = (
+            self._design_system_reuse_run_dir.strip()
+            if self._design_system_reuse_run_dir
+            else ""
+        )
+        if explicit_run_dir:
+            try:
+                return self._load_compatible_design_system_from_run_dir(
+                    explicit_run_dir,
+                    reference_bundle,
+                )
+            except Exception as exc:
+                candidate_errors.append(str(exc))
+
+        cached_design_system = load_design_system_preflight_from_current_cache()
+        cached_reference_bundle = load_reference_bundle_from_current_cache()
+        if (
+            cached_design_system is not None
+            and cached_reference_bundle is not None
+            and self._design_system_reference_bundles_compatible(
+                current=reference_bundle,
+                candidate=cached_reference_bundle,
+            )
+        ):
+            return cached_design_system
+
+        if self._design_system_reuse_mode == "require_reuse" and candidate_errors:
+            raise RuntimeError(candidate_errors[0])
+
+        return None
+
+    def _load_compatible_design_system_from_run_dir(
+        self,
+        run_dir: str,
+        reference_bundle: ReferenceBundle,
+    ) -> DesignSystemPreflight:
+        source_reference_bundle = ValidatedLoopArtifactStore.load_reference_bundle(run_dir)
+        if not self._design_system_reference_bundles_compatible(
+            current=reference_bundle,
+            candidate=source_reference_bundle,
+        ):
+            raise RuntimeError(
+                "Saved design-system preflight is not compatible with the current reference input."
+            )
+        return load_design_system_preflight_from_run_dir(run_dir)
+
+    @staticmethod
+    def _design_system_reference_bundles_compatible(
+        *,
+        current: ReferenceBundle,
+        candidate: ReferenceBundle,
+    ) -> bool:
+        if current.input_mode != candidate.input_mode:
+            return False
+
+        current_reference_url = current.reference_url.strip()
+        candidate_reference_url = candidate.reference_url.strip()
+        if bool(current_reference_url) != bool(candidate_reference_url):
+            return False
+        if current_reference_url and candidate_reference_url:
+            if current_reference_url != candidate_reference_url:
+                return False
+
+        current_live_url = (
+            current.live_reference.url.strip()
+            if current.live_reference is not None
+            else ""
+        )
+        candidate_live_url = (
+            candidate.live_reference.url.strip()
+            if candidate.live_reference is not None
+            else ""
+        )
+        if bool(current_live_url) != bool(candidate_live_url):
+            return False
+        if current_live_url and candidate_live_url and current_live_url != candidate_live_url:
+            return False
+
+        if bool(current.images) != bool(candidate.images):
+            return False
+        if current.images and candidate.images:
+            if _media_fingerprints(current.images) != _media_fingerprints(candidate.images):
+                return False
+
+        if bool(current.videos) != bool(candidate.videos):
+            return False
+        if current.videos and candidate.videos:
+            if _media_fingerprints(current.videos) != _media_fingerprints(candidate.videos):
+                return False
+
+        if current.images and candidate.images and len(current.images) != len(candidate.images):
+            return False
+
+        if current.videos and candidate.videos and len(current.videos) != len(candidate.videos):
+            return False
+
+        return True
+
+    def _persist_design_system_preflight_artifacts(
+        self, design_system: DesignSystemPreflight
+    ) -> DesignSystemPreflight:
+        design_system_json, design_system_html = self._design_system_renderer.render(
+            design_system
+        )
+        run_json_path, run_html_path = self._artifact_store.persist_design_system_artifacts(
+            design_system_json=design_system_json,
+            design_system_html=design_system_html,
+        )
+        return design_system.model_copy(
+            update={
+                "json_artifact_path": run_json_path,
+                "html_artifact_path": run_html_path,
+            }
+        )
 
     def _should_stop_after_validation(
         self,
@@ -425,6 +762,29 @@ class ValidationLoopOrchestrator:
             lines.append(f"Summary: {requirements.summary}")
         if requirements.template_goal:
             lines.append(f"Template goal: {requirements.template_goal}")
+        if requirements.page_outline:
+            lines.append(
+                "Page outline:\n- " + "\n- ".join(requirements.page_outline[:6])
+            )
+        if requirements.closing_sections:
+            lines.append(
+                "Closing sections:\n- "
+                + "\n- ".join(requirements.closing_sections[:5])
+            )
+        if requirements.footer_present is not None:
+            footer_line = (
+                "Footer assessment: present"
+                if requirements.footer_present
+                else "Footer assessment: not present"
+            )
+            if requirements.footer_description:
+                footer_line += f" — {requirements.footer_description}"
+            lines.append(footer_line)
+        if requirements.coverage_notes:
+            lines.append(
+                "Coverage notes:\n- "
+                + "\n- ".join(requirements.coverage_notes[:4])
+            )
         if requirements.hard_constraints:
             lines.append(
                 "Hard constraints:\n- "
@@ -479,6 +839,21 @@ class ValidationLoopOrchestrator:
         ]
         if validation_report.summary:
             lines.append(f"Summary: {validation_report.summary}")
+        if validation_report.section_results:
+            missing_sections = [
+                result.name
+                for result in validation_report.section_results
+                if result.status == "missing"
+            ]
+            partial_sections = [
+                result.name
+                for result in validation_report.section_results
+                if result.status == "partial"
+            ]
+            if missing_sections:
+                lines.append("Missing sections:\n- " + "\n- ".join(missing_sections[:4]))
+            if partial_sections:
+                lines.append("Partial sections:\n- " + "\n- ".join(partial_sections[:4]))
         if validation_report.issues:
             lines.append(
                 "Top issues:\n- "
@@ -502,3 +877,7 @@ class ValidationLoopOrchestrator:
     @property
     def validator_model(self):
         return self._validator.model
+
+
+def _media_fingerprints(items: list[str]) -> list[str]:
+    return [sha256(item.encode("utf-8")).hexdigest() for item in items]
