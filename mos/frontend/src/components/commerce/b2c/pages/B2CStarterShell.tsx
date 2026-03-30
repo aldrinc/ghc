@@ -21,7 +21,7 @@ type B2CStarterShellProps = {
 
 function shellLinkClass(isMuted = false): string {
   const baseClasses = "text-sm transition-colors";
-  return isMuted ? `${baseClasses} text-zinc-500 hover:text-zinc-900` : `${baseClasses} text-zinc-600 hover:text-zinc-900`;
+  return isMuted ? `${baseClasses} text-content-muted hover:text-content` : `${baseClasses} text-content-muted hover:text-content`;
 }
 
 function rootCategories<T extends { parent_category_id?: string | null }>(categories: T[]): T[] {
@@ -170,11 +170,11 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-white text-zinc-900"
+      className="flex min-h-screen flex-col bg-surface text-content"
       style={rootStyle}
     >
       <header
-        className="sticky inset-x-0 top-0 z-50 border-b border-neutral-200 bg-white text-zinc-900"
+        className="sticky inset-x-0 top-0 z-50 border-b border-border bg-surface text-content"
         style={headerStyle}
         data-testid="b2c-starter-header"
       >
@@ -183,7 +183,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex items-center justify-center rounded-full border border-neutral-200 p-2 text-zinc-900 transition hover:bg-neutral-50 lg:hidden"
+              className="inline-flex items-center justify-center rounded-full border border-border p-2 text-content transition hover:bg-surface-hover lg:hidden"
               style={{
                 borderRadius: actionRadius,
                 ...(isThemed
@@ -232,7 +232,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
               {logoDisplay}
               <span className="min-w-0">
                 <span
-                  className="block truncate text-sm font-semibold uppercase tracking-[0.14em] text-zinc-900"
+                  className="block truncate text-sm font-semibold uppercase tracking-[0.14em] text-content"
                   style={headingStyle}
                 >
                   {brandName}
@@ -248,7 +248,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                 setMiniCartOpen(false);
                 navigateToAccount();
               }}
-              className="hidden text-sm transition-colors hover:text-zinc-900 sm:inline-flex"
+              className="hidden text-sm transition-colors hover:text-content sm:inline-flex"
               style={{
                 ...(isThemed
                   ? {
@@ -266,7 +266,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
               <button
                 type="button"
                 onClick={handleCartTrigger}
-                className="relative inline-flex items-center gap-1 text-sm transition-colors hover:text-zinc-900"
+                className="relative inline-flex items-center gap-1 text-sm transition-colors hover:text-content"
                 style={{
                   ...(isThemed
                     ? {
@@ -297,7 +297,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                     aria-modal="true"
                   >
                     <div
-                      className="flex h-full w-full max-w-[28rem] flex-col border-l bg-white px-5 py-5 shadow-2xl sm:px-6"
+                      className="flex h-full w-full max-w-[28rem] flex-col border-l bg-surface px-5 py-5 shadow-2xl sm:px-6"
                       style={miniCartStyle}
                     >
                       <div className="flex items-center justify-between gap-4">
@@ -485,7 +485,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
 
         {menuOpen ? (
           <div
-            className="border-t border-neutral-200 bg-white px-4 py-3 lg:hidden"
+            className="border-t border-border bg-surface px-4 py-3 lg:hidden"
             style={{
               borderTopColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
               backgroundColor: tokens.colorBackground || "#ffffff",
@@ -499,7 +499,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                   setMiniCartOpen(false);
                   setMenuOpen(false);
                 }}
-                className="rounded-xl px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-neutral-50 hover:text-zinc-900"
+                className="rounded-xl px-3 py-2 text-left text-sm text-content-muted transition hover:bg-surface-hover hover:text-content"
                 style={{ borderRadius: actionRadius, ...(isThemed ? { color: tokens.colorText } : {}) }}
               >
                 All products
@@ -513,7 +513,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                     setMiniCartOpen(false);
                     setMenuOpen(false);
                   }}
-                  className="rounded-xl px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-neutral-50 hover:text-zinc-900"
+                  className="rounded-xl px-3 py-2 text-left text-sm text-content-muted transition hover:bg-surface-hover hover:text-content"
                   style={{ borderRadius: actionRadius, ...(isThemed ? { color: tokens.colorText } : {}) }}
                 >
                   {category.name}
@@ -526,7 +526,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                   setMiniCartOpen(false);
                   setMenuOpen(false);
                 }}
-                className="rounded-xl px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-neutral-50 hover:text-zinc-900"
+                className="rounded-xl px-3 py-2 text-left text-sm text-content-muted transition hover:bg-surface-hover hover:text-content"
                 style={{ borderRadius: actionRadius, ...(isThemed ? { color: tokens.colorText } : {}) }}
               >
                 {accountLabel}
@@ -539,7 +539,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
       <div className="flex-1">{children}</div>
 
       <footer
-        className="border-t border-neutral-200 bg-white text-zinc-900"
+        className="border-t border-border bg-surface text-content"
         style={footerStyle}
         data-testid="b2c-starter-footer"
       >
@@ -547,13 +547,13 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
             <div className="max-w-sm">
               <p
-                className="text-xs uppercase tracking-[0.14em] text-neutral-500"
+                className="text-xs uppercase tracking-[0.14em] text-content-muted"
                 style={mutedTextStyle}
               >
                 {brandName}
               </p>
               <p
-                className="mt-4 text-sm leading-7 text-neutral-600"
+                className="mt-4 text-sm leading-7 text-content-muted"
                 style={mutedTextStyle}
               >
                 Browse products, collections, cart, checkout, and account pages from one storefront.
@@ -562,7 +562,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
 
             <div>
               <h3
-                className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted"
                 style={sectionLabelStyle}
               >
                 Categories
@@ -583,7 +583,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                   ))
                 ) : (
                   <li
-                    className="text-sm text-neutral-500"
+                    className="text-sm text-content-muted"
                     style={mutedTextStyle}
                   >
                     Categories appear when catalog data is available.
@@ -594,7 +594,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
 
             <div>
               <h3
-                className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted"
                 style={sectionLabelStyle}
               >
                 Collections
@@ -615,7 +615,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
                   ))
                 ) : (
                   <li
-                    className="text-sm text-neutral-500"
+                    className="text-sm text-content-muted"
                     style={mutedTextStyle}
                   >
                     Collections appear after products are merchandised in Medusa.
@@ -626,7 +626,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
 
             <div>
               <h3
-                className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted"
                 style={sectionLabelStyle}
               >
                 Pages
@@ -677,7 +677,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
           </div>
 
           <div
-            className="mt-12 flex flex-col gap-3 border-t border-neutral-200 pt-6 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between"
+            className="mt-12 flex flex-col gap-3 border-t border-border pt-6 text-xs text-content-muted sm:flex-row sm:items-center sm:justify-between"
             style={{
               borderTopColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
               color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.64)",

@@ -185,18 +185,18 @@ function PageShell({
         style={theme.pageStyle}
       >
         <header
-          className="space-y-2 border-b border-zinc-200 pb-4"
+          className="space-y-2 border-b border-border pb-4"
           style={theme.borderStyle}
         >
           <h1
-            className="text-3xl font-medium text-zinc-950"
+            className="text-3xl font-medium text-content"
             style={theme.headingStyle}
           >
             {title}
           </h1>
           {description ? (
             <p
-              className="max-w-2xl text-sm text-zinc-600"
+              className="max-w-2xl text-sm text-content-muted"
               style={theme.mutedTextStyle}
             >
               {description}
@@ -512,7 +512,7 @@ function CatalogResultsSection({
       </div>
 
       {priceSortLimited ? (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-content-muted">
           Price sorting is currently limited to the first{' '}
           {PRICE_SORT_FETCH_LIMIT} products returned by Medusa.
         </p>
@@ -633,7 +633,7 @@ export function MedusaB2CPolicyPage({
     >
       {loading ? (
         <div
-          className="rounded-[28px] border border-zinc-200 bg-white px-5 py-5 text-sm text-zinc-600 sm:px-6"
+          className="rounded-[28px] border border-border bg-surface px-5 py-5 text-sm text-content-muted sm:px-6"
           style={theme.surfaceStyle}
         >
           Loading {pageTitle || 'policy page'}...
@@ -643,7 +643,7 @@ export function MedusaB2CPolicyPage({
       {error ? (
         <div
           role="alert"
-          className="rounded-[28px] border border-rose-200 bg-rose-50 px-5 py-5 text-sm text-rose-900 sm:px-6"
+          className="rounded-[28px] border border-danger/30 bg-danger/10 px-5 py-5 text-sm text-danger sm:px-6"
         >
           Unable to load {pageTitle || 'policy page'}. {error}
         </div>
@@ -651,7 +651,7 @@ export function MedusaB2CPolicyPage({
 
       {policyPage ? (
         <div
-          className="rounded-[28px] border border-zinc-200 bg-white px-5 py-6 sm:px-6"
+          className="rounded-[28px] border border-border bg-surface px-5 py-6 sm:px-6"
           style={theme.surfaceStyle}
         >
           <MarkdownViewer
@@ -700,19 +700,19 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
     <div className="w-full max-w-sm space-y-6">
       <div className="space-y-2 text-center">
         <h2
-          className="text-2xl font-semibold text-zinc-950"
+          className="text-2xl font-semibold text-content"
           style={theme.headingStyle}
         >
           Welcome back
         </h2>
-        <p className="text-sm text-zinc-600" style={theme.mutedTextStyle}>
+        <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
           Sign in to access your account and orders.
         </p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Email
@@ -722,13 +722,13 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Password
@@ -738,28 +738,28 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="w-full rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
           style={theme.primaryButtonStyle}
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
       <p
-        className="text-center text-sm text-zinc-600"
+        className="text-center text-sm text-content-muted"
         style={theme.mutedTextStyle}
       >
         Not a member?{' '}
         <button
           onClick={onSwitch}
-          className="font-medium text-zinc-950 underline"
+          className="font-medium text-content underline"
           style={theme.textStyle}
         >
           Join us
@@ -813,12 +813,12 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
     <div className="w-full max-w-sm space-y-6">
       <div className="space-y-2 text-center">
         <h2
-          className="text-2xl font-semibold text-zinc-950"
+          className="text-2xl font-semibold text-content"
           style={theme.headingStyle}
         >
           Create an account
         </h2>
-        <p className="text-sm text-zinc-600" style={theme.mutedTextStyle}>
+        <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
           Join us for an enhanced shopping experience.
         </p>
       </div>
@@ -826,7 +826,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-content-muted"
               style={theme.labelStyle}
             >
               First name
@@ -838,13 +838,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
                 setForm((f) => ({ ...f, firstName: e.target.value }))
               }
               required
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
               style={theme.inputStyle}
             />
           </div>
           <div>
             <label
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-content-muted"
               style={theme.labelStyle}
             >
               Last name
@@ -856,14 +856,14 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
                 setForm((f) => ({ ...f, lastName: e.target.value }))
               }
               required
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
               style={theme.inputStyle}
             />
           </div>
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Email
@@ -873,13 +873,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Phone
@@ -888,13 +888,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             type="tel"
             value={form.phone}
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Password
@@ -906,28 +906,28 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
               setForm((f) => ({ ...f, password: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="w-full rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
           style={theme.primaryButtonStyle}
         >
           {loading ? 'Creating account...' : 'Create account'}
         </button>
       </form>
       <p
-        className="text-center text-sm text-zinc-600"
+        className="text-center text-sm text-content-muted"
         style={theme.mutedTextStyle}
       >
         Already a member?{' '}
         <button
           onClick={onSwitch}
-          className="font-medium text-zinc-950 underline"
+          className="font-medium text-content underline"
           style={theme.textStyle}
         >
           Sign in
@@ -961,15 +961,15 @@ function AccountErrorShell({ message }: { message: string }) {
       title="Account unavailable"
       description="A customer session exists, but the storefront could not load account data from Medusa."
     >
-      <div className="max-w-2xl rounded-xl border border-red-200 bg-red-50 p-6">
-        <p className="font-medium text-red-950">
+      <div className="max-w-2xl rounded-xl border border-danger/30 bg-danger/10 p-6">
+        <p className="font-medium text-danger">
           Account data could not be loaded.
         </p>
-        <p className="mt-2 text-sm text-red-800">
+        <p className="mt-2 text-sm text-danger">
           This is a storefront or backend failure, not a sign-in problem. Fix
           the customer or order API and reload this page.
         </p>
-        <p className="mt-4 text-sm text-red-900">{message}</p>
+        <p className="mt-4 text-sm text-danger">{message}</p>
       </div>
     </PageShell>
   );
@@ -1013,15 +1013,15 @@ function AccountNav({
   return (
     <div className="space-y-6">
       <div
-        className="rounded-xl border border-zinc-200 p-4"
+        className="rounded-xl border border-border p-4"
         style={theme.surfaceStyle}
       >
-        <p className="font-medium text-zinc-950" style={theme.headingStyle}>
+        <p className="font-medium text-content" style={theme.headingStyle}>
           {[customer?.first_name, customer?.last_name]
             .filter(Boolean)
             .join(' ') || 'Account'}
         </p>
-        <p className="text-sm text-zinc-500" style={theme.mutedTextStyle}>
+        <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
           {customer?.email}
         </p>
       </div>
@@ -1032,8 +1032,8 @@ function AccountNav({
             onClick={item.onClick}
             className={`block w-full rounded-lg px-3 py-2 text-left text-sm font-medium ${
               active === item.id
-                ? 'bg-zinc-100 text-zinc-950'
-                : 'text-zinc-600 hover:bg-zinc-50'
+                ? 'bg-surface-2 text-content'
+                : 'text-content-muted hover:bg-surface-hover'
             }`}
             style={
               active === item.id
@@ -1046,7 +1046,7 @@ function AccountNav({
         ))}
         <button
           onClick={handleLogout}
-          className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+          className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger/10"
         >
           Log out
         </button>
@@ -1086,19 +1086,19 @@ export function MedusaB2CAccountDashboardPage() {
         <AccountNav active="dashboard" />
         <div className="space-y-6">
           <div
-            className="rounded-xl border border-zinc-200 p-6"
+            className="rounded-xl border border-border p-6"
             style={theme.surfaceStyle}
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2
-                  className="text-lg font-medium text-zinc-950"
+                  className="text-lg font-medium text-content"
                   style={theme.headingStyle}
                 >
                   Welcome back
                 </h2>
                 <p
-                  className="mt-2 text-sm text-zinc-600"
+                  className="mt-2 text-sm text-content-muted"
                   style={theme.mutedTextStyle}
                 >
                   You&apos;re signed in as {customer?.email}
@@ -1110,7 +1110,7 @@ export function MedusaB2CAccountDashboardPage() {
                   <span style={theme.textStyle}>{profileCompletion}%</span>
                 </div>
                 <div
-                  className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-200"
+                  className="mt-2 h-2 overflow-hidden rounded-full bg-border"
                   style={{
                     backgroundColor:
                       theme.tokens.colorBorder || 'rgba(17, 24, 39, 0.12)',
@@ -1139,17 +1139,17 @@ export function MedusaB2CAccountDashboardPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div
-              className="rounded-xl border border-zinc-200 p-6"
+              className="rounded-xl border border-border p-6"
               style={theme.surfaceStyle}
             >
               <h3
-                className="font-medium text-zinc-950"
+                className="font-medium text-content"
                 style={theme.headingStyle}
               >
                 Profile
               </h3>
               <p
-                className="mt-1 text-sm text-zinc-600"
+                className="mt-1 text-sm text-content-muted"
                 style={theme.mutedTextStyle}
               >
                 Manage your personal information.
@@ -1164,17 +1164,17 @@ export function MedusaB2CAccountDashboardPage() {
               </button>
             </div>
             <div
-              className="rounded-xl border border-zinc-200 p-6"
+              className="rounded-xl border border-border p-6"
               style={theme.surfaceStyle}
             >
               <h3
-                className="font-medium text-zinc-950"
+                className="font-medium text-content"
                 style={theme.headingStyle}
               >
                 Orders
               </h3>
               <p
-                className="mt-1 text-sm text-zinc-600"
+                className="mt-1 text-sm text-content-muted"
                 style={theme.mutedTextStyle}
               >
                 View and track your orders.
@@ -1287,7 +1287,7 @@ export function MedusaB2CAccountProfilePage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-content-muted"
                   style={theme.labelStyle}
                 >
                   First name
@@ -1298,13 +1298,13 @@ export function MedusaB2CAccountProfilePage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, firstName: e.target.value }))
                   }
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                  className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
                   style={theme.inputStyle}
                 />
               </div>
               <div>
                 <label
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-content-muted"
                   style={theme.labelStyle}
                 >
                   Last name
@@ -1315,14 +1315,14 @@ export function MedusaB2CAccountProfilePage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, lastName: e.target.value }))
                   }
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                  className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
                   style={theme.inputStyle}
                 />
               </div>
             </div>
             <div>
               <label
-                className="block text-sm font-medium text-zinc-700"
+                className="block text-sm font-medium text-content-muted"
                 style={theme.labelStyle}
               >
                 Email
@@ -1333,13 +1333,13 @@ export function MedusaB2CAccountProfilePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, email: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
                 style={theme.inputStyle}
               />
             </div>
             <div>
               <label
-                className="block text-sm font-medium text-zinc-700"
+                className="block text-sm font-medium text-content-muted"
                 style={theme.labelStyle}
               >
                 Phone
@@ -1350,20 +1350,20 @@ export function MedusaB2CAccountProfilePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, phone: e.target.value }))
                 }
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
                 style={theme.inputStyle}
               />
             </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
             {success ? (
-              <p className="text-sm text-green-600">
+              <p className="text-sm text-success">
                 Profile updated successfully.
               </p>
             ) : null}
             <button
               type="submit"
               disabled={customerLoading}
-              className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
               style={theme.primaryButtonStyle}
             >
               {customerLoading ? 'Saving...' : 'Save changes'}
@@ -1371,7 +1371,7 @@ export function MedusaB2CAccountProfilePage() {
           </form>
 
           <div
-            className="max-w-md rounded-xl border border-zinc-200 p-6"
+            className="max-w-md rounded-xl border border-border p-6"
             style={theme.surfaceStyle}
           >
             <h2 className="text-lg font-medium" style={theme.headingStyle}>
@@ -1382,10 +1382,10 @@ export function MedusaB2CAccountProfilePage() {
               email. We&apos;ll send the reset link to {form.email || customer?.email}.
             </p>
             {passwordResetError ? (
-              <p className="mt-4 text-sm text-red-600">{passwordResetError}</p>
+              <p className="mt-4 text-sm text-danger">{passwordResetError}</p>
             ) : null}
             {passwordResetSuccess ? (
-              <p className="mt-4 text-sm text-green-600">
+              <p className="mt-4 text-sm text-success">
                 Reset link sent. Check your inbox to finish updating your
                 password.
               </p>
@@ -1454,13 +1454,13 @@ function AddressForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-xl border border-zinc-200 p-6"
+      className="space-y-4 rounded-xl border border-border p-6"
       style={theme.surfaceStyle}
     >
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             First name
@@ -1472,13 +1472,13 @@ function AddressForm({
               setForm((f) => ({ ...f, first_name: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Last name
@@ -1490,14 +1490,14 @@ function AddressForm({
               setForm((f) => ({ ...f, last_name: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
       </div>
       <div>
         <label
-          className="block text-sm font-medium text-zinc-700"
+          className="block text-sm font-medium text-content-muted"
           style={theme.labelStyle}
         >
           Company (optional)
@@ -1506,13 +1506,13 @@ function AddressForm({
           type="text"
           value={form.company}
           onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
           style={theme.inputStyle}
         />
       </div>
       <div>
         <label
-          className="block text-sm font-medium text-zinc-700"
+          className="block text-sm font-medium text-content-muted"
           style={theme.labelStyle}
         >
           Address line 1
@@ -1524,13 +1524,13 @@ function AddressForm({
             setForm((f) => ({ ...f, address_1: e.target.value }))
           }
           required
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
           style={theme.inputStyle}
         />
       </div>
       <div>
         <label
-          className="block text-sm font-medium text-zinc-700"
+          className="block text-sm font-medium text-content-muted"
           style={theme.labelStyle}
         >
           Address line 2 (optional)
@@ -1541,14 +1541,14 @@ function AddressForm({
           onChange={(e) =>
             setForm((f) => ({ ...f, address_2: e.target.value }))
           }
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+          className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
           style={theme.inputStyle}
         />
       </div>
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             City
@@ -1558,13 +1558,13 @@ function AddressForm({
             value={form.city}
             onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Province/State
@@ -1576,13 +1576,13 @@ function AddressForm({
               setForm((f) => ({ ...f, province: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Postal code
@@ -1594,7 +1594,7 @@ function AddressForm({
               setForm((f) => ({ ...f, postal_code: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
@@ -1602,7 +1602,7 @@ function AddressForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Country code
@@ -1612,7 +1612,7 @@ function AddressForm({
             onChange={(e) =>
               setForm((f) => ({ ...f, country_code: e.target.value }))
             }
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           >
             <option value="us">United States</option>
@@ -1625,7 +1625,7 @@ function AddressForm({
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-content-muted"
             style={theme.labelStyle}
           >
             Phone
@@ -1634,7 +1634,7 @@ function AddressForm({
             type="tel"
             value={form.phone}
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
@@ -1643,7 +1643,7 @@ function AddressForm({
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
           style={theme.primaryButtonStyle}
         >
           {loading ? 'Saving...' : address ? 'Update address' : 'Add address'}
@@ -1652,7 +1652,7 @@ function AddressForm({
           type="button"
           onClick={onCancel}
           disabled={loading}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-surface-hover"
           style={theme.secondaryButtonStyle}
         >
           Cancel
@@ -1733,7 +1733,7 @@ export function MedusaB2CAccountAddressesPage() {
       <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
         <AccountNav active="addresses" />
         <div className="space-y-6">
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
 
           {isAdding ? (
             <AddressForm
@@ -1744,7 +1744,7 @@ export function MedusaB2CAccountAddressesPage() {
           ) : (
             <button
               onClick={() => setIsAdding(true)}
-              className="w-full rounded-xl border-2 border-dashed border-zinc-300 p-6 text-center text-sm font-medium text-zinc-600 hover:border-zinc-900 hover:text-zinc-900"
+              className="w-full rounded-xl border-2 border-dashed border-border p-6 text-center text-sm font-medium text-content-muted hover:border-content hover:text-content"
               style={theme.surfaceStyle}
             >
               + Add new address
@@ -1755,7 +1755,7 @@ export function MedusaB2CAccountAddressesPage() {
             {customer?.addresses?.map((address) => (
               <div
                 key={address.id}
-                className="rounded-xl border border-zinc-200 p-4"
+                className="rounded-xl border border-border p-4"
                 style={theme.surfaceStyle}
               >
                 {editingAddress?.id === address.id ? (
@@ -1768,7 +1768,7 @@ export function MedusaB2CAccountAddressesPage() {
                 ) : (
                   <>
                     <p
-                      className="font-medium text-zinc-950"
+                      className="font-medium text-content"
                       style={theme.headingStyle}
                     >
                       {[address.first_name, address.last_name]
@@ -1777,28 +1777,28 @@ export function MedusaB2CAccountAddressesPage() {
                     </p>
                     {address.company ? (
                       <p
-                        className="text-sm text-zinc-600"
+                        className="text-sm text-content-muted"
                         style={theme.mutedTextStyle}
                       >
                         {address.company}
                       </p>
                     ) : null}
                     <p
-                      className="text-sm text-zinc-600"
+                      className="text-sm text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       {address.address_1}
                     </p>
                     {address.address_2 ? (
                       <p
-                        className="text-sm text-zinc-600"
+                        className="text-sm text-content-muted"
                         style={theme.mutedTextStyle}
                       >
                         {address.address_2}
                       </p>
                     ) : null}
                     <p
-                      className="text-sm text-zinc-600"
+                      className="text-sm text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       {[address.city, address.province, address.postal_code]
@@ -1806,14 +1806,14 @@ export function MedusaB2CAccountAddressesPage() {
                         .join(', ')}
                     </p>
                     <p
-                      className="text-sm text-zinc-600"
+                      className="text-sm text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       {address.country_code?.toUpperCase()}
                     </p>
                     {address.phone ? (
                       <p
-                        className="text-sm text-zinc-600"
+                        className="text-sm text-content-muted"
                         style={theme.mutedTextStyle}
                       >
                         {address.phone}
@@ -1822,14 +1822,14 @@ export function MedusaB2CAccountAddressesPage() {
                     <div className="mt-4 flex gap-3">
                       <button
                         onClick={() => setEditingAddress(address)}
-                        className="text-sm font-medium text-zinc-950 underline"
+                        className="text-sm font-medium text-content underline"
                         style={theme.textStyle}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(address.id)}
-                        className="text-sm font-medium text-red-600 underline"
+                        className="text-sm font-medium text-danger underline"
                       >
                         Delete
                       </button>
@@ -1841,7 +1841,7 @@ export function MedusaB2CAccountAddressesPage() {
           </div>
 
           {!customer?.addresses?.length && !isAdding ? (
-            <p className="text-center text-sm text-zinc-500">
+            <p className="text-center text-sm text-content-muted">
               No addresses saved yet.
             </p>
           ) : null}
@@ -1861,27 +1861,27 @@ function OrderCard({ order }: { order: MedusaOrder }) {
 
   return (
     <div
-      className="rounded-xl border border-zinc-200 p-4"
+      className="rounded-xl border border-border p-4"
       style={theme.surfaceStyle}
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-medium text-zinc-950" style={theme.headingStyle}>
+          <p className="font-medium text-content" style={theme.headingStyle}>
             Order #{order.display_id || order.id.slice(-8)}
           </p>
-          <p className="text-sm text-zinc-500" style={theme.mutedTextStyle}>
+          <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
             {formatDate(order.created_at)}
           </p>
         </div>
         <div className="text-right">
-          <p className="font-medium text-zinc-950" style={theme.headingStyle}>
+          <p className="font-medium text-content" style={theme.headingStyle}>
             {formatPrice(order.total, order.currency_code)}
           </p>
           <span
             className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
               order.status === 'completed'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-zinc-100 text-zinc-800'
+                ? 'bg-success/10 text-success'
+                : 'bg-surface-2 text-content'
             }`}
           >
             {order.status || 'Pending'}
@@ -1890,17 +1890,17 @@ function OrderCard({ order }: { order: MedusaOrder }) {
       </div>
       {order.items && order.items.length > 0 && (
         <div
-          className="mt-4 border-t border-zinc-100 pt-4"
+          className="mt-4 border-t border-divider pt-4"
           style={theme.borderStyle}
         >
-          <p className="text-sm text-zinc-600" style={theme.mutedTextStyle}>
+          <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
             {order.items.length} item(s)
           </p>
         </div>
       )}
       <button
         onClick={() => navigateToOrder(order.id)}
-        className="mt-4 text-sm font-medium text-zinc-950 underline"
+        className="mt-4 text-sm font-medium text-content underline"
         style={theme.textStyle}
       >
         View details
@@ -1942,19 +1942,19 @@ export function MedusaB2CAccountOrdersPage() {
         <AccountNav active="orders" />
         <div className="space-y-4">
           {loading ? (
-            <p className="text-sm text-zinc-500">Loading orders...</p>
+            <p className="text-sm text-content-muted">Loading orders...</p>
           ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-danger">{error}</p>
           ) : orders.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-zinc-950 font-medium">No orders yet</p>
-              <p className="text-sm text-zinc-600 mt-1">
+              <p className="text-content font-medium">No orders yet</p>
+              <p className="text-sm text-content-muted mt-1">
                 You haven&apos;t placed any orders yet.
               </p>
             </div>
           ) : (
             <>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-content-muted">
                 Showing {orders.length} of {count} orders
               </p>
               <div className="space-y-4">
@@ -2029,27 +2029,27 @@ export function MedusaB2CAccountOrderDetailPage() {
         <AccountNav active="orders" />
         <div>
           {loading ? (
-            <p className="text-sm text-zinc-500">Loading order...</p>
+            <p className="text-sm text-content-muted">Loading order...</p>
           ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-danger">{error}</p>
           ) : !order ? (
-            <p className="text-sm text-zinc-500">Order not found.</p>
+            <p className="text-sm text-content-muted">Order not found.</p>
           ) : (
             <div className="space-y-6">
               <div
-                className="rounded-xl border border-zinc-200 p-6"
+                className="rounded-xl border border-border p-6"
                 style={theme.surfaceStyle}
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <p
-                      className="text-sm text-zinc-500"
+                      className="text-sm text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       Order date
                     </p>
                     <p
-                      className="font-medium text-zinc-950"
+                      className="font-medium text-content"
                       style={theme.headingStyle}
                     >
                       {formatDate(order.created_at)}
@@ -2058,8 +2058,8 @@ export function MedusaB2CAccountOrderDetailPage() {
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${
                       order.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-zinc-100 text-zinc-800'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-surface-2 text-content'
                     }`}
                   >
                     {order.status || 'Pending'}
@@ -2069,11 +2069,11 @@ export function MedusaB2CAccountOrderDetailPage() {
 
               {order.items && order.items.length > 0 && (
                 <div
-                  className="rounded-xl border border-zinc-200 p-6"
+                  className="rounded-xl border border-border p-6"
                   style={theme.surfaceStyle}
                 >
                   <h3
-                    className="font-medium text-zinc-950 mb-4"
+                    className="font-medium text-content mb-4"
                     style={theme.headingStyle}
                   >
                     Items
@@ -2094,21 +2094,21 @@ export function MedusaB2CAccountOrderDetailPage() {
                           )}
                           <div>
                             <p
-                              className="font-medium text-zinc-950"
+                              className="font-medium text-content"
                               style={theme.headingStyle}
                             >
                               {item.title}
                             </p>
                             {item.variant_title && (
                               <p
-                                className="text-sm text-zinc-600"
+                                className="text-sm text-content-muted"
                                 style={theme.mutedTextStyle}
                               >
                                 {item.variant_title}
                               </p>
                             )}
                             <p
-                              className="text-sm text-zinc-500"
+                              className="text-sm text-content-muted"
                               style={theme.mutedTextStyle}
                             >
                               Qty: {item.quantity}
@@ -2116,7 +2116,7 @@ export function MedusaB2CAccountOrderDetailPage() {
                           </div>
                         </div>
                         <p
-                          className="font-medium text-zinc-950"
+                          className="font-medium text-content"
                           style={theme.headingStyle}
                         >
                           {formatPrice(item.total, order.currency_code)}
@@ -2128,11 +2128,11 @@ export function MedusaB2CAccountOrderDetailPage() {
               )}
 
               <div
-                className="rounded-xl border border-zinc-200 p-6"
+                className="rounded-xl border border-border p-6"
                 style={theme.surfaceStyle}
               >
                 <h3
-                  className="font-medium text-zinc-950 mb-4"
+                  className="font-medium text-content mb-4"
                   style={theme.headingStyle}
                 >
                   Order summary
@@ -2140,49 +2140,49 @@ export function MedusaB2CAccountOrderDetailPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span
-                      className="text-zinc-600"
+                      className="text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       Subtotal
                     </span>
-                    <span className="text-zinc-950" style={theme.textStyle}>
+                    <span className="text-content" style={theme.textStyle}>
                       {formatPrice(order.subtotal, order.currency_code)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span
-                      className="text-zinc-600"
+                      className="text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       Shipping
                     </span>
-                    <span className="text-zinc-950" style={theme.textStyle}>
+                    <span className="text-content" style={theme.textStyle}>
                       {formatPrice(order.shipping_total, order.currency_code)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span
-                      className="text-zinc-600"
+                      className="text-content-muted"
                       style={theme.mutedTextStyle}
                     >
                       Tax
                     </span>
-                    <span className="text-zinc-950" style={theme.textStyle}>
+                    <span className="text-content" style={theme.textStyle}>
                       {formatPrice(order.tax_total, order.currency_code)}
                     </span>
                   </div>
                   <div
-                    className="flex justify-between border-t border-zinc-200 pt-2"
+                    className="flex justify-between border-t border-border pt-2"
                     style={theme.borderStyle}
                   >
                     <span
-                      className="font-medium text-zinc-950"
+                      className="font-medium text-content"
                       style={theme.headingStyle}
                     >
                       Total
                     </span>
                     <span
-                      className="font-medium text-zinc-950"
+                      className="font-medium text-content"
                       style={theme.headingStyle}
                     >
                       {formatPrice(order.total, order.currency_code)}
@@ -2192,17 +2192,17 @@ export function MedusaB2CAccountOrderDetailPage() {
               </div>
 
               <div
-                className="rounded-xl border border-zinc-200 p-6"
+                className="rounded-xl border border-border p-6"
                 style={theme.surfaceStyle}
               >
                 <h3
-                  className="font-medium text-zinc-950 mb-4"
+                  className="font-medium text-content mb-4"
                   style={theme.headingStyle}
                 >
                   Order transfers
                 </h3>
                 <p
-                  className="text-sm text-zinc-600"
+                  className="text-sm text-content-muted"
                   style={theme.mutedTextStyle}
                 >
                   Request a transfer email if this order should move to another
@@ -2210,7 +2210,7 @@ export function MedusaB2CAccountOrderDetailPage() {
                 </p>
                 {transferMessage ? (
                   <p
-                    className="mt-3 text-sm text-zinc-700"
+                    className="mt-3 text-sm text-content-muted"
                     style={theme.textStyle}
                   >
                     {transferMessage}
@@ -2218,7 +2218,7 @@ export function MedusaB2CAccountOrderDetailPage() {
                 ) : null}
                 <button
                   onClick={() => void handleTransferRequest()}
-                  className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                  className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-medium text-content hover:bg-surface-hover"
                   style={theme.secondaryButtonStyle}
                 >
                   Request transfer
@@ -2227,17 +2227,17 @@ export function MedusaB2CAccountOrderDetailPage() {
 
               {order.shipping_address && (
                 <div
-                  className="rounded-xl border border-zinc-200 p-6"
+                  className="rounded-xl border border-border p-6"
                   style={theme.surfaceStyle}
                 >
                   <h3
-                    className="font-medium text-zinc-950 mb-4"
+                    className="font-medium text-content mb-4"
                     style={theme.headingStyle}
                   >
                     Shipping address
                   </h3>
                   <div
-                    className="text-sm text-zinc-600"
+                    className="text-sm text-content-muted"
                     style={theme.mutedTextStyle}
                   >
                     <p>
@@ -2654,7 +2654,7 @@ export function MedusaB2CCartPage() {
       <div className="space-y-6">
         {!customer ? (
           <div
-            className="rounded-xl border border-zinc-200 p-5"
+            className="rounded-xl border border-border p-5"
             style={theme.surfaceStyle}
           >
             <p className="font-medium" style={theme.headingStyle}>
@@ -2677,7 +2677,7 @@ export function MedusaB2CCartPage() {
 
         {typeof remainingFreeShipping === 'number' ? (
           <div
-            className="rounded-xl border border-zinc-200 p-5"
+            className="rounded-xl border border-border p-5"
             style={theme.surfaceStyle}
           >
             <div className="flex items-center justify-between gap-4">
@@ -2694,7 +2694,7 @@ export function MedusaB2CCartPage() {
               </span>
             </div>
             <div
-              className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200"
+              className="mt-3 h-2 overflow-hidden rounded-full bg-border"
               style={{
                 backgroundColor:
                   theme.tokens.colorBorder || 'rgba(17, 24, 39, 0.12)',
@@ -2715,7 +2715,7 @@ export function MedusaB2CCartPage() {
           {cart.items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col gap-4 rounded-xl border border-zinc-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
               style={theme.surfaceStyle}
             >
               <div className="flex items-center gap-4">
@@ -2752,7 +2752,7 @@ export function MedusaB2CCartPage() {
 
               <div className="flex items-center justify-between gap-4 sm:min-w-[15rem]">
                 <div
-                  className="flex items-center border border-zinc-200"
+                  className="flex items-center border border-border"
                   style={theme.surfaceStyle}
                 >
                   <button
@@ -2789,7 +2789,7 @@ export function MedusaB2CCartPage() {
                   </p>
                   <button
                     type="button"
-                    className="mt-1 text-sm text-red-600"
+                    className="mt-1 text-sm text-danger"
                     onClick={() => void removeCartItem(item.id)}
                   >
                     Remove
@@ -2801,7 +2801,7 @@ export function MedusaB2CCartPage() {
         </div>
 
         <div
-          className="rounded-xl border border-zinc-200 p-5"
+          className="rounded-xl border border-border p-5"
           style={theme.surfaceStyle}
         >
           <div className="space-y-3 text-sm">
@@ -2962,7 +2962,7 @@ function getProviderPresentation(providerId: string): {
     return {
       label: 'G Pay',
       badge: 'GP',
-      badgeClassName: 'border-zinc-300 bg-white text-zinc-950',
+      badgeClassName: 'border-border bg-surface text-content',
       kind: 'express',
       helper: 'Accelerated checkout with Google Pay.',
     };
@@ -2972,7 +2972,7 @@ function getProviderPresentation(providerId: string): {
     return {
       label: 'Apple Pay',
       badge: 'AP',
-      badgeClassName: 'border-zinc-300 bg-zinc-950 text-white',
+      badgeClassName: 'border-border bg-content text-white',
       kind: 'express',
       helper: 'Accelerated checkout with Apple Pay.',
     };
@@ -2992,7 +2992,7 @@ function getProviderPresentation(providerId: string): {
     return {
       label: 'Manual Test',
       badge: 'MT',
-      badgeClassName: 'border-zinc-300 bg-zinc-100 text-zinc-700',
+      badgeClassName: 'border-border bg-surface-2 text-content-muted',
       kind: 'standard',
       helper: 'Use this provider to complete checkout inside the storefront.',
     };
@@ -3002,7 +3002,7 @@ function getProviderPresentation(providerId: string): {
     return {
       label: 'Card',
       badge: 'CC',
-      badgeClassName: 'border-zinc-300 bg-white text-zinc-950',
+      badgeClassName: 'border-border bg-surface text-content',
       kind: 'standard',
       helper: 'Card handling is delegated to the active payment provider.',
     };
@@ -3014,7 +3014,7 @@ function getProviderPresentation(providerId: string): {
       .replace(/[_-]+/g, ' ')
       .replace(/\b\w/g, (match) => match.toUpperCase()),
     badge: providerId.slice(0, 2).toUpperCase(),
-    badgeClassName: 'border-zinc-300 bg-zinc-100 text-zinc-700',
+    badgeClassName: 'border-border bg-surface-2 text-content-muted',
     kind: 'standard',
     helper:
       'Provider-specific behavior is handled by the active Medusa runtime.',
@@ -3242,10 +3242,10 @@ function CheckoutStripeCardForm({
   return (
     <div className="space-y-4">
       <div
-        className="rounded-md border border-zinc-400 bg-white px-4 py-4"
+        className="rounded-md border border-border bg-surface px-4 py-4"
         data-testid="b2c-stripe-card-form"
       >
-        <div className="mb-3 flex items-center justify-between gap-3 text-xs text-zinc-600">
+        <div className="mb-3 flex items-center justify-between gap-3 text-xs text-content-muted">
           <span>Card details</span>
           {cardBrand ? <span>{cardBrand}</span> : null}
         </div>
@@ -3265,13 +3265,13 @@ function CheckoutStripeCardForm({
         />
       </div>
       {cardError ? (
-        <p className="text-sm font-medium text-red-600">{cardError}</p>
+        <p className="text-sm font-medium text-danger">{cardError}</p>
       ) : null}
       <button
         type="button"
         onClick={() => void handleSubmit()}
         disabled={submitting || !cardComplete || !stripe || !elements}
-        className="w-full rounded-md bg-zinc-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-md bg-content px-6 py-3 text-sm font-medium text-white transition hover:bg-content/80 disabled:cursor-not-allowed disabled:opacity-50"
         style={{ ...buttonStyle, borderRadius: '6px' }}
         data-testid="b2c-stripe-complete-checkout"
       >
@@ -3307,11 +3307,11 @@ function CheckoutShell({
 
   return (
     <div
-      className="min-h-screen bg-white text-zinc-950"
+      className="min-h-screen bg-surface text-content"
       style={theme.pageStyle}
       data-testid="b2c-checkout-page"
     >
-      <header className="w-full border-b border-zinc-200 bg-white">
+      <header className="w-full border-b border-border bg-surface">
         <div
           className={`w-full lg:grid ${CHECKOUT_CENTER_TRACKS_CLASS}`}
           data-testid="b2c-checkout-header-frame"
@@ -3327,7 +3327,7 @@ function CheckoutShell({
               >
                 <button
                   onClick={onBackToCart}
-                  className="w-full text-left text-lg font-bold tracking-tight text-zinc-950"
+                  className="w-full text-left text-lg font-bold tracking-tight text-content"
                   style={theme.headingStyle}
                 >
                   {brandName}
@@ -3335,7 +3335,7 @@ function CheckoutShell({
               </div>
               <button
                 onClick={onBackToCart}
-                className="shrink-0 text-zinc-600 transition hover:text-zinc-950 lg:hidden"
+                className="shrink-0 text-content-muted transition hover:text-content lg:hidden"
                 aria-label="Cart"
               >
                 <svg
@@ -3358,7 +3358,7 @@ function CheckoutShell({
             <div className="hidden items-center justify-end px-4 py-5 sm:px-8 lg:flex lg:px-0">
               <button
                 onClick={onBackToCart}
-                className="text-zinc-600 transition hover:text-zinc-950"
+                className="text-content-muted transition hover:text-content"
                 aria-label="Cart"
               >
                 <svg
@@ -3382,11 +3382,11 @@ function CheckoutShell({
           <div className="hidden lg:block" />
         </div>
       </header>
-      <div className="border-b border-zinc-200 bg-white px-4 py-3 sm:hidden">
+      <div className="border-b border-border bg-surface px-4 py-3 sm:hidden">
         <button
           type="button"
           onClick={onToggleMobileSummary}
-          className="flex w-full items-center justify-between py-2 text-left text-sm font-medium text-zinc-950"
+          className="flex w-full items-center justify-between py-2 text-left text-sm font-medium text-content"
           data-testid="b2c-mobile-summary-toggle"
         >
           <span>Order summary</span>
@@ -3420,7 +3420,7 @@ function CheckoutExpressSection({
   return (
     <section data-testid="b2c-checkout-express">
       <p
-        className="mb-3 text-center text-xs text-zinc-600"
+        className="mb-3 text-center text-xs text-content-muted"
         style={theme.mutedTextStyle}
       >
         Express checkout
@@ -3439,10 +3439,10 @@ function CheckoutExpressSection({
               data-testid={`b2c-express-provider-${provider.id}`}
               className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold transition ${
                 disabled
-                  ? 'cursor-not-allowed bg-zinc-100 text-zinc-500'
+                  ? 'cursor-not-allowed bg-surface-2 text-content-muted'
                   : isActive
-                    ? 'bg-zinc-900 text-white'
-                    : 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200'
+                    ? 'bg-content text-white'
+                    : 'bg-surface-2 text-content hover:bg-border'
               }`}
               style={isActive ? theme.primaryButtonStyle : undefined}
             >
@@ -3452,9 +3452,9 @@ function CheckoutExpressSection({
         })}
       </div>
       <div className="my-6 flex items-center gap-4">
-        <div className="h-px flex-1 bg-zinc-300" />
-        <span className="text-xs uppercase text-zinc-500">or</span>
-        <div className="h-px flex-1 bg-zinc-300" />
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs uppercase text-content-muted">or</span>
+        <div className="h-px flex-1 bg-border" />
       </div>
     </section>
   );
@@ -3481,7 +3481,7 @@ function CheckoutSection({
     <section data-testid={testId}>
       <div className="flex flex-wrap items-baseline justify-between gap-4 pb-3">
         <h2
-          className="text-lg font-bold text-zinc-950"
+          className="text-lg font-bold text-content"
           style={theme.headingStyle}
         >
           {title}
@@ -3507,7 +3507,7 @@ function CheckoutFieldError({
   message?: string;
 }) {
   return message ? (
-    <p id={id} role="alert" className="mt-1 text-xs font-medium text-red-600">
+    <p id={id} role="alert" className="mt-1 text-xs font-medium text-danger">
       {message}
     </p>
   ) : null;
@@ -3537,9 +3537,9 @@ function CheckoutAddressFields({
     boxShadow: 'none',
   };
   const floatInputClassName =
-    'peer w-full rounded-md border border-zinc-400 bg-white px-3 pb-2 pt-5 text-sm text-zinc-950 outline-none transition placeholder:text-transparent focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950';
+    'peer w-full rounded-md border border-border bg-surface px-3 pb-2 pt-5 text-sm text-content outline-none transition placeholder:text-transparent focus:border-content focus:ring-2 focus:ring-accent/30';
   const floatLabelClassName =
-    'pointer-events-none absolute left-3 top-1.5 origin-left text-[11px] text-zinc-600 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-zinc-500 peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-zinc-600';
+    'pointer-events-none absolute left-3 top-1.5 origin-left text-[11px] text-content-muted transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-content-muted peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-content-muted';
 
   const selectValue = address.country_code || countries[0]?.iso_2 || '';
 
@@ -3550,7 +3550,7 @@ function CheckoutAddressFields({
           id={`${prefix}_country_code`}
           value={selectValue}
           onChange={(event) => onChange('country_code', event.target.value)}
-          className="w-full appearance-none rounded-md border border-zinc-400 bg-white px-3 pb-2 pt-5 text-sm text-zinc-950 outline-none transition focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950"
+          className="w-full appearance-none rounded-md border border-border bg-surface px-3 pb-2 pt-5 text-sm text-content outline-none transition focus:border-content focus:ring-2 focus:ring-accent/30"
           style={checkoutInputStyle}
           disabled={countryLocked && countries.length <= 1}
           aria-label="Country/Region"
@@ -3570,10 +3570,10 @@ function CheckoutAddressFields({
             </option>
           )}
         </select>
-        <span className="pointer-events-none absolute left-3 top-1.5 text-[11px] text-zinc-600">
+        <span className="pointer-events-none absolute left-3 top-1.5 text-[11px] text-content-muted">
           Country/Region
         </span>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-content-muted">
           &#x25BE;
         </span>
         <CheckoutFieldError id={`${prefix}_country_code_error`} message={errors[`${prefix}_country_code`]} />
@@ -3714,7 +3714,7 @@ function CheckoutAddressFields({
         <label htmlFor={`${prefix}_phone`} className={floatLabelClassName}>Phone</label>
       </div>
       {countryHint ? (
-        <p className="text-xs text-zinc-600" style={theme.mutedTextStyle}>
+        <p className="text-xs text-content-muted" style={theme.mutedTextStyle}>
           {countryHint}
         </p>
       ) : null}
@@ -3758,7 +3758,7 @@ function CheckoutSummary({
     <aside
       className={
         mobile
-          ? 'border-b border-zinc-200 pb-5'
+          ? 'border-b border-border pb-5'
           : `sticky top-6 w-full ${CHECKOUT_SUMMARY_MAX_WIDTH_CLASS}`
       }
       data-testid={
@@ -3778,28 +3778,28 @@ function CheckoutSummary({
                     <img
                       src={item.thumbnail}
                       alt={item.title}
-                      className="h-14 w-14 rounded-md border border-zinc-200 bg-white object-cover"
+                      className="h-14 w-14 rounded-md border border-border bg-surface object-cover"
                     />
                   ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-md border border-zinc-200 bg-white text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-md border border-border bg-surface text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted">
                       {item.title?.charAt(0) || '?'}
                     </div>
                   )}
                   {item.quantity > 1 ? (
-                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">
+                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-content-muted text-[10px] font-semibold text-white">
                       {item.quantity}
                     </span>
                   ) : null}
                 </div>
                 <div className="min-w-0 space-y-1">
                   <p
-                    className="truncate text-sm font-medium text-zinc-950"
+                    className="truncate text-sm font-medium text-content"
                     style={theme.headingStyle}
                   >
                     {item.title}
                   </p>
                   <p
-                    className="text-xs text-zinc-600"
+                    className="text-xs text-content-muted"
                     style={theme.mutedTextStyle}
                   >
                     Qty {item.quantity}
@@ -3808,7 +3808,7 @@ function CheckoutSummary({
                 </div>
               </div>
               <p
-                className="shrink-0 text-sm font-medium text-zinc-950"
+                className="shrink-0 text-sm font-medium text-content"
                 style={theme.headingStyle}
               >
                 {formatPrice(
@@ -3826,7 +3826,7 @@ function CheckoutSummary({
                 value={promotionCode}
                 onChange={(event) => onPromotionCodeChange(event.target.value)}
                 placeholder="Discount code or gift card"
-                className="min-w-0 flex-1 rounded-md border border-zinc-400 bg-white px-3 py-2.5 text-sm text-zinc-950 outline-none transition placeholder:text-zinc-500 focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-content outline-none transition placeholder:text-content-muted focus:border-content focus:ring-2 focus:ring-accent/30"
                 style={{
                   ...theme.inputStyle,
                   borderRadius: '6px',
@@ -3837,14 +3837,14 @@ function CheckoutSummary({
                 type="button"
                 onClick={onApplyPromotion}
                 disabled={promotionSubmitting}
-                className="rounded-md border border-zinc-400 bg-zinc-100 px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-border bg-surface-2 px-5 py-2.5 text-sm font-medium text-content-muted transition hover:bg-border disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {promotionSubmitting ? 'Applying…' : 'Apply'}
               </button>
             </div>
           </label>
           {promotionError ? (
-            <p className="mt-3 text-sm font-medium text-red-600">
+            <p className="mt-3 text-sm font-medium text-danger">
               {promotionError}
             </p>
           ) : null}
@@ -3853,7 +3853,7 @@ function CheckoutSummary({
               {cart.promotions.map((promotion) => (
                 <div
                   key={promotion.id}
-                  className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-zinc-700"
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs font-medium text-content-muted"
                   style={theme.surfaceStyle}
                 >
                   <span>{promotion.code || 'Applied code'}</span>
@@ -3861,7 +3861,7 @@ function CheckoutSummary({
                     <button
                       type="button"
                       onClick={() => onRemovePromotion(promotion.code || '')}
-                      className="text-zinc-500 transition hover:text-zinc-950"
+                      className="text-content-muted transition hover:text-content"
                       style={theme.mutedTextStyle}
                     >
                       Remove
@@ -3872,16 +3872,16 @@ function CheckoutSummary({
             </div>
           ) : null}
         </div>
-        <div className="space-y-2 pt-4 text-sm text-zinc-700">
+        <div className="space-y-2 pt-4 text-sm text-content-muted">
           <div className="flex items-center justify-between">
             <span>Subtotal</span>
-            <span className="text-zinc-950">
+            <span className="text-content">
               {formatPrice(cart.subtotal, currencyCode)}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span>Shipping</span>
-            <span className="text-xs text-zinc-600">
+            <span className="text-xs text-content-muted">
               {shippingCompleted && displayShippingTotal > 0
                 ? formatPrice(displayShippingTotal, currencyCode)
                 : 'Enter shipping address'}
@@ -3890,7 +3890,7 @@ function CheckoutSummary({
           {cart.tax_total ? (
             <div className="flex items-center justify-between">
               <span>Taxes</span>
-              <span className="text-zinc-950">
+              <span className="text-content">
                 {formatPrice(cart.tax_total, currencyCode)}
               </span>
             </div>
@@ -3898,7 +3898,7 @@ function CheckoutSummary({
           {cart.discount_total ? (
             <div className="flex items-center justify-between">
               <span>Discounts</span>
-              <span className="text-zinc-950">
+              <span className="text-content">
                 -{formatPrice(cart.discount_total, currencyCode)}
               </span>
             </div>
@@ -3906,17 +3906,17 @@ function CheckoutSummary({
         </div>
         <div className="flex items-center justify-between pt-4">
           <p
-            className="text-lg font-bold text-zinc-950"
+            className="text-lg font-bold text-content"
             style={theme.headingStyle}
           >
             Total
           </p>
           <p className="text-right">
-            <span className="mr-2 text-xs text-zinc-600">
+            <span className="mr-2 text-xs text-content-muted">
               {currencyCode.toUpperCase()}
             </span>
             <span
-              className="text-lg font-bold text-zinc-950"
+              className="text-lg font-bold text-content"
               style={theme.headingStyle}
             >
               {formatPrice(displayTotal, currencyCode)}
@@ -3952,14 +3952,14 @@ function CheckoutFooterLinks() {
 
   return (
     <div
-      className="flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-zinc-200 pt-6 text-xs text-zinc-500"
+      className="flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-border pt-6 text-xs text-content-muted"
       data-testid="b2c-checkout-footer-links"
     >
       {policyLinks.map((link) => (
         <a
           key={link.href}
           href={link.href}
-          className="underline underline-offset-2 transition hover:text-zinc-950"
+          className="underline underline-offset-2 transition hover:text-content"
           style={theme.textStyle}
         >
           {link.label}
@@ -4892,7 +4892,7 @@ export function MedusaB2CCheckoutPage() {
   if (cartLoading && !cart) {
     return (
       <div
-        className="min-h-screen bg-stone-50 px-4 py-16 text-center text-sm text-zinc-500"
+        className="min-h-screen bg-surface-2 px-4 py-16 text-center text-sm text-content-muted"
         style={theme.pageStyle}
       >
         Loading checkout…
@@ -4903,35 +4903,35 @@ export function MedusaB2CCheckoutPage() {
   if (!cart || !cart.items?.length) {
     return (
       <div
-        className="min-h-screen bg-stone-50 px-4 py-16 sm:px-6 lg:px-8"
+        className="min-h-screen bg-surface-2 px-4 py-16 sm:px-6 lg:px-8"
         style={theme.pageStyle}
         data-testid="b2c-checkout-empty-state"
       >
         <div
-          className="mx-auto max-w-xl rounded-lg border border-zinc-200 bg-white px-8 py-10 text-center"
+          className="mx-auto max-w-xl rounded-lg border border-border bg-surface px-8 py-10 text-center"
           style={theme.surfaceStyle}
         >
           <p
-            className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-500"
+            className="text-[11px] font-semibold uppercase tracking-[0.28em] text-content-muted"
             style={theme.mutedTextStyle}
           >
             Checkout
           </p>
           <h1
-            className="mt-3 text-3xl font-semibold text-zinc-950"
+            className="mt-3 text-3xl font-semibold text-content"
             style={theme.headingStyle}
           >
             Your cart is empty
           </h1>
           <p
-            className="mt-3 text-sm leading-6 text-zinc-600"
+            className="mt-3 text-sm leading-6 text-content-muted"
             style={theme.mutedTextStyle}
           >
             Add something to your cart before continuing to checkout.
           </p>
           <button
             onClick={() => navigateToCart()}
-            className="mt-6 rounded-md bg-zinc-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-zinc-800"
+            className="mt-6 rounded-md bg-content px-6 py-3 text-sm font-medium text-white transition hover:bg-content/80"
             style={{ ...theme.primaryPillStyle, borderRadius: '6px' }}
           >
             Back to cart
@@ -5000,7 +5000,7 @@ export function MedusaB2CCheckoutPage() {
                       Sign in
                     </button>
                   ) : (
-                    <span className="text-sm text-emerald-700">Signed in</span>
+                    <span className="text-sm text-success">Signed in</span>
                   )
                 }
                 testId="b2c-checkout-contact"
@@ -5022,7 +5022,7 @@ export function MedusaB2CCheckoutPage() {
                       onBlur={() => void handleEmailBlur()}
                       autoComplete="email"
                       placeholder="Email"
-                      className="peer w-full rounded-md border border-zinc-400 bg-white px-3 pb-2 pt-5 text-sm text-zinc-950 outline-none transition placeholder:text-transparent focus:border-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                      className="peer w-full rounded-md border border-border bg-surface px-3 pb-2 pt-5 text-sm text-content outline-none transition placeholder:text-transparent focus:border-content focus:ring-2 focus:ring-accent/30"
                       style={{
                         ...theme.inputStyle,
                         borderRadius: '6px',
@@ -5032,20 +5032,20 @@ export function MedusaB2CCheckoutPage() {
                       aria-invalid={!!fieldErrors.contact_email || undefined}
                       aria-describedby={fieldErrors.contact_email ? 'checkout_email_error' : undefined}
                     />
-                    <label htmlFor="checkout_email" className="pointer-events-none absolute left-3 top-1.5 origin-left text-[11px] text-zinc-600 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-zinc-500 peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-zinc-600">
+                    <label htmlFor="checkout_email" className="pointer-events-none absolute left-3 top-1.5 origin-left text-[11px] text-content-muted transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-content-muted peer-focus:top-1.5 peer-focus:text-[11px] peer-focus:text-content-muted">
                       Email
                     </label>
                     <CheckoutFieldError id="checkout_email_error" message={fieldErrors.contact_email} />
                   </div>
                   {sectionErrors.contact ? (
-                    <p className="text-sm font-medium text-red-600">
+                    <p className="text-sm font-medium text-danger">
                       {sectionErrors.contact}
                     </p>
                   ) : null}
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-content-muted">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-zinc-400 text-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                      className="h-4 w-4 rounded border-border text-content focus:ring-2 focus:ring-accent/30"
                     />
                     <span>Email me with news and offers</span>
                   </label>
@@ -5065,14 +5065,14 @@ export function MedusaB2CCheckoutPage() {
                   />
                 </div>
                 {sectionErrors.delivery ? (
-                  <p className="mt-2 text-sm font-medium text-red-600">
+                  <p className="mt-2 text-sm font-medium text-danger">
                     {sectionErrors.delivery}
                   </p>
                 ) : null}
-                <div className="mt-3 flex items-center gap-2 text-sm text-zinc-700">
+                <div className="mt-3 flex items-center gap-2 text-sm text-content-muted">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-zinc-400 text-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                    className="h-4 w-4 rounded border-border text-content focus:ring-2 focus:ring-accent/30"
                   />
                   <span>Save this information for next time</span>
                 </div>
@@ -5085,18 +5085,18 @@ export function MedusaB2CCheckoutPage() {
               >
                 <div className="space-y-3">
                   {!deliveryCompleted ? (
-                    <p className="rounded-md bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                    <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-content-muted">
                       Enter your shipping address to view available shipping
                       methods.
                     </p>
                   ) : null}
                   {deliveryCompleted && shippingOptionsLoading ? (
-                    <p className="text-sm text-zinc-600">
+                    <p className="text-sm text-content-muted">
                       Loading shipping options…
                     </p>
                   ) : null}
                   {sectionErrors.shipping ? (
-                    <p className="text-sm font-medium text-red-600">
+                    <p className="text-sm font-medium text-danger">
                       {sectionErrors.shipping}
                     </p>
                   ) : null}
@@ -5104,7 +5104,7 @@ export function MedusaB2CCheckoutPage() {
                   !shippingOptionsLoading &&
                   shippingOptions.length ? (
                     <fieldset
-                      className="space-y-2 rounded-md border border-zinc-400"
+                      className="space-y-2 rounded-md border border-border"
                       data-testid="b2c-shipping-options"
                     >
                       <legend className="sr-only">Shipping method</legend>
@@ -5114,10 +5114,10 @@ export function MedusaB2CCheckoutPage() {
                         return (
                           <label
                             key={option.id}
-                            className={`flex cursor-pointer items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 last:border-b-0 transition ${
+                            className={`flex cursor-pointer items-center justify-between gap-4 border-b border-border px-4 py-3 last:border-b-0 transition ${
                               isSelected
-                                ? 'bg-zinc-50'
-                                : 'bg-white hover:bg-zinc-50'
+                                ? 'bg-surface-2'
+                                : 'bg-surface hover:bg-surface-hover'
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -5127,13 +5127,13 @@ export function MedusaB2CCheckoutPage() {
                                 onChange={() =>
                                   void selectShippingOption(option.id)
                                 }
-                                className="h-4 w-4 border-zinc-400 text-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                                className="h-4 w-4 border-border text-content focus:ring-2 focus:ring-accent/30"
                               />
-                              <p className="text-sm text-zinc-950">
+                              <p className="text-sm text-content">
                                 {option.name}
                               </p>
                             </div>
-                            <p className="text-sm font-semibold text-zinc-950">
+                            <p className="text-sm font-semibold text-content">
                               {formatPrice(
                                 option.amount || 0,
                                 option.currency_code || currencyCode,
@@ -5152,29 +5152,29 @@ export function MedusaB2CCheckoutPage() {
                 disabled={!shippingCompleted}
                 testId="b2c-checkout-payment"
               >
-                <p className="mb-3 text-sm text-zinc-600">
+                <p className="mb-3 text-sm text-content-muted">
                   All transactions are secure and encrypted.
                 </p>
                 <div className="space-y-3">
                   {!shippingCompleted ? (
-                    <p className="text-sm text-zinc-600">
+                    <p className="text-sm text-content-muted">
                       Choose a shipping method before selecting a payment
                       option.
                     </p>
                   ) : null}
                   {shippingCompleted && paymentProvidersLoading ? (
-                    <p className="text-sm text-zinc-600">
+                    <p className="text-sm text-content-muted">
                       Loading payment methods…
                     </p>
                   ) : null}
                   {sectionErrors.payment ? (
-                    <p className="text-sm font-medium text-red-600">
+                    <p className="text-sm font-medium text-danger">
                       {sectionErrors.payment}
                     </p>
                   ) : null}
                   {shippingCompleted && paymentProviders.length ? (
                     <fieldset
-                      className="rounded-md border border-zinc-400"
+                      className="rounded-md border border-border"
                       data-testid="b2c-payment-providers"
                     >
                       <legend className="sr-only">Payment method</legend>
@@ -5187,10 +5187,10 @@ export function MedusaB2CCheckoutPage() {
                         return (
                           <label
                             key={provider.id}
-                            className={`block cursor-pointer border-b border-zinc-200 px-4 py-3 last:border-b-0 transition ${
+                            className={`block cursor-pointer border-b border-border px-4 py-3 last:border-b-0 transition ${
                               isSelected
-                                ? 'bg-zinc-50'
-                                : 'bg-white hover:bg-zinc-50'
+                                ? 'bg-surface-2'
+                                : 'bg-surface hover:bg-surface-hover'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-4">
@@ -5201,14 +5201,14 @@ export function MedusaB2CCheckoutPage() {
                                   onChange={() =>
                                     void selectPaymentProvider(provider.id)
                                   }
-                                  className="h-4 w-4 border-zinc-400 text-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                                  className="h-4 w-4 border-border text-content focus:ring-2 focus:ring-accent/30"
                                 />
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm text-zinc-950">
+                                  <p className="text-sm text-content">
                                     {presentation.label}
                                   </p>
                                   {provider.is_default ? (
-                                    <span className="rounded-full border border-zinc-400 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-700">
+                                    <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-content-muted">
                                       Default
                                     </span>
                                   ) : null}
@@ -5222,21 +5222,21 @@ export function MedusaB2CCheckoutPage() {
                   ) : null}
                 </div>
                 <div className="mt-4 space-y-4">
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-content-muted">
                     <input
                       type="checkbox"
                       checked={billingSameAsShipping}
                       onChange={(event) =>
                         setBillingSameAsShipping(event.target.checked)
                       }
-                      className="h-4 w-4 rounded border-zinc-400 text-zinc-950 focus:ring-2 focus:ring-zinc-950"
+                      className="h-4 w-4 rounded border-border text-content focus:ring-2 focus:ring-accent/30"
                     />
                     <span>Use shipping address as billing address</span>
                   </label>
                   {!billingSameAsShipping ? (
                     <div>
                       <h3
-                        className="mb-2 text-sm font-bold text-zinc-950"
+                        className="mb-2 text-sm font-bold text-content"
                         style={theme.headingStyle}
                       >
                         Billing address
@@ -5254,22 +5254,22 @@ export function MedusaB2CCheckoutPage() {
                   ) : null}
                   {stripeSelected ? (
                     !stripePublishableKey ? (
-                      <p className="text-sm font-medium text-red-600">
+                      <p className="text-sm font-medium text-danger">
                         Stripe publishable key is not configured for this
                         frontend. Set `VITE_STRIPE_PUBLISHABLE_KEY` to render
                         card fields.
                       </p>
                     ) : paymentSessionLoading ? (
-                      <p className="text-sm text-zinc-500">
+                      <p className="text-sm text-content-muted">
                         Initializing secure card form…
                       </p>
                     ) : !stripeClientSecret || !stripeElementsOptions ? (
-                      <p className="text-sm font-medium text-red-600">
+                      <p className="text-sm font-medium text-danger">
                         Stripe payment session is missing a client secret. The
                         Medusa Stripe provider did not initialize correctly.
                       </p>
                     ) : !stripePromise ? (
-                      <p className="text-sm font-medium text-red-600">
+                      <p className="text-sm font-medium text-danger">
                         Stripe could not be initialized for this checkout.
                       </p>
                     ) : (
@@ -5300,7 +5300,7 @@ export function MedusaB2CCheckoutPage() {
                         !selectedPaymentProviderId ||
                         !shippingCompleted
                       }
-                      className="w-full rounded-md bg-zinc-950 px-6 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-md bg-content px-6 py-3 text-sm font-medium text-white transition hover:bg-content/80 disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ ...theme.primaryPillStyle, borderRadius: '6px' }}
                       data-testid="b2c-complete-checkout"
                     >
@@ -5318,7 +5318,7 @@ export function MedusaB2CCheckoutPage() {
             </div>
           </div>
 
-          <div className="hidden border-l border-zinc-200 bg-zinc-50 px-6 py-8 lg:flex lg:justify-start xl:px-10">
+          <div className="hidden border-l border-border bg-surface-2 px-6 py-8 lg:flex lg:justify-start xl:px-10">
             <CheckoutSummary
               cart={cart}
               currencyCode={currencyCode}
@@ -5332,7 +5332,7 @@ export function MedusaB2CCheckoutPage() {
             />
           </div>
         </div>
-        <div className="hidden bg-zinc-50 lg:block" />
+        <div className="hidden bg-surface-2 lg:block" />
       </main>
     </CheckoutShell>
   );
@@ -5442,7 +5442,7 @@ export function MedusaB2COrderConfirmedPage() {
             {/* Order items */}
             {order.items && order.items.length > 0 ? (
               <div
-                className="rounded-xl border border-zinc-200 p-6"
+                className="rounded-xl border border-border p-6"
                 style={theme.surfaceStyle}
               >
                 <h2
@@ -5506,7 +5506,7 @@ export function MedusaB2COrderConfirmedPage() {
             {/* Order summary + shipping address side by side on desktop */}
             <div className="grid gap-6 lg:grid-cols-2">
               <div
-                className="rounded-xl border border-zinc-200 p-6"
+                className="rounded-xl border border-border p-6"
                 style={theme.surfaceStyle}
               >
                 <h2
@@ -5553,7 +5553,7 @@ export function MedusaB2COrderConfirmedPage() {
 
               {order.shipping_address ? (
                 <div
-                  className="rounded-xl border border-zinc-200 p-6"
+                  className="rounded-xl border border-border p-6"
                   style={theme.surfaceStyle}
                 >
                   <h2
@@ -5628,29 +5628,29 @@ export function MedusaB2COrderTransferPage() {
       title="Order transfer"
       description={`Review the transfer request for order ${orderId}.`}
     >
-      <div className="max-w-2xl space-y-4 rounded-xl border border-zinc-200 p-6">
-        <p className="text-sm text-zinc-600">
+      <div className="max-w-2xl space-y-4 rounded-xl border border-border p-6">
+        <p className="text-sm text-content-muted">
           You&apos;ve received a request to transfer ownership of order{' '}
           <strong>{orderId}</strong>. If you accept, the new owner will take
           over future access to this order.
         </p>
-        <p className="text-sm text-zinc-500">Transfer token: {token}</p>
+        <p className="text-sm text-content-muted">Transfer token: {token}</p>
         <div className="flex gap-3">
           <a
             href={acceptPath}
-            className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            className="rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80"
           >
             Accept transfer
           </a>
           <a
             href={declinePath}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-surface-hover"
           >
             Decline transfer
           </a>
           <button
             onClick={() => navigateToHome()}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-content-muted hover:bg-surface-hover"
           >
             Cancel
           </button>
@@ -5692,26 +5692,26 @@ export function MedusaB2COrderTransferAcceptPage() {
     >
       <div className="max-w-md space-y-6">
         {status === 'success' ? (
-          <div className="rounded-xl bg-green-50 p-6 text-center">
-            <p className="font-medium text-green-800">
+          <div className="rounded-xl bg-success/10 p-6 text-center">
+            <p className="font-medium text-success">
               Transfer accepted successfully!
             </p>
-            <p className="mt-2 text-sm text-green-700">
+            <p className="mt-2 text-sm text-success">
               The order has been transferred to your account.
             </p>
           </div>
         ) : (
           <>
-            <p className="text-sm text-zinc-600">
+            <p className="text-sm text-content-muted">
               You are about to accept the transfer of order{' '}
               <strong>#{orderId.slice(-8)}</strong> to your account.
             </p>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
             <div className="flex gap-3">
               <button
                 onClick={handleAccept}
                 disabled={status === 'loading'}
-                className="rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                className="rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
               >
                 {status === 'loading' ? 'Accepting...' : 'Accept transfer'}
               </button>
@@ -5755,24 +5755,24 @@ export function MedusaB2COrderTransferDeclinePage() {
     >
       <div className="max-w-md space-y-6">
         {status === 'success' ? (
-          <div className="rounded-xl bg-zinc-100 p-6 text-center">
-            <p className="font-medium text-zinc-800">Transfer declined</p>
-            <p className="mt-2 text-sm text-zinc-600">
+          <div className="rounded-xl bg-surface-2 p-6 text-center">
+            <p className="font-medium text-content">Transfer declined</p>
+            <p className="mt-2 text-sm text-content-muted">
               The order transfer has been declined.
             </p>
           </div>
         ) : (
           <>
-            <p className="text-sm text-zinc-600">
+            <p className="text-sm text-content-muted">
               You are about to decline the transfer of order{' '}
               <strong>#{orderId.slice(-8)}</strong>.
             </p>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
             <div className="flex gap-3">
               <button
                 onClick={handleDecline}
                 disabled={status === 'loading'}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-surface-hover disabled:opacity-50"
               >
                 {status === 'loading' ? 'Declining...' : 'Decline transfer'}
               </button>

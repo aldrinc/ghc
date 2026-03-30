@@ -1235,7 +1235,7 @@ export function B2CRuntimeProvider({
 
   if (!isConfigured) {
     return (
-      <div className="mx-auto my-10 max-w-3xl rounded-2xl border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+      <div className="mx-auto my-10 max-w-3xl rounded-2xl border border-danger/30 bg-danger/10 px-6 py-5 text-sm text-danger">
         {configError || "Medusa runtime configuration is missing for this storefront."}
       </div>
     );

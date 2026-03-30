@@ -496,7 +496,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
               : surface === "primary"
                 ? "bg-primary text-primary-foreground"
                 : surface === "dark"
-                  ? "bg-zinc-900 text-white"
+                  ? "bg-content text-white"
                   : "bg-surface";
 
           // Resolve content width

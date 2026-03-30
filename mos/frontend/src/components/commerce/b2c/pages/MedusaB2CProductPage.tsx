@@ -665,7 +665,7 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
         </div>
 
         <div
-          className="fixed inset-x-0 bottom-0 z-40 border-t bg-white px-4 py-3 lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t bg-surface px-4 py-3 lg:hidden"
           style={{
             backgroundColor: tokens.colorBackground || "#ffffff",
             borderTopColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",

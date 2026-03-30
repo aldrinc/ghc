@@ -159,7 +159,7 @@ export function MedusaB2CStorePage() {
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-8 lg:flex-row">
             <aside
-              className="lg:w-64 lg:flex-shrink-0 lg:border-r lg:border-neutral-200 lg:pr-8"
+              className="lg:w-64 lg:flex-shrink-0 lg:border-r lg:border-border lg:pr-8"
               style={sidebarStyle}
             >
               <h2 className="mb-4 text-lg font-medium" style={headingStyle}>

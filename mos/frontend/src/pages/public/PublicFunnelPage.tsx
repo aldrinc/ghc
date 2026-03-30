@@ -669,7 +669,7 @@ export function PublicFunnelPage() {
     return (
       <div className="min-h-screen bg-surface" data-public-funnel-page="true">
         {pageLoading || siteCommerceLoading ? (
-          <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-zinc-900/80 animate-pulse" aria-hidden="true" />
+          <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-content/80 animate-pulse" aria-hidden="true" />
         ) : null}
         <FunnelRuntimeProvider
           value={{
@@ -736,7 +736,7 @@ export function PublicFunnelPage() {
   // Non-site funnel: use existing FunnelRuntimeProvider only
   return (
     <div className="min-h-screen bg-surface" data-public-funnel-page="true">
-      {pageLoading ? <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-zinc-900/80 animate-pulse" aria-hidden="true" /> : null}
+      {pageLoading ? <div className="fixed inset-x-0 top-0 z-[120] h-0.5 bg-content/80 animate-pulse" aria-hidden="true" /> : null}
       <FunnelRuntimeProvider
         value={{
           productSlug,

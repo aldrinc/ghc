@@ -792,7 +792,7 @@ export function SiteDetailPage() {
               {!isEditingTheme ? (
                 <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
                   <div className="flex items-start gap-3">
-                    <div className={cn("mt-0.5 h-2 w-2 rounded-full", site.themeBindingMode === "standalone" ? "bg-neutral-400" : site.themeBindingMode === "workspace_default" ? "bg-accent" : site.themeBindingMode === "design_system" ? "bg-success" : "bg-neutral-400")} />
+                    <div className={cn("mt-0.5 h-2 w-2 rounded-full", site.themeBindingMode === "standalone" ? "bg-content-muted" : site.themeBindingMode === "workspace_default" ? "bg-accent" : site.themeBindingMode === "design_system" ? "bg-success" : "bg-content-muted")} />
                     <div className="flex-1">
                       <div className="text-sm font-semibold text-content">{getThemeBindingLabel(site.themeBindingMode)}</div>
                       <div className="mt-1 text-xs text-content-muted">{getThemeBindingDescription(site.themeBindingMode)}</div>
@@ -844,7 +844,7 @@ export function SiteDetailPage() {
               {effectiveThemeMode === "standalone" ? (
                 <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-2 w-2 rounded-full bg-neutral-400 mt-1.5" />
+                    <div className="h-2 w-2 rounded-full bg-content-muted mt-1.5" />
                     <div>
                       <div className="text-sm font-medium text-content">Standalone mode</div>
                       <div className="text-xs text-content-muted mt-1">This site uses generic styling without brand-specific tokens. The storefront will display with neutral colors and default typography.</div>

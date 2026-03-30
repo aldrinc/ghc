@@ -58,19 +58,19 @@ function formatElapsedSince(timestampMs: number | undefined, nowMs: number): str
 
 function getEventIcon(type: ActivityEvent["type"], toolName?: string) {
   if (type === "thinking") {
-    return <Lightbulb className="h-4 w-4 text-yellow-500" />;
+    return <Lightbulb className="h-4 w-4 text-warning" />;
   }
   if (type === "assistant") {
     return <MessageSquare className="h-4 w-4 text-blue-500" />;
   }
   if (type === "status") {
-    return <Terminal className="h-4 w-4 text-gray-500" />;
+    return <Terminal className="h-4 w-4 text-content-muted" />;
   }
   if (type === "variant") {
-    return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    return <CheckCircle2 className="h-4 w-4 text-success" />;
   }
   if (type === "error") {
-    return <XCircle className="h-4 w-4 text-red-500" />;
+    return <XCircle className="h-4 w-4 text-danger" />;
   }
   if (toolName === "create_file") {
     return <FilePlus className="h-4 w-4 text-indigo-500" />;
@@ -85,9 +85,9 @@ function getEventIcon(type: ActivityEvent["type"], toolName?: string) {
     return <Scissors className="h-4 w-4 text-teal-500" />;
   }
   if (toolName === "retrieve_option") {
-    return <Files className="h-4 w-4 text-slate-500" />;
+    return <Files className="h-4 w-4 text-content-muted" />;
   }
-  return <FilePlus className="h-4 w-4 text-gray-500" />;
+  return <FilePlus className="h-4 w-4 text-content-muted" />;
 }
 
 // =============================================================================

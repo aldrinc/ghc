@@ -169,7 +169,7 @@ function sectionSurfaceClass(surface?: string): string {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-black/10 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+    <div className="rounded-[24px] border border-black/10 bg-surface/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-sm">
       {children}
     </div>
   );
@@ -301,7 +301,7 @@ export function ImportedNarrativeBlock({
   const textPanel = (
     <div className={centered ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
       {eyebrow ? (
-        <div className="mb-4 inline-flex rounded-full border border-[var(--import-primary)]/20 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--import-primary)]">
+        <div className="mb-4 inline-flex rounded-full border border-[var(--import-primary)]/20 bg-surface/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--import-primary)]">
           {eyebrow}
         </div>
       ) : null}
@@ -327,7 +327,7 @@ export function ImportedNarrativeBlock({
       ) : null}
       {body ? <p className="mt-5 text-lg leading-8 text-black/70">{body}</p> : null}
       {quote ? (
-        <div className="mt-6 rounded-[20px] border border-[var(--import-primary)]/10 bg-white/70 px-5 py-4 text-base italic leading-7 text-black/75">
+        <div className="mt-6 rounded-[20px] border border-[var(--import-primary)]/10 bg-surface/70 px-5 py-4 text-base italic leading-7 text-black/75">
           {quote}
         </div>
       ) : null}
@@ -352,7 +352,7 @@ export function ImportedNarrativeBlock({
   }
 
   const mediaPanel = (
-    <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+    <div className="overflow-hidden rounded-[28px] border border-black/10 bg-surface shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
       <img src={imageSrc} alt={imageAlt || title || "Imported image"} className="h-full w-full object-cover" />
     </div>
   );
@@ -426,7 +426,7 @@ export function ImportedBadgeStrip({
 }) {
   const itemList = normalizeArray<ImportedBadge>(items);
   return (
-    <div className="rounded-full border border-black/10 bg-white/80 px-4 py-3 shadow-sm">
+    <div className="rounded-full border border-black/10 bg-surface/80 px-4 py-3 shadow-sm">
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
         {title ? (
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--import-primary)]">
@@ -474,7 +474,7 @@ export function ImportedOfferSelector({
   return (
     <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
       <div className="space-y-4">
-        <div className="aspect-square overflow-hidden rounded-[28px] border border-black/10 bg-white">
+        <div className="aspect-square overflow-hidden rounded-[28px] border border-black/10 bg-surface">
           {primaryImage?.src ? (
             <img
               src={primaryImage.src}
@@ -488,7 +488,7 @@ export function ImportedOfferSelector({
         {imageItems.length > 1 ? (
           <div className="grid grid-cols-4 gap-3 md:grid-cols-6">
             {imageItems.slice(0, 6).map((item, index) => (
-              <div key={`${item.src || "thumb"}-${index}`} className="aspect-square overflow-hidden rounded-2xl border border-black/10 bg-white">
+              <div key={`${item.src || "thumb"}-${index}`} className="aspect-square overflow-hidden rounded-2xl border border-black/10 bg-surface">
                 {item.src ? (
                   <img src={item.src} alt={item.alt || `Gallery image ${index + 1}`} className="h-full w-full object-cover" />
                 ) : null}
@@ -527,7 +527,7 @@ export function ImportedOfferSelector({
             {offerItems.map((offer, index) => (
               <div
                 key={`${offer.title || "offer"}-${index}`}
-                className="rounded-[24px] border border-black/10 bg-white p-5 shadow-sm"
+                className="rounded-[24px] border border-black/10 bg-surface p-5 shadow-sm"
               >
                 {offer.badge ? (
                   <div className="mb-3 inline-flex rounded-full bg-[var(--import-primary)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
@@ -543,7 +543,7 @@ export function ImportedOfferSelector({
                 ) : null}
                 {offer.total ? <div className="mt-1 text-sm font-medium text-black/70">Total {offer.total}</div> : null}
                 {offer.regularPrice ? <div className="mt-1 text-sm text-black/45 line-through">{offer.regularPrice}</div> : null}
-                {offer.savings ? <div className="mt-3 text-sm font-semibold text-emerald-700">{offer.savings}</div> : null}
+                {offer.savings ? <div className="mt-3 text-sm font-semibold text-success">{offer.savings}</div> : null}
               </div>
             ))}
           </div>
@@ -630,7 +630,7 @@ export function ImportedComparisonTable({
           {body ? <p className="mx-auto mt-3 max-w-3xl text-base leading-7 text-black/70">{body}</p> : null}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-surface shadow-sm">
         <div className="grid grid-cols-4 bg-[var(--import-background)] text-sm font-semibold uppercase tracking-[0.14em] text-black/60">
           <div className="p-4">Feature</div>
           <div className="bg-[var(--import-primary)] p-4 text-center text-white">{primaryLabel || "Primary"}</div>
@@ -671,7 +671,7 @@ export function ImportedAccordion({
           {body ? <p className="mx-auto mt-3 max-w-3xl text-base leading-7 text-black/70">{body}</p> : null}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-[28px] border border-black/10 bg-surface shadow-sm">
         {itemList.map((item, index) => (
           <div key={`${item.question || "faq"}-${index}`} className="border-t border-black/10 first:border-t-0">
             <div className="px-6 py-5 text-lg font-semibold text-[var(--import-text)]">{item.question || "Question"}</div>
@@ -697,7 +697,7 @@ export function ImportedFooterLinks({
   const theme = useImportedTheme();
   const linkItems = normalizeArray<ImportedFooterLink>(links);
   return (
-    <div className="rounded-[28px] border border-black/10 bg-white px-6 py-8 shadow-sm">
+    <div className="rounded-[28px] border border-black/10 bg-surface px-6 py-8 shadow-sm">
       <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
         <div className="max-w-xl">
           {brandName ? (

@@ -123,7 +123,7 @@ export function MedusaB2CHomePage({
             </p>
             <button
               onClick={() => navigateToStore()}
-              className="mt-8 inline-flex h-10 items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors hover:bg-neutral-100"
+              className="mt-8 inline-flex h-10 items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors hover:bg-surface-hover"
               style={heroCtaStyle}
             >
               Shop all products

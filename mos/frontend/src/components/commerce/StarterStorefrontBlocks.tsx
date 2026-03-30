@@ -129,8 +129,8 @@ function starterCollectionGroups({
 
 function starterShellLinkClass(isMuted = false): string {
   return isMuted
-    ? "text-sm text-neutral-500 transition-colors hover:text-zinc-900"
-    : "text-sm text-zinc-700 transition-colors hover:text-zinc-900";
+    ? "text-sm text-content-muted transition-colors hover:text-content"
+    : "text-sm text-content-muted transition-colors hover:text-content";
 }
 
 async function parseStarterPublicError(resp: Response): Promise<string> {
@@ -216,7 +216,7 @@ export function StarterStoreHeader({
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-neutral-200 bg-white/95 font-sans text-zinc-900 backdrop-blur"
+      className="sticky top-0 z-50 border-b border-border bg-surface/95 font-sans text-content backdrop-blur"
       data-testid="starter-store-header"
     >
       <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex items-center justify-between gap-4 py-3 lg:py-4`}>
@@ -231,12 +231,12 @@ export function StarterStoreHeader({
             className="flex items-center gap-3 text-left"
             data-testid="starter-store-brand"
           >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-700">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-content-muted">
               HH
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-medium uppercase tracking-[0.28em] text-zinc-900">{storeName}</span>
-              <span className="block truncate text-[11px] uppercase tracking-[0.2em] text-neutral-500">Clinical reference store</span>
+              <span className="block truncate text-sm font-medium uppercase tracking-[0.28em] text-content">{storeName}</span>
+              <span className="block truncate text-[11px] uppercase tracking-[0.2em] text-content-muted">Clinical reference store</span>
             </span>
           </button>
 
@@ -263,10 +263,10 @@ export function StarterStoreHeader({
                 event.preventDefault();
                 handleSearchSubmit();
               }}
-              className="hidden items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 lg:flex"
+              className="hidden items-center gap-2 rounded-full border border-border bg-surface-2 px-4 py-2 lg:flex"
               role="search"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 text-neutral-500">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 text-content-muted">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.85-5.4a7.25 7.25 0 11-14.5 0 7.25 7.25 0 0114.5 0Z" />
               </svg>
               <input
@@ -274,12 +274,12 @@ export function StarterStoreHeader({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search books, pads, and guides"
-                className="w-52 bg-transparent text-sm text-zinc-900 placeholder:text-neutral-400 focus:outline-none"
+                className="w-52 bg-transparent text-sm text-content placeholder:text-content-muted focus:outline-none"
                 aria-label="Search products"
               />
               <button
                 type="submit"
-                className="rounded-full bg-white px-3 py-1 text-xs font-medium text-zinc-900 transition hover:bg-neutral-100"
+                className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-content transition hover:bg-surface-hover"
               >
                 Search
               </button>
@@ -290,14 +290,14 @@ export function StarterStoreHeader({
             <button
               type="button"
               onClick={() => runtime?.navigateToCart()}
-              className="relative inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors hover:bg-neutral-50"
+              className="relative inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-sm text-content transition-colors hover:bg-surface-hover"
               data-testid="starter-header-cart"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835L5.41 6.75m0 0h14.34l-1.348 6.067a1.125 1.125 0 0 1-1.098.883H8.052a1.125 1.125 0 0 1-1.098-.883L5.41 6.75Zm0 0L4.663 5.04M8.25 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm9 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
               </svg>
               <span className="hidden sm:inline">Cart</span>
-              <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-zinc-900 px-1.5 py-0.5 text-[11px] font-medium text-white">
+              <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-content px-1.5 py-0.5 text-[11px] font-medium text-white">
                 {cartCount}
               </span>
             </button>
@@ -307,7 +307,7 @@ export function StarterStoreHeader({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex items-center justify-center rounded-full border border-neutral-200 p-2 text-zinc-900 transition-colors hover:bg-neutral-50 lg:hidden"
+              className="inline-flex items-center justify-center rounded-full border border-border p-2 text-content transition-colors hover:bg-surface-hover lg:hidden"
               aria-expanded={menuOpen}
               aria-label="Toggle navigation"
             >
@@ -324,7 +324,7 @@ export function StarterStoreHeader({
       </div>
 
       {menuOpen && mainCategories.length > 0 ? (
-        <div className="border-t border-neutral-200 bg-white px-4 py-3 font-sans lg:hidden">
+        <div className="border-t border-border bg-surface px-4 py-3 font-sans lg:hidden">
           <nav className="flex flex-col gap-2" aria-label="Mobile store navigation">
             {mainCategories.map((category) => (
               <button
@@ -334,7 +334,7 @@ export function StarterStoreHeader({
                   runtime?.navigateToCategory(category.handle);
                   setMenuOpen(false);
                 }}
-                className="rounded-xl px-3 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-neutral-50 hover:text-zinc-900"
+                className="rounded-xl px-3 py-2 text-left text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
               >
                 {category.name}
               </button>
@@ -373,9 +373,9 @@ export function StarterPromoBar({
     : null;
 
   return (
-    <div className="bg-zinc-950 text-white" data-testid="starter-promo-bar">
+    <div className="bg-content text-white" data-testid="starter-promo-bar">
       <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex flex-col items-center justify-between gap-2 py-3 text-center font-sans sm:flex-row`}>
-        <p className="text-xs uppercase tracking-[0.24em] text-neutral-200 sm:text-[11px]">{message}</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-white/80 sm:text-[11px]">{message}</p>
         {hasAction && actionHref ? (
           <button
             type="button"
@@ -386,7 +386,7 @@ export function StarterPromoBar({
               }
               navigate(actionHref);
             }}
-            className="text-xs font-medium uppercase tracking-[0.22em] text-white underline-offset-4 transition hover:text-neutral-200 hover:underline"
+            className="text-xs font-medium uppercase tracking-[0.22em] text-white underline-offset-4 transition hover:text-white/80 hover:underline"
           >
             {ctaLabel}
           </button>
@@ -425,8 +425,8 @@ export function StarterHomeHero({
 
   if ((runtime.products || []).length === 0) {
     return (
-      <section className="border-b border-neutral-200 bg-[#f4f1eb] font-sans text-zinc-900" data-testid="starter-home-hero">
-        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex min-h-[420px] items-center justify-center py-16 text-sm uppercase tracking-[0.24em] text-neutral-500`}>
+      <section className="border-b border-border bg-[#f4f1eb] font-sans text-content" data-testid="starter-home-hero">
+        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} flex min-h-[420px] items-center justify-center py-16 text-sm uppercase tracking-[0.24em] text-content-muted`}>
           Loading starter hero…
         </div>
       </section>
@@ -473,14 +473,14 @@ export function StarterHomeHero({
   const heroUsesSingleProductLayout = resolvedProducts.length === 1;
 
   return (
-    <section className="border-b border-neutral-200 bg-[#f4f1eb] font-sans text-zinc-900" data-testid="starter-home-hero">
+    <section className="border-b border-border bg-[#f4f1eb] font-sans text-content" data-testid="starter-home-hero">
       <div className={`${STARTER_CONTENT_CONTAINER_CLASS} grid min-h-[620px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:py-20`}>
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:items-start lg:text-left">
-          <span className="text-xs font-medium uppercase tracking-[0.32em] text-neutral-500">{eyebrow}</span>
-          <h1 className="mt-6 max-w-[12ch] text-5xl font-normal tracking-[-0.05em] text-zinc-900 sm:text-6xl">
+          <span className="text-xs font-medium uppercase tracking-[0.32em] text-content-muted">{eyebrow}</span>
+          <h1 className="mt-6 max-w-[12ch] text-5xl font-normal tracking-[-0.05em] text-content sm:text-6xl">
             {title}
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-neutral-600">{description}</p>
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-content-muted">{description}</p>
           {primaryCtaLabel && primaryHrefResolved ? (
             <button
               type="button"
@@ -491,7 +491,7 @@ export function StarterHomeHero({
                 }
                 navigate(primaryHrefResolved);
               }}
-              className="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-zinc-800"
+              className="mt-8 inline-flex items-center rounded-full bg-content px-6 py-3 text-sm font-medium text-white transition hover:bg-content/80"
             >
               {primaryCtaLabel}
             </button>
@@ -499,9 +499,9 @@ export function StarterHomeHero({
         </div>
 
         <div className={`relative min-h-[440px] ${heroUsesSingleProductLayout ? "flex items-center justify-center" : ""}`} data-testid="starter-home-hero-media">
-          <div className="absolute inset-0 rounded-[2rem] border border-white/70 bg-white/40" />
+          <div className="absolute inset-0 rounded-[2rem] border border-white/70 bg-surface/40" />
           {heroUsesSingleProductLayout ? (
-            <article className="relative z-[1] w-full max-w-[28rem] overflow-hidden rounded-[1.9rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+            <article className="relative z-[1] w-full max-w-[28rem] overflow-hidden rounded-[1.9rem] border border-black/5 bg-surface shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
               <div className="aspect-[4/5] bg-[#f8f6f2] p-8">
                 <img
                   src={starterProductImage(resolvedProducts[0]) || undefined}
@@ -509,14 +509,14 @@ export function StarterHomeHero({
                   className="h-full w-full object-contain"
                 />
               </div>
-              <div className="border-t border-neutral-200 px-6 py-5">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">Featured product</p>
-                <p className="mt-2 text-lg font-medium text-zinc-900">{resolvedProducts[0].title}</p>
-                <p className="mt-2 text-sm leading-6 text-neutral-600">
+              <div className="border-t border-border px-6 py-5">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-content-muted">Featured product</p>
+                <p className="mt-2 text-lg font-medium text-content">{resolvedProducts[0].title}</p>
+                <p className="mt-2 text-sm leading-6 text-content-muted">
                   The live Honest Herbalist catalog currently has one fully merchandised product with attached artwork. The rest of the range is still visible in the catalog while media is being added.
                 </p>
                 {starterPriceLabel(resolvedProducts[0]) ? (
-                  <p className="mt-4 text-sm text-neutral-600">From {starterPriceLabel(resolvedProducts[0])}</p>
+                  <p className="mt-4 text-sm text-content-muted">From {starterPriceLabel(resolvedProducts[0])}</p>
                 ) : null}
               </div>
             </article>
@@ -526,7 +526,7 @@ export function StarterHomeHero({
               return (
                 <article
                   key={product.id}
-                  className={`absolute overflow-hidden rounded-[1.75rem] border border-black/5 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] ${
+                  className={`absolute overflow-hidden rounded-[1.75rem] border border-black/5 bg-surface shadow-[0_30px_80px_rgba(15,23,42,0.12)] ${
                     index === 0
                       ? "left-[6%] top-[8%] w-[56%]"
                       : index === 1
@@ -537,11 +537,11 @@ export function StarterHomeHero({
                   <div className="aspect-[4/5] bg-[#f8f6f2] p-6">
                     <img src={imageUrl || undefined} alt={product.title} className="h-full w-full object-contain" />
                   </div>
-                  <div className="border-t border-neutral-200 px-5 py-4">
-                    <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">Featured product</p>
-                    <p className="mt-2 text-sm font-medium text-zinc-900">{product.title}</p>
+                  <div className="border-t border-border px-5 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-content-muted">Featured product</p>
+                    <p className="mt-2 text-sm font-medium text-content">{product.title}</p>
                     {starterPriceLabel(product) ? (
-                      <p className="mt-1 text-sm text-neutral-600">From {starterPriceLabel(product)}</p>
+                      <p className="mt-1 text-sm text-content-muted">From {starterPriceLabel(product)}</p>
                     ) : null}
                   </div>
                 </article>
@@ -620,7 +620,7 @@ export function StarterPolicyPage({
     <section className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
       <div className="mx-auto max-w-5xl">
         {loading ? (
-          <div className="rounded-[2rem] border border-neutral-200 bg-white px-6 py-6 text-sm text-neutral-600 shadow-sm sm:px-8">
+          <div className="rounded-[2rem] border border-border bg-surface px-6 py-6 text-sm text-content-muted shadow-sm sm:px-8">
             Loading {pageTitle || "policy page"}...
           </div>
         ) : null}
@@ -628,14 +628,14 @@ export function StarterPolicyPage({
         {error ? (
           <div
             role="alert"
-            className="rounded-[2rem] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-900 shadow-sm sm:px-8"
+            className="rounded-[2rem] border border-danger/30 bg-danger/10 px-6 py-6 text-sm text-danger shadow-sm sm:px-8"
           >
             Unable to load {pageTitle || "policy page"}. {error}
           </div>
         ) : null}
 
         {policyPage ? (
-          <div className="rounded-[2rem] border border-neutral-200 bg-white px-6 py-8 shadow-sm sm:px-8 lg:px-10">
+          <div className="rounded-[2rem] border border-border bg-surface px-6 py-8 shadow-sm sm:px-8 lg:px-10">
             <MarkdownViewer content={policyPage.markdown} className="max-w-none px-0" />
           </div>
         ) : null}
@@ -659,8 +659,8 @@ export function StarterCollectionRails({
 
   if ((runtime.products || []).length === 0 && (runtime.collections || []).length === 0) {
     return (
-      <div className="bg-white font-sans" data-testid="starter-collection-rails">
-        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 text-sm uppercase tracking-[0.24em] text-neutral-500`}>
+      <div className="bg-surface font-sans" data-testid="starter-collection-rails">
+        <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 text-sm uppercase tracking-[0.24em] text-content-muted`}>
           Loading collection rails…
         </div>
       </div>
@@ -689,16 +689,16 @@ export function StarterCollectionRails({
   }
 
   return (
-    <div className="bg-white font-sans" data-testid="starter-collection-rails">
+    <div className="bg-surface font-sans" data-testid="starter-collection-rails">
       {groupedCollections.map(({ collection, products }) => (
-        <section key={collection.id} className="border-b border-neutral-200 last:border-b-0">
+        <section key={collection.id} className="border-b border-border last:border-b-0">
           <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
             <div className="mb-8 flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-neutral-500">Collection</p>
-                <h2 className="mt-3 text-2xl font-normal tracking-[-0.04em] text-zinc-900">{collection.title}</h2>
+                <p className="text-xs uppercase tracking-[0.24em] text-content-muted">Collection</p>
+                <h2 className="mt-3 text-2xl font-normal tracking-[-0.04em] text-content">{collection.title}</h2>
               </div>
-              <p className="text-sm text-neutral-500">Merchandised directly from the live Medusa catalog</p>
+              <p className="text-sm text-content-muted">Merchandised directly from the live Medusa catalog</p>
             </div>
 
             <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -707,9 +707,9 @@ export function StarterCollectionRails({
                   <button
                     type="button"
                     onClick={() => runtime.navigateToProduct(product.handle)}
-                    className="group flex h-full w-full flex-col overflow-hidden rounded-[1.5rem] border border-neutral-200 bg-[#faf8f5] text-left transition hover:border-neutral-300 hover:bg-[#f6f2eb]"
+                    className="group flex h-full w-full flex-col overflow-hidden rounded-[1.5rem] border border-border bg-[#faf8f5] text-left transition hover:border-border hover:bg-[#f6f2eb]"
                   >
-                    <div className="aspect-[4/5] border-b border-neutral-200 p-6">
+                    <div className="aspect-[4/5] border-b border-border p-6">
                       <img
                         src={starterProductImage(product) || undefined}
                         alt={product.title}
@@ -717,9 +717,9 @@ export function StarterCollectionRails({
                       />
                     </div>
                     <div className="flex flex-1 flex-col gap-2 px-5 py-4">
-                      <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500">{collection.title}</p>
-                      <h3 className="text-base font-medium text-zinc-900">{product.title}</h3>
-                      <p className="mt-auto text-sm text-neutral-600">
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-content-muted">{collection.title}</p>
+                      <h3 className="text-base font-medium text-content">{product.title}</h3>
+                      <p className="mt-auto text-sm text-content-muted">
                         {starterPriceLabel(product) ? `From ${starterPriceLabel(product)}` : "Price available on product page"}
                       </p>
                     </div>
@@ -764,20 +764,20 @@ export function StarterStoreFooter({
     .filter((entry): entry is { label: string; path: string } => Boolean(entry.path));
 
   return (
-    <footer className="border-t border-neutral-200 bg-[#faf7f2] font-sans text-zinc-900" data-testid="starter-store-footer">
+    <footer className="border-t border-border bg-[#faf7f2] font-sans text-content" data-testid="starter-store-footer">
       <div className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="max-w-sm">
-            <p className="text-xs uppercase tracking-[0.28em] text-neutral-500">{storeName}</p>
-            <h2 className="mt-4 text-3xl font-normal tracking-[-0.04em] text-zinc-900">Practical references for herbal consultations and patient prep.</h2>
-            <p className="mt-4 text-sm leading-7 text-neutral-600">
+            <p className="text-xs uppercase tracking-[0.28em] text-content-muted">{storeName}</p>
+            <h2 className="mt-4 text-3xl font-normal tracking-[-0.04em] text-content">Practical references for herbal consultations and patient prep.</h2>
+            <p className="mt-4 text-sm leading-7 text-content-muted">
               Browse the live Honest Herbalist catalog across books, worksheet pads, and clinical quick-check guides without sample storefront data mixed in.
             </p>
           </div>
 
           {showCategories ? (
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-neutral-500">Categories</h3>
+              <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-content-muted">Categories</h3>
               <ul className="mt-5 space-y-3">
                 {categories.length > 0 ? (
                   categories.map((category) => (
@@ -792,7 +792,7 @@ export function StarterStoreFooter({
                     </li>
                   ))
                 ) : (
-                  <li className="text-sm text-neutral-500">Categories appear when live catalog data is available.</li>
+                  <li className="text-sm text-content-muted">Categories appear when live catalog data is available.</li>
                 )}
               </ul>
             </div>
@@ -800,23 +800,23 @@ export function StarterStoreFooter({
 
           {showCollections ? (
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-neutral-500">Collections</h3>
+              <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-content-muted">Collections</h3>
               <ul className="mt-5 space-y-3">
                 {collections.length > 0 ? (
                   collections.map((collection) => (
-                    <li key={collection.id} className="text-sm text-neutral-500">
+                    <li key={collection.id} className="text-sm text-content-muted">
                       {collection.title}
                     </li>
                   ))
                 ) : (
-                  <li className="text-sm text-neutral-500">Collections appear after products are merchandised in Medusa.</li>
+                  <li className="text-sm text-content-muted">Collections appear after products are merchandised in Medusa.</li>
                 )}
               </ul>
             </div>
           ) : null}
 
           <div>
-            <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-neutral-500">Pages</h3>
+            <h3 className="text-xs font-medium uppercase tracking-[0.24em] text-content-muted">Pages</h3>
             <ul className="mt-5 space-y-3">
               {footerPages.map((page) => (
                 <li key={page.label}>
@@ -829,7 +829,7 @@ export function StarterStoreFooter({
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-neutral-200 pt-6 text-xs uppercase tracking-[0.2em] text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-3 border-t border-border pt-6 text-xs uppercase tracking-[0.2em] text-content-muted sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} {storeName}</span>
           <span>Powered by Honest Herbalist · Medusa · Marketi</span>
         </div>

@@ -358,7 +358,7 @@ export function FunnelPageEditorPage() {
         <>
           <div className="ds-card ds-card--md p-0 overflow-hidden">
             {siteCommerceLoading ? (
-              <div className="h-0.5 animate-pulse bg-zinc-900/80" aria-hidden="true" />
+              <div className="h-0.5 animate-pulse bg-content/80" aria-hidden="true" />
             ) : null}
             {siteCommerceError ? (
               <div className="border-b border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
