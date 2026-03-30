@@ -49,6 +49,7 @@ dev = [
   "pytest",
   "pytest-asyncio",
   "httpx[http2]",
+  "respx",
   "ruff",
   "black",
   "mypy",
