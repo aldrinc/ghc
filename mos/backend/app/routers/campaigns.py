@@ -981,7 +981,8 @@ async def start_creative_production(
 
     asset_brief_ids = payload.asset_brief_ids
     swipe_collections_repo = SwipeCollectionsRepository(session)
-    resolved_collection_id = payload.swipe_collection_id or (
+    explicit_swipe_collection_id = payload.swipe_collection_id
+    resolved_collection_id = explicit_swipe_collection_id or (
         str(campaign.default_swipe_collection_id) if campaign.default_swipe_collection_id else None
     )
     if not resolved_collection_id:
@@ -997,7 +998,7 @@ async def start_creative_production(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
         )
-    if swipe_collection.kind in {"default", "gethookd_inbox"}:
+    if explicit_swipe_collection_id is None and swipe_collection.kind in {"default", "gethookd_inbox"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign launch defaults must point at a curated or uploaded swipe collection.",

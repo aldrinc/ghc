@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
-from app.config import settings
+import app.config as app_config
 from app.db.deps import get_session
 from app.db.models import User
 from app.db.repositories.clients import ClientsRepository
@@ -262,7 +262,7 @@ def _resolve_mos_user_email(
 
 
 def _derive_postiz_browser_password(*, user_id: str, email: str) -> str:
-    secret = settings.POSTIZ_BROWSER_LOGIN_SECRET
+    secret = app_config.settings.POSTIZ_BROWSER_LOGIN_SECRET
     if not secret:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -376,7 +376,7 @@ def get_credentials(
         PostizCredentialsResponse.model_validate(
             {
                 "hasCredentials": creds is not None,
-                "baseUrl": creds.base_url if creds else settings.POSTIZ_DEFAULT_BASE_URL,
+                "baseUrl": creds.base_url if creds else app_config.settings.POSTIZ_DEFAULT_BASE_URL,
                 "authType": creds.auth_type if creds else None,
                 "lastValidatedAt": getattr(creds, "last_validated_at", None),
                 "lastValidationError": getattr(creds, "last_validation_error", None),
@@ -527,7 +527,7 @@ def prepare_postiz_browser_launch(
 
     creds_repo = PostizCredentialsRepository(session)
     creds = creds_repo.get(org_id=auth.org_id, client_id=client_id)
-    resolved_base_url = creds.base_url if creds else settings.POSTIZ_DEFAULT_BASE_URL
+    resolved_base_url = creds.base_url if creds else app_config.settings.POSTIZ_DEFAULT_BASE_URL
     if not resolved_base_url:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
