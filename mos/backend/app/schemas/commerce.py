@@ -252,6 +252,9 @@ class SiteCommerceData(BaseModel):
     # Payment providers (if region_id provided)
     paymentProviders: list[dict[str, Any]] = []
 
+    # Default payment provider (if region_id provided)
+    defaultPaymentProviderId: Optional[str] = None
+
 
 class SiteCommerceCartResponse(BaseModel):
     """Response for cart operations."""
@@ -269,6 +272,7 @@ class SiteCommercePaymentProvidersResponse(BaseModel):
     """Response for payment providers."""
 
     payment_providers: list[dict[str, Any]]
+    default_payment_provider_id: Optional[str] = None
 
 
 class SiteCommercePaymentSessionResponse(BaseModel):

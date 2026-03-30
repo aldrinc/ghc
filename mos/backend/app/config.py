@@ -227,6 +227,13 @@ class Settings(BaseSettings):
     GETHOOKD_SYNC_SCHEDULE_ID: str = "gethookd-nightly-sync"
     GETHOOKD_SYNC_SCHEDULE_CRON: str = "0 3 * * *"
 
+    # Postiz sidecar configuration
+    # Default base URL for self-hosted Postiz instances.
+    # Workspace credentials override this on a per-workspace basis.
+    POSTIZ_DEFAULT_BASE_URL: str | None = None
+    POSTIZ_TIMEOUT_SECONDS: float = 30.0
+    POSTIZ_BROWSER_LOGIN_SECRET: str | None = None
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:

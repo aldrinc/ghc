@@ -16,7 +16,10 @@ Quote flows, approval flows, and account flows are NOT included in the current s
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+
+
+ThemeRequirement = Literal["optional", "required"]
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,7 @@ class SiteFamilyDescriptor:
     commerce_provider: str
     page_blueprints: tuple[SitePageBlueprint, ...]
     provenance_notes: tuple[str, ...]
+    theme_requirement: ThemeRequirement = "optional"
 
 
 # Medusa B2B Starter page blueprints
@@ -60,6 +64,7 @@ MEDUSA_B2B_STARTER_BLUEPRINT = SiteFamilyDescriptor(
     description="A B2B ecommerce starter template with product catalog, cart, and checkout.",
     site_type="ecommerce",
     commerce_provider="medusa",
+    theme_requirement="optional",
     page_blueprints=(
         SitePageBlueprint(
             page_type="home",
@@ -102,6 +107,46 @@ MEDUSA_B2B_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             description="Checkout flow with shipping, payment, and order confirmation.",
             ordering=4,
         ),
+        SitePageBlueprint(
+            page_type="privacy_policy",
+            template_id="medusa-b2b-policy-privacy",
+            name="Privacy Policy",
+            slug="privacy",
+            description="Store privacy policy rendered from the workspace compliance profile.",
+            ordering=5,
+        ),
+        SitePageBlueprint(
+            page_type="terms_of_service",
+            template_id="medusa-b2b-policy-terms",
+            name="Terms of Service",
+            slug="terms",
+            description="Store terms of service rendered from the workspace compliance profile.",
+            ordering=6,
+        ),
+        SitePageBlueprint(
+            page_type="returns_refunds_policy",
+            template_id="medusa-b2b-policy-returns",
+            name="Returns and Refunds",
+            slug="returns",
+            description="Returns and refunds policy rendered from the workspace compliance profile.",
+            ordering=7,
+        ),
+        SitePageBlueprint(
+            page_type="shipping_policy",
+            template_id="medusa-b2b-policy-shipping",
+            name="Shipping Policy",
+            slug="shipping",
+            description="Shipping policy rendered from the workspace compliance profile.",
+            ordering=8,
+        ),
+        SitePageBlueprint(
+            page_type="contact_support",
+            template_id="medusa-b2b-policy-contact",
+            name="Contact",
+            slug="contact",
+            description="Customer support and business contact information for the store.",
+            ordering=9,
+        ),
     ),
     provenance_notes=(
         "Derived from Medusa B2B starter feature set.",
@@ -128,6 +173,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
     description="A B2C ecommerce starter template with full storefront, cart, checkout, and customer account flows.",
     site_type="ecommerce",
     commerce_provider="medusa",
+    theme_requirement="optional",
     page_blueprints=(
         SitePageBlueprint(
             page_type="home",
@@ -187,12 +233,52 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             ordering=6,
         ),
         SitePageBlueprint(
+            page_type="privacy_policy",
+            template_id="medusa-b2c-policy-privacy",
+            name="Privacy Policy",
+            slug="privacy-policy",
+            description="Store privacy policy rendered from the workspace compliance profile.",
+            ordering=7,
+        ),
+        SitePageBlueprint(
+            page_type="terms_of_service",
+            template_id="medusa-b2c-policy-terms",
+            name="Terms of Service",
+            slug="terms-of-service",
+            description="Terms of service rendered from the workspace compliance profile.",
+            ordering=8,
+        ),
+        SitePageBlueprint(
+            page_type="returns_refunds_policy",
+            template_id="medusa-b2c-policy-returns",
+            name="Refund Policy",
+            slug="refund-policy",
+            description="Returns and refunds policy rendered from the workspace compliance profile.",
+            ordering=9,
+        ),
+        SitePageBlueprint(
+            page_type="shipping_policy",
+            template_id="medusa-b2c-policy-shipping",
+            name="Shipping Policy",
+            slug="shipping-policy",
+            description="Shipping policy rendered from the workspace compliance profile.",
+            ordering=10,
+        ),
+        SitePageBlueprint(
+            page_type="contact_support",
+            template_id="medusa-b2c-policy-contact",
+            name="Contact Support",
+            slug="contact-support",
+            description="Support contact page rendered from the workspace compliance profile.",
+            ordering=11,
+        ),
+        SitePageBlueprint(
             page_type="account_dashboard",
             template_id="medusa-b2c-account-dashboard",
             name="Account Dashboard",
             slug="account",
             description="Customer account overview with login/register.",
-            ordering=7,
+            ordering=12,
         ),
         SitePageBlueprint(
             page_type="account_profile",
@@ -200,7 +286,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Account Profile",
             slug="account/profile",
             description="Customer profile management.",
-            ordering=8,
+            ordering=13,
         ),
         SitePageBlueprint(
             page_type="account_addresses",
@@ -208,7 +294,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Account Addresses",
             slug="account/addresses",
             description="Customer address book management.",
-            ordering=9,
+            ordering=14,
         ),
         SitePageBlueprint(
             page_type="account_orders",
@@ -216,7 +302,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Account Orders",
             slug="account/orders",
             description="Customer orders list.",
-            ordering=10,
+            ordering=15,
         ),
         SitePageBlueprint(
             page_type="account_order_detail",
@@ -224,7 +310,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Order Detail",
             slug="account/orders/details",
             description="Single order detail view.",
-            ordering=11,
+            ordering=16,
         ),
         SitePageBlueprint(
             page_type="order_confirmed",
@@ -232,7 +318,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Order Confirmed",
             slug="order/confirmed",
             description="Order confirmation page after successful checkout.",
-            ordering=12,
+            ordering=17,
         ),
         SitePageBlueprint(
             page_type="order_transfer",
@@ -240,7 +326,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Order Transfer",
             slug="order/transfer",
             description="Order transfer landing page for gift/transfer flows.",
-            ordering=13,
+            ordering=18,
         ),
         SitePageBlueprint(
             page_type="order_transfer_accept",
@@ -248,7 +334,7 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Accept Transfer",
             slug="order/transfer/accept",
             description="Accept order transfer action page.",
-            ordering=14,
+            ordering=19,
         ),
         SitePageBlueprint(
             page_type="order_transfer_decline",
@@ -256,12 +342,12 @@ MEDUSA_B2C_STARTER_BLUEPRINT = SiteFamilyDescriptor(
             name="Decline Transfer",
             slug="order/transfer/decline",
             description="Decline order transfer action page.",
-            ordering=15,
+            ordering=20,
         ),
     ),
     provenance_notes=(
         "Derived from Medusa B2C starter feature set (medusajs/nextjs-starter-medusa).",
-        "Supports full storefront, cart, checkout, and customer account flows.",
+        "Supports full storefront, cart, checkout, policy pages, and customer account flows.",
         "No fake reviews or unsupported business claims.",
         "Account, address, order, and transfer flows included.",
     ),
@@ -305,3 +391,20 @@ def get_entry_page_blueprint(family: str) -> SitePageBlueprint | None:
         if blueprint.is_entry:
             return blueprint
     return None
+
+
+def validate_theme_requirement(
+    descriptor: SiteFamilyDescriptor | None,
+    *,
+    theme_binding_mode: str,
+    subject: str,
+) -> None:
+    """Validate that a descriptor's theme requirement matches the requested mode."""
+    if descriptor is None or descriptor.theme_requirement != "required":
+        return
+    if theme_binding_mode != "standalone":
+        return
+    raise ValueError(
+        f"{subject} requires an explicit site theme. "
+        "Choose 'workspace_default' or 'design_system' instead of 'standalone'."
+    )

@@ -60,6 +60,7 @@ import {
   Package,
   ShoppingBag,
   LayoutTemplate,
+  Send,
 } from "lucide-react";
 import { appRoutes } from "./routes";
 import { cn } from "@/lib/utils";
@@ -113,6 +114,7 @@ const EXECUTION_NAV: NavSection = {
   label: "Execution",
   items: [
     { title: "Campaigns", path: "/campaigns", icon: Target },
+    { title: "Postiz", path: "/workspaces/execution/postiz", icon: Send },
   ],
 };
 
@@ -352,7 +354,7 @@ export function AppShell() {
     if (isLoadingProducts) return [{ label: "Loading products…", value: "" }];
     if (!products.length) return [{ label: "No products yet", value: "" }];
     return [
-      { label: "Select product", value: "" },
+      { label: "Select workspace product", value: "" },
       ...products.map((item) => ({
         label: item.title,
         value: item.id,
@@ -566,7 +568,7 @@ export function AppShell() {
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden text-xs font-semibold text-content-muted md:inline">Product</span>
+            <span className="hidden text-xs font-semibold text-content-muted md:inline">Workspace Product</span>
             <Select
               className="min-w-[180px] md:min-w-[220px]"
               options={productOptions}

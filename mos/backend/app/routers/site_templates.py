@@ -36,6 +36,7 @@ from app.services.site_templates import (
     get_template_links,
     get_template_funnels,
     get_template_funnel_steps,
+    get_template_theme_requirement,
     instantiate_template,
     seed_system_templates,
     SiteTemplateError,
@@ -88,6 +89,7 @@ def list_site_templates(
             description=t.description,
             siteType=t.site_type,
             commerceProvider=t.commerce_provider,
+            themeRequirement=get_template_theme_requirement(t.family),
             isSystemTemplate=t.is_system_template,
             pageCount=len(get_template_pages(session, str(t.id))),
             funnelCount=len(get_template_funnels(session, str(t.id))),
@@ -129,6 +131,7 @@ def create_site_template(
         description=template.description,
         siteType=template.site_type,
         commerceProvider=template.commerce_provider,
+        themeRequirement=get_template_theme_requirement(template.family),
         isSystemTemplate=template.is_system_template,
         pageCount=0,
         funnelCount=0,
@@ -188,6 +191,7 @@ def get_site_template(
         description=template.description,
         siteType=template.site_type,
         commerceProvider=template.commerce_provider,
+        themeRequirement=get_template_theme_requirement(template.family),
         isSystemTemplate=template.is_system_template,
         provenanceNotes=list(template.provenance_notes or []),
         pages=[
@@ -218,7 +222,11 @@ def get_site_template(
     )
 
 
-@router.post("/{template_id}/instantiate", response_model=SiteTemplateInstantiateResponse)
+@router.post(
+    "/{template_id}/instantiate",
+    response_model=SiteTemplateInstantiateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def instantiate_site_template(
     template_id: str,
     request: SiteTemplateInstantiateRequest,
@@ -232,6 +240,40 @@ def instantiate_site_template(
     # Validate workspace
     _get_workspace_or_404(session, request.clientId, auth.org_id)
 
+    # Determine theme_binding_mode (default to standalone)
+    theme_binding_mode = request.themeBindingMode or "standalone"
+
+    # Validate theme binding mode is a known value
+    valid_modes = {"standalone", "workspace_default", "design_system"}
+    if theme_binding_mode not in valid_modes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid themeBindingMode '{theme_binding_mode}'. Must be one of: {', '.join(sorted(valid_modes))}.",
+        )
+
+    # Validate and resolve design_system_id based on theme_binding_mode
+    design_system_id = None
+    if theme_binding_mode == "design_system":
+        if not request.designSystemId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="themeBindingMode 'design_system' requires a non-empty designSystemId.",
+            )
+        # Validate design system ownership using the same helper as create-site
+        from app.routers.funnels import _validate_design_system
+
+        _validate_design_system(
+            session=session,
+            org_id=auth.org_id,
+            client_id=request.clientId,
+            design_system_id=request.designSystemId,
+        )
+        design_system_id = request.designSystemId
+    elif theme_binding_mode == "standalone":
+        # standalone mode ignores any provided designSystemId
+        design_system_id = None
+    # workspace_default mode - design_system_id stays None, resolved at access time
+
     try:
         result = instantiate_template(
             session,
@@ -241,7 +283,8 @@ def instantiate_site_template(
             name=request.name,
             description=request.description,
             product_id=request.productId,
-            design_system_id=request.designSystemId,
+            design_system_id=design_system_id,
+            theme_binding_mode=theme_binding_mode,
             primary_domain=request.primaryDomain,
             created_by_user_external_id=auth.user_id,
         )

@@ -14,6 +14,10 @@ class MedusaConfigUpdateRequest(BaseModel):
     baseUrl: str = Field(..., min_length=1)
     adminApiKey: str | None = None
     publishableKey: str | None = None
+    stripeAccountProfileId: str | None = None
+    defaultPaymentProviderId: str | None = None
+    allowedPaymentProviderIds: list[str] | None = None
+    webhookRoutingMode: Literal["direct", "shared_ingress"] | None = None
 
 
 class MedusaConfigResponse(BaseModel):
@@ -26,8 +30,48 @@ class MedusaConfigResponse(BaseModel):
     connectionStatus: str = "not_configured"
     lastConnectionCheckAt: datetime | None = None
     lastConnectionError: str | None = None
+    stripeAccountProfileId: str | None = None
+    defaultPaymentProviderId: str | None = None
+    allowedPaymentProviderIds: list[str] = Field(default_factory=list)
+    webhookRoutingMode: str = "shared_ingress"
     createdAt: datetime | None = None
     updatedAt: datetime | None = None
+
+
+class StripeAccountProfileCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(..., min_length=1, max_length=255)
+    stripeAccountId: str | None = None
+    secretKeyRef: str | None = None
+    webhookSecretRef: str | None = None
+    mode: Literal["shared", "dedicated"] = "shared"
+
+
+class StripeAccountProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(None, min_length=1, max_length=255)
+    stripeAccountId: str | None = None
+    secretKeyRef: str | None = None
+    webhookSecretRef: str | None = None
+    mode: Literal["shared", "dedicated"] | None = None
+    status: Literal["active", "disabled", "error"] | None = None
+
+
+class StripeAccountProfileResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    orgId: str
+    label: str
+    stripeAccountId: str | None = None
+    hasSecretKeyRef: bool = False
+    hasWebhookSecretRef: bool = False
+    mode: str = "shared"
+    status: str = "active"
+    createdAt: datetime
+    updatedAt: datetime
 
 
 class MedusaConnectionStatusResponse(BaseModel):

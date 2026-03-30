@@ -18,13 +18,19 @@ from app.config import settings
 from app.db.deps import get_session
 from app.db.enums import FunnelEventTypeEnum, FunnelPageVersionStatusEnum, FunnelStatusEnum
 from app.db.models import (
+    Client,
+    ClientComplianceProfile,
     ClientMedusaConfig,
+    DesignSystem,
     Funnel,
     FunnelEvent,
     FunnelPage,
     FunnelPageVersion,
     Product,
     ProductVariant,
+    Site,
+    SitePage,
+    SitePageVersion,
 )
 from app.db.repositories.funnels import (
     FunnelPageVersionsRepository,
@@ -43,6 +49,11 @@ from app.schemas.commerce import (
     SiteCommercePaymentSessionRequest,
 )
 from app.schemas.funnels import PublicEventsIngestRequest
+from app.services.compliance import (
+    get_policy_template,
+    list_policy_page_keys,
+    render_policy_template_markdown,
+)
 from app.services.campaign_destinations import normalize_destination_type
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
@@ -50,7 +61,11 @@ from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import normalize_route_token, require_product_route_slug
-from app.services.medusa_connection import get_client_medusa_config
+from app.services.medusa_connection import (
+    get_client_medusa_config,
+    get_stripe_account_profile_by_id,
+)
+from app.services.site_publications import get_active_site_publication, list_site_publication_pages
 from app.services.medusa_store_runtime import (
     MedusaStoreConfig,
     get_medusa_store_config,
@@ -73,10 +88,29 @@ from app.services.medusa_store_runtime import (
     medusa_create_payment_collection,
     medusa_initialize_payment_session,
     medusa_complete_cart,
+    filter_payment_providers_by_allowlist,
+    validate_provider_id_against_allowlist,
+    resolve_default_payment_provider_id,
 )
 
 router = APIRouter(prefix="/public", tags=["public"])
 _MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
+
+
+def _resolve_public_medusa_stripe_account_id(
+    *,
+    session: Session,
+    config: ClientMedusaConfig,
+) -> str | None:
+    if not config.stripe_account_profile_id:
+        return None
+    profile = get_stripe_account_profile_by_id(
+        session=session,
+        profile_id=str(config.stripe_account_profile_id),
+    )
+    if not profile:
+        return None
+    return profile.stripe_account_id
 
 
 def create_shopify_checkout(
@@ -142,6 +176,11 @@ SITE_PAGE_TYPES = {
     "product_detail",
     "cart",
     "checkout",
+    "privacy_policy",
+    "terms_of_service",
+    "returns_refunds_policy",
+    "shipping_policy",
+    "contact_support",
     "account_dashboard",
     "account_profile",
     "account_addresses",
@@ -154,12 +193,21 @@ SITE_PAGE_TYPES = {
 }
 
 
-def _site_page_type(*, slug: str | None = None, template_id: str | None = None) -> str | None:
+def _site_page_type(
+    *,
+    slug: str | None = None,
+    template_id: str | None = None,
+    page_type: str | None = None,
+) -> str | None:
     """Determine the site page type for commerce experiences.
 
     Returns the page_type if this is a recognized site page type,
     or None if not a recognized site page type.
     """
+    normalized_page_type = clean_optional_text(page_type)
+    if normalized_page_type in SITE_PAGE_TYPES:
+        return normalized_page_type
+
     normalized_template_id = clean_optional_text(template_id)
     if not normalized_template_id:
         return None
@@ -172,6 +220,11 @@ def _site_page_type(*, slug: str | None = None, template_id: str | None = None) 
         "medusa-b2b-pdp": "product_detail",
         "medusa-b2b-cart": "cart",
         "medusa-b2b-checkout": "checkout",
+        "medusa-b2b-policy-privacy": "privacy_policy",
+        "medusa-b2b-policy-terms": "terms_of_service",
+        "medusa-b2b-policy-returns": "returns_refunds_policy",
+        "medusa-b2b-policy-shipping": "shipping_policy",
+        "medusa-b2b-policy-contact": "contact_support",
         # B2C templates
         "medusa-b2c-home": "home",
         "medusa-b2c-store": "store",
@@ -180,6 +233,11 @@ def _site_page_type(*, slug: str | None = None, template_id: str | None = None) 
         "medusa-b2c-product": "product_detail",
         "medusa-b2c-cart": "cart",
         "medusa-b2c-checkout": "checkout",
+        "medusa-b2c-policy-privacy": "privacy_policy",
+        "medusa-b2c-policy-terms": "terms_of_service",
+        "medusa-b2c-policy-returns": "returns_refunds_policy",
+        "medusa-b2c-policy-shipping": "shipping_policy",
+        "medusa-b2c-policy-contact": "contact_support",
         "medusa-b2c-account-dashboard": "account_dashboard",
         "medusa-b2c-account-profile": "account_profile",
         "medusa-b2c-account-addresses": "account_addresses",
@@ -192,6 +250,64 @@ def _site_page_type(*, slug: str | None = None, template_id: str | None = None) 
     }
 
     return template_to_page_type.get(normalized_template_id)
+
+
+def _require_absolute_public_website_url(website_url: str | None) -> str:
+    cleaned = clean_optional_text(website_url)
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="website_url query parameter is required.",
+        )
+
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="website_url must be an absolute URL (http/https).",
+        )
+    return cleaned
+
+
+def _public_policy_placeholder_values(
+    *,
+    profile: ClientComplianceProfile,
+    workspace_name: str,
+    website_url: str,
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    scalar_fields = {
+        "legal_business_name": profile.legal_business_name,
+        "operating_entity_name": profile.operating_entity_name,
+        "company_address_text": profile.company_address_text,
+        "business_license_identifier": profile.business_license_identifier,
+        "support_email": profile.support_email,
+        "support_phone": profile.support_phone,
+        "support_hours_text": profile.support_hours_text,
+        "response_time_commitment": profile.response_time_commitment,
+    }
+    for key, value in scalar_fields.items():
+        if isinstance(value, str) and value.strip():
+            values[key] = value.strip()
+
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    for key, raw_value in metadata.items():
+        if not isinstance(key, str):
+            continue
+        placeholder_key = key.strip()
+        if not placeholder_key or raw_value is None:
+            continue
+        if isinstance(raw_value, str):
+            cleaned = raw_value.strip()
+            if cleaned:
+                values[placeholder_key] = cleaned
+            continue
+        if isinstance(raw_value, (int, float, bool)):
+            values[placeholder_key] = str(raw_value)
+
+    values["brand_name"] = workspace_name
+    values["website_url"] = website_url
+    return values
 
 
 def _resolve_public_medusa_runtime_config(
@@ -213,7 +329,246 @@ def _resolve_public_medusa_runtime_config(
     return {
         "backendUrl": clean_optional_text(config.base_url),
         "publishableKey": clean_optional_text(config.publishable_key_encrypted),
+        "stripeAccountId": _resolve_public_medusa_stripe_account_id(
+            session=session,
+            config=config,
+        ),
         "defaultCountryCode": "us",
+    }
+
+
+def _site_uses_b2c_medusa_runtime(site: Site) -> bool:
+    if clean_optional_text(site.site_family) == "medusa-b2b-starter":
+        return False
+    return clean_optional_text(site.commerce_provider) == "medusa"
+
+
+def _resolve_public_medusa_runtime_config_for_site(
+    *, session: Session, site: Site
+) -> dict[str, Any] | None:
+    if not _site_uses_b2c_medusa_runtime(site):
+        return None
+
+    config = get_client_medusa_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not config or not clean_optional_text(config.base_url):
+        return None
+    if not clean_optional_text(config.publishable_key_encrypted):
+        return None
+
+    return {
+        "backendUrl": clean_optional_text(config.base_url),
+        "publishableKey": clean_optional_text(config.publishable_key_encrypted),
+        "stripeAccountId": _resolve_public_medusa_stripe_account_id(
+            session=session,
+            config=config,
+        ),
+        "defaultCountryCode": "us",
+    }
+
+
+def _resolve_public_site_design_system_tokens(
+    *,
+    session: Session,
+    site: Site,
+    page: SitePage | None = None,
+) -> dict[str, Any] | None:
+    if page and page.design_system_id:
+        design_system = session.scalars(
+            select(DesignSystem).where(
+                DesignSystem.org_id == UUID(str(site.org_id)),
+                DesignSystem.id == UUID(str(page.design_system_id)),
+            )
+        ).first()
+        if not design_system:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Page '{page.id}' references design_system_id '{page.design_system_id}' "
+                    "which no longer exists. Please reconfigure the page override."
+                ),
+            )
+        return design_system.tokens
+
+    site_mode = (
+        site.theme_binding_mode.value
+        if hasattr(site.theme_binding_mode, "value")
+        else site.theme_binding_mode
+    )
+
+    if site_mode == "standalone":
+        return None
+
+    if site_mode == "design_system":
+        if not site.design_system_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Site '{site.id}' has theme_binding_mode 'design_system' "
+                    "but is missing a bound design_system_id."
+                ),
+            )
+        design_system = session.scalars(
+            select(DesignSystem).where(
+                DesignSystem.org_id == UUID(str(site.org_id)),
+                DesignSystem.id == UUID(str(site.design_system_id)),
+            )
+        ).first()
+        if not design_system:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Site '{site.id}' references design_system_id '{site.design_system_id}' "
+                    "which no longer exists. Please reconfigure the site's theme binding."
+                ),
+            )
+        return design_system.tokens
+
+    if site_mode == "workspace_default":
+        return resolve_design_system_tokens(
+            session=session,
+            org_id=str(site.org_id),
+            client_id=str(site.client_id),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=(
+            f"Site '{site.id}' has unrecognized theme_binding_mode '{site_mode}'. "
+            "Valid modes are: standalone, workspace_default, design_system."
+        ),
+    )
+
+
+def _resolve_site_by_route_token(*, session: Session, site_token: str) -> Site | None:
+    token = str(site_token or "").strip()
+    if not token:
+        return None
+
+    site = session.scalars(select(Site).where(Site.route_slug == token)).first()
+    if site:
+        return site
+
+    try:
+        parsed_site_id = str(UUID(token))
+    except ValueError:
+        short_token = token.lower()
+        if len(short_token) != 8 or any(ch not in "0123456789abcdef" for ch in short_token):
+            return None
+        matches = list(
+            session.scalars(
+                select(Site)
+                .where(func.left(cast(Site.id, String), 8) == short_token)
+                .order_by(Site.created_at.asc(), Site.id.asc())
+                .limit(2)
+            ).all()
+        )
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    return session.scalars(select(Site).where(Site.id == parsed_site_id)).first()
+
+
+def _get_site_or_404(
+    *, session: Session, product_slug: str, site_slug: str
+) -> tuple[Site, Product, str]:
+    site = _resolve_site_by_route_token(session=session, site_token=site_slug)
+    if not site:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+    if not site.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Site has no product configured.",
+        )
+    product = session.scalars(
+        select(Product).where(Product.id == site.product_id, Product.org_id == site.org_id)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    try:
+        resolved_product_slug = require_product_route_slug(product=product)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    requested_product_slug = normalize_route_token(product_slug)
+    if requested_product_slug != resolved_product_slug:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+    return site, product, resolved_product_slug
+
+
+def _get_public_runtime_target_or_404(
+    *, session: Session, product_slug: str, funnel_slug: str
+) -> tuple[str, Funnel | Site, Product, str]:
+    funnel = _resolve_funnel_by_route_token(session=session, funnel_token=funnel_slug)
+    if funnel:
+        resolved_funnel, product, resolved_product_slug = _get_funnel_or_404(
+            session=session,
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+        )
+        return "funnel", resolved_funnel, product, resolved_product_slug
+
+    site = _resolve_site_by_route_token(session=session, site_token=funnel_slug)
+    if site:
+        resolved_site, product, resolved_product_slug = _get_site_or_404(
+            session=session,
+            product_slug=product_slug,
+            site_slug=funnel_slug,
+        )
+        return "site", resolved_site, product, resolved_product_slug
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+
+
+def _public_site_preview_pages(*, session: Session, site_id: str) -> list[SitePage]:
+    preview_page_ids = {
+        str(page_id)
+        for page_id in session.scalars(
+            select(SitePageVersion.page_id)
+            .join(SitePage, SitePage.id == SitePageVersion.page_id)
+            .where(
+                SitePage.site_id == site_id,
+                SitePageVersion.status.in_(["draft", "approved"]),
+            )
+            .distinct()
+        ).all()
+    }
+    pages = session.scalars(
+        select(SitePage)
+        .where(SitePage.site_id == site_id)
+        .order_by(SitePage.ordering.asc(), SitePage.created_at.asc())
+    ).all()
+    return [page for page in pages if str(page.id) in preview_page_ids]
+
+
+def _public_site_preview_version(*, session: Session, page_id: str) -> SitePageVersion | None:
+    draft = session.scalars(
+        select(SitePageVersion)
+        .where(SitePageVersion.page_id == page_id, SitePageVersion.status == "draft")
+        .order_by(SitePageVersion.created_at.desc())
+    ).first()
+    if draft:
+        return draft
+    return session.scalars(
+        select(SitePageVersion)
+        .where(SitePageVersion.page_id == page_id, SitePageVersion.status == "approved")
+        .order_by(SitePageVersion.created_at.desc())
+    ).first()
+
+
+def _build_public_site_metadata(*, site: Site, page: SitePage) -> dict[str, Any]:
+    site_name = clean_optional_text(site.name) or "Store"
+    page_name = clean_optional_text(page.name) or site_name
+    description = clean_optional_text(site.description) or f"{page_name} page."
+    title = page_name if page_name.lower() == site_name.lower() else f"{page_name} | {site_name}"
+    return {
+        "title": title,
+        "description": description,
+        "lang": "en",
+        "brandName": site_name,
     }
 
 
@@ -330,6 +685,248 @@ def _publication_id_for_public_response(funnel: Funnel) -> str:
     """
 
     return str(funnel.active_publication_id or funnel.id)
+
+
+def _site_publication_id_for_public_response(site: Site) -> str:
+    return str(site.active_site_publication_id or site.id)
+
+
+def _public_site_meta_response(
+    *,
+    session: Session,
+    site: Site,
+    resolved_product_slug: str,
+    response: Response,
+) -> dict[str, Any]:
+    publication_id = _site_publication_id_for_public_response(site)
+    if site.active_site_publication_id:
+        publication = get_active_site_publication(session, site_id=str(site.id))
+        if not publication:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found"
+            )
+        pages = list_site_publication_pages(session, publication_id=str(publication.id))
+        entry_slug = None
+        for item in pages:
+            if str(item.page_id) == str(publication.entry_page_id):
+                entry_slug = item.slug_at_publish
+                break
+        if not entry_slug:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found"
+            )
+
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return {
+            "productSlug": resolved_product_slug,
+            "funnelSlug": str(site.route_slug or site.id),
+            "funnelId": str(site.id),
+            "publicationId": publication_id,
+            "entrySlug": entry_slug,
+            "medusaRuntimeConfig": _resolve_public_medusa_runtime_config_for_site(
+                session=session,
+                site=site,
+            ),
+            "pages": [
+                {
+                    "pageId": str(item.page_id),
+                    "slug": item.slug_at_publish,
+                }
+                for item in pages
+            ],
+        }
+
+    preview_pages = _public_site_preview_pages(session=session, site_id=str(site.id))
+    if not site.entry_page_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
+    entry_page = next((page for page in preview_pages if str(page.id) == str(site.entry_page_id)), None)
+    if not entry_page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version"
+        )
+
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return {
+        "productSlug": resolved_product_slug,
+        "funnelSlug": str(site.route_slug or site.id),
+        "funnelId": str(site.id),
+        "publicationId": publication_id,
+        "entrySlug": entry_page.slug,
+        "medusaRuntimeConfig": _resolve_public_medusa_runtime_config_for_site(
+            session=session,
+            site=site,
+        ),
+        "pages": [{"pageId": str(page.id), "slug": page.slug} for page in preview_pages],
+    }
+
+
+def _public_site_page_response(
+    *,
+    session: Session,
+    site: Site,
+    resolved_product_slug: str,
+    slug: str,
+    response: Response,
+) -> dict[str, Any]:
+    publication_id = _site_publication_id_for_public_response(site)
+    slug_candidates = _public_page_slug_candidates(slug)
+
+    if site.active_site_publication_id:
+        publication = get_active_site_publication(session, site_id=str(site.id))
+        if not publication:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found"
+            )
+        publication_pages = list_site_publication_pages(session, publication_id=str(publication.id))
+        page_lookup = {item.slug_at_publish: item for item in publication_pages}
+        publication_page = None
+        for candidate_slug in slug_candidates:
+            publication_page = page_lookup.get(candidate_slug)
+            if publication_page:
+                break
+        if not publication_page:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+
+        page_rows = {
+            str(page.id): page
+            for page in session.scalars(
+                select(SitePage).where(SitePage.id.in_([item.page_id for item in publication_pages]))
+            ).all()
+        }
+        page = page_rows.get(str(publication_page.page_id))
+        if not page:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+        version = session.scalars(
+            select(SitePageVersion).where(SitePageVersion.id == publication_page.page_version_id)
+        ).first()
+        if not version:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Page content not found"
+            )
+
+        page_map = {str(item.page_id): item.slug_at_publish for item in publication_pages}
+        page_stage_map = {
+            str(item.page_id): _public_page_stage(
+                slug=item.slug_at_publish,
+                template_id=page_rows.get(str(item.page_id)).template_id
+                if page_rows.get(str(item.page_id))
+                else None,
+                page_name=page_rows.get(str(item.page_id)).name
+                if page_rows.get(str(item.page_id))
+                else None,
+            )
+            for item in publication_pages
+        }
+        page_type_map = {
+            str(item.page_id): _site_page_type(
+                slug=item.slug_at_publish,
+                template_id=page_rows.get(str(item.page_id)).template_id
+                if page_rows.get(str(item.page_id))
+                else None,
+                page_type=item.page_type_at_publish
+                or (
+                    page_rows.get(str(item.page_id)).page_type
+                    if page_rows.get(str(item.page_id))
+                    else None
+                ),
+            )
+            for item in publication_pages
+        }
+        page_type_map = {k: v for k, v in page_type_map.items() if v is not None}
+        canonical_slug = publication_page.slug_at_publish
+        if normalize_route_token(slug) != normalize_route_token(canonical_slug):
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
+            return {"redirectToSlug": canonical_slug}
+
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return {
+            "productSlug": resolved_product_slug,
+            "funnelId": str(site.id),
+            "publicationId": publication_id,
+            "pageId": str(page.id),
+            "slug": canonical_slug,
+            "stage": _public_page_stage(
+                slug=canonical_slug,
+                template_id=page.template_id,
+                page_name=page.name,
+            ),
+            "puckData": version.puck_data,
+            "pageMap": page_map,
+            "pageStageMap": page_stage_map,
+            "pageTypeMap": page_type_map,
+            "designSystemTokens": _resolve_public_site_design_system_tokens(
+                session=session,
+                site=site,
+                page=page,
+            ),
+            "metadata": _build_public_site_metadata(site=site, page=page),
+            "tracking": None,
+            "nextPageId": None,
+        }
+
+    preview_pages = _public_site_preview_pages(session=session, site_id=str(site.id))
+    page = None
+    for candidate_slug in slug_candidates:
+        page = next((item for item in preview_pages if item.slug == candidate_slug), None)
+        if page:
+            break
+    if not page:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+
+    version = _public_site_preview_version(session=session, page_id=str(page.id))
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Page has no saved version"
+        )
+
+    page_map = {str(item.id): item.slug for item in preview_pages}
+    page_stage_map = {
+        str(item.id): _public_page_stage(
+            slug=item.slug,
+            template_id=item.template_id,
+            page_name=item.name,
+        )
+        for item in preview_pages
+    }
+    page_type_map = {
+        str(item.id): _site_page_type(
+            slug=item.slug,
+            template_id=item.template_id,
+            page_type=item.page_type,
+        )
+        for item in preview_pages
+    }
+    page_type_map = {k: v for k, v in page_type_map.items() if v is not None}
+    canonical_slug = page.slug
+    if normalize_route_token(slug) != normalize_route_token(canonical_slug):
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return {"redirectToSlug": canonical_slug}
+
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return {
+        "productSlug": resolved_product_slug,
+        "funnelId": str(site.id),
+        "publicationId": publication_id,
+        "pageId": str(page.id),
+        "slug": canonical_slug,
+        "stage": _public_page_stage(
+            slug=canonical_slug,
+            template_id=page.template_id,
+            page_name=page.name,
+        ),
+        "puckData": version.puck_data,
+        "pageMap": page_map,
+        "pageStageMap": page_stage_map,
+        "pageTypeMap": page_type_map,
+        "designSystemTokens": _resolve_public_site_design_system_tokens(
+            session=session,
+            site=site,
+            page=page,
+        ),
+        "metadata": _build_public_site_metadata(site=site, page=page),
+        "tracking": None,
+        "nextPageId": None,
+    }
 
 
 def _normalize_variant_provider(provider: str | None) -> str | None:
@@ -533,12 +1130,21 @@ def public_funnel_meta(
     response: Response,
     session: Session = Depends(get_session),
 ):
-    public_repo = FunnelPublicRepository(session)
-    funnel, _product, resolved_product_slug = _get_funnel_or_404(
+    target_kind, runtime_target, _product, resolved_product_slug = _get_public_runtime_target_or_404(
         session=session,
         product_slug=product_slug,
         funnel_slug=funnel_slug,
     )
+    if target_kind == "site":
+        return _public_site_meta_response(
+            session=session,
+            site=runtime_target,
+            resolved_product_slug=resolved_product_slug,
+            response=response,
+        )
+
+    public_repo = FunnelPublicRepository(session)
+    funnel = runtime_target
 
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:
@@ -656,12 +1262,22 @@ def public_funnel_page(
     response: Response,
     session: Session = Depends(get_session),
 ):
-    public_repo = FunnelPublicRepository(session)
-    funnel, _product, resolved_product_slug = _get_funnel_or_404(
+    target_kind, runtime_target, _product, resolved_product_slug = _get_public_runtime_target_or_404(
         session=session,
         product_slug=product_slug,
         funnel_slug=funnel_slug,
     )
+    if target_kind == "site":
+        return _public_site_page_response(
+            session=session,
+            site=runtime_target,
+            resolved_product_slug=resolved_product_slug,
+            slug=slug,
+            response=response,
+        )
+
+    public_repo = FunnelPublicRepository(session)
+    funnel = runtime_target
 
     if _is_legacy_public_presales_slug(slug):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
@@ -740,6 +1356,9 @@ def public_funnel_page(
             str(item.page_id): _site_page_type(
                 slug=public_page_map.get(str(item.page_id)),
                 template_id=page_rows.get(str(item.page_id)).template_id
+                if page_rows.get(str(item.page_id))
+                else None,
+                page_type=page_rows.get(str(item.page_id)).page_type
                 if page_rows.get(str(item.page_id))
                 else None,
             )
@@ -861,6 +1480,7 @@ def public_funnel_page(
         str(item.id): _site_page_type(
             slug=public_page_map.get(str(item.id), item.slug),
             template_id=item.template_id,
+            page_type=item.page_type,
         )
         for item in preview_pages
     }
@@ -911,6 +1531,81 @@ def public_funnel_page(
         "metadata": metadata,
         "tracking": tracking,
         "nextPageId": str(page.next_page_id) if page.next_page_id else None,
+    }
+
+
+@router.get("/funnels/{product_slug}/{funnel_slug}/policy-pages/{page_key}")
+def public_funnel_policy_page(
+    product_slug: str,
+    funnel_slug: str,
+    page_key: str,
+    website_url: str,
+    response: Response,
+    session: Session = Depends(get_session),
+):
+    target_kind, runtime_target, _product, _resolved_product_slug = _get_public_runtime_target_or_404(
+        session=session,
+        product_slug=product_slug,
+        funnel_slug=funnel_slug,
+    )
+
+    if page_key not in set(list_policy_page_keys()):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy page not found")
+
+    website_url_value = _require_absolute_public_website_url(website_url)
+
+    if target_kind == "site":
+        site = runtime_target
+        org_id = site.org_id
+        client_id = site.client_id
+    else:
+        funnel = runtime_target
+        org_id = funnel.org_id
+        client_id = funnel.client_id
+
+    client = session.scalars(select(Client).where(Client.id == client_id)).first()
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+    workspace_name = clean_optional_text(client.name)
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace name is required to render policy pages.",
+        )
+
+    profile = session.scalars(
+        select(ClientComplianceProfile).where(
+            ClientComplianceProfile.org_id == org_id,
+            ClientComplianceProfile.client_id == client_id,
+        )
+    ).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compliance profile not found for this site.",
+        )
+
+    template = get_policy_template(page_key=page_key)
+    placeholder_values = _public_policy_placeholder_values(
+        profile=profile,
+        workspace_name=workspace_name,
+        website_url=website_url_value,
+    )
+
+    try:
+        markdown = render_policy_template_markdown(
+            page_key=page_key,
+            placeholder_values=placeholder_values,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return {
+        "pageKey": page_key,
+        "title": template["title"],
+        "markdown": markdown,
     }
 
 
@@ -1727,14 +2422,35 @@ def public_site_commerce(
 
     # Fetch payment providers if region_id provided
     if effective_region_id:
-        try:
-            payment_providers = medusa_list_payment_providers(
-                config=config,
-                region_id=effective_region_id,
+        medusa_config = get_client_medusa_config(
+            session=session,
+            org_id=str(funnel.org_id),
+            client_id=str(funnel.client_id),
+        )
+        if not medusa_config:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Medusa configuration not found for this workspace.",
             )
-            result["paymentProviders"] = payment_providers
-        except HTTPException:
-            result["paymentProviders"] = []
+
+        allowed_provider_ids = list(medusa_config.allowed_payment_provider_ids or [])
+        default_payment_provider_id = medusa_config.default_payment_provider_id
+
+        payment_providers = medusa_list_payment_providers(
+            config=config,
+            region_id=effective_region_id,
+        )
+        payment_providers = filter_payment_providers_by_allowlist(
+            providers=payment_providers,
+            allowed_provider_ids=allowed_provider_ids,
+        )
+        resolved_default_id = resolve_default_payment_provider_id(
+            allowed_provider_ids=allowed_provider_ids,
+            default_payment_provider_id=default_payment_provider_id,
+            available_providers=payment_providers,
+        )
+        result["paymentProviders"] = payment_providers
+        result["defaultPaymentProviderId"] = resolved_default_id
 
     # Include any errors encountered during critical fetches
     if errors:
@@ -2110,6 +2826,20 @@ def public_site_payment_providers(
             detail="Site payment endpoint requires Medusa commerce provider.",
         )
 
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(funnel.org_id),
+        client_id=str(funnel.client_id),
+    )
+    if not medusa_config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa configuration not found for this workspace.",
+        )
+
+    allowed_provider_ids = list(medusa_config.allowed_payment_provider_ids or [])
+    default_payment_provider_id = medusa_config.default_payment_provider_id
+
     config = _get_medusa_store_config_for_funnel(session=session, funnel=funnel)
 
     payment_providers = medusa_list_payment_providers(
@@ -2117,8 +2847,21 @@ def public_site_payment_providers(
         region_id=region_id,
     )
 
+    payment_providers = filter_payment_providers_by_allowlist(
+        providers=payment_providers,
+        allowed_provider_ids=allowed_provider_ids,
+    )
+    resolved_default = resolve_default_payment_provider_id(
+        allowed_provider_ids=allowed_provider_ids,
+        default_payment_provider_id=default_payment_provider_id,
+        available_providers=payment_providers,
+    )
+
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    return {"payment_providers": payment_providers}
+    return {
+        "payment_providers": payment_providers,
+        "default_payment_provider_id": resolved_default,
+    }
 
 
 @router.post("/funnels/{product_slug}/{funnel_slug}/site/checkout/session")
@@ -2152,6 +2895,24 @@ def public_site_checkout_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Site checkout endpoint requires Medusa commerce provider.",
         )
+
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(funnel.org_id),
+        client_id=str(funnel.client_id),
+    )
+    if not medusa_config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa configuration not found for this workspace.",
+        )
+
+    allowed_provider_ids = list(medusa_config.allowed_payment_provider_ids or [])
+
+    validate_provider_id_against_allowlist(
+        provider_id=provider_id,
+        allowed_provider_ids=allowed_provider_ids,
+    )
 
     config = _get_medusa_store_config_for_funnel(session=session, funnel=funnel)
 
@@ -2250,6 +3011,13 @@ def ingest_public_events(
         select(Funnel).where(Funnel.active_publication_id == publication_uuid)
     ).first()
     if not funnel:
+        site = session.scalars(
+            select(Site).where(
+                (Site.active_site_publication_id == publication_uuid) | (Site.id == publication_uuid)
+            )
+        ).first()
+        if site:
+            return {"ingested": 0}
         # Preview mode: publicationId is the funnel id (see _publication_id_for_public_response()).
         # Unpublished funnels cannot persist events because funnel_events.publication_id is a FK.
         preview_funnel = session.scalars(

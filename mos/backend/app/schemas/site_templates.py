@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -61,6 +61,7 @@ class SiteTemplateSummary(BaseModel):
     description: Optional[str] = None
     siteType: str
     commerceProvider: str
+    themeRequirement: Optional[Literal["optional", "required"]] = None
     isSystemTemplate: bool = False
     pageCount: int = 0
     funnelCount: int = 0
@@ -76,6 +77,7 @@ class SiteTemplateDetail(BaseModel):
     description: Optional[str] = None
     siteType: str
     commerceProvider: str
+    themeRequirement: Optional[Literal["optional", "required"]] = None
     isSystemTemplate: bool = False
     provenanceNotes: list[str] = []
     pages: list[SiteTemplatePageSummary] = []
@@ -101,6 +103,7 @@ class SiteTemplateInstantiateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     productId: Optional[str] = None
+    themeBindingMode: Optional[str] = None  # standalone, workspace_default, design_system
     designSystemId: Optional[str] = None
     primaryDomain: Optional[str] = None
 

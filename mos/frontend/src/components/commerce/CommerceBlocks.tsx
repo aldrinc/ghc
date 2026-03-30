@@ -7,6 +7,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode, Fragment } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
   MedusaProduct,
@@ -287,22 +288,17 @@ export function CommerceRuntimeProvider({
   useEffect(() => {
     const cartKey = `${CART_STORAGE_KEY_PREFIX}${productSlug}:${funnelSlug}`;
     const storedCartId = localStorage.getItem(cartKey);
-    console.log("[CommerceRuntime] Loading cart, key:", cartKey, "storedCartId:", storedCartId);
     if (storedCartId) {
       setCartLoading(true);
       getCart(storedCartId)
         .then((c) => {
-          console.log("[CommerceRuntime] Cart loaded successfully, items:", c.items?.length || 0);
           setCart(c);
         })
         .catch((err) => {
-          console.log("[CommerceRuntime] Cart load failed, clearing storage:", err);
           // Cart not found or expired, clear storage
           localStorage.removeItem(cartKey);
         })
         .finally(() => setCartLoading(false));
-    } else {
-      console.log("[CommerceRuntime] No stored cart ID found");
     }
   }, [productSlug, funnelSlug, getCart]);
 
@@ -518,7 +514,16 @@ export function CommerceRuntimeProvider({
         throw new Error(error.detail || "Failed to get payment providers");
       }
       const data = await response.json();
-      return data.payment_providers as MedusaPaymentProvider[];
+      const defaultProviderId =
+        typeof data.default_payment_provider_id === "string" ? data.default_payment_provider_id : null;
+      const providers = Array.isArray(data.payment_providers)
+        ? (data.payment_providers as MedusaPaymentProvider[])
+        : [];
+
+      return providers.map((provider) => ({
+        ...provider,
+        is_default: provider.id === defaultProviderId,
+      }));
     },
     [buildUrl]
   );
@@ -622,19 +627,13 @@ export function CommerceRuntimeProvider({
   // Uses pageTypeMap for site experiences, falls back to pageStageMap for legacy funnels
   const resolvePageSlugByType = useCallback(
     (pageType: string): string | null => {
-      console.log("[CommerceRuntime] resolvePageSlugByType called, pageType:", pageType, "funnelRuntime:", funnelRuntime ? "exists" : "null");
       if (!funnelRuntime) return null;
-      
-      console.log("[CommerceRuntime] pageTypeMap:", funnelRuntime.pageTypeMap);
-      console.log("[CommerceRuntime] pageMap:", funnelRuntime.pageMap);
-      
+
       // First try pageTypeMap (site experiences)
       if (funnelRuntime.pageTypeMap) {
         for (const [pageId, type] of Object.entries(funnelRuntime.pageTypeMap)) {
           if (type === pageType) {
-            const slug = funnelRuntime.pageMap[pageId] || null;
-            console.log("[CommerceRuntime] Found pageType:", pageType, "-> pageId:", pageId, "slug:", slug);
-            return slug;
+            return funnelRuntime.pageMap[pageId] || null;
           }
         }
       }
@@ -1928,6 +1927,10 @@ export function CommerceCheckout() {
           return;
         }
         setPaymentProviders(providers);
+        const defaultProvider = providers.find((provider) => provider.is_default);
+        if (defaultProvider) {
+          setSelectedPaymentProvider(defaultProvider.id);
+        }
         setCurrentStep("payment");
       }
     } catch (err) {
@@ -2194,7 +2197,9 @@ export function CommerceCheckout() {
                 <div className="bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.08)] p-6">
                   <h2 className="text-base font-medium text-zinc-900 mb-4">Payment Method</h2>
                   {paymentProviders.length === 0 ? (
-                    <p className="text-neutral-500">No payment methods available.</p>
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+                      No payment methods available. Please contact support.
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {paymentProviders.map((provider) => (
@@ -2209,11 +2214,26 @@ export function CommerceCheckout() {
                               : "border-neutral-200 bg-white hover:border-neutral-300"
                           }`}
                         >
-                          <span className="font-medium text-zinc-900">
-                            {provider.id === "pp_system_default" ? "Pay on Delivery" : 
-                             provider.id === "manual" ? "Manual Payment" :
-                             provider.id.replace("pp_", "").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-zinc-900">
+                              {provider.id === "pp_system_default"
+                                ? "Pay on Delivery"
+                                : provider.id === "manual"
+                                  ? "Manual Payment"
+                                  : provider.id
+                                      .replace("pp_", "")
+                                      .replace(/_/g, " ")
+                                      .replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                            </span>
+                            {provider.is_default && (
+                              <span className="text-xs bg-zinc-900 text-white px-2 py-0.5 rounded-full">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          {selectedPaymentProvider === provider.id && (
+                            <CheckCircle2 className="h-5 w-5 text-zinc-900" />
+                          )}
                         </button>
                       ))}
                     </div>

@@ -103,6 +103,9 @@ class ThemeCandidate(BaseModel):
 
 class NormalizedSection(BaseModel):
     id: str
+    displayName: str | None = None
+    sectionKey: str | None = None
+    semanticTags: list[str] = Field(default_factory=list)
     sectionType: str
     confidence: float
     keyText: list[str] = Field(default_factory=list)
@@ -186,6 +189,11 @@ class SaveSiteImportRequest(BaseModel):
     description: str | None = None
 
 
+class CreateVariantSiteRequest(BaseModel):
+    siteName: str | None = None
+    description: str | None = None
+
+
 class SavedSitePageResponse(BaseModel):
     pageId: str
     pageType: str | None = None
@@ -202,12 +210,22 @@ class SaveSiteImportResponse(BaseModel):
     createdAt: datetime
 
 
+class CreateVariantSiteResponse(BaseModel):
+    siteId: str
+    siteName: str
+    pageCount: int
+    entryPageType: str | None = None
+    createdPages: list[SavedSitePageResponse] = Field(default_factory=list)
+    createdAt: datetime
+
+
 class TemplateVariantSummary(BaseModel):
     id: str
     name: str
     family: str
     pageType: str
     status: str
+    siteImportId: str | None = None
     sourceType: str | None = None
     parentVariantId: str | None = None
     mutationPresetLabel: str | None = None

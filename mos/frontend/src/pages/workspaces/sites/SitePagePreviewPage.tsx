@@ -3,9 +3,12 @@ import type { Data } from "@measured/puck";
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Edit, Loader2 } from "lucide-react";
+import { useProducts } from "@/api/products";
 import { useSite, useSiteMedusaConfig, useSitePage } from "@/api/sites";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import { B2CRuntimeProvider } from "@/components/commerce/b2c/B2CRuntimeProvider";
+import { isMedusaB2CRuntimeSite } from "@/components/commerce/b2c/runtimeSite";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
@@ -24,14 +27,24 @@ export function SitePagePreviewPage() {
   const params = useParams();
   const siteId = params.siteId || null;
   const previewPath = params["*"] || "";
+  const { clients, selectWorkspace, workspace } = useWorkspace();
 
-  const { data: site, isLoading: siteLoading, error: siteError } = useSite(siteId);
+  const { data: site, isLoading: siteLoading, error: siteError } = useSite(siteId, {
+    clientId: null,
+    requireWorkspace: false,
+  });
   const resolvedPage = useMemo(
     () => (site ? resolveSitePreviewPage(site.pages, previewPath, site.entryPageId) : null),
     [previewPath, site]
   );
-  const { data: pageDetail, isLoading: pageLoading, error: pageError } = useSitePage(siteId, resolvedPage?.id || null);
+  const previewClientId = site?.clientId || null;
+  const { data: pageDetail, isLoading: pageLoading, error: pageError } = useSitePage(
+    siteId,
+    resolvedPage?.id || null,
+    { clientId: previewClientId }
+  );
   const { data: medusaConfig } = useSiteMedusaConfig(siteId);
+  const { data: products = [] } = useProducts(previewClientId);
 
   const pageOptions = useMemo(
     () => site?.pages?.map((page) => ({ label: page.name, value: page.id })) || [],
@@ -60,15 +73,33 @@ export function SitePagePreviewPage() {
     [resolvedPage, siteId]
   );
   const previewBasePath = useMemo(() => (siteId ? buildSitePreviewPath(siteId) : null), [siteId]);
+  const productsById = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
+  const previewProductHandle = useMemo(
+    () => (site?.productId ? productsById.get(site.productId)?.handle?.trim() || null : null),
+    [productsById, site?.productId],
+  );
   const previewProductSlug = useMemo(
-    () => shortUuidRouteToken(site?.productId || site?.id || ""),
-    [site?.id, site?.productId]
+    () => previewProductHandle || shortUuidRouteToken(site?.productId || site?.id || ""),
+    [previewProductHandle, site?.id, site?.productId]
   );
   const previewFunnelSlug = useMemo(
     () => site?.routeSlug || shortUuidRouteToken(site?.id || ""),
     [site?.id, site?.routeSlug]
   );
-  const isB2CSitePreview = site?.siteFamily === "medusa-b2c-starter" && Object.keys(runtimePageTypeMap).length > 0;
+  const isB2CSitePreview = isMedusaB2CRuntimeSite({
+    siteFamily: site?.siteFamily,
+    commerceProvider: site?.commerceProvider,
+  }) && Object.keys(runtimePageTypeMap).length > 0;
+
+  useEffect(() => {
+    if (!previewClientId || workspace?.id === previewClientId) return;
+    const matchingClient = clients.find((client) => client.id === previewClientId);
+    if (!matchingClient) return;
+    selectWorkspace(previewClientId);
+  }, [clients, previewClientId, selectWorkspace, workspace?.id]);
 
   useEffect(() => {
     const runtimeConfig = medusaConfig?.medusaConfig;
@@ -80,6 +111,7 @@ export function SitePagePreviewPage() {
     setMedusaRuntimeConfig({
       backendUrl: runtimeConfig.baseUrl,
       publishableKey: runtimeConfig.publishableKey,
+      stripeAccountId: runtimeConfig.stripeAccountId || undefined,
       defaultCountryCode: "us",
     });
 
@@ -190,8 +222,9 @@ export function SitePagePreviewPage() {
       <FunnelRuntimeProvider value={previewRuntimeValue}>
         {isB2CSitePreview ? (
           <B2CRuntimeProvider
-            siteFamily="medusa-b2c-starter"
+            siteFamily={site.siteFamily || "medusa-b2c-starter"}
             siteName={site.name}
+            siteId={site.id}
             initialCountryCode={parsedSitePath.countryCode || undefined}
           >
             <DesignSystemProvider tokens={pageDetail.designSystemTokens}>

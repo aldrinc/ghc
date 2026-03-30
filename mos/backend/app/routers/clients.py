@@ -37,6 +37,7 @@ from app.db.models import (
     Funnel,
     FunnelPage,
     Product,
+    StripeAccountProfile,
 )
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.client_compliance_profiles import (
@@ -117,6 +118,9 @@ from app.schemas.medusa_connection import (
     MedusaConfigUpdateRequest,
     MedusaConfigResponse,
     MedusaConnectionStatusResponse,
+    StripeAccountProfileCreateRequest,
+    StripeAccountProfileUpdateRequest,
+    StripeAccountProfileResponse,
 )
 from app.services.design_system_generation import (
     DesignSystemGenerationError,
@@ -163,10 +167,18 @@ from app.services.shopify_connection import (
     upsert_client_shopify_policy_pages,
 )
 from app.services.medusa_connection import (
+    UNSET,
+    count_workspaces_using_stripe_profile,
+    create_stripe_account_profile,
     get_client_medusa_config,
     get_medusa_connection_status,
+    get_stripe_account_profile,
+    has_direct_webhook_workspace,
+    list_stripe_account_profiles,
     mask_medusa_config,
+    mask_stripe_account_profile,
     test_medusa_connection,
+    update_stripe_account_profile,
     upsert_client_medusa_config,
 )
 from app.services.shopify_theme_copy_agent import (
@@ -11321,6 +11333,10 @@ def get_medusa_config(
             "connectionStatus": "not_configured",
             "lastConnectionCheckAt": None,
             "lastConnectionError": None,
+            "stripeAccountProfileId": None,
+            "defaultPaymentProviderId": None,
+            "allowedPaymentProviderIds": [],
+            "webhookRoutingMode": "shared_ingress",
             "createdAt": None,
             "updatedAt": None,
         }
@@ -11341,13 +11357,140 @@ def update_medusa_config(
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
+    provided_fields = payload.model_fields_set
+    existing_config = get_client_medusa_config(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
+
+    normalized_allowed_ids = UNSET
+    if "allowedPaymentProviderIds" in provided_fields:
+        normalized_allowed_ids = list(
+            dict.fromkeys(
+                provider_id.strip()
+                for provider_id in (payload.allowedPaymentProviderIds or [])
+                if provider_id and provider_id.strip()
+            )
+        )
+
+    default_payment_provider_id = (
+        payload.defaultPaymentProviderId if "defaultPaymentProviderId" in provided_fields else UNSET
+    )
+    effective_allowed_ids = (
+        normalized_allowed_ids
+        if normalized_allowed_ids is not UNSET
+        else list(existing_config.allowed_payment_provider_ids or [])
+        if existing_config
+        else []
+    )
+    effective_default_provider_id = (
+        default_payment_provider_id
+        if default_payment_provider_id is not UNSET
+        else existing_config.default_payment_provider_id
+        if existing_config
+        else None
+    )
+
+    if effective_default_provider_id and effective_default_provider_id not in effective_allowed_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="defaultPaymentProviderId must be included in allowedPaymentProviderIds.",
+        )
+
+    stripe_account_profile_id = (
+        payload.stripeAccountProfileId if "stripeAccountProfileId" in provided_fields else UNSET
+    )
+    effective_profile_id = (
+        stripe_account_profile_id
+        if stripe_account_profile_id is not UNSET
+        else existing_config.stripe_account_profile_id
+        if existing_config
+        else None
+    )
+
+    selected_profile = None
+    if effective_profile_id:
+        profile = get_stripe_account_profile(
+            session=session,
+            org_id=auth.org_id,
+            profile_id=effective_profile_id,
+        )
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stripe account profile not found or does not belong to this organization.",
+            )
+        selected_profile = profile
+
+        if stripe_account_profile_id is not UNSET and profile.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stripe account profile is {profile.status}, cannot attach",
+            )
+
+        if profile.mode == "dedicated":
+            count = count_workspaces_using_stripe_profile(
+                session=session,
+                stripe_account_profile_id=effective_profile_id,
+                exclude_client_id=client_id,
+            )
+            if count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot attach a dedicated Stripe profile that is already in use by another workspace.",
+                )
+
+        if has_direct_webhook_workspace(
+            session=session,
+            stripe_account_profile_id=effective_profile_id,
+            exclude_client_id=client_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Stripe profile already has a workspace using direct webhook routing. Switch that workspace to shared_ingress before reusing the profile.",
+            )
+
+    webhook_routing_mode = (
+        payload.webhookRoutingMode if "webhookRoutingMode" in provided_fields else UNSET
+    )
+    effective_webhook_routing_mode = (
+        webhook_routing_mode
+        if webhook_routing_mode is not UNSET
+        else existing_config.webhook_routing_mode
+        if existing_config
+        else "shared_ingress"
+    )
+
+    if effective_webhook_routing_mode == "direct":
+        if not effective_profile_id or not selected_profile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="direct webhook routing mode requires a Stripe account profile.",
+            )
+
+        count = count_workspaces_using_stripe_profile(
+            session=session,
+            stripe_account_profile_id=effective_profile_id,
+            exclude_client_id=client_id,
+        )
+        if count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="direct webhook routing mode is only allowed when the Stripe profile is attached to one workspace.",
+            )
+
     config = upsert_client_medusa_config(
         session=session,
         org_id=auth.org_id,
         client_id=client_id,
         base_url=payload.baseUrl,
-        admin_api_key=payload.adminApiKey,
-        publishable_key=payload.publishableKey,
+        admin_api_key=(payload.adminApiKey if "adminApiKey" in provided_fields else UNSET),
+        publishable_key=(payload.publishableKey if "publishableKey" in provided_fields else UNSET),
+        stripe_account_profile_id=stripe_account_profile_id,
+        default_payment_provider_id=default_payment_provider_id,
+        allowed_payment_provider_ids=normalized_allowed_ids,
+        webhook_routing_mode=webhook_routing_mode,
     )
     session.commit()
 
@@ -11379,3 +11522,161 @@ def get_medusa_status(
         baseUrl=status_result.base_url,
         lastCheckAt=status_result.last_check_at,
     )
+
+
+# =============================================================================
+# Stripe Account Profile Endpoints
+# =============================================================================
+
+
+stripe_profiles_router = APIRouter(
+    prefix="/clients/org/stripe-profiles",
+    tags=["stripe-profiles"],
+)
+
+
+@stripe_profiles_router.get("", response_model=list[StripeAccountProfileResponse])
+def list_stripe_profiles(
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """List all Stripe account profiles for the org."""
+    profiles = list_stripe_account_profiles(
+        session=session,
+        org_id=auth.org_id,
+    )
+    return [mask_stripe_account_profile(p) for p in profiles]
+
+
+@stripe_profiles_router.post(
+    "", response_model=StripeAccountProfileResponse, status_code=status.HTTP_201_CREATED
+)
+def create_stripe_profile(
+    payload: StripeAccountProfileCreateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Create a new Stripe account profile."""
+    profile = create_stripe_account_profile(
+        session=session,
+        org_id=auth.org_id,
+        label=payload.label,
+        stripe_account_id=payload.stripeAccountId,
+        secret_key_ref=payload.secretKeyRef,
+        webhook_secret_ref=payload.webhookSecretRef,
+        mode=payload.mode,
+    )
+    session.commit()
+    return mask_stripe_account_profile(profile)
+
+
+@stripe_profiles_router.get("/{profile_id}", response_model=StripeAccountProfileResponse)
+def get_stripe_profile(
+    profile_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Get a Stripe account profile by ID."""
+    profile = get_stripe_account_profile(
+        session=session,
+        org_id=auth.org_id,
+        profile_id=profile_id,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stripe account profile {profile_id} not found",
+        )
+    return mask_stripe_account_profile(profile)
+
+
+@stripe_profiles_router.put("/{profile_id}", response_model=StripeAccountProfileResponse)
+def update_stripe_profile(
+    profile_id: str,
+    payload: StripeAccountProfileUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Update a Stripe account profile."""
+    existing = get_stripe_account_profile(
+        session=session,
+        org_id=auth.org_id,
+        profile_id=profile_id,
+    )
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stripe account profile not found.",
+        )
+
+    new_mode = payload.mode
+    if new_mode == "dedicated" and existing.mode == "shared":
+        count = count_workspaces_using_stripe_profile(
+            session=session,
+            stripe_account_profile_id=profile_id,
+        )
+        if count > 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change to dedicated mode: profile is currently attached to multiple workspaces.",
+            )
+
+    if new_mode == "shared" and existing.mode == "dedicated":
+        if has_direct_webhook_workspace(
+            session=session,
+            stripe_account_profile_id=profile_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change profile to shared while a workspace is configured for direct webhook routing.",
+            )
+
+    profile = update_stripe_account_profile(
+        session=session,
+        org_id=auth.org_id,
+        profile_id=profile_id,
+        label=payload.label,
+        stripe_account_id=payload.stripeAccountId,
+        secret_key_ref=payload.secretKeyRef,
+        webhook_secret_ref=payload.webhookSecretRef,
+        mode=payload.mode,
+        status=payload.status,
+    )
+
+    session.commit()
+    return mask_stripe_account_profile(profile)
+
+
+@stripe_profiles_router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_stripe_profile(
+    profile_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Delete a Stripe account profile."""
+    from sqlalchemy import delete
+
+    profile = get_stripe_account_profile(
+        session=session,
+        org_id=auth.org_id,
+        profile_id=profile_id,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Stripe account profile {profile_id} not found",
+        )
+
+    # Check if profile is in use
+    count = count_workspaces_using_stripe_profile(
+        session=session,
+        stripe_account_profile_id=profile_id,
+    )
+    if count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot delete profile: it is attached to {count} workspace(s)",
+        )
+
+    session.execute(delete(StripeAccountProfile).where(StripeAccountProfile.id == profile_id))
+    session.commit()

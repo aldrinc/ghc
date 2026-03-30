@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel
 
 
@@ -14,6 +14,7 @@ class SiteFamilySummary(BaseModel):
     description: str
     siteType: str
     commerceProvider: str
+    themeRequirement: Literal["optional", "required"]
     pageCount: int
 
 
@@ -37,6 +38,7 @@ class SiteFamilyDetail(BaseModel):
     description: str
     siteType: str
     commerceProvider: str
+    themeRequirement: Literal["optional", "required"]
     pageBlueprints: list[SitePageBlueprintSummary]
     provenanceNotes: list[str]
 
@@ -45,6 +47,7 @@ class SiteCreateRequest(BaseModel):
     """Request to create a new site from a family blueprint.
 
     productId is optional in the canonical site runtime.
+    themeBindingMode defaults to 'standalone' for new sites.
     """
 
     clientId: str
@@ -52,7 +55,26 @@ class SiteCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     productId: Optional[str] = None  # Optional for site runtime
+    themeBindingMode: Optional[Literal["standalone", "workspace_default", "design_system"]] = None
     designSystemId: Optional[str] = None
+
+
+class SiteUpdateRequest(BaseModel):
+    """Request to update site-level settings."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    routeSlug: Optional[str] = None
+    primaryDomain: Optional[str] = None
+    themeBindingMode: Optional[Literal["standalone", "workspace_default", "design_system"]] = None
+    designSystemId: Optional[str] = None
+
+
+class SiteCreateTemplateRequest(BaseModel):
+    """Request to create a reusable site template from an existing site."""
+
+    name: str
+    description: Optional[str] = None
 
 
 class SitePageUpdateRequest(BaseModel):
@@ -84,6 +106,7 @@ class SiteSummary(BaseModel):
     commerceProvider: Optional[str] = None
     productId: Optional[str] = None
     designSystemId: Optional[str] = None
+    themeBindingMode: str
     routeSlug: Optional[str] = None
     primaryDomain: Optional[str] = None
     templateId: Optional[str] = None
@@ -119,6 +142,7 @@ class SiteDetail(BaseModel):
     commerceProvider: Optional[str] = None
     productId: Optional[str] = None
     designSystemId: Optional[str] = None
+    themeBindingMode: str
     routeSlug: Optional[str] = None
     primaryDomain: Optional[str] = None
     templateId: Optional[str] = None
@@ -169,6 +193,7 @@ class MedusaRuntimeConfig(BaseModel):
 
     baseUrl: Optional[str] = None
     publishableKey: Optional[str] = None
+    stripeAccountId: Optional[str] = None
     available: bool = False
 
 

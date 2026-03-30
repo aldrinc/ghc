@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "@/api/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import type { SiteThemeBindingMode } from "@/api/sites";
 
 export interface SiteTemplate {
   id: string;
@@ -9,6 +10,7 @@ export interface SiteTemplate {
   siteType: string;
   siteFamily: string;
   commerceProvider: string | null;
+  themeRequirement?: "optional" | "required" | null;
   scope: "system" | "workspace" | "org";
   status: "active" | "draft" | "archived";
   previewImageAssetId: string | null;
@@ -51,6 +53,9 @@ export interface InstantiateSiteTemplateRequest {
   clientId: string;
   name: string;
   description?: string;
+  productId?: string;
+  themeBindingMode?: SiteThemeBindingMode;
+  designSystemId?: string;
 }
 
 // Get all site templates (system + workspace scoped)

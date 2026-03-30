@@ -11,6 +11,11 @@ import type {
   ProductOfferBonus,
   ProductVariant,
 } from "@/types/products";
+import type {
+  StripeProfile,
+  StripeProfileCreatePayload,
+  StripeProfileUpdatePayload,
+} from "@/types/commerce";
 
 type ShopifyCreatedVariant = {
   variantGid: string;
@@ -594,6 +599,10 @@ export type MedusaConfig = {
   connectionStatus: string;
   lastConnectionCheckAt: string | null;
   lastConnectionError: string | null;
+  stripeAccountProfileId: string | null;
+  defaultPaymentProviderId: string | null;
+  allowedPaymentProviderIds: string[];
+  webhookRoutingMode: "direct" | "shared_ingress";
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -646,8 +655,15 @@ export function useUpdateMedusaConfig(clientId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { baseUrl: string; adminApiKey?: string; publishableKey?: string }) =>
-      put<MedusaConfig>(`/clients/${clientId}/medusa/config`, payload),
+    mutationFn: (payload: {
+      baseUrl: string;
+      adminApiKey?: string;
+      publishableKey?: string;
+      stripeAccountProfileId?: string | null;
+      defaultPaymentProviderId?: string | null;
+      allowedPaymentProviderIds?: string[];
+      webhookRoutingMode?: "direct" | "shared_ingress";
+    }) => put<MedusaConfig>(`/clients/${clientId}/medusa/config`, payload),
     onSuccess: () => {
       toast.success("Medusa configuration saved");
       queryClient.invalidateQueries({ queryKey: ["medusa", "config", clientId] });
@@ -693,6 +709,57 @@ export function useCreateMedusaVariant(productId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create Medusa variant";
+      toast.error(message);
+    },
+  });
+}
+
+// =============================================================================
+// Stripe Profile API Hooks
+// =============================================================================
+
+export function useStripeProfiles() {
+  const { get } = useApiClient();
+  return useQuery<StripeProfile[]>({
+    queryKey: ["stripe-profiles"],
+    queryFn: () => get("/clients/org/stripe-profiles"),
+  });
+}
+
+export function useCreateStripeProfile() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: StripeProfileCreatePayload) =>
+      post<StripeProfile>("/clients/org/stripe-profiles", payload),
+    onSuccess: () => {
+      toast.success("Stripe profile created");
+      queryClient.invalidateQueries({ queryKey: ["stripe-profiles"] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Stripe profile";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateStripeProfile(profileId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: StripeProfileUpdatePayload) =>
+      request<StripeProfile>(`/clients/org/stripe-profiles/${profileId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast.success("Stripe profile updated");
+      queryClient.invalidateQueries({ queryKey: ["stripe-profiles"] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update Stripe profile";
       toast.error(message);
     },
   });

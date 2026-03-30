@@ -8,6 +8,7 @@ import { useClient } from "@/api/clients";
 import { useWorkflows } from "@/api/workflows";
 import { OnboardingWizard } from "@/components/clients/OnboardingWizard";
 import { GetHookdSettings } from "@/components/clients/GetHookdSettings";
+import { PostizSettings } from "@/components/clients/PostizSettings";
 
 export function ClientDetailPage() {
   const { clientId } = useParams();
@@ -33,6 +34,7 @@ export function ClientDetailPage() {
             <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
             <TabsTrigger value="workflows">Workflows</TabsTrigger>
             <TabsTrigger value="gethookd">GetHookd</TabsTrigger>
+            <TabsTrigger value="postiz">Postiz</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -108,6 +110,14 @@ export function ClientDetailPage() {
           <TabsContent value="gethookd">
             {clientId ? (
               <GetHookdSettings clientId={clientId} />
+            ) : (
+              <div className="text-sm text-danger">Client ID is required.</div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="postiz">
+            {clientId ? (
+              <PostizSettings clientId={clientId} />
             ) : (
               <div className="text-sm text-danger">Client ID is required.</div>
             )}

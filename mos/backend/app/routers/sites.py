@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,8 @@ from app.schemas.sites import (
     SiteFamilySummary,
     SiteFamilyDetail,
     SiteCreateRequest,
+    SiteCreateTemplateRequest,
+    SiteUpdateRequest,
     SiteSummary,
     SiteDetail,
     SitePageDetail,
@@ -40,15 +42,62 @@ from app.schemas.sites import (
     SiteMedusaConfigResponse,
     MedusaRuntimeConfig,
 )
+from app.schemas.site_templates import SiteTemplateSummary
+from app.schemas.funnels import FunnelPageAIGenerateRequest, FunnelPageAIGenerateResponse
 from app.services.site_blueprints import (
     list_site_families,
     get_site_family,
+    validate_theme_requirement,
 )
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnels import rewrite_internal_target_ids
+from app.services.site_page_ai import generate_site_page_draft, SitePageAiError
+from app.services.site_templates import (
+    SiteTemplateError,
+    create_template_from_site,
+    get_template_pages,
+    get_template_funnels,
+    get_template_theme_requirement,
+)
+from app.services.medusa_connection import (
+    get_client_medusa_config,
+    get_stripe_account_profile_by_id,
+)
+from app.services.medusa_store_runtime import (
+    filter_payment_providers_by_allowlist,
+    get_medusa_store_config,
+    medusa_create_payment_collection,
+    medusa_initialize_payment_session,
+    medusa_list_payment_providers,
+    resolve_default_payment_provider_id,
+    validate_provider_id_against_allowlist,
+)
 
 router = APIRouter(prefix="/sites", tags=["sites"])
+
+
+def _resolve_medusa_runtime_stripe_account_id(
+    *,
+    session: Session,
+    medusa_config,
+) -> str | None:
+    profile_id = medusa_config.stripe_account_profile_id
+    if not profile_id:
+        return None
+    profile = get_stripe_account_profile_by_id(
+        session=session,
+        profile_id=str(profile_id),
+    )
+    if not profile:
+        return None
+    return profile.stripe_account_id
+
+
+def _site_uses_b2c_medusa_runtime(site: Site) -> bool:
+    if site.site_family == "medusa-b2b-starter":
+        return False
+    return site.commerce_provider == "medusa"
 
 
 def _parse_uuid_or_400(value: str, field_name: str) -> UUID:
@@ -69,25 +118,87 @@ def _resolve_site_design_system_tokens(
     site: Site,
     page: SitePage | None = None,
 ) -> dict[str, Any] | None:
-    design_system_id = None
+    """Resolve design system tokens using explicit site theme binding mode.
+
+    Resolution order:
+    1. Page-level override (if page.design_system_id is set)
+    2. Site mode resolution:
+       - standalone: return None (no tokens)
+       - workspace_default: resolve from workspace default design system
+       - design_system: resolve from site.design_system_id
+    """
+    # Page-level override takes precedence
     if page and page.design_system_id:
         design_system_id = str(page.design_system_id)
-    elif site.design_system_id:
-        design_system_id = str(site.design_system_id)
-
-    if design_system_id:
         design_system = session.scalars(
             select(DesignSystem).where(
                 DesignSystem.org_id == UUID(org_id),
                 DesignSystem.id == UUID(design_system_id),
             )
         ).first()
-        return design_system.tokens if design_system else None
+        if not design_system:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Page '{page.id}' references design_system_id '{design_system_id}' "
+                    "which no longer exists. Please reconfigure the page override."
+                ),
+            )
+        return design_system.tokens
 
-    return resolve_design_system_tokens(
-        session=session,
-        org_id=org_id,
-        client_id=client_id,
+    # Site-level resolution based on explicit theme binding mode
+    site_mode = (
+        site.theme_binding_mode.value
+        if hasattr(site.theme_binding_mode, "value")
+        else site.theme_binding_mode
+    )
+
+    if site_mode == "standalone":
+        # Standalone sites have no design system binding
+        return None
+
+    if site_mode == "design_system":
+        # Use the site's explicitly selected design system
+        if not site.design_system_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Site '{site.id}' has theme_binding_mode 'design_system' "
+                    "but is missing a bound design_system_id. "
+                    "This is an inconsistent state that should never occur."
+                ),
+            )
+        design_system = session.scalars(
+            select(DesignSystem).where(
+                DesignSystem.org_id == UUID(org_id),
+                DesignSystem.id == site.design_system_id,
+            )
+        ).first()
+        if not design_system:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    f"Site '{site.id}' references design_system_id '{site.design_system_id}' "
+                    "which no longer exists. Please reconfigure the site's theme binding."
+                ),
+            )
+        return design_system.tokens
+
+    # workspace_default mode - resolve from workspace/client default
+    if site_mode == "workspace_default":
+        return resolve_design_system_tokens(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+        )
+
+    # Unrecognized mode - this is an error
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=(
+            f"Site '{site.id}' has unrecognized theme_binding_mode '{site_mode}'. "
+            "Valid modes are: standalone, workspace_default, design_system."
+        ),
     )
 
 
@@ -112,6 +223,7 @@ def list_families() -> list[SiteFamilySummary]:
             description=f.description,
             siteType=f.site_type,
             commerceProvider=f.commerce_provider,
+            themeRequirement=f.theme_requirement,
             pageCount=len(f.page_blueprints),
         )
         for f in families
@@ -133,6 +245,7 @@ def get_family_detail(family: str) -> SiteFamilyDetail:
         description=descriptor.description,
         siteType=descriptor.site_type,
         commerceProvider=descriptor.commerce_provider,
+        themeRequirement=descriptor.theme_requirement,
         pageBlueprints=[
             SitePageBlueprintSummary(
                 pageType=bp.page_type,
@@ -204,7 +317,27 @@ def create_site(
     # Resolve design system tokens if provided
     design_system_tokens = None
     design_system_id = None
-    if payload.designSystemId:
+    theme_binding_mode = payload.themeBindingMode or "standalone"
+
+    try:
+        validate_theme_requirement(
+            descriptor,
+            theme_binding_mode=theme_binding_mode,
+            subject=f"Site family '{descriptor.family}'",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # Validate theme binding mode semantics
+    if theme_binding_mode == "design_system":
+        if not payload.designSystemId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="themeBindingMode 'design_system' requires a non-empty designSystemId.",
+            )
         from app.routers.funnels import _validate_design_system
 
         design_system = _validate_design_system(
@@ -215,7 +348,12 @@ def create_site(
         )
         design_system_tokens = design_system.tokens
         design_system_id = str(design_system.id)
+    elif theme_binding_mode == "standalone":
+        # standalone mode ignores any provided designSystemId
+        design_system_id = None
+        design_system_tokens = None
     else:
+        # workspace_default mode - resolve from workspace default for template hydration
         design_system_tokens = resolve_design_system_tokens(
             session=session,
             org_id=auth.org_id,
@@ -241,6 +379,7 @@ def create_site(
             commerce_provider=descriptor.commerce_provider,
             route_slug=route_slug,
             design_system_id=design_system_id,
+            theme_binding_mode=theme_binding_mode,
             product_id=str(product_uuid) if product_uuid else None,
         )
 
@@ -279,13 +418,14 @@ def create_site(
                 ) from exc
 
             # Create the page
+            # NOTE: Pages do NOT inherit site.design_system_id. They inherit from the site
+            # at token-resolution time only when they don't have an explicit override.
             page = sites_repo.create_page(
                 site_id=str(site.id),
                 name=blueprint.name,
                 slug=blueprint.slug,
                 ordering=blueprint.ordering,
                 template_id=blueprint.template_id,
-                design_system_id=design_system_id,
                 page_type=blueprint.page_type,
                 adapted_puck_data=template_puck_data,
             )
@@ -323,7 +463,7 @@ def create_site(
                     "pageType": blueprint.page_type,
                     "templateId": blueprint.template_id,
                     "ordering": blueprint.ordering,
-                    "designSystemId": design_system_id,
+                    "designSystemId": str(page.design_system_id) if page.design_system_id else None,
                     "isEntry": blueprint.is_entry,
                     "latestDraftVersionId": str(version.id),
                     "latestApprovedVersionId": str(approved_version.id),
@@ -375,6 +515,9 @@ def create_site(
             "commerceProvider": site.commerce_provider,
             "productId": str(site.product_id) if site.product_id else None,
             "designSystemId": str(site.design_system_id) if site.design_system_id else None,
+            "themeBindingMode": site.theme_binding_mode.value
+            if hasattr(site.theme_binding_mode, "value")
+            else site.theme_binding_mode,
             "routeSlug": site.route_slug,
             "primaryDomain": site.primary_domain,
             "templateId": str(site.site_template_id) if site.site_template_id else None,
@@ -432,6 +575,9 @@ def list_sites(
             "commerceProvider": s.commerce_provider,
             "productId": str(s.product_id) if s.product_id else None,
             "designSystemId": str(s.design_system_id) if s.design_system_id else None,
+            "themeBindingMode": s.theme_binding_mode.value
+            if hasattr(s.theme_binding_mode, "value")
+            else s.theme_binding_mode,
             "routeSlug": s.route_slug,
             "primaryDomain": s.primary_domain,
             "templateId": str(s.site_template_id) if s.site_template_id else None,
@@ -445,24 +591,25 @@ def list_sites(
 @router.get("/{site_id}", response_model=SiteDetail)
 def get_site(
     site_id: str,
-    clientId: str,
+    clientId: str | None = Query(None, description="Workspace ID"),
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> SiteDetail:
     """Get detailed information about a specific site."""
-    # Validate workspace ownership
-    client = session.scalars(
-        select(Client).where(
-            Client.org_id == UUID(auth.org_id),
-            Client.id == _parse_uuid_or_400(clientId, "clientId"),
-        )
-    ).first()
+    # Validate workspace ownership when the caller scopes the request to a workspace.
+    if clientId is not None:
+        client = session.scalars(
+            select(Client).where(
+                Client.org_id == UUID(auth.org_id),
+                Client.id == _parse_uuid_or_400(clientId, "clientId"),
+            )
+        ).first()
 
-    if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workspace not found or does not belong to this organization.",
-        )
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workspace not found or does not belong to this organization.",
+            )
 
     # Get the site from dedicated site runtime
     sites_repo = SitesRuntimeRepository(session)
@@ -479,8 +626,8 @@ def get_site(
             detail="Site not found.",
         )
 
-    # Check if site belongs to the specified workspace
-    if str(site.client_id) != clientId:
+    # Check if site belongs to the specified workspace when one is provided.
+    if clientId is not None and str(site.client_id) != clientId:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Site does not belong to this workspace.",
@@ -519,6 +666,230 @@ def get_site(
         commerceProvider=site.commerce_provider,
         productId=str(site.product_id) if site.product_id else None,
         designSystemId=str(site.design_system_id) if site.design_system_id else None,
+        themeBindingMode=site.theme_binding_mode.value
+        if hasattr(site.theme_binding_mode, "value")
+        else site.theme_binding_mode,
+        routeSlug=site.route_slug,
+        primaryDomain=site.primary_domain,
+        templateId=str(site.site_template_id) if site.site_template_id else None,
+        entryPageId=str(site.entry_page_id) if site.entry_page_id else None,
+        pages=page_summaries,
+        createdAt=site.created_at.isoformat(),
+        updatedAt=site.updated_at.isoformat(),
+    )
+
+
+@router.post(
+    "/{site_id}/create-template",
+    response_model=SiteTemplateSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_site_template_from_site(
+    site_id: str,
+    request: SiteCreateTemplateRequest,
+    clientId: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteTemplateSummary:
+    """Create a reusable site template from an existing site runtime record."""
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    try:
+        template = create_template_from_site(
+            session,
+            site_id=site_id,
+            org_id=str(UUID(auth.org_id)),
+            client_id=str(UUID(clientId)),
+            name=request.name,
+            description=request.description,
+            created_by_user_external_id=auth.user_id,
+        )
+        session.commit()
+        session.refresh(template)
+    except SiteTemplateError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return SiteTemplateSummary(
+        id=str(template.id),
+        family=template.family,
+        name=template.name,
+        description=template.description,
+        siteType=template.site_type,
+        commerceProvider=template.commerce_provider,
+        themeRequirement=get_template_theme_requirement(template.family),
+        isSystemTemplate=template.is_system_template,
+        pageCount=len(get_template_pages(session, str(template.id))),
+        funnelCount=len(get_template_funnels(session, str(template.id))),
+        createdAt=template.created_at,
+    )
+
+
+@router.patch("/{site_id}", response_model=SiteDetail)
+def update_site(
+    site_id: str,
+    payload: SiteUpdateRequest,
+    clientId: str = Query(..., description="Workspace ID"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteDetail:
+    """Update site-level settings including theme binding configuration."""
+    # Validate workspace ownership
+    client = session.scalars(
+        select(Client).where(
+            Client.org_id == UUID(auth.org_id),
+            Client.id == _parse_uuid_or_400(clientId, "clientId"),
+        )
+    ).first()
+
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or does not belong to this organization.",
+        )
+
+    # Get the site
+    sites_repo = SitesRuntimeRepository(session)
+    site = sites_repo.get_site_by_id(
+        org_id=str(UUID(auth.org_id)),
+        site_id=site_id,
+    )
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    # Check if site belongs to the specified workspace
+    if str(site.client_id) != clientId:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Site does not belong to this workspace.",
+        )
+
+    # Update basic fields
+    if payload.name is not None:
+        site.name = payload.name
+    if payload.description is not None:
+        site.description = payload.description
+    if payload.routeSlug is not None:
+        # Validate slug uniqueness if being changed
+        if payload.routeSlug != site.route_slug:
+            existing = sites_repo.get_site_by_route_slug(route_slug=payload.routeSlug)
+            if existing and str(existing.id) != site_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Route slug '{payload.routeSlug}' is already in use.",
+                )
+        site.route_slug = payload.routeSlug
+    if payload.primaryDomain is not None:
+        site.primary_domain = payload.primaryDomain
+
+    # Handle theme binding mode changes
+    if payload.themeBindingMode is not None:
+        theme_binding_mode = payload.themeBindingMode
+
+        # Validate design_system mode requires designSystemId
+        if theme_binding_mode == "design_system":
+            if not payload.designSystemId:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="themeBindingMode 'design_system' requires a non-empty designSystemId.",
+                )
+            # Validate and set the design system
+            from app.routers.funnels import _validate_design_system
+
+            _validate_design_system(
+                session=session,
+                org_id=auth.org_id,
+                client_id=clientId,
+                design_system_id=payload.designSystemId,
+            )
+            site.design_system_id = str(
+                _parse_uuid_or_400(payload.designSystemId, "designSystemId")
+            )
+            site.theme_binding_mode = theme_binding_mode
+        elif theme_binding_mode == "standalone":
+            # standalone mode clears design_system_id
+            site.design_system_id = None
+            site.theme_binding_mode = theme_binding_mode
+        else:
+            # workspace_default mode - clear site design_system_id
+            site.design_system_id = None
+            site.theme_binding_mode = theme_binding_mode
+
+    # Handle designSystemId changes without mode change
+    elif payload.designSystemId is not None:
+        # If theme_binding_mode is design_system, allow designSystemId update
+        current_mode = (
+            site.theme_binding_mode.value
+            if hasattr(site.theme_binding_mode, "value")
+            else site.theme_binding_mode
+        )
+        if current_mode == "design_system":
+            from app.routers.funnels import _validate_design_system
+
+            _validate_design_system(
+                session=session,
+                org_id=auth.org_id,
+                client_id=clientId,
+                design_system_id=payload.designSystemId,
+            )
+            site.design_system_id = str(
+                _parse_uuid_or_400(payload.designSystemId, "designSystemId")
+            )
+        # For other modes, designSystemId updates are ignored (not an error per spec)
+
+    # Persist changes
+    site = sites_repo.update_site(site=site)
+    session.commit()
+    session.refresh(site)
+
+    # Get pages for response
+    pages = sites_repo.list_pages(site_id=str(site.id))
+    page_summaries = []
+    for page in pages:
+        draft = sites_repo.latest_version_for_page(page_id=str(page.id), status="draft")
+        approved = sites_repo.latest_version_for_page(page_id=str(page.id), status="approved")
+        page_summaries.append(
+            SitePageDetail(
+                id=str(page.id),
+                name=page.name,
+                slug=page.slug,
+                pageType=page.page_type,
+                templateId=page.template_id,
+                ordering=page.ordering,
+                designSystemId=str(page.design_system_id) if page.design_system_id else None,
+                isEntry=str(page.id) == str(site.entry_page_id) if site.entry_page_id else False,
+                latestDraftVersionId=str(draft.id) if draft else None,
+                latestApprovedVersionId=str(approved.id) if approved else None,
+            )
+        )
+
+    return SiteDetail(
+        id=str(site.id),
+        clientId=str(site.client_id),
+        name=site.name,
+        description=site.description,
+        status=site.status,
+        siteType=site.site_type,
+        siteFamily=site.site_family,
+        commerceProvider=site.commerce_provider,
+        productId=str(site.product_id) if site.product_id else None,
+        designSystemId=str(site.design_system_id) if site.design_system_id else None,
+        themeBindingMode=site.theme_binding_mode.value
+        if hasattr(site.theme_binding_mode, "value")
+        else site.theme_binding_mode,
         routeSlug=site.route_slug,
         primaryDomain=site.primary_domain,
         templateId=str(site.site_template_id) if site.site_template_id else None,
@@ -835,6 +1206,51 @@ def create_site_page_version(
     }
 
 
+@router.post(
+    "/{site_id}/pages/{page_id}/ai/generate",
+    response_model=FunnelPageAIGenerateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def ai_generate_site_page_draft(
+    site_id: str,
+    page_id: str,
+    payload: FunnelPageAIGenerateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    try:
+        assistant_message, version, puck_data = generate_site_page_draft(
+            session=session,
+            org_id=auth.org_id,
+            user_id=auth.user_id,
+            site_id=site_id,
+            page_id=page_id,
+            prompt=payload.prompt,
+            messages=[message.model_dump() for message in payload.messages] if payload.messages else None,
+            current_puck_data=payload.currentPuckData,
+            model=payload.model,
+            temperature=payload.temperature,
+            max_tokens=payload.maxTokens,
+            attached_assets=[asset.model_dump() for asset in payload.attachedAssets] if payload.attachedAssets else None,
+            generate_images=payload.generateImages,
+        )
+    except SitePageAiError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    return {
+        "assistantMessage": assistant_message,
+        "puckData": puck_data,
+        "draftVersionId": str(version.id),
+        "generatedImages": [],
+        "generatedCarouselImages": [],
+        "imagePlans": [],
+    }
+
+
 @router.post("/{site_id}/publish", response_model=dict[str, Any])
 def publish_site(
     site_id: str,
@@ -993,14 +1409,12 @@ def get_site_medusa_config(
             detail="Site not found.",
         )
 
-    if site.site_family != "medusa-b2c-starter":
+    if not _site_uses_b2c_medusa_runtime(site):
         return SiteMedusaConfigResponse(
             siteFamily=site.site_family,
             commerceProvider=site.commerce_provider,
             medusaConfig=None,
         )
-
-    from app.services.medusa_connection import get_client_medusa_config
 
     medusa_config = get_client_medusa_config(
         session=session,
@@ -1031,6 +1445,152 @@ def get_site_medusa_config(
         medusaConfig=MedusaRuntimeConfig(
             baseUrl=medusa_config.base_url,
             publishableKey=medusa_config.publishable_key_encrypted,
+            stripeAccountId=_resolve_medusa_runtime_stripe_account_id(
+                session=session,
+                medusa_config=medusa_config,
+            ),
             available=True,
         ),
     )
+
+
+@router.get("/{site_id}/medusa/payment-providers")
+def get_site_medusa_payment_providers(
+    site_id: str,
+    region_id: str = Query(...),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """List Medusa payment providers for an authenticated site preview."""
+    site_uuid = _parse_uuid_or_400(site_id, "site_id")
+    site = session.scalars(
+        select(Site).where(
+            Site.id == site_uuid,
+            Site.org_id == UUID(auth.org_id),
+        )
+    ).first()
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    if site.commerce_provider != "medusa":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This site does not use Medusa commerce.",
+        )
+
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not medusa_config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa configuration not found for this workspace.",
+        )
+
+    config = get_medusa_store_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa Store API is not configured for this workspace. A publishable key is required.",
+        )
+
+    allowed_provider_ids = list(medusa_config.allowed_payment_provider_ids or [])
+    default_payment_provider_id = medusa_config.default_payment_provider_id
+
+    payment_providers = medusa_list_payment_providers(
+        config=config,
+        region_id=region_id,
+    )
+    filtered_providers = filter_payment_providers_by_allowlist(
+        providers=payment_providers,
+        allowed_provider_ids=allowed_provider_ids,
+    )
+    resolved_default = resolve_default_payment_provider_id(
+        allowed_provider_ids=allowed_provider_ids,
+        default_payment_provider_id=default_payment_provider_id,
+        available_providers=filtered_providers,
+    )
+
+    return {
+        "payment_providers": filtered_providers,
+        "default_payment_provider_id": resolved_default,
+    }
+
+
+@router.post("/{site_id}/medusa/checkout/session")
+def create_site_medusa_checkout_session(
+    site_id: str,
+    cart_id: str = Query(...),
+    provider_id: str = Query(...),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Initialize a payment session for an authenticated site preview."""
+    site_uuid = _parse_uuid_or_400(site_id, "site_id")
+    site = session.scalars(
+        select(Site).where(
+            Site.id == site_uuid,
+            Site.org_id == UUID(auth.org_id),
+        )
+    ).first()
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    if site.commerce_provider != "medusa":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This site does not use Medusa commerce.",
+        )
+
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not medusa_config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa configuration not found for this workspace.",
+        )
+
+    config = get_medusa_store_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa Store API is not configured for this workspace. A publishable key is required.",
+        )
+
+    validate_provider_id_against_allowlist(
+        provider_id=provider_id,
+        allowed_provider_ids=list(medusa_config.allowed_payment_provider_ids or []),
+    )
+
+    payment_collection = medusa_create_payment_collection(
+        config=config,
+        cart_id=cart_id,
+    )
+    payment_collection = medusa_initialize_payment_session(
+        config=config,
+        payment_collection_id=payment_collection["id"],
+        provider_id=provider_id,
+    )
+
+    return {"payment_collection": payment_collection}

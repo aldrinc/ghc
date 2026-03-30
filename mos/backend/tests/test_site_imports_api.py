@@ -1,8 +1,10 @@
 """Tests for site import API endpoints."""
 
 import asyncio
+import io
 import time
 from unittest.mock import patch
+import zipfile
 
 import pytest
 
@@ -207,6 +209,158 @@ def _wait_for_import_terminal_state(
     return last_payload
 
 
+def _build_archive_zip(files: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path, content in files.items():
+            archive.writestr(f"project/{path}", content)
+    return buffer.getvalue()
+
+
+def _sample_react_export_archive() -> bytes:
+    return _build_archive_zip(
+        {
+            "package.json": """
+{
+  "name": "validated-loop-react-export",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
+""".strip(),
+            "index.html": """
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OMNI Creatine</title>
+  </head>
+  <body class="bg-bg-light text-primary-dark font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+""".strip(),
+            "tailwind.config.js": """
+export default {
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          dark: 'rgb(0, 34, 102)',
+          DEFAULT: 'rgb(38, 83, 146)'
+        },
+        text: {
+          dark: 'rgb(26, 26, 26)'
+        },
+        bg: {
+          light: 'rgb(245, 248, 255)',
+          card: 'rgb(235, 242, 255)'
+        },
+        sale: {
+          red: 'rgb(220, 38, 38)'
+        }
+      },
+      fontFamily: {
+        sans: ['Satoshi', 'sans-serif']
+      },
+      borderRadius: {
+        'pill': '999px'
+      }
+    }
+  }
+};
+""".strip(),
+            "src/index.css": """
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+""".strip(),
+            "src/main.tsx": """
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+""".strip(),
+            "src/App.tsx": """
+import React from "react";
+
+const HeroSection = () => (
+  <section data-section-id="hero-section" className="mx-auto max-w-5xl px-6 py-16">
+    <div>SPRING SALE</div>
+    <h1>Creatine For Body & Mind</h1>
+    <p>Clinically dosed creatine gummies for strength, recovery, and focus.</p>
+  </section>
+);
+
+const ProductPurchaseSection = () => (
+  <section data-section-id="product-purchase-section" className="rounded-pill bg-primary px-6 py-8 text-white">
+    <h2>OMNI Creatine Gummy</h2>
+    <p>Choose flavor and bundle size.</p>
+    <button>ADD TO CART</button>
+  </section>
+);
+
+const RealPeopleRealResults = () => (
+  <section data-section-id="real-people-real-results">
+    <p>Real people, real results.</p>
+  </section>
+);
+
+const UsVsThem = () => (
+  <section data-section-id="us-vs-them">
+    <h2>Why Choose OMNI?</h2>
+  </section>
+);
+
+const AnyLastQuestions = () => (
+  <section data-section-id="any-last-questions">
+    <h2>Any Last Questions?</h2>
+    <p>Everything you need to know before ordering.</p>
+  </section>
+);
+
+const JoinTheCommunity = () => (
+  <section data-section-id="join-the-community">
+    <h2>Join The Community</h2>
+  </section>
+);
+
+const GlobalFooter = () => (
+  <footer data-section-id="global-footer">
+    <p>All rights reserved.</p>
+  </footer>
+);
+
+export default function App() {
+  return (
+    <main className="bg-bg-light text-primary-dark font-sans">
+      <HeroSection />
+      <div data-section-id="feature-marquee-1">
+        <div>BACKED BY 700+ STUDIES</div>
+      </div>
+      <ProductPurchaseSection />
+      <div data-section-id="feature-marquee-2">
+        <div>FRESH & LIGHT TASTE</div>
+      </div>
+      <RealPeopleRealResults />
+      <UsVsThem />
+      <AnyLastQuestions />
+      <JoinTheCommunity />
+      <GlobalFooter />
+    </main>
+  );
+}
+""".strip(),
+        }
+    )
+
+
 def test_list_imports_empty(api_client):
     """Test listing imports when none exist."""
     response = api_client.post(
@@ -248,6 +402,146 @@ def test_create_import_validates_workspace(api_client):
     )
 
     assert response.status_code == 404
+
+
+def test_create_archive_import_success_and_blocks_legacy_convert(api_client):
+    response = api_client.post(
+        "/clients", json={"name": "Archive Import Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    archive_bytes = _sample_react_export_archive()
+    response = api_client.post(
+        f"/storefront/templates/imports/archive?clientId={client_id}",
+        files={"file": ("project.zip", archive_bytes, "application/zip")},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["suggestedTemplateFamily"] == "imported-template"
+    import_id = payload["id"]
+
+    detail = api_client.get(f"/storefront/templates/imports/{import_id}?clientId={client_id}")
+    assert detail.status_code == 200
+    detail_payload = detail.json()
+    assert detail_payload["inputMode"] == "archive"
+    assert detail_payload["resolvedSiteFamily"] == "imported-template"
+    assert detail_payload["resolvedPageType"] == "product_detail"
+    assert detail_payload["resolvedTemplateId"] is None
+    assert detail_payload["upstreamMetadata"]["reviewOnly"] is False
+    assert len(detail_payload["adaptedPages"]) == 1
+    assert detail_payload["adaptedPages"][0]["page_type"] == "product_detail"
+    assert detail_payload["adaptedPuckData"]["content"][0]["type"] == "ImportedPage"
+    assert detail_payload["adaptedPuckData"]["content"][0]["props"]["renderMode"] == "source"
+    assert detail_payload["adaptedPuckData"]["content"][0]["props"]["content"][0]["type"] == "ImportedSection"
+    section_order = [
+        section["props"]["sourceSectionId"]
+        for section in detail_payload["adaptedPuckData"]["content"][0]["props"]["content"]
+    ]
+    assert section_order == [
+        "hero-section",
+        "feature-marquee-1",
+        "product-purchase-section",
+        "feature-marquee-2",
+        "real-people-real-results",
+        "us-vs-them",
+        "any-last-questions",
+        "join-the-community",
+        "global-footer",
+    ]
+    runtime_block = detail_payload["adaptedPuckData"]["content"][0]["props"]["content"][0]["props"]["content"][0]
+    assert runtime_block["type"] == "ImportedRuntimeSection"
+    assert runtime_block["props"]["componentName"]
+    assert isinstance(runtime_block["props"]["textOverrides"], list)
+    assert detail_payload["upstreamMetadata"]["generatorSystem"] == "screenshot-to-code"
+    assert len(detail_payload["normalizedSections"]) >= 4
+    assert detail_payload["normalizedSections"][0]["displayName"] is not None
+    assert detail_payload["normalizedSections"][0]["semanticTags"]
+    assert detail_payload["synthesis"] is None
+
+    accepted_section_ids = [
+        section["id"] for section in detail_payload["normalizedSections"] if section["id"] != "global-footer"
+    ]
+    convert = api_client.post(
+        f"/storefront/templates/imports/{import_id}/convert?clientId={client_id}",
+        json={
+            "name": "Imported OMNI Template",
+            "family": "sales-pdp",
+            "pageType": "product_detail",
+            "acceptedSectionIds": accepted_section_ids,
+        },
+    )
+
+    assert convert.status_code == 400
+    assert "Imported-template archive imports no longer synthesize" in convert.json()["detail"]
+
+
+def test_save_archive_import_as_site_creates_runtime_records(api_client):
+    response = api_client.post(
+        "/clients", json={"name": "Archive Save Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    archive_bytes = _sample_react_export_archive()
+    response = api_client.post(
+        f"/storefront/templates/imports/archive?clientId={client_id}",
+        files={"file": ("project.zip", archive_bytes, "application/zip")},
+    )
+    assert response.status_code == 201
+    import_id = response.json()["id"]
+
+    save_response = api_client.post(
+        f"/storefront/templates/imports/{import_id}/save?clientId={client_id}",
+        json={"siteName": "Imported Runtime Site", "description": "Archive-backed runtime"},
+    )
+    assert save_response.status_code == 200
+    payload = save_response.json()
+    assert payload["siteName"] == "Imported Runtime Site"
+    assert payload["pageCount"] == 1
+    assert payload["createdPages"][0]["pageType"] == "product_detail"
+
+    site_response = api_client.get(f"/sites/{payload['siteId']}?clientId={client_id}")
+    assert site_response.status_code == 200
+    site_payload = site_response.json()
+    assert len(site_payload["pages"]) == 1
+    page_id = site_payload["pages"][0]["id"]
+
+    editor_response = api_client.get(f"/sites/{payload['siteId']}/pages/{page_id}?clientId={client_id}")
+    assert editor_response.status_code == 200
+    editor_payload = editor_response.json()
+    draft = editor_payload["latestDraft"]
+    assert draft is not None
+    assert draft["puckData"]["content"][0]["type"] == "ImportedPage"
+    assert draft["puckData"]["content"][0]["props"]["content"][0]["type"] == "ImportedSection"
+    assert (
+        draft["puckData"]["content"][0]["props"]["content"][0]["props"]["content"][0]["type"]
+        == "ImportedRuntimeSection"
+    )
+
+
+def test_create_archive_import_rejects_missing_app_file(api_client):
+    response = api_client.post(
+        "/clients", json={"name": "Archive Import Invalid Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    invalid_archive = _build_archive_zip(
+        {
+            "package.json": '{"name":"broken-export"}',
+            "index.html": "<html><body><div id='root'></div></body></html>",
+        }
+    )
+    response = api_client.post(
+        f"/storefront/templates/imports/archive?clientId={client_id}",
+        files={"file": ("broken.zip", invalid_archive, "application/zip")},
+    )
+
+    assert response.status_code == 400
+    assert "src/App" in response.json()["detail"]
 
 
 @patch("app.services.site_imports.capture_site")
@@ -1016,6 +1310,116 @@ def test_canonical_create_site_materializes_editor_visible_puck_data(
     assert draft is not None
     assert len(draft["puckData"]["content"]) > 0
     assert draft["puckData"]["content"][0]["type"] == "Section"
+
+
+@patch("app.services.site_imports.capture_site")
+@patch("app.services.site_imports.normalize_capture")
+def test_create_site_from_approved_variant_materializes_runtime_site(
+    mock_normalize, mock_capture, api_client, mock_capture_result, mock_normalize_result
+):
+    mock_capture.return_value = type(
+        "CaptureResult",
+        (),
+        mock_capture_result,
+    )()
+    mock_normalize.return_value = type("NormalizationResult", (), mock_normalize_result)()
+
+    response = api_client.post(
+        "/clients", json={"name": "Variant Materialization Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    response = api_client.post(
+        f"/storefront/templates/imports?clientId={client_id}",
+        json={"sourceUrl": "https://example.com"},
+    )
+    assert response.status_code == 201
+    import_id = response.json()["id"]
+
+    payload = _wait_for_import_terminal_state(api_client, client_id=client_id, import_id=import_id)
+    assert payload is not None
+    section_id = payload["normalizedSections"][0]["id"]
+
+    response = api_client.post(
+        f"/storefront/templates/imports/{import_id}/convert?clientId={client_id}",
+        json={
+            "name": "Materialized Variant",
+            "family": "sales-pdp",
+            "pageType": "product_detail",
+            "acceptedSectionIds": [section_id],
+        },
+    )
+    assert response.status_code == 200
+    variant_id = response.json()["id"]
+
+    approve_response = api_client.post(
+        f"/storefront/templates/variants/{variant_id}/approve?clientId={client_id}",
+        json={},
+    )
+    assert approve_response.status_code == 200
+    assert approve_response.json()["status"] == "approved"
+
+    create_site_response = api_client.post(
+        f"/storefront/templates/variants/{variant_id}/create-site?clientId={client_id}",
+        json={"siteName": "Materialized Variant Site"},
+    )
+    assert create_site_response.status_code == 200
+    create_payload = create_site_response.json()
+    assert create_payload["siteName"] == "Materialized Variant Site"
+    assert create_payload["pageCount"] == 1
+    assert create_payload["entryPageType"] == "product_detail"
+
+    sites_response = api_client.get(f"/sites?clientId={client_id}")
+    assert sites_response.status_code == 200
+    assert any(site["id"] == create_payload["siteId"] for site in sites_response.json())
+
+    site_response = api_client.get(f"/sites/{create_payload['siteId']}?clientId={client_id}")
+    assert site_response.status_code == 200
+    site_payload = site_response.json()
+    assert site_payload["siteFamily"] == "sales-pdp"
+    assert len(site_payload["pages"]) == 1
+    page_id = site_payload["pages"][0]["id"]
+
+    editor_response = api_client.get(
+        f"/sites/{create_payload['siteId']}/pages/{page_id}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    editor_payload = editor_response.json()
+    assert editor_payload["latestDraft"] is not None
+    assert editor_payload["latestApproved"] is not None
+
+
+def test_archive_import_variant_convert_is_rejected(api_client):
+    response = api_client.post(
+        "/clients", json={"name": "Archive Variant Materialization Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    archive_bytes = _sample_react_export_archive()
+    response = api_client.post(
+        f"/storefront/templates/imports/archive?clientId={client_id}",
+        files={"file": ("project.zip", archive_bytes, "application/zip")},
+    )
+    assert response.status_code == 201
+    import_id = response.json()["id"]
+
+    detail = api_client.get(f"/storefront/templates/imports/{import_id}?clientId={client_id}")
+    assert detail.status_code == 200
+    accepted_section_ids = [section["id"] for section in detail.json()["normalizedSections"]]
+
+    convert_response = api_client.post(
+        f"/storefront/templates/imports/{import_id}/convert?clientId={client_id}",
+        json={
+            "name": "Archive Imported Variant",
+            "family": "sales-pdp",
+            "pageType": "product_detail",
+            "acceptedSectionIds": accepted_section_ids,
+        },
+    )
+    assert convert_response.status_code == 400
+    assert "Imported-template archive imports no longer synthesize" in convert_response.json()["detail"]
 
 
 @patch("app.services.site_imports.capture_site")

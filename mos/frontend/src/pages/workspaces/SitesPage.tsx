@@ -1,53 +1,102 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Layers3, Plus, Loader2, Globe, ExternalLink, Download, LayoutTemplate, ArrowRight } from "lucide-react";
+import { Plus, Loader2, Globe, ExternalLink, Download, LayoutTemplate } from "lucide-react";
 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { useSites, useSiteFamilies, useCreateSite } from "@/api/sites";
+import { useSites, useSiteFamilies, useCreateSite, type SiteThemeBindingMode } from "@/api/sites";
 import { useInstantiateSiteTemplate, useSiteTemplates } from "@/api/siteTemplates";
 import { useSiteImports } from "@/api/siteImports";
+import { useDesignSystems } from "@/api/designSystems";
+import { useProductContext } from "@/contexts/ProductContext";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DialogContent, DialogRoot, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/toast";
+import { Callout } from "@/components/ui/callout";
 import { cn } from "@/lib/utils";
+import {
+  formatSiteType,
+  formatCommerceProvider,
+  formatSiteFamily,
+  formatImportStatus,
+} from "@/lib/siteFormatters";
 
-function formatSiteType(siteType: string | null): string {
-  if (!siteType) return "Unknown";
-  return siteType
-    .split("_")
-    .map((token) => (token ? token[0].toUpperCase() + token.slice(1) : token))
-    .join(" ");
+/* ------------------------------------------------------------------ */
+/*  Skeleton placeholders                                              */
+/* ------------------------------------------------------------------ */
+
+function TemplateCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2 px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-5 w-36" />
+        </div>
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <Skeleton className="mt-3 h-4 w-full" />
+    </div>
+  );
 }
 
-function formatCommerceProvider(provider: string | null): string {
-  if (!provider) return "None";
-  return provider.charAt(0).toUpperCase() + provider.slice(1);
+function SiteRowSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-56" />
+        </div>
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+    </div>
+  );
 }
 
-function formatSiteFamily(family: string | null): string {
-  if (!family) return "Unknown";
-  return family
-    .split("-")
-    .map((token) => (token ? token[0].toUpperCase() + token.slice(1) : token))
-    .join(" ");
+/* ------------------------------------------------------------------ */
+/*  Section Card – replaces the repeated section wrapper pattern       */
+/* ------------------------------------------------------------------ */
+
+function SectionCard({
+  title,
+  description,
+  count,
+  countLabel,
+  children,
+}: {
+  title: string;
+  description: string;
+  count?: number;
+  countLabel?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="ds-section-card">
+      <div className="ds-section-card__header">
+        <div>
+          <div className="text-sm font-semibold text-content">{title}</div>
+          <div className="text-xs text-content-muted">{description}</div>
+        </div>
+        {count !== undefined && (
+          <Badge tone="neutral">{count} {countLabel ?? "items"}</Badge>
+        )}
+      </div>
+      {children}
+    </div>
+  );
 }
 
-function formatPageType(pageType: string): string {
-  return pageType
-    .split("_")
-    .map((token) => (token ? token[0].toUpperCase() + token.slice(1) : token))
-    .join(" ");
-}
-
-function formatImportStatus(status: string): "success" | "warning" | "danger" | "neutral" {
-  if (status === "completed") return "success";
-  if (["queued", "capturing", "generating", "adapting", "running"].includes(status)) return "warning";
-  if (status === "failed") return "danger";
-  return "neutral";
-}
+/* ------------------------------------------------------------------ */
+/*  Page component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function SitesPage() {
   const { templateId } = useParams<{ templateId?: string }>();
@@ -56,11 +105,14 @@ export function SitesPage() {
   const navigate = useNavigate();
   const { data: sites = [], isLoading: sitesLoading } = useSites();
   const { data: families = [], isLoading: familiesLoading } = useSiteFamilies();
-  const { data: siteTemplates = [], isLoading: templatesLoading } = useSiteTemplates();
+  const { data: siteTemplates = [] } = useSiteTemplates();
   const { data: imports = [], isLoading: importsLoading } = useSiteImports();
+  const { data: designSystems = [] } = useDesignSystems(workspace?.id);
+  const { product: activeWorkspaceProduct, products: workspaceProducts, isLoading: productsLoading } = useProductContext();
   const createSite = useCreateSite();
   const instantiateTemplate = useInstantiateSiteTemplate(templateId || null);
 
+  /* ---- routing-driven tab ---- */
   const routeTab = useMemo<"templates" | "sites" | "imports">(() => {
     if (location.pathname.endsWith("/imports")) return "imports";
     if (location.pathname.includes("/templates")) return "templates";
@@ -73,6 +125,11 @@ export function SitesPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [siteName, setSiteName] = useState("");
   const [siteDescription, setSiteDescription] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("");
+
+  // Theme binding state
+  const [themeBindingMode, setThemeBindingMode] = useState<SiteThemeBindingMode>("standalone");
+  const [selectedDesignSystemId, setSelectedDesignSystemId] = useState<string>("");
 
   useEffect(() => {
     if (routeTab !== activeTab) {
@@ -88,8 +145,11 @@ export function SitesPage() {
     setSelectedFamily(null);
     setSiteName(`${template.name} Site`);
     setSiteDescription(template.description || "");
+    setSelectedProductId(activeWorkspaceProduct?.id || "");
+    setThemeBindingMode("standalone");
+    setSelectedDesignSystemId("");
     setShowCreateForm(true);
-  }, [siteTemplates, templateId]);
+  }, [activeWorkspaceProduct?.id, siteTemplates, templateId]);
 
   const handleTabChange = (nextTab: "templates" | "sites" | "imports") => {
     setActiveTab(nextTab);
@@ -104,6 +164,17 @@ export function SitesPage() {
     navigate("/workspaces/sites");
   };
 
+  const resetCreateForm = () => {
+    setShowCreateForm(false);
+    setSelectedFamily(null);
+    setSelectedTemplateId(null);
+    setSiteName("");
+    setSiteDescription("");
+    setSelectedProductId("");
+    setThemeBindingMode("standalone");
+    setSelectedDesignSystemId("");
+  };
+
   const handleCreateSite = async () => {
     if (!workspace?.id || (!selectedFamily && !selectedTemplateId) || !siteName.trim()) return;
 
@@ -113,27 +184,45 @@ export function SitesPage() {
             clientId: workspace.id,
             name: siteName.trim(),
             description: siteDescription.trim() || undefined,
+            productId: selectedProductId || undefined,
+            themeBindingMode,
+            designSystemId: themeBindingMode === "design_system" ? selectedDesignSystemId || undefined : undefined,
           })
         : await createSite.mutateAsync({
             clientId: workspace.id,
             family: selectedFamily!,
             name: siteName.trim(),
             description: siteDescription.trim() || undefined,
+            productId: selectedProductId || undefined,
+            themeBindingMode,
+            designSystemId: themeBindingMode === "design_system" ? selectedDesignSystemId || undefined : undefined,
           });
-      setShowCreateForm(false);
-      setSiteName("");
-      setSiteDescription("");
-      setSelectedFamily(null);
-      setSelectedTemplateId(null);
+      resetCreateForm();
+      toast.success("Site created");
       navigate(`/workspaces/sites/${("siteId" in result ? result.siteId : result.id)}`);
     } catch (error) {
-      console.error("Failed to create site:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create site. Please try again.");
     }
   };
 
   const createPending = createSite.isPending || instantiateTemplate.isPending;
-  const createError = createSite.error || instantiateTemplate.error;
 
+  const designSystemOptions = useMemo(() => [
+    { label: "Select a design system", value: "" },
+    ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
+  ], [designSystems]);
+  const productOptions = useMemo(() => [
+    { label: productsLoading ? "Loading products..." : "No default product", value: "" },
+    ...workspaceProducts.map((product) => ({ label: product.title, value: product.id })),
+  ], [productsLoading, workspaceProducts]);
+
+  const themeModeOptions = [
+    { label: "Standalone (no theme)", value: "standalone", description: "Use generic styling without brand tokens" },
+    { label: "Use workspace brand", value: "workspace_default", description: "Inherit the workspace default design system" },
+    { label: "Use specific design system", value: "design_system", description: "Select a design system to apply" },
+  ];
+
+  /* ---- early return: no workspace ---- */
   if (!workspace) {
     return (
       <div className="space-y-4">
@@ -151,11 +240,7 @@ export function SitesPage() {
       <PageHeader
         title="Sites"
         description="Create and manage sites for your workspace."
-      >
-        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-content-muted">
-          <Badge tone="neutral">Workspace: {workspace.name}</Badge>
-        </div>
-      </PageHeader>
+      />
 
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as typeof activeTab)}>
         <TabsList className="w-full sm:w-auto">
@@ -175,28 +260,21 @@ export function SitesPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Templates Tab */}
+        {/* ---- Templates Tab ---- */}
         <TabsContent value="templates" className="space-y-4">
-          <div className="rounded-2xl border border-border bg-surface px-4 py-4">
-            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-              <div>
-                <div className="text-sm font-semibold text-content">Site Templates</div>
-                <div className="text-xs text-content-muted">
-                  Choose a starter template to create a new site.
-                </div>
-              </div>
-              <Badge tone="neutral">{families.length + siteTemplates.length} templates</Badge>
-            </div>
-
+          <SectionCard
+            title="Site Templates"
+            description="Choose a starter template to create a new site."
+            count={families.length + siteTemplates.length}
+            countLabel="templates"
+          >
             {/* Built-in Family Templates */}
-            <div className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-content-muted mb-2">
-                Built-in Starters
-              </div>
+            <div>
+              <div className="text-overline mb-2">Built-in Starters</div>
               {familiesLoading ? (
-                <div className="py-6 text-sm text-content-muted">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                  Loading site templates...
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <TemplateCardSkeleton />
+                  <TemplateCardSkeleton />
                 </div>
               ) : (
                 <div className="grid gap-3 lg:grid-cols-2">
@@ -204,26 +282,28 @@ export function SitesPage() {
                     <button
                       key={family.family}
                       type="button"
+                      aria-label={`Select ${family.name} template`}
                       onClick={() => {
                         setSelectedFamily(family.family);
                         setSiteName(`${family.name} Site`);
+                        setSelectedProductId(activeWorkspaceProduct?.id || "");
+                        setThemeBindingMode("standalone");
+                        setSelectedDesignSystemId("");
                         setShowCreateForm(true);
                       }}
                       className={cn(
-                        "rounded-xl border px-4 py-4 text-left transition-colors",
+                        "rounded-xl border px-4 py-3 text-left transition-colors",
                         "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">
-                            {formatCommerceProvider(family.commerceProvider)}
-                          </div>
-                          <div className="mt-1 text-base font-semibold text-content">{family.name}</div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-content">{family.name}</div>
+                        <div className="flex items-center gap-1.5">
+                          <Badge tone="neutral">{formatCommerceProvider(family.commerceProvider)}</Badge>
+                          <Badge tone="accent">{family.pageCount} pages</Badge>
                         </div>
-                        <Badge tone="accent">{family.pageCount} pages</Badge>
                       </div>
-                      <div className="mt-2 text-sm text-content-muted">{family.description}</div>
+                      <div className="mt-1.5 text-sm text-content-muted">{family.description}</div>
                     </button>
                   ))}
                 </div>
@@ -233,68 +313,69 @@ export function SitesPage() {
             {/* Workspace Site Templates */}
             {siteTemplates.length > 0 && (
               <div className="mt-6">
-                <div className="text-xs font-semibold uppercase tracking-wide text-content-muted mb-2">
-                  Workspace Templates
-                </div>
+                <div className="text-overline mb-2">Workspace Templates</div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   {siteTemplates.map((template) => (
                     <button
                       key={template.id}
                       type="button"
+                      aria-label={`Select ${template.name} template`}
                       onClick={() => navigate(`/workspaces/sites/templates/${template.id}`)}
                       className={cn(
-                        "rounded-xl border px-4 py-4 text-left transition-colors",
+                        "rounded-xl border px-4 py-3 text-left transition-colors",
                         "border-border bg-surface-2 hover:border-accent/40 hover:bg-surface"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">
-                            {formatCommerceProvider(template.commerceProvider)}
-                          </div>
-                          <div className="mt-1 text-base font-semibold text-content">{template.name}</div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-content">{template.name}</div>
+                        <div className="flex items-center gap-1.5">
+                          <Badge tone="neutral">{formatCommerceProvider(template.commerceProvider)}</Badge>
+                          <Badge tone="accent">{template.pageCount} pages</Badge>
                         </div>
-                        <Badge tone="accent">{template.pageCount} pages</Badge>
                       </div>
-                        <div className="mt-2 text-sm text-content-muted">
-                          {template.description || `${formatSiteFamily((template as { siteFamily?: string; family?: string }).siteFamily || (template as { family?: string }).family || null)} template`}
-                        </div>
+                      <div className="mt-1.5 text-sm text-content-muted">
+                        {template.description || `${formatSiteFamily((template as { siteFamily?: string; family?: string }).siteFamily || (template as { family?: string }).family || null)} template`}
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
         </TabsContent>
 
-        {/* Sites Tab */}
+        {/* ---- Sites Tab ---- */}
         <TabsContent value="sites" className="space-y-4">
-          <div className="rounded-2xl border border-border bg-surface px-4 py-4">
-            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-              <div>
-                <div className="text-sm font-semibold text-content">Your Sites</div>
-                <div className="text-xs text-content-muted">
-                  Sites created for this workspace.
-                </div>
-              </div>
-              <Badge tone="neutral">{sites.length} sites</Badge>
-            </div>
-
+          <SectionCard
+            title="Your Sites"
+            description="Sites created for this workspace."
+            count={sites.length}
+            countLabel="sites"
+          >
             {sitesLoading ? (
-              <div className="py-6 text-sm text-content-muted">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                Loading sites...
+              <div className="space-y-2">
+                <SiteRowSkeleton />
+                <SiteRowSkeleton />
+                <SiteRowSkeleton />
               </div>
             ) : sites.length === 0 ? (
-              <div className="py-6 text-sm text-content-muted">
-                No sites created yet. Choose a template from the Templates tab to get started.
-              </div>
+              <EmptyState
+                title="No sites yet"
+                description="Choose a template from the Templates tab to get started."
+                actions={
+                  <Button size="sm" variant="outline" onClick={() => handleTabChange("templates")}>
+                    <LayoutTemplate className="mr-2 h-4 w-4" />
+                    Browse Templates
+                  </Button>
+                }
+              />
             ) : (
-              <div className="mt-4 space-y-2">
+              <div className="space-y-2">
                 {sites.map((site) => (
                   <button
                     key={site.id}
                     type="button"
+                    aria-label={`View site: ${site.name}`}
                     onClick={() => navigate(`/workspaces/sites/${site.id}`)}
                     className={cn(
                       "w-full rounded-xl border px-4 py-3 text-left transition-colors",
@@ -306,6 +387,10 @@ export function SitesPage() {
                         <div className="text-sm font-semibold text-content">{site.name}</div>
                         <div className="mt-1 text-xs text-content-muted">
                           {formatSiteFamily(site.siteFamily)} • {formatSiteType(site.siteType)}
+                          {site.themeBindingMode && (
+                            <span> • Theme: {site.themeBindingMode === "standalone" ? "Standalone" :
+                              site.themeBindingMode === "workspace_default" ? "Workspace brand" : "Design system"}</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -319,37 +404,34 @@ export function SitesPage() {
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
         </TabsContent>
 
-        {/* Imports Tab */}
+        {/* ---- Imports Tab ---- */}
         <TabsContent value="imports" className="space-y-4">
-          <div className="rounded-2xl border border-border bg-surface px-4 py-4">
-            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-              <div>
-                <div className="text-sm font-semibold text-content">Site Imports</div>
-                <div className="text-xs text-content-muted">
-                  Import existing websites to use as templates or add to sites.
-                </div>
-              </div>
-              <Badge tone="neutral">{imports.length} imports</Badge>
-            </div>
-
+          <SectionCard
+            title="Site Imports"
+            description="Import existing websites to use as templates or add to sites."
+            count={imports.length}
+            countLabel="imports"
+          >
             {importsLoading ? (
-              <div className="py-6 text-sm text-content-muted">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                Loading imports...
+              <div className="space-y-2">
+                <SiteRowSkeleton />
+                <SiteRowSkeleton />
               </div>
             ) : imports.length === 0 ? (
-              <div className="py-6 text-sm text-content-muted">
-                No imports yet. Start a site import to capture a reference site for this workspace.
-              </div>
+              <EmptyState
+                title="No imports yet"
+                description="Start a site import to capture a reference site for this workspace."
+              />
             ) : (
-              <div className="mt-4 space-y-2">
+              <div className="space-y-2">
                 {imports.map((imp) => (
                   <button
                     key={imp.id}
                     type="button"
+                    aria-label={`View import: ${imp.title || imp.sourceHostname || imp.sourceUrl}`}
                     onClick={() => navigate(`/workspaces/sites/imports/${imp.id}`)}
                     className={cn(
                       "w-full rounded-xl border px-4 py-3 text-left transition-colors",
@@ -376,82 +458,129 @@ export function SitesPage() {
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
         </TabsContent>
       </Tabs>
 
-      {/* Create Site Modal */}
-      {showCreateForm && (selectedFamily || selectedTemplateId) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">
-            <div className="mb-4">
-              <div className="text-lg font-semibold text-content">Create New Site</div>
-              <div className="mt-1 text-sm text-content-muted">
-                Creating a site from the {selectedFamily ? formatSiteFamily(selectedFamily) : "selected"} template.
-              </div>
-            </div>
+      {/* ---- Create Site Dialog ---- */}
+      <DialogRoot open={showCreateForm && !!(selectedFamily || selectedTemplateId)} onOpenChange={(open) => { if (!open) resetCreateForm(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <div className="space-y-1">
+            <DialogTitle>Create New Site</DialogTitle>
+            <DialogDescription>
+              Creating a site from the {selectedFamily ? formatSiteFamily(selectedFamily) : "selected"} template.
+            </DialogDescription>
+          </div>
 
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Site Name</label>
+          <div className="mt-4 space-y-5">
+            {/* Site Details */}
+            <div className="space-y-3">
+              <FormField label="Site Name" required>
                 <Input
                   placeholder="My Site"
                   value={siteName}
                   onChange={(e) => setSiteName(e.target.value)}
                 />
-              </div>
+              </FormField>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Description (optional)</label>
+              <FormField label="Description" helper="Optional — a brief description of your site.">
                 <Input
                   placeholder="A brief description of your site"
                   value={siteDescription}
                   onChange={(e) => setSiteDescription(e.target.value)}
                 />
+              </FormField>
+
+              <FormField
+                label="Default Product"
+                helper="Sets the site's default product context. You can still add page-level product bindings later."
+              >
+                <Select
+                  options={productOptions}
+                  value={selectedProductId}
+                  onValueChange={setSelectedProductId}
+                  disabled={productsLoading}
+                />
+              </FormField>
+            </div>
+
+            {/* Theme Section */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="text-overline">Theme</div>
+
+              <div className="space-y-2">
+                {themeModeOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className={cn(
+                      "flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors",
+                      themeBindingMode === option.value
+                        ? "border-accent bg-accent/5"
+                        : "border-border bg-surface-2 hover:border-accent/40"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="themeBindingMode"
+                      value={option.value}
+                      checked={themeBindingMode === option.value}
+                      onChange={(e) => setThemeBindingMode(e.target.value as SiteThemeBindingMode)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-content">{option.label}</div>
+                      <div className="text-xs text-content-muted">{option.description}</div>
+                    </div>
+                  </label>
+                ))}
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreateSite}
-                  disabled={!siteName.trim() || createPending}
-                  className="flex-1"
-                >
-                  {createPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Site
-                    </>
+              {/* Design System Picker */}
+              {themeBindingMode === "design_system" && (
+                <FormField label="Design System">
+                  <Select
+                    options={designSystemOptions}
+                    value={selectedDesignSystemId}
+                    onValueChange={setSelectedDesignSystemId}
+                  />
+                  {designSystems.length === 0 && (
+                    <Callout variant="warning" size="sm" className="mt-2">
+                      No design systems available. Create one in the Brand Design System page first.
+                    </Callout>
                   )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setSelectedFamily(null);
-                    setSelectedTemplateId(null);
-                    setSiteName("");
-                    setSiteDescription("");
-                  }}
-                  disabled={createPending}
-                >
-                  Cancel
-                </Button>
-              </div>
-
-              {createError && (
-                <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
-                  {createError instanceof Error ? createError.message : "Failed to create site. Please try again."}
-                </div>
+                </FormField>
               )}
             </div>
+
+            {/* Actions — Cancel left, Primary right */}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={resetCreateForm}
+                disabled={createPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateSite}
+                disabled={!siteName.trim() || createPending || (themeBindingMode === "design_system" && !selectedDesignSystemId)}
+              >
+                {createPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Site
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </DialogRoot>
     </div>
   );
 }

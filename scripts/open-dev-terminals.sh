@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CMD_SHOPIFY_FUNNEL="cd \"$ROOT\" && ./scripts/start-shopify-funnel.sh"
 CMD_SHOPIFY_NGROK="cd \"$ROOT\" && ./scripts/start-shopify-ngrok.sh"
 CMD_TEMPORAL="cd \"$ROOT\" && ./scripts/start-temporal.sh"
+CMD_POSTIZ="cd \"$ROOT\" && ./scripts/start-postiz.sh"
 CMD_BACKEND="cd \"$ROOT\" && ./scripts/start-backend.sh"
 CMD_WORKER="cd \"$ROOT\" && SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh"
 CMD_FRONTEND="cd \"$ROOT\" && ./scripts/start-frontend.sh"
@@ -17,6 +18,7 @@ tell application "Terminal"
   do script "cd '$ROOT'; ./scripts/start-shopify-funnel.sh"
   do script "cd '$ROOT'; ./scripts/start-shopify-ngrok.sh"
   do script "cd '$ROOT'; ./scripts/start-temporal.sh"
+  do script "cd '$ROOT'; ./scripts/start-postiz.sh"
   do script "cd '$ROOT'; ./scripts/start-backend.sh"
   do script "cd '$ROOT'; SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh"
   do script "cd '$ROOT'; ./scripts/start-frontend.sh"
@@ -31,6 +33,7 @@ if command -v gnome-terminal >/dev/null 2>&1; then
   gnome-terminal -- bash -lc "$CMD_SHOPIFY_FUNNEL; exec bash" &
   gnome-terminal -- bash -lc "$CMD_SHOPIFY_NGROK; exec bash" &
   gnome-terminal -- bash -lc "$CMD_TEMPORAL; exec bash" &
+  gnome-terminal -- bash -lc "$CMD_POSTIZ; exec bash" &
   gnome-terminal -- bash -lc "$CMD_BACKEND; exec bash" &
   gnome-terminal -- bash -lc "$CMD_WORKER; exec bash" &
   gnome-terminal -- bash -lc "$CMD_FRONTEND; exec bash" &
@@ -42,6 +45,7 @@ echo "Could not auto-launch terminals. Run these in separate shells:"
 echo "$CMD_SHOPIFY_FUNNEL"
 echo "$CMD_SHOPIFY_NGROK"
 echo "$CMD_TEMPORAL"
+echo "$CMD_POSTIZ"
 echo "$CMD_BACKEND"
 echo "$CMD_WORKER"
 echo "$CMD_FRONTEND"

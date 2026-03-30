@@ -1,0 +1,25 @@
+{
+  "id": "medusa-b2c-policy-contact",
+  "name": "Medusa B2C Contact Support",
+  "description": "Contact support page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Contact Support",
+        "description": "Support channels, response expectations, and contact details for customer help requests."
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CPolicyPage",
+        "props": {
+          "pageKey": "contact_support",
+          "pageTitle": "Contact Support",
+          "description": "Support channels, response expectations, and contact details for customer help requests."
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

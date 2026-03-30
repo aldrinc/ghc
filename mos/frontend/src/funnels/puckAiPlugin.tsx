@@ -11,12 +11,16 @@ import type { FunnelAIChatMessage } from "@/types/funnels";
 import { normalizePuckData } from "@/funnels/puckData";
 
 type FunnelAiPluginOptions = {
+  scope?: "funnel" | "site";
   funnelId?: string;
   pageId?: string;
   templateId?: string;
   ideaWorkspaceId?: string;
   apiBaseUrl: string;
   clerkTokenTemplate: string;
+  supportsAttachments?: boolean;
+  supportsImageGeneration?: boolean;
+  supportsStreaming?: boolean;
 };
 
 type FunnelAiFieldsProps = FunnelAiPluginOptions & {
@@ -154,16 +158,32 @@ function FunnelAiFields({ children, ...options }: FunnelAiFieldsProps) {
   );
 }
 
-function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBaseUrl, clerkTokenTemplate }: FunnelAiPluginOptions) {
+function AiAssistantPanel({
+  scope = "funnel",
+  funnelId,
+  pageId,
+  templateId,
+  ideaWorkspaceId,
+  apiBaseUrl,
+  clerkTokenTemplate,
+  supportsAttachments = true,
+  supportsImageGeneration = true,
+  supportsStreaming = true,
+}: FunnelAiPluginOptions) {
   const appState = usePuck((state) => state.appState);
   const dispatch = usePuck((state) => state.dispatch);
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
-  const storageKey = pageId ? `funnel-ai:${funnelId ?? "unknown"}:${pageId}` : null;
+  const resourceId = funnelId;
+  const basePath =
+    resourceId && pageId
+      ? `${apiBaseUrl}/${scope === "site" ? "sites" : "funnels"}/${resourceId}/pages/${pageId}/ai`
+      : null;
+  const storageKey = pageId ? `${scope}-ai:${resourceId ?? "unknown"}:${pageId}` : null;
 
   const [aiMessages, setAiMessages] = useState<FunnelAIChatMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiGenerateImages, setAiGenerateImages] = useState(true);
+  const [aiGenerateImages, setAiGenerateImages] = useState(supportsImageGeneration);
   const [aiIsGenerating, setAiIsGenerating] = useState(false);
   const [aiStreamText, setAiStreamText] = useState<string | null>(null);
   const [aiRawStreamText, setAiRawStreamText] = useState<string | null>(null);
@@ -195,11 +215,15 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
     if (stored) {
       setAiMessages(Array.isArray(stored.messages) ? stored.messages : []);
       setAiPrompt(typeof stored.prompt === "string" ? stored.prompt : "");
-      setAiGenerateImages(typeof stored.generateImages === "boolean" ? stored.generateImages : true);
+      setAiGenerateImages(
+        supportsImageGeneration
+          ? (typeof stored.generateImages === "boolean" ? stored.generateImages : true)
+          : false
+      );
     } else {
       setAiMessages([]);
       setAiPrompt("");
-      setAiGenerateImages(true);
+      setAiGenerateImages(supportsImageGeneration);
     }
     setAiStreamText(null);
     setAiRawStreamText(null);
@@ -212,7 +236,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
     rawStreamBufferRef.current = "";
     assistantStreamBufferRef.current = "";
     hasRestoredRef.current = true;
-  }, [pageId, storageKey]);
+  }, [pageId, storageKey, supportsImageGeneration]);
 
   useEffect(() => {
     if (!storageKey || !hasRestoredRef.current) return;
@@ -248,8 +272,12 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
   const handleAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
-    if (!funnelId || !pageId) {
-      toast.error("Select a funnel page before attaching images.");
+    if (!supportsAttachments) {
+      toast.error("Image attachments are not available for this editor yet.");
+      return;
+    }
+    if (!resourceId || !pageId || !basePath) {
+      toast.error(`Select a ${scope === "site" ? "site" : "funnel"} page before attaching images.`);
       return;
     }
     const remainingSlots = AI_ATTACHMENT_MAX - aiAttachments.length;
@@ -276,7 +304,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
           const formData = new FormData();
           formData.append("files", file);
           const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-          const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/attachments`, {
+          const resp = await fetch(`${basePath}/attachments`, {
             method: "POST",
             headers,
             body: formData,
@@ -331,7 +359,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
   };
 
   const handleAiGenerate = () => {
-    if (!funnelId || !pageId) return;
+    if (!resourceId || !pageId || !basePath) return;
     const prompt = aiPrompt.trim();
     if (!prompt) return;
     if (aiAttachmentsUploading) {
@@ -387,12 +415,17 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
         if (Array.isArray(draft.generatedImages)) setAiGeneratedImages(draft.generatedImages as Array<Record<string, unknown>>);
         setAiMessages((prev) => [...prev, { role: "assistant", content: assistantMessage || "Draft generated." }]);
         toast.success(`AI draft applied (${blocks} blocks)`);
-        queryClient.invalidateQueries({ queryKey: ["funnels", "page", funnelId, pageId] });
-        queryClient.invalidateQueries({ queryKey: ["funnels", "detail", funnelId] });
+        if (scope === "site") {
+          queryClient.invalidateQueries({ queryKey: ["sites", resourceId, "pages", pageId] });
+          queryClient.invalidateQueries({ queryKey: ["sites"] });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["funnels", "page", resourceId, pageId] });
+          queryClient.invalidateQueries({ queryKey: ["funnels", "detail", resourceId] });
+        }
       };
 
       const fallbackNonStream = async (headers: Headers) => {
-        const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/generate`, {
+        const resp = await fetch(`${basePath}/generate`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -409,7 +442,7 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             currentPuckData: appState.data,
             templateId,
             ideaWorkspaceId,
-            generateImages: aiGenerateImages,
+            generateImages: supportsImageGeneration ? aiGenerateImages : false,
           }),
           signal: controller.signal,
         });
@@ -430,7 +463,12 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
         headers.set("Content-Type", "application/json");
         if (token) headers.set("Authorization", `Bearer ${token}`);
 
-        const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/generate/stream`, {
+        if (!supportsStreaming) {
+          await fallbackNonStream(headers);
+          return;
+        }
+
+        const resp = await fetch(`${basePath}/generate/stream`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -447,7 +485,8 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             currentPuckData: appState.data,
             templateId,
             ideaWorkspaceId,
-            generateImages: aiGenerateImages,
+            generateImages: supportsImageGeneration ? aiGenerateImages : false,
+            maxImages: supportsImageGeneration && aiGenerateImages ? 3 : 0,
           }),
           signal: controller.signal,
         });
@@ -586,17 +625,19 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       </div>
 
       <div className="border-t border-border p-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={aiGenerateImages}
-              onChange={(e) => setAiGenerateImages(e.target.checked)}
-              className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary"
-            />
-            Generate images
-          </label>
-        </div>
+        {supportsImageGeneration ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={aiGenerateImages}
+                onChange={(e) => setAiGenerateImages(e.target.checked)}
+                className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary"
+              />
+              Generate images
+            </label>
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-3">
           <div className="space-y-1">
@@ -615,78 +656,80 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-content">
-                Attached images ({aiAttachments.length}/{AI_ATTACHMENT_MAX})
+          {supportsAttachments ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-content">
+                  Attached images ({aiAttachments.length}/{AI_ATTACHMENT_MAX})
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={() => aiFileInputRef.current?.click()}
+                  disabled={!resourceId || !pageId || !basePath || aiAttachments.length >= AI_ATTACHMENT_MAX}
+                >
+                  Attach images
+                </Button>
+                <input
+                  ref={aiFileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleAttachmentSelect}
+                />
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                type="button"
-                onClick={() => aiFileInputRef.current?.click()}
-                disabled={!funnelId || !pageId || aiAttachments.length >= AI_ATTACHMENT_MAX}
-              >
-                Attach images
-              </Button>
-              <input
-                ref={aiFileInputRef}
-                type="file"
-                multiple
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={handleAttachmentSelect}
-              />
-            </div>
-            <div className="text-xs text-content-muted">
-              Attach reference images (PNG, JPEG, WebP, GIF). The assistant can place them directly or use them as
-              references for new generated scenes.
-            </div>
-            {aiAttachments.length ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {aiAttachments.map((item) => (
-                  <div key={item.id} className="rounded-md border border-border bg-surface p-2 space-y-2">
-                    <div className="relative overflow-hidden rounded-md border border-border bg-surface-2">
-                      <img src={item.previewUrl} alt={item.name} className="h-28 w-full object-cover" />
-                      {item.status === "uploading" ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-surface/80 text-xs text-content">
-                          Uploading...
-                        </div>
-                      ) : null}
-                      {item.status === "error" ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-danger/10 text-xs text-danger">
-                          Upload failed
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="truncate text-xs text-content-muted">{item.name}</div>
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-content hover:text-content/80"
-                        onClick={() => handleRemoveAttachment(item.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    {item.error ? <div className="text-xs text-danger">{item.error}</div> : null}
-                  </div>
-                ))}
+              <div className="text-xs text-content-muted">
+                Attach reference images (PNG, JPEG, WebP, GIF). The assistant can place them directly or use them as
+                references for new generated scenes.
               </div>
-            ) : null}
-          </div>
+              {aiAttachments.length ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {aiAttachments.map((item) => (
+                    <div key={item.id} className="rounded-md border border-border bg-surface p-2 space-y-2">
+                      <div className="relative overflow-hidden rounded-md border border-border bg-surface-2">
+                        <img src={item.previewUrl} alt={item.name} className="h-28 w-full object-cover" />
+                        {item.status === "uploading" ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-surface/80 text-xs text-content">
+                            Uploading...
+                          </div>
+                        ) : null}
+                        {item.status === "error" ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-danger/10 text-xs text-danger">
+                            Upload failed
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="truncate text-xs text-content-muted">{item.name}</div>
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-content hover:text-content/80"
+                          onClick={() => handleRemoveAttachment(item.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {item.error ? <div className="text-xs text-danger">{item.error}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <Button
             size="sm"
             type="button"
             onClick={handleAiGenerate}
-            disabled={!aiPrompt.trim() || aiIsGenerating || aiAttachmentsUploading || !funnelId || !pageId}
+            disabled={!aiPrompt.trim() || aiIsGenerating || aiAttachmentsUploading || !resourceId || !pageId || !basePath}
           >
             {aiIsGenerating ? "Generating..." : "Generate draft"}
           </Button>
         </div>
 
-        {aiGeneratedImages.length ? (
+        {supportsImageGeneration && aiGeneratedImages.length ? (
           <div className="pt-2">
             <div className="text-xs font-semibold text-content">Generated images</div>
             <div className="mt-2 grid gap-3">

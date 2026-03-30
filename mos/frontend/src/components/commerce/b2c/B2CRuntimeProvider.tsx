@@ -22,6 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { useApiClient } from "@/api/client";
 import type {
   MedusaProduct,
   MedusaCart,
@@ -50,6 +51,7 @@ import {
   listCollections,
   listCategories,
   getProductByHandle,
+  getCollectionByHandle,
   getCategoryByHandle,
   createCart as createMedusaCart,
   getOrCreateCart,
@@ -58,6 +60,8 @@ import {
   addCartLineItem,
   updateCartLineItem,
   deleteCartLineItem,
+  applyPromotionCode as applyMedusaPromotionCode,
+  removePromotionCode as removeMedusaPromotionCode,
   listShippingOptions,
   addShippingMethod,
   listPaymentProviders,
@@ -68,6 +72,7 @@ import {
   logoutCustomer,
   getCurrentCustomer,
   updateCustomer,
+  requestCustomerPasswordReset,
   createCustomerAddress,
   updateCustomerAddress,
   deleteCustomerAddress,
@@ -76,7 +81,9 @@ import {
   requestOrderTransfer,
   acceptOrderTransfer,
   declineOrderTransfer,
+  MedusaApiError,
   type ProductListOptions,
+  type ProductListResult,
   type UpdateCustomerInput,
   type CreateAddressInput,
   type UpdateAddressInput,
@@ -172,6 +179,7 @@ export type B2CRuntimeContextValue = {
   categories: MedusaCategory[];
   productsLoading: boolean;
   productsError: string | null;
+  productsCount: number;
 
   // Current selections
   currentProduct: MedusaProduct | null;
@@ -186,6 +194,7 @@ export type B2CRuntimeContextValue = {
   // Customer state
   customer: MedusaCustomer | null;
   customerLoading: boolean;
+  customerError: string | null;
   isAuthenticated: boolean;
 
   // Actions: Country/Locale
@@ -193,10 +202,11 @@ export type B2CRuntimeContextValue = {
   setLocalePreference: (locale: string | null) => void;
 
   // Actions: Catalog
-  refreshProducts: (options?: ProductListOptions) => Promise<void>;
+  refreshProducts: (options?: ProductListOptions) => Promise<ProductListResult | null>;
   refreshCollections: () => Promise<void>;
   refreshCategories: () => Promise<void>;
   loadProductByHandle: (handle: string) => Promise<MedusaProduct | null>;
+  loadCollectionByHandle: (handle: string) => Promise<MedusaCollection | null>;
   loadCategoryByHandle: (handle: string) => Promise<MedusaCategory | null>;
 
   // Actions: Cart
@@ -205,6 +215,8 @@ export type B2CRuntimeContextValue = {
   addToCart: (variantId: string, quantity: number) => Promise<void>;
   updateCartItem: (lineId: string, quantity: number) => Promise<void>;
   removeCartItem: (lineId: string) => Promise<void>;
+  applyPromotionCode: (code: string) => Promise<void>;
+  removePromotionCode: (code: string) => Promise<void>;
   updateCartEmail: (email: string) => Promise<void>;
   updateCartShippingAddress: (address: Record<string, unknown>) => Promise<void>;
   updateCartBillingAddress: (address: Record<string, unknown>) => Promise<void>;
@@ -228,6 +240,7 @@ export type B2CRuntimeContextValue = {
   logout: () => Promise<void>;
   refreshCustomer: () => Promise<void>;
   updateCustomer: (input: UpdateCustomerInput) => Promise<void>;
+  requestPasswordReset: (email?: string) => Promise<void>;
 
   // Actions: Addresses
   addCustomerAddress: (input: CreateAddressInput) => Promise<void>;
@@ -274,6 +287,10 @@ export function useB2CRuntime(): B2CRuntimeContextValue {
   return context;
 }
 
+export function useMaybeB2CRuntime(): B2CRuntimeContextValue | null {
+  return useContext(B2CRuntimeContext);
+}
+
 // =============================================================================
 // Provider
 // =============================================================================
@@ -282,6 +299,7 @@ export type B2CRuntimeProviderProps = {
   children: ReactNode;
   siteFamily: string;
   siteName?: string | null;
+  siteId?: string | null;
   initialCountryCode?: string;
   initialLocale?: string | null;
 };
@@ -290,11 +308,13 @@ export function B2CRuntimeProvider({
   children,
   siteFamily,
   siteName = null,
+  siteId = null,
   initialCountryCode,
   initialLocale,
 }: B2CRuntimeProviderProps): ReactNode {
   const funnelRuntime = useFunnelRuntime();
   const navigate = useNavigate();
+  const { get: apiGet, post: apiPost } = useApiClient();
 
   // Configuration state
   const runtimeConfig = getMedusaRuntimeConfig();
@@ -316,6 +336,7 @@ export function B2CRuntimeProvider({
   const [categories, setCategories] = useState<MedusaCategory[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const [productsCount, setProductsCount] = useState(0);
 
   // Current selections
   const [currentProduct, setCurrentProduct] = useState<MedusaProduct | null>(null);
@@ -330,6 +351,7 @@ export function B2CRuntimeProvider({
   // Customer state
   const [customer, setCustomer] = useState<MedusaCustomer | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerError, setCustomerError] = useState<string | null>(null);
   const isAuthenticated = useMemo(() => !!customer, [customer]);
 
   // =============================================================================
@@ -396,12 +418,18 @@ export function B2CRuntimeProvider({
 
     const loadCustomer = async () => {
       setCustomerLoading(true);
+      setCustomerError(null);
       try {
         const customerData = await getCurrentCustomer();
         setCustomer(customerData);
-      } catch {
-        // Clear invalid token
-        setAuthToken(null);
+      } catch (err) {
+        if (err instanceof MedusaApiError && err.statusCode === 401) {
+          setAuthToken(null);
+          setCustomer(null);
+          setCustomerError(null);
+        } else {
+          setCustomerError(err instanceof Error ? err.message : "Failed to load customer account.");
+        }
       } finally {
         setCustomerLoading(false);
       }
@@ -429,14 +457,19 @@ export function B2CRuntimeProvider({
   // Actions: Catalog
   // =============================================================================
 
-  const refreshProducts = useCallback(async (options: ProductListOptions = {}) => {
+  const refreshProducts = useCallback(async (options: ProductListOptions = {}): Promise<ProductListResult | null> => {
     setProductsLoading(true);
     setProductsError(null);
     try {
       const result = await listProducts(options);
       setProducts(result.products);
+      setProductsCount(result.count);
+      return result;
     } catch (err) {
       setProductsError(err instanceof Error ? err.message : "Failed to load products");
+      setProducts([]);
+      setProductsCount(0);
+      return null;
     } finally {
       setProductsLoading(false);
     }
@@ -467,6 +500,17 @@ export function B2CRuntimeProvider({
       return product;
     } catch (err) {
       console.error("Failed to load product:", err);
+      return null;
+    }
+  }, []);
+
+  const loadCollectionByHandle = useCallback(async (handle: string) => {
+    try {
+      const collection = await getCollectionByHandle(handle);
+      setCurrentCollection(collection);
+      return collection;
+    } catch (err) {
+      console.error("Failed to load collection:", err);
       return null;
     }
   }, []);
@@ -580,6 +624,42 @@ export function B2CRuntimeProvider({
     }
   }, []);
 
+  const applyPromotionCode = useCallback(async (code: string) => {
+    const cartId = getCartId();
+    if (!cartId) {
+      throw new Error("No cart available");
+    }
+    setCartLoading(true);
+    setCartError(null);
+    try {
+      const updatedCart = await applyMedusaPromotionCode(cartId, code);
+      setCart(updatedCart);
+    } catch (err) {
+      setCartError(err instanceof Error ? err.message : "Failed to apply discount code");
+      throw err;
+    } finally {
+      setCartLoading(false);
+    }
+  }, []);
+
+  const removePromotionCode = useCallback(async (code: string) => {
+    const cartId = getCartId();
+    if (!cartId) {
+      throw new Error("No cart available");
+    }
+    setCartLoading(true);
+    setCartError(null);
+    try {
+      const updatedCart = await removeMedusaPromotionCode(cartId, code);
+      setCart(updatedCart);
+    } catch (err) {
+      setCartError(err instanceof Error ? err.message : "Failed to remove discount code");
+      throw err;
+    } finally {
+      setCartLoading(false);
+    }
+  }, []);
+
   const updateCartEmail = useCallback(async (email: string) => {
     const cartId = getCartId();
     if (!cartId) return;
@@ -679,6 +759,12 @@ export function B2CRuntimeProvider({
         }
         case "init_payment_session": {
           if (data.step !== "init_payment_session") throw new Error("Invalid step data");
+          if (siteId) {
+            const response = await apiPost<{ payment_collection: MedusaPaymentCollection }>(
+              `/sites/${encodeURIComponent(siteId)}/medusa/checkout/session?cart_id=${encodeURIComponent(cartId)}&provider_id=${encodeURIComponent(data.providerId)}`
+            );
+            return response.payment_collection;
+          }
           // Payment session doesn't update cart - caller handles the payment collection
           return await initializePaymentSession(cartId, data.providerId);
         }
@@ -692,7 +778,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, [addShippingMethod, updateCart]);
+  }, [addShippingMethod, apiPost, siteId, updateCart]);
 
   // =============================================================================
   // Actions: Shipping
@@ -729,19 +815,41 @@ export function B2CRuntimeProvider({
     // Get region from cart
     const cartData = await getCart(cartId);
     if (!cartData?.region_id) throw new Error("Cart has no region");
+    if (siteId) {
+      const response = await apiGet<{
+        payment_providers: MedusaPaymentProvider[];
+        default_payment_provider_id: string | null;
+      }>(
+        `/sites/${encodeURIComponent(siteId)}/medusa/payment-providers?region_id=${encodeURIComponent(cartData.region_id)}`
+      );
+      const defaultProviderId =
+        typeof response.default_payment_provider_id === "string"
+          ? response.default_payment_provider_id
+          : null;
+      return (response.payment_providers || []).map((provider) => ({
+        ...provider,
+        is_default: provider.id === defaultProviderId,
+      }));
+    }
     return listPaymentProviders(cartData.region_id);
-  }, []);
+  }, [apiGet, siteId]);
 
   const initPaymentSession = useCallback(async (providerId: string) => {
     const cartId = getCartId();
     if (!cartId) throw new Error("No cart available");
     setCartLoading(true);
     try {
+      if (siteId) {
+        const response = await apiPost<{ payment_collection: MedusaPaymentCollection }>(
+          `/sites/${encodeURIComponent(siteId)}/medusa/checkout/session?cart_id=${encodeURIComponent(cartId)}&provider_id=${encodeURIComponent(providerId)}`
+        );
+        return response.payment_collection;
+      }
       return await initializePaymentSession(cartId, providerId);
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [apiPost, siteId]);
 
   const completeCheckoutAction = useCallback(async () => {
     const cartId = getCartId();
@@ -766,10 +874,12 @@ export function B2CRuntimeProvider({
 
   const login = useCallback(async (email: string, password: string) => {
     setCustomerLoading(true);
+    setCustomerError(null);
     try {
       const result = await loginCustomer(email, password);
       setAuthToken(result.token);
       setCustomer(result.customer);
+      setCustomerError(null);
     } finally {
       setCustomerLoading(false);
     }
@@ -783,6 +893,7 @@ export function B2CRuntimeProvider({
     phone?: string
   ) => {
     setCustomerLoading(true);
+    setCustomerError(null);
     try {
       await registerCustomer(email, password, firstName, lastName, phone);
     } finally {
@@ -794,15 +905,27 @@ export function B2CRuntimeProvider({
     await logoutCustomer();
     setAuthToken(null);
     setCustomer(null);
+    setCustomerError(null);
     setCart(null);
   }, []);
 
   const refreshCustomer = useCallback(async () => {
     if (!getAuthToken()) return;
     setCustomerLoading(true);
+    setCustomerError(null);
     try {
       const customerData = await getCurrentCustomer();
       setCustomer(customerData);
+      setCustomerError(null);
+    } catch (err) {
+      if (err instanceof MedusaApiError && err.statusCode === 401) {
+        setAuthToken(null);
+        setCustomer(null);
+        setCustomerError(null);
+      } else {
+        setCustomerError(err instanceof Error ? err.message : "Failed to refresh customer account.");
+        throw err;
+      }
     } finally {
       setCustomerLoading(false);
     }
@@ -817,6 +940,14 @@ export function B2CRuntimeProvider({
       setCustomerLoading(false);
     }
   }, []);
+
+  const requestPasswordResetAction = useCallback(async (email?: string) => {
+    const targetEmail = (email || customer?.email || "").trim();
+    if (!targetEmail) {
+      throw new MedusaApiError("A customer email is required to send a password reset link.");
+    }
+    await requestCustomerPasswordReset(targetEmail);
+  }, [customer?.email]);
 
   // =============================================================================
   // Actions: Addresses
@@ -1037,6 +1168,7 @@ export function B2CRuntimeProvider({
     categories,
     productsLoading,
     productsError,
+    productsCount,
     currentProduct,
     currentCategory,
     currentCollection,
@@ -1045,6 +1177,7 @@ export function B2CRuntimeProvider({
     cartError,
     customer,
     customerLoading,
+    customerError,
     isAuthenticated,
     setCountry,
     setLocalePreference,
@@ -1052,12 +1185,15 @@ export function B2CRuntimeProvider({
     refreshCollections,
     refreshCategories,
     loadProductByHandle,
+    loadCollectionByHandle,
     loadCategoryByHandle,
     createCart,
     refreshCart,
     addToCart,
     updateCartItem,
     removeCartItem,
+    applyPromotionCode,
+    removePromotionCode,
     updateCartEmail,
     updateCartShippingAddress,
     updateCartBillingAddress,
@@ -1072,6 +1208,7 @@ export function B2CRuntimeProvider({
     logout,
     refreshCustomer,
     updateCustomer: updateCustomerAction,
+    requestPasswordReset: requestPasswordResetAction,
     addCustomerAddress: addCustomerAddressAction,
     updateCustomerAddress: updateCustomerAddressAction,
     deleteCustomerAddress: deleteCustomerAddressAction,

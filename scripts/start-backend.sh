@@ -38,6 +38,18 @@ if ! [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || (( BACKEND_PORT < 1 || BACKEND_PORT > 
   fail "Invalid BACKEND_PORT '$BACKEND_PORT' (expected 1-65535)."
 fi
 
+if [ ! -d ".venv" ]; then
+  echo "[backend] Creating Python 3.11 virtualenv..."
+  python3.11 -m venv .venv
+  .venv/bin/pip install --upgrade pip
+fi
+
+echo "[backend] Installing/updating dependencies from pyproject.toml..."
+.venv/bin/pip install -e .
+
+echo "[backend] Applying database migrations..."
+SKIP_PIP_INSTALL=1 "$ROOT/scripts/migrate-backend-db.sh"
+
 existing_backend_pid="$(matching_backend_pid "$BACKEND_PORT")"
 if [ -n "$existing_backend_pid" ]; then
   echo "[backend] Uvicorn already running on http://localhost:${BACKEND_PORT} (pid ${existing_backend_pid})."
@@ -49,15 +61,6 @@ if [ -n "$existing_pid" ]; then
   existing_cmd="$(ps -p "$existing_pid" -o command= | sed 's/^ *//')"
   fail "Port ${BACKEND_PORT} is in use by pid ${existing_pid}: ${existing_cmd}"
 fi
-
-if [ ! -d ".venv" ]; then
-  echo "[backend] Creating Python 3.11 virtualenv..."
-  python3.11 -m venv .venv
-  .venv/bin/pip install --upgrade pip
-fi
-
-echo "[backend] Installing/updating dependencies from pyproject.toml..."
-.venv/bin/pip install -e .
 
 echo "[backend] Starting uvicorn on http://0.0.0.0:${BACKEND_PORT}"
 exec .venv/bin/python "$ROOT/scripts/run_with_backend_env.py" \

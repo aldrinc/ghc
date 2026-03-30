@@ -58,6 +58,7 @@ from app.db.enums import (
     ResearchJobStatusEnum,
     SiteFamilyEnum,
     SitePageTypeEnum,
+    SiteThemeBindingModeEnum,
     SiteTypeEnum,
     UserRoleEnum,
     WorkflowKindEnum,
@@ -2312,6 +2313,41 @@ class ClientMedusaConfig(Base):
         DateTime(timezone=True), nullable=True
     )
     last_connection_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    stripe_account_profile_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("stripe_account_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    default_payment_provider_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    allowed_payment_provider_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    webhook_routing_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=sa.text("'shared_ingress'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class StripeAccountProfile(Base):
+    __tablename__ = "stripe_account_profiles"
+    __table_args__ = (
+        UniqueConstraint("org_id", "label", name="uq_stripe_account_profiles_org_label"),
+        sa.Index("idx_stripe_account_profiles_org_id", "org_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    stripe_account_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    secret_key_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    webhook_secret_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mode: Mapped[str] = mapped_column(Text, nullable=False, server_default=sa.text("'shared'"))
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=sa.text("'active'"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -3288,6 +3324,11 @@ class Site(Base):
     design_system_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("design_systems.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    theme_binding_mode: Mapped[SiteThemeBindingModeEnum] = mapped_column(
+        Enum(SiteThemeBindingModeEnum, name="site_theme_binding_mode"),
+        nullable=False,
+        server_default=SiteThemeBindingModeEnum.standalone.value,
     )
     site_template_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("site_templates.id", ondelete="SET NULL"),
@@ -4346,5 +4387,181 @@ class AdTeardownAssertionEvidence(Base):
         ForeignKey("ad_teardown_evidence_items.id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# =============================================================================
+# Postiz Integration Models
+# =============================================================================
+
+
+class ClientPostizCredentials(Base):
+    """Workspace-scoped Postiz API credentials."""
+
+    __tablename__ = "client_postiz_credentials"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_postiz_credentials_org_client"),
+        sa.Index("idx_postiz_credentials_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    base_url: Mapped[str] = mapped_column(Text, nullable=False)
+    auth_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="api_key")
+    credentials_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    last_validated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_validation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ClientPostizChannel(Base):
+    """Synced Postiz channel (social media connection) for a workspace."""
+
+    __tablename__ = "client_postiz_channels"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "postiz_integration_id",
+            "postiz_channel_id",
+            name="uq_postiz_channels_org_client_integration_channel",
+        ),
+        sa.Index("idx_postiz_channels_org_client", "org_id", "client_id"),
+        sa.Index("idx_postiz_channels_postiz_integration", "postiz_integration_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    postiz_integration_id: Mapped[str] = mapped_column(Text, nullable=False)
+    postiz_channel_id: Mapped[str] = mapped_column(Text, nullable=False)
+    identifier: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    profile: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    picture_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    disabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ClientPostizPostingProfile(Base):
+    """Reusable posting defaults for a workspace (timezone, UTM, channel set, etc.)."""
+
+    __tablename__ = "client_postiz_posting_profiles"
+    __table_args__ = (sa.Index("idx_postiz_posting_profiles_org_client", "org_id", "client_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    default_channel_ids: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    timezone: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    short_link: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
+    provider_settings_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    postiz_posting_profile_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PostizPublication(Base):
+    """Local publication history for Postiz posts created from MOS."""
+
+    __tablename__ = "postiz_publications"
+    __table_args__ = (
+        sa.Index("idx_postiz_publications_org_client", "org_id", "client_id"),
+        sa.Index("idx_postiz_publications_postiz_post_id", "postiz_post_id"),
+        sa.Index("idx_postiz_publications_status", "status"),
+        sa.Index("idx_postiz_publications_scheduled_for", "scheduled_for"),
+        sa.Index("idx_postiz_publications_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    postiz_posting_profile_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("client_postiz_posting_profiles.id", ondelete="SET NULL"), nullable=True
+    )
+    postiz_post_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    postiz_post_ids_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    post_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="now")
+    scheduled_for: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    target_channels_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    media_urls_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    link_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_settings_by_identifier_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    request_payload_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    response_payload_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    error_payload_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    release_urls_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")
+    )
+    postiz_post_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

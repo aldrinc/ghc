@@ -13,6 +13,32 @@ type BuildImportedRuntimeSrcDocParams = {
   compiledSource: string;
   reactUmdSource: string;
   reactDomUmdSource: string;
+  viewportHeightPx?: number | null;
+  componentName?: string;
+  sectionTargetId?: string;
+  initialTextOverrides?: unknown;
+  initialButtonOverrides?: unknown;
+  initialImageOverrides?: unknown;
+};
+
+type ImportedTextOverride = {
+  originalText: string;
+  text: string;
+};
+
+type ImportedButtonOverride = {
+  originalText: string;
+  text: string;
+  href: string;
+  action?: string;
+  selectionStrategy?: string;
+  replaceCart?: boolean;
+};
+
+type ImportedImageOverride = {
+  originalSrc: string;
+  src: string;
+  alt: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,6 +53,76 @@ function normalizeStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function normalizeTextOverrides(value: unknown): ImportedTextOverride[] {
+  if (!Array.isArray(value)) return [];
+  const results: ImportedTextOverride[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const originalText = typeof entry.originalText === "string" ? entry.originalText.trim() : "";
+    if (!originalText) continue;
+    const text = Object.prototype.hasOwnProperty.call(entry, "text") && typeof entry.text === "string"
+      ? entry.text
+      : originalText;
+    results.push({ originalText, text });
+  }
+  return results;
+}
+
+function normalizeButtonOverrides(value: unknown): ImportedButtonOverride[] {
+  if (!Array.isArray(value)) return [];
+  const results: ImportedButtonOverride[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const originalText = typeof entry.originalText === "string" ? entry.originalText.trim() : "";
+    if (!originalText) continue;
+    const text = Object.prototype.hasOwnProperty.call(entry, "text") && typeof entry.text === "string"
+      ? entry.text
+      : originalText;
+    const href = Object.prototype.hasOwnProperty.call(entry, "href") && typeof entry.href === "string"
+      ? entry.href
+      : "";
+    const action =
+      Object.prototype.hasOwnProperty.call(entry, "action") && typeof entry.action === "string"
+        ? entry.action.trim()
+        : "";
+    const selectionStrategy =
+      Object.prototype.hasOwnProperty.call(entry, "selectionStrategy") && typeof entry.selectionStrategy === "string"
+        ? entry.selectionStrategy.trim()
+        : "";
+    const replaceCart =
+      Object.prototype.hasOwnProperty.call(entry, "replaceCart") && typeof entry.replaceCart === "boolean"
+        ? entry.replaceCart
+        : false;
+    results.push({
+      originalText,
+      text,
+      href,
+      action: action || undefined,
+      selectionStrategy: selectionStrategy || undefined,
+      replaceCart,
+    });
+  }
+  return results;
+}
+
+function normalizeImageOverrides(value: unknown): ImportedImageOverride[] {
+  if (!Array.isArray(value)) return [];
+  const results: ImportedImageOverride[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const originalSrc = typeof entry.originalSrc === "string" ? entry.originalSrc.trim() : "";
+    if (!originalSrc) continue;
+    const src = Object.prototype.hasOwnProperty.call(entry, "src") && typeof entry.src === "string"
+      ? entry.src
+      : originalSrc;
+    const alt = Object.prototype.hasOwnProperty.call(entry, "alt") && typeof entry.alt === "string"
+      ? entry.alt
+      : "";
+    results.push({ originalSrc, src, alt });
+  }
+  return results;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -38,6 +134,21 @@ function escapeHtml(value: string): string {
 
 function escapeInlineTagContent(value: string): string {
   return value.replace(/<\/(script|style)/gi, "<\\/$1");
+}
+
+function normalizeViewportHeightPx(value: number | null | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  return rounded >= 1 ? rounded : null;
+}
+
+function stabilizeViewportCss(value: string, viewportHeightPx: number | null): string {
+  if (!viewportHeightPx) return value;
+  return value
+    .replaceAll("100dvh", "var(--mos-imported-vh)")
+    .replaceAll("100svh", "var(--mos-imported-vh)")
+    .replaceAll("100lvh", "var(--mos-imported-vh)")
+    .replaceAll("100vh", "var(--mos-imported-vh)");
 }
 
 export function isImportedRuntimeSectionType(type: unknown): type is string {
@@ -88,11 +199,23 @@ export function buildImportedRuntimeSrcDoc({
   compiledSource,
   reactUmdSource,
   reactDomUmdSource,
+  viewportHeightPx,
+  componentName,
+  sectionTargetId,
+  initialTextOverrides,
+  initialButtonOverrides,
+  initialImageOverrides,
 }: BuildImportedRuntimeSrcDocParams): string {
   const normalizedHeadAssets = normalizeImportedHeadAssets(headAssets);
   const title = escapeHtml(sectionLabel?.trim() || "Imported section");
   const bodyClassName = escapeHtml(normalizedHeadAssets.bodyClassName);
   const compiledRuntime = escapeInlineTagContent(compiledSource);
+  const resolvedViewportHeightPx = normalizeViewportHeightPx(viewportHeightPx);
+  const resolvedComponentName = typeof componentName === "string" && componentName.trim() ? componentName.trim() : "App";
+  const resolvedSectionTargetId = typeof sectionTargetId === "string" ? sectionTargetId.trim() : "";
+  const initialTextOverridesJson = JSON.stringify(normalizeTextOverrides(initialTextOverrides));
+  const initialButtonOverridesJson = JSON.stringify(normalizeButtonOverrides(initialButtonOverrides));
+  const initialImageOverridesJson = JSON.stringify(normalizeImageOverrides(initialImageOverrides));
 
   const bridgeScript = escapeInlineTagContent(`
 (() => {
@@ -100,6 +223,7 @@ export function buildImportedRuntimeSrcDoc({
   const post = (type, payload = {}) => {
     parent.postMessage({ source: "mos-imported-runtime", frameId, type, ...payload }, "*");
   };
+  window.__postImportedRuntimeEvent = post;
 
   const reportHeight = () => {
     const body = document.body;
@@ -133,6 +257,16 @@ export function buildImportedRuntimeSrcDoc({
     reportError(event.reason || "Imported section runtime rejected.");
   });
 
+  window.addEventListener("message", (event) => {
+    const payload = event.data;
+    if (!payload || typeof payload !== "object") return;
+    if ((payload.source !== "mos-imported-runtime-host")) return;
+    if (payload.frameId !== frameId) return;
+    if (payload.type === "request-height") {
+      reportHeight();
+    }
+  });
+
   window.addEventListener("load", () => {
     reportHeight();
 
@@ -158,8 +292,11 @@ export function buildImportedRuntimeSrcDoc({
   const stylesheetLinks = normalizedHeadAssets.stylesheetHrefs
     .map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}" />`)
     .join("\n");
+  const viewportStyle = resolvedViewportHeightPx
+    ? `<style>:root{--mos-imported-vh:${resolvedViewportHeightPx}px;}</style>`
+    : "";
   const inlineStyles = normalizedHeadAssets.inlineStyles
-    .map((css) => `<style>${escapeInlineTagContent(css)}</style>`)
+    .map((css) => `<style>${escapeInlineTagContent(stabilizeViewportCss(css, resolvedViewportHeightPx))}</style>`)
     .join("\n");
   const externalScripts = normalizedHeadAssets.scriptSrcs
     .map((src) => `<script src="${escapeHtml(src)}"></script>`)
@@ -172,8 +309,143 @@ export function buildImportedRuntimeSrcDoc({
 try {
 ${compiledRuntime}
 
-  if (typeof ImportedSection !== "function") {
-    throw new Error("Imported section runtime did not define ImportedSection.");
+  const runtimeFrameId = ${JSON.stringify(frameId)};
+  const componentName = ${JSON.stringify(resolvedComponentName)};
+  const sectionTargetId = ${JSON.stringify(resolvedSectionTargetId)};
+  let textOverrides = ${initialTextOverridesJson};
+  let buttonOverrides = ${initialButtonOverridesJson};
+  let imageOverrides = ${initialImageOverridesJson};
+  const NEWLINE = String.fromCharCode(10);
+  const CARRIAGE_RETURN = String.fromCharCode(13);
+  const normalizeText = (value) => {
+    const input = String(value || "");
+    let output = "";
+    let lastWhitespace = false;
+    for (const char of input) {
+      const isWhitespace = char.trim().length === 0;
+      if (isWhitespace) {
+        if (!lastWhitespace) {
+          output += " ";
+        }
+      } else {
+        output += char;
+      }
+      lastWhitespace = isWhitespace;
+    }
+    return output.trim();
+  };
+  const splitOverrideSegments = (value) =>
+    String(value ?? "")
+      .replaceAll(CARRIAGE_RETURN, "")
+      .split(NEWLINE)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  const readRawText = (node) => String(node && node.textContent ? node.textContent : "");
+  const readNodeText = (node) => {
+    if (node == null) return "";
+    if (node.nodeType === Node.TEXT_NODE) {
+      return String(node.textContent || "");
+    }
+    if (!(node instanceof Element)) {
+      return String(node.textContent || "");
+    }
+    const tagName = node.tagName.toLowerCase();
+    if (tagName === "script" || tagName === "style") return "";
+    if (tagName === "br") return " ";
+    const parts = [];
+    node.childNodes.forEach((childNode) => {
+      const text = readNodeText(childNode);
+      if (text) parts.push(text);
+    });
+    return parts.join(" ");
+  };
+  const readNormalizedNodeText = (node) => normalizeText(readNodeText(node));
+  const readRawButtonText = (element) => normalizeText(readRawText(element));
+  const matchesButtonText = (element, originalText) => {
+    const currentText = readRawButtonText(element);
+    const targetText = normalizeText(originalText);
+    if (!targetText) return false;
+    return currentText === targetText || currentText.startsWith(targetText);
+  };
+  const buildOverrideButtonText = (element, override) => {
+    const originalText = String(override.originalText || "");
+    const nextText = typeof override.text === "string" ? override.text : originalText;
+    const currentText = String(element.textContent || "");
+    const trimmedCurrentText = currentText.trim();
+    const trimmedOriginalText = originalText.trim();
+    if (
+      trimmedOriginalText &&
+      trimmedCurrentText &&
+      trimmedCurrentText !== trimmedOriginalText &&
+      trimmedCurrentText.toUpperCase().startsWith(trimmedOriginalText.toUpperCase())
+    ) {
+      return nextText + trimmedCurrentText.slice(trimmedOriginalText.length);
+    }
+    return nextText;
+  };
+  const postCommerceAction = (payload) => {
+    const postEvent =
+      typeof window.__postImportedRuntimeEvent === "function"
+        ? window.__postImportedRuntimeEvent
+        : (type, detail) => parent.postMessage({ source: "mos-imported-runtime", frameId: runtimeFrameId, type, ...detail }, "*");
+    postEvent("commerce-action", payload);
+  };
+  const resolveButtonSelection = (scope, strategy) => {
+    if (!(scope instanceof Element)) return null;
+    if (strategy !== "omni_selected_tier") return null;
+
+    const tierCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
+        return false;
+      }
+      return candidate.querySelector("h3") instanceof HTMLElement;
+    });
+
+    if (!(tierCard instanceof HTMLElement)) return null;
+    const titleElement = tierCard.querySelector("h3");
+    const selectedOfferTitle = normalizeText(titleElement ? titleElement.textContent : "");
+    return selectedOfferTitle || null;
+  };
+  const wireCommerceAction = (scope, element, override) => {
+    if (!(element instanceof HTMLElement)) return;
+    const action = typeof override.action === "string" ? override.action.trim() : "";
+    if (!action) return;
+    if (element.dataset.mosImportedActionBound === "true") return;
+    element.dataset.mosImportedActionBound = "true";
+    element.dataset.mosImportedAction = action;
+    if (typeof override.selectionStrategy === "string" && override.selectionStrategy.trim()) {
+      element.dataset.mosImportedSelectionStrategy = override.selectionStrategy.trim();
+    }
+    element.dataset.mosImportedReplaceCart = override.replaceCart ? "true" : "false";
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const selectionStrategy = typeof override.selectionStrategy === "string" ? override.selectionStrategy.trim() : "";
+      const selectedOfferTitle = resolveButtonSelection(scope, selectionStrategy);
+      postCommerceAction({
+        action,
+        selectionStrategy: selectionStrategy || null,
+        replaceCart: Boolean(override.replaceCart),
+        selectedOfferTitle,
+        buttonText: readRawButtonText(element),
+      });
+    });
+  };
+  const componentRegistry =
+    globalThis.__mosImportedRuntimeComponents &&
+    typeof globalThis.__mosImportedRuntimeComponents === "object"
+      ? globalThis.__mosImportedRuntimeComponents
+      : {};
+  const rootComponent =
+    typeof componentRegistry[componentName] === "function"
+      ? componentRegistry[componentName]
+      : typeof ImportedSection === "function"
+        ? ImportedSection
+        : null;
+
+  if (typeof rootComponent !== "function") {
+    throw new Error("Imported section runtime did not expose the requested component.");
   }
 
   const container = document.getElementById("root");
@@ -181,12 +453,232 @@ ${compiledRuntime}
     throw new Error("Imported section root container is missing.");
   }
 
-  const root = ReactDOM.createRoot(container);
-  root.render(React.createElement(ImportedSection));
+  let mountNode = null;
+  let root = null;
 
-  if (typeof window.__notifyImportedRuntimeHeight === "function") {
-    requestAnimationFrame(() => window.__notifyImportedRuntimeHeight());
-  }
+  const createFreshRoot = () => {
+    if (root && typeof root.unmount === "function") {
+      try {
+        root.unmount();
+      } catch (_error) {
+        // Ignore teardown failures and rebuild the runtime tree from scratch.
+      }
+    }
+    container.replaceChildren();
+    mountNode = document.createElement("div");
+    mountNode.setAttribute("data-mos-imported-runtime-mount", "true");
+    container.appendChild(mountNode);
+    root = ReactDOM.createRoot(mountNode);
+    return root;
+  };
+
+  const isolateSection = () => {
+    if (!sectionTargetId) return container;
+    const target = Array.from(container.querySelectorAll("[data-section-id]")).find(
+      (candidate) => candidate.getAttribute("data-section-id") === sectionTargetId,
+    );
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Imported section target "' + sectionTargetId + '" was not found in the rendered runtime.');
+    }
+    const isolatedTarget = target.cloneNode(true);
+    if (!(isolatedTarget instanceof HTMLElement)) {
+      throw new Error('Imported section target "' + sectionTargetId + '" could not be isolated.');
+    }
+    container.replaceChildren(isolatedTarget);
+    return isolatedTarget;
+  };
+
+  const applyTextOverrides = (scope) => {
+    if (!scope || !textOverrides.length || typeof document.createTreeWalker !== "function") return;
+    const textNodes = [];
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        const tagName = parent.tagName.toLowerCase();
+        if (tagName === "script" || tagName === "style") return NodeFilter.FILTER_REJECT;
+        return normalizeText(node.textContent).length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      textNodes.push(currentNode);
+      currentNode = walker.nextNode();
+    }
+    const used = new Set();
+    for (const override of textOverrides) {
+      const originalText = normalizeText(override.originalText);
+      if (!originalText) continue;
+      const nextText = typeof override.text === "string" ? override.text : override.originalText;
+      let matched = false;
+      for (let index = 0; index < textNodes.length; index += 1) {
+        if (used.has(index)) continue;
+        const node = textNodes[index];
+        if (normalizeText(node.textContent) !== originalText) continue;
+        node.textContent = nextText;
+        used.add(index);
+        matched = true;
+        break;
+      }
+      if (matched || !(scope instanceof Element)) continue;
+
+      const elementDepth = (element) => {
+        let depth = 0;
+        let current = element.parentElement;
+        while (current) {
+          depth += 1;
+          current = current.parentElement;
+        }
+        return depth;
+      };
+
+      const allElements = [scope, ...Array.from(scope.querySelectorAll("*"))];
+      const matchingElements = allElements
+        .filter((element) => readNormalizedNodeText(element) === originalText)
+        .filter(
+          (element) =>
+            !Array.from(element.querySelectorAll("*")).some(
+              (child) => readNormalizedNodeText(child) === originalText,
+            ),
+        )
+        .sort((left, right) => {
+          const leftDepth = elementDepth(left);
+          const rightDepth = elementDepth(right);
+          return rightDepth - leftDepth;
+        });
+
+      const target = matchingElements[0];
+      if (!(target instanceof HTMLElement)) continue;
+
+      const slots = [];
+      target.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE && normalizeText(node.textContent)) {
+          slots.push(node);
+          return;
+        }
+        if (node instanceof HTMLElement && node.tagName.toLowerCase() !== "br" && readNormalizedNodeText(node)) {
+          slots.push(node);
+        }
+      });
+
+      const segments = splitOverrideSegments(nextText);
+
+      if (segments.length > 1 && slots.length === segments.length) {
+        slots.forEach((slot, slotIndex) => {
+          const segment = segments[slotIndex] || "";
+          slot.textContent = segment;
+        });
+      } else {
+        target.textContent = nextText;
+      }
+    }
+  };
+
+  const applyButtonOverrides = (scope) => {
+    if (!(scope instanceof Element) || !buttonOverrides.length) return;
+    const actions = Array.from(scope.querySelectorAll("a, button"));
+    const used = new Set();
+    for (const override of buttonOverrides) {
+      const originalText = normalizeText(override.originalText);
+      if (!originalText) continue;
+      for (let index = 0; index < actions.length; index += 1) {
+        if (used.has(index)) continue;
+        const element = actions[index];
+        if (!matchesButtonText(element, originalText)) continue;
+        const nextText = buildOverrideButtonText(element, override);
+        element.textContent = nextText;
+        if (element instanceof HTMLAnchorElement && typeof override.href === "string") {
+          if (override.href) {
+            element.setAttribute("href", override.href);
+          } else {
+            element.removeAttribute("href");
+          }
+        }
+        wireCommerceAction(scope, element, override);
+        used.add(index);
+        break;
+      }
+    }
+  };
+
+  const applyImageOverrides = (scope) => {
+    if (!(scope instanceof Element) || !imageOverrides.length) return;
+    const images = Array.from(scope.querySelectorAll("img"));
+    const used = new Set();
+    for (const override of imageOverrides) {
+      const originalSrc = typeof override.originalSrc === "string" ? override.originalSrc.trim() : "";
+      if (!originalSrc) continue;
+      for (let index = 0; index < images.length; index += 1) {
+        if (used.has(index)) continue;
+        const image = images[index];
+        const currentSrc = image.getAttribute("src") || "";
+        if (
+          currentSrc !== originalSrc &&
+          !currentSrc.endsWith(originalSrc) &&
+          !currentSrc.includes(originalSrc)
+        ) {
+          continue;
+        }
+        const nextSrc = typeof override.src === "string" ? override.src : originalSrc;
+        if (nextSrc) {
+          image.setAttribute("src", nextSrc);
+        } else {
+          image.removeAttribute("src");
+        }
+        if (typeof override.alt === "string") {
+          image.setAttribute("alt", override.alt);
+        }
+        used.add(index);
+        break;
+      }
+    }
+  };
+
+  const finalizeSection = () => {
+    const sectionRoot = isolateSection();
+    applyTextOverrides(sectionRoot);
+    applyButtonOverrides(sectionRoot);
+    applyImageOverrides(sectionRoot);
+  };
+
+  const renderAndFinalizeSection = () => {
+    const currentRoot = createFreshRoot();
+    const renderRoot = () => currentRoot.render(React.createElement(rootComponent));
+    if (typeof ReactDOM.flushSync === "function") {
+      ReactDOM.flushSync(renderRoot);
+    } else {
+      renderRoot();
+    }
+
+    const finalize = () => {
+      finalizeSection();
+      if (typeof window.__notifyImportedRuntimeHeight === "function") {
+        window.__notifyImportedRuntimeHeight();
+      }
+    };
+
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(finalize);
+    } else {
+      requestAnimationFrame(finalize);
+    }
+  };
+
+  window.addEventListener("message", (event) => {
+    const payload = event.data;
+    if (!payload || typeof payload !== "object") return;
+    if ((payload.source !== "mos-imported-runtime-host")) return;
+    if (payload.frameId !== runtimeFrameId) return;
+    if (payload.type !== "update-overrides") return;
+
+    textOverrides = Array.isArray(payload.textOverrides) ? payload.textOverrides : textOverrides;
+    buttonOverrides = Array.isArray(payload.buttonOverrides) ? payload.buttonOverrides : buttonOverrides;
+    imageOverrides = Array.isArray(payload.imageOverrides) ? payload.imageOverrides : imageOverrides;
+    renderAndFinalizeSection();
+  });
+
+  renderAndFinalizeSection();
 } catch (error) {
   if (typeof window.__reportImportedRuntimeError === "function") {
     window.__reportImportedRuntimeError(error);
@@ -204,6 +696,7 @@ ${compiledRuntime}
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     `<title>${title}</title>`,
     "<style>html,body{margin:0;padding:0;background:transparent;}body{min-height:1px;}#root{width:100%;}</style>",
+    viewportStyle,
     stylesheetLinks,
     inlineStyles,
     `<script>${bridgeScript}</script>`,

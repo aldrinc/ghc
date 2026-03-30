@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MedusaCategory, MedusaCollection, MedusaProduct } from "@/types/commerce";
+import type { SitePageType } from "@/types/funnels";
 import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { useCommerceRuntime } from "@/components/commerce/CommerceBlocks";
+import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 
 type StarterLinkType = "funnelPage" | "nextPage" | "external";
 
@@ -41,7 +44,7 @@ function resolvePagePathByType({
   pageType,
   funnelRuntime,
 }: {
-  pageType: "home" | "category" | "product_detail" | "cart" | "checkout";
+  pageType: SitePageType;
   funnelRuntime: ReturnType<typeof useFunnelRuntime>;
 }): string | null {
   if (!funnelRuntime?.pageTypeMap) {
@@ -130,7 +133,47 @@ function starterShellLinkClass(isMuted = false): string {
     : "text-sm text-zinc-700 transition-colors hover:text-zinc-900";
 }
 
+async function parseStarterPublicError(resp: Response): Promise<string> {
+  try {
+    const raw = (await resp.clone().json()) as { detail?: unknown; message?: unknown };
+    if (typeof raw.detail === "string" && raw.detail.trim()) {
+      return raw.detail;
+    }
+    if (typeof raw.message === "string" && raw.message.trim()) {
+      return raw.message;
+    }
+  } catch {
+    const text = await resp.text();
+    if (text.trim()) {
+      return text;
+    }
+  }
+  return resp.statusText || "Request failed";
+}
+
 const STARTER_CONTENT_CONTAINER_CLASS = "mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8";
+const publicApiBaseUrl = resolvePublicApiBaseUrl();
+
+type StarterPolicyPageKey =
+  | "privacy_policy"
+  | "terms_of_service"
+  | "returns_refunds_policy"
+  | "shipping_policy"
+  | "contact_support";
+
+type StarterPolicyPageResponse = {
+  pageKey: StarterPolicyPageKey;
+  title: string;
+  markdown: string;
+};
+
+const STARTER_POLICY_FOOTER_PAGES: Array<{ label: string; pageType: StarterPolicyPageKey }> = [
+  { label: "Privacy", pageType: "privacy_policy" },
+  { label: "Terms", pageType: "terms_of_service" },
+  { label: "Returns", pageType: "returns_refunds_policy" },
+  { label: "Shipping", pageType: "shipping_policy" },
+  { label: "Contact", pageType: "contact_support" },
+];
 
 export function StarterStoreHeader({
   storeName: storeNameProp = "Store",
@@ -511,6 +554,96 @@ export function StarterHomeHero({
   );
 }
 
+export function StarterPolicyPage({
+  pageKey,
+  pageTitle,
+}: {
+  pageKey: StarterPolicyPageKey;
+  pageTitle?: string;
+}) {
+  const funnelRuntime = useFunnelRuntime();
+  const homePath = resolvePagePathByType({ pageType: "home", funnelRuntime });
+  const productSlug = funnelRuntime?.productSlug || null;
+  const funnelSlug = funnelRuntime?.funnelSlug || null;
+  const [policyPage, setPolicyPage] = useState<StarterPolicyPageResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!productSlug || !funnelSlug || !homePath) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const websiteUrl = new URL(homePath, window.location.origin).toString();
+    const query = new URLSearchParams({ website_url: websiteUrl });
+    const url = `${publicApiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/policy-pages/${encodeURIComponent(pageKey)}?${query.toString()}`;
+
+    setLoading(true);
+    setError(null);
+    setPolicyPage(null);
+
+    fetch(url, { signal: controller.signal })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          throw new Error(await parseStarterPublicError(resp));
+        }
+        return (await resp.json()) as StarterPolicyPageResponse;
+      })
+      .then((payload) => {
+        setPolicyPage(payload);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Unable to load policy page");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [funnelSlug, homePath, pageKey, productSlug]);
+
+  if (!funnelRuntime) {
+    throw new Error("StarterPolicyPage requires funnel runtime context.");
+  }
+
+  if (!homePath) {
+    throw new Error("StarterPolicyPage requires a resolvable home page route.");
+  }
+
+  return (
+    <section className={`${STARTER_CONTENT_CONTAINER_CLASS} py-14 lg:py-20`}>
+      <div className="mx-auto max-w-5xl">
+        {loading ? (
+          <div className="rounded-[2rem] border border-neutral-200 bg-white px-6 py-6 text-sm text-neutral-600 shadow-sm sm:px-8">
+            Loading {pageTitle || "policy page"}...
+          </div>
+        ) : null}
+
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-[2rem] border border-rose-200 bg-rose-50 px-6 py-6 text-sm text-rose-900 shadow-sm sm:px-8"
+          >
+            Unable to load {pageTitle || "policy page"}. {error}
+          </div>
+        ) : null}
+
+        {policyPage ? (
+          <div className="rounded-[2rem] border border-neutral-200 bg-white px-6 py-8 shadow-sm sm:px-8 lg:px-10">
+            <MarkdownViewer content={policyPage.markdown} className="max-w-none px-0" />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function StarterCollectionRails({
   maxCollections = 3,
   productsPerCollection = 4,
@@ -618,11 +751,17 @@ export function StarterStoreFooter({
   const categories = starterRootCategories(runtime?.categories || []).slice(0, 6);
   const collections = (runtime?.collections || []).slice(0, 6);
   const footerPages = [
-    { label: "Home", path: resolvePagePathByType({ pageType: "home", funnelRuntime }) },
-    { label: "Catalog", path: resolvePagePathByType({ pageType: "category", funnelRuntime }) },
-    { label: "Cart", path: resolvePagePathByType({ pageType: "cart", funnelRuntime }) },
-    { label: "Checkout", path: resolvePagePathByType({ pageType: "checkout", funnelRuntime }) },
-  ].filter((entry): entry is { label: string; path: string } => Boolean(entry.path));
+    { label: "Home", pageType: "home" as const },
+    { label: "Catalog", pageType: "category" as const },
+    { label: "Cart", pageType: "cart" as const },
+    { label: "Checkout", pageType: "checkout" as const },
+    ...STARTER_POLICY_FOOTER_PAGES,
+  ]
+    .map((entry) => ({
+      label: entry.label,
+      path: resolvePagePathByType({ pageType: entry.pageType, funnelRuntime }),
+    }))
+    .filter((entry): entry is { label: string; path: string } => Boolean(entry.path));
 
   return (
     <footer className="border-t border-neutral-200 bg-[#faf7f2] font-sans text-zinc-900" data-testid="starter-store-footer">

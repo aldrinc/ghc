@@ -1,16 +1,25 @@
 /**
  * Medusa B2C Home Page
- * 
+ *
  * The storefront homepage featuring:
  * - Hero section with featured content
  * - Featured collections/products
  * - Value propositions
  * - Navigation to store sections
+ *
+ * Theme-aware: Uses design system tokens for colors, typography, and CTAs.
  */
 
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import {
+  resolveB2CActionRadius,
+  resolveB2CHeadingFont,
+  useB2CTheme,
+  useB2CCTATheme,
+} from "../useB2CTheme";
 import { B2CStarterShell } from "./B2CStarterShell";
+import { StoreProductCard, SkeletonProductGrid } from "./storefrontPrimitives";
 
 export type MedusaB2CHomePageProps = {
   /** Hero title override */
@@ -27,6 +36,7 @@ export function MedusaB2CHomePage({
   featuredProducts,
 }: MedusaB2CHomePageProps) {
   const {
+    siteName,
     products,
     collections,
     productsLoading,
@@ -35,6 +45,8 @@ export function MedusaB2CHomePage({
     navigateToCollection,
     navigateToProduct,
   } = useB2CRuntime();
+  const { tokens } = useB2CTheme();
+  const ctaTheme = useB2CCTATheme();
 
   // Load products on mount
   useEffect(() => {
@@ -46,42 +58,92 @@ export function MedusaB2CHomePage({
     ? products.filter((p) => featuredProducts.includes(p.handle))
     : products.slice(0, 4);
 
-  const displayTitle = heroTitle || "Welcome to our store";
-  const displayDescription = heroDescription || "Discover our curated collection of products";
+  const displayTitle = heroTitle || siteName?.trim() || "Storefront";
+  const displayDescription = heroDescription || "Browse current products and featured collections.";
 
-  const formatPrice = (amount: number, currencyCode: string = "usd") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode.toUpperCase(),
-    }).format(amount / 100);
+  // Theme-aware styles
+  const heroStyle: CSSProperties = {
+    backgroundColor: tokens.colorBackgroundAlt || tokens.colorBackground || "#f8fafc",
+    borderBottomColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
+  };
+
+  const heroTitleStyle: CSSProperties = {
+    color: tokens.colorText || "#111827",
+    fontFamily: resolveB2CHeadingFont(tokens),
+  };
+
+  const heroDescriptionStyle: CSSProperties = {
+    color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.64)",
+  };
+  const heroCtaStyle: CSSProperties = {
+    ...ctaTheme.style,
+    backgroundColor: ctaTheme.style?.backgroundColor || tokens.colorBackground || "#ffffff",
+    borderColor: ctaTheme.style?.borderColor || tokens.colorBorder || "#111827",
+    color: ctaTheme.style?.color || tokens.colorText || "#111827",
+    borderRadius: ctaTheme.style?.borderRadius || resolveB2CActionRadius(tokens),
+  };
+
+  const sectionStyle: CSSProperties = {
+    backgroundColor: tokens.colorBackground || "#ffffff",
+  };
+
+  const sectionAltStyle: CSSProperties = {
+    backgroundColor: tokens.colorBackgroundAlt || tokens.colorBackground || "#ffffff",
+  };
+
+  const headingStyle: CSSProperties = {
+    color: tokens.colorText || "#111827",
+    fontFamily: resolveB2CHeadingFont(tokens),
+  };
+
+  const textMutedStyle: CSSProperties = {
+    color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.64)",
   };
 
   return (
     <B2CStarterShell>
       <main>
         {/* Hero Section */}
-        <section className="relative bg-neutral-100 py-24 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-normal text-zinc-900 mb-6">
+        <section
+          className="flex min-h-[70vh] items-center border-b px-4 py-20 sm:px-6 lg:px-8"
+          style={heroStyle}
+        >
+          <div className="mx-auto max-w-3xl text-center">
+            <h1
+              className="text-3xl font-normal leading-10 sm:text-4xl"
+              style={heroTitleStyle}
+            >
               {displayTitle}
             </h1>
-            <p className="text-lg text-neutral-600 mb-8 max-w-2xl mx-auto">
+            <p
+              className="mx-auto mt-3 max-w-2xl text-2xl font-normal leading-9"
+              style={heroDescriptionStyle}
+            >
               {displayDescription}
             </p>
             <button
               onClick={() => navigateToStore()}
-              className="inline-flex items-center justify-center px-8 py-3 border border-zinc-900 rounded-full text-sm font-medium text-zinc-900 hover:bg-zinc-900 hover:text-white transition-colors"
+              className="mt-8 inline-flex h-10 items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors hover:bg-neutral-100"
+              style={heroCtaStyle}
             >
-              Shop Now
+              Shop all products
             </button>
           </div>
         </section>
 
         {/* Featured Collections */}
         {collections.length > 0 && (
-          <section className="py-16 px-4 sm:px-6 lg:px-8">
+          <section
+            className="py-16 px-4 sm:px-6 lg:px-8"
+            style={sectionStyle}
+          >
             <div className="max-w-7xl mx-auto">
-              <h2 className="text-2xl font-medium text-zinc-900 mb-8">Collections</h2>
+              <h2
+                className="mb-8 text-2xl font-medium"
+                style={headingStyle}
+              >
+                Collections
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {collections.slice(0, 3).map((collection) => (
                   <button
@@ -89,12 +151,24 @@ export function MedusaB2CHomePage({
                     onClick={() => navigateToCollection(collection.handle)}
                     className="group text-left"
                   >
-                    <div className="aspect-[4/3] bg-neutral-100 rounded-lg mb-4 overflow-hidden">
-                      <div className="w-full h-full flex items-center justify-center text-neutral-400 group-hover:bg-neutral-200 transition-colors">
+                    <div
+                      className="aspect-[4/3] rounded-lg mb-4 overflow-hidden transition-colors"
+                      style={{
+                        backgroundColor: tokens.colorBackgroundAlt || "#f5f5f5",
+                        borderRadius: tokens.radiusMedium || undefined,
+                      }}
+                    >
+                      <div
+                        className="w-full h-full flex items-center justify-center transition-opacity group-hover:opacity-70"
+                        style={{ color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.44)" }}
+                      >
                         {collection.title}
                       </div>
                     </div>
-                    <h3 className="font-medium text-zinc-900 group-hover:text-zinc-600 transition-colors">
+                    <h3
+                      className="font-medium transition-opacity group-hover:opacity-70"
+                      style={headingStyle}
+                    >
                       {collection.title}
                     </h3>
                   </button>
@@ -105,58 +179,37 @@ export function MedusaB2CHomePage({
         )}
 
         {/* Featured Products */}
-        <section className="py-16 px-4 sm:px-6 lg:px-8 bg-neutral-50">
+        <section
+          className="py-16 px-4 sm:px-6 lg:px-8"
+          style={sectionAltStyle}
+        >
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-medium text-zinc-900">Featured Products</h2>
+              <h2
+                className="text-2xl font-medium"
+                style={headingStyle}
+              >
+                Featured Products
+              </h2>
               <button
                 onClick={() => navigateToStore()}
-                className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors"
+                className="text-sm transition-opacity hover:opacity-70"
+                style={textMutedStyle}
               >
                 View all →
               </button>
             </div>
             
             {productsLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="aspect-[3/4] bg-neutral-200 rounded-lg mb-4" />
-                    <div className="h-4 bg-neutral-200 rounded w-3/4 mb-2" />
-                    <div className="h-4 bg-neutral-200 rounded w-1/2" />
-                  </div>
-                ))}
-              </div>
+              <SkeletonProductGrid count={4} columns={4} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {displayProducts.map((product) => (
-                  <button
+                  <StoreProductCard
                     key={product.id}
+                    product={product}
                     onClick={() => navigateToProduct(product.handle)}
-                    className="group text-left"
-                  >
-                    <div className="aspect-[3/4] bg-neutral-100 rounded-lg mb-4 overflow-hidden">
-                      {product.thumbnail ? (
-                        <img
-                          src={product.thumbnail}
-                          alt={product.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                          {product.title}
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="font-medium text-zinc-900 group-hover:text-zinc-600 transition-colors line-clamp-1">
-                      {product.title}
-                    </h3>
-                    {product.variants?.[0]?.prices?.[0] && (
-                      <p className="text-sm text-neutral-600 mt-1">
-                        {formatPrice(product.variants[0].prices[0].amount, product.variants[0].prices[0].currency_code)}
-                      </p>
-                    )}
-                  </button>
+                  />
                 ))}
               </div>
             )}

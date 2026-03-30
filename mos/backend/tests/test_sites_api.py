@@ -1,12 +1,15 @@
 """Tests for the Sites API endpoints."""
 
+from dataclasses import replace
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db.enums import AssetSourceEnum
 from app.db.models import (
+    Asset,
     Artifact,
     Client,
     Funnel,
@@ -20,6 +23,94 @@ from app.db.models import (
     SitePublication,
     SitePublicationPage,
 )
+from app.services import site_blueprints
+
+
+B2B_EXPECTED_PAGES = [
+    {
+        "pageType": "home",
+        "templateId": "medusa-b2b-home",
+        "name": "Home",
+        "slug": "home",
+        "ordering": 0,
+        "isEntry": True,
+    },
+    {
+        "pageType": "category",
+        "templateId": "medusa-b2b-category",
+        "name": "Category",
+        "slug": "category",
+        "ordering": 1,
+        "isEntry": False,
+    },
+    {
+        "pageType": "product_detail",
+        "templateId": "medusa-b2b-pdp",
+        "name": "Product Detail",
+        "slug": "product",
+        "ordering": 2,
+        "isEntry": False,
+    },
+    {
+        "pageType": "cart",
+        "templateId": "medusa-b2b-cart",
+        "name": "Cart",
+        "slug": "cart",
+        "ordering": 3,
+        "isEntry": False,
+    },
+    {
+        "pageType": "checkout",
+        "templateId": "medusa-b2b-checkout",
+        "name": "Checkout",
+        "slug": "checkout",
+        "ordering": 4,
+        "isEntry": False,
+    },
+    {
+        "pageType": "privacy_policy",
+        "templateId": "medusa-b2b-policy-privacy",
+        "name": "Privacy Policy",
+        "slug": "privacy",
+        "ordering": 5,
+        "isEntry": False,
+    },
+    {
+        "pageType": "terms_of_service",
+        "templateId": "medusa-b2b-policy-terms",
+        "name": "Terms of Service",
+        "slug": "terms",
+        "ordering": 6,
+        "isEntry": False,
+    },
+    {
+        "pageType": "returns_refunds_policy",
+        "templateId": "medusa-b2b-policy-returns",
+        "name": "Returns and Refunds",
+        "slug": "returns",
+        "ordering": 7,
+        "isEntry": False,
+    },
+    {
+        "pageType": "shipping_policy",
+        "templateId": "medusa-b2b-policy-shipping",
+        "name": "Shipping Policy",
+        "slug": "shipping",
+        "ordering": 8,
+        "isEntry": False,
+    },
+    {
+        "pageType": "contact_support",
+        "templateId": "medusa-b2b-policy-contact",
+        "name": "Contact",
+        "slug": "contact",
+        "ordering": 9,
+        "isEntry": False,
+    },
+]
+
+B2B_EXPECTED_PAGE_TYPES = {page["pageType"] for page in B2B_EXPECTED_PAGES}
+B2B_EXPECTED_PAGE_COUNT = len(B2B_EXPECTED_PAGES)
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +167,8 @@ def test_list_site_families_returns_medusa_b2b_starter(api_client: TestClient):
     assert medusa_family["name"] == "Medusa B2B Starter"
     assert medusa_family["siteType"] == "ecommerce"
     assert medusa_family["commerceProvider"] == "medusa"
-    assert medusa_family["pageCount"] == 5  # home, category, pdp, cart, checkout
+    assert medusa_family["themeRequirement"] == "optional"
+    assert medusa_family["pageCount"] == B2B_EXPECTED_PAGE_COUNT
 
 
 def test_get_site_family_detail_returns_page_blueprints(api_client: TestClient):
@@ -88,18 +180,12 @@ def test_get_site_family_detail_returns_page_blueprints(api_client: TestClient):
 
     assert family["family"] == "medusa-b2b-starter"
     assert family["name"] == "Medusa B2B Starter"
-    assert len(family["pageBlueprints"]) == 5
+    assert family["themeRequirement"] == "optional"
+    assert len(family["pageBlueprints"]) == B2B_EXPECTED_PAGE_COUNT
 
-    # Verify page types - commerce-core pages only
+    # Verify page types include commerce flow and compliance/support pages
     page_types = {bp["pageType"] for bp in family["pageBlueprints"]}
-    expected_page_types = {
-        "home",
-        "category",
-        "product_detail",
-        "cart",
-        "checkout",
-    }
-    assert page_types == expected_page_types
+    assert page_types == B2B_EXPECTED_PAGE_TYPES
 
     # Verify entry page
     entry_pages = [bp for bp in family["pageBlueprints"] if bp["isEntry"]]
@@ -132,7 +218,8 @@ def test_list_site_families_includes_medusa_b2c_starter(api_client: TestClient):
     assert b2c_family["name"] == "Medusa B2C Starter"
     assert b2c_family["siteType"] == "ecommerce"
     assert b2c_family["commerceProvider"] == "medusa"
-    assert b2c_family["pageCount"] == 16
+    assert b2c_family["themeRequirement"] == "optional"
+    assert b2c_family["pageCount"] == 21
 
 
 def test_get_medusa_b2c_starter_family_detail(api_client: TestClient):
@@ -144,7 +231,8 @@ def test_get_medusa_b2c_starter_family_detail(api_client: TestClient):
 
     assert family["family"] == "medusa-b2c-starter"
     assert family["name"] == "Medusa B2C Starter"
-    assert len(family["pageBlueprints"]) == 16
+    assert family["themeRequirement"] == "optional"
+    assert len(family["pageBlueprints"]) == 21
 
     expected_page_types = {
         "home",
@@ -154,6 +242,11 @@ def test_get_medusa_b2c_starter_family_detail(api_client: TestClient):
         "product_detail",
         "cart",
         "checkout",
+        "privacy_policy",
+        "terms_of_service",
+        "returns_refunds_policy",
+        "shipping_policy",
+        "contact_support",
         "account_dashboard",
         "account_profile",
         "account_addresses",
@@ -203,18 +296,11 @@ def test_create_site_without_product_succeeds(api_client: TestClient, db_session
     assert site["routeSlug"] is not None  # Generated unique slug
 
     # Verify pages were created in site_pages, not funnel_pages
-    assert len(site["pages"]) == 5
+    assert len(site["pages"]) == B2B_EXPECTED_PAGE_COUNT
 
     # Verify page types
     page_types = {page["pageType"] for page in site["pages"]}
-    expected_page_types = {
-        "home",
-        "category",
-        "product_detail",
-        "cart",
-        "checkout",
-    }
-    assert page_types == expected_page_types
+    assert page_types == B2B_EXPECTED_PAGE_TYPES
 
     # Verify entry page
     entry_pages = [page for page in site["pages"] if page["isEntry"]]
@@ -234,7 +320,7 @@ def test_create_site_without_product_succeeds(api_client: TestClient, db_session
 
     # Verify pages are SitePage records
     db_pages = db_session.query(SitePage).filter(SitePage.site_id == db_site.id).all()
-    assert len(db_pages) == 5
+    assert len(db_pages) == B2B_EXPECTED_PAGE_COUNT
 
     # Verify versions are SitePageVersion records
     for page in db_pages:
@@ -274,18 +360,11 @@ def test_create_site_succeeds_with_product(api_client: TestClient, db_session):
     assert site["productId"] == product_id
 
     # Verify pages were created
-    assert len(site["pages"]) == 5
+    assert len(site["pages"]) == B2B_EXPECTED_PAGE_COUNT
 
     # Verify page types
     page_types = {page["pageType"] for page in site["pages"]}
-    expected_page_types = {
-        "home",
-        "category",
-        "product_detail",
-        "cart",
-        "checkout",
-    }
-    assert page_types == expected_page_types
+    assert page_types == B2B_EXPECTED_PAGE_TYPES
 
     # Verify entry page
     entry_pages = [page for page in site["pages"] if page["isEntry"]]
@@ -328,17 +407,10 @@ def test_create_site_has_correct_site_metadata(api_client: TestClient, db_sessio
 
     # Verify pages have page_type in SitePage
     db_pages = db_session.query(SitePage).filter(SitePage.site_id == db_site.id).all()
-    assert len(db_pages) == 5
+    assert len(db_pages) == B2B_EXPECTED_PAGE_COUNT
 
     page_types = {page.page_type for page in db_pages}
-    expected_page_types = {
-        "home",
-        "category",
-        "product_detail",
-        "cart",
-        "checkout",
-    }
-    assert page_types == expected_page_types
+    assert page_types == B2B_EXPECTED_PAGE_TYPES
 
     # Verify each page has a draft version
     for page in db_pages:
@@ -506,51 +578,7 @@ def test_create_site_generates_all_expected_pages_with_correct_page_types(api_cl
     assert response.status_code == 201
     site = response.json()
 
-    # Expected page configurations - commerce-core pages only
-    expected_pages = [
-        {
-            "pageType": "home",
-            "templateId": "medusa-b2b-home",
-            "name": "Home",
-            "slug": "home",
-            "ordering": 0,
-            "isEntry": True,
-        },
-        {
-            "pageType": "category",
-            "templateId": "medusa-b2b-category",
-            "name": "Category",
-            "slug": "category",
-            "ordering": 1,
-            "isEntry": False,
-        },
-        {
-            "pageType": "product_detail",
-            "templateId": "medusa-b2b-pdp",
-            "name": "Product Detail",
-            "slug": "product",
-            "ordering": 2,
-            "isEntry": False,
-        },
-        {
-            "pageType": "cart",
-            "templateId": "medusa-b2b-cart",
-            "name": "Cart",
-            "slug": "cart",
-            "ordering": 3,
-            "isEntry": False,
-        },
-        {
-            "pageType": "checkout",
-            "templateId": "medusa-b2b-checkout",
-            "name": "Checkout",
-            "slug": "checkout",
-            "ordering": 4,
-            "isEntry": False,
-        },
-    ]
-
-    for expected in expected_pages:
+    for expected in B2B_EXPECTED_PAGES:
         matching_pages = [p for p in site["pages"] if p["pageType"] == expected["pageType"]]
         assert len(matching_pages) == 1, (
             f"Expected exactly one page with pageType {expected['pageType']}"
@@ -657,13 +685,40 @@ def test_get_site_detail_returns_pages(api_client: TestClient):
     assert site["id"] == site_id
     assert site["name"] == "Detail Test Site"
     assert site["siteFamily"] == "medusa-b2b-starter"
-    assert len(site["pages"]) == 5
+    assert site["themeBindingMode"] == "standalone"
+    assert len(site["pages"]) == B2B_EXPECTED_PAGE_COUNT
 
     # Verify entry page is marked
     entry_pages = [p for p in site["pages"] if p["isEntry"]]
     assert len(entry_pages) == 1
     assert entry_pages[0]["pageType"] == "home"
     assert site["entryPageId"] == entry_pages[0]["id"]
+
+
+def test_get_site_detail_without_client_id_returns_site_for_same_org(api_client: TestClient):
+    """Direct site lookups should work without a preselected workspace."""
+    client_id = _create_client(api_client, name="Direct Preview Workspace")
+    product_id = _create_product(api_client, client_id=client_id, title="Direct Preview Product")
+
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Direct Preview Site",
+            "productId": product_id,
+        },
+    )
+    assert create_response.status_code == 201
+    site_id = create_response.json()["id"]
+
+    response = api_client.get(f"/sites/{site_id}")
+    assert response.status_code == 200
+
+    site = response.json()
+    assert site["id"] == site_id
+    assert site["clientId"] == client_id
+    assert site["name"] == "Direct Preview Site"
 
 
 def test_get_site_validates_workspace_ownership(api_client: TestClient):
@@ -1056,7 +1111,7 @@ def test_site_publish_success(api_client: TestClient, db_session):
     assert "artifactVersion" in publish_data
     assert publish_data["siteId"] == site_id
     assert publish_data["routeSlug"] is not None
-    assert publish_data["pageCount"] == 5
+    assert publish_data["pageCount"] == B2B_EXPECTED_PAGE_COUNT
     assert publish_data["publishedAt"] is not None
 
     # Verify publication record was created
@@ -1073,7 +1128,7 @@ def test_site_publish_success(api_client: TestClient, db_session):
         .filter(SitePublicationPage.publication_id == uuid.UUID(pub_id))
         .all()
     )
-    assert len(pub_pages) == 5
+    assert len(pub_pages) == B2B_EXPECTED_PAGE_COUNT
 
     # Verify site_runtime_bundle artifact was created
     artifact = (
@@ -1122,7 +1177,9 @@ def test_site_publish_updates_active_publication(api_client: TestClient, db_sess
     assert str(db_site.active_site_publication_id) == pub2_id
 
 
-def test_site_publish_prefers_published_version_over_newer_approved(api_client: TestClient, db_session):
+def test_site_publish_prefers_published_version_over_newer_approved(
+    api_client: TestClient, db_session
+):
     """Publishing should keep the currently published page version when a newer approved draft exists."""
     client_id = _create_client(api_client, name="Publish Version Preference Test")
 
@@ -1330,7 +1387,7 @@ def test_public_site_graph_success(api_client: TestClient, db_session):
     assert graph["siteId"] == site["id"]
     assert "pages" in graph
     assert "links" in graph
-    assert len(graph["pages"]) == 5  # All pages from medusa-b2b-starter
+    assert len(graph["pages"]) == B2B_EXPECTED_PAGE_COUNT
 
 
 def test_public_site_graph_uses_published_page_slugs_for_links(api_client: TestClient, db_session):
@@ -1410,7 +1467,9 @@ def test_public_site_product_not_found(api_client: TestClient, db_session):
     assert product_response.status_code == 404
 
 
-def test_public_site_artifact_fallback_uses_matching_site_artifact(api_client: TestClient, db_session):
+def test_public_site_artifact_fallback_uses_matching_site_artifact(
+    api_client: TestClient, db_session
+):
     """Artifact fallback must not return another site's runtime when a client has multiple sites."""
     client_id = _create_client(api_client, name="Artifact Fallback Scope Test")
 
@@ -1501,9 +1560,574 @@ def test_site_runtime_bundle_artifact_payload_structure(api_client: TestClient, 
     assert data["meta"]["publicationId"] is not None
 
     # Verify pages
-    assert len(data["pages"]) == 5
+    assert len(data["pages"]) == B2B_EXPECTED_PAGE_COUNT
     for slug, page_data in data["pages"].items():
         assert "pageId" in page_data
         assert "versionId" in page_data
         assert "puckData" in page_data
         assert "pageType" in page_data
+
+
+# =============================================================================
+# Tests for site theme binding mode
+# =============================================================================
+
+
+def test_create_site_defaults_to_standalone_mode(api_client: TestClient, db_session):
+    """New sites should default to standalone theme binding mode."""
+    client_id = _create_client(api_client, name="Theme Binding Test Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Standalone Site",
+        },
+    )
+
+    assert response.status_code == 201
+    site = response.json()
+
+    assert site["themeBindingMode"] == "standalone"
+    assert site["designSystemId"] is None
+
+
+def test_create_site_with_explicit_workspace_default_mode(api_client: TestClient, db_session):
+    """Sites can be created with workspace_default theme binding mode."""
+    client_id = _create_client(api_client, name="Workspace Default Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Workspace Default Site",
+            "themeBindingMode": "workspace_default",
+        },
+    )
+
+    assert response.status_code == 201
+    site = response.json()
+
+    assert site["themeBindingMode"] == "workspace_default"
+
+
+def test_create_site_design_system_mode_requires_design_system_id(
+    api_client: TestClient, db_session
+):
+    """design_system theme binding mode requires a designSystemId."""
+    client_id = _create_client(api_client, name="Design System Mode Test")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Should Fail",
+            "themeBindingMode": "design_system",
+            # No designSystemId provided
+        },
+    )
+
+    assert response.status_code == 400
+    assert "designSystemId" in response.json()["detail"]
+
+
+def test_create_site_standalone_ignores_provided_design_system_id(
+    api_client: TestClient, db_session
+):
+    """standalone theme binding mode should ignore any provided designSystemId."""
+    client_id = _create_client(api_client, name="Standalone Ignore DS Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Standalone Ignore DS Site",
+            "themeBindingMode": "standalone",
+            "designSystemId": "00000000-0000-0000-0000-000000000001",  # Should be ignored
+        },
+    )
+
+    assert response.status_code == 201
+    site = response.json()
+
+    assert site["themeBindingMode"] == "standalone"
+    assert site["designSystemId"] is None
+
+
+def test_create_site_rejects_standalone_when_family_requires_theme(
+    api_client: TestClient, db_session, monkeypatch
+):
+    """Required-theme families should reject standalone site creation."""
+    descriptor = site_blueprints.SITE_FAMILIES["medusa-b2c-starter"]
+    monkeypatch.setitem(
+        site_blueprints.SITE_FAMILIES,
+        "medusa-b2c-starter",
+        replace(descriptor, theme_requirement="required"),
+    )
+    client_id = _create_client(api_client, name="Required Theme Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2c-starter",
+            "name": "Theme Required Site",
+            "themeBindingMode": "standalone",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "requires an explicit site theme" in response.json()["detail"]
+
+
+def test_patch_site_theme_binding_mode(api_client: TestClient, db_session):
+    """PATCH /sites/{site_id} should allow updating theme binding mode."""
+    client_id = _create_client(api_client, name="Patch Theme Workspace")
+
+    # Create a site
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Patch Theme Site",
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+    assert site["themeBindingMode"] == "standalone"
+
+    # Patch to workspace_default
+    patch_response = api_client.patch(
+        f"/sites/{site['id']}?clientId={client_id}",
+        json={"themeBindingMode": "workspace_default"},
+    )
+    assert patch_response.status_code == 200
+    patched_site = patch_response.json()
+    assert patched_site["themeBindingMode"] == "workspace_default"
+
+
+def test_patch_site_theme_binding_mode_to_design_system_requires_ds_id(
+    api_client: TestClient, db_session
+):
+    """Patching to design_system mode requires designSystemId."""
+    client_id = _create_client(api_client, name="Patch DS Req Workspace")
+
+    # Create a site
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Patch DS Req Site",
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+
+    # Try to patch to design_system without designSystemId
+    patch_response = api_client.patch(
+        f"/sites/{site['id']}?clientId={client_id}",
+        json={"themeBindingMode": "design_system"},
+    )
+    assert patch_response.status_code == 400
+    assert "designSystemId" in patch_response.json()["detail"]
+
+
+def test_list_sites_includes_theme_binding_mode(api_client: TestClient, db_session):
+    """List sites response should include themeBindingMode."""
+    client_id = _create_client(api_client, name="List Theme Workspace")
+
+    response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "List Theme Site",
+        },
+    )
+    assert response.status_code == 201
+
+    # List sites
+    list_response = api_client.get(f"/sites?clientId={client_id}")
+    assert list_response.status_code == 200
+    sites = list_response.json()
+
+    assert len(sites) == 1
+    assert sites[0]["themeBindingMode"] == "standalone"
+
+
+def test_get_site_includes_theme_binding_mode(api_client: TestClient, db_session):
+    """Get site detail response should include themeBindingMode."""
+    client_id = _create_client(api_client, name="Get Theme Workspace")
+
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Get Theme Site",
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+
+    # Get site detail
+    detail_response = api_client.get(f"/sites/{site['id']}?clientId={client_id}")
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+
+    assert detail["themeBindingMode"] == "standalone"
+    assert "pages" in detail
+
+
+def test_site_page_editor_returns_null_tokens_for_standalone_site(
+    api_client: TestClient, db_session
+):
+    """Site page editor should return null design system tokens for standalone sites."""
+    client_id = _create_client(api_client, name="Editor Tokens Workspace")
+
+    # Create a site
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Editor Tokens Site",
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Get page editor
+    editor_response = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    editor_data = editor_response.json()
+
+    # Standalone site should have null tokens
+    assert editor_data["designSystemTokens"] is None
+
+
+def _create_design_system(
+    api_client: TestClient, db_session, *, client_id: str, name: str
+) -> str:
+    """Helper to create a design system and return its ID."""
+    client = db_session.query(Client).filter(Client.id == uuid.UUID(client_id)).first()
+    assert client is not None
+
+    logo_public_id = uuid.uuid4()
+    db_session.add(
+        Asset(
+            org_id=client.org_id,
+            client_id=client.id,
+            source_type=AssetSourceEnum.generated,
+            channel_id="brand",
+            format="image",
+            content={"label": f"{name} logo"},
+            public_id=logo_public_id,
+            asset_kind="image",
+            alt=f"{name} logo",
+        )
+    )
+    db_session.commit()
+
+    tokens = {
+        "dataTheme": "light",
+        "fontUrls": [],
+        "fontCss": None,
+        "cssVars": {
+            "--color-page-bg": "#ffffff",
+            "--color-bg": "#f5f5f5",
+            "--color-brand": "#3b82f6",
+            "--color-text": "#1a1a1a",
+            "--color-cta": "#3b82f6",
+            "--color-cta-text": "#ffffff",
+            "--color-cta-shell": "#1e40af",
+            "--color-cta-icon": "#ffffff",
+            "--hero-bg": "#1e3a8a",
+            "--pitch-bg": "#f0fdf4",
+        },
+        "funnelDefaults": {"bgColor": "#ffffff", "textColor": "#1a1a1a"},
+        "brand": {
+            "name": name,
+            "logoAssetPublicId": str(logo_public_id),
+            "logoAlt": f"{name} logo",
+        },
+    }
+    response = api_client.post(
+        "/design-systems",
+        json={"name": name, "tokens": tokens, "clientId": client_id},
+    )
+    assert response.status_code == 201, f"Failed to create design system: {response.json()}"
+    return response.json()["id"]
+
+
+def test_changing_site_theme_mode_affects_page_editor_token_resolution(
+    api_client: TestClient, db_session
+):
+    """Changing a site's theme mode after creation should affect page editor token resolution.
+
+    Pages do NOT copy site-level design_system_id, so they are not "pinned" to a specific DS.
+    When the site's theme mode changes, the page editor should reflect the new site-level
+    resolution (not use stale copied values).
+    """
+    client_id = _create_client(api_client, name="Theme Mode Affect Workspace")
+
+    # Create a site (defaults to standalone mode)
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Theme Mode Test Site",
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Verify page has no design_system_id (pages don't inherit at creation)
+    assert home_page["designSystemId"] is None
+
+    # Get page editor - should have null tokens (standalone mode)
+    editor_response = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    editor_data = editor_response.json()
+    assert editor_data["designSystemTokens"] is None
+
+    # Create a design system
+    ds_id = _create_design_system(api_client, db_session, client_id=client_id, name="Test DS")
+
+    # Patch site to use design_system mode
+    patch_response = api_client.patch(
+        f"/sites/{site['id']}?clientId={client_id}",
+        json={"themeBindingMode": "design_system", "designSystemId": ds_id},
+    )
+    assert patch_response.status_code == 200
+    patched_site = patch_response.json()
+    assert patched_site["themeBindingMode"] == "design_system"
+    assert patched_site["designSystemId"] == ds_id
+
+    # Get page editor again - should NOW have tokens from the site's DS
+    # because the page doesn't have its own override
+    editor_response2 = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response2.status_code == 200
+    editor_data2 = editor_response2.json()
+    assert editor_data2["designSystemTokens"] is not None
+    assert editor_data2["designSystemTokens"]["brand"]["name"] == "Test DS"
+
+
+def test_page_override_wins_over_site_theme(api_client: TestClient, db_session):
+    """When a page has an explicit design_system_id override, it should win over site theme."""
+    client_id = _create_client(api_client, name="Page Override Workspace")
+
+    # Create two design systems
+    site_ds_id = _create_design_system(api_client, db_session, client_id=client_id, name="Site DS")
+    page_ds_id = _create_design_system(api_client, db_session, client_id=client_id, name="Page DS")
+
+    # Create a site with design_system mode
+    create_response = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2b-starter",
+            "name": "Override Test Site",
+            "themeBindingMode": "design_system",
+            "designSystemId": site_ds_id,
+        },
+    )
+    assert create_response.status_code == 201
+    site = create_response.json()
+    home_page = next(p for p in site["pages"] if p["pageType"] == "home")
+
+    # Get page editor - should use site's DS tokens
+    editor_response = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response.status_code == 200
+    editor_data = editor_response.json()
+    assert editor_data["designSystemTokens"]["brand"]["name"] == "Site DS"
+
+    # Now set an explicit page-level override
+    patch_response = api_client.patch(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}",
+        json={"designSystemId": page_ds_id},
+    )
+    assert patch_response.status_code == 200
+
+    # Get page editor - should now use page's DS tokens
+    editor_response2 = api_client.get(
+        f"/sites/{site['id']}/pages/{home_page['id']}?clientId={client_id}"
+    )
+    assert editor_response2.status_code == 200
+    editor_data2 = editor_response2.json()
+    assert editor_data2["designSystemTokens"]["brand"]["name"] == "Page DS"
+
+
+def test_template_instantiation_rejects_invalid_design_system_id(
+    api_client: TestClient, db_session
+):
+    """Template instantiation should reject invalid design_system_id."""
+    client_id = _create_client(api_client, name="Instantiate Invalid DS Workspace")
+
+    # Get a template ID
+    templates_response = api_client.get("/site-templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    assert len(templates) > 0
+    template_id = templates[0]["id"]
+
+    # Try to instantiate with an invalid design system ID
+    response = api_client.post(
+        f"/site-templates/{template_id}/instantiate",
+        json={
+            "clientId": client_id,
+            "name": "Should Fail",
+            "themeBindingMode": "design_system",
+            "designSystemId": "00000000-0000-0000-0000-000000000001",  # Invalid UUID
+        },
+    )
+    assert response.status_code == 404
+    assert "Design system not found" in response.json()["detail"]
+
+
+def test_site_templates_expose_theme_requirement(api_client: TestClient, db_session):
+    """System site templates should expose their theme requirement metadata."""
+    response = api_client.get("/site-templates")
+
+    assert response.status_code == 200
+    templates = response.json()
+    template = next(item for item in templates if item["family"] == "medusa-b2c-starter")
+    assert template["themeRequirement"] == "optional"
+
+
+def test_template_instantiation_rejects_foreign_design_system_id(
+    api_client: TestClient, db_session
+):
+    """Template instantiation should reject design_system_id that belongs to another client."""
+    client_id_1 = _create_client(api_client, name="Client 1 Workspace")
+    client_id_2 = _create_client(api_client, name="Client 2 Workspace")
+
+    # Create a design system for client 1
+    ds_id = _create_design_system(api_client, db_session, client_id=client_id_1, name="Client 1 DS")
+
+    # Get a template ID
+    templates_response = api_client.get("/site-templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    template_id = templates[0]["id"]
+
+    # Client 2 should NOT be able to use client 1's design system
+    response = api_client.post(
+        f"/site-templates/{template_id}/instantiate",
+        json={
+            "clientId": client_id_2,
+            "name": "Should Fail",
+            "themeBindingMode": "design_system",
+            "designSystemId": ds_id,  # Belongs to client 1
+        },
+    )
+    assert response.status_code == 409
+    assert "must belong to the same client" in response.json()["detail"]
+
+
+def test_template_instantiation_rejects_invalid_theme_binding_mode(
+    api_client: TestClient, db_session
+):
+    """Template instantiation should reject invalid theme_binding_mode values."""
+    client_id = _create_client(api_client, name="Invalid Mode Workspace")
+
+    # Get a template ID
+    templates_response = api_client.get("/site-templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    template_id = templates[0]["id"]
+
+    # Try with invalid mode
+    response = api_client.post(
+        f"/site-templates/{template_id}/instantiate",
+        json={
+            "clientId": client_id,
+            "name": "Should Fail",
+            "themeBindingMode": "invalid_mode",
+        },
+    )
+    assert response.status_code == 400
+    assert "Invalid themeBindingMode" in response.json()["detail"]
+
+
+def test_template_instantiation_standalone_ignores_design_system_id(
+    api_client: TestClient, db_session
+):
+    """Template instantiation with standalone mode should ignore any provided designSystemId."""
+    client_id = _create_client(api_client, name="Standalone Ignore DS Workspace")
+
+    # Create a design system
+    ds_id = _create_design_system(api_client, db_session, client_id=client_id, name="Test DS")
+
+    # Get a template ID
+    templates_response = api_client.get("/site-templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    template_id = templates[0]["id"]
+
+    # Instantiate with standalone mode but provide a designSystemId
+    response = api_client.post(
+        f"/site-templates/{template_id}/instantiate",
+        json={
+            "clientId": client_id,
+            "name": "Standalone Should Ignore DS",
+            "themeBindingMode": "standalone",
+            "designSystemId": ds_id,  # Should be ignored
+        },
+    )
+    assert response.status_code == 201
+    site = response.json()
+
+    # Verify the site has standalone mode and no design_system_id
+    get_response = api_client.get(f"/sites/{site['siteId']}?clientId={client_id}")
+    assert get_response.status_code == 200
+    site_detail = get_response.json()
+    assert site_detail["themeBindingMode"] == "standalone"
+    assert site_detail["designSystemId"] is None
+
+
+def test_template_instantiation_rejects_standalone_when_template_requires_theme(
+    api_client: TestClient, db_session, monkeypatch
+):
+    """Required-theme templates should reject standalone instantiation."""
+    descriptor = site_blueprints.SITE_FAMILIES["medusa-b2c-starter"]
+    monkeypatch.setitem(
+        site_blueprints.SITE_FAMILIES,
+        "medusa-b2c-starter",
+        replace(descriptor, theme_requirement="required"),
+    )
+    client_id = _create_client(api_client, name="Required Template Theme Workspace")
+
+    templates_response = api_client.get("/site-templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    template_id = next(item["id"] for item in templates if item["family"] == "medusa-b2c-starter")
+
+    response = api_client.post(
+        f"/site-templates/{template_id}/instantiate",
+        json={
+            "clientId": client_id,
+            "name": "Theme Required Template Site",
+            "themeBindingMode": "standalone",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "requires an explicit site theme" in response.json()["detail"]

@@ -13,6 +13,8 @@ export type MedusaRuntimeConfig = {
   backendUrl: string;
   /** Medusa publishable API key */
   publishableKey: string;
+  /** Optional Stripe Connect account for the active workspace runtime */
+  stripeAccountId?: string;
   /** Default region ID for new carts */
   defaultRegionId?: string;
   /** Default country code for new carts */

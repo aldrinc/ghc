@@ -15,7 +15,10 @@ import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.db.models import ClientMedusaConfig
+from app.db.models import ClientMedusaConfig, StripeAccountProfile
+
+
+UNSET = object()
 
 
 _MEDUSA_URL_RE = re.compile(
@@ -337,8 +340,12 @@ def upsert_client_medusa_config(
     org_id: str,
     client_id: str,
     base_url: str,
-    admin_api_key: str | None = None,
-    publishable_key: str | None = None,
+    admin_api_key: str | None | object = UNSET,
+    publishable_key: str | None | object = UNSET,
+    stripe_account_profile_id: str | None | object = UNSET,
+    default_payment_provider_id: str | None | object = UNSET,
+    allowed_payment_provider_ids: list[str] | None | object = UNSET,
+    webhook_routing_mode: str | None | object = UNSET,
 ) -> ClientMedusaConfig:
     """Create or update a workspace's Medusa configuration."""
     normalized_url = _normalize_medusa_url(base_url)
@@ -353,10 +360,18 @@ def upsert_client_medusa_config(
 
     if existing:
         existing.base_url = normalized_url
-        if admin_api_key is not None:
+        if admin_api_key is not UNSET:
             existing.admin_api_key_encrypted = admin_api_key
-        if publishable_key is not None:
+        if publishable_key is not UNSET:
             existing.publishable_key_encrypted = publishable_key
+        if stripe_account_profile_id is not UNSET:
+            existing.stripe_account_profile_id = stripe_account_profile_id
+        if default_payment_provider_id is not UNSET:
+            existing.default_payment_provider_id = default_payment_provider_id
+        if allowed_payment_provider_ids is not UNSET:
+            existing.allowed_payment_provider_ids = allowed_payment_provider_ids
+        if webhook_routing_mode is not UNSET:
+            existing.webhook_routing_mode = webhook_routing_mode
         existing.updated_at = now
         existing.connection_status = "not_tested"
         existing.last_connection_error = None
@@ -368,9 +383,21 @@ def upsert_client_medusa_config(
         org_id=org_id,
         client_id=client_id,
         base_url=normalized_url,
-        admin_api_key_encrypted=admin_api_key,
-        publishable_key_encrypted=publishable_key,
+        admin_api_key_encrypted=admin_api_key if admin_api_key is not UNSET else None,
+        publishable_key_encrypted=publishable_key if publishable_key is not UNSET else None,
         connection_status="not_tested",
+        stripe_account_profile_id=(
+            stripe_account_profile_id if stripe_account_profile_id is not UNSET else None
+        ),
+        default_payment_provider_id=(
+            default_payment_provider_id if default_payment_provider_id is not UNSET else None
+        ),
+        allowed_payment_provider_ids=(
+            allowed_payment_provider_ids if allowed_payment_provider_ids is not UNSET else []
+        ),
+        webhook_routing_mode=(
+            webhook_routing_mode if webhook_routing_mode is not UNSET else "shared_ingress"
+        ),
     )
     session.add(config)
     session.flush()
@@ -511,8 +538,189 @@ def mask_medusa_config(config: ClientMedusaConfig) -> dict[str, Any]:
         if config.last_connection_check_at
         else None,
         "lastConnectionError": config.last_connection_error,
+        "stripeAccountProfileId": str(config.stripe_account_profile_id)
+        if config.stripe_account_profile_id
+        else None,
+        "defaultPaymentProviderId": config.default_payment_provider_id,
+        "allowedPaymentProviderIds": list(config.allowed_payment_provider_ids or []),
+        "webhookRoutingMode": config.webhook_routing_mode,
         "createdAt": config.created_at.isoformat(),
         "updatedAt": config.updated_at.isoformat(),
+    }
+
+
+# =============================================================================
+# Stripe Account Profile Operations
+# =============================================================================
+
+
+def list_stripe_account_profiles(
+    *,
+    session: Session,
+    org_id: str,
+) -> list[StripeAccountProfile]:
+    """List all Stripe account profiles for an org."""
+    from sqlalchemy import select
+
+    return list(
+        session.scalars(
+            select(StripeAccountProfile)
+            .where(StripeAccountProfile.org_id == org_id)
+            .order_by(StripeAccountProfile.created_at.asc())
+        ).all()
+    )
+
+
+def get_stripe_account_profile(
+    *,
+    session: Session,
+    org_id: str,
+    profile_id: str,
+) -> StripeAccountProfile | None:
+    """Get a Stripe account profile by ID, verifying org ownership."""
+    from sqlalchemy import select
+
+    return session.scalar(
+        select(StripeAccountProfile).where(
+            StripeAccountProfile.id == profile_id,
+            StripeAccountProfile.org_id == org_id,
+        )
+    )
+
+
+def get_stripe_account_profile_by_id(
+    *,
+    session: Session,
+    profile_id: str,
+) -> StripeAccountProfile | None:
+    """Get a Stripe account profile by ID without org filter."""
+    from sqlalchemy import select
+
+    return session.scalar(select(StripeAccountProfile).where(StripeAccountProfile.id == profile_id))
+
+
+def create_stripe_account_profile(
+    *,
+    session: Session,
+    org_id: str,
+    label: str,
+    stripe_account_id: str | None = None,
+    secret_key_ref: str | None = None,
+    webhook_secret_ref: str | None = None,
+    mode: str = "shared",
+) -> StripeAccountProfile:
+    """Create a new Stripe account profile for an org."""
+    profile = StripeAccountProfile(
+        org_id=org_id,
+        label=label,
+        stripe_account_id=stripe_account_id,
+        secret_key_ref=secret_key_ref,
+        webhook_secret_ref=webhook_secret_ref,
+        mode=mode,
+        status="active",
+    )
+    session.add(profile)
+    session.flush()
+    return profile
+
+
+def update_stripe_account_profile(
+    *,
+    session: Session,
+    org_id: str,
+    profile_id: str,
+    label: str | None = None,
+    stripe_account_id: str | None = None,
+    secret_key_ref: str | None = None,
+    webhook_secret_ref: str | None = None,
+    mode: str | None = None,
+    status: str | None = None,
+) -> StripeAccountProfile:
+    """Update an existing Stripe account profile."""
+    profile = get_stripe_account_profile(
+        session=session,
+        org_id=org_id,
+        profile_id=profile_id,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stripe account profile not found.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    if label is not None:
+        profile.label = label
+    if stripe_account_id is not None:
+        profile.stripe_account_id = stripe_account_id
+    if secret_key_ref is not None:
+        profile.secret_key_ref = secret_key_ref
+    if webhook_secret_ref is not None:
+        profile.webhook_secret_ref = webhook_secret_ref
+    if mode is not None:
+        profile.mode = mode
+    if status is not None:
+        profile.status = status
+
+    profile.updated_at = now
+    session.add(profile)
+    session.flush()
+    return profile
+
+
+def count_workspaces_using_stripe_profile(
+    *,
+    session: Session,
+    stripe_account_profile_id: str,
+    exclude_client_id: str | None = None,
+) -> int:
+    """Count how many workspaces are using a given Stripe profile."""
+    from sqlalchemy import func, select
+
+    query = (
+        select(func.count())
+        .select_from(ClientMedusaConfig)
+        .where(ClientMedusaConfig.stripe_account_profile_id == stripe_account_profile_id)
+    )
+    if exclude_client_id:
+        query = query.where(ClientMedusaConfig.client_id != exclude_client_id)
+
+    return session.scalar(query) or 0
+
+
+def has_direct_webhook_workspace(
+    *,
+    session: Session,
+    stripe_account_profile_id: str,
+    exclude_client_id: str | None = None,
+) -> bool:
+    """Return whether any workspace on the profile uses direct webhook routing."""
+    from sqlalchemy import select
+
+    query = select(ClientMedusaConfig.id).where(
+        ClientMedusaConfig.stripe_account_profile_id == stripe_account_profile_id,
+        ClientMedusaConfig.webhook_routing_mode == "direct",
+    )
+    if exclude_client_id:
+        query = query.where(ClientMedusaConfig.client_id != exclude_client_id)
+
+    return session.scalar(query.limit(1)) is not None
+
+
+def mask_stripe_account_profile(profile: StripeAccountProfile) -> dict[str, Any]:
+    """Return a masked version of Stripe account profile for API responses."""
+    return {
+        "id": str(profile.id),
+        "orgId": str(profile.org_id),
+        "label": profile.label,
+        "stripeAccountId": profile.stripe_account_id,
+        "hasSecretKeyRef": bool(profile.secret_key_ref),
+        "hasWebhookSecretRef": bool(profile.webhook_secret_ref),
+        "mode": profile.mode,
+        "status": profile.status,
+        "createdAt": profile.created_at.isoformat(),
+        "updatedAt": profile.updated_at.isoformat(),
     }
 
 

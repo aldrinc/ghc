@@ -16,7 +16,7 @@ import httpx
 import pytest
 import respx
 from app.auth.dependencies import AuthContext
-from app.db.models import Client, ClientMedusaConfig, Product, ProductVariant
+from app.db.models import Client, ClientMedusaConfig, Product, ProductVariant, StripeAccountProfile
 from app.routers import clients as clients_router
 from app.routers import products as products_router
 from app.services.medusa_connection import (
@@ -66,6 +66,10 @@ class TestMedusaConfigCRUD:
         assert data["baseUrl"] is None
         assert data["connectionStatus"] == "not_configured"
         assert data["hasAdminApiKey"] is False
+        assert data["stripeAccountProfileId"] is None
+        assert data["defaultPaymentProviderId"] is None
+        assert data["allowedPaymentProviderIds"] == []
+        assert data["webhookRoutingMode"] == "shared_ingress"
 
     def test_create_medusa_config(self, api_client, seed_client):
         """Test creating a new Medusa configuration."""
@@ -611,3 +615,282 @@ class TestMedusaServiceRequests:
         payload = json.loads(route.calls[0].request.content.decode("utf-8"))
         assert payload["title"] == "Test Variant"
         assert "variant" not in payload
+
+
+class TestStripeAccountProfileCRUD:
+    """Tests for Stripe account profile CRUD operations."""
+
+    def test_create_stripe_account_profile(self, api_client, seed_client, db_session):
+        """Test creating a new Stripe account profile."""
+        response = api_client.post(
+            "/clients/org/stripe-profiles",
+            json={
+                "label": "Test Stripe Profile",
+                "stripeAccountId": "acct_test123",
+                "mode": "shared",
+            },
+        )
+        assert response.status_code == 201, f"Response: {response.text}"
+        data = response.json()
+        assert data["label"] == "Test Stripe Profile"
+        assert data["stripeAccountId"] == "acct_test123"
+        assert data["mode"] == "shared"
+        assert data["status"] == "active"
+        assert data["hasSecretKeyRef"] is False
+        assert data["hasWebhookSecretRef"] is False
+
+    def test_list_stripe_profiles(self, api_client, seed_client, db_session):
+        """Test listing Stripe account profiles for an org."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="List Test Profile",
+            stripe_account_id="acct_list123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response = api_client.get("/clients/org/stripe-profiles")
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert any(profile["label"] == "List Test Profile" for profile in data)
+
+    def test_get_stripe_profile_by_id(self, api_client, seed_client, db_session):
+        """Test getting a Stripe account profile by ID."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Get Test Profile",
+            stripe_account_id="acct_get123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response = api_client.get(f"/clients/org/stripe-profiles/{profile.id}")
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert data["label"] == "Get Test Profile"
+        assert data["stripeAccountId"] == "acct_get123"
+
+    def test_update_stripe_profile(self, api_client, seed_client, db_session):
+        """Test updating a Stripe account profile."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Update Test Profile",
+            stripe_account_id="acct_update123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response = api_client.put(
+            f"/clients/org/stripe-profiles/{profile.id}",
+            json={
+                "label": "Updated Label",
+                "status": "disabled",
+            },
+        )
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert data["label"] == "Updated Label"
+        assert data["status"] == "disabled"
+
+    def test_stripe_profile_not_found(self, api_client, seed_client):
+        """Test getting a non-existent Stripe account profile returns 404."""
+        response = api_client.get(f"/clients/org/stripe-profiles/{uuid.uuid4()}")
+        assert response.status_code == 404
+
+
+class TestMedusaConfigWithStripeProfile:
+    """Tests for Medusa config with Stripe profile linkage."""
+
+    def test_create_medusa_config_with_stripe_profile(self, api_client, seed_client, db_session):
+        """Test creating a Medusa config with Stripe profile linkage."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Link Test Profile",
+            stripe_account_id="acct_link123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "adminApiKey": "test-api-key",
+                "stripeAccountProfileId": str(profile.id),
+                "defaultPaymentProviderId": "stripe",
+                "allowedPaymentProviderIds": ["stripe", "manual"],
+                "webhookRoutingMode": "shared_ingress",
+            },
+        )
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert data["stripeAccountProfileId"] == str(profile.id)
+        assert data["defaultPaymentProviderId"] == "stripe"
+        assert data["allowedPaymentProviderIds"] == ["stripe", "manual"]
+        assert data["webhookRoutingMode"] == "shared_ingress"
+
+    def test_stripe_profile_org_validation(self, api_client, seed_client, db_session):
+        """Test that a Stripe profile must belong to the same org."""
+        from app.db.models import Org
+
+        other_org = Org(id=uuid.UUID("00000000-0000-0000-0000-000000000999"), name="Other Org")
+        db_session.add(other_org)
+        db_session.commit()
+
+        other_profile = StripeAccountProfile(
+            org_id=other_org.id,
+            label="Other Org Profile",
+            stripe_account_id="acct_other123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(other_profile)
+        db_session.commit()
+
+        response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "stripeAccountProfileId": str(other_profile.id),
+            },
+        )
+        assert response.status_code == 400
+        assert "not found or does not belong to this organization" in response.json()["detail"]
+
+    def test_dedicated_profile_cannot_be_shared(self, api_client, seed_client, db_session):
+        """Test that a dedicated Stripe profile cannot be attached to multiple workspaces."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Dedicated Profile",
+            stripe_account_id="acct_dedicated123",
+            mode="dedicated",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response1 = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://workspace1.medusa.example.com",
+                "stripeAccountProfileId": str(profile.id),
+            },
+        )
+        assert response1.status_code == 200, f"Response: {response1.text}"
+
+        other_client = Client(org_id=TEST_ORG_ID, name="Other Workspace", industry="Retail")
+        db_session.add(other_client)
+        db_session.commit()
+
+        response2 = api_client.put(
+            f"/clients/{other_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://workspace2.medusa.example.com",
+                "stripeAccountProfileId": str(profile.id),
+            },
+        )
+        assert response2.status_code == 400
+        assert "dedicated Stripe profile" in response2.json()["detail"]
+
+    def test_default_provider_must_be_in_allowlist(self, api_client, seed_client, db_session):
+        """Test that default_payment_provider_id must be in allowed_payment_provider_ids."""
+        response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "defaultPaymentProviderId": "stripe",
+                "allowedPaymentProviderIds": ["paypal", "manual"],
+            },
+        )
+        assert response.status_code == 400
+        assert "defaultPaymentProviderId" in response.json()["detail"]
+
+    def test_direct_webhook_mode_requires_single_workspace_profile(
+        self, api_client, seed_client, db_session
+    ):
+        """Test that direct webhook routing is allowed when the profile is only used by one workspace."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Shared Profile",
+            stripe_account_id="acct_shared123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "stripeAccountProfileId": str(profile.id),
+                "webhookRoutingMode": "direct",
+            },
+        )
+        assert response.status_code == 200, f"Response: {response.text}"
+
+    def test_shared_profile_cannot_be_reused_while_other_workspace_uses_direct_webhook(
+        self, api_client, seed_client, db_session
+    ):
+        """Test that a second workspace cannot attach a profile already used with direct routing."""
+        profile = StripeAccountProfile(
+            org_id=TEST_ORG_ID,
+            label="Shared Profile",
+            stripe_account_id="acct_shared123",
+            mode="shared",
+            status="active",
+        )
+        db_session.add(profile)
+        db_session.commit()
+
+        first_response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "stripeAccountProfileId": str(profile.id),
+                "allowedPaymentProviderIds": ["stripe"],
+                "webhookRoutingMode": "direct",
+            },
+        )
+        assert first_response.status_code == 200, f"Response: {first_response.text}"
+
+        other_client = Client(org_id=TEST_ORG_ID, name="Other Workspace", industry="Retail")
+        db_session.add(other_client)
+        db_session.commit()
+
+        second_response = api_client.put(
+            f"/clients/{other_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://other-store.medusa.example.com",
+                "stripeAccountProfileId": str(profile.id),
+                "allowedPaymentProviderIds": ["stripe"],
+            },
+        )
+        assert second_response.status_code == 400
+        assert "direct webhook routing" in second_response.json()["detail"]
+
+    def test_allowed_payment_provider_ids_normalized(self, api_client, seed_client, db_session):
+        """Test that allowed_payment_provider_ids are normalized (trimmed, de-duped)."""
+        response = api_client.put(
+            f"/clients/{seed_client.id}/medusa/config",
+            json={
+                "baseUrl": "https://my-store.medusa.example.com",
+                "allowedPaymentProviderIds": ["  stripe ", "stripe", " paypal ", "manual"],
+            },
+        )
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert "stripe" in data["allowedPaymentProviderIds"]
+        assert "paypal" in data["allowedPaymentProviderIds"]
+        assert "manual" in data["allowedPaymentProviderIds"]
+        assert len(data["allowedPaymentProviderIds"]) == len(set(data["allowedPaymentProviderIds"]))

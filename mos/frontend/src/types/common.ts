@@ -31,6 +31,95 @@ export interface GetHookdCredentials {
   lastValidationError?: string | null;
 }
 
+export interface PostizCredentials {
+  hasCredentials: boolean;
+  baseUrl?: string | null;
+  authType?: string | null;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+}
+
+export interface PostizBrowserLaunchSession {
+  launchUrl: string;
+  autoConfiguredCredentials: boolean;
+}
+
+export interface PostizChannel {
+  id: string;
+  postizIntegrationId: string;
+  postizChannelId: string;
+  identifier: string;
+  name: string;
+  profile?: string | null;
+  pictureUrl?: string | null;
+  disabled: boolean;
+  isDefault: boolean;
+  metadata: Record<string, unknown>;
+  lastSyncedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPostingProfile {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  defaultChannelIds: string[];
+  timezone?: string | null;
+  shortLink?: boolean | null;
+  providerSettings: Record<string, unknown>;
+  postizPostingProfileId?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPostingProfileInput {
+  name: string;
+  isDefault?: boolean;
+  defaultChannelIds?: string[];
+  timezone?: string | null;
+  shortLink?: boolean | null;
+  providerSettings?: Record<string, unknown>;
+}
+
+export interface PostizPostingProfileUpdateInput extends Partial<PostizPostingProfileInput> {}
+
+export interface PostizPublication {
+  id: string;
+  postizPostId?: string | null;
+  postizPostIds?: string[];
+  content: string;
+  postType: string;
+  scheduledFor?: string | null;
+  targetChannels: Record<string, unknown>;
+  mediaUrls: string[];
+  linkUrl?: string | null;
+  status: string;
+  postizPostStatus?: string | null;
+  releaseUrls: string[];
+  errorPayload?: Record<string, unknown> | null;
+  lastSyncedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPublicationListResponse {
+  posts: PostizPublication[];
+  total: number;
+}
+
+export interface PostizCreatePostInput {
+  content: string;
+  postType: "now" | "schedule" | "draft";
+  scheduledFor?: string | null;
+  channelIds: string[];
+  mediaUrls?: string[];
+  linkUrl?: string | null;
+  postingProfileId?: string | null;
+  providerSettingsByIdentifier?: Record<string, unknown>;
+}
+
 export interface GetHookdSyncFeedFilters {
   query?: string;
   platforms?: string;

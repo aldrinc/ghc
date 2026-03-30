@@ -238,6 +238,45 @@ def test_collect_blind_angle_forbidden_terms_skips_single_generic_taxonomy_words
     assert "safety" not in terms
 
 
+def test_build_swipe_stage1_destination_context_uses_manual_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="pre-sales",
+        resolved_destination_url="https://example.com/presell",
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_campaign_loaded_copy",
+            "swipe_stage1_campaign_creative_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Pre-Sales Landing Page (pre-sales)" in destination_context
+    assert "Resolved destination URL: https://example.com/presell" in destination_context
+    assert "Swipe Stage1 Campaign Asset Brief" in destination_context
+    assert "Swipe Stage1 Campaign Loaded Copy" in destination_context
+    assert "Swipe Stage1 Campaign Creative Context" in destination_context
+    assert "presell or pre-sales page content" in destination_context
+    assert "pull it from those artifacts instead of inventing it" in destination_context
+
+
+def test_build_swipe_stage1_destination_context_uses_strategy_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="sales",
+        resolved_destination_url=None,
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_strategy_v2_copy",
+            "swipe_stage1_strategy_v2_copy_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Sales Page (sales)" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy Context" in destination_context
+    assert "sales page content as the post-click continuity anchor" in destination_context
+
+
 def test_validate_swipe_copy_blind_angle_blackout_rejects_exact_internal_angle_phrase():
     copy_pack = swipe_activity.SwipeAdCopyPack.model_validate(
         {
@@ -593,7 +632,16 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     monkeypatch.setattr(
         swipe_activity,
         "_resolve_swipe_stage1_gemini_file_search_context",
-        _fake_file_search_context,
+        lambda **_kwargs: (
+            ["fileSearchStores/context-store"],
+            [
+                "swipe_stage1_campaign_asset_brief",
+                "swipe_stage1_campaign_loaded_copy",
+                "swipe_stage1_campaign_creative_context",
+            ],
+            [],
+            [],
+        ),
     )
     monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
     def _fake_create_generated_asset_from_url(**kwargs):
@@ -638,6 +686,11 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert "RUNTIME INPUTS (INJECTED)" in prompt_input
     assert "Brand: Brand Name" in prompt_input
     assert "Angle: Clinical proof and fast results" in prompt_input
+    assert "Destination page type: Sales Page (sales)" in prompt_input
+    assert "Swipe Stage1 Campaign Asset Brief" in prompt_input
+    assert "Swipe Stage1 Campaign Loaded Copy" in prompt_input
+    assert "Swipe Stage1 Campaign Creative Context" in prompt_input
+    assert "pull it from those artifacts instead of inventing it" in prompt_input
     assert "Competitor swipe image is attached as image input." in prompt_input
     assert len(captured_calls[0]["contents"]) == 3
     rendered_copy_prompt = captured_calls[1]["contents"][0]

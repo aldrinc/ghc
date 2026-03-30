@@ -35,6 +35,7 @@ from app.routers import (
     site_funnels,
     site_product_bindings,
     site_imports,
+    postiz,
 )
 
 __all__ = [
@@ -72,4 +73,5 @@ __all__ = [
     "site_funnels",
     "site_product_bindings",
     "site_imports",
+    "postiz",
 ]

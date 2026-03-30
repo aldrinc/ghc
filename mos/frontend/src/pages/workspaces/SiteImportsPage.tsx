@@ -1,10 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Download, Loader2, Plus, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Globe,
+  RefreshCw,
+} from "lucide-react";
 
-import { useSiteImports, useSiteImport, useCreateSiteImport, useApplySiteImport } from "@/api/siteImports";
-import { useSites } from "@/api/sites";
-import { useSiteFamilies } from "@/api/sites";
+import {
+  useCreateSiteImport,
+  useCreateSiteImportFromArchive,
+  useSiteImports,
+  useTemplateVariants,
+} from "@/api/storefrontTemplates";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/layout/EmptyState";
@@ -12,54 +22,144 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { readQueryError } from "@/components/import/importUtils";
 
-function toneForStatus(status: string): "success" | "warning" | "danger" | "neutral" {
-  if (status === "completed") return "success";
-  if (status === "failed") return "danger";
-  if (["queued", "capturing", "generating", "adapting", "running"].includes(status)) return "warning";
-  return "neutral";
-}
+import { ImportListSidebar } from "@/components/import/ImportListSidebar";
+import { ImportDetailPanel } from "@/components/import/ImportDetailPanel";
+import { VariantMutationPanel } from "@/components/import/VariantMutationPanel";
+import { GovernancePanel } from "@/components/import/GovernancePanel";
+import { formatPageType } from "@/lib/siteFormatters";
+
+const importPageHintOptions = [
+  { label: "No page hint", value: "" },
+  { label: "Home", value: "home" },
+  { label: "Category", value: "category" },
+  { label: "Product detail", value: "product_detail" },
+  { label: "Pre-sell", value: "pre_sell" },
+  { label: "Cart", value: "cart" },
+  { label: "Checkout", value: "checkout" },
+];
+
+const supportedSiteFamilyHints = [
+  { label: "No family hint", value: "" },
+  { label: "sales-pdp", value: "sales-pdp" },
+  { label: "listicle-presell", value: "listicle-presell" },
+  { label: "medusa-b2b-starter", value: "medusa-b2b-starter" },
+];
 
 export function SiteImportsPage() {
   const navigate = useNavigate();
-  const { importId } = useParams<{ importId: string }>();
+  const { importId: routeImportId } = useParams<{ importId?: string }>();
   const { workspace } = useWorkspace();
-  const { data: imports = [], isLoading: importsLoading } = useSiteImports();
-  const { data: selectedImport } = useSiteImport(importId || null);
-  const { data: sites = [] } = useSites();
-  const { data: families = [] } = useSiteFamilies();
+
+  // Import creation form state
+  const [importUrl, setImportUrl] = useState("");
+  const [importArchiveFile, setImportArchiveFile] = useState<File | null>(null);
+  const [importPageType, setImportPageType] = useState("");
+  const [importSiteFamilyHint, setImportSiteFamilyHint] = useState("");
+  const [showAdvancedImport, setShowAdvancedImport] = useState(false);
+
+  // Orchestration state
+  const [lastConvertedVariantId, setLastConvertedVariantId] = useState<string | null>(null);
+  const [selectedTemplateVariantId, setSelectedTemplateVariantId] = useState<string | null>(null);
+  const draftVariantsSectionRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedImportId = routeImportId || null;
+
+  const { data: imports = [], isLoading: importsLoading, refetch: refetchImports } = useSiteImports(
+    workspace?.id
+  );
+  const { data: variants = [], refetch: refetchVariants } = useTemplateVariants(workspace?.id);
+
   const createImport = useCreateSiteImport();
-  const applyImport = useApplySiteImport(importId || null);
+  const createArchiveImport = useCreateSiteImportFromArchive();
 
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [siteName, setSiteName] = useState("");
-  const [templateName, setTemplateName] = useState("");
-  const [selectedSiteId, setSelectedSiteId] = useState("");
-  const [selectedFamily, setSelectedFamily] = useState("");
+  // Filter variants for selected import
+  const variantsForSelectedImport = useMemo(
+    () =>
+      variants
+        .filter((v) => v.siteImportId === selectedImportId)
+        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    [selectedImportId, variants]
+  );
 
+  // Auto-select variant when import changes
   useEffect(() => {
-    if (selectedImport) {
-      setSiteName(selectedImport.title || selectedImport.sourceHostname || "Imported Site");
-      setTemplateName(selectedImport.title || selectedImport.sourceHostname || "Imported Template");
-      setSelectedFamily(selectedImport.suggestedTemplateFamily || families[0]?.family || "medusa-b2b-starter");
-    }
-  }, [families, selectedImport]);
+    if (!selectedImportId || !variantsForSelectedImport.length) return;
+    const current = variants.find((v) => v.id === selectedTemplateVariantId);
+    if (current?.siteImportId === selectedImportId) return;
+    setSelectedTemplateVariantId(variantsForSelectedImport[0].id);
+  }, [selectedImportId, selectedTemplateVariantId, variants, variantsForSelectedImport]);
 
-  const siteOptions = useMemo(
-    () => [{ label: "Select target site", value: "" }, ...sites.map((site) => ({ label: site.name, value: site.id }))],
-    [sites]
-  );
-  const familyOptions = useMemo(
-    () => families.map((family) => ({ label: family.name, value: family.family })),
-    [families]
-  );
+  // Reset variant selection and last-converted on import change
+  useEffect(() => {
+    setLastConvertedVariantId(null);
+  }, [selectedImportId]);
+
+  const handleCreateImport = async () => {
+    if (!importUrl || !workspace?.id) return;
+    try {
+      const created = await createImport.mutateAsync({
+        sourceUrl: importUrl,
+        pageTypeHint: importPageType || undefined,
+        siteFamilyHint: importSiteFamilyHint || undefined,
+        clientId: workspace.id,
+      });
+      setImportUrl("");
+      setImportPageType("");
+      setImportSiteFamilyHint("");
+      setShowAdvancedImport(false);
+      navigate(`/workspaces/sites/imports/${created.id}`);
+      refetchImports();
+    } catch (err) {
+      console.error("Failed to create import:", err);
+    }
+  };
+
+  const handleCreateArchiveImport = async () => {
+    if (!importArchiveFile || !workspace?.id) return;
+    try {
+      const created = await createArchiveImport.mutateAsync({
+        clientId: workspace.id,
+        file: importArchiveFile,
+        pageTypeHint: importPageType || undefined,
+        siteFamilyHint: importSiteFamilyHint || undefined,
+      });
+      setImportArchiveFile(null);
+      setImportPageType("");
+      setImportSiteFamilyHint("");
+      setShowAdvancedImport(false);
+      navigate(`/workspaces/sites/imports/${created.id}`);
+      refetchImports();
+    } catch (err) {
+      console.error("Failed to create archive import:", err);
+    }
+  };
+
+  const handleSelectImport = (importId: string) => {
+    navigate(`/workspaces/sites/imports/${importId}`);
+  };
+
+  const handleDraftConverted = (variantId: string) => {
+    setLastConvertedVariantId(variantId);
+    setSelectedTemplateVariantId(variantId);
+    refetchVariants();
+    window.requestAnimationFrame(() => {
+      draftVariantsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   if (!workspace) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Site Imports" description="Capture and apply imports inside the Sites workspace." />
-        <EmptyState title="No workspace selected" description="Select a workspace to manage site imports." />
+        <PageHeader
+          title="Site Imports"
+          description="Capture, review, and save imported sites."
+        />
+        <EmptyState
+          title="No workspace selected"
+          description="Choose a workspace to manage site imports."
+        />
       </div>
     );
   }
@@ -68,185 +168,224 @@ export function SiteImportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Site Imports"
-        description="Capture reference sites, then apply them as sites, pages, or reusable templates."
+        description="Capture reference sites, review the generated output, and save as sites or template drafts."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => navigate("/workspaces/sites")}>
-              <ArrowLeft className="h-4 w-4" />
-              Back to Sites
-            </Button>
-            {selectedImport?.savedSiteId ? (
-              <Button
-                variant="secondary"
-                onClick={() => navigate(`/workspaces/sites/${selectedImport.savedSiteId}`)}
-              >
-                <ExternalLink className="h-4 w-4" />
-                Open Imported Site
-              </Button>
-            ) : null}
-          </div>
+          <Button variant="outline" onClick={() => navigate("/workspaces/sites")}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to Sites
+          </Button>
         }
       >
         <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-content-muted">
-          <Badge tone="neutral">Workspace: {workspace.name}</Badge>
+          <Badge tone="accent">Workspace: {workspace.name}</Badge>
         </div>
       </PageHeader>
 
-      <div className="rounded-2xl border border-border bg-surface px-4 py-4 space-y-3">
-        <div>
-          <div className="text-sm font-semibold text-content">Start a new import</div>
-          <div className="text-xs text-content-muted">Capture a live site once, then choose an explicit apply action.</div>
+      {/* Import Form */}
+      <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+          <div>
+            <div className="text-sm font-semibold text-content">Import reference site</div>
+            <div className="text-xs text-content-muted">
+              Capture a live site or upload a React/Tailwind export.
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Input placeholder="https://example.com" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} />
-          <Button
-            onClick={async () => {
-              const created = await createImport.mutateAsync({ sourceUrl });
-              setSourceUrl("");
-              navigate(`/workspaces/sites/imports/${created.id}`);
-            }}
-            disabled={!sourceUrl.trim() || createImport.isPending}
+
+        <div className="mt-4 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-content">Source URL</label>
+            <Input
+              type="url"
+              placeholder="https://example.com"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+            />
+          </div>
+
+          <div className="rounded-xl border border-dashed border-border px-3 py-3 text-xs text-content-muted">
+            <div className="font-semibold text-content">Or upload a screenshot2code React export</div>
+            <div className="mt-1">
+              Use this when you already have a trusted project zip from outside Marketi.
+            </div>
+            <div className="mt-3">
+              <input
+                key={importArchiveFile?.name || "archive-input-empty"}
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(event) => {
+                  setImportArchiveFile(event.target.files?.[0] || null);
+                }}
+                className="block w-full text-sm text-content file:mr-3 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:font-medium"
+              />
+            </div>
+            {importArchiveFile && (
+              <div className="mt-2 text-xs text-content">
+                Selected: <span className="font-medium">{importArchiveFile.name}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Options Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedImport((prev) => !prev)}
+            className="flex items-center gap-1 text-xs text-content-muted hover:text-content"
           >
-            {createImport.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            <span className="ml-2">Start import</span>
-          </Button>
+            {showAdvancedImport ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            Advanced options
+          </button>
+
+          {showAdvancedImport && (
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 px-3 py-3">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-content">Page type hint (optional)</label>
+                <Select value={importPageType} onValueChange={setImportPageType} options={importPageHintOptions} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-content">Site family hint (optional)</label>
+                <Select value={importSiteFamilyHint} onValueChange={setImportSiteFamilyHint} options={supportedSiteFamilyHints} />
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              onClick={handleCreateImport}
+              disabled={!importUrl || createImport.isPending || createArchiveImport.isPending}
+              className="w-full"
+            >
+              {createImport.isPending ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Importing URL...
+                </>
+              ) : (
+                <>
+                  <Globe className="mr-2 h-4 w-4" />
+                  Import URL
+                </>
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleCreateArchiveImport}
+              disabled={!importArchiveFile || createArchiveImport.isPending || createImport.isPending}
+              className="w-full"
+            >
+              {createArchiveImport.isPending ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Importing Archive...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Import Archive
+                </>
+              )}
+            </Button>
+          </div>
+
+          {createImport.isError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+              {readQueryError(createImport.error, "Failed to create import. Please check the URL and try again.")}
+            </div>
+          )}
+          {createArchiveImport.isError && (
+            <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+              {readQueryError(createArchiveImport.error, "Failed to import archive.")}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="rounded-2xl border border-border bg-surface px-4 py-4">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-            <div>
-              <div className="text-sm font-semibold text-content">Imports</div>
-              <div className="text-xs text-content-muted">Choose an import to review and apply.</div>
-            </div>
-            <Badge tone="neutral">{imports.length}</Badge>
-          </div>
-          {importsLoading ? (
-            <div className="py-6 text-sm text-content-muted"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading imports...</div>
-          ) : !imports.length ? (
-            <div className="py-6 text-sm text-content-muted">No imports yet.</div>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {imports.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => navigate(`/workspaces/sites/imports/${item.id}`)}
-                  className={cn(
-                    "w-full rounded-xl border px-4 py-3 text-left transition-colors",
-                    importId === item.id ? "border-accent bg-surface" : "border-border bg-surface-2 hover:border-accent/40"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-content">{item.title || item.sourceHostname || item.sourceUrl}</div>
-                      <div className="mt-1 truncate text-xs text-content-muted">{item.sourceUrl}</div>
+      {/* Two-column layout: Sidebar + Detail */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,1fr)]">
+        <section ref={draftVariantsSectionRef}>
+          <ImportListSidebar
+            imports={imports}
+            isLoading={importsLoading}
+            selectedImportId={selectedImportId}
+            onSelectImport={handleSelectImport}
+            variants={variants}
+            selectedVariantId={selectedTemplateVariantId}
+            onSelectVariant={setSelectedTemplateVariantId}
+            lastConvertedVariantId={lastConvertedVariantId}
+          />
+
+          {/* Variant-level panels (below sidebar when variant selected) */}
+          {selectedTemplateVariantId && (
+            <div className="mt-4 space-y-4">
+              {/* Selected draft info */}
+              {(() => {
+                const selectedVariant = variants.find((v) => v.id === selectedTemplateVariantId);
+                if (!selectedVariant) return null;
+                return (
+                  <div className="rounded-2xl border border-border bg-surface px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-content">Selected draft</div>
+                        <div className="mt-1 text-xs text-content-muted">
+                          Convert creates a template draft, not a saved site page.
+                        </div>
+                      </div>
+                      <Badge tone={selectedVariant.status === "draft" ? "warning" : "success"}>
+                        {selectedVariant.status}
+                      </Badge>
                     </div>
-                    <Badge tone={toneForStatus(item.status)}>{item.status}</Badge>
+                    <div className="mt-3 rounded-xl border border-border bg-surface-2 px-3 py-3">
+                      <div className="text-sm font-semibold text-content">{selectedVariant.name}</div>
+                      <div className="mt-1 text-xs text-content-muted">
+                        {selectedVariant.family} / {formatPageType(selectedVariant.pageType)}
+                      </div>
+                      {selectedVariant.siteImportId === selectedImportId && (
+                        <div className="mt-2">
+                          <Badge tone="accent">Built from this import</Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </button>
-              ))}
+                );
+              })()}
+
+              <VariantMutationPanel
+                variantId={selectedTemplateVariantId}
+                workspaceId={workspace?.id}
+                onVariantGenerated={() => {
+                  refetchVariants();
+                  setSelectedTemplateVariantId(null);
+                }}
+              />
+
+              <GovernancePanel
+                variantId={selectedTemplateVariantId}
+                workspaceId={workspace?.id}
+                onApproved={() => refetchVariants()}
+              />
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="rounded-2xl border border-border bg-surface px-4 py-4 space-y-4">
-          {!selectedImport ? (
-            <EmptyState title="Select an import" description="Choose an import from the list to apply it." />
+        <aside>
+          {!selectedImportId ? (
+            <div className="rounded-2xl border border-border bg-surface px-4 py-8 text-center text-sm text-content-muted">
+              Select an import to view details.
+            </div>
           ) : (
-            <>
-              <div className="border-b border-border pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-content">{selectedImport.title || selectedImport.sourceHostname || selectedImport.sourceUrl}</div>
-                    <div className="mt-1 text-xs text-content-muted">{selectedImport.sourceUrl}</div>
-                  </div>
-                  <Badge tone={toneForStatus(selectedImport.status)}>{selectedImport.status}</Badge>
-                </div>
-                <div className="mt-2 text-xs text-content-muted">
-                  Suggested family: {selectedImport.suggestedTemplateFamily || "None"}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-border bg-surface-2 p-4 space-y-3">
-                  <div className="text-sm font-semibold text-content">Create site</div>
-                  <Input value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="Site name" />
-                  <Button
-                    className="w-full"
-                    onClick={async () => {
-                      const result = await applyImport.mutateAsync({ action: "create-site", name: siteName });
-                      if (result.siteId) navigate(`/workspaces/sites/${result.siteId}`);
-                    }}
-                    disabled={!siteName.trim() || applyImport.isPending}
-                  >
-                    Create site
-                  </Button>
-                </div>
-
-                <div className="rounded-xl border border-border bg-surface-2 p-4 space-y-3">
-                  <div className="text-sm font-semibold text-content">Add pages to site</div>
-                  <Select value={selectedSiteId} onValueChange={setSelectedSiteId} options={siteOptions} />
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() => applyImport.mutate({ action: "add-pages", targetSiteId: selectedSiteId })}
-                    disabled={!selectedSiteId || applyImport.isPending}
-                  >
-                    Add pages
-                  </Button>
-                </div>
-
-                <div className="rounded-xl border border-border bg-surface-2 p-4 space-y-3">
-                  <div className="text-sm font-semibold text-content">Save as site template</div>
-                  <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Template name" />
-                  <Select value={selectedFamily} onValueChange={setSelectedFamily} options={familyOptions} />
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() => applyImport.mutate({ action: "create-site-template", name: templateName, family: selectedFamily })}
-                    disabled={!templateName.trim() || !selectedFamily || applyImport.isPending}
-                  >
-                    Save site template
-                  </Button>
-                </div>
-
-                <div className="rounded-xl border border-border bg-surface-2 p-4 space-y-3">
-                  <div className="text-sm font-semibold text-content">Create page template</div>
-                  <div className="text-xs text-content-muted">Use this when you only want a reusable single-page artifact.</div>
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() =>
-                      applyImport.mutate({
-                        action: "create-page-template",
-                        name: templateName || siteName || "Imported Page Template",
-                        family: selectedFamily || selectedImport.suggestedTemplateFamily || "sales-pdp",
-                        pageType: "product_detail",
-                        acceptedSectionIds: [],
-                      })
-                    }
-                    disabled={applyImport.isPending}
-                  >
-                    Create page template
-                  </Button>
-                </div>
-              </div>
-
-              {applyImport.isError ? (
-                <div className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
-                  {applyImport.error instanceof Error ? applyImport.error.message : "Failed to apply import."}
-                </div>
-              ) : null}
-
-              <div className="flex items-center gap-2 text-xs text-content-muted">
-                <Download className="h-4 w-4" />
-                Imports now live under Sites. Legacy storefront-template routes only redirect here for compatibility.
-              </div>
-            </>
+            <ImportDetailPanel
+              importId={selectedImportId}
+              workspaceId={workspace.id}
+              imports={imports}
+              onSiteSaved={() => refetchImports()}
+              onDraftConverted={handleDraftConverted}
+            />
           )}
-        </div>
+        </aside>
       </div>
     </div>
   );

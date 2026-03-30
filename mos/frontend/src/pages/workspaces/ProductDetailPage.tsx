@@ -228,6 +228,8 @@ export function ProductDetailPage() {
       title: productDetail.title,
       client_id: productDetail.client_id,
       product_type: productDetail.product_type ?? null,
+    }, {
+      clientId: productDetail.client_id,
     });
     setShopifyProductGidDraft(productDetail.shopify_product_gid || "");
   }, [productDetail, selectProduct]);

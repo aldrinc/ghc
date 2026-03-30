@@ -18,9 +18,7 @@ from app.db.models import (
     SiteLink,
     SitePage,
     SitePageVersion,
-    SiteTemplate,
     SiteTemplatePage,
-    SiteTemplateLink,
 )
 from app.db.repositories.storefront_imports import StorefrontImportsRepository
 from app.db.repositories.sites_runtime import SitesRuntimeRepository
@@ -30,6 +28,10 @@ from app.services.site_import_adapter import (
     DEFAULT_MODEL_SLOTS,
     SiteImportAdapterError,
 )
+from app.services.site_import_archive import (
+    analyze_site_import_archive,
+    SiteImportArchiveError,
+)
 from app.services.site_import_capture import CaptureResult, capture_site
 from app.services.site_import_generator_client import (
     GeneratorRunResult,
@@ -37,8 +39,13 @@ from app.services.site_import_generator_client import (
     SiteImportGeneratorError,
 )
 from app.services.site_import_normalize import normalize_capture
-from app.services.template_synthesis import synthesize_import, SynthesisResult
+from app.services.template_synthesis import (
+    FAMILY_TO_TEMPLATE_ID,
+    synthesize_import,
+    SynthesisResult,
+)
 from app.services.template_variant_governance import (
+    append_provenance_event,
     build_convert_provenance,
     build_template_draft_provenance,
 )
@@ -47,6 +54,7 @@ from app.services.puck_data_validation import (
     LegacySectionPropError,
     validate_puck_data_no_legacy_section_props,
 )
+from app.services.site_templates import SiteTemplateError, create_template_from_site
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +122,12 @@ def _import_page_raw_puck_data(adapted_page: dict[str, Any]) -> dict[str, Any]:
     return deepcopy(raw_puck_data)
 
 
+def _is_imported_runtime_block_type(block_type: str) -> bool:
+    return block_type == "ImportedRuntimeSection" or (
+        block_type.startswith("Imported") and block_type.endswith("Section")
+    )
+
+
 def _should_materialize_template_puck_data(puck_data: dict[str, Any]) -> bool:
     content = puck_data.get("content")
     if not isinstance(content, list) or not content:
@@ -130,10 +144,37 @@ def _should_materialize_template_puck_data(puck_data: dict[str, Any]) -> bool:
     if any(block_type in _PLACEHOLDER_IMPORT_BLOCK_TYPES for block_type in top_level_types):
         return True
 
+    if any(_is_imported_runtime_block_type(block_type) for block_type in top_level_types):
+        return False
+
     has_structural_blocks = any(
         block_type == "Section" or "Page" in block_type for block_type in top_level_types
     )
     return not has_structural_blocks
+
+
+def _has_imported_runtime_block(puck_data: dict[str, Any]) -> bool:
+    found = False
+
+    def walk(node: Any) -> None:
+        nonlocal found
+        if found:
+            return
+        if isinstance(node, list):
+            for entry in node:
+                walk(entry)
+            return
+        if not isinstance(node, dict):
+            return
+        block_type = node.get("type")
+        if isinstance(block_type, str) and _is_imported_runtime_block_type(block_type):
+            found = True
+            return
+        for value in node.values():
+            walk(value)
+
+    walk(puck_data.get("content"))
+    return found
 
 
 def _migrate_legacy_section_props(node: Any) -> None:
@@ -203,6 +244,23 @@ def _apply_import_root_metadata(
         )
     if not isinstance(props.get("description"), str):
         props["description"] = source_url
+
+
+def _humanize_page_type(page_type: str | None) -> str:
+    tokens = (page_type or "page").replace("-", "_").split("_")
+    return " ".join(token.capitalize() for token in tokens if token) or "Page"
+
+
+def _slugify_page_type(page_type: str | None) -> str:
+    return ((page_type or "page").strip().lower().replace("_", "-")) or "page"
+
+
+def _default_site_type_for_page(page_type: str | None) -> str:
+    if page_type in {"product_detail", "category", "collection", "store", "cart", "checkout"}:
+        return "ecommerce"
+    if page_type in {"pre_sell", "landing"}:
+        return "landing"
+    return "content"
 
 
 def _materialize_import_page_puck_data(
@@ -278,6 +336,102 @@ def create_import_record(
         model_slots=slots,
         created_by_user_external_id=created_by_user_external_id,
     )
+
+
+def create_archive_import_record(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    archive_name: str,
+    archive_bytes: bytes,
+    page_type_hint: str | None,
+    site_family_hint: str | None,
+    created_by_user_external_id: str | None,
+) -> SiteImport:
+    """
+    Create a completed import record from a trusted React/Tailwind archive export.
+
+    This path is intentionally strict:
+    - accepts only zip archives
+    - derives screenshot-to-code review artifacts from the archive
+    - preserves the same review/convert flow shape used by normal imports
+    - does not fabricate screenshots
+    """
+    try:
+        analysis = analyze_site_import_archive(
+            archive_name=archive_name,
+            archive_bytes=archive_bytes,
+            page_type_hint=page_type_hint,
+            site_family_hint=site_family_hint,
+        )
+    except SiteImportArchiveError as exc:
+        raise SiteImportError(str(exc)) from exc
+
+    repo = StorefrontImportsRepository(session)
+    site_import = repo.create_import(
+        org_id=org_id,
+        client_id=client_id,
+        source_url=analysis.source_url,
+        source_hostname=None,
+        input_mode=analysis.input_mode,
+        page_type_hint=page_type_hint,
+        site_family_hint=site_family_hint,
+        model_slots=[],
+        created_by_user_external_id=created_by_user_external_id,
+    )
+
+    try:
+        repo.create_snapshot(
+            site_import=site_import,
+            html_snapshot=analysis.html_snapshot,
+            desktop_screenshot_data_url="",
+            mobile_screenshot_data_url="",
+            capture_metadata=analysis.capture_metadata,
+        )
+        refreshed_import = repo.get_import_by_id(site_import_id=str(site_import.id))
+        if refreshed_import is None:
+            raise SiteImportError("Archive import record disappeared before persistence.")
+        repo.store_upstream_generation(
+            site_import=refreshed_import,
+            upstream_request_payload=analysis.upstream_request_payload,
+            upstream_transcript=analysis.upstream_transcript,
+            upstream_variants=analysis.upstream_variants,
+            upstream_metadata=analysis.upstream_metadata,
+        )
+        refreshed_import = repo.get_import_by_id(site_import_id=str(site_import.id))
+        if refreshed_import is None:
+            raise SiteImportError("Archive import record disappeared before completion.")
+        repo.mark_import_completed(
+            site_import=refreshed_import,
+            title=analysis.title,
+            meta_description=analysis.meta_description,
+            suggested_template_family=analysis.suggested_template_family,
+            resolved_site_family=analysis.resolved_site_family,
+            resolved_page_type=analysis.resolved_page_type,
+            resolved_template_id=analysis.resolved_template_id,
+            theme_candidate=analysis.theme_candidate,
+            normalized_sections=analysis.normalized_sections,
+            adapted_site=analysis.adapted_site,
+            adapted_pages=analysis.adapted_pages,
+            adapted_puck_data=analysis.adapted_puck_data,
+        )
+    except Exception as exc:
+        refresh_import = repo.get_import_by_id(site_import_id=str(site_import.id))
+        if refresh_import is not None:
+            repo.mark_import_failed(
+                site_import=refresh_import,
+                error_message=str(exc) if str(exc) else "Archive import failed",
+                stage="adapting",
+            )
+        if isinstance(exc, SiteImportError):
+            raise
+        raise SiteImportError("Failed to persist archive import.") from exc
+
+    completed_import = repo.get_import_by_id(site_import_id=str(site_import.id))
+    if completed_import is None:
+        raise SiteImportError("Archive import record could not be reloaded after completion.")
+    return completed_import
 
 
 async def _process_import_job_with_session(session: Session, *, site_import_id: str) -> None:
@@ -485,7 +639,9 @@ def save_import_as_site(
     adapted_site = site_import.adapted_site or {}
     adapted_pages = site_import.adapted_pages or []
     if not adapted_pages:
-        raise SiteImportError("Import has no adapted pages to save")
+        raise SiteImportError(
+            "This import does not have a first-party site runtime translation. Use the existing import review flow instead of saving it as a site."
+        )
 
     materialized_puck_data: list[dict[str, Any]] = []
 
@@ -783,86 +939,40 @@ def create_import_as_site_template(
     created_by_user_external_id: str | None,
 ) -> dict[str, Any]:
     """Persist an import as a reusable multi-page site template."""
-    imports_repo = StorefrontImportsRepository(session)
     site_import = _load_completed_import(
         session, org_id=org_id, client_id=client_id, site_import_id=site_import_id
     )
-    adapted_site = site_import.adapted_site or {}
-    adapted_pages = site_import.adapted_pages or []
-    if not adapted_pages:
-        raise SiteImportError("Import has no adapted pages to save")
-
-    existing = session.scalars(
-        select(SiteTemplate).where(SiteTemplate.family == family, SiteTemplate.name == name)
-    ).first()
-    if existing:
+    if not site_import.saved_site_id:
         raise SiteImportError(
-            f"A site template named '{name}' already exists for family '{family}'."
+            "Import must first be saved as a site before it can be converted into a reusable site template."
         )
 
     try:
-        template = SiteTemplate(
-            id=str(uuid4()),
-            family=family,
+        template = create_template_from_site(
+            session,
+            site_id=str(site_import.saved_site_id),
+            org_id=org_id,
+            client_id=client_id,
             name=name,
             description=description,
-            site_type=(adapted_site.get("site_type") or adapted_site.get("siteType") or "generic"),
-            commerce_provider=(
-                adapted_site.get("commerce_provider")
-                or adapted_site.get("commerceProvider")
-                or "none"
-            ),
-            is_system_template=False,
-            provenance_notes=[f"Created from site import {site_import_id}"],
-            created_at=datetime.now(timezone.utc),
+            created_by_user_external_id=created_by_user_external_id,
         )
-        session.add(template)
-        session.flush()
-
-        created_pages: list[SiteTemplatePage] = []
-        for index, adapted_page in enumerate(adapted_pages):
-            page_type = (
-                adapted_page.get("page_type") or adapted_page.get("pageType") or f"page_{index + 1}"
-            )
-            page = SiteTemplatePage(
-                id=str(uuid4()),
-                site_template_id=str(template.id),
-                page_type=page_type,
-                name=adapted_page.get("name") or page_type,
-                slug=adapted_page.get("slug") or page_type,
-                description=adapted_page.get("description"),
-                page_template_id=adapted_page.get("template_id") or adapted_page.get("templateId"),
-                ordering=int(adapted_page.get("ordering", index)),
-                is_entry=index == 0,
-                provenance_notes=[],
-                created_at=datetime.now(timezone.utc),
-            )
-            session.add(page)
-            created_pages.append(page)
-
-        for adapted_page in adapted_pages:
-            for link in (
-                adapted_page.get("outbound_links") or adapted_page.get("outboundLinks") or []
-            ):
-                session.add(
-                    SiteTemplateLink(
-                        id=str(uuid4()),
-                        site_template_id=str(template.id),
-                        from_page_type=adapted_page.get("page_type")
-                        or adapted_page.get("pageType"),
-                        to_page_type=link.get("to_page_type") or link.get("toPageType"),
-                        label=link.get("label"),
-                        link_kind=link.get("link_kind") or link.get("linkKind") or "internal",
-                        meta=link,
-                        created_at=datetime.now(timezone.utc),
-                    )
-                )
-
+        if template.family != family:
+            template.family = family
+            session.add(template)
         session.commit()
         session.refresh(template)
     except Exception as exc:
         session.rollback()
+        if isinstance(exc, SiteImportError):
+            raise
+        if isinstance(exc, SiteTemplateError):
+            raise SiteImportError(str(exc)) from exc
         raise SiteImportError("Failed to persist site template from import.") from exc
+
+    created_pages = session.scalars(
+        select(SiteTemplatePage).where(SiteTemplatePage.site_template_id == str(template.id))
+    ).all()
 
     return {
         "siteTemplateId": str(template.id),
@@ -1000,6 +1110,9 @@ def get_import_synthesis(
     if site_import.status != "completed":
         return None
 
+    if site_import.resolved_site_family == "imported-template":
+        return None
+
     normalized_sections = site_import.normalized_sections or []
     theme_candidate = site_import.theme_candidate or {}
     suggested_family = site_import.suggested_template_family
@@ -1053,6 +1166,11 @@ def convert_import_to_variant_with_synthesis(
 
     if site_import.status != "completed":
         raise SiteImportError(f"Cannot convert import with status: {site_import.status}")
+
+    if site_import.resolved_site_family == "imported-template":
+        raise SiteImportError(
+            "Imported-template archive imports no longer synthesize into legacy draft families. Save the imported page set into My Sites instead."
+        )
 
     # Validate accepted section IDs
     normalized_sections = site_import.normalized_sections or []
@@ -1310,4 +1428,239 @@ def create_draft_from_template(
     return {
         "variant": variant,
         "style_preset": style_preset,
+    }
+
+
+def create_site_from_variant(
+    session: Session,
+    *,
+    org_id: str,
+    client_id: str,
+    variant_id: str,
+    site_name: str,
+    description: str | None,
+    created_by_user_external_id: str | None,
+) -> dict[str, Any]:
+    """Materialize an approved template variant into the canonical site runtime."""
+    repo = StorefrontImportsRepository(session)
+    runtime_repo = SitesRuntimeRepository(session)
+
+    variant = repo.get_variant(org_id=org_id, client_id=client_id, variant_id=variant_id)
+    if variant is None:
+        raise SiteImportError("Variant not found")
+    if variant.status != "approved":
+        raise SiteImportError(
+            f"Cannot create site from variant with status: {variant.status}. Approve it for publish first."
+        )
+
+    provenance = deepcopy(variant.provenance or {})
+    existing_site_id = provenance.get("materialized_site_id")
+    if isinstance(existing_site_id, str) and existing_site_id.strip():
+        raise SiteImportError(f"Variant already materialized to site {existing_site_id}.")
+
+    source_import = None
+    screenshot_refs: list[str] = []
+    source_url = provenance.get("source_url")
+    source_hostname = provenance.get("source_hostname")
+    materialized_puck_data: dict[str, Any] | None = None
+    materialized_page_type = variant.page_type
+    materialized_template_id: str | None = None
+    materialization_mode = "synthesized_variant"
+    if variant.site_import_id:
+        source_import = repo.get_import(
+            org_id=org_id,
+            client_id=client_id,
+            site_import_id=str(variant.site_import_id),
+        )
+        if source_import is not None:
+            if not isinstance(source_url, str) or not source_url.strip():
+                source_url = source_import.source_url
+            if not isinstance(source_hostname, str) or not source_hostname.strip():
+                source_hostname = source_import.source_hostname
+            screenshot_refs = _collect_screenshot_refs(
+                repo.get_import_snapshot(site_import_id=str(source_import.id))
+            )
+            for adapted_page in source_import.adapted_pages or []:
+                raw_puck_data = _import_page_raw_puck_data(adapted_page)
+                if not _has_imported_runtime_block(raw_puck_data):
+                    continue
+                materialized_puck_data = _materialize_import_page_puck_data(
+                    session,
+                    org_id=org_id,
+                    client_id=client_id,
+                    adapted_page=adapted_page,
+                    source_url=source_import.source_url,
+                )
+                materialized_page_type = (
+                    adapted_page.get("page_type") or adapted_page.get("pageType") or variant.page_type
+                )
+                candidate_template_id = adapted_page.get("template_id") or adapted_page.get("templateId")
+                if isinstance(candidate_template_id, str) and candidate_template_id.strip():
+                    materialized_template_id = candidate_template_id.strip()
+                materialization_mode = "import_runtime"
+                break
+
+    if materialized_puck_data is None:
+        synthesis = provenance.get("synthesis")
+        if not isinstance(synthesis, dict):
+            raise SiteImportError(
+                "Variant has no synthesized puckData. Rebuild the draft from the import first."
+            )
+
+        synthesized_puck_data = synthesis.get("synthesized_puck_data")
+        if not isinstance(synthesized_puck_data, dict) or not synthesized_puck_data:
+            raise SiteImportError(
+                "Variant has no synthesized puckData. Rebuild the draft from the import first."
+            )
+        materialized_puck_data = synthesized_puck_data
+
+    try:
+        validate_puck_data_no_legacy_section_props(materialized_puck_data)
+    except LegacySectionPropError as exc:
+        raise SiteImportError(
+            f"Cannot create site: legacy Section prop '{exc.prop_name}' is still present in the materialized draft."
+        ) from exc
+
+    resolved_template_id = materialized_template_id or provenance.get("template_id")
+    if not isinstance(resolved_template_id, str) or not resolved_template_id.strip():
+        resolved_template_id = (
+            None if materialization_mode == "import_runtime" else FAMILY_TO_TEMPLATE_ID.get(variant.family, variant.family)
+        )
+
+    product_id = provenance.get("product_id")
+    if not isinstance(product_id, str) or not product_id.strip():
+        product_id = None
+
+    commerce_provider = provenance.get("variant_provider")
+    if not isinstance(commerce_provider, str) or not commerce_provider.strip():
+        commerce_provider = None
+    if not commerce_provider and source_import is not None:
+        adapted_site = source_import.adapted_site or {}
+        adapted_provider = adapted_site.get("commerce_provider") or adapted_site.get("commerceProvider")
+        if isinstance(adapted_provider, str) and adapted_provider.strip():
+            commerce_provider = adapted_provider
+
+    route_slug = runtime_repo._generate_unique_route_slug(desired_slug=site_name or variant.name)
+    page_slug = _slugify_page_type(materialized_page_type)
+    page_name = _humanize_page_type(materialized_page_type)
+
+    site_type = _default_site_type_for_page(materialized_page_type)
+    if source_import is not None:
+        adapted_site = source_import.adapted_site or {}
+        adapted_site_type = adapted_site.get("site_type") or adapted_site.get("siteType")
+        if isinstance(adapted_site_type, str) and adapted_site_type.strip():
+            site_type = adapted_site_type
+
+    try:
+        site = runtime_repo.create_site(
+            org_id=org_id,
+            client_id=client_id,
+            site_import_id=str(variant.site_import_id) if variant.site_import_id else None,
+            product_id=product_id,
+            name=site_name,
+            description=description,
+            site_type=site_type,
+            site_family=(
+                source_import.resolved_site_family
+                if materialization_mode == "import_runtime"
+                and source_import is not None
+                and source_import.resolved_site_family
+                else variant.family
+            ),
+            commerce_provider=commerce_provider,
+            route_slug=route_slug,
+            source_hostname=source_hostname if isinstance(source_hostname, str) else None,
+            entry_page_type=materialized_page_type,
+            imported_page_count=1,
+            completeness_state="complete",
+            created_by_user_external_id=created_by_user_external_id,
+        )
+
+        page = runtime_repo.create_page(
+            site_id=str(site.id),
+            name=page_name,
+            slug=page_slug,
+            page_type=materialized_page_type,
+            page_role=materialized_page_type,
+            template_id=resolved_template_id if isinstance(resolved_template_id, str) else None,
+            page_template_id=resolved_template_id if isinstance(resolved_template_id, str) else None,
+            ordering=0,
+            source_url=source_url if isinstance(source_url, str) else None,
+            source_screenshot_refs=screenshot_refs,
+            adapted_puck_data=materialized_puck_data,
+        )
+        page_provenance = {
+            "source_type": "template_variant",
+            "variant_id": str(variant.id),
+            "variant_name": variant.name,
+            "variant_family": variant.family,
+            "variant_page_type": variant.page_type,
+            "site_import_id": str(variant.site_import_id) if variant.site_import_id else None,
+            "source_url": source_url if isinstance(source_url, str) else None,
+            "source_hostname": source_hostname if isinstance(source_hostname, str) else None,
+            "template_id": resolved_template_id if isinstance(resolved_template_id, str) else None,
+            "materialization_mode": materialization_mode,
+        }
+        draft_version = runtime_repo.create_page_version(
+            page_id=str(page.id),
+            puck_data=materialized_puck_data,
+            provenance=page_provenance,
+            status="draft",
+            source_type="template_variant",
+            source_id=str(variant.id),
+        )
+        approved_version = runtime_repo.create_page_version(
+            page_id=str(page.id),
+            puck_data=materialized_puck_data,
+            provenance=page_provenance,
+            status="approved",
+            source_type="template_variant",
+            source_id=str(variant.id),
+        )
+
+        site.entry_page_id = str(page.id)
+        runtime_repo.update_site(site=site)
+
+        updated_provenance = append_provenance_event(
+            provenance,
+            "materialize_site",
+            actor=created_by_user_external_id,
+            metadata={
+                "site_id": str(site.id),
+                "site_name": site.name,
+                "page_id": str(page.id),
+            },
+        )
+        updated_provenance["materialized_site_id"] = str(site.id)
+        updated_provenance["materialized_site_name"] = site.name
+        updated_provenance["materialized_page_id"] = str(page.id)
+        repo.update_variant_status(
+            org_id=org_id,
+            client_id=client_id,
+            variant_id=str(variant.id),
+            new_status=variant.status,
+            provenance_update=updated_provenance,
+        )
+
+        session.commit()
+        session.refresh(site)
+    except Exception as exc:
+        session.rollback()
+        raise SiteImportError("Failed to create site from approved template variant.") from exc
+
+    return {
+        "siteId": str(site.id),
+        "siteName": site.name,
+        "pageCount": 1,
+        "entryPageType": materialized_page_type,
+        "createdPages": [
+            {
+                "pageId": str(page.id),
+                "pageType": materialized_page_type,
+                "templateId": resolved_template_id if isinstance(resolved_template_id, str) else None,
+                "versionId": str(draft_version.id),
+                "approvedVersionId": str(approved_version.id),
+            }
+        ],
+        "createdAt": site.created_at,
     }

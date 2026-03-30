@@ -1,0 +1,76 @@
+{
+  "id": "medusa-b2b-policy-privacy",
+  "name": "Honest Herbalist Privacy Policy",
+  "description": "Privacy policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Privacy Policy",
+        "description": "How Honest Herbalist collects, uses, and protects customer information."
+      }
+    },
+    "content": [
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "header",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterStoreHeader",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showSearch": true,
+                "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterPolicyPage",
+              "props": {
+                "pageKey": "privacy_policy",
+                "pageTitle": "Privacy Policy"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "footer",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterStoreFooter",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showCategories": true,
+                "showCollections": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

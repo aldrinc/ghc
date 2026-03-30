@@ -1,175 +1,253 @@
 /**
  * Medusa B2C Store Page
- * 
- * The main store/catalog page featuring:
- * - Product grid with filtering
- * - Category sidebar
- * - Search and sort controls
+ *
+ * The main storefront catalog page featuring:
+ * - URL-driven sorting and pagination
+ * - Category navigation
+ * - Theme-aware product cards and loading states
  */
 
-import { useEffect, useState, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import { resolveB2CHeadingFont, useB2CTheme } from "../useB2CTheme";
 import { B2CStarterShell } from "./B2CStarterShell";
+import {
+  CatalogPagination,
+  CatalogSortSelect,
+  PRICE_SORT_FETCH_LIMIT,
+  PRODUCTS_PER_PAGE,
+  SkeletonProductGrid,
+  StoreProductCard,
+  StorefrontEmptyState,
+  normalizeCatalogSort,
+  sortCatalogProducts,
+  type CatalogSortValue,
+} from "./storefrontPrimitives";
 
-export type MedusaB2CStorePageProps = {
-  /** Page title override */
-  title?: string;
-  /** Default category filter */
-  defaultCategory?: string;
-};
-
-export function MedusaB2CStorePage({ title, defaultCategory }: MedusaB2CStorePageProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+export function MedusaB2CStorePage() {
   const {
     products,
     categories,
     productsLoading,
-    productsError,
+    productsCount,
     refreshProducts,
     navigateToProduct,
-    currentCategory,
-    loadCategoryByHandle,
+    navigateToCategory,
   } = useB2CRuntime();
+  const { tokens, isThemed } = useB2CTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [catalogCount, setCatalogCount] = useState(0);
+  const [priceSortLimited, setPriceSortLimited] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const currentPage = Math.max(1, Number(searchParams.get("page") || "1") || 1);
+  const currentSort = normalizeCatalogSort(searchParams.get("sort"));
 
-  // Load products and category on mount
+  const updateCatalogParams = useCallback(
+    (next: { page?: number; sort?: CatalogSortValue }) => {
+      const params = new URLSearchParams(searchParams);
+      const nextPage = next.page ?? currentPage;
+      const nextSort = next.sort ?? currentSort;
+
+      if (nextSort === "created_at") {
+        params.delete("sort");
+      } else {
+        params.set("sort", nextSort);
+      }
+
+      if (nextPage <= 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(nextPage));
+      }
+
+      setSearchParams(params);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [currentPage, currentSort, searchParams, setSearchParams],
+  );
+
   useEffect(() => {
-    const categoryHandle = searchParams.get("category") || defaultCategory;
-    if (categoryHandle) {
-      loadCategoryByHandle(categoryHandle).then((cat) => {
-        refreshProducts({ categoryId: cat ? [cat.id] : undefined });
+    let cancelled = false;
+
+    const loadCatalog = async () => {
+      const requestLimit =
+        currentSort === "created_at" ? PRODUCTS_PER_PAGE : PRICE_SORT_FETCH_LIMIT;
+      const requestOffset =
+        currentSort === "created_at"
+          ? (currentPage - 1) * PRODUCTS_PER_PAGE
+          : 0;
+
+      const result = await refreshProducts({
+        limit: requestLimit,
+        offset: requestOffset,
       });
-    } else {
-      refreshProducts();
+
+      if (cancelled || !result) {
+        if (!cancelled) {
+          setCatalogCount(0);
+          setPriceSortLimited(false);
+        }
+        return;
+      }
+
+      const nextCount =
+        currentSort === "created_at"
+          ? result.count
+          : Math.min(result.count, result.products.length);
+      const totalPages = Math.max(1, Math.ceil(nextCount / PRODUCTS_PER_PAGE));
+
+      setCatalogCount(nextCount);
+      setPriceSortLimited(
+        currentSort !== "created_at" && result.count > result.products.length,
+      );
+
+      if (currentPage > totalPages) {
+        updateCatalogParams({ page: totalPages });
+      }
+    };
+
+    void loadCatalog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, currentSort, refreshProducts, updateCatalogParams]);
+
+  const sortedProducts = useMemo(() => {
+    if (currentSort === "created_at") {
+      return products;
     }
-  }, [searchParams, defaultCategory, loadCategoryByHandle, refreshProducts]);
+    return sortCatalogProducts(products, currentSort);
+  }, [currentSort, products]);
 
-  const handleSearch = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setSearchParams({ q: searchQuery.trim() });
-      refreshProducts({ q: searchQuery.trim() });
-    } else {
-      setSearchParams({});
-      refreshProducts();
+  const visibleProducts = useMemo(() => {
+    if (currentSort === "created_at") {
+      return products;
     }
-  }, [searchQuery, setSearchParams, refreshProducts]);
 
-  const handleCategoryClick = useCallback((category: typeof categories[0]) => {
-    setSearchParams({ category: category.handle });
-    refreshProducts({ categoryId: [category.id] });
-  }, [setSearchParams, refreshProducts]);
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return sortedProducts.slice(start, start + PRODUCTS_PER_PAGE);
+  }, [currentPage, currentSort, products, sortedProducts]);
 
-  const displayTitle = title || currentCategory?.name || "All Products";
-  const parentCategories = categories.filter((c) => !c.parent_category_id);
+  const totalPages = Math.max(1, Math.ceil(catalogCount / PRODUCTS_PER_PAGE));
 
-  const formatPrice = (amount: number, currencyCode: string = "usd") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode.toUpperCase(),
-    }).format(amount / 100);
+  const pageStyle: CSSProperties = {
+    backgroundColor: tokens.colorBackground || "#ffffff",
+    color: tokens.colorText || "#111827",
+  };
+  const headingStyle: CSSProperties = {
+    color: tokens.colorText || "#111827",
+    fontFamily: resolveB2CHeadingFont(tokens),
+  };
+  const textMutedStyle: CSSProperties = {
+    color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.64)",
+  };
+  const sidebarStyle: CSSProperties = {
+    borderRightColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
   };
 
   return (
     <B2CStarterShell>
-      <main className="py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-medium text-zinc-900 mb-8">{displayTitle}</h1>
-
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Sidebar */}
-            <aside className="w-full lg:w-64 flex-shrink-0">
-              {/* Search */}
-              <div className="mb-6">
-                <form onSubmit={handleSearch}>
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search products..."
-                    className="w-full px-4 py-2 border border-neutral-200 rounded-lg"
-                  />
-                </form>
-              </div>
-
-              {/* Categories */}
-              {parentCategories.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-medium text-zinc-900 mb-4">Categories</h3>
-                  <ul className="space-y-2">
-                    {parentCategories.map((category) => (
-                      <li key={category.id}>
-                        <button
-                          onClick={() => handleCategoryClick(category)}
-                          className="text-sm text-neutral-600 hover:text-zinc-900"
-                        >
-                          {category.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+      <div className="min-h-screen" style={pageStyle}>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-8 lg:flex-row">
+            <aside
+              className="lg:w-64 lg:flex-shrink-0 lg:border-r lg:border-neutral-200 lg:pr-8"
+              style={sidebarStyle}
+            >
+              <h2 className="mb-4 text-lg font-medium" style={headingStyle}>
+                Categories
+              </h2>
+              <nav className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => updateCatalogParams({ page: 1, sort: "created_at" })}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm"
+                  style={
+                    isThemed
+                      ? {
+                          backgroundColor: tokens.colorPrimary || undefined,
+                          color: tokens.colorPrimaryText || undefined,
+                        }
+                      : undefined
+                  }
+                >
+                  All Products
+                </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => navigateToCategory(category.handle)}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm transition-opacity hover:opacity-70"
+                    style={{ color: tokens.colorText || undefined }}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </nav>
             </aside>
 
-            {/* Product Grid */}
             <div className="flex-1">
-              {productsError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-red-600">{productsError}</p>
+              <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h1 className="text-3xl font-medium" style={headingStyle}>
+                    All Products
+                  </h1>
+                  <p className="mt-2 text-sm" style={textMutedStyle}>
+                    {productsLoading
+                      ? "Loading catalog..."
+                      : `${catalogCount || productsCount || visibleProducts.length} products`}
+                  </p>
                 </div>
-              )}
+                <CatalogSortSelect
+                  value={currentSort}
+                  onChange={(value) => updateCatalogParams({ sort: value, page: 1 })}
+                />
+              </div>
+
+              {priceSortLimited ? (
+                <p className="mb-6 text-sm" style={textMutedStyle}>
+                  Price sorting is currently limited to the first {PRICE_SORT_FETCH_LIMIT} products returned by Medusa.
+                </p>
+              ) : null}
 
               {productsLoading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="aspect-[3/4] bg-neutral-200 rounded-lg mb-4" />
-                      <div className="h-4 bg-neutral-200 rounded w-3/4" />
-                    </div>
-                  ))}
-                </div>
-              ) : products.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-neutral-500">No products found</p>
-                </div>
+                <SkeletonProductGrid />
+              ) : visibleProducts.length === 0 ? (
+                <StorefrontEmptyState
+                  title="No products available"
+                  description="This storefront doesn't have any products to show yet."
+                />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product) => (
-                    <button
-                      key={product.id}
-                      onClick={() => navigateToProduct(product.handle)}
-                      className="group text-left"
-                    >
-                      <div className="aspect-[3/4] bg-neutral-100 rounded-lg mb-4 overflow-hidden">
-                        {product.thumbnail ? (
-                          <img
-                            src={product.thumbnail}
-                            alt={product.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                            {product.title}
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="font-medium text-zinc-900 line-clamp-1">{product.title}</h3>
-                      {product.variants?.[0]?.prices?.[0] && (
-                        <p className="text-sm text-neutral-600 mt-1">
-                          {formatPrice(product.variants[0].prices[0].amount, product.variants[0].prices[0].currency_code)}
-                        </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                    {visibleProducts.map((product) => (
+                      <StoreProductCard
+                        key={product.id}
+                        product={product}
+                        onClick={() => navigateToProduct(product.handle)}
+                      />
+                    ))}
+                  </div>
+                  <CatalogPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(page) => updateCatalogParams({ page })}
+                  />
+                </>
               )}
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </B2CStarterShell>
   );
 }

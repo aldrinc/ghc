@@ -1,5 +1,6 @@
 import { buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
 import { buildSitePath, parseSitePath } from "@/funnels/runtimeRouting";
+import { isMedusaB2CRuntimeSite } from "@/components/commerce/b2c/runtimeSite";
 import type { SitePage } from "@/api/sites";
 import type { SitePageType } from "@/types/funnels";
 
@@ -7,6 +8,7 @@ const DEFAULT_SITE_COUNTRY_CODE = "us";
 
 type SitePagePreviewOptions = {
   siteFamily?: string | null;
+  commerceProvider?: string | null;
   countryCode?: string | null;
   productHandle?: string | null;
   collectionHandle?: string | null;
@@ -27,6 +29,16 @@ function resolveSitePathPageType(routePath: string): SitePageType | null {
   if (parsedSitePath.pageType === "products") return "product_detail";
   if (parsedSitePath.pageType === "cart") return "cart";
   if (parsedSitePath.pageType === "checkout") return "checkout";
+  if (parsedSitePath.pageType === "policies") {
+    if (accountSection === "privacy-policy") return "privacy_policy";
+    if (accountSection === "terms-of-service") return "terms_of_service";
+    if (accountSection === "refund-policy" || accountSection === "returns-refunds-policy") {
+      return "returns_refunds_policy";
+    }
+    if (accountSection === "shipping-policy") return "shipping_policy";
+    if (accountSection === "contact" || accountSection === "contact-support") return "contact_support";
+  }
+  if (parsedSitePath.pageType === "contact") return "contact_support";
 
   if (parsedSitePath.pageType === "account") {
     if (accountSection === "profile") return "account_profile";
@@ -65,7 +77,12 @@ export function buildSitePagePreviewPath(
   page: SitePage,
   options: SitePagePreviewOptions = {},
 ): string | null {
-  if (options.siteFamily !== "medusa-b2c-starter") {
+  if (
+    !isMedusaB2CRuntimeSite({
+      siteFamily: options.siteFamily,
+      commerceProvider: options.commerceProvider,
+    })
+  ) {
     return buildSitePreviewPath(siteId, page.slug);
   }
 
@@ -99,6 +116,21 @@ export function buildSitePagePreviewPath(
       break;
     case "checkout":
       routePath = buildSitePath({ countryCode, pageType: "checkout" });
+      break;
+    case "privacy_policy":
+      routePath = buildSitePath({ countryCode, pageType: "policies", handle: "privacy-policy" });
+      break;
+    case "terms_of_service":
+      routePath = buildSitePath({ countryCode, pageType: "policies", handle: "terms-of-service" });
+      break;
+    case "returns_refunds_policy":
+      routePath = buildSitePath({ countryCode, pageType: "policies", handle: "refund-policy" });
+      break;
+    case "shipping_policy":
+      routePath = buildSitePath({ countryCode, pageType: "policies", handle: "shipping-policy" });
+      break;
+    case "contact_support":
+      routePath = buildSitePath({ countryCode, pageType: "policies", handle: "contact-support" });
       break;
     case "account_dashboard":
       routePath = buildSitePath({ countryCode, pageType: "account" });
@@ -172,6 +204,47 @@ export function buildSitePagePreviewPath(
   }
 
   return buildSitePreviewPath(siteId, routePath);
+}
+
+function getErrorMessage(error: unknown): string | null {
+  const candidate = error as { message?: unknown } | null;
+  if (candidate && typeof candidate.message === "string" && candidate.message.trim()) {
+    return candidate.message.trim();
+  }
+
+  return null;
+}
+
+export function getSitePagePreviewErrorMessage(
+  page: Pick<SitePage, "pageType">,
+  options: {
+    medusaPreviewDataError?: unknown;
+  } = {},
+): string {
+  const previewDataErrorMessage = getErrorMessage(options.medusaPreviewDataError);
+
+  switch (page.pageType) {
+    case "collection":
+      return previewDataErrorMessage
+        ? `Unable to load the live Medusa collection handle needed for preview: ${previewDataErrorMessage}`
+        : "This collection page needs a real Medusa collection handle before it can be previewed from the workspace.";
+    case "category":
+      return previewDataErrorMessage
+        ? `Unable to load the live Medusa category handle needed for preview: ${previewDataErrorMessage}`
+        : "This category page needs a real Medusa category handle before it can be previewed from the workspace.";
+    case "product_detail":
+      return "This product page needs a bound product handle before it can be previewed from the workspace.";
+    case "account_order_detail":
+      return "This order detail page needs a real order ID before it can be previewed from the workspace.";
+    case "order_confirmed":
+      return "This order confirmation page needs a real order ID before it can be previewed from the workspace.";
+    case "order_transfer":
+    case "order_transfer_accept":
+    case "order_transfer_decline":
+      return "This order transfer page needs a real order ID and transfer token before it can be previewed from the workspace.";
+    default:
+      return "This page needs a concrete storefront route before it can be previewed from the workspace.";
+  }
 }
 
 export function resolveSitePreviewPage(

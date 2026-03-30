@@ -50,6 +50,7 @@ export {
   getProductByHandle,
   getProduct,
   type ProductListOptions,
+  type ProductListResult,
   
   // Collections
   listCollections,
@@ -67,6 +68,8 @@ export {
   addCartLineItem,
   updateCartLineItem,
   deleteCartLineItem,
+  applyPromotionCode,
+  removePromotionCode,
   
   // Shipping
   listShippingOptions,
@@ -85,6 +88,7 @@ export {
   logoutCustomer,
   getCurrentCustomer,
   updateCustomer,
+  requestCustomerPasswordReset,
   createCustomerAddress,
   updateCustomerAddress,
   deleteCustomerAddress,

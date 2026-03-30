@@ -431,8 +431,12 @@ async function mockB2CCheckout(
   const paymentRedirect = options?.paymentRedirect === true;
   const shippingOptionFailure = options?.shippingOptionFailure === true;
   const backendUrl = "https://medusa.test";
+  const recalculateCartTotal = <TCart extends { subtotal?: number; shipping_total?: number; tax_total?: number; discount_total?: number; total?: number }>(nextCart: TCart) => ({
+    ...nextCart,
+    total: (nextCart.subtotal || 0) + (nextCart.shipping_total || 0) + (nextCart.tax_total || 0) - (nextCart.discount_total || 0),
+  });
 
-  let cart = {
+  let cart = recalculateCartTotal({
     id: "cart-b2c-1",
     region_id: "reg-us",
     currency_code: "usd",
@@ -442,8 +446,9 @@ async function mockB2CCheckout(
     shipping_methods: [] as Array<{ id: string; shipping_option_id: string; price: number }>,
     subtotal: cartHasItems ? 3900 : 0,
     shipping_total: 0,
+    discount_total: 0,
     tax_total: 0,
-    total: cartHasItems ? 3900 : 0,
+    promotions: [] as Array<{ id: string; code: string }>,
     items: cartHasItems
       ? [
           {
@@ -458,7 +463,7 @@ async function mockB2CCheckout(
           },
         ]
       : [],
-  };
+  });
 
   await page.route(`**/public/funnels/${PRODUCT_SLUG}/${FUNNEL_SLUG}/meta`, async (route) => {
     await route.fulfill({
@@ -560,12 +565,11 @@ async function mockB2CCheckout(
 
     if (method === "POST" && path.includes(`/store/carts/${cart.id}`) && path.includes("shipping-method")) {
       const payload = request.postDataJSON() as { option_id?: string };
-      cart = {
+      cart = recalculateCartTotal({
         ...cart,
         shipping_methods: [{ id: "sm-1", shipping_option_id: payload.option_id || "ship-standard", price: 900 }],
         shipping_total: 900,
-        total: cart.subtotal + 900,
-      };
+      });
       await route.fulfill({ json: { cart } });
       return;
     }
@@ -575,18 +579,48 @@ async function mockB2CCheckout(
       return;
     }
 
+    if ((method === "POST" || method === "DELETE") && path.includes(`/store/carts/${cart.id}/promotions`)) {
+      const payload = request.postDataJSON() as { promo_codes?: string[] };
+      const [code] = payload.promo_codes || [];
+      if (!code) {
+        await route.fulfill({ status: 400, json: { message: "Enter a discount code." } });
+        return;
+      }
+
+      if (method === "POST") {
+        if (code !== "HERBAL10") {
+          await route.fulfill({ status: 400, json: { message: "Discount code is invalid." } });
+          return;
+        }
+        cart = recalculateCartTotal({
+          ...cart,
+          discount_total: 500,
+          promotions: [{ id: "promo-herbal10", code }],
+        });
+      } else {
+        cart = recalculateCartTotal({
+          ...cart,
+          discount_total: 0,
+          promotions: cart.promotions.filter((promotion) => promotion.code !== code),
+        });
+      }
+
+      await route.fulfill({ json: { cart } });
+      return;
+    }
+
     if (method === "POST" && path.includes(`/store/carts/${cart.id}`)) {
       const payload = request.postDataJSON() as {
         email?: string;
         shipping_address?: typeof cart.shipping_address;
         billing_address?: typeof cart.billing_address;
       };
-      cart = {
+      cart = recalculateCartTotal({
         ...cart,
         email: payload.email ?? cart.email,
         shipping_address: payload.shipping_address ?? cart.shipping_address,
         billing_address: payload.billing_address ?? cart.billing_address,
-      };
+      });
       await route.fulfill({ json: { cart } });
       return;
     }
@@ -609,7 +643,7 @@ async function mockB2CCheckout(
     if (method === "GET" && path.includes("payment") && path.includes("provider")) {
       await route.fulfill({
         json: {
-          payment_providers: [{ id: paymentRedirect ? "paypal" : "manual_test" }],
+          payment_providers: [{ id: "paypal" }, { id: "manual_test" }],
         },
       });
       return;
@@ -617,6 +651,7 @@ async function mockB2CCheckout(
 
     if (method === "POST" && path.includes("payment")) {
       const payload = request.postDataJSON() as { provider_id?: string };
+      const shouldRedirect = payload.provider_id === "paypal" || paymentRedirect;
       await route.fulfill({
         json: {
           payment_collection: {
@@ -627,10 +662,10 @@ async function mockB2CCheckout(
             payment_sessions: [
               {
                 id: "session-1",
-                provider_id: payload.provider_id || (paymentRedirect ? "paypal" : "manual_test"),
+                provider_id: payload.provider_id || "manual_test",
                 status: "pending",
                 amount: cart.total,
-                data: paymentRedirect ? { redirect_url: "https://payments.test/checkout" } : {},
+                data: shouldRedirect ? { redirect_url: "https://payments.test/checkout" } : {},
               },
             ],
           },
@@ -789,6 +824,30 @@ test.describe("b2c checkout parity", () => {
     await page.waitForURL(new RegExp(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/order/order-b2c-1/confirmed$`));
   });
 
+  test("applies and removes a discount code from the live order summary", async ({ page }) => {
+    await mockB2CCheckout(page);
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    const summary = page.getByTestId("b2c-checkout-summary");
+    const promo = page.getByTestId("b2c-checkout-promo");
+
+    await expect(summary).toContainText("$39.00");
+
+    await promo.getByPlaceholder("Enter code").fill("HERBAL10");
+    await promo.getByRole("button", { name: "Apply" }).click();
+
+    await expect(summary).toContainText("Discounts");
+    await expect(summary).toContainText("-$5.00");
+    await expect(summary).toContainText("$34.00");
+
+    await promo.getByRole("button", { name: "Remove" }).click();
+
+    await expect(summary).not.toContainText("Discounts");
+    await expect(summary).toContainText("$39.00");
+  });
+
   test("re-locks shipping totals and payment after delivery details change", async ({ page }) => {
     await mockB2CCheckout(page);
 
@@ -842,6 +901,31 @@ test.describe("b2c checkout parity", () => {
     await expect(page.getByTestId("b2c-checkout-summary")).toContainText("$39.00");
   });
 
+  test("express checkout auto-selects a single shipping option and redirects through the wallet provider", async ({ page }) => {
+    await mockB2CCheckout(page, { paymentRedirect: true });
+
+    await page.goto(`/f/${PRODUCT_SLUG}/${FUNNEL_SLUG}/us/checkout`);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByTestId("b2c-checkout-express")).toBeVisible();
+    await expect(page.getByTestId("b2c-express-provider-paypal")).toBeDisabled();
+
+    const deliverySection = page.getByTestId("b2c-checkout-delivery");
+    await page.getByLabel("Email address").fill("buyer@example.com");
+    await deliverySection.getByLabel("First name").fill("Taylor");
+    await deliverySection.getByLabel("Last name").fill("Smith");
+    await deliverySection.getByLabel("Address").fill("123 Market Street");
+    await deliverySection.getByLabel("City").fill("Austin");
+    await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
+    await page.getByTestId("b2c-save-delivery").click();
+
+    await expect(page.getByTestId("b2c-express-provider-paypal")).toBeEnabled();
+    await page.getByTestId("b2c-express-provider-paypal").click();
+
+    await page.waitForURL("https://payments.test/checkout");
+    await expect(page.getByText("Redirected to provider")).toBeVisible();
+  });
+
   test("renders inline shipping API failures", async ({ page }) => {
     await mockB2CCheckout(page, { shippingOptionFailure: true });
 
@@ -875,7 +959,7 @@ test.describe("b2c checkout parity", () => {
     await deliverySection.getByLabel("ZIP / Postal code").fill("78701");
     await page.getByTestId("b2c-save-delivery").click();
     await page.getByText("Standard Shipping").click();
-    await page.getByTestId("b2c-payment-providers").getByText("Paypal", { exact: true }).click();
+    await page.getByTestId("b2c-payment-providers").getByText("PayPal", { exact: true }).click();
     await page.getByTestId("b2c-complete-checkout").click();
 
     await page.waitForURL("https://payments.test/checkout");

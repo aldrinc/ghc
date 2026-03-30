@@ -50,6 +50,7 @@ from app.routers import (
     site_funnels,
     site_product_bindings,
     site_imports,
+    postiz,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,6 +153,7 @@ def create_app() -> FastAPI:
             return {"db": f"error: {exc}"}
 
     app.include_router(clients.router)
+    app.include_router(clients.stripe_profiles_router)
     app.include_router(brands.router)
     app.include_router(design_systems.router)
     app.include_router(products.router)
@@ -188,6 +190,7 @@ def create_app() -> FastAPI:
     app.include_router(site_product_bindings.router)
     app.include_router(site_product_bindings.products_router)
     app.include_router(site_imports.router)
+    app.include_router(postiz.router)
 
     return app
 

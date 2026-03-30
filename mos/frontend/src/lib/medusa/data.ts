@@ -51,6 +51,50 @@ function handleApiError(error: unknown): never {
   throw new MedusaApiError(message);
 }
 
+async function medusaStoreFetch<TResponse>(
+  path: string,
+  options: {
+    method?: "POST" | "DELETE";
+    body?: Record<string, unknown>;
+  } = {},
+): Promise<TResponse> {
+  const config = getMedusaRuntimeConfig();
+  if (!config) {
+    throw new MedusaApiError(
+      "Medusa runtime is not configured. Please set VITE_MEDUSA_BACKEND_URL and VITE_MEDUSA_PUBLISHABLE_KEY.",
+    );
+  }
+
+  const authToken = getAuthToken();
+  const response = await fetch(`${config.backendUrl}${path}`, {
+    method: options.method || "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "x-publishable-api-key": config.publishableKey,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify(options.body || {}),
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : typeof payload === "string" && payload.trim()
+          ? payload
+          : `Medusa request failed with status ${response.status}.`;
+    throw new MedusaApiError(message, response.status, payload);
+  }
+
+  return payload as TResponse;
+}
+
 // =============================================================================
 // Regions
 // =============================================================================
@@ -99,15 +143,17 @@ export type ProductListOptions = {
   order?: string;
 };
 
-/**
- * List products from Medusa with optional filtering.
- */
-export async function listProducts(options: ProductListOptions = {}): Promise<{
+export type ProductListResult = {
   products: MedusaProduct[];
   count: number;
   offset: number;
   limit: number;
-}> {
+};
+
+/**
+ * List products from Medusa with optional filtering.
+ */
+export async function listProducts(options: ProductListOptions = {}): Promise<ProductListResult> {
   try {
     const client = getMedusaClient();
     const response = await client.store.product.list({
@@ -496,6 +542,44 @@ export async function completeCart(cartId: string): Promise<{
   }
 }
 
+export async function applyPromotionCode(cartId: string, code: string): Promise<MedusaCart> {
+  const trimmedCode = code.trim();
+  if (!trimmedCode) {
+    throw new MedusaApiError("Enter a discount code.");
+  }
+
+  try {
+    const response = await medusaStoreFetch<{ cart: MedusaCart }>(`/store/carts/${cartId}/promotions`, {
+      method: "POST",
+      body: {
+        promo_codes: [trimmedCode],
+      },
+    });
+    return response.cart;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function removePromotionCode(cartId: string, code: string): Promise<MedusaCart> {
+  const trimmedCode = code.trim();
+  if (!trimmedCode) {
+    throw new MedusaApiError("Enter a discount code.");
+  }
+
+  try {
+    const response = await medusaStoreFetch<{ cart: MedusaCart }>(`/store/carts/${cartId}/promotions`, {
+      method: "DELETE",
+      body: {
+        promo_codes: [trimmedCode],
+      },
+    });
+    return response.cart;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
 // =============================================================================
 // Customer / Auth
 // =============================================================================
@@ -630,6 +714,25 @@ export async function updateCustomer(input: UpdateCustomerInput): Promise<Medusa
     const client = getMedusaClient();
     const response = await client.store.customer.update(input);
     return response.customer as MedusaCustomer;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/**
+ * Request a password reset link for a customer email.
+ */
+export async function requestCustomerPasswordReset(email: string): Promise<void> {
+  const identifier = email.trim();
+  if (!identifier) {
+    throw new MedusaApiError("A customer email is required to send a password reset link.");
+  }
+
+  try {
+    const client = getMedusaClient();
+    await client.auth.resetPassword("customer", "emailpass", {
+      identifier,
+    });
   } catch (error) {
     return handleApiError(error);
   }

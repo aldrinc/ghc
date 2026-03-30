@@ -1,6 +1,18 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Config } from "@measured/puck";
 import { Link } from "react-router-dom";
+import {
+  ImportedAccordion,
+  ImportedBadgeStrip,
+  ImportedComparisonTable,
+  ImportedFooterLinks,
+  ImportedItemGrid,
+  ImportedNarrativeBlock,
+  ImportedOfferSelector,
+  ImportedPage,
+  ImportedSection,
+  ImportedTestimonialsGrid,
+} from "@/components/imported-site/ImportedTemplateBlocks";
 import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
@@ -58,6 +70,7 @@ import {
   StarterStoreHeader,
   StarterPromoBar,
   StarterHomeHero,
+  StarterPolicyPage,
   StarterCollectionRails,
   StarterStoreFooter,
 } from "@/components/commerce/StarterStorefrontBlocks";
@@ -69,6 +82,7 @@ import {
   MedusaB2CProductPage,
   MedusaB2CCartPage,
   MedusaB2CCheckoutPage,
+  MedusaB2CPolicyPage,
   MedusaB2CAccountDashboardPage,
   MedusaB2CAccountProfilePage,
   MedusaB2CAccountAddressesPage,
@@ -1352,6 +1366,39 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           />
         )),
       },
+      StarterPolicyPage: {
+        fields: {
+          pageKey: {
+            type: "select",
+            options: [
+              { label: "Privacy Policy", value: "privacy_policy" },
+              { label: "Terms of Service", value: "terms_of_service" },
+              { label: "Returns and Refunds", value: "returns_refunds_policy" },
+              { label: "Shipping Policy", value: "shipping_policy" },
+              { label: "Contact and Support", value: "contact_support" },
+            ],
+          },
+          pageTitle: { type: "text" },
+        },
+        defaultProps: {
+          pageKey: "privacy_policy",
+          pageTitle: "Privacy Policy",
+        },
+        render: withBlockBoundary("StarterPolicyPage", (props: Record<string, unknown>) => (
+          <StarterPolicyPage
+            pageKey={
+              props.pageKey === "privacy_policy" ||
+              props.pageKey === "terms_of_service" ||
+              props.pageKey === "returns_refunds_policy" ||
+              props.pageKey === "shipping_policy" ||
+              props.pageKey === "contact_support"
+                ? props.pageKey
+                : "privacy_policy"
+            }
+            pageTitle={typeof props.pageTitle === "string" ? props.pageTitle : undefined}
+          />
+        )),
+      },
       StarterCollectionRails: {
         fields: {
           maxCollections: { type: "number" },
@@ -1426,6 +1473,41 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {},
         render: withBlockBoundary("MedusaB2CCheckoutPage", () => <MedusaB2CCheckoutPage />),
       },
+      MedusaB2CPolicyPage: {
+        fields: {
+          pageKey: {
+            type: "select",
+            options: [
+              { label: "Privacy Policy", value: "privacy_policy" },
+              { label: "Terms of Service", value: "terms_of_service" },
+              { label: "Refund Policy", value: "returns_refunds_policy" },
+              { label: "Shipping Policy", value: "shipping_policy" },
+              { label: "Contact Support", value: "contact_support" },
+            ],
+          },
+          pageTitle: { type: "text" },
+          description: { type: "textarea" },
+        },
+        defaultProps: {
+          pageKey: "privacy_policy",
+          pageTitle: "Privacy Policy",
+        },
+        render: withBlockBoundary(
+          "MedusaB2CPolicyPage",
+          (props: { pageKey: string; pageTitle?: string; description?: string }) => (
+            <MedusaB2CPolicyPage
+              pageKey={props.pageKey as
+                | "privacy_policy"
+                | "terms_of_service"
+                | "returns_refunds_policy"
+                | "shipping_policy"
+                | "contact_support"}
+              pageTitle={props.pageTitle}
+              description={props.description}
+            />
+          ),
+        ),
+      },
       MedusaB2CAccountDashboardPage: {
         fields: {},
         defaultProps: {},
@@ -1477,8 +1559,387 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         },
         render: ({ height }: { height?: number }) => <div style={{ height: Math.max(0, height || 24) }} />,
       },
+      ImportedPage: {
+        fields: {
+          pageName: { type: "text" },
+          themeJson: { type: "textarea" },
+          content: { type: "slot" },
+        },
+        defaultProps: {
+          pageName: "Imported Page",
+        },
+        render: withBlockBoundary("ImportedPage", (props: Record<string, unknown>) => (
+          <ImportedPage
+            pageName={typeof props.pageName === "string" ? props.pageName : undefined}
+            theme={props.theme}
+            themeJson={typeof props.themeJson === "string" ? props.themeJson : undefined}
+            renderMode={typeof props.renderMode === "string" ? props.renderMode : undefined}
+            sharedRuntimeSource={
+              typeof props.sharedRuntimeSource === "string" ? props.sharedRuntimeSource : undefined
+            }
+            sharedHeadAssets={props.sharedHeadAssets}
+            content={typeof props.content === "function" ? props.content : undefined}
+          />
+        )),
+      },
+      ImportedSection: {
+        fields: {
+          displayName: { type: "text" },
+          sourceSectionId: { type: "text" },
+          sectionKey: { type: "text" },
+          sectionType: { type: "text" },
+          semanticTagsText: { type: "text" },
+          surface: {
+            type: "select",
+            options: [
+              { label: "Source", value: "source" },
+              { label: "Default", value: "default" },
+              { label: "Muted", value: "muted" },
+              { label: "Primary", value: "primary" },
+            ],
+          },
+          content: { type: "slot" },
+        },
+        defaultProps: {
+          surface: "default",
+        },
+        render: withBlockBoundary("ImportedSection", (props: Record<string, unknown>) => (
+          <ImportedSection
+            displayName={typeof props.displayName === "string" ? props.displayName : undefined}
+            sourceSectionId={typeof props.sourceSectionId === "string" ? props.sourceSectionId : undefined}
+            sectionKey={typeof props.sectionKey === "string" ? props.sectionKey : undefined}
+            sectionType={typeof props.sectionType === "string" ? props.sectionType : undefined}
+            semanticTagsText={typeof props.semanticTagsText === "string" ? props.semanticTagsText : undefined}
+            surface={typeof props.surface === "string" ? props.surface : undefined}
+            renderMode={typeof props.renderMode === "string" ? props.renderMode : undefined}
+            content={typeof props.content === "function" ? props.content : undefined}
+          />
+        )),
+      },
+      ImportedNarrativeBlock: {
+        fields: {
+          eyebrow: { type: "text" },
+          title: { type: "text" },
+          body: { type: "textarea" },
+          quote: { type: "textarea" },
+          imageSrc: { type: "text" },
+          imageAlt: { type: "text" },
+          mediaPosition: {
+            type: "select",
+            options: [
+              { label: "Right", value: "right" },
+              { label: "Left", value: "left" },
+            ],
+          },
+          align: {
+            type: "select",
+            options: [
+              { label: "Left", value: "left" },
+              { label: "Center", value: "center" },
+            ],
+          },
+          badges: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+            },
+            defaultItemProps: { label: "" },
+          },
+          buttons: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", href: "" },
+          },
+        },
+        defaultProps: {
+          mediaPosition: "right",
+          align: "left",
+          badges: [],
+          buttons: [],
+        },
+        render: withBlockBoundary("ImportedNarrativeBlock", (props: Record<string, unknown>) => (
+          <ImportedNarrativeBlock
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            quote={typeof props.quote === "string" ? props.quote : undefined}
+            imageSrc={typeof props.imageSrc === "string" ? props.imageSrc : undefined}
+            imageAlt={typeof props.imageAlt === "string" ? props.imageAlt : undefined}
+            mediaPosition={props.mediaPosition === "left" ? "left" : "right"}
+            align={props.align === "center" ? "center" : "left"}
+            badges={Array.isArray(props.badges) ? (props.badges as Array<{ label?: string }>) : undefined}
+            buttons={Array.isArray(props.buttons) ? (props.buttons as Array<{ label?: string; href?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedItemGrid: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          columns: {
+            type: "select",
+            options: [
+              { label: "1 column", value: 1 },
+              { label: "2 columns", value: 2 },
+              { label: "3 columns", value: 3 },
+              { label: "4 columns", value: 4 },
+            ],
+          },
+          items: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              title: { type: "text" },
+              text: { type: "textarea" },
+              value: { type: "text" },
+            },
+            defaultItemProps: { label: "", title: "", text: "", value: "" },
+          },
+        },
+        defaultProps: {
+          columns: 3,
+          items: [],
+        },
+        render: withBlockBoundary("ImportedItemGrid", (props: Record<string, unknown>) => (
+          <ImportedItemGrid
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            columns={typeof props.columns === "number" ? props.columns : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ label?: string; title?: string; text?: string; value?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedBadgeStrip: {
+        fields: {
+          title: { type: "text" },
+          items: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+            },
+            defaultItemProps: { label: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedBadgeStrip", (props: Record<string, unknown>) => (
+          <ImportedBadgeStrip
+            title={typeof props.title === "string" ? props.title : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ label?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedOfferSelector: {
+        fields: {
+          eyebrow: { type: "text" },
+          title: { type: "text" },
+          body: { type: "textarea" },
+          reviewText: { type: "text" },
+          ctaLabel: { type: "text" },
+          galleryImages: {
+            type: "array",
+            arrayFields: {
+              src: { type: "text" },
+              alt: { type: "text" },
+            },
+            defaultItemProps: { src: "", alt: "" },
+          },
+          benefits: {
+            type: "array",
+            arrayFields: {
+              text: { type: "text" },
+            },
+            defaultItemProps: { text: "" },
+          },
+          offers: {
+            type: "array",
+            arrayFields: {
+              title: { type: "text" },
+              subtitle: { type: "text" },
+              price: { type: "text" },
+              total: { type: "text" },
+              regularPrice: { type: "text" },
+              savings: { type: "text" },
+              badge: { type: "text" },
+            },
+            defaultItemProps: {
+              title: "",
+              subtitle: "",
+              price: "",
+              total: "",
+              regularPrice: "",
+              savings: "",
+              badge: "",
+            },
+          },
+        },
+        defaultProps: {
+          galleryImages: [],
+          benefits: [],
+          offers: [],
+        },
+        render: withBlockBoundary("ImportedOfferSelector", (props: Record<string, unknown>) => (
+          <ImportedOfferSelector
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            reviewText={typeof props.reviewText === "string" ? props.reviewText : undefined}
+            ctaLabel={typeof props.ctaLabel === "string" ? props.ctaLabel : undefined}
+            galleryImages={Array.isArray(props.galleryImages) ? (props.galleryImages as Array<{ src?: string; alt?: string }>) : undefined}
+            benefits={Array.isArray(props.benefits) ? (props.benefits as Array<{ text?: string }>) : undefined}
+            offers={Array.isArray(props.offers) ? (props.offers as Array<{ title?: string; subtitle?: string; price?: string; total?: string; regularPrice?: string; savings?: string; badge?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedTestimonialsGrid: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          items: {
+            type: "array",
+            arrayFields: {
+              name: { type: "text" },
+              quote: { type: "textarea" },
+              role: { type: "text" },
+              imageSrc: { type: "text" },
+            },
+            defaultItemProps: { name: "", quote: "", role: "", imageSrc: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedTestimonialsGrid", (props: Record<string, unknown>) => (
+          <ImportedTestimonialsGrid
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ name?: string; quote?: string; role?: string; imageSrc?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedComparisonTable: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          primaryLabel: { type: "text" },
+          secondaryLabel: { type: "text" },
+          tertiaryLabel: { type: "text" },
+          rows: {
+            type: "array",
+            arrayFields: {
+              feature: { type: "text" },
+              primaryValue: { type: "text" },
+              secondaryValue: { type: "text" },
+              tertiaryValue: { type: "text" },
+            },
+            defaultItemProps: { feature: "", primaryValue: "", secondaryValue: "", tertiaryValue: "" },
+          },
+        },
+        defaultProps: {
+          rows: [],
+        },
+        render: withBlockBoundary("ImportedComparisonTable", (props: Record<string, unknown>) => (
+          <ImportedComparisonTable
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            primaryLabel={typeof props.primaryLabel === "string" ? props.primaryLabel : undefined}
+            secondaryLabel={typeof props.secondaryLabel === "string" ? props.secondaryLabel : undefined}
+            tertiaryLabel={typeof props.tertiaryLabel === "string" ? props.tertiaryLabel : undefined}
+            rows={Array.isArray(props.rows) ? (props.rows as Array<{ feature?: string; primaryValue?: string; secondaryValue?: string; tertiaryValue?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedAccordion: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          items: {
+            type: "array",
+            arrayFields: {
+              question: { type: "text" },
+              answer: { type: "textarea" },
+            },
+            defaultItemProps: { question: "", answer: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedAccordion", (props: Record<string, unknown>) => (
+          <ImportedAccordion
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ question?: string; answer?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedFooterLinks: {
+        fields: {
+          brandName: { type: "text" },
+          body: { type: "textarea" },
+          legalText: { type: "textarea" },
+          links: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", href: "" },
+          },
+        },
+        defaultProps: {
+          links: [],
+        },
+        render: withBlockBoundary("ImportedFooterLinks", (props: Record<string, unknown>) => (
+          <ImportedFooterLinks
+            brandName={typeof props.brandName === "string" ? props.brandName : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            legalText={typeof props.legalText === "string" ? props.legalText : undefined}
+            links={Array.isArray(props.links) ? (props.links as Array<{ label?: string; href?: string }>) : undefined}
+          />
+        )),
+      },
       ImportedRuntimeSection: {
-        fields: {},
+        fields: {
+          textOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalText: { type: "textarea" },
+              text: { type: "textarea" },
+            },
+            defaultItemProps: { label: "", originalText: "", text: "" },
+          },
+          buttonOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalText: { type: "text" },
+              text: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", originalText: "", text: "", href: "" },
+          },
+          imageOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalSrc: { type: "text" },
+              src: { type: "text" },
+              alt: { type: "text" },
+            },
+            defaultItemProps: { label: "", originalSrc: "", src: "", alt: "" },
+          },
+        },
+        defaultProps: {
+          textOverrides: [],
+          buttonOverrides: [],
+          imageOverrides: [],
+        },
         render: withBlockBoundary("ImportedRuntimeSection", (props: Record<string, unknown>) => (
           <ImportedRuntimeSection
             id={typeof props.id === "string" ? props.id : undefined}
@@ -1486,6 +1947,23 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
             runtimeSource={typeof props.runtimeSource === "string" ? props.runtimeSource : undefined}
             headAssets={props.headAssets}
             sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textOverrides={
+              Array.isArray(props.textOverrides)
+                ? (props.textOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
+            buttonOverrides={
+              Array.isArray(props.buttonOverrides)
+                ? (props.buttonOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
+            imageOverrides={
+              Array.isArray(props.imageOverrides)
+                ? (props.imageOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
           />
         )),
       },

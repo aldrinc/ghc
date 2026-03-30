@@ -23,7 +23,6 @@ import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
-console.log("[PublicFunnelPage] apiBaseUrl:", apiBaseUrl);
 const runtimeConfig = createFunnelPuckConfig();
 const managedFaviconAttr = "data-mos-managed-favicon";
 const managedMetaAttr = "data-mos-managed-meta";
@@ -309,6 +308,21 @@ function resolveRequestedPageSlug(sitePath: string | undefined): string | undefi
   if (routeParts[0] === "products") return "product";
   if (routeParts[0] === "cart") return "cart";
   if (routeParts[0] === "checkout") return "checkout";
+  if (routeParts[0] === "policies" && routeParts[1] === "privacy-policy") return "privacy-policy";
+  if (routeParts[0] === "policies" && routeParts[1] === "terms-of-service") return "terms-of-service";
+  if (
+    routeParts[0] === "policies" &&
+    ["refund-policy", "returns-refunds-policy"].includes(routeParts[1] || "")
+  ) {
+    return "refund-policy";
+  }
+  if (routeParts[0] === "policies" && routeParts[1] === "shipping-policy") return "shipping-policy";
+  if (
+    (routeParts[0] === "policies" && ["contact", "contact-support"].includes(routeParts[1] || "")) ||
+    routeParts[0] === "contact"
+  ) {
+    return "contact-support";
+  }
   if (routeParts[0] === "account" && routeParts.length === 1) return "account";
   if (routeParts[0] === "account" && routeParts[1] === "profile") return "account/profile";
   if (routeParts[0] === "account" && routeParts[1] === "addresses") return "account/addresses";
@@ -401,8 +415,12 @@ export function PublicFunnelPage() {
 
   // Fetch legacy commerce data for non-site funnels
   useEffect(() => {
-    if (!productSlug || !funnelSlug) return;
-    if (isSite) return; // Skip legacy commerce for site experiences
+    if (!productSlug || !funnelSlug || !page) return;
+    if (isSite) {
+      setCommerce(null);
+      setCommerceError(null);
+      return; // Skip legacy commerce for site experiences once the page type is known
+    }
     setCommerce(null);
     setCommerceError(null);
     fetch(`${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/commerce`)
@@ -416,7 +434,7 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setCommerceError(err instanceof Error ? err.message : "Unable to load commerce data");
       });
-  }, [funnelSlug, productSlug, isSite]);
+  }, [funnelSlug, page, productSlug, isSite]);
 
   // Fetch site commerce data for site experiences
   useEffect(() => {
@@ -674,7 +692,7 @@ export function PublicFunnelPage() {
         >
           {useB2CRuntime ? (
             <B2CRuntimeProvider
-              siteFamily="medusa-b2c-starter"
+              siteFamily={siteCommerce?.siteFamily || "medusa-b2c-starter"}
               siteName={pageMetadata?.brandName || pageMetadata?.title || null}
               initialCountryCode={parsedRouteSitePath.countryCode || undefined}
             >

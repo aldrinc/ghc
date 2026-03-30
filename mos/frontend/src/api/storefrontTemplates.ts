@@ -1,10 +1,14 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useApiClient } from "@/api/client";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import type {
   ApproveForPublishRequest,
   ApproveForPublishResponse,
   ConvertImportRequest,
+  CreateVariantSiteRequest,
+  CreateVariantSiteResponse,
   CreateDraftFromTemplateRequest,
   CreateDraftFromTemplateResponse,
   CreateSiteImportRequest,
@@ -26,6 +30,21 @@ import type {
   TemplateVariantDetailExtended,
   TemplateVariantSummary,
 } from "@/types/storefrontTemplates";
+
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
+const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
+
+async function readUploadError(resp: Response): Promise<string> {
+  try {
+    const payload = (await resp.json()) as { detail?: unknown; message?: unknown };
+    if (typeof payload.detail === "string" && payload.detail.trim()) return payload.detail;
+    if (typeof payload.message === "string" && payload.message.trim()) return payload.message;
+  } catch {
+    const text = await resp.text();
+    if (text.trim()) return text;
+  }
+  return resp.statusText || "Request failed";
+}
 
 export function useStorefrontTemplates() {
   const { get } = useApiClient();
@@ -117,6 +136,50 @@ export function useCreateSiteImport() {
   return useMutation({
     mutationFn: (request: CreateSiteImportRequest & { clientId: string }) => {
       return post<SiteImportSummary>(`/storefront/templates/imports?clientId=${request.clientId}`, request);
+    },
+  });
+}
+
+export function useCreateSiteImportFromArchive() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      clientId,
+      file,
+      pageTypeHint,
+      siteFamilyHint,
+    }: {
+      clientId: string;
+      file: File;
+      pageTypeHint?: string;
+      siteFamilyHint?: string;
+    }) => {
+      if (!clientId) throw new Error("Workspace is required.");
+      if (!file) throw new Error("Archive file is required.");
+
+      const token = await getToken({ template: clerkTokenTemplate });
+      const formData = new FormData();
+      formData.append("file", file);
+      if (pageTypeHint) formData.append("pageTypeHint", pageTypeHint);
+      if (siteFamilyHint) formData.append("siteFamilyHint", siteFamilyHint);
+
+      const response = await fetch(
+        `${defaultBaseUrl}/storefront/templates/imports/archive?clientId=${encodeURIComponent(clientId)}`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: formData,
+        },
+      );
+      if (!response.ok) {
+        throw new Error(await readUploadError(response));
+      }
+      return (await response.json()) as SiteImportSummary;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["storefront", "imports", vars.clientId] });
     },
   });
 }
@@ -220,6 +283,26 @@ export function useApproveForPublish() {
         `/storefront/templates/variants/${variantId}/approve?clientId=${clientId}`,
         body
       );
+    },
+  });
+}
+
+export function useCreateSiteFromVariant() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (request: CreateVariantSiteRequest & { variantId: string; clientId: string }) => {
+      const { variantId, clientId, ...body } = request;
+      return post<CreateVariantSiteResponse>(
+        `/storefront/templates/variants/${variantId}/create-site?clientId=${clientId}`,
+        body
+      );
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["sites", vars.clientId] });
+      queryClient.invalidateQueries({ queryKey: ["storefront", "variants", vars.clientId] });
+      queryClient.invalidateQueries({ queryKey: ["storefront", "variants", vars.variantId, vars.clientId] });
     },
   });
 }

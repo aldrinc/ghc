@@ -1,0 +1,76 @@
+{
+  "id": "medusa-b2b-policy-terms",
+  "name": "Honest Herbalist Terms of Service",
+  "description": "Terms of service page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Terms of Service",
+        "description": "Terms that govern orders and use of the Honest Herbalist store."
+      }
+    },
+    "content": [
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "header",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterStoreHeader",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showSearch": true,
+                "showCart": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "section",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterPolicyPage",
+              "props": {
+                "pageKey": "terms_of_service",
+                "pageTitle": "Terms of Service"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Section",
+        "props": {
+          "purpose": "footer",
+          "layout": "full",
+          "containerWidth": "lg",
+          "variant": "default",
+          "padding": "none",
+          "content": [
+            {
+              "type": "StarterStoreFooter",
+              "props": {
+                "storeName": "Honest Herbalist",
+                "showCategories": true,
+                "showCollections": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

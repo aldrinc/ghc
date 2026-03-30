@@ -95,6 +95,9 @@ export type ThemeCandidate = {
 
 export type NormalizedSection = {
   id: string;
+  displayName?: string | null;
+  sectionKey?: string | null;
+  semanticTags: string[];
   sectionType: string;
   confidence: number;
   keyText: string[];
@@ -187,6 +190,7 @@ export type TemplateVariantSummary = {
   family: string;
   pageType: string;
   status: string;
+  siteImportId?: string | null;
   sourceType?: string | null;
   parentVariantId?: string | null;
   mutationPresetLabel?: string | null;
@@ -239,6 +243,11 @@ export type SaveSiteImportRequest = {
   description?: string;
 };
 
+export type CreateVariantSiteRequest = {
+  siteName?: string;
+  description?: string;
+};
+
 export type SaveSiteImportCreatedPage = {
   pageId: string;
   pageType?: string | null;
@@ -247,6 +256,15 @@ export type SaveSiteImportCreatedPage = {
 };
 
 export type SaveSiteImportResponse = {
+  siteId: string;
+  siteName: string;
+  pageCount: number;
+  entryPageType?: string | null;
+  createdPages: SaveSiteImportCreatedPage[];
+  createdAt: string;
+};
+
+export type CreateVariantSiteResponse = {
   siteId: string;
   siteName: string;
   pageCount: number;

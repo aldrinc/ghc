@@ -1,0 +1,25 @@
+{
+  "id": "medusa-b2c-policy-privacy",
+  "name": "Medusa B2C Privacy Policy",
+  "description": "Privacy policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Privacy Policy",
+        "description": "How customer information is collected, used, and protected across the storefront."
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CPolicyPage",
+        "props": {
+          "pageKey": "privacy_policy",
+          "pageTitle": "Privacy Policy",
+          "description": "How customer information is collected, used, and protected across the storefront."
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

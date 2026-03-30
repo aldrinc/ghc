@@ -1037,3 +1037,86 @@ def get_medusa_store_config(
         base_url=config.base_url,
         publishable_key=config.publishable_key_encrypted,
     )
+
+
+# =============================================================================
+# Payment Provider Filtering
+# =============================================================================
+
+
+def filter_payment_providers_by_allowlist(
+    providers: list[dict[str, Any]],
+    allowed_provider_ids: list[str],
+) -> list[dict[str, Any]]:
+    """Filter Medusa payment providers against an allowlist."""
+    if not allowed_provider_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+    allowed_set = {provider_id.strip() for provider_id in allowed_provider_ids if provider_id and provider_id.strip()}
+    if not allowed_set:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+    return [provider for provider in providers if provider.get("id") in allowed_set]
+
+
+def validate_provider_id_against_allowlist(
+    provider_id: str,
+    allowed_provider_ids: list[str],
+) -> None:
+    """Validate that a provider ID is in the workspace allowlist."""
+    if not allowed_provider_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+    allowed_set = {allowed_id.strip() for allowed_id in allowed_provider_ids if allowed_id and allowed_id.strip()}
+    if not allowed_set:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+    if provider_id not in allowed_set:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Payment provider '{provider_id}' is not allowed for this workspace.",
+        )
+
+
+def resolve_default_payment_provider_id(
+    allowed_provider_ids: list[str],
+    default_payment_provider_id: str | None,
+    available_providers: list[dict[str, Any]],
+) -> str | None:
+    """Resolve which payment provider should be selected by default."""
+    if not allowed_provider_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+
+    allowed_set = {allowed_id.strip() for allowed_id in allowed_provider_ids if allowed_id and allowed_id.strip()}
+    if not allowed_set:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace payment providers are not configured. Set allowedPaymentProviderIds before checkout.",
+        )
+
+    if default_payment_provider_id:
+        if default_payment_provider_id not in allowed_set:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Configured default payment provider '{default_payment_provider_id}' is not in the workspace allowlist.",
+            )
+        available_ids = {provider.get("id") for provider in available_providers}
+        if default_payment_provider_id not in available_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Configured default payment provider '{default_payment_provider_id}' is not currently available from Medusa.",
+            )
+        return default_payment_provider_id
+
+    return None

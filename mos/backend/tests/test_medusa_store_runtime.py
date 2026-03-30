@@ -26,6 +26,9 @@ from app.services.medusa_store_runtime import (
     medusa_create_payment_collection,
     medusa_initialize_payment_session,
     medusa_complete_cart,
+    filter_payment_providers_by_allowlist,
+    validate_provider_id_against_allowlist,
+    resolve_default_payment_provider_id,
 )
 
 
@@ -653,3 +656,106 @@ class TestMedusaCompleteCart:
 
         assert exc_info.value.status_code == 409
         assert "not ready" in str(exc_info.value.detail).lower()
+
+
+class TestPaymentProviderFiltering:
+    """Tests for payment provider allowlist filtering."""
+
+    def test_filter_payment_providers_empty_allowlist(self):
+        """Test that empty allowlist raises a clean configuration error."""
+        providers = [
+            {"id": "stripe"},
+            {"id": "paypal"},
+        ]
+        with pytest.raises(HTTPException) as exc_info:
+            filter_payment_providers_by_allowlist(providers, [])
+        assert exc_info.value.status_code == 409
+        assert "not configured" in str(exc_info.value.detail).lower()
+
+    def test_filter_payment_providers_with_allowlist(self):
+        """Test filtering providers against allowlist."""
+        providers = [
+            {"id": "stripe"},
+            {"id": "paypal"},
+            {"id": "manual"},
+        ]
+        result = filter_payment_providers_by_allowlist(providers, ["stripe", "manual"])
+        assert len(result) == 2
+        assert all(provider["id"] in ["stripe", "manual"] for provider in result)
+
+    def test_filter_payment_providers_trims_whitespace(self):
+        """Test that provider IDs are trimmed before comparison."""
+        providers = [
+            {"id": "stripe"},
+            {"id": "paypal"},
+        ]
+        result = filter_payment_providers_by_allowlist(providers, [" stripe ", " paypal "])
+        assert len(result) == 2
+
+    def test_filter_payment_providers_removes_duplicates(self):
+        """Test that allowlist duplicates are removed."""
+        providers = [{"id": "stripe"}]
+        result = filter_payment_providers_by_allowlist(providers, ["stripe", "stripe"])
+        assert len(result) == 1
+
+
+class TestValidateProviderIdAgainstAllowlist:
+    """Tests for provider ID validation against allowlist."""
+
+    def test_validate_provider_id_empty_allowlist(self):
+        """Test that empty allowlist raises a clean configuration error."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_provider_id_against_allowlist("stripe", [])
+        assert exc_info.value.status_code == 409
+        assert "not configured" in str(exc_info.value.detail).lower()
+
+    def test_validate_provider_id_in_allowlist(self):
+        """Test that provider in allowlist is accepted."""
+        validate_provider_id_against_allowlist("stripe", ["stripe", "paypal"])
+
+    def test_validate_provider_id_not_in_allowlist(self):
+        """Test that provider not in allowlist raises 403."""
+        with pytest.raises(HTTPException) as exc_info:
+            validate_provider_id_against_allowlist("unknown", ["stripe", "paypal"])
+        assert exc_info.value.status_code == 403
+        assert "not allowed" in str(exc_info.value.detail).lower()
+
+
+class TestResolveDefaultPaymentProviderId:
+    """Tests for resolving default payment provider."""
+
+    def test_resolve_default_no_config(self):
+        """Test resolving when no allowlist is configured."""
+        providers = [{"id": "stripe"}, {"id": "paypal"}]
+        with pytest.raises(HTTPException) as exc_info:
+            resolve_default_payment_provider_id([], None, providers)
+        assert exc_info.value.status_code == 409
+        assert "not configured" in str(exc_info.value.detail).lower()
+
+    def test_resolve_default_with_default_in_allowlist(self):
+        """Test resolving when default is in allowlist and available."""
+        providers = [{"id": "stripe"}, {"id": "paypal"}]
+        result = resolve_default_payment_provider_id(["stripe", "paypal"], "stripe", providers)
+        assert result == "stripe"
+
+    def test_resolve_default_not_in_allowlist(self):
+        """Test resolving when default is not in allowlist."""
+        providers = [{"id": "stripe"}, {"id": "paypal"}]
+        with pytest.raises(HTTPException) as exc_info:
+            resolve_default_payment_provider_id(["paypal"], "stripe", providers)
+        assert exc_info.value.status_code == 400
+        assert "not in the workspace allowlist" in str(exc_info.value.detail)
+
+    def test_resolve_default_not_available(self):
+        """Test resolving when default is not available from Medusa."""
+        providers = [{"id": "paypal"}]
+        with pytest.raises(HTTPException) as exc_info:
+            resolve_default_payment_provider_id(["stripe", "paypal"], "stripe", providers)
+        assert exc_info.value.status_code == 409
+        assert "not currently available" in str(exc_info.value.detail)
+
+    def test_resolve_default_single_allowed_provider(self):
+        """Test resolving when no default provider is configured."""
+        providers = [{"id": "stripe"}]
+        result = resolve_default_payment_provider_id(["stripe"], None, providers)
+        assert result is None

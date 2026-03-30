@@ -4,12 +4,15 @@ import { useApiClient } from "@/api/client";
 import type { Data } from "@measured/puck";
 import type { MedusaRuntimeConfig } from "@/lib/medusa";
 
+export type SiteThemeBindingMode = "standalone" | "workspace_default" | "design_system";
+
 interface SiteFamilySummary {
   family: string;
   name: string;
   description: string;
   siteType: string;
   commerceProvider: string;
+  themeRequirement: "optional" | "required";
   pageCount: number;
 }
 
@@ -29,6 +32,7 @@ interface SiteFamilyDetail {
   description: string;
   siteType: string;
   commerceProvider: string;
+  themeRequirement: "optional" | "required";
   pageBlueprints: SitePageBlueprint[];
   provenanceNotes: string[];
 }
@@ -44,6 +48,7 @@ interface SiteSummary {
   commerceProvider: string | null;
   productId?: string | null;
   designSystemId?: string | null;
+  themeBindingMode: SiteThemeBindingMode;
   routeSlug?: string | null;
   primaryDomain?: string | null;
   templateId?: string | null;
@@ -86,6 +91,7 @@ export interface SiteDetail {
   commerceProvider: string | null;
   productId?: string | null;
   designSystemId?: string | null;
+  themeBindingMode: SiteThemeBindingMode;
   entryPageId: string | null;
   routeSlug?: string | null;
   primaryDomain?: string | null;
@@ -105,6 +111,7 @@ export interface SitePageDetail {
     commerceProvider: string | null;
     productId: string | null;
     designSystemId: string | null;
+    themeBindingMode?: SiteThemeBindingMode | null;
   };
   page: {
     id: string;
@@ -126,8 +133,18 @@ interface CreateSiteRequest {
   family: string;
   name: string;
   description?: string;
-  productId?: string;  // Optional - sites can exist without a single product
+  productId?: string;
+  themeBindingMode?: SiteThemeBindingMode;
   designSystemId?: string;
+}
+
+interface UpdateSiteRequest {
+  name?: string;
+  description?: string;
+  routeSlug?: string | null;
+  primaryDomain?: string | null;
+  themeBindingMode?: SiteThemeBindingMode;
+  designSystemId?: string | null;
 }
 
 interface UpdateSitePageRequest {
@@ -146,8 +163,33 @@ export interface SiteMedusaConfigResponse {
   commerceProvider: string | null;
   medusaConfig: (Pick<MedusaRuntimeConfig, "publishableKey"> & {
     baseUrl?: string | null;
+    stripeAccountId?: string | null;
     available: boolean;
   }) | null;
+}
+
+type SiteQueryOptions = {
+  clientId?: string | null;
+  requireWorkspace?: boolean;
+};
+
+type SitePageQueryOptions = {
+  clientId?: string | null;
+};
+
+function hasExplicitClientId(options: { clientId?: string | null }): boolean {
+  return Object.prototype.hasOwnProperty.call(options, "clientId");
+}
+
+function buildSiteDetailPath(siteId: string, clientId?: string | null): string {
+  const cleanedClientId = (clientId || "").trim();
+  return cleanedClientId
+    ? `/sites/${siteId}?clientId=${encodeURIComponent(cleanedClientId)}`
+    : `/sites/${siteId}`;
+}
+
+function buildSitePageDetailPath(siteId: string, pageId: string, clientId: string): string {
+  return `/sites/${siteId}/pages/${pageId}?clientId=${encodeURIComponent(clientId)}`;
 }
 
 export function useSiteFamilies() {
@@ -177,13 +219,16 @@ export function useSites() {
   });
 }
 
-export function useSite(siteId: string | null) {
+export function useSite(siteId: string | null, options: SiteQueryOptions = {}) {
   const { get } = useApiClient();
   const { workspace } = useWorkspace();
+  const clientId = hasExplicitClientId(options) ? options.clientId ?? null : workspace?.id ?? null;
+  const requireWorkspace = options.requireWorkspace ?? true;
+
   return useQuery({
-    queryKey: ["sites", workspace?.id ?? null, siteId],
-    queryFn: () => get<SiteDetail>(`/sites/${siteId}?clientId=${workspace!.id}`),
-    enabled: !!workspace?.id && !!siteId,
+    queryKey: ["sites", clientId ?? "__org_scope__", siteId],
+    queryFn: () => get<SiteDetail>(buildSiteDetailPath(siteId!, clientId)),
+    enabled: !!siteId && (!requireWorkspace || !!clientId),
   });
 }
 
@@ -200,14 +245,38 @@ export function useCreateSite() {
   });
 }
 
+export function useUpdateSite(siteId: string | null) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: (payload: UpdateSiteRequest) =>
+      request<SiteDetail>(`/sites/${siteId}?clientId=${workspace!.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id ?? null, siteId] });
+      queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id] });
+    },
+  });
+}
+
 // Site Page Editor APIs
-export function useSitePage(siteId: string | null | undefined, pageId: string | null | undefined) {
+export function useSitePage(
+  siteId: string | null | undefined,
+  pageId: string | null | undefined,
+  options: SitePageQueryOptions = {},
+) {
   const { get } = useApiClient();
   const { workspace } = useWorkspace();
+  const clientId = hasExplicitClientId(options) ? options.clientId ?? null : workspace?.id ?? null;
+
   return useQuery<SitePageDetail>({
-    queryKey: ["sites", siteId, "pages", pageId],
-    queryFn: () => get<SitePageDetail>(`/sites/${siteId}/pages/${pageId}?clientId=${workspace!.id}`),
-    enabled: !!workspace?.id && !!siteId && !!pageId,
+    queryKey: ["sites", siteId, "pages", pageId, clientId ?? "__missing_client__"],
+    queryFn: () => get<SitePageDetail>(buildSitePageDetailPath(siteId!, pageId!, clientId!)),
+    enabled: !!clientId && !!siteId && !!pageId,
   });
 }
 

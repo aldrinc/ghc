@@ -312,3 +312,16 @@ class SitePageTypeEnum(str, Enum):
     account = "account"
     quote = "quote"
     approval = "approval"
+
+
+class SiteThemeBindingModeEnum(str, Enum):
+    """Site theme binding mode determining how the site resolves its design system tokens.
+
+    - standalone: Site intentionally has no bound design system. Returns null tokens.
+    - workspace_default: Site intentionally uses the workspace default design system.
+    - design_system: Site intentionally uses a specific selected design system.
+    """
+
+    standalone = "standalone"
+    workspace_default = "workspace_default"
+    design_system = "design_system"

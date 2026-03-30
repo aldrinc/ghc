@@ -1,39 +1,150 @@
 import { Puck } from "@measured/puck";
 import type { Data } from "@measured/puck";
+import type { Viewport } from "@measured/puck";
 import { useProducts } from "@/api/products";
 import { useSiteProductBindings } from "@/api/siteProductBindings";
 import { useSite, useSitePage, useUpdateSitePage, useCreateSitePageVersion, useSiteMedusaConfig } from "@/api/sites";
 import { B2CRuntimeProvider } from "@/components/commerce/b2c/B2CRuntimeProvider";
+import { isMedusaB2CRuntimeSite } from "@/components/commerce/b2c/runtimeSite";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { DialogContent, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { useDesignSystems } from "@/api/designSystems";
+import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
+import { createPuckFieldTypesPlugin } from "@/funnels/puckFieldTypesPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
 import { buildRuntimePageMap, buildRuntimePageStageMap, buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { setMedusaRuntimeConfig } from "@/lib/medusa";
-import { buildSitePagePreviewPath, buildSitePreviewPath } from "@/pages/workspaces/sites/sitePreviewRouting";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { useSitePreviewDefaults } from "@/pages/workspaces/sites/sitePreviewDefaults";
+import { buildSitePagePreviewPath, buildSitePreviewPath, getSitePagePreviewErrorMessage } from "@/pages/workspaces/sites/sitePreviewRouting";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ChevronRight, ExternalLink, Loader2, MoreVertical, Save, Settings } from "lucide-react";
+import { SITE_PAGE_EDITOR_THEME_INHERITANCE_COPY } from "./sitePageEditorCopy";
+
+/* ------------------------------------------------------------------ */
+/*  Breadcrumb                                                         */
+/* ------------------------------------------------------------------ */
+
+function Breadcrumb({ items }: { items: Array<{ label: string; href?: string }> }) {
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-content-muted">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1">
+          {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
+          {item.href ? (
+            <Link to={item.href} className="hover:text-content transition-colors truncate max-w-[12rem]">
+              {item.label}
+            </Link>
+          ) : (
+            <span className="text-content font-medium truncate max-w-[12rem]">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+function clonePuckData<T>(value: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+type ImportedRuntimeSyncEntry = {
+  frameId: string;
+  sectionSourceId: string | null;
+  revision: string;
+  textOverrides: Array<Record<string, unknown>>;
+  buttonOverrides: Array<Record<string, unknown>>;
+  imageOverrides: Array<Record<string, unknown>>;
+};
+
+function collectImportedRuntimeSyncEntries(data: Data): ImportedRuntimeSyncEntry[] {
+  const zones = (data.zones || {}) as Record<string, unknown>;
+  const entries: ImportedRuntimeSyncEntry[] = [];
+
+  const visitNodes = (nodes: unknown, currentSectionSourceId: string | null) => {
+    if (!Array.isArray(nodes)) return;
+
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const record = node as Record<string, unknown>;
+      const type = typeof record.type === "string" ? record.type : "";
+      const props = record.props && typeof record.props === "object" ? (record.props as Record<string, unknown>) : {};
+      const nodeId = typeof props.id === "string" ? props.id : null;
+      const nextSectionSourceId =
+        type === "ImportedSection" && typeof props.sourceSectionId === "string"
+          ? props.sourceSectionId
+          : currentSectionSourceId;
+
+      if (type === "ImportedRuntimeSection" && nodeId) {
+        const textOverrides = Array.isArray(props.textOverrides)
+          ? (props.textOverrides as Array<Record<string, unknown>>)
+          : [];
+        const buttonOverrides = Array.isArray(props.buttonOverrides)
+          ? (props.buttonOverrides as Array<Record<string, unknown>>)
+          : [];
+        const imageOverrides = Array.isArray(props.imageOverrides)
+          ? (props.imageOverrides as Array<Record<string, unknown>>)
+          : [];
+        entries.push({
+          frameId: `imported-runtime-${nodeId}`,
+          sectionSourceId: nextSectionSourceId,
+          revision: JSON.stringify({ textOverrides, buttonOverrides, imageOverrides }),
+          textOverrides,
+          buttonOverrides,
+          imageOverrides,
+        });
+      }
+
+      if (nodeId) {
+        for (const [zoneKey, zoneValue] of Object.entries(zones)) {
+          if (zoneKey.startsWith(`${nodeId}:`)) {
+            visitNodes(zoneValue, nextSectionSourceId);
+          }
+        }
+      }
+    }
+  };
+
+  visitNodes(data.content, null);
+  return entries;
+}
+
+function escapeAttributeValue(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function SitePageEditorPage() {
   const navigate = useNavigate();
   const { siteId, pageId } = useParams<{ siteId: string; pageId: string }>();
   const { workspace } = useWorkspace();
-  const { data: site } = useSite(siteId);
+  const { data: site } = useSite(siteId || null);
   const { data: products = [] } = useProducts(workspace?.id);
   const { data: pageDetail, isLoading } = useSitePage(siteId, pageId);
   const { data: productBindings = [] } = useSiteProductBindings(siteId || null);
   const { data: medusaConfig } = useSiteMedusaConfig(siteId);
+  const {
+    data: previewDefaults,
+    error: previewDefaultsError,
+  } = useSitePreviewDefaults(siteId || null, site?.siteFamily || null, site?.commerceProvider || null);
   const updatePage = useUpdateSitePage(siteId, pageId);
   const createVersion = useCreateSitePageVersion(siteId, pageId);
 
@@ -47,6 +158,14 @@ export function SitePageEditorPage() {
   const [draftSlug, setDraftSlug] = useState("");
   const [draftDesignSystemId, setDraftDesignSystemId] = useState("");
   const initializedPageIdRef = useRef<string | null>(null);
+
+  /** Snapshot of the last-saved data so we can detect dirty state. */
+  const savedDataRef = useRef<Data | null>(null);
+  const isDirty = useMemo(() => {
+    if (!savedDataRef.current) return false;
+    return JSON.stringify(data) !== JSON.stringify(savedDataRef.current);
+  }, [data]);
+
   const backHref = siteId ? `/workspaces/sites/${siteId}` : "/workspaces/sites";
 
   useEffect(() => {
@@ -65,7 +184,9 @@ export function SitePageEditorPage() {
       (pageDetail.latestDraft?.puckData as Data | undefined) ||
       (pageDetail.latestApproved?.puckData as Data | undefined) ||
       (defaultFunnelPuckData() as unknown as Data);
-    setData(normalizePuckData(initial, { designSystemTokens: pageDetail.designSystemTokens ?? null }));
+    const normalized = normalizePuckData(initial, { designSystemTokens: pageDetail.designSystemTokens ?? null });
+    setData(clonePuckData(normalized));
+    savedDataRef.current = clonePuckData(normalized);
     setPuckKey(`${pageId}:${pageDetail.latestDraft?.id || pageDetail.latestApproved?.id || "initial"}`);
     setMetaName(pageDetail.page.name);
     setMetaSlug(pageDetail.page.slug);
@@ -139,38 +260,75 @@ export function SitePageEditorPage() {
       siteId && previewPage
         ? buildSitePagePreviewPath(siteId, previewPage, {
             siteFamily: site?.siteFamily,
+            commerceProvider: site?.commerceProvider,
             productHandle: productHandlesByPageId.get(previewPage.id) || primaryProductHandle,
+            collectionHandle: previewDefaults?.collectionHandle,
+            categoryHandle: previewDefaults?.categoryHandle,
           })
         : null,
-    [previewPage, primaryProductHandle, productHandlesByPageId, site?.siteFamily, siteId]
+    [
+      previewDefaults?.categoryHandle,
+      previewDefaults?.collectionHandle,
+      previewPage,
+      primaryProductHandle,
+      productHandlesByPageId,
+      site?.commerceProvider,
+      site?.siteFamily,
+      siteId,
+    ]
   );
   const previewProductSlug = useMemo(
-    () => shortUuidRouteToken(site?.productId || site?.id || ""),
-    [site?.id, site?.productId]
+    () => primaryProductHandle || shortUuidRouteToken(site?.productId || site?.id || ""),
+    [primaryProductHandle, site?.id, site?.productId]
   );
   const previewFunnelSlug = useMemo(
     () => site?.routeSlug || shortUuidRouteToken(site?.id || ""),
     [site?.id, site?.routeSlug]
   );
-  const isB2CSiteEditor = site?.siteFamily === "medusa-b2c-starter" && Object.keys(runtimePageTypeMap).length > 0;
+  const isB2CSiteEditor = isMedusaB2CRuntimeSite({
+    siteFamily: site?.siteFamily,
+    commerceProvider: site?.commerceProvider,
+  }) && Object.keys(runtimePageTypeMap).length > 0;
 
-  const currentPageLabel = useMemo(() => {
+  const currentPageName = useMemo(() => {
     const page = site?.pages?.find((p) => p.id === pageId);
-    return page ? `${page.name} (${page.slug})` : "Page";
+    return page ? page.name : "Page";
   }, [site?.pages, pageId]);
 
   const designSystemTokens = pageDetail?.designSystemTokens ?? null;
+  const apiBaseUrl = resolveRequiredApiBaseUrl();
+  const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
+  const aiPlugin = useMemo(
+    () =>
+      createFunnelAiPlugin({
+        scope: "site",
+        funnelId: siteId,
+        pageId,
+        templateId: pageDetail?.page?.templateId || undefined,
+        ideaWorkspaceId: workspace?.id,
+        apiBaseUrl,
+        clerkTokenTemplate,
+        supportsAttachments: false,
+        supportsImageGeneration: false,
+        supportsStreaming: false,
+      }),
+    [apiBaseUrl, clerkTokenTemplate, pageDetail?.page?.templateId, pageId, siteId, workspace?.id]
+  );
   const designSystemPlugin = useMemo(
     () => createDesignSystemPlugin({ tokens: designSystemTokens }),
     [designSystemTokens]
   );
-  const plugins = useMemo(() => [designSystemPlugin], [designSystemPlugin]);
-  const editorViewports = useMemo(
+  const fieldTypesPlugin = useMemo(() => createPuckFieldTypesPlugin(), []);
+  const plugins = useMemo(
+    () => [designSystemPlugin, fieldTypesPlugin, aiPlugin],
+    [aiPlugin, designSystemPlugin, fieldTypesPlugin]
+  );
+  const editorViewports = useMemo<Viewport[]>(
     () => [
       { width: 375, height: "auto", icon: "Smartphone", label: "Small" },
       { width: 768, height: "auto", icon: "Tablet", label: "Medium" },
       { width: 1280, height: "auto", icon: "Monitor", label: "Large" },
-      { width: 1920, height: 1080, icon: "Monitor", label: "Desktop (1920×1080)" },
+      { width: 1920, height: 1080, icon: "Monitor", label: "Desktop (1920\u00d71080)" },
     ],
     []
   );
@@ -183,6 +341,14 @@ export function SitePageEditorPage() {
       },
     }),
     [editorViewports]
+  );
+  const importedRuntimeSyncEntries = useMemo(() => collectImportedRuntimeSyncEntries(data), [data]);
+  const importedRuntimeSyncKey = useMemo(
+    () =>
+      importedRuntimeSyncEntries
+        .map((entry) => `${entry.frameId}:${entry.sectionSourceId || ""}:${entry.revision}`)
+        .join("|"),
+    [importedRuntimeSyncEntries]
   );
 
   useEffect(() => {
@@ -202,32 +368,90 @@ export function SitePageEditorPage() {
     setMedusaRuntimeConfig({
       backendUrl: runtimeConfig.baseUrl,
       publishableKey: runtimeConfig.publishableKey,
+      stripeAccountId: runtimeConfig.stripeAccountId || undefined,
       defaultCountryCode: "us",
     });
 
     return () => setMedusaRuntimeConfig(null);
   }, [medusaConfig?.medusaConfig]);
 
+  useEffect(() => {
+    if (!importedRuntimeSyncEntries.length) return;
+
+    const syncImportedRuntimeSections = () => {
+      const previewFrame = document.querySelector('iframe[name="preview-frame"]') as HTMLIFrameElement | null;
+      const previewDocument = previewFrame?.contentDocument;
+      if (!previewDocument) return;
+
+      for (const entry of importedRuntimeSyncEntries) {
+        const sectionSelector = entry.sectionSourceId
+          ? `section[data-imported-section-id="${escapeAttributeValue(entry.sectionSourceId)}"] iframe`
+          : "section[data-imported-section-id] iframe";
+        const targetIframe = previewDocument.querySelector(sectionSelector) as HTMLIFrameElement | null;
+        targetIframe?.contentWindow?.postMessage(
+          {
+            source: "mos-imported-runtime-host",
+            frameId: entry.frameId,
+            type: "update-overrides",
+            revision: entry.revision,
+            textOverrides: entry.textOverrides,
+            buttonOverrides: entry.buttonOverrides,
+            imageOverrides: entry.imageOverrides,
+          },
+          "*",
+        );
+      }
+    };
+
+    const animationFrameId = window.requestAnimationFrame(syncImportedRuntimeSections);
+    const timeoutId = window.setTimeout(syncImportedRuntimeSections, 120);
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [importedRuntimeSyncEntries, importedRuntimeSyncKey]);
+
   const { data: designSystems = [] } = useDesignSystems(workspace?.id);
   const designSystemOptions = useMemo(() => {
     return [
-      { label: "Workspace default", value: "" },
+      { label: "Inherit from site theme", value: "" },
       ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
     ];
   }, [designSystems]);
 
-  const handleSaveDraft = () => {
+  const handlePuckChange = useCallback((nextData: Data) => {
+    setData(clonePuckData(nextData));
+  }, []);
+
+  const handleSaveDraft = useCallback(() => {
     if (!siteId || !pageId) return;
-    createVersion.mutate({ puckData: data, status: "draft" });
-  };
+    createVersion.mutate(
+      { puckData: data, status: "draft" },
+      {
+        onSuccess: () => {
+          savedDataRef.current = clonePuckData(data);
+          toast.success("Draft saved");
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Failed to save draft");
+        },
+      },
+    );
+  }, [createVersion, data, pageId, siteId]);
+
   const openPreview = () => {
     if (!previewPageHref) {
-      toast.error("This page needs a concrete storefront route before it can be previewed from the workspace.");
+      toast.error(
+        getSitePagePreviewErrorMessage(previewPage || pageDetail?.page || { pageType: null }, {
+          medusaPreviewDataError: previewDefaultsError,
+        }),
+      );
       return;
     }
     window.open(previewPageHref, "_blank", "noreferrer");
   };
 
+  /* ---- Loading state ---- */
   if (isLoading || !pageDetail) {
     return (
       <div className="space-y-4">
@@ -241,63 +465,92 @@ export function SitePageEditorPage() {
     );
   }
 
+  /* ---- Status badge ---- */
+  const statusBadge = isDirty ? (
+    <Badge tone="warning">Unsaved changes</Badge>
+  ) : pageDetail?.latestDraft ? (
+    <Badge tone="neutral">Draft saved</Badge>
+  ) : null;
+
   return (
     <div className="space-y-4">
       <PageHeader
         compact
         title={
           <span className="flex flex-wrap items-center gap-2">
-            <span>{currentPageLabel}</span>
-            {pageDetail?.latestDraft ? <Badge tone="neutral">Draft saved</Badge> : null}
+            <span>{currentPageName}</span>
+            {statusBadge}
           </span>
         }
-        description={site ? `Site: ${site.name}` : "Edit site page"}
+        description={
+          <Breadcrumb
+            items={[
+              { label: "Sites", href: "/workspaces/sites" },
+              { label: site?.name || "Site", href: backHref },
+              { label: currentPageName },
+            ]}
+          />
+        }
         actions={
-          <Menu>
-            <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>Actions</MenuTrigger>
-            <MenuContent className="w-64">
-              <MenuItem onClick={() => navigate(backHref)}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Site
-              </MenuItem>
-              {site?.pages?.length ? (
-                <>
-                  <MenuSeparator />
-                  <div className="px-2 py-1.5">
-                    <Select
-                      value={pageId || ""}
-                      onValueChange={(nextPageId) => {
-                        if (!siteId || !nextPageId) return;
-                        navigate(`/workspaces/sites/${siteId}/pages/${nextPageId}`);
-                      }}
-                      options={[
-                        { label: "Select page", value: "" },
-                        ...pageOptions.map((o) => ({ label: o.label, value: o.value })),
-                      ]}
-                    />
-                  </div>
-                </>
-              ) : null}
-              <MenuSeparator />
-              <MenuItem onClick={() => setSettingsOpen(true)}>Edit settings</MenuItem>
-              <MenuItem
-                onClick={openPreview}
-                className={!previewPageHref ? "opacity-60" : undefined}
-              >
-                Open preview
-              </MenuItem>
-              <MenuSeparator />
-              <MenuItem
-                onClick={handleSaveDraft}
-                className={createVersion.isPending ? "pointer-events-none opacity-60" : undefined}
-              >
-                {createVersion.isPending ? "Saving draft..." : "Save draft"}
-              </MenuItem>
-            </MenuContent>
-          </Menu>
+          <div className="flex items-center gap-2">
+            {/* Page switcher – inline for quick access */}
+            {site?.pages && site.pages.length > 1 && (
+              <Select
+                value={pageId || ""}
+                onValueChange={(nextPageId) => {
+                  if (!siteId || !nextPageId) return;
+                  navigate(`/workspaces/sites/${siteId}/pages/${nextPageId}`);
+                }}
+                options={[
+                  { label: "Switch page\u2026", value: "" },
+                  ...pageOptions.map((o) => ({ label: o.label, value: o.value })),
+                ]}
+              />
+            )}
+
+            {/* Primary: Save Draft */}
+            <Button
+              size="sm"
+              onClick={handleSaveDraft}
+              disabled={createVersion.isPending || !isDirty}
+            >
+              {createVersion.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              {createVersion.isPending ? "Saving\u2026" : "Save Draft"}
+            </Button>
+
+            {/* Secondary actions menu */}
+            <Menu>
+              <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>
+                <MoreVertical className="h-4 w-4" />
+              </MenuTrigger>
+              <MenuContent className="w-56">
+                <MenuItem onClick={() => navigate(backHref)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Site
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem onClick={() => setSettingsOpen(true)}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Page settings
+                </MenuItem>
+                <MenuItem
+                  onClick={openPreview}
+                  className={!previewPageHref ? "opacity-60" : undefined}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open preview
+                </MenuItem>
+              </MenuContent>
+            </Menu>
+          </div>
         }
       />
 
+      {/* ---- Settings Dialog ---- */}
       <DialogRoot open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>
           <div className="space-y-4">
@@ -306,25 +559,19 @@ export function SitePageEditorPage() {
               <p className="text-sm text-content-muted">Update the page name and slug for this site page.</p>
             </div>
             <div className="grid gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Page name</label>
+              <FormField label="Page name">
                 <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Slug</label>
+              </FormField>
+              <FormField label="Slug">
                 <Input value={draftSlug} onChange={(e) => setDraftSlug(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Design system override</label>
+              </FormField>
+              <FormField label="Design system override" helper={SITE_PAGE_EDITOR_THEME_INHERITANCE_COPY}>
                 <Select
                   value={draftDesignSystemId}
                   onValueChange={setDraftDesignSystemId}
                   options={designSystemOptions}
                 />
-                <div className="text-xs text-content-muted">
-                  Leave as workspace default to inherit the brand tokens.
-                </div>
-              </div>
+              </FormField>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button variant="secondary" size="sm" onClick={() => setSettingsOpen(false)}>
@@ -346,19 +593,24 @@ export function SitePageEditorPage() {
                         setMetaSlug(draftSlug);
                         setMetaDesignSystemId(draftDesignSystemId || null);
                         setSettingsOpen(false);
+                        toast.success("Page settings saved");
+                      },
+                      onError: (err) => {
+                        toast.error(err instanceof Error ? err.message : "Failed to save page settings");
                       },
                     }
                   );
                 }}
                 disabled={updatePage.isPending}
               >
-                {updatePage.isPending ? "Saving..." : "Save"}
+                {updatePage.isPending ? "Saving\u2026" : "Save"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </DialogRoot>
 
+      {/* ---- Editor ---- */}
       <div className="ds-card ds-card--md p-0 overflow-hidden">
         <FunnelRuntimeProvider
           value={{
@@ -380,12 +632,16 @@ export function SitePageEditorPage() {
           }}
         >
           {isB2CSiteEditor ? (
-            <B2CRuntimeProvider siteFamily="medusa-b2c-starter" siteName={site?.name || null}>
+            <B2CRuntimeProvider
+              siteFamily={site?.siteFamily || "medusa-b2c-starter"}
+              siteName={site?.name || null}
+              siteId={site?.id || null}
+            >
               <Puck
                 key={puckKey}
                 config={config}
                 data={data}
-                onChange={setData}
+                onChange={handlePuckChange}
                 ui={editorUi}
                 viewports={editorViewports}
                 plugins={plugins}
@@ -396,7 +652,7 @@ export function SitePageEditorPage() {
               key={puckKey}
               config={config}
               data={data}
-              onChange={setData}
+              onChange={handlePuckChange}
               ui={editorUi}
               viewports={editorViewports}
               plugins={plugins}

@@ -41,22 +41,42 @@ export type MedusaProductVariant = {
   allow_backorder?: boolean;
   manage_inventory?: boolean;
   inventory_quantity?: number;
+  calculated_price?: {
+    calculated_amount?: number;
+    original_amount?: number;
+    currency_code?: string;
+  };
   prices: Array<{
     id: string;
     currency_code: string;
     amount: number;
     original_amount?: number;
   }>;
-  options?: Record<string, string>;
+  options?:
+    | Array<{
+        id?: string;
+        value?: string | null;
+        option?: {
+          id?: string;
+          title?: string | null;
+        } | null;
+      }>
+    | Record<string, string>;
 };
 
 export type MedusaProduct = {
   id: string;
   title: string;
   handle: string;
+  subtitle?: string;
   description?: string;
   thumbnail?: string;
   status?: string;
+  created_at?: string;
+  images?: Array<{
+    id?: string;
+    url?: string | null;
+  }>;
   variants?: MedusaProductVariant[];
   options?: Array<{
     id: string;
@@ -66,10 +86,21 @@ export type MedusaProduct = {
       value: string;
     }>;
   }>;
+  metadata?: Record<string, unknown> | null;
+  weight?: number | null;
+  height?: number | null;
+  width?: number | null;
+  length?: number | null;
+  type?: {
+    id?: string;
+    value?: string | null;
+  } | null;
   collection_id?: string;
   categories?: Array<{
     id: string;
     name: string;
+    handle?: string;
+    parent_category_id?: string | null;
   }>;
 };
 
@@ -77,6 +108,7 @@ export type MedusaCollection = {
   id: string;
   title: string;
   handle: string;
+  description?: string;
   products?: MedusaProduct[];
 };
 
@@ -86,15 +118,24 @@ export type MedusaCategory = {
   handle: string;
   description?: string;
   parent_category_id?: string;
+  parent_category?: {
+    id: string;
+    name: string;
+    handle?: string;
+    parent_category_id?: string | null;
+  } | null;
   category_children?: Array<{
     id: string;
     name: string;
+    handle?: string;
+    parent_category_id?: string | null;
   }>;
 };
 
 export type MedusaCartAddress = {
   first_name?: string;
   last_name?: string;
+  company?: string;
   address_1?: string;
   address_2?: string;
   city?: string;
@@ -108,7 +149,10 @@ export type MedusaCartLineItem = {
   id: string;
   cart_id: string;
   title: string;
+  product_title?: string;
+  variant_title?: string;
   description?: string;
+  thumbnail?: string;
   variant_id: string;
   quantity: number;
   unit_price: number;
@@ -116,6 +160,11 @@ export type MedusaCartLineItem = {
   tax_total?: number;
   total?: number;
   variant?: MedusaProductVariant;
+};
+
+export type MedusaPromotion = {
+  id: string;
+  code?: string;
 };
 
 export type MedusaCart = {
@@ -136,6 +185,7 @@ export type MedusaCart = {
   discount_total?: number;
   total?: number;
   currency_code: string;
+  promotions?: MedusaPromotion[];
 };
 
 export type MedusaShippingOption = {
@@ -145,10 +195,19 @@ export type MedusaShippingOption = {
   amount?: number;
   currency_code?: string;
   region_id: string;
+  requirements?: Array<{
+    id?: string;
+    type?: string;
+    amount?: number;
+    value?: number;
+    field?: string;
+    operator?: string;
+  }>;
 };
 
 export type MedusaPaymentProvider = {
   id: string;
+  is_default?: boolean;
 };
 
 export type MedusaPaymentSession = {
@@ -251,6 +310,9 @@ export type SiteCommerceData = {
   // Payment providers (if region_id provided)
   paymentProviders?: MedusaPaymentProvider[];
 
+  // Default payment provider for checkout
+  defaultPaymentProviderId?: string;
+
   // Pagination
   productsCount?: number;
 
@@ -268,6 +330,7 @@ export type SiteCommerceShippingOptionsResponse = {
 
 export type SiteCommercePaymentProvidersResponse = {
   payment_providers: MedusaPaymentProvider[];
+  default_payment_provider_id?: string | null;
 };
 
 export type SiteCommercePaymentSessionResponse = {
@@ -366,4 +429,38 @@ export type CommerceRuntimeContextValue = {
   refreshProducts: (collectionId?: string, categoryId?: string) => Promise<void>;
   refreshCategories: () => Promise<void>;
   refreshCollections: () => Promise<void>;
+};
+
+// =============================================================================
+// Stripe Profile Types
+// =============================================================================
+
+export type StripeProfile = {
+  id: string;
+  orgId: string;
+  label: string;
+  stripeAccountId: string | null;
+  hasSecretKeyRef: boolean;
+  hasWebhookSecretRef: boolean;
+  mode: "shared" | "dedicated";
+  status: "active" | "disabled" | "error";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StripeProfileCreatePayload = {
+  label: string;
+  stripeAccountId?: string;
+  secretKeyRef?: string;
+  webhookSecretRef?: string;
+  mode?: "shared" | "dedicated";
+};
+
+export type StripeProfileUpdatePayload = {
+  label?: string;
+  stripeAccountId?: string;
+  secretKeyRef?: string;
+  webhookSecretRef?: string;
+  mode?: "shared" | "dedicated";
+  status?: "active" | "disabled" | "error";
 };

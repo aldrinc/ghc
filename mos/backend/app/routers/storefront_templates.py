@@ -5,7 +5,7 @@ import threading
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,8 @@ from app.schemas.storefront_templates import (
     BlockCoverageDetail,
     BlockCoverageSummary,
     ConvertImportRequest,
+    CreateVariantSiteRequest,
+    CreateVariantSiteResponse,
     CreateDraftFromTemplateRequest,
     CreateDraftFromTemplateResponse,
     CreateSiteImportRequest,
@@ -58,7 +60,9 @@ from app.services.site_imports import (
     SiteImportError,
     convert_import_to_variant,
     convert_import_to_variant_with_synthesis,
+    create_site_from_variant,
     create_draft_from_template,
+    create_archive_import_record,
     create_import_record,
     get_import_detail,
     get_import_snapshot,
@@ -248,6 +252,54 @@ async def create_import(
     )
 
 
+@router.post("/imports/archive", response_model=SiteImportSummary, status_code=status.HTTP_201_CREATED)
+async def create_archive_import(
+    clientId: str,
+    file: UploadFile = File(...),
+    pageTypeHint: str | None = Form(default=None),
+    siteFamilyHint: str | None = Form(default=None),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> SiteImportSummary:
+    """Create a completed site import from a trusted React/Tailwind archive export."""
+    _get_workspace_or_404(session, clientId, auth.org_id)
+
+    filename = (file.filename or "").strip()
+    if not filename:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Archive filename is required.",
+        )
+
+    archive_bytes = await file.read()
+    try:
+        import_job = create_archive_import_record(
+            session,
+            org_id=auth.org_id,
+            client_id=clientId,
+            archive_name=filename,
+            archive_bytes=archive_bytes,
+            page_type_hint=pageTypeHint,
+            site_family_hint=siteFamilyHint,
+            created_by_user_external_id=auth.user_id,
+        )
+    except SiteImportError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return SiteImportSummary(
+        id=str(import_job.id),
+        sourceUrl=import_job.source_url,
+        sourceHostname=import_job.source_hostname,
+        pageTypeHint=import_job.page_type_hint,
+        siteFamilyHint=import_job.site_family_hint,
+        status=import_job.status,
+        title=import_job.title,
+        suggestedTemplateFamily=import_job.suggested_template_family,
+        createdAt=import_job.created_at,
+        updatedAt=import_job.updated_at,
+    )
+
+
 @router.get("/imports", response_model=list[SiteImportSummary])
 def list_imports_endpoint(
     clientId: str,
@@ -312,6 +364,9 @@ def get_import_detail_endpoint(
     normalized_sections = [
         NormalizedSection(
             id=s.get("id", ""),
+            displayName=s.get("displayName"),
+            sectionKey=s.get("sectionKey"),
+            semanticTags=s.get("semanticTags", []),
             sectionType=s.get("sectionType", "generic_content"),
             confidence=s.get("confidence", 0.0),
             keyText=s.get("keyText", []),
@@ -329,7 +384,7 @@ def get_import_detail_endpoint(
 
     # Get synthesis if import is completed
     synthesis_output: SynthesisOutput | None = None
-    if site_import.status == "completed":
+    if site_import.status == "completed" and site_import.resolved_site_family != "imported-template":
         try:
             synthesis = get_import_synthesis(
                 session,
@@ -600,6 +655,7 @@ def list_variants_endpoint(
             family=v.family,
             pageType=v.page_type,
             status=v.status,
+            siteImportId=str(v.site_import_id) if v.site_import_id else None,
             sourceType=(v.provenance or {}).get("source_type"),
             parentVariantId=(v.provenance or {}).get("parent_variant_id"),
             mutationPresetLabel=(v.provenance or {}).get("mutation_preset_label"),
@@ -1451,4 +1507,59 @@ def approve_variant_for_publish(
         status=updated_variant.status,
         provenance=updated_variant.provenance or {},
         governanceReport=_serialize_governance_report(updated_report),
+    )
+
+
+@router.post("/variants/{variant_id}/create-site", response_model=CreateVariantSiteResponse)
+def create_site_from_variant_endpoint(
+    variant_id: str,
+    request: CreateVariantSiteRequest,
+    clientId: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> CreateVariantSiteResponse:
+    """Create a canonical Site runtime record from an approved template variant."""
+    _get_workspace_or_404(session, clientId, auth.org_id)
+    _validate_variant_id(variant_id)
+
+    repo = StorefrontImportsRepository(session)
+    variant = repo.get_variant(org_id=auth.org_id, client_id=clientId, variant_id=variant_id)
+    if variant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found.")
+
+    site_name = (request.siteName or variant.name or "").strip()
+    if not site_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="siteName is required to create a site from a variant.",
+        )
+
+    try:
+        result = create_site_from_variant(
+            session,
+            org_id=auth.org_id,
+            client_id=clientId,
+            variant_id=variant_id,
+            site_name=site_name,
+            description=request.description,
+            created_by_user_external_id=auth.user_id,
+        )
+    except SiteImportError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return CreateVariantSiteResponse(
+        siteId=result["siteId"],
+        siteName=result["siteName"],
+        pageCount=result["pageCount"],
+        entryPageType=result.get("entryPageType"),
+        createdPages=[
+            SavedSitePageResponse(
+                pageId=page["pageId"],
+                pageType=page.get("pageType"),
+                templateId=page.get("templateId"),
+                versionId=page.get("versionId"),
+            )
+            for page in result.get("createdPages", [])
+        ],
+        createdAt=result["createdAt"],
     )
