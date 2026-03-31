@@ -26,7 +26,7 @@ This doc captures what is required to ship the current stack (FastAPI + Temporal
 
 ## Build and release
 - Database: `cd mos/backend && .venv/bin/alembic upgrade head` (applies migrations up to `0013_ad_scores.py`).
-- Backend API (Python 3.11): `cd mos/backend && .venv/bin/pip install . && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8008`.
+- Backend API (Python 3.11): `cd mos/backend && .venv/bin/pip install . && .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8008` when fronted by a reverse proxy. For private VM dev, bind to the NetBird/private interface instead of `0.0.0.0`.
 - Temporal worker: `cd mos/backend && .venv/bin/python -m app.temporal.worker` (shares the same env/secrets as the API).
 - Frontend: `cd mos/frontend && npm ci && npm run build`; serve `mos/frontend/dist` via a static server (e.g., nginx, Vercel, S3+CloudFront). Use `.env.production` to inject deploy-time `VITE_*` values.
 - Local infra helper: `cd mos/infra && docker compose up -d` brings up Postgres (5433), Temporal (7234), Temporal UI (8234), and PgAdmin (8081). Swap to managed services for production.

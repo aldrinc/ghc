@@ -370,6 +370,9 @@ ${compiledRuntime}
   const buildOverrideButtonText = (element, override) => {
     const originalText = String(override.originalText || "");
     const nextText = typeof override.text === "string" ? override.text : originalText;
+    if (typeof override.action === "string" && override.action.trim() === "medusa_buy_now") {
+      return nextText.replace(/\s*-\s*$/, "").trim();
+    }
     const currentText = String(element.textContent || "");
     const trimmedCurrentText = currentText.trim();
     const trimmedOriginalText = originalText.trim();
@@ -390,17 +393,235 @@ ${compiledRuntime}
         : (type, detail) => parent.postMessage({ source: "mos-imported-runtime", frameId: runtimeFrameId, type, ...detail }, "*");
     postEvent("commerce-action", payload);
   };
+  const postHashNavigation = (hash) => {
+    const normalizedHash = String(hash || "").trim();
+    if (!normalizedHash) return;
+    const postEvent =
+      typeof window.__postImportedRuntimeEvent === "function"
+        ? window.__postImportedRuntimeEvent
+        : (type, detail) => parent.postMessage({ source: "mos-imported-runtime", frameId: runtimeFrameId, type, ...detail }, "*");
+    postEvent("navigate-hash", { hash: normalizedHash });
+  };
+  const readMoneyTokens = (value) => {
+    const matches = String(value || "").match(/[$€£]\s?\d+(?:[.,]\d+)?/g);
+    return Array.isArray(matches) ? matches.map((entry) => entry.trim()) : [];
+  };
+  const readTierCards = (scope) => {
+    if (!(scope instanceof Element)) return [];
+    return Array.from(scope.querySelectorAll("*")).filter((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      if (!candidate.classList.contains("cursor-pointer")) return false;
+      const titleElement = candidate.querySelector("h3");
+      if (!(titleElement instanceof HTMLElement)) return false;
+      return /pouch/i.test(normalizeText(titleElement.textContent));
+    });
+  };
+  const readSelectedTierCard = (scope) => {
+    if (!(scope instanceof Element)) return null;
+    const tierCards = readTierCards(scope);
+    if (!tierCards.length) {
+      const fallbackCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
+        if (!(candidate instanceof HTMLElement)) return false;
+        if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
+          return false;
+        }
+        return candidate.querySelector("h3") instanceof HTMLElement;
+      });
+      return fallbackCard instanceof HTMLElement ? fallbackCard : null;
+    }
+    const explicitSelected = tierCards.find((candidate) => candidate.dataset.mosImportedSelectedTier === "true");
+    if (explicitSelected) return explicitSelected;
+    const classSelected = tierCards.find(
+      (candidate) => candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card"),
+    );
+    return classSelected || tierCards[0] || null;
+  };
+  const readTierCardPrice = (tierCard) => {
+    if (!(tierCard instanceof HTMLElement)) return null;
+    const moneyTokens = readMoneyTokens(tierCard.textContent || "");
+    if (!moneyTokens.length) return null;
+    return moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2] : moneyTokens[moneyTokens.length - 1];
+  };
+  const readSelectedTierPrice = (scope) => {
+    const selectedTierCard = readSelectedTierCard(scope);
+    return readTierCardPrice(selectedTierCard);
+  };
+  const setTierCardSelected = (card, selected) => {
+    if (!(card instanceof HTMLElement)) return;
+    card.dataset.mosImportedSelectedTier = selected ? "true" : "false";
+    card.classList.toggle("border-primary", selected);
+    card.classList.toggle("bg-bg-card", selected);
+    card.classList.toggle("border-black/10", !selected);
+    card.classList.toggle("bg-white", !selected);
+
+    const indicator = Array.from(card.querySelectorAll("div")).find((candidate) => {
+      return candidate instanceof HTMLElement && candidate.classList.contains("rounded-circle") && candidate.classList.contains("border-2");
+    });
+    if (indicator instanceof HTMLElement) {
+      indicator.classList.toggle("border-primary", selected);
+      indicator.classList.toggle("border-black/20", !selected);
+      let dot = Array.from(indicator.children).find((child) => child instanceof HTMLElement && child.classList.contains("rounded-circle"));
+      if (selected) {
+        if (!(dot instanceof HTMLElement)) {
+          dot = document.createElement("div");
+          dot.className = "w-3 h-3 rounded-circle bg-primary";
+          indicator.appendChild(dot);
+        }
+      } else if (dot instanceof HTMLElement) {
+        dot.remove();
+      }
+    }
+  };
+  const syncBuyNowButtonText = (scope) => {
+    if (!(scope instanceof Element)) return;
+    const buyButton = scope.querySelector('[data-mos-imported-action="medusa_buy_now"]');
+    if (!(buyButton instanceof HTMLElement)) return;
+    const prefix = String(buyButton.dataset.mosImportedLabelPrefix || readRawButtonText(buyButton) || "BUY NOW").replace(/\s*-\s*$/, "").trim();
+    const price = readSelectedTierPrice(scope);
+    if (price) {
+      buyButton.dataset.mosImportedSelectedPrice = price;
+    }
+    buyButton.textContent = prefix;
+  };
+  const readFlavorButtons = (scope) => {
+    if (!(scope instanceof Element)) return [];
+    const flavorLabel = Array.from(scope.querySelectorAll("*")).find((candidate) => {
+      return candidate instanceof HTMLElement && normalizeText(candidate.textContent) === "Choose Flavor:";
+    });
+    if (!(flavorLabel instanceof HTMLElement) || !(flavorLabel.nextElementSibling instanceof HTMLElement)) return [];
+    return Array.from(flavorLabel.nextElementSibling.querySelectorAll("button")).filter((candidate) => {
+      return normalizeText(candidate.textContent).length > 0;
+    });
+  };
+  const setFlavorButtonSelected = (button, selected) => {
+    if (!(button instanceof HTMLElement)) return;
+    button.dataset.mosImportedSelectedFlavor = selected ? "true" : "false";
+    button.classList.toggle("border-primary", selected);
+    button.classList.toggle("bg-bg-card", selected);
+    button.classList.toggle("text-primary", selected);
+    button.classList.toggle("shadow-sm", selected);
+    button.classList.toggle("border-black/10", !selected);
+    button.classList.toggle("bg-white", !selected);
+    button.classList.toggle("text-text-dark/70", !selected);
+    button.classList.toggle("hover:border-black/20", !selected);
+  };
+  const enhanceOmniPurchaseSelection = (scope) => {
+    if (!(scope instanceof Element)) return;
+    const buyButton = scope.querySelector('[data-mos-imported-action="medusa_buy_now"]');
+    if (!(buyButton instanceof HTMLElement)) return;
+
+    const tierCards = readTierCards(scope);
+    if (tierCards.length) {
+      const applySelectedTierPrice = () => {
+        const selectedPrice = readSelectedTierPrice(scope);
+        const prefix = String(buyButton.dataset.mosImportedLabelPrefix || readRawButtonText(buyButton) || "BUY NOW").replace(/\s*-\s*$/, "").trim();
+        if (selectedPrice) {
+          buyButton.dataset.mosImportedSelectedPrice = selectedPrice;
+        }
+        buyButton.textContent = prefix;
+      };
+      const selectedCard = readSelectedTierCard(scope);
+      tierCards.forEach((candidate) => setTierCardSelected(candidate, candidate === selectedCard));
+      tierCards.forEach((candidate) => {
+        if (candidate.dataset.mosImportedTierBound === "true") return;
+        candidate.dataset.mosImportedTierBound = "true";
+        candidate.tabIndex = 0;
+        candidate.setAttribute("role", "button");
+        candidate.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+          }
+          tierCards.forEach((entry) => setTierCardSelected(entry, entry === candidate));
+          applySelectedTierPrice();
+          if (typeof queueMicrotask === "function") {
+            queueMicrotask(applySelectedTierPrice);
+          } else {
+            setTimeout(applySelectedTierPrice, 0);
+          }
+          setTimeout(applySelectedTierPrice, 32);
+          if (typeof window.__notifyImportedRuntimeHeight === "function") {
+            window.__notifyImportedRuntimeHeight();
+          }
+        }, true);
+        candidate.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          candidate.click();
+        });
+      });
+      if (typeof MutationObserver === "function" && scope instanceof HTMLElement && scope.dataset.mosImportedTierObserverBound !== "true") {
+        scope.dataset.mosImportedTierObserverBound = "true";
+        const observer = new MutationObserver(() => applySelectedTierPrice());
+        tierCards.forEach((candidate) => {
+          observer.observe(candidate, {
+            attributes: true,
+            attributeFilter: ["data-mos-imported-selected-tier"],
+          });
+        });
+      }
+      applySelectedTierPrice();
+    }
+
+    const flavorButtons = readFlavorButtons(scope);
+    if (flavorButtons.length) {
+      const selectedFlavor = flavorButtons.find((candidate) => candidate.classList.contains("border-primary")) || flavorButtons[0];
+      flavorButtons.forEach((candidate) => setFlavorButtonSelected(candidate, candidate === selectedFlavor));
+      flavorButtons.forEach((candidate) => {
+        if (candidate.dataset.mosImportedFlavorBound === "true") return;
+        candidate.dataset.mosImportedFlavorBound = "true";
+        candidate.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+          }
+          flavorButtons.forEach((entry) => setFlavorButtonSelected(entry, entry === candidate));
+          if (typeof window.__notifyImportedRuntimeHeight === "function") {
+            window.__notifyImportedRuntimeHeight();
+          }
+        }, true);
+      });
+    }
+
+    syncBuyNowButtonText(scope);
+  };
+  const resolveImplicitTargetHash = (override) => {
+    const href = typeof override.href === "string" ? override.href.trim() : "";
+    if (href.startsWith("#")) return href;
+    const label = normalizeText(typeof override.text === "string" ? override.text : override.originalText).toUpperCase();
+    if (!label) return "";
+    if (
+      label.includes("TRY OMNI") ||
+      label.includes("SHOP OMNI") ||
+      label === "SHOP NOW" ||
+      label === "GET STARTED"
+    ) {
+      return "#shop";
+    }
+    return "";
+  };
+  const wireHashNavigation = (element, targetHash) => {
+    if (!(element instanceof HTMLElement)) return;
+    const normalizedHash = String(targetHash || "").trim();
+    if (!normalizedHash || !normalizedHash.startsWith("#")) return;
+    if (element.dataset.mosImportedHashBound === "true") return;
+    element.dataset.mosImportedHashBound = "true";
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
+      postHashNavigation(normalizedHash);
+    }, true);
+  };
   const resolveButtonSelection = (scope, strategy) => {
     if (!(scope instanceof Element)) return null;
     if (strategy !== "omni_selected_tier") return null;
 
-    const tierCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
-      if (!(candidate instanceof HTMLElement)) return false;
-      if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
-        return false;
-      }
-      return candidate.querySelector("h3") instanceof HTMLElement;
-    });
+    const tierCard = readSelectedTierCard(scope);
 
     if (!(tierCard instanceof HTMLElement)) return null;
     const titleElement = tierCard.querySelector("h3");
@@ -421,6 +642,9 @@ ${compiledRuntime}
     element.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
       const selectionStrategy = typeof override.selectionStrategy === "string" ? override.selectionStrategy.trim() : "";
       const selectedOfferTitle = resolveButtonSelection(scope, selectionStrategy);
       postCommerceAction({
@@ -430,7 +654,7 @@ ${compiledRuntime}
         selectedOfferTitle,
         buttonText: readRawButtonText(element),
       });
-    });
+    }, true);
   };
   const componentRegistry =
     globalThis.__mosImportedRuntimeComponents &&
@@ -587,6 +811,7 @@ ${compiledRuntime}
         const element = actions[index];
         if (!matchesButtonText(element, originalText)) continue;
         const nextText = buildOverrideButtonText(element, override);
+        element.dataset.mosImportedLabelPrefix = typeof override.text === "string" ? override.text : override.originalText;
         element.textContent = nextText;
         if (element instanceof HTMLAnchorElement && typeof override.href === "string") {
           if (override.href) {
@@ -596,6 +821,7 @@ ${compiledRuntime}
           }
         }
         wireCommerceAction(scope, element, override);
+        wireHashNavigation(element, resolveImplicitTargetHash(override));
         used.add(index);
         break;
       }
@@ -640,6 +866,7 @@ ${compiledRuntime}
     applyTextOverrides(sectionRoot);
     applyButtonOverrides(sectionRoot);
     applyImageOverrides(sectionRoot);
+    enhanceOmniPurchaseSelection(sectionRoot);
   };
 
   const renderAndFinalizeSection = () => {

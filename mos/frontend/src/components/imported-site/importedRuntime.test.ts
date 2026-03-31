@@ -356,7 +356,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
     }
 
     const button = dom.window.document.querySelector("button");
-    expect(button?.textContent).toBe("BUY NOW - $117");
+    expect(button?.textContent).toBe("BUY NOW");
 
     button?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
@@ -375,7 +375,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
       selectionStrategy: "omni_selected_tier",
       replaceCart: true,
       selectedOfferTitle: "3 Pouches",
-      buttonText: "BUY NOW - $117",
+      buttonText: "BUY NOW",
     });
   });
 
@@ -499,6 +499,107 @@ describe("buildImportedRuntimeSrcDoc", () => {
     dispatchUpdate("Creatine");
     heading = dom.window.document.querySelector("h1");
     expect(heading?.textContent).toBe("Creatine");
+  });
+
+  it("posts parent hash navigation events for non-commerce Omni CTAs", () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              if (key === "className") {
+                element.setAttribute("class", String(value));
+                return;
+              }
+              element.setAttribute(key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return { render(node) { container.replaceChildren(renderNode(node)); } };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ImportedSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "hero-section" },
+          React.createElement("button", null, "TRY OMNI TODAY"),
+        );
+    `;
+    const postedMessages = [];
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-hash-nav",
+      sectionLabel: "Hero",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "ImportedSection",
+      sectionTargetId: "hero-section",
+      initialButtonOverrides: [
+        {
+          originalText: "TRY OMNI TODAY",
+          text: "TRY OMNI TODAY",
+          href: "",
+        },
+      ],
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage(payload: unknown) { postedMessages.push(payload); } };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => { callback(0); return 1; };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    const button = dom.window.document.querySelector("button");
+    button?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+    const navigationMessage = postedMessages.find(
+      (payload) => typeof payload === "object" && payload !== null && (payload as { type?: unknown }).type === "navigate-hash",
+    ) as Record<string, unknown> | undefined;
+
+    expect(navigationMessage).toMatchObject({
+      source: "mos-imported-runtime",
+      frameId: "frame-hash-nav",
+      type: "navigate-hash",
+      hash: "#shop",
+    });
   });
 
   it("matches composed heading text split by line breaks", () => {

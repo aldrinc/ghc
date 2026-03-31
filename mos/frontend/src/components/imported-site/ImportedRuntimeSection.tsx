@@ -271,6 +271,81 @@ export function ImportedRuntimeSection({
     [b2cRuntime, funnelRuntime?.productSlug],
   );
 
+  const handleHashNavigation = useCallback((hash: string) => {
+    const targetId = hash.replace(/^#/, "").trim();
+    if (!targetId) return;
+
+    const ownerDocument = frameRef.current?.ownerDocument || document;
+    const iframes = Array.from(ownerDocument.querySelectorAll("iframe"));
+    for (const iframe of iframes) {
+      try {
+        const frameDocument = iframe.contentDocument;
+        if (!frameDocument?.getElementById(targetId)) continue;
+        iframe.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      } catch {
+        continue;
+      }
+    }
+
+    ownerDocument.getElementById(targetId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
+
+  const syncHostedPurchaseFrame = useCallback(() => {
+    const frame = frameRef.current;
+    const frameDocument = frame?.contentDocument;
+    if (!frameDocument) return;
+
+    const buyButton = frameDocument.querySelector('[data-mos-imported-action="medusa_buy_now"]');
+    if (!(buyButton instanceof HTMLElement)) return;
+
+    const selectedTierCard = Array.from(frameDocument.querySelectorAll("*")).find((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      if (candidate.getAttribute("data-mos-imported-selected-tier") === "true") return true;
+      return candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card") && candidate.querySelector("h3") instanceof HTMLElement;
+    });
+    if (!(selectedTierCard instanceof HTMLElement)) return;
+
+    const moneyTokens = (selectedTierCard.textContent || "").match(/(?:[$€£]|EUR|GBP)\s?\d+(?:[.,]\d+)?/g) || [];
+    const selectedPrice = moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2]?.trim() : moneyTokens[0]?.trim();
+    if (!selectedPrice) return;
+
+    const prefix = (buyButton.dataset.mosImportedLabelPrefix || buyButton.textContent || "BUY NOW")
+      .replace(/[$€£]\s?\d+(?:[.,]\d+)?/g, "")
+      .replace(/\s*-\s*$/, "")
+      .trim();
+    buyButton.dataset.mosHostedSelectedPrice = selectedPrice;
+    buyButton.textContent = prefix;
+  }, []);
+
+  const installHostedPurchaseFrameSync = useCallback(() => {
+    const frame = frameRef.current as (HTMLIFrameElement & { __mosPurchaseSyncObserver?: MutationObserver | null }) | null;
+    const frameDocument = frame?.contentDocument;
+    if (!frame || !frameDocument?.body) return;
+    frame.dataset.mosPurchaseSyncInstalled = "true";
+
+    frame.__mosPurchaseSyncObserver?.disconnect();
+
+    const scheduleSync = () => window.setTimeout(() => syncHostedPurchaseFrame(), 0);
+    frameDocument.addEventListener("click", scheduleSync, true);
+
+    const observer = new MutationObserver(() => {
+      syncHostedPurchaseFrame();
+    });
+    observer.observe(frameDocument.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    frame.__mosPurchaseSyncObserver = observer;
+
+    syncHostedPurchaseFrame();
+  }, [syncHostedPurchaseFrame]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -352,12 +427,20 @@ export function ImportedRuntimeSection({
 
       if ((payload as { type?: unknown }).type === "commerce-action") {
         void handleCommerceAction(payload as ImportedRuntimeCommerceActionPayload);
+        return;
+      }
+
+      if ((payload as { type?: unknown }).type === "navigate-hash") {
+        const hash = (payload as { hash?: unknown }).hash;
+        if (typeof hash === "string" && hash.trim()) {
+          handleHashNavigation(hash.trim());
+        }
       }
     };
 
     ownerWindow.addEventListener("message", handleMessage);
     return () => ownerWindow.removeEventListener("message", handleMessage);
-  }, [frameId, handleCommerceAction, srcDoc]);
+  }, [frameId, handleCommerceAction, handleHashNavigation, srcDoc]);
 
   useEffect(() => {
     if (!srcDoc) return;
@@ -377,6 +460,27 @@ export function ImportedRuntimeSection({
   }, [frameId, srcDoc]);
 
   useEffect(() => {
+    if (!srcDoc) return;
+    const timeoutId = window.setTimeout(() => {
+      installHostedPurchaseFrameSync();
+    }, 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [installHostedPurchaseFrameSync, srcDoc]);
+
+  useEffect(() => {
+    if (!srcDoc) return;
+    let attempts = 0;
+    const intervalId = window.setInterval(() => {
+      attempts += 1;
+      installHostedPurchaseFrameSync();
+      if (frameRef.current?.dataset.mosPurchaseSyncInstalled === "true" || attempts >= 20) {
+        window.clearInterval(intervalId);
+      }
+    }, 250);
+    return () => window.clearInterval(intervalId);
+  }, [installHostedPurchaseFrameSync, srcDoc]);
+
+  useEffect(() => {
     const frame = frameRef.current;
     if (!frame || !srcDoc) return;
 
@@ -392,6 +496,65 @@ export function ImportedRuntimeSection({
 
     frame.contentWindow?.postMessage(payload, "*");
   }, [frameId, srcDoc, overridesRevision, textOverridesJson, buttonOverridesJson, imageOverridesJson]);
+
+  useEffect(() => {
+    return () => {
+      const frame = frameRef.current as (HTMLIFrameElement & { __mosPurchaseSyncObserver?: MutationObserver | null }) | null;
+      frame?.__mosPurchaseSyncObserver?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const ownerWindow = frameRef.current?.ownerDocument?.defaultView || window;
+    const ownerDocument = frameRef.current?.ownerDocument || document;
+    type SyncWindow = Window & {
+      __mosImportedPurchaseFramesIntervalId?: number;
+      __mosImportedPurchaseFramesSyncInstalled?: boolean;
+    };
+    const syncWindow = ownerWindow as SyncWindow;
+    if (syncWindow.__mosImportedPurchaseFramesSyncInstalled) {
+      return;
+    }
+    syncWindow.__mosImportedPurchaseFramesSyncInstalled = true;
+
+    const syncAllPurchaseFrames = () => {
+      for (const iframe of Array.from(ownerDocument.querySelectorAll("iframe"))) {
+        try {
+          const frameDocument = iframe.contentDocument;
+          if (!frameDocument) continue;
+          const buyButton = frameDocument.querySelector('[data-mos-imported-action="medusa_buy_now"]');
+          if (!(buyButton instanceof HTMLElement)) continue;
+          const selectedTierCard = Array.from(frameDocument.querySelectorAll("*")).find((candidate) => {
+            if (!(candidate instanceof HTMLElement)) return false;
+            if (candidate.getAttribute("data-mos-imported-selected-tier") === "true") return true;
+            return candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card") && candidate.querySelector("h3") instanceof HTMLElement;
+          });
+          if (!(selectedTierCard instanceof HTMLElement)) continue;
+          const moneyTokens = (selectedTierCard.textContent || "").match(/(?:[$€£]|EUR|GBP)\s?\d+(?:[.,]\d+)?/g) || [];
+          const selectedPrice = moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2]?.trim() : moneyTokens[0]?.trim();
+          if (!selectedPrice) continue;
+          const prefix = (buyButton.dataset.mosImportedLabelPrefix || buyButton.textContent || "BUY NOW -")
+            .replace(/[$€£]\s?\d+(?:[.,]\d+)?/g, "")
+            .trim();
+          buyButton.dataset.mosHostedSelectedPrice = selectedPrice;
+          buyButton.textContent = `${prefix} ${selectedPrice}`.trim();
+          iframe.dataset.mosPurchaseSyncInstalled = "true";
+        } catch {
+          continue;
+        }
+      }
+    };
+
+    syncAllPurchaseFrames();
+    syncWindow.__mosImportedPurchaseFramesIntervalId = ownerWindow.setInterval(syncAllPurchaseFrames, 250);
+    return () => {
+      if (syncWindow.__mosImportedPurchaseFramesIntervalId) {
+        ownerWindow.clearInterval(syncWindow.__mosImportedPurchaseFramesIntervalId);
+      }
+      syncWindow.__mosImportedPurchaseFramesIntervalId = undefined;
+      syncWindow.__mosImportedPurchaseFramesSyncInstalled = false;
+    };
+  }, []);
 
   const resolvedTitle = sectionLabel?.trim() || originalType?.trim() || "Imported section";
 
@@ -417,7 +580,7 @@ export function ImportedRuntimeSection({
       ref={frameRef}
       title={resolvedTitle}
       srcDoc={srcDoc}
-      sandbox="allow-forms allow-popups allow-scripts"
+      sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
       className="block w-full overflow-hidden border-0 bg-transparent"
       style={{ height: `${height}px` }}
       onLoad={() => {
@@ -437,6 +600,7 @@ export function ImportedRuntimeSection({
           },
           "*",
         );
+        window.setTimeout(() => installHostedPurchaseFrameSync(), 0);
       }}
     />
   );
