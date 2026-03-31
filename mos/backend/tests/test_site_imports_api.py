@@ -217,9 +217,38 @@ def _build_archive_zip(files: dict[str, str]) -> bytes:
     return buffer.getvalue()
 
 
-def _sample_react_export_archive() -> bytes:
-    return _build_archive_zip(
-        {
+def _sample_design_system_html() -> str:
+    return """
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>OMNI Design System</title>
+    <style>
+      :root {
+        --primary: rgb(38, 83, 146);
+        --primary-dark: rgb(0, 34, 102);
+        --surface: rgb(235, 242, 255);
+        --background: rgb(245, 248, 255);
+        --text: rgb(26, 26, 26);
+        --accent: rgb(220, 38, 38);
+        --font-primary: "Satoshi", sans-serif;
+        --button-radius: 999px;
+      }
+
+      body {
+        font-family: "Satoshi", sans-serif;
+      }
+    </style>
+  </head>
+  <body data-theme="light">
+    <button>Primary CTA</button>
+  </body>
+</html>
+""".strip()
+
+
+def _sample_react_export_archive(*, design_system_path: str | None = None) -> bytes:
+    files = {
             "package.json": """
 {
   "name": "validated-loop-react-export",
@@ -357,8 +386,10 @@ export default function App() {
   );
 }
 """.strip(),
-        }
-    )
+    }
+    if design_system_path:
+        files[design_system_path] = _sample_design_system_html()
+    return _build_archive_zip(files)
 
 
 def test_list_imports_empty(api_client):
@@ -520,6 +551,44 @@ def test_save_archive_import_as_site_creates_runtime_records(api_client):
         draft["puckData"]["content"][0]["props"]["content"][0]["props"]["content"][0]["type"]
         == "ImportedRuntimeSection"
     )
+
+
+@pytest.mark.parametrize("design_system_path", ["design-system/design-system.html", "design-system.html"])
+def test_archive_import_design_system_html_builds_canonical_candidate(api_client, design_system_path: str):
+    response = api_client.post(
+        "/clients", json={"name": "Archive Design Candidate Workspace", "industry": "Pets"}
+    )
+    assert response.status_code == 201
+    client_id = response.json()["id"]
+
+    archive_bytes = _sample_react_export_archive(design_system_path=design_system_path)
+    response = api_client.post(
+        f"/storefront/templates/imports/archive?clientId={client_id}",
+        files={"file": ("project.zip", archive_bytes, "application/zip")},
+    )
+    assert response.status_code == 201
+    import_id = response.json()["id"]
+
+    detail = api_client.get(f"/storefront/templates/imports/{import_id}?clientId={client_id}")
+    assert detail.status_code == 200
+    theme_candidate = detail.json()["themeCandidate"]
+    css_vars = theme_candidate["cssVars"]
+
+    assert theme_candidate["dataTheme"] == "light"
+    assert theme_candidate["brand"]["name"] == "validated-loop-react-export"
+    assert theme_candidate["diagnostics"]["sourceInputs"]["designSystemHtmlPath"] == design_system_path
+    assert theme_candidate["diagnostics"]["promotionReadiness"]["missingFields"] == ["brand.logoAssetPublicId"]
+    assert theme_candidate["fonts"]["heading"] == "Satoshi"
+    assert "Satoshi" in css_vars["--font-sans"]
+    assert "system-ui" in css_vars["--font-sans"]
+    assert css_vars["--color-cta"] == "rgb(38, 83, 146)"
+    assert css_vars["--hero-bg"] == "rgb(235, 242, 255)"
+    assert css_vars["--pitch-bg"] == "rgb(235, 242, 255)"
+    assert css_vars["--color-bg"] == "rgb(245, 248, 255)"
+    assert css_vars["--hero-bg"] != "rgb(220, 38, 38)"
+    assert css_vars["--pitch-bg"] != "rgb(220, 38, 38)"
+    assert css_vars["--radius-full"] == "999px"
+    assert css_vars["--pdp-radius-pill"] == "999px"
 
 
 def test_create_archive_import_rejects_missing_app_file(api_client):

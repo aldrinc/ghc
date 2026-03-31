@@ -111,7 +111,7 @@ function extractThemeTokens(rawTokens: unknown): B2CThemeTokens {
     radiusSmall: asString(cssVars["--radius-sm"]),
     radiusMedium: asString(cssVars["--radius-md"]),
     radiusLarge: asString(cssVars["--radius-lg"]),
-    radiusFull: asString(cssVars["--radius-full"]),
+    radiusFull: asString(cssVars["--radius-full"] ?? cssVars["--pdp-radius-pill"]),
   };
 }
 
@@ -200,7 +200,7 @@ export function useB2CCTATheme(): {
       hoverStyle.backgroundColor = tokens.colorPrimaryHover;
       hoverStyle.borderColor = tokens.colorPrimaryHover;
     }
-    style.borderRadius = resolveB2CActionRadius(tokens);
+    style.borderRadius = resolveB2CPillRadius(tokens);
 
     return {
       style: Object.keys(style).length ? style : undefined,

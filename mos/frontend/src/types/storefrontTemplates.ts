@@ -70,6 +70,7 @@ export type ThemePalette = {
 };
 
 export type ThemeFonts = {
+  primary?: string | null;
   heading?: string | null;
   body?: string | null;
   cta?: string | null;
@@ -87,10 +88,38 @@ export type ThemeCTA = {
 };
 
 export type ThemeCandidate = {
-  palette: ThemePalette;
-  fonts: ThemeFonts;
-  spacing: ThemeSpacing;
-  cta: ThemeCTA;
+  palette?: ThemePalette;
+  fonts?: ThemeFonts;
+  spacing?: ThemeSpacing;
+  cta?: ThemeCTA;
+  dataTheme?: string;
+  fontUrls?: string[];
+  fontCss?: string | null;
+  cssVars?: Record<string, string | number>;
+  funnelDefaults?: Record<string, unknown>;
+  brand?: {
+    name?: string | null;
+    logoAssetPublicId?: string | null;
+    logoOnDarkAssetPublicId?: string | null;
+    logoAlt?: string | null;
+  };
+  diagnostics?: {
+    sourceInputs?: {
+      hasTailwindSource?: boolean;
+      hasIndexCssSource?: boolean;
+      designSystemHtmlPath?: string | null;
+    };
+    fidelity?: {
+      fontDelivery?: string | null;
+      backgroundStrategy?: string | null;
+    };
+    promotionReadiness?: {
+      ready?: boolean;
+      missingFields?: string[];
+      notes?: string[];
+    };
+  };
+  [key: string]: unknown;
 };
 
 export type NormalizedSection = {

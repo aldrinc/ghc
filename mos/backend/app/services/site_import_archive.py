@@ -7,6 +7,7 @@ import re
 import subprocess
 import tempfile
 import zipfile
+from copy import deepcopy
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
@@ -63,6 +64,10 @@ _SECTION_WINDOW_AFTER = 2600
 _QUOTED_STRING_RE = re.compile(r"""(["'])(.*?)(?<!\\)\1""", re.DOTALL)
 _URL_RE = re.compile(r"""https?://[^\s"'`<>()]+""")
 _ALLOWED_RUNTIME_IMPORT_SOURCES = {"react", "react-dom", "react-dom/client"}
+_SYSTEM_UI_FONT_FALLBACK = (
+    'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, '
+    'Apple Color Emoji, Segoe UI Emoji'
+)
 
 
 def analyze_site_import_archive(
@@ -86,11 +91,14 @@ def analyze_site_import_archive(
     files = _read_archive_text_files(archive_bytes)
     package_json_text = _get_required_file(files, "package.json")
     package_data = _parse_package_json(package_json_text)
+    project_name = str(package_data.get("name") or "").strip() or None
     index_html = _get_required_file(files, "index.html")
     app_path = _resolve_first_existing(
         files,
         ["src/App.tsx", "src/App.jsx", "src/App.ts", "src/App.js"],
     )
+    if app_path is None:
+        raise SiteImportArchiveError("Archive is missing required file: src/App")
     app_source = files[app_path]
     main_path = _resolve_first_existing(
         files,
@@ -107,6 +115,11 @@ def analyze_site_import_archive(
         ["src/index.css", "src/app.css", "src/styles.css"],
         required=False,
     )
+    design_system_path = _resolve_first_existing(
+        files,
+        ["design-system/design-system.html", "design-system.html"],
+        required=False,
+    )
     if not index_css_path:
         raise SiteImportArchiveError(
             "Archive import requires a stylesheet entry file for fidelity-preserving translation. "
@@ -116,6 +129,9 @@ def analyze_site_import_archive(
     extracted_theme_candidate = _extract_theme_candidate(
         tailwind_source=files.get(tailwind_path) if tailwind_path else None,
         index_css_source=files.get(index_css_path) if index_css_path else None,
+        design_system_source=files.get(design_system_path) if design_system_path else None,
+        design_system_path=design_system_path,
+        brand_name=project_name,
     )
     extracted_sections = _extract_normalized_sections(app_source)
     if not extracted_sections:
@@ -132,10 +148,12 @@ def analyze_site_import_archive(
 
     title = _extract_title(app_source, extracted_sections)
     meta_description = _extract_meta_description(extracted_sections)
-    project_name = str(package_data.get("name") or "").strip() or None
     source_url = f"archive://{archive_name.strip()}"
     resolved_template_id = None
     page_title = title or project_name or _humanize_page_type(resolved_page_type)
+    brand = extracted_theme_candidate.get("brand")
+    if isinstance(brand, dict) and not str(brand.get("name") or "").strip():
+        brand["name"] = page_title
     code_bundle = _build_code_bundle(
         files=files,
         ordered_paths=[
@@ -437,9 +455,14 @@ def _extract_theme_candidate(
     *,
     tailwind_source: str | None,
     index_css_source: str | None,
+    design_system_source: str | None,
+    design_system_path: str | None,
+    brand_name: str | None,
 ) -> dict[str, Any]:
-    source = "\n".join(part for part in (tailwind_source, index_css_source) if part)
-    palette = {
+    source = "\n".join(part for part in (tailwind_source, index_css_source, design_system_source) if part)
+    design_system_doc = _extract_design_system_document(source=design_system_source, path=design_system_path)
+    design_palette = design_system_doc.get("palette") if isinstance(design_system_doc, dict) else {}
+    extracted_palette = {
         "primary": _search(source, r"primary\s*:\s*\{[^}]*DEFAULT:\s*'([^']+)'"),
         "secondary": _search(source, r"primary\s*:\s*\{[^}]*dark:\s*'([^']+)'"),
         "surface": _search(source, r"bg\s*:\s*\{[^}]*card:\s*'([^']+)'"),
@@ -447,22 +470,329 @@ def _extract_theme_candidate(
         "text": _search(source, r"text\s*:\s*\{[^}]*dark:\s*'([^']+)'"),
         "background": _search(source, r"bg\s*:\s*\{[^}]*light:\s*'([^']+)'"),
     }
-    fonts = {
-        "heading": _search(source, r"sans\s*:\s*\[\s*'([^']+)'"),
-        "body": _search(source, r"sans\s*:\s*\[\s*'([^']+)'"),
-        "cta": _search(source, r"sans\s*:\s*\[\s*'([^']+)'"),
+    palette = {
+        role: _first_non_empty(
+            design_palette.get(role) if isinstance(design_palette, dict) else None,
+            extracted_palette.get(role),
+        )
+        for role in ("primary", "secondary", "surface", "accent", "text", "background")
     }
-    border_radius = _search(source, r"pill'\s*:\s*'([^']+)'")
-    return {
+
+    extracted_primary_font = _search(source, r"sans\s*:\s*\[\s*'([^']+)'")
+    design_fonts = design_system_doc.get("fonts") if isinstance(design_system_doc, dict) else {}
+    primary_font = _first_non_empty(
+        design_fonts.get("primary") if isinstance(design_fonts, dict) else None,
+        extracted_primary_font,
+    )
+    fonts = {
+        "primary": primary_font,
+        "heading": _first_non_empty(
+            design_fonts.get("heading") if isinstance(design_fonts, dict) else None,
+            primary_font,
+        ),
+        "body": _first_non_empty(
+            design_fonts.get("body") if isinstance(design_fonts, dict) else None,
+            primary_font,
+        ),
+        "cta": _first_non_empty(
+            design_fonts.get("cta") if isinstance(design_fonts, dict) else None,
+            primary_font,
+        ),
+    }
+    border_radius = _first_non_empty(
+        design_system_doc.get("ctaBorderRadius") if isinstance(design_system_doc, dict) else None,
+        _search(source, r"pill'\s*:\s*'([^']+)'"),
+    )
+    font_urls = design_system_doc.get("fontUrls") if isinstance(design_system_doc, dict) else []
+    font_css = design_system_doc.get("fontCss") if isinstance(design_system_doc, dict) else None
+    data_theme = _first_non_empty(
+        design_system_doc.get("dataTheme") if isinstance(design_system_doc, dict) else None,
+        "light",
+    )
+
+    base_tokens = deepcopy(_load_base_design_system_tokens_template())
+    css_vars = deepcopy(base_tokens.get("cssVars", {})) if isinstance(base_tokens.get("cssVars"), dict) else {}
+
+    background = _first_non_empty(palette.get("background"), palette.get("surface"), css_vars.get("--color-page-bg"))
+    surface = _first_non_empty(palette.get("surface"), background, css_vars.get("--hero-bg"))
+    brand_color = _first_non_empty(palette.get("secondary"), palette.get("primary"), css_vars.get("--color-brand"))
+    body_text = _first_non_empty(palette.get("text"), brand_color, css_vars.get("--color-text"))
+    cta_color = _first_non_empty(palette.get("primary"), brand_color, css_vars.get("--color-cta"))
+    cta_text = _choose_text_color(cta_color) if isinstance(cta_color, str) and cta_color.strip() else css_vars.get("--color-cta-text")
+
+    heading_font_stack = _build_font_stack(fonts.get("heading"))
+    body_font_stack = _build_font_stack(fonts.get("body"))
+    cta_font_stack = _build_font_stack(fonts.get("cta"))
+    if body_font_stack:
+        css_vars["--font-sans"] = body_font_stack
+    if heading_font_stack:
+        css_vars["--font-heading"] = heading_font_stack
+    if cta_font_stack:
+        css_vars["--font-cta"] = cta_font_stack
+
+    if isinstance(brand_color, str) and brand_color.strip():
+        css_vars["--color-brand"] = brand_color
+        css_vars["--pdp-brand-strong"] = brand_color
+        brand_rgb = _parse_simple_rgb(brand_color)
+        if brand_rgb is not None:
+            css_vars["--color-border"] = _rgba_string(brand_rgb, 0.18)
+            css_vars["--focus-outline-color"] = _rgba_string(brand_rgb, 0.35)
+            css_vars["--focus-outline-color-soft"] = _rgba_string(brand_rgb, 0.25)
+            css_vars["--pdp-brand-05"] = _rgba_string(brand_rgb, 0.05)
+            css_vars["--pdp-brand-08"] = _rgba_string(brand_rgb, 0.08)
+            css_vars["--pdp-brand-12"] = _rgba_string(brand_rgb, 0.12)
+    if isinstance(body_text, str) and body_text.strip():
+        css_vars["--color-text"] = body_text
+        text_rgb = _parse_simple_rgb(body_text)
+        if text_rgb is not None:
+            css_vars["--color-muted"] = _rgba_string(text_rgb, 0.76)
+    if isinstance(background, str) and background.strip():
+        css_vars["--color-bg"] = background
+        css_vars["--color-page-bg"] = background
+    if isinstance(surface, str) and surface.strip():
+        css_vars["--color-page-bg-secondary"] = surface
+        css_vars["--hero-bg"] = surface
+        css_vars["--pitch-bg"] = surface
+        css_vars["--color-soft"] = surface
+    if isinstance(cta_color, str) and cta_color.strip():
+        css_vars["--color-cta"] = cta_color
+        css_vars["--pdp-cta-bg"] = cta_color
+    if isinstance(cta_text, str) and cta_text.strip():
+        css_vars["--color-cta-text"] = cta_text
+    if isinstance(brand_color, str) and brand_color.strip():
+        css_vars["--color-cta-icon"] = brand_color
+    if isinstance(border_radius, str) and border_radius.strip():
+        css_vars["--radius-full"] = border_radius.strip()
+        css_vars["--pdp-radius-pill"] = border_radius.strip()
+
+    candidate = {
+        "dataTheme": data_theme or "light",
+        "fontUrls": font_urls if isinstance(font_urls, list) else [],
+        "cssVars": css_vars,
+        "funnelDefaults": deepcopy(base_tokens.get("funnelDefaults", {})),
+        "brand": {
+            "name": _first_non_empty(
+                brand_name,
+                design_system_doc.get("title") if isinstance(design_system_doc, dict) else None,
+                "Imported Brand",
+            ),
+        },
         "palette": palette,
-        "fonts": fonts,
+        "fonts": {role: fonts.get(role) for role in ("primary", "heading", "body", "cta")},
         "spacing": {"density": "comfortable", "scale": []},
         "cta": {
             "style": "solid",
             "borderRadius": border_radius,
             "padding": None,
         },
+        "diagnostics": {
+            "sourceInputs": {
+                "hasTailwindSource": bool(tailwind_source and tailwind_source.strip()),
+                "hasIndexCssSource": bool(index_css_source and index_css_source.strip()),
+                "designSystemHtmlPath": design_system_path,
+            },
+            "fidelity": {
+                "fontDelivery": "document_supplied" if font_urls or font_css else "family_name_only",
+                "backgroundStrategy": "page and section surfaces derive from background and surface roles; accent is excluded from hero and pitch backgrounds",
+            },
+            "promotionReadiness": {
+                "ready": False,
+                "missingFields": ["brand.logoAssetPublicId"],
+                "notes": [
+                    "Candidate matches design-system token shape closely but still requires a real logo asset before promotion into a runtime design system.",
+                ],
+            },
+        },
     }
+    if isinstance(font_css, str) and font_css.strip():
+        candidate["fontCss"] = font_css.strip()
+    return candidate
+
+
+def _build_font_stack(font_name: str | None) -> str | None:
+    if not isinstance(font_name, str) or not font_name.strip():
+        return None
+    cleaned = _normalize_font_name(font_name)
+    quoted = f'"{cleaned}"' if " " in cleaned else cleaned
+    return f"{quoted}, {_SYSTEM_UI_FONT_FALLBACK}"
+
+
+def _normalize_font_name(value: str) -> str:
+    cleaned = value.strip().strip("\"'")
+    if "," in cleaned:
+        cleaned = cleaned.split(",", 1)[0].strip().strip("\"'")
+    return cleaned
+
+
+def _choose_text_color(color: str) -> str:
+    rgb = _parse_simple_rgb(color)
+    if rgb is None:
+        return "#ffffff"
+    brightness = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
+    return "#061a70" if brightness >= 175 else "#ffffff"
+
+
+def _rgba_string(rgb: tuple[int, int, int], alpha: float) -> str:
+    return f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {alpha:.2f})"
+
+
+def _parse_simple_rgb(value: str) -> tuple[int, int, int] | None:
+    raw = value.strip().lower()
+    hex_match = re.fullmatch(r"#([0-9a-f]{6})", raw)
+    if hex_match:
+        body = hex_match.group(1)
+        return int(body[0:2], 16), int(body[2:4], 16), int(body[4:6], 16)
+    short_hex_match = re.fullmatch(r"#([0-9a-f]{3})", raw)
+    if short_hex_match:
+        body = short_hex_match.group(1)
+        return int(body[0] * 2, 16), int(body[1] * 2, 16), int(body[2] * 2, 16)
+    rgb_match = re.fullmatch(r"rgba?\(([^)]+)\)", raw)
+    if rgb_match:
+        parts = [part.strip() for part in rgb_match.group(1).split(",")]
+        if len(parts) >= 3:
+            try:
+                r = max(0, min(255, int(round(float(parts[0])))))
+                g = max(0, min(255, int(round(float(parts[1])))))
+                b = max(0, min(255, int(round(float(parts[2])))))
+                return r, g, b
+            except ValueError:
+                return None
+    if raw == "white":
+        return 255, 255, 255
+    if raw == "black":
+        return 0, 0, 0
+    return None
+
+
+class _DesignSystemDocumentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.title: str | None = None
+        self.stylesheet_hrefs: list[str] = []
+        self.inline_styles: list[str] = []
+        self._capture_title = False
+        self._capture_style = False
+        self._title_chunks: list[str] = []
+        self._style_chunks: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = {key: value or "" for key, value in attrs}
+        if tag == "title":
+            self._capture_title = True
+            self._title_chunks = []
+            return
+        if tag == "style":
+            self._capture_style = True
+            self._style_chunks = []
+            return
+        if tag != "link":
+            return
+        rel = attributes.get("rel", "").lower()
+        href = attributes.get("href", "").strip()
+        if "stylesheet" in rel and _is_external_asset_url(href):
+            self.stylesheet_hrefs.append(href)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "title" and self._capture_title:
+            title = "".join(self._title_chunks).strip()
+            if title:
+                self.title = title
+            self._capture_title = False
+            self._title_chunks = []
+        if tag == "style" and self._capture_style:
+            style = "".join(self._style_chunks).strip()
+            if style:
+                self.inline_styles.append(style)
+            self._capture_style = False
+            self._style_chunks = []
+
+    def handle_data(self, data: str) -> None:
+        if self._capture_title:
+            self._title_chunks.append(data)
+        if self._capture_style:
+            self._style_chunks.append(data)
+
+
+def _extract_design_system_document(*, source: str | None, path: str | None) -> dict[str, Any]:
+    if not isinstance(source, str) or not source.strip():
+        return {}
+
+    parser = _DesignSystemDocumentParser()
+    parser.feed(source)
+    css_source = "\n".join(parser.inline_styles)
+    css_vars = {
+        key.strip().lower(): value.strip()
+        for key, value in re.findall(r"(--[A-Za-z0-9_-]+)\s*:\s*([^;}{]+);", css_source)
+        if key.strip() and value.strip()
+    }
+    font_urls = _ordered_unique(
+        parser.stylesheet_hrefs
+        + [
+            match.strip().strip("\"'")
+            for match in re.findall(r"@import\s+url\(([^)]+)\)", css_source, re.IGNORECASE)
+            if _is_external_asset_url(match.strip().strip("\"'"))
+        ]
+    )
+    font_css_blocks = re.findall(r"@font-face\s*\{[^{}]*\}", css_source, re.IGNORECASE | re.DOTALL)
+    font_css_imports = [
+        match.strip()
+        for match in re.findall(r"@import\s+[^;]+;", css_source, re.IGNORECASE)
+        if "font" in match.lower()
+    ]
+    font_css = "\n\n".join([*font_css_imports, *font_css_blocks]).strip() or None
+    data_theme = "dark" if re.search(r"data-theme\s*=\s*[\"']dark[\"']", source, re.IGNORECASE) else "light"
+    palette = {
+        "primary": _resolve_design_system_value(css_vars, [r"--(?:color-)?primary$", r"--brand$", r"--cta$"]),
+        "secondary": _resolve_design_system_value(css_vars, [r"--(?:color-)?secondary$", r"--primary-dark$", r"--brand-dark$", r"--navy$"]),
+        "surface": _resolve_design_system_value(css_vars, [r"--(?:color-)?surface$", r"--card$", r"--panel$"]),
+        "accent": _resolve_design_system_value(css_vars, [r"--(?:color-)?accent$", r"--sale$", r"--danger$", r"--highlight$", r"--red$"]),
+        "text": _resolve_design_system_value(css_vars, [r"--(?:color-)?text$", r"--foreground$", r"--ink$", r"--copy$"]),
+        "background": _resolve_design_system_value(css_vars, [r"--(?:color-)?background$", r"--page-bg$", r"--canvas$", r"--light$"]),
+    }
+    fonts = {
+        "primary": _extract_primary_font_name(
+            _resolve_design_system_value(css_vars, [r"--font-primary$", r"--font-sans$", r"--font-family$"])
+            or _search(css_source, r"font-family\s*:\s*([^;}{]+)")
+        ),
+        "heading": _extract_primary_font_name(_resolve_design_system_value(css_vars, [r"--font-heading$", r"--heading-font$"])),
+        "body": _extract_primary_font_name(_resolve_design_system_value(css_vars, [r"--font-body$", r"--body-font$", r"--font-copy$"])),
+        "cta": _extract_primary_font_name(_resolve_design_system_value(css_vars, [r"--font-cta$", r"--button-font$"])),
+    }
+    cta_border_radius = _first_non_empty(
+        _resolve_design_system_value(css_vars, [r"--button-radius$", r"--cta-radius$", r"--pill$", r"--radius-full$"]),
+        _search(css_source, r"button[^\{]*\{[^}]*border-radius\s*:\s*([^;}{]+)"),
+    )
+    return {
+        "path": path,
+        "title": parser.title,
+        "dataTheme": data_theme,
+        "palette": palette,
+        "fonts": fonts,
+        "ctaBorderRadius": cta_border_radius,
+        "fontUrls": font_urls,
+        "fontCss": font_css,
+    }
+
+
+def _resolve_design_system_value(css_vars: dict[str, str], patterns: list[str]) -> str | None:
+    for pattern in patterns:
+        matcher = re.compile(pattern, re.IGNORECASE)
+        for key, value in css_vars.items():
+            if matcher.search(key) and isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _extract_primary_font_name(value: str | None) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    for candidate in [part.strip().strip("\"'") for part in value.split(",")]:
+        if not candidate:
+            continue
+        if candidate.lower() in {"sans-serif", "serif", "monospace", "system-ui", "ui-sans-serif"}:
+            continue
+        return candidate
+    return None
 
 
 def _extract_normalized_sections(app_source: str) -> list[dict[str, Any]]:
@@ -1256,6 +1586,23 @@ def _derive_site_type(page_type: str) -> str:
     if page_type in {"pre_sell", "landing"}:
         return "landing"
     return "content"
+
+
+def _load_base_design_system_tokens_template() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[1] / "templates" / "design_systems" / "base_tokens.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SiteImportArchiveError(
+            f"Missing design system base template at {path}."
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise SiteImportArchiveError(
+            f"Design system base template is not valid JSON: {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise SiteImportArchiveError("Design system base template must decode to a JSON object.")
+    return payload
 
 
 def _frontend_root() -> Path:

@@ -277,7 +277,7 @@ export type B2CRuntimeContextValue = {
 // Context
 // =============================================================================
 
-const B2CRuntimeContext = createContext<B2CRuntimeContextValue | null>(null);
+export const B2CRuntimeContext = createContext<B2CRuntimeContextValue | null>(null);
 
 export function useB2CRuntime(): B2CRuntimeContextValue {
   const context = useContext(B2CRuntimeContext);
