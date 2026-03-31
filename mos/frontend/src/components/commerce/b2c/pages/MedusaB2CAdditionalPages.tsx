@@ -4072,16 +4072,24 @@ export function MedusaB2CCheckoutPage() {
   );
   const currencyCode = cart?.currency_code || 'usd';
   const activeCartCount = cart ? getCartItemCount(cart) : 0;
+  const cartRequiresShipping = useMemo(() => {
+    const items = cart?.items || [];
+    if (!items.length) return true;
+    return items.some((item) => item.requires_shipping !== false);
+  }, [cart?.items]);
   const contactCompleted =
     Boolean(cart?.email?.trim()) && cart?.email === email.trim();
-  const deliveryCompleted = isAddressReadyForRating(cart?.shipping_address);
+  const deliveryCompleted =
+    !cartRequiresShipping || isAddressReadyForRating(cart?.shipping_address);
   const cartShippingMethodId =
     cart?.shipping_methods?.[0]?.shipping_option_id || null;
   const shippingCompleted =
-    Boolean(cartShippingMethodId) &&
-    deliveryVersion > 0 &&
-    shippingVersion === deliveryVersion &&
-    !shippingAddressEdited;
+    !cartRequiresShipping ||
+    (Boolean(cartShippingMethodId) &&
+      deliveryVersion > 0 &&
+      shippingVersion === deliveryVersion &&
+      !shippingAddressEdited);
+  const paymentStepReady = cartRequiresShipping ? shippingCompleted : contactCompleted;
   const visibleShippingOptionId = shippingAddressEdited
     ? null
     : shippingCompleted
@@ -4106,17 +4114,18 @@ export function MedusaB2CCheckoutPage() {
     submitting ||
     promotionSubmitting ||
     !contactCompleted ||
-    !deliveryCompleted ||
-    shippingAddressEdited ||
-    shippingOptionsLoading ||
-    (!shippingCompleted && !hasSingleShippingOption);
+    (cartRequiresShipping &&
+      (!deliveryCompleted ||
+        shippingAddressEdited ||
+        shippingOptionsLoading ||
+        (!shippingCompleted && !hasSingleShippingOption)));
   const expressDisabledReason = !contactCompleted
     ? 'Save your contact email before using accelerated checkout.'
-    : !deliveryCompleted || shippingAddressEdited
+    : cartRequiresShipping && (!deliveryCompleted || shippingAddressEdited)
       ? 'Save your delivery details before using accelerated checkout.'
-      : shippingOptionsLoading
+      : cartRequiresShipping && shippingOptionsLoading
         ? 'Loading shipping options for this address.'
-        : !shippingCompleted && !hasSingleShippingOption
+        : cartRequiresShipping && !shippingCompleted && !hasSingleShippingOption
           ? shippingOptions.length > 1
             ? 'Choose a shipping method before using an accelerated wallet.'
             : sectionErrors.shipping ||
@@ -4351,6 +4360,7 @@ export function MedusaB2CCheckoutPage() {
   useEffect(() => {
     if (
       !cart ||
+      !cartRequiresShipping ||
       !deliveryCompleted ||
       shippingOptions.length ||
       shippingOptionsLoading ||
@@ -4360,6 +4370,7 @@ export function MedusaB2CCheckoutPage() {
     void loadShippingOptions();
   }, [
     cart,
+    cartRequiresShipping,
     deliveryCompleted,
     loadShippingOptions,
     shippingOptions.length,
@@ -4368,7 +4379,7 @@ export function MedusaB2CCheckoutPage() {
   ]);
 
   useEffect(() => {
-    if (!shippingCompleted) {
+    if (!paymentStepReady) {
       setPaymentCollection(null);
       setPaymentSessionLoading(false);
       updateSectionError('payment', null);
@@ -4385,10 +4396,10 @@ export function MedusaB2CCheckoutPage() {
   }, [
     cart,
     loadPaymentProviders,
+    paymentStepReady,
     paymentProviders.length,
     paymentProvidersLoaded,
     paymentProvidersLoading,
-    shippingCompleted,
     updateSectionError,
   ]);
 
@@ -4567,7 +4578,7 @@ export function MedusaB2CCheckoutPage() {
 
   useEffect(() => {
     if (
-      !shippingCompleted ||
+      !paymentStepReady ||
       selectedPaymentProviderId ||
       !paymentProviders.length
     ) {
@@ -4583,14 +4594,14 @@ export function MedusaB2CCheckoutPage() {
     updateSectionError('payment', null);
   }, [
     paymentProviders,
+    paymentStepReady,
     selectedPaymentProviderId,
-    shippingCompleted,
     updateSectionError,
   ]);
 
   useEffect(() => {
     if (
-      !shippingCompleted ||
+      !paymentStepReady ||
       !selectedPaymentProviderId ||
       paymentCollection ||
       paymentSessionLoading
@@ -4600,10 +4611,10 @@ export function MedusaB2CCheckoutPage() {
     void selectPaymentProvider(selectedPaymentProviderId);
   }, [
     paymentCollection,
+    paymentStepReady,
     paymentSessionLoading,
     selectedPaymentProviderId,
     selectPaymentProvider,
-    shippingCompleted,
   ]);
 
   const ensurePaymentProviderInitialized = useCallback(
@@ -4680,6 +4691,13 @@ export function MedusaB2CCheckoutPage() {
   const completeWithProvider = useCallback(
     async (providerId?: string) => {
       updateSectionError('payment', null);
+      if (!contactCompleted) {
+        updateSectionError(
+          'payment',
+          'Save your contact email before completing checkout.',
+        );
+        return false;
+      }
       const resolvedProviderId = providerId || selectedPaymentProviderId;
       if (!resolvedProviderId) {
         updateSectionError(
@@ -4727,6 +4745,7 @@ export function MedusaB2CCheckoutPage() {
       return false;
     },
     [
+      contactCompleted,
       completeConfirmedCheckout,
       ensurePaymentProviderInitialized,
       prepareBillingForPayment,
@@ -5064,6 +5083,11 @@ export function MedusaB2CCheckoutPage() {
                     countryHint={countryHint}
                   />
                 </div>
+                {!cartRequiresShipping ? (
+                  <p className="mt-2 text-sm text-content-muted">
+                    Shipping address is not required for this order.
+                  </p>
+                ) : null}
                 {sectionErrors.delivery ? (
                   <p className="mt-2 text-sm font-medium text-danger">
                     {sectionErrors.delivery}
@@ -5084,7 +5108,11 @@ export function MedusaB2CCheckoutPage() {
                 testId="b2c-checkout-shipping"
               >
                 <div className="space-y-3">
-                  {!deliveryCompleted ? (
+                  {!cartRequiresShipping ? (
+                    <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-content-muted">
+                      Shipping is not required for this order.
+                    </p>
+                  ) : !deliveryCompleted ? (
                     <p className="rounded-md bg-surface-2 px-4 py-3 text-sm text-content-muted">
                       Enter your shipping address to view available shipping
                       methods.
@@ -5149,20 +5177,21 @@ export function MedusaB2CCheckoutPage() {
 
               <CheckoutSection
                 title="Payment"
-                disabled={!shippingCompleted}
+                disabled={!paymentStepReady}
                 testId="b2c-checkout-payment"
               >
                 <p className="mb-3 text-sm text-content-muted">
                   All transactions are secure and encrypted.
                 </p>
                 <div className="space-y-3">
-                  {!shippingCompleted ? (
+                  {!paymentStepReady ? (
                     <p className="text-sm text-content-muted">
-                      Choose a shipping method before selecting a payment
-                      option.
+                      {cartRequiresShipping
+                        ? 'Choose a shipping method before selecting a payment option.'
+                        : 'Save your contact email before selecting a payment option.'}
                     </p>
                   ) : null}
-                  {shippingCompleted && paymentProvidersLoading ? (
+                  {paymentStepReady && paymentProvidersLoading ? (
                     <p className="text-sm text-content-muted">
                       Loading payment methods…
                     </p>
@@ -5172,7 +5201,7 @@ export function MedusaB2CCheckoutPage() {
                       {sectionErrors.payment}
                     </p>
                   ) : null}
-                  {shippingCompleted && paymentProviders.length ? (
+                  {paymentStepReady && paymentProviders.length ? (
                     <fieldset
                       className="rounded-md border border-border"
                       data-testid="b2c-payment-providers"
@@ -5298,7 +5327,7 @@ export function MedusaB2CCheckoutPage() {
                       disabled={
                         submitting ||
                         !selectedPaymentProviderId ||
-                        !shippingCompleted
+                        !paymentStepReady
                       }
                       className="w-full rounded-md bg-content px-6 py-3 text-sm font-medium text-white transition hover:bg-content/80 disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ ...theme.primaryPillStyle, borderRadius: '6px' }}

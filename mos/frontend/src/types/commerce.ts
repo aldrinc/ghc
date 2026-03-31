@@ -160,6 +160,7 @@ export type MedusaCartLineItem = {
   tax_total?: number;
   total?: number;
   variant?: MedusaProductVariant;
+  requires_shipping?: boolean;
 };
 
 export type MedusaPromotion = {
@@ -171,6 +172,7 @@ export type MedusaCart = {
   id: string;
   email?: string;
   region_id: string;
+  completed_at?: string | null;
   shipping_address?: MedusaCartAddress;
   billing_address?: MedusaCartAddress;
   items?: MedusaCartLineItem[];

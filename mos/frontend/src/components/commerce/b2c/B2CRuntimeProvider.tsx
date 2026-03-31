@@ -566,6 +566,11 @@ export function B2CRuntimeProvider({
     setCartLoading(true);
     try {
       const cartData = await getCart(cartId);
+      if (cartData?.completed_at) {
+        setCartId(null);
+        setCart(null);
+        return;
+      }
       setCart(cartData);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to refresh cart");

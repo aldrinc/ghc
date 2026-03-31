@@ -150,6 +150,39 @@ export type ProductListResult = {
   limit: number;
 };
 
+function singularizeLookupToken(token: string): string {
+  if (token.endsWith("ies") && token.length > 3) {
+    return `${token.slice(0, -3)}y`;
+  }
+  if (token.endsWith("s") && !token.endsWith("ss") && token.length > 1) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function normalizeLookupValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildComparableLookupValues(value: string): string[] {
+  const normalized = normalizeLookupValue(value);
+  if (!normalized) {
+    return [];
+  }
+
+  const singularized = normalized
+    .split(/\s+/)
+    .map((token) => singularizeLookupToken(token))
+    .join(" ")
+    .trim();
+
+  return singularized && singularized !== normalized ? [normalized, singularized] : [normalized];
+}
+
 /**
  * List products from Medusa with optional filtering.
  */
@@ -184,7 +217,30 @@ export async function getProductByHandle(handle: string): Promise<MedusaProduct 
   try {
     const client = getMedusaClient();
     const response = await client.store.product.list({ handle });
-    return (response.products[0] as MedusaProduct) || null;
+    const exactProduct = (response.products[0] as MedusaProduct) || null;
+    if (exactProduct) {
+      return exactProduct;
+    }
+
+    const fallbackResult = await listProducts({ limit: 50 });
+    const comparableHandleValues = buildComparableLookupValues(handle);
+    const fallbackProduct = fallbackResult.products.find((product) => {
+      const comparableProductValues = [product.handle, product.title]
+        .flatMap((value) => buildComparableLookupValues(String(value || "")));
+      return comparableHandleValues.some((searchValue) => {
+        return comparableProductValues.some((productValue) => {
+          return Boolean(
+            productValue
+            && (
+              productValue.includes(searchValue)
+              || searchValue.includes(productValue)
+            )
+          );
+        });
+      });
+    });
+
+    return fallbackProduct || null;
   } catch (error) {
     return handleApiError(error);
   }
@@ -327,9 +383,10 @@ export async function getOrCreateCart(): Promise<MedusaCart> {
   if (existingCartId) {
     try {
       const cart = await getCart(existingCartId);
-      if (cart) {
+      if (cart && !cart.completed_at) {
         return cart;
       }
+      setCartId(null);
     } catch {
       // Cart not found or expired, create new one
     }
