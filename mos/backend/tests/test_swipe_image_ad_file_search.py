@@ -277,6 +277,24 @@ def test_build_swipe_stage1_destination_context_uses_strategy_artifact_names():
     assert "sales page content as the post-click continuity anchor" in destination_context
 
 
+def test_build_swipe_stage1_prompt_input_includes_workspace_brand_colors_fonts():
+    rendered = swipe_activity._build_swipe_stage1_prompt_input(
+        prompt_template="Base swipe prompt",
+        brand_name="Ember",
+        angle="Clinical proof",
+        destination_context="Destination page type: Sales Page (sales)",
+        brand_colors_fonts="Heading font: Bookmania | Body font: Proxima Nova | Brand color: #C41423",
+    )
+
+    assert "Base swipe prompt" in rendered
+    assert "RUNTIME INPUTS (INJECTED)" in rendered
+    assert "Brand: Ember" in rendered
+    assert "Angle: Clinical proof" in rendered
+    assert "Brand colors/fonts: Heading font: Bookmania | Body font: Proxima Nova | Brand color: #C41423" in rendered
+    assert "Destination page type: Sales Page (sales)" in rendered
+    assert "Competitor swipe image is attached as image input." in rendered
+
+
 def test_validate_swipe_copy_blind_angle_blackout_rejects_exact_internal_angle_phrase():
     copy_pack = swipe_activity.SwipeAdCopyPack.model_validate(
         {
@@ -624,7 +642,13 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             "client_name": "Brand Name",
             "product_title": "Product Name",
             "canon": {"constraints": {"legal": ["No medical claims"]}},
-            "design_system_tokens": {},
+            "design_system_tokens": {
+                "cssVars": {
+                    "--font-heading": "Bookmania, 'Times New Roman', serif",
+                    "--font-sans": "'Proxima Nova', Helvetica, Arial, sans-serif",
+                    "--color-brand": "#C41423",
+                }
+            },
         },
     )
     monkeypatch.setattr(
@@ -725,6 +749,10 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert "RUNTIME INPUTS (INJECTED)" in prompt_input
     assert "Brand: Brand Name" in prompt_input
     assert "Angle: Clinical proof and fast results" in prompt_input
+    assert (
+        "Brand colors/fonts: Heading font: Bookmania, 'Times New Roman', serif | "
+        "Body font: 'Proxima Nova', Helvetica, Arial, sans-serif | Brand color: #C41423"
+    ) in prompt_input
     assert "Destination page type: Sales Page (sales)" in prompt_input
     assert "Swipe Stage1 Campaign Asset Brief" in prompt_input
     assert "Swipe Stage1 Campaign Loaded Copy" in prompt_input

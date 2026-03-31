@@ -1804,6 +1804,7 @@ def _build_swipe_stage1_prompt_input(
     brand_name: str,
     angle: str | None,
     destination_context: str | None = None,
+    brand_colors_fonts: str | None = None,
 ) -> str:
     if not isinstance(prompt_template, str) or not prompt_template.strip():
         raise ValueError("swipe stage-1 prompt template is required and must be non-empty.")
@@ -1816,6 +1817,8 @@ def _build_swipe_stage1_prompt_input(
         f"Brand: {clean_brand}",
         f"Angle: {clean_angle}",
     ]
+    if isinstance(brand_colors_fonts, str) and brand_colors_fonts.strip():
+        runtime_lines.append(f"Brand colors/fonts: {brand_colors_fonts.strip()}")
     if isinstance(destination_context, str) and destination_context.strip():
         runtime_lines.append(destination_context.strip())
     runtime_lines.append("Competitor swipe image is attached as image input.")
@@ -3748,6 +3751,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         )
         prompt_context_parts: list[str] = []
         minimal_context_block: str | None = None
+        brand_colors_fonts: str | None = None
         if swipe_context_mode == _SWIPE_CONTEXT_MODE_MINIMAL:
             minimal_context = _resolve_swipe_minimal_context(
                 session=session,
@@ -3777,6 +3781,9 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 product_id=product_id,
             )
             client_name = brand_ctx.get("client_name") or ""
+            brand_colors_fonts = _brand_colors_fonts_from_design_tokens(
+                brand_ctx.get("design_system_tokens") or {}
+            )
             effective_angle = requirement_angle
             (
                 gemini_store_names,
@@ -3816,6 +3823,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             brand_name=str(client_name),
             angle=effective_angle,
             destination_context=destination_context,
+            brand_colors_fonts=brand_colors_fonts,
         )
         rendered_prompt_signature = _stable_idempotency_key(
             "swipe_prompt_input_v1",
