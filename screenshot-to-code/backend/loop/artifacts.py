@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from loop.contracts import (
+    BlueprintValidationReport,
     DesignSystemPreflight,
     LoopResumeState,
     ReferenceBundle,
@@ -90,6 +91,18 @@ class ValidatedLoopArtifactStore:
         iteration_file = self._iterations_dir / f"iteration-{iteration:02d}.html"
         iteration_file.write_text(html, encoding="utf-8")
 
+    def persist_blueprint_validation_artifact(
+        self,
+        blueprint_validation: BlueprintValidationReport,
+    ) -> tuple[str, str]:
+        payload = blueprint_validation.model_dump(mode="json")
+        current_path = self._current_dir / "blueprint-validation.json"
+        run_path = Path(self.paths.run_dir) / "blueprint-validation.json"
+        serialized = json.dumps(payload, indent=2)
+        current_path.write_text(serialized, encoding="utf-8")
+        run_path.write_text(serialized, encoding="utf-8")
+        return str(current_path), str(run_path)
+
     def persist_best_checkpoint(
         self,
         *,
@@ -97,11 +110,15 @@ class ValidatedLoopArtifactStore:
         iteration: int,
         requirements: RequirementsSpec,
         validation_report: ValidationReport,
+        blueprint_validation: BlueprintValidationReport | None = None,
     ) -> None:
         best_file = Path(self.paths.best_file_path)
         best_file.write_text(html, encoding="utf-8")
         run_best_file = self._run_best_dir / "index.html"
         run_best_file.write_text(html, encoding="utf-8")
+
+        if blueprint_validation is not None:
+            self.persist_blueprint_validation_artifact(blueprint_validation)
 
         payload: dict[str, Any] = {
             "updatedAt": datetime.now(timezone.utc).isoformat(),
@@ -111,6 +128,11 @@ class ValidatedLoopArtifactStore:
             "runDir": self.paths.run_dir,
             "stopReason": None,
             "requirements": requirements.model_dump(mode="json"),
+            "blueprintValidation": (
+                blueprint_validation.model_dump(mode="json")
+                if blueprint_validation is not None
+                else None
+            ),
             "validation": validation_report.model_dump(mode="json"),
         }
         best_metadata = Path(self.paths.best_metadata_path)
@@ -125,7 +147,11 @@ class ValidatedLoopArtifactStore:
         stop_reason: str | None,
         requirements: RequirementsSpec | None,
         validation_report: ValidationReport | None,
+        blueprint_validation: BlueprintValidationReport | None = None,
     ) -> None:
+        if blueprint_validation is not None:
+            self.persist_blueprint_validation_artifact(blueprint_validation)
+
         payload: dict[str, Any] = {
             "updatedAt": datetime.now(timezone.utc).isoformat(),
             "currentFilePath": self.paths.current_file_path,
@@ -135,6 +161,11 @@ class ValidatedLoopArtifactStore:
             "requirements": (
                 requirements.model_dump(mode="json")
                 if requirements is not None
+                else None
+            ),
+            "blueprintValidation": (
+                blueprint_validation.model_dump(mode="json")
+                if blueprint_validation is not None
                 else None
             ),
             "validation": (
@@ -167,6 +198,7 @@ class ValidatedLoopArtifactStore:
         return LoopResumeState.model_validate(
             {
                 "requirements": payload.get("requirements"),
+                "blueprint_validation": payload.get("blueprintValidation"),
                 "latest_validation": payload.get("validation"),
                 "best_file_state": best_file_state,
                 "completed_iterations": payload.get("bestIteration")

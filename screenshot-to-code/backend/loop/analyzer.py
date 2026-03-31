@@ -3,7 +3,12 @@ from loop.analyzer_prompt import (
     ANALYZER_SYSTEM_INSTRUCTION,
     build_analyzer_prompt,
 )
-from loop.contracts import ReferenceBundle, RequirementsSpec, ValidationReport
+from loop.contracts import (
+    BlueprintValidationReport,
+    ReferenceBundle,
+    RequirementsSpec,
+    ValidationReport,
+)
 from loop.gemini import (
     GeminiPart,
     data_url_to_part,
@@ -23,6 +28,7 @@ class LoopAnalyzer:
         current_html: str | None = None,
         prior_requirements: RequirementsSpec | None = None,
         prior_validation: ValidationReport | None = None,
+        prior_blueprint_validation: BlueprintValidationReport | None = None,
     ) -> RequirementsSpec:
         parts: list[GeminiPart] = [
             text_part(
@@ -31,6 +37,7 @@ class LoopAnalyzer:
                     current_html,
                     prior_requirements,
                     prior_validation,
+                    prior_blueprint_validation,
                 )
             )
         ]

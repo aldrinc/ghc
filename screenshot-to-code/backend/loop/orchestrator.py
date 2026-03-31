@@ -1,8 +1,9 @@
 import uuid
 from hashlib import sha256
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable
 
 from config import (
+    DEFAULT_BLUEPRINT_VALIDATION_MAX_ATTEMPTS,
     VALIDATED_LOOP_PASS_SCORE,
     VIDEO_VALIDATED_LOOP_ANIMATION_PASS_SCORE,
     VIDEO_VALIDATED_LOOP_BEHAVIOR_PASS_SCORE,
@@ -15,7 +16,10 @@ from loop.artifacts import (
     load_reference_bundle_from_current_cache,
 )
 from loop.analyzer import LoopAnalyzer
+from loop.blueprint_validator import LoopBlueprintValidator
 from loop.contracts import (
+    BlueprintValidationIssue,
+    BlueprintValidationReport,
     DesignSystemReuseMode,
     DesignSystemPreflight,
     LoopIterationRecord,
@@ -53,9 +57,29 @@ def _needs_design_system_preflight(reference_bundle: ReferenceBundle) -> bool:
 
 def _requires_explicit_section_blueprint(reference_bundle: ReferenceBundle) -> bool:
     return bool(
-        reference_bundle.input_mode == "video"
+        reference_bundle.images
+        or reference_bundle.videos
+        or reference_bundle.input_mode == "video"
         or reference_bundle.live_reference is not None
         or reference_bundle.reference_url.strip()
+    )
+
+
+_FOOTER_KEYWORDS = (
+    "footer",
+    "legal",
+    "newsletter",
+    "community",
+    "copyright",
+)
+
+
+def _mentions_footer_region(values: list[str]) -> bool:
+    return any(
+        keyword in value.strip().lower()
+        for value in values
+        for keyword in _FOOTER_KEYWORDS
+        if value.strip()
     )
 
 
@@ -75,18 +99,24 @@ class ValidationLoopOrchestrator:
         design_system_reuse_run_dir: str | None = None,
         renderer: HtmlPreviewRenderer | None = None,
         analyzer: LoopAnalyzer | None = None,
+        blueprint_validator: LoopBlueprintValidator | None = None,
         validator: LoopValidator | None = None,
         executor: LoopExecutor | None = None,
         artifact_store: ValidatedLoopArtifactStore | None = None,
         live_reference_extractor: LiveReferenceExtractor | None = None,
         design_system_builder: DesignSystemPreflightBuilder | None = None,
         design_system_renderer: DesignSystemDocumentRenderer | None = None,
+        max_blueprint_validation_attempts: int = DEFAULT_BLUEPRINT_VALIDATION_MAX_ATTEMPTS,
     ) -> None:
         self._send_message = send_message
         self._max_iterations = max_iterations
+        self._max_blueprint_validation_attempts = max(1, max_blueprint_validation_attempts)
         self._design_system_reuse_mode = design_system_reuse_mode
         self._design_system_reuse_run_dir = design_system_reuse_run_dir
         self._analyzer = analyzer or LoopAnalyzer(gemini_api_key)
+        self._blueprint_validator = blueprint_validator or LoopBlueprintValidator(
+            gemini_api_key
+        )
         self._validator = validator or LoopValidator(gemini_api_key)
         self._renderer = renderer or HtmlPreviewRenderer()
         self._artifact_store = artifact_store or ValidatedLoopArtifactStore()
@@ -131,6 +161,12 @@ class ValidationLoopOrchestrator:
         current_file_state = initial_file_state or (
             resume_state.best_file_state if resume_state else None
         )
+        validation_report: ValidationReport | None = (
+            resume_state.latest_validation if resume_state else None
+        )
+        prior_blueprint_validation: BlueprintValidationReport | None = (
+            resume_state.blueprint_validation if resume_state else None
+        )
         if resume_state and resume_state.requirements is not None:
             await self._send_supervisor_thinking(
                 title="Supervisor: Resuming prior context",
@@ -148,6 +184,7 @@ class ValidationLoopOrchestrator:
                 current_file_state.get("content", "") if current_file_state else None,
                 prior_requirements=resume_state.requirements,
                 prior_validation=resume_state.latest_validation,
+                prior_blueprint_validation=resume_state.blueprint_validation,
             )
         else:
             await self._send_supervisor_thinking(
@@ -163,21 +200,37 @@ class ValidationLoopOrchestrator:
                 reference_bundle,
                 current_file_state.get("content", "") if current_file_state else None,
             )
-        requirements = await self._ensure_actionable_requirements(
+        (
+            requirements,
+            blueprint_validation,
+            blueprint_was_repaired,
+        ) = await self._validate_blueprint_before_execution(
             requirements,
             reference_bundle=reference_bundle,
+            current_html=current_file_state.get("content", "") if current_file_state else None,
+            prior_validation=validation_report,
+            prior_blueprint_validation=prior_blueprint_validation,
         )
         await self._send_supervisor_assistant(
-            title="Supervisor: Requirements draft ready",
+            title=(
+                "Supervisor: Blueprint repaired"
+                if blueprint_was_repaired
+                else "Supervisor: Requirements draft ready"
+            ),
             content=self._summarize_requirements(requirements),
-        )
-        validation_report: ValidationReport | None = (
-            resume_state.latest_validation if resume_state else None
         )
         iterations: list[LoopIterationRecord] = []
         last_code = current_file_state.get("content", "") if current_file_state else ""
         best_code = last_code
         best_validation_report = validation_report
+
+        self._artifact_store.persist_metadata(
+            iteration=0,
+            stop_reason=None,
+            requirements=requirements,
+            validation_report=validation_report,
+            blueprint_validation=blueprint_validation,
+        )
 
         if best_code and best_validation_report is not None:
             self._artifact_store.persist_best_checkpoint(
@@ -185,6 +238,7 @@ class ValidationLoopOrchestrator:
                 iteration=0,
                 requirements=requirements,
                 validation_report=best_validation_report,
+                blueprint_validation=blueprint_validation,
             )
 
         for iteration in range(1, self._max_iterations + 1):
@@ -239,6 +293,7 @@ class ValidationLoopOrchestrator:
                 stop_reason=None,
                 requirements=requirements,
                 validation_report=None,
+                blueprint_validation=blueprint_validation,
             )
             await self._status(
                 f"Iteration {iteration}/{self._max_iterations}: rendering candidate."
@@ -292,6 +347,7 @@ class ValidationLoopOrchestrator:
                 stop_reason=None,
                 requirements=requirements,
                 validation_report=validation_report,
+                blueprint_validation=blueprint_validation,
             )
 
             if self._is_better_validation(
@@ -305,6 +361,7 @@ class ValidationLoopOrchestrator:
                     iteration=iteration,
                     requirements=requirements,
                     validation_report=best_validation_report,
+                    blueprint_validation=blueprint_validation,
                 )
             elif best_validation_report is not None:
                 await self._send_supervisor_assistant(
@@ -325,6 +382,7 @@ class ValidationLoopOrchestrator:
                     stop_reason="pass",
                     requirements=requirements,
                     validation_report=validation_report,
+                    blueprint_validation=blueprint_validation,
                 )
                 await self._send_supervisor_assistant(
                     title="Supervisor: Loop complete",
@@ -335,6 +393,7 @@ class ValidationLoopOrchestrator:
                 return LoopRunResult(
                     code=final_code,
                     requirements=requirements,
+                    blueprint_validation=blueprint_validation,
                     iterations=iterations,
                     stop_reason="pass",
                     saved_code_path=self._artifact_store.paths.best_file_path,
@@ -360,6 +419,7 @@ class ValidationLoopOrchestrator:
                     stop_reason="blocked",
                     requirements=requirements,
                     validation_report=validation_report,
+                    blueprint_validation=blueprint_validation,
                 )
                 await self._send_supervisor_assistant(
                     title="Supervisor: Loop blocked",
@@ -371,6 +431,7 @@ class ValidationLoopOrchestrator:
                 return LoopRunResult(
                     code=best_code if best_code.strip() else last_code,
                     requirements=requirements,
+                    blueprint_validation=blueprint_validation,
                     iterations=iterations,
                     stop_reason="blocked",
                     saved_code_path=self._artifact_store.paths.best_file_path,
@@ -387,6 +448,7 @@ class ValidationLoopOrchestrator:
             stop_reason="max_iterations",
             requirements=requirements,
             validation_report=validation_report,
+            blueprint_validation=blueprint_validation,
         )
         await self._send_supervisor_assistant(
             title="Supervisor: Loop stopped at iteration cap",
@@ -398,6 +460,7 @@ class ValidationLoopOrchestrator:
         return LoopRunResult(
             code=best_code if best_code.strip() else last_code,
             requirements=requirements,
+            blueprint_validation=blueprint_validation,
             iterations=iterations,
             stop_reason="max_iterations",
             saved_code_path=self._artifact_store.paths.best_file_path,
@@ -410,28 +473,285 @@ class ValidationLoopOrchestrator:
     async def _status(self, message: str, data: dict[str, object] | None = None) -> None:
         await self._send_message("status", message, 0, data, None)
 
-    async def _ensure_actionable_requirements(
+    async def _validate_blueprint_before_execution(
         self,
         requirements: RequirementsSpec,
         *,
         reference_bundle: ReferenceBundle,
-    ) -> RequirementsSpec:
+        current_html: str | None,
+        prior_validation: ValidationReport | None,
+        prior_blueprint_validation: BlueprintValidationReport | None,
+    ) -> tuple[RequirementsSpec, BlueprintValidationReport | None, bool]:
         if not _requires_explicit_section_blueprint(reference_bundle):
-            return requirements
+            return requirements, None, False
 
-        section_count = sum(
-            1 for section in requirements.section_requirements if section.name.strip()
-        )
-        if section_count > 0:
-            return requirements
+        current_requirements = requirements
+        current_prior_blueprint_validation = prior_blueprint_validation
 
-        await self._status(
-            "Analysis failed: the supervisor returned no section blueprint for this video/live-reference run."
+        for attempt in range(1, self._max_blueprint_validation_attempts + 1):
+            await self._send_supervisor_thinking(
+                title="Supervisor: Reviewing blueprint coverage",
+                content=(
+                    "Checking whether the supervisor requirements cover the full page, "
+                    "the closing state, and the canonical section blueprint before any "
+                    "HTML generation begins."
+                ),
+            )
+            await self._status(
+                "Blueprint QA: validating supervisor requirements before execution."
+            )
+            blueprint_validation = await self._validate_blueprint_once(
+                reference_bundle=reference_bundle,
+                requirements=current_requirements,
+                prior_blueprint_validation=current_prior_blueprint_validation,
+            )
+            self._artifact_store.persist_metadata(
+                iteration=0,
+                stop_reason=None,
+                requirements=current_requirements,
+                validation_report=prior_validation,
+                blueprint_validation=blueprint_validation,
+            )
+            if blueprint_validation.verdict == "pass":
+                return current_requirements, blueprint_validation, attempt > 1
+
+            if attempt >= self._max_blueprint_validation_attempts:
+                await self._status(
+                    "Blueprint QA blocked execution after "
+                    f"{self._max_blueprint_validation_attempts} failed repair attempts."
+                )
+                self._artifact_store.persist_metadata(
+                    iteration=0,
+                    stop_reason="blocked",
+                    requirements=current_requirements,
+                    validation_report=prior_validation,
+                    blueprint_validation=blueprint_validation,
+                )
+                raise RuntimeError(self._format_blueprint_failure(blueprint_validation))
+
+            await self._send_supervisor_thinking(
+                title="Supervisor: Repairing blueprint",
+                content=(
+                    "Updating the supervisor requirements to restore missing sections, "
+                    "closing coverage, and any contradictory planning details before the "
+                    "executor is allowed to continue."
+                ),
+            )
+            await self._status(
+                "Blueprint QA: repairing missing sections and blueprint inconsistencies."
+            )
+            current_requirements = await self._analyzer.analyze(
+                reference_bundle,
+                current_html,
+                prior_requirements=current_requirements,
+                prior_validation=prior_validation,
+                prior_blueprint_validation=blueprint_validation,
+            )
+            current_prior_blueprint_validation = blueprint_validation
+
+        return current_requirements, None, False
+
+    async def _validate_blueprint_once(
+        self,
+        *,
+        reference_bundle: ReferenceBundle,
+        requirements: RequirementsSpec,
+        prior_blueprint_validation: BlueprintValidationReport | None,
+    ) -> BlueprintValidationReport:
+        sanity_report = self._build_blueprint_sanity_report(
+            requirements=requirements,
+            reference_bundle=reference_bundle,
         )
-        raise RuntimeError(
-            "Validated loop analysis failed: the supervisor returned no `section_requirements` "
-            "for a video/live-reference run. Refusing to execute because that would allow section "
-            "coverage regressions. Fix the analyzer output and rerun."
+        if sanity_report is not None:
+            return sanity_report
+
+        return await self._blueprint_validator.validate(
+            reference_bundle=reference_bundle,
+            requirements=requirements,
+            prior_blueprint_validation=prior_blueprint_validation,
+        )
+
+    def _build_blueprint_sanity_report(
+        self,
+        *,
+        requirements: RequirementsSpec,
+        reference_bundle: ReferenceBundle,
+    ) -> BlueprintValidationReport | None:
+        if not _requires_explicit_section_blueprint(reference_bundle):
+            return None
+
+        issues: list[BlueprintValidationIssue] = []
+        missing_sections: list[str] = []
+
+        named_sections = [
+            section for section in requirements.section_requirements if section.name.strip()
+        ]
+        if not named_sections:
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="coverage",
+                    title="No section blueprint returned",
+                    detail=(
+                        "The supervisor returned no named `section_requirements` even "
+                        "though visual reference evidence exists for this run."
+                    ),
+                    affected_fields=["section_requirements"],
+                    fix_instructions=(
+                        "Populate `section_requirements` with the full top-to-bottom "
+                        "canonical section list before execution starts."
+                    ),
+                )
+            )
+        blank_named_sections = [
+            index + 1
+            for index, section in enumerate(requirements.section_requirements)
+            if not section.name.strip()
+        ]
+        if blank_named_sections:
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="consistency",
+                    title="Unnamed section entries in blueprint",
+                    detail=(
+                        "One or more `section_requirements` entries are present but have "
+                        "no stable section name, which breaks canonical section tracking."
+                    ),
+                    affected_fields=["section_requirements"],
+                    fix_instructions=(
+                        "Give every `section_requirements` entry a distinct, non-empty "
+                        "section name in top-to-bottom order."
+                    ),
+                )
+            )
+        section_ids: dict[str, str] = {}
+        duplicate_section_ids: list[str] = []
+        for section in named_sections:
+            prior_name = section_ids.get(section.section_id)
+            if prior_name is None:
+                section_ids[section.section_id] = section.name.strip()
+                continue
+            duplicate_section_ids.append(section.section_id)
+        if duplicate_section_ids:
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="consistency",
+                    title="Duplicate canonical section IDs",
+                    detail=(
+                        "Multiple `section_requirements` normalize to the same "
+                        "`section_id`, which would make DOM coverage tracking ambiguous."
+                    ),
+                    affected_fields=["section_requirements"],
+                    fix_instructions=(
+                        "Rename the conflicting sections so each normalized `section_id` "
+                        "is unique and stable."
+                    ),
+                )
+            )
+        if not requirements.page_outline:
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="coverage",
+                    title="Missing page outline",
+                    detail=(
+                        "The blueprint does not include `page_outline`, so there is no "
+                        "explicit ledger of the full top-to-bottom page scan."
+                    ),
+                    affected_fields=["page_outline"],
+                    fix_instructions=(
+                        "Populate `page_outline` with the full top-to-bottom page scan "
+                        "before execution begins."
+                    ),
+                )
+            )
+        if requirements.footer_present is None:
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="consistency",
+                    title="Footer presence not assessed",
+                    detail=(
+                        "The blueprint leaves `footer_present` unset even though visual "
+                        "reference evidence exists."
+                    ),
+                    affected_fields=["footer_present"],
+                    fix_instructions=(
+                        "Set `footer_present` explicitly to `true` or `false`, and add "
+                        "matching footer coverage when it is present."
+                    ),
+                )
+            )
+        closing_references = [
+            *requirements.closing_sections,
+            *(section.name for section in named_sections),
+        ]
+        if requirements.footer_present and not (
+            requirements.footer_description.strip()
+            or _mentions_footer_region(closing_references)
+        ):
+            issues.append(
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="coverage",
+                    title="Footer marked present but not represented",
+                    detail=(
+                        "The blueprint says a footer or closing region is present, but it "
+                        "is not described in `footer_description`, `closing_sections`, or "
+                        "the canonical section names."
+                    ),
+                    affected_fields=[
+                        "footer_present",
+                        "footer_description",
+                        "closing_sections",
+                        "section_requirements",
+                    ],
+                    fix_instructions=(
+                        "Add the footer or closing region explicitly to `footer_description`, "
+                        "`closing_sections`, and `section_requirements`."
+                    ),
+                )
+            )
+            missing_sections.append("Footer or closing region")
+
+        if not issues:
+            return None
+
+        coverage_issue_count = sum(issue.category == "coverage" for issue in issues)
+        consistency_issue_count = sum(
+            issue.category == "consistency" for issue in issues
+        )
+        return BlueprintValidationReport(
+            verdict="blocked",
+            overall_score=0.0,
+            coverage_score=0.0 if coverage_issue_count else 0.5,
+            consistency_score=0.0 if consistency_issue_count else 0.5,
+            execution_readiness_score=0.0,
+            summary="Blueprint sanity checks failed before execution.",
+            issues=issues,
+            missing_sections=missing_sections,
+            repair_instructions=[issue.fix_instructions for issue in issues],
+        )
+
+    def _format_blueprint_failure(
+        self,
+        blueprint_validation: BlueprintValidationReport,
+    ) -> str:
+        top_issues = [
+            issue.title.strip()
+            for issue in blueprint_validation.issues
+            if issue.title.strip()
+        ]
+        top_failure_summary = "; ".join(top_issues[:3])
+        if not top_failure_summary:
+            top_failure_summary = blueprint_validation.summary.strip() or (
+                "Blueprint QA rejected the requirements plan."
+            )
+        return (
+            "Blueprint QA failed before execution: "
+            f"{top_failure_summary}. Refusing to execute with a rejected blueprint."
         )
 
     async def _send_supervisor_thinking(self, *, title: str, content: str) -> None:
