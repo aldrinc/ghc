@@ -1,6 +1,12 @@
-from loop.contracts import ReferenceBundle, RequirementsSpec, ValidationReport
+from loop.contracts import (
+    BlueprintValidationReport,
+    ReferenceBundle,
+    RequirementsSpec,
+    ValidationReport,
+)
 from loop.frontend_developer_policy import build_frontend_developer_policy
 from loop.prompts import (
+    compact_blueprint_validation_report_for_prompt,
     compact_requirements_for_prompt,
     compact_validation_report_for_prompt,
     reference_summary,
@@ -38,6 +44,7 @@ def build_analyzer_prompt(
     current_html: str | None = None,
     prior_requirements: RequirementsSpec | None = None,
     prior_validation: ValidationReport | None = None,
+    prior_blueprint_validation: BlueprintValidationReport | None = None,
 ) -> str:
     selected_stack = build_selected_stack_policy(reference_bundle.stack)
     template_policy = build_template_output_policy()
@@ -80,6 +87,17 @@ Latest validator report from the previous block:
 <prior_validation>
 {truncate_json_context(prior_validation_json)}
 </prior_validation>"""
+    prior_blueprint_validation_block = ""
+    if prior_blueprint_validation is not None:
+        prior_blueprint_validation_json = compact_blueprint_validation_report_for_prompt(
+            prior_blueprint_validation
+        ).model_dump_json(indent=2)
+        prior_blueprint_validation_block = f"""
+
+Latest blueprint QA report:
+<prior_blueprint_validation>
+{truncate_json_context(prior_blueprint_validation_json)}
+</prior_blueprint_validation>"""
     live_reference_block = ""
     if reference_bundle.live_reference is not None:
         live_reference_block = f"""
@@ -113,6 +131,7 @@ be used by a separate execution model and a separate validation model.
 {current_html_landmarks_block}
 {prior_requirements_block}
 {prior_validation_block}
+{prior_blueprint_validation_block}
 
 Analysis requirements:
 
@@ -154,6 +173,10 @@ Analysis requirements:
 - Use the current HTML landmarks to refer to concrete sections and elements when describing what should be preserved, changed, or rebuilt.
 - If prior requirements are provided, treat them as the previous supervisor draft. Preserve the accurate parts, correct stale assumptions, and sharpen them using the actual current HTML plus the reference media.
 - If a prior validator report is provided, use it as evidence of where the last block stalled. Do not repeat old advice blindly if the current HTML already resolved it.
+- If a prior blueprint validation report is provided, treat it as a pre-execution rejection of the supervisor plan. Repair the missing or contradictory blueprint fields first so execution will not be blocked again.
+- When repairing after blueprint QA feedback, preserve the accurate parts of the prior requirements and change only the sections, outline entries, closing states, footer coverage, or execution guidance that the blueprint report rejected.
+- If blueprint QA said a scene or section is missing from the canonical section list, add it to `page_outline`, `closing_sections` when relevant, and `section_requirements` before spending attention on finer styling detail.
+- Execution will not start until blueprint QA passes, so do not leave known omissions in the canonical section list.
 - On resume, produce a delta-aware requirements spec that helps the executor continue from the current implementation instead of re-building the page from scratch.
 
 Reference summary:

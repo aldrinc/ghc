@@ -1,6 +1,6 @@
 # pyright: reportUnknownVariableType=false
 import re
-from typing import Literal, Mapping, cast
+from typing import Literal, Mapping, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -144,6 +144,98 @@ class RequirementsSpec(BaseModel):
     known_unknowns: list[str] = Field(default_factory=list)
     interaction_checkpoints: list[InteractionCheckpoint] = Field(default_factory=list)
     acceptance_criteria: list[str] = Field(default_factory=list)
+
+
+BlueprintValidationSeverity: TypeAlias = Literal["critical", "major", "minor"]
+BlueprintValidationIssueCategory: TypeAlias = Literal[
+    "coverage",
+    "consistency",
+    "behavior",
+    "animation",
+    "design_system",
+    "ambiguity",
+]
+BlueprintValidationVerdict: TypeAlias = Literal["pass", "revise", "blocked"]
+
+_BLUEPRINT_CATEGORY_NORMALIZATION: dict[str, BlueprintValidationIssueCategory] = {
+    "coverage": "coverage",
+    "completeness": "coverage",
+    "missing_sections": "coverage",
+    "consistency": "consistency",
+    "structure": "consistency",
+    "contradiction": "consistency",
+    "behavior": "behavior",
+    "interaction": "behavior",
+    "animation": "animation",
+    "motion": "animation",
+    "design_system": "design_system",
+    "designsystem": "design_system",
+    "styling_system": "design_system",
+    "ambiguity": "ambiguity",
+    "uncertainty": "ambiguity",
+    "unknowns": "ambiguity",
+}
+
+
+class BlueprintValidationIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    severity: BlueprintValidationSeverity = "major"
+    category: BlueprintValidationIssueCategory = "coverage"
+    title: str
+    detail: str
+    affected_fields: list[str] = Field(default_factory=list)
+    fix_instructions: str
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def normalize_severity(cls, value: object) -> BlueprintValidationSeverity:
+        return cast(
+            BlueprintValidationSeverity,
+            _normalize_text_enum(value, _SEVERITY_NORMALIZATION, "major"),
+        )
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, value: object) -> BlueprintValidationIssueCategory:
+        return cast(
+            BlueprintValidationIssueCategory,
+            _normalize_text_enum(value, _BLUEPRINT_CATEGORY_NORMALIZATION, "coverage"),
+        )
+
+
+class BlueprintValidationReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verdict: BlueprintValidationVerdict = "revise"
+    overall_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    coverage_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    consistency_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    execution_readiness_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    summary: str = ""
+    strengths: list[str] = Field(default_factory=list)
+    issues: list[BlueprintValidationIssue] = Field(default_factory=list)
+    missing_sections: list[str] = Field(default_factory=list)
+    repair_instructions: list[str] = Field(default_factory=list)
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def normalize_verdict(cls, value: object) -> BlueprintValidationVerdict:
+        return cast(
+            BlueprintValidationVerdict,
+            _normalize_text_enum(value, _VERDICT_NORMALIZATION, "revise"),
+        )
+
+    @field_validator(
+        "overall_score",
+        "coverage_score",
+        "consistency_score",
+        "execution_readiness_score",
+        mode="before",
+    )
+    @classmethod
+    def normalize_scores(cls, value: object) -> object:
+        return _normalize_score(value)
 
 
 class ReferenceBundle(BaseModel):
@@ -407,6 +499,7 @@ class LoopResumeState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requirements: RequirementsSpec | None = None
+    blueprint_validation: BlueprintValidationReport | None = None
     latest_validation: ValidationReport | None = None
     best_file_state: dict[str, str] | None = None
     completed_iterations: int = 0
@@ -418,6 +511,7 @@ class LoopRunResult(BaseModel):
 
     code: str
     requirements: RequirementsSpec
+    blueprint_validation: BlueprintValidationReport | None = None
     iterations: list[LoopIterationRecord] = Field(default_factory=list)
     stop_reason: Literal["pass", "max_iterations", "blocked"]
     saved_code_path: str | None = None

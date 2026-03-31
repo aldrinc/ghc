@@ -7,6 +7,8 @@ import pytest
 
 from llm import Llm
 from loop.contracts import (
+    BlueprintValidationIssue,
+    BlueprintValidationReport,
     DesignSystemPreflight,
     DesignTokenSet,
     LiveReferenceContext,
@@ -40,6 +42,35 @@ class _StaticDesignSystemRenderer:
     def render(self, design_system) -> tuple[str, str]:
         payload = cast(Any, design_system).model_dump_json(indent=2)
         return (payload, "<html><body>design system</body></html>")
+
+
+class _PassBlueprintValidator:
+    async def validate(self, **kwargs) -> BlueprintValidationReport:
+        return BlueprintValidationReport(
+            verdict="pass",
+            overall_score=0.99,
+            coverage_score=0.99,
+            consistency_score=0.99,
+            execution_readiness_score=0.99,
+            summary="Blueprint is execution-ready.",
+        )
+
+
+class _StaticLiveReferenceExtractor:
+    async def extract(self, *, url, viewport):
+        return LiveReferenceContext(
+            url=url,
+            design_system=LiveReferenceDesignSystem(),
+            renders=[],
+        )
+
+
+@pytest.fixture(autouse=True)
+def _stub_blueprint_validator(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "loop.orchestrator.LoopBlueprintValidator",
+        lambda gemini_api_key: _PassBlueprintValidator(),
+    )
 
 
 def _requirements_with_section_blueprint(summary: str) -> RequirementsSpec:
@@ -668,10 +699,14 @@ async def test_validation_loop_orchestrator_emits_supervisor_trace(
 
         async def analyze(self, reference_bundle, current_html=None):
             assert current_html is None
-            return RequirementsSpec(
-                summary="Simple UI",
-                preserve_requirements=["Keep the existing header markup intact."],
-                structure_guidance=["Use shared theme tokens"],
+            requirements = _requirements_with_section_blueprint("Simple UI")
+            return requirements.model_copy(
+                update={
+                    "preserve_requirements": [
+                        "Keep the existing header markup intact."
+                    ],
+                    "structure_guidance": ["Use shared theme tokens"],
+                }
             )
 
     class FakeExecutor:
@@ -779,14 +814,13 @@ async def test_validation_loop_orchestrator_requires_98_percent_video_motion_mat
 
         async def analyze(self, reference_bundle, current_html=None):
             assert current_html is None
-            return RequirementsSpec(
-                summary="Animated landing page",
-                section_requirements=[
-                    SectionRequirement(name="Hero", must_include=["headline"])
-                ],
-                animation_requirements=[
-                    "Hero card and chart should animate into place during the opening sequence"
-                ],
+            requirements = _requirements_with_section_blueprint("Animated landing page")
+            return requirements.model_copy(
+                update={
+                    "animation_requirements": [
+                        "Hero card and chart should animate into place during the opening sequence"
+                    ]
+                }
             )
 
     class FakeExecutor:
@@ -1073,7 +1107,7 @@ async def test_validation_loop_orchestrator_persists_supplied_preflight_artifact
             assert reference_bundle.design_system_preflight.html_artifact_path.endswith(
                 "design-system/design-system.html"
             )
-            return RequirementsSpec(summary="Use supplied design system")
+            return _requirements_with_section_blueprint("Use supplied design system")
 
     class FakeExecutor:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
@@ -1167,7 +1201,7 @@ async def test_validation_loop_orchestrator_skips_preflight_for_simple_screensho
 
         async def analyze(self, reference_bundle, current_html=None):
             assert reference_bundle.design_system_preflight is None
-            return RequirementsSpec(summary="Simple screenshot requirements")
+            return _requirements_with_section_blueprint("Simple screenshot requirements")
 
     class FakeExecutor:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
@@ -1368,7 +1402,7 @@ async def test_validation_loop_orchestrator_rejects_empty_section_blueprint_for_
     class FakeAnalyzer:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
 
-        async def analyze(self, reference_bundle, current_html=None):
+        async def analyze(self, reference_bundle, current_html=None, **kwargs):
             return RequirementsSpec(summary="Video requirements without sections")
 
     class FailIfCalledExecutor:
@@ -1410,7 +1444,7 @@ async def test_validation_loop_orchestrator_rejects_empty_section_blueprint_for_
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
 
-    with pytest.raises(RuntimeError, match="no `section_requirements`"):
+    with pytest.raises(RuntimeError, match="Blueprint QA failed before execution"):
         await orchestrator.run(
             reference_bundle=ReferenceBundle(
                 input_mode="video",
@@ -1425,9 +1459,363 @@ async def test_validation_loop_orchestrator_rejects_empty_section_blueprint_for_
     assert any(
         msg[0] == "status"
         and msg[1]
-        and "returned no section blueprint" in msg[1]
+        and "Blueprint QA blocked execution" in msg[1]
         for msg in sent_messages
     )
+
+
+@pytest.mark.asyncio
+async def test_validation_loop_orchestrator_repairs_blueprint_before_execution(
+    tmp_path: Path,
+) -> None:
+    sent_messages: list[tuple[str, str | None, int, dict[str, object] | None]] = []
+
+    async def send_message(
+        msg_type: str,
+        value: str | None,
+        variant_index: int,
+        data=None,
+        eventId=None,
+    ) -> None:
+        sent_messages.append((msg_type, value, variant_index, data))
+
+    class FakeAnalyzer:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        def __init__(self) -> None:
+            self.calls: list[BlueprintValidationReport | None] = []
+
+        async def analyze(
+            self,
+            reference_bundle,
+            current_html=None,
+            prior_requirements=None,
+            prior_validation=None,
+            prior_blueprint_validation=None,
+        ):
+            self.calls.append(prior_blueprint_validation)
+            if prior_blueprint_validation is None:
+                return RequirementsSpec(
+                    summary="Initial image requirements",
+                    page_outline=["Header", "Hero", "Features"],
+                    closing_sections=["Features"],
+                    footer_present=False,
+                    section_requirements=[SectionRequirement(name="Hero")],
+                    execution_plan=["Build the Hero section.", "Build the FAQ section."],
+                )
+            return RequirementsSpec(
+                summary="Repaired image requirements",
+                page_outline=["Header", "Hero", "FAQ"],
+                closing_sections=["FAQ"],
+                footer_present=False,
+                section_requirements=[
+                    SectionRequirement(name="Hero"),
+                    SectionRequirement(name="FAQ"),
+                ],
+                execution_plan=["Build the Hero section.", "Build the FAQ section."],
+            )
+
+    class FakeBlueprintValidator:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def validate(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return BlueprintValidationReport(
+                    verdict="revise",
+                    overall_score=0.45,
+                    coverage_score=0.3,
+                    consistency_score=0.7,
+                    execution_readiness_score=0.35,
+                    summary="The lower-page FAQ section is missing from the canonical section list.",
+                    issues=[
+                        BlueprintValidationIssue(
+                            severity="critical",
+                            category="coverage",
+                            title="Missing FAQ section",
+                            detail="The execution plan references an FAQ section that is not represented in section_requirements.",
+                            affected_fields=["section_requirements", "execution_plan"],
+                            fix_instructions="Add the FAQ section to page_outline, closing_sections, and section_requirements.",
+                        )
+                    ],
+                    missing_sections=["FAQ"],
+                    repair_instructions=[
+                        "Add the FAQ section to the canonical section list before execution."
+                    ],
+                )
+            return BlueprintValidationReport(
+                verdict="pass",
+                overall_score=0.98,
+                coverage_score=0.99,
+                consistency_score=0.97,
+                execution_readiness_score=0.98,
+                summary="Blueprint covers the page structure.",
+                strengths=["Canonical section list now includes the FAQ closing section."],
+            )
+
+    class FakeExecutor:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def execute(self, **kwargs):
+            self.calls += 1
+            return "<html><body>repaired</body></html>"
+
+    class FakeRenderer:
+        async def render_html(self, html, viewport, interaction_checkpoints=None):
+            from loop.contracts import RenderArtifact
+
+            return RenderArtifact(
+                viewport_screenshot_data_url="data:image/png;base64,abc",
+                viewport=viewport,
+            )
+
+    class FakeValidator:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        async def validate(self, **kwargs):
+            return ValidationReport(
+                verdict="pass",
+                overall_score=0.99,
+                visual_fidelity_score=0.99,
+                behavior_fidelity_score=0.99,
+                animation_fidelity_score=0.99,
+                editability_score=0.99,
+                summary="Close match",
+            )
+
+    from loop.artifacts import ValidatedLoopArtifactStore
+    from loop.orchestrator import ValidationLoopOrchestrator
+
+    analyzer = FakeAnalyzer()
+    blueprint_validator = FakeBlueprintValidator()
+    executor = FakeExecutor()
+    artifact_store = ValidatedLoopArtifactStore(repo_root=tmp_path)
+    orchestrator = ValidationLoopOrchestrator(
+        send_message=send_message,
+        openai_api_key="key",
+        openai_base_url=None,
+        anthropic_api_key=None,
+        gemini_api_key="key",
+        should_generate_images=True,
+        option_codes=[],
+        max_iterations=1,
+        analyzer=cast(Any, analyzer),
+        blueprint_validator=cast(Any, blueprint_validator),
+        executor=cast(Any, executor),
+        renderer=cast(Any, FakeRenderer()),
+        validator=cast(Any, FakeValidator()),
+        artifact_store=artifact_store,
+        design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
+    )
+
+    result = await orchestrator.run(
+        reference_bundle=ReferenceBundle(
+            input_mode="image",
+            stack="html_tailwind",
+            user_text="Create this landing page",
+            images=["data:image/png;base64,abc"],
+            videos=[],
+        ),
+        initial_file_state=None,
+    )
+
+    assert result.stop_reason == "pass"
+    assert result.blueprint_validation is not None
+    assert result.blueprint_validation.verdict == "pass"
+    assert analyzer.calls[0] is None
+    assert analyzer.calls[1] is not None
+    assert analyzer.calls[1].missing_sections == ["FAQ"]
+    assert blueprint_validator.calls == 2
+    assert executor.calls == 1
+    resume_state = artifact_store.load_resume_state(artifact_store.paths.run_dir)
+    assert resume_state.blueprint_validation is not None
+    assert resume_state.blueprint_validation.verdict == "pass"
+    assert any(
+        msg[0] == "status"
+        and msg[1]
+        and "Blueprint QA: repairing missing sections and blueprint inconsistencies." in msg[1]
+        for msg in sent_messages
+    )
+
+
+@pytest.mark.asyncio
+async def test_validation_loop_orchestrator_blocks_after_blueprint_repair_budget(
+    tmp_path: Path,
+) -> None:
+    sent_messages: list[tuple[str, str | None, int, dict[str, object] | None]] = []
+
+    async def send_message(
+        msg_type: str,
+        value: str | None,
+        variant_index: int,
+        data=None,
+        eventId=None,
+    ) -> None:
+        sent_messages.append((msg_type, value, variant_index, data))
+
+    class FakeAnalyzer:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def analyze(
+            self,
+            reference_bundle,
+            current_html=None,
+            prior_requirements=None,
+            prior_validation=None,
+            prior_blueprint_validation=None,
+        ):
+            self.calls += 1
+            return RequirementsSpec(
+                summary="Still incomplete requirements",
+                page_outline=["Header", "Hero"],
+                closing_sections=["Hero"],
+                footer_present=False,
+                section_requirements=[SectionRequirement(name="Hero")],
+            )
+
+    class AlwaysFailBlueprintValidator:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def validate(self, **kwargs):
+            self.calls += 1
+            return BlueprintValidationReport(
+                verdict="blocked",
+                overall_score=0.2,
+                coverage_score=0.1,
+                consistency_score=0.5,
+                execution_readiness_score=0.15,
+                summary="The lower-page pricing section is still missing.",
+                issues=[
+                    BlueprintValidationIssue(
+                        severity="critical",
+                        category="coverage",
+                        title="Missing pricing section",
+                        detail="The reference includes a pricing section that never appears in section_requirements.",
+                        affected_fields=["page_outline", "section_requirements"],
+                        fix_instructions="Add the pricing section to the canonical section list.",
+                    )
+                ],
+                missing_sections=["Pricing"],
+                repair_instructions=["Add the Pricing section before execution."],
+            )
+
+    class FailIfCalledExecutor:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        async def execute(self, **kwargs):
+            raise AssertionError("Executor should not run after blueprint QA failure")
+
+    class FailIfCalledValidator:
+        model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
+
+        async def validate(self, **kwargs):
+            raise AssertionError("HTML validator should not run after blueprint QA failure")
+
+    from loop.artifacts import ValidatedLoopArtifactStore
+    from loop.orchestrator import ValidationLoopOrchestrator
+
+    analyzer = FakeAnalyzer()
+    blueprint_validator = AlwaysFailBlueprintValidator()
+    orchestrator = ValidationLoopOrchestrator(
+        send_message=send_message,
+        openai_api_key="key",
+        openai_base_url=None,
+        anthropic_api_key=None,
+        gemini_api_key="key",
+        should_generate_images=True,
+        option_codes=[],
+        max_iterations=1,
+        analyzer=cast(Any, analyzer),
+        blueprint_validator=cast(Any, blueprint_validator),
+        executor=cast(Any, FailIfCalledExecutor()),
+        validator=cast(Any, FailIfCalledValidator()),
+        artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path),
+        design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
+        max_blueprint_validation_attempts=2,
+    )
+
+    with pytest.raises(RuntimeError, match="Blueprint QA failed before execution"):
+        await orchestrator.run(
+            reference_bundle=ReferenceBundle(
+                input_mode="image",
+                stack="html_tailwind",
+                user_text="Create this pricing page",
+                images=["data:image/png;base64,abc"],
+                videos=[],
+            ),
+            initial_file_state=None,
+        )
+
+    assert analyzer.calls == 2
+    assert blueprint_validator.calls == 2
+    assert any(
+        msg[0] == "status"
+        and msg[1]
+        and "Blueprint QA blocked execution after 2 failed repair attempts." in msg[1]
+        for msg in sent_messages
+    )
+
+
+@pytest.mark.asyncio
+async def test_validation_loop_blueprint_sanity_report_flags_duplicate_section_ids(
+    tmp_path: Path,
+) -> None:
+    async def send_message(
+        msg_type: str,
+        value: str | None,
+        variant_index: int,
+        data=None,
+        eventId=None,
+    ) -> None:
+        return None
+
+    from loop.artifacts import ValidatedLoopArtifactStore
+    from loop.orchestrator import ValidationLoopOrchestrator
+
+    orchestrator = ValidationLoopOrchestrator(
+        send_message=send_message,
+        openai_api_key="key",
+        openai_base_url=None,
+        anthropic_api_key=None,
+        gemini_api_key="key",
+        should_generate_images=True,
+        option_codes=[],
+        max_iterations=1,
+        artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path),
+        design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
+    )
+
+    report = orchestrator._build_blueprint_sanity_report(
+        reference_bundle=ReferenceBundle(
+            input_mode="image",
+            stack="html_tailwind",
+            user_text="Create this page",
+            images=["data:image/png;base64,abc"],
+            videos=[],
+        ),
+        requirements=RequirementsSpec(
+            page_outline=["Hero", "FAQ", "Footer"],
+            closing_sections=["Footer"],
+            footer_present=True,
+            footer_description="Footer with legal links.",
+            section_requirements=[
+                SectionRequirement(name="FAQ"),
+                SectionRequirement(name="Faq"),
+            ],
+        ),
+    )
+
+    assert report is not None
+    assert report.verdict == "blocked"
+    assert any(issue.title == "Duplicate canonical section IDs" for issue in report.issues)
 
 
 @pytest.mark.asyncio
@@ -1442,7 +1830,7 @@ async def test_validation_loop_orchestrator_skips_preflight_for_text_only_run(
     class FakeAnalyzer:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
 
-        async def analyze(self, reference_bundle, current_html=None):
+        async def analyze(self, reference_bundle, current_html=None, **kwargs):
             assert reference_bundle.design_system_preflight is None
             return RequirementsSpec(summary="Text-only requirements")
 
@@ -1479,6 +1867,10 @@ async def test_validation_loop_orchestrator_skips_preflight_for_text_only_run(
         async def build(self, reference_bundle):
             raise AssertionError("Design-system preflight should be skipped")
 
+    class FailIfCalledBlueprintValidator:
+        async def validate(self, **kwargs):
+            raise AssertionError("Blueprint validator should be skipped for text-only runs")
+
     from loop.artifacts import ValidatedLoopArtifactStore
     from loop.orchestrator import ValidationLoopOrchestrator
 
@@ -1496,6 +1888,7 @@ async def test_validation_loop_orchestrator_skips_preflight_for_text_only_run(
         executor=cast(Any, FakeExecutor()),
         renderer=cast(Any, FakeRenderer()),
         validator=cast(Any, FakeValidator()),
+        blueprint_validator=cast(Any, FailIfCalledBlueprintValidator()),
         artifact_store=artifact_store,
         design_system_builder=cast(Any, FailIfCalledDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
@@ -1631,6 +2024,7 @@ async def test_validation_loop_orchestrator_reuses_explicit_design_system_run_di
         renderer=cast(Any, FakeRenderer()),
         validator=cast(Any, FakeValidator()),
         artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path / "target"),
+        live_reference_extractor=cast(Any, _StaticLiveReferenceExtractor()),
         design_system_builder=cast(Any, _StaticDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
@@ -1708,6 +2102,7 @@ async def test_validation_loop_orchestrator_rejects_same_count_but_different_med
         renderer=cast(Any, AsyncMock()),
         validator=cast(Any, AsyncMock()),
         artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path / "target"),
+        live_reference_extractor=cast(Any, _StaticLiveReferenceExtractor()),
         design_system_builder=cast(Any, _StaticDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
@@ -1779,6 +2174,7 @@ async def test_validation_loop_orchestrator_require_reuse_rejects_incompatible_r
         renderer=cast(Any, AsyncMock()),
         validator=cast(Any, AsyncMock()),
         artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path / "target"),
+        live_reference_extractor=cast(Any, _StaticLiveReferenceExtractor()),
         design_system_builder=cast(Any, _StaticDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
@@ -1815,7 +2211,7 @@ async def test_validation_loop_orchestrator_repersist_existing_preflight_into_ne
                 str(tmp_path)
             )
             assert "/new-run/" in reference_bundle.design_system_preflight.html_artifact_path
-            return RequirementsSpec(summary="Repersist supplied design system")
+            return _requirements_with_section_blueprint("Repersist supplied design system")
 
     class FakeExecutor:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
@@ -1993,6 +2389,7 @@ async def test_validation_loop_orchestrator_reuses_compatible_current_cache(
         renderer=cast(Any, FakeRenderer()),
         validator=cast(Any, FakeValidator()),
         artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path / "target"),
+        live_reference_extractor=cast(Any, _StaticLiveReferenceExtractor()),
         design_system_builder=cast(Any, _StaticDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
@@ -2111,6 +2508,7 @@ async def test_validation_loop_orchestrator_regenerates_after_incompatible_curre
         renderer=cast(Any, FakeRenderer()),
         validator=cast(Any, FakeValidator()),
         artifact_store=ValidatedLoopArtifactStore(repo_root=tmp_path / "target"),
+        live_reference_extractor=cast(Any, _StaticLiveReferenceExtractor()),
         design_system_builder=cast(Any, FakeDesignSystemBuilder()),
         design_system_renderer=cast(Any, _StaticDesignSystemRenderer()),
     )
@@ -2967,7 +3365,7 @@ async def test_validation_loop_run_result_includes_model_metadata(tmp_path: Path
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
 
         async def analyze(self, reference_bundle, current_html=None):
-            return RequirementsSpec(summary="Use model metadata")
+            return _requirements_with_section_blueprint("Use model metadata")
 
     class FakeExecutor:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
@@ -3169,7 +3567,9 @@ async def test_validation_loop_orchestrator_passes_initial_file_state_to_analyze
 
         async def analyze(self, reference_bundle, current_html=None):
             captured_html.append(current_html)
-            return RequirementsSpec(summary="Use the current implementation as baseline")
+            return _requirements_with_section_blueprint(
+                "Use the current implementation as baseline"
+            )
 
     class FakeExecutor:
         model = Llm.GEMINI_3_1_PRO_PREVIEW_HIGH
@@ -3267,6 +3667,7 @@ async def test_validation_loop_orchestrator_resumes_with_saved_requirements_and_
             current_html=None,
             prior_requirements=None,
             prior_validation=None,
+            prior_blueprint_validation=None,
         ):
             analyzer_inputs.append(
                 (current_html, prior_requirements, prior_validation)

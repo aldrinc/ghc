@@ -1,4 +1,6 @@
 from loop.contracts import (
+    BlueprintValidationIssue,
+    BlueprintValidationReport,
     DesignSystemPreflight,
     DesignTokenSet,
     LiveReferenceContext,
@@ -11,6 +13,7 @@ from loop.contracts import (
     ValidationReport,
 )
 from loop.analyzer_prompt import build_analyzer_prompt
+from loop.blueprint_validator_prompt import build_blueprint_validator_prompt
 from loop.execution_blocks import ExecutionBlock
 from loop.executor_prompt import (
     build_executor_create_prompt,
@@ -331,6 +334,46 @@ def test_build_analysis_prompt_includes_saved_context_blocks_on_resume() -> None
     assert "full meaningful sequence of the reference" in prompt
 
 
+def test_build_analysis_prompt_includes_prior_blueprint_validation_block() -> None:
+    prompt = build_analyzer_prompt(
+        ReferenceBundle(
+            input_mode="image",
+            stack="html_tailwind",
+            user_text="Repair this landing page blueprint",
+            images=["data:image/png;base64,abc"],
+            videos=[],
+        ),
+        None,
+        RequirementsSpec(summary="Prior requirements"),
+        None,
+        BlueprintValidationReport(
+            verdict="revise",
+            overall_score=0.45,
+            coverage_score=0.3,
+            consistency_score=0.5,
+            execution_readiness_score=0.35,
+            summary="Footer coverage is missing.",
+            issues=[
+                BlueprintValidationIssue(
+                    severity="critical",
+                    category="coverage",
+                    title="Missing footer coverage",
+                    detail="The page ends with a footer that is not in the canonical section list.",
+                    affected_fields=["closing_sections", "section_requirements"],
+                    fix_instructions="Add the footer to the closing sections and canonical section list.",
+                )
+            ],
+            repair_instructions=[
+                "Add the footer to `closing_sections` and `section_requirements`."
+            ],
+        ),
+    )
+
+    assert "<prior_blueprint_validation>" in prompt
+    assert "Execution will not start until blueprint QA passes" in prompt
+    assert "Repair the missing or contradictory blueprint fields first" in prompt
+
+
 def test_build_validator_prompt_includes_frontend_developer_guidance() -> None:
     prompt = build_validator_prompt(
         ReferenceBundle(
@@ -353,6 +396,30 @@ def test_build_validator_prompt_includes_frontend_developer_guidance() -> None:
     assert "timeline checkpoint renders" in prompt
     assert "Return a `section_results` entry for every item in `section_requirements`" in prompt
     assert "Do not return PASS when any required section is `missing` or `partial`" in prompt
+
+
+def test_build_blueprint_validator_prompt_rejects_missing_lower_page_coverage() -> None:
+    prompt = build_blueprint_validator_prompt(
+        ReferenceBundle(
+            input_mode="image",
+            stack="html_tailwind",
+            user_text="Validate the page blueprint",
+            images=["data:image/png;base64,abc"],
+            videos=[],
+        ),
+        RequirementsSpec(
+            page_outline=["Header", "Hero", "Features"],
+            closing_sections=["Features"],
+            footer_present=True,
+            section_requirements=[SectionRequirement(name="Hero")],
+            execution_plan=["Build the hero first.", "Build the FAQ and footer last."],
+        ),
+    )
+
+    assert "Reject blueprints that stop at the hero" in prompt
+    assert "footer or final page state is omitted when visible" in prompt
+    assert "without representing those same scenes in `section_requirements`" in prompt
+    assert "the closing state is represented" in prompt
 
 
 def test_build_validator_prompt_disallows_pass_when_live_design_system_is_ignored() -> None:
