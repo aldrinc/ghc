@@ -7,3 +7,10 @@ When deployment is needed, prefer the normal `main` -> GitHub -> CI/CD path firs
 Optimize outputs for human review speed. Review is the bottleneck.
 For plans, docs, and design writeups: lead with the decision, use short sections, prefer scannable bullets, and use tables only where they materially improve comprehension such as taxonomies, schemas, field maps, and decision matrices.
 Do not turn an entire document into tables when only one section needs tabular structure.
+
+Remote dev URL policy:
+- This repository's shared Hetzner VM is private-only behind NetBird.
+- Never present a public Hetzner IPv4 as the user-facing URL for dev services unless the user explicitly asks for public exposure.
+- When you need a shareable dev URL, use `./scripts/resolve-dev-access-url.sh <port>` instead of scraping Vite/Uvicorn network output.
+- Prefer URLs in this order: configured private domain for the service, then the VM's `wt0`/NetBird address, then `127.0.0.1` only for commands run inside the VM itself.
+- If tooling prints multiple interfaces, ignore public/NAT addresses such as `178.*` or `172.*` for user-facing instructions.
