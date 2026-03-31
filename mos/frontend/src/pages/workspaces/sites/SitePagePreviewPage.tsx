@@ -118,6 +118,67 @@ export function SitePagePreviewPage() {
     return () => setMedusaRuntimeConfig(null);
   }, [medusaConfig?.medusaConfig]);
 
+  useEffect(() => {
+    if (!isB2CSitePreview) return;
+
+    const syncImportedPurchaseFrames = () => {
+      for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
+        try {
+          const frameDocument = iframe.contentDocument;
+          if (!frameDocument) continue;
+          const buyButton = frameDocument.querySelector('[data-mos-imported-action="medusa_buy_now"]');
+          if (!(buyButton instanceof HTMLElement)) continue;
+          const selectedTierCard = Array.from(frameDocument.querySelectorAll("*")).find((candidate) => {
+            if (!(candidate instanceof HTMLElement)) return false;
+            if (candidate.getAttribute("data-mos-imported-selected-tier") === "true") return true;
+            return candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card") && candidate.querySelector("h3") instanceof HTMLElement;
+          });
+          if (!(selectedTierCard instanceof HTMLElement)) continue;
+          const moneyTokens = (selectedTierCard.textContent || "").match(/(?:[$€£]|EUR|GBP)\s?\d+(?:[.,]\d+)?/g) || [];
+          const selectedPrice = moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2]?.trim() : moneyTokens[0]?.trim();
+          if (!selectedPrice) continue;
+          const prefix = (buyButton.dataset.mosImportedLabelPrefix || buyButton.textContent || "BUY NOW")
+            .replace(/[$€£]\s?\d+(?:[.,]\d+)?/g, "")
+            .replace(/\s*-\s*$/, "")
+            .trim();
+          buyButton.dataset.mosPreviewSelectedPrice = selectedPrice;
+          buyButton.textContent = prefix;
+        } catch {
+          continue;
+        }
+      }
+    };
+
+    const handleImportedHashNavigation = (event: MessageEvent) => {
+      const payload = event.data;
+      if (!payload || typeof payload !== "object") return;
+      if ((payload as { source?: unknown }).source !== "mos-imported-runtime") return;
+      if ((payload as { type?: unknown }).type !== "navigate-hash") return;
+      const rawHash = (payload as { hash?: unknown }).hash;
+      const targetId = typeof rawHash === "string" ? rawHash.replace(/^#/, "").trim() : "";
+      if (!targetId) return;
+      for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
+        try {
+          if (iframe.contentDocument?.getElementById(targetId)) {
+            iframe.scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    syncImportedPurchaseFrames();
+    const intervalId = window.setInterval(syncImportedPurchaseFrames, 250);
+    window.addEventListener("message", handleImportedHashNavigation);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("message", handleImportedHashNavigation);
+    };
+  }, [isB2CSitePreview]);
+
   if (siteLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-3 bg-surface text-sm text-content-muted">
