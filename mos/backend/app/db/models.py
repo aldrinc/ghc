@@ -787,6 +787,364 @@ class Artifact(Base):
     )
 
 
+class SkillPackage(Base):
+    __tablename__ = "skill_packages"
+    __table_args__ = (
+        UniqueConstraint("org_id", "key", name="uq_skill_packages_org_key"),
+        sa.Index("idx_skill_packages_org_created_at", "org_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_repo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_root: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SkillPackageRelease(Base):
+    __tablename__ = "skill_package_releases"
+    __table_args__ = (
+        UniqueConstraint(
+            "skill_package_id",
+            "version",
+            name="uq_skill_package_releases_package_version",
+        ),
+        sa.Index(
+            "idx_skill_package_releases_org_created_at",
+            "org_id",
+            "created_at",
+        ),
+        sa.Index(
+            "idx_skill_package_releases_org_package_status",
+            "org_id",
+            "skill_package_id",
+            "status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    skill_package_id: Mapped[str] = mapped_column(
+        ForeignKey("skill_packages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    version: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    manifest_json: Mapped[dict[str, Any]] = mapped_column(
+        "manifest",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    source_revision: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SkillPackageReleaseAsset(Base):
+    __tablename__ = "skill_package_release_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "skill_package_release_id",
+            "relative_path",
+            name="uq_skill_package_release_assets_release_path",
+        ),
+        sa.Index(
+            "idx_skill_package_release_assets_org_release",
+            "org_id",
+            "skill_package_release_id",
+        ),
+        sa.Index(
+            "idx_skill_package_release_assets_org_kind_role",
+            "org_id",
+            "asset_kind",
+            "role",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    skill_package_release_id: Mapped[str] = mapped_column(
+        ForeignKey("skill_package_releases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    asset_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    relative_path: Mapped[str] = mapped_column(Text, nullable=False)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RuntimeProfile(Base):
+    __tablename__ = "runtime_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "skill_package_release_id",
+            "key",
+            name="uq_runtime_profiles_release_key",
+        ),
+        sa.Index("idx_runtime_profiles_org_created_at", "org_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    skill_package_release_id: Mapped[str] = mapped_column(
+        ForeignKey("skill_package_releases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    profile_json: Mapped[dict[str, Any]] = mapped_column(
+        "profile",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WorkspaceSkillBinding(Base):
+    __tablename__ = "workspace_skill_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "product_id",
+            "bundle_key",
+            name="uq_workspace_skill_bindings_scope_bundle_key",
+        ),
+        sa.Index(
+            "idx_workspace_skill_bindings_org_scope",
+            "org_id",
+            "client_id",
+            "product_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    skill_package_release_id: Mapped[str] = mapped_column(
+        ForeignKey("skill_package_releases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    bundle_key: Mapped[str] = mapped_column(Text, nullable=False)
+    bundle_family: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ProjectDocBundle(Base):
+    __tablename__ = "project_doc_bundles"
+    __table_args__ = (
+        sa.Index(
+            "idx_project_doc_bundles_org_scope_type",
+            "org_id",
+            "client_id",
+            "product_id",
+            "bundle_type",
+        ),
+        sa.Index(
+            "idx_project_doc_bundles_org_scope_active",
+            "org_id",
+            "client_id",
+            "product_id",
+            "is_active",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    bundle_type: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sa.text("false"),
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_by_user: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approved_by_user: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ProjectDocBundleItem(Base):
+    __tablename__ = "project_doc_bundle_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_doc_bundle_id",
+            "role",
+            name="uq_project_doc_bundle_items_bundle_role",
+        ),
+        sa.Index(
+            "idx_project_doc_bundle_items_bundle_order",
+            "project_doc_bundle_id",
+            "item_order",
+        ),
+        sa.Index(
+            "idx_project_doc_bundle_items_artifact",
+            "artifact_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    project_doc_bundle_id: Mapped[str] = mapped_column(
+        ForeignKey("project_doc_bundles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    item_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RuntimeBundleExport(Base):
+    __tablename__ = "runtime_bundle_exports"
+    __table_args__ = (
+        sa.Index(
+            "idx_runtime_bundle_exports_org_scope_created_at",
+            "org_id",
+            "client_id",
+            "product_id",
+            "created_at",
+        ),
+        sa.Index(
+            "idx_runtime_bundle_exports_binding_profile",
+            "workspace_skill_binding_id",
+            "runtime_profile_key",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_skill_binding_id: Mapped[str] = mapped_column(
+        ForeignKey("workspace_skill_bindings.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    project_doc_bundle_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("project_doc_bundles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    bundle_key: Mapped[str] = mapped_column(Text, nullable=False)
+    runtime_profile_key: Mapped[str] = mapped_column(Text, nullable=False)
+    export_root: Mapped[str] = mapped_column(Text, nullable=False)
+    export_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="ready")
+    manifest_json: Mapped[dict[str, Any]] = mapped_column(
+        "manifest",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ResearchArtifact(Base):
     __tablename__ = "research_artifacts"
     __table_args__ = (
@@ -2066,6 +2424,203 @@ class AgentArtifact(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class AgentThread(Base):
+    __tablename__ = "agent_threads"
+    __table_args__ = (
+        sa.Index("idx_agent_threads_org_created_at", "org_id", "created_at"),
+        sa.Index("idx_agent_threads_org_client_profile", "org_id", "client_id", "agent_profile"),
+        sa.Index("idx_agent_threads_org_page", "org_id", "page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    site_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("sites.id", ondelete="SET NULL"), nullable=True
+    )
+    page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    agent_profile: Mapped[str] = mapped_column(Text, nullable=False)
+    objective_type: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    bundle_key: Mapped[str] = mapped_column(Text, nullable=False)
+    runtime_profile_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    strategy_bundle_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("project_doc_bundles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="open")
+    bundle_manifest: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RuntimeSession(Base):
+    __tablename__ = "runtime_sessions"
+    __table_args__ = (
+        UniqueConstraint("thread_id", name="uq_runtime_sessions_thread"),
+        UniqueConstraint("scope_key", name="uq_runtime_sessions_scope_key"),
+        sa.Index("idx_runtime_sessions_org_last_used", "org_id", "last_used_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    thread_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    agent_profile: Mapped[str] = mapped_column(Text, nullable=False)
+    scope_key: Mapped[str] = mapped_column(Text, nullable=False)
+    runtime_home: Mapped[str] = mapped_column(Text, nullable=False)
+    projection_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    hermes_session_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="ready")
+    toolsets: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AgentTurn(Base):
+    __tablename__ = "agent_turns"
+    __table_args__ = (
+        UniqueConstraint("thread_id", "seq", name="uq_agent_turns_thread_seq"),
+        sa.Index("idx_agent_turns_thread_created", "thread_id", "created_at"),
+        sa.Index("idx_agent_turns_run", "run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    thread_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("agent_artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    site_page_version_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_page_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SitePageContextBinding(Base):
+    __tablename__ = "site_page_context_bindings"
+    __table_args__ = (
+        UniqueConstraint("page_id", name="uq_site_page_context_bindings_page"),
+        sa.Index("idx_site_page_context_bindings_org_page", "org_id", "page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    bundle_key: Mapped[str] = mapped_column(Text, nullable=False)
+    strategy_bundle_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("project_doc_bundles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    runtime_profile_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    binding_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ApprovalItem(Base):
+    __tablename__ = "approval_items"
+    __table_args__ = (
+        sa.Index("idx_approval_items_thread_created", "thread_id", "created_at"),
+        sa.Index("idx_approval_items_org_status", "org_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    thread_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_threads.id", ondelete="CASCADE"), nullable=False
+    )
+    artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("agent_artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    site_page_version_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("site_page_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    target_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    decision: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_by_user_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OnboardingPayload(Base):

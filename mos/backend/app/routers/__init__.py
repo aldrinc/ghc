@@ -1,4 +1,5 @@
 from app.routers import (
+    agent_threads,
     clients,
     campaigns,
     artifacts,
@@ -25,6 +26,7 @@ from app.routers import (
     ads,
     design_systems,
     products,
+    product_strategy_skills,
     stripe_webhooks,
     meta_ads,
     paid_ads_qa,
@@ -39,6 +41,7 @@ from app.routers import (
 )
 
 __all__ = [
+    "agent_threads",
     "agent_runs",
     "clients",
     "campaigns",
@@ -50,6 +53,7 @@ __all__ = [
     "brands",
     "design_systems",
     "products",
+    "product_strategy_skills",
     "swipes",
     "experiments",
     "workflows",

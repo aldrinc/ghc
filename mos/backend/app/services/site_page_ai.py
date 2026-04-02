@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from typing import Any
 
@@ -10,6 +11,7 @@ from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.db.models import Site, SitePage, SitePageVersion
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services import funnel_ai
+from app.services.site_import_archive import backfill_imported_runtime_override_slots
 
 
 _IMPORTED_TEMPLATE_ALLOWED_TYPES = {
@@ -29,6 +31,12 @@ _IMPORTED_TEMPLATE_ALLOWED_TYPES = {
 
 class SitePageAiError(ValueError):
     """Raised when site-page AI generation cannot be completed."""
+
+
+@dataclass(frozen=True)
+class SitePageAgentDraftResult:
+    assistant_message: str
+    puck_data: dict[str, Any]
 
 
 def _sanitize_imported_component_tree(items: Any) -> list[dict[str, Any]]:
@@ -216,6 +224,52 @@ def _build_site_ai_prompt(
     return "\n\n".join(base_prompt_parts + ["Return JSON now."])
 
 
+def is_imported_template_page_data(puck_data: dict[str, Any] | None) -> bool:
+    return _is_imported_template_page_data(puck_data)
+
+
+def build_site_page_agent_prompt(
+    *,
+    site: Site,
+    page: SitePage,
+    base_puck: dict[str, Any],
+    page_context: list[dict[str, str]],
+    prompt: str,
+    messages: list[dict[str, str]] | None,
+) -> str:
+    return _build_site_ai_prompt(
+        site=site,
+        page=page,
+        base_puck=base_puck,
+        page_context=page_context,
+        prompt=prompt,
+        messages=messages,
+    )
+
+
+def parse_site_page_agent_response(raw_output: str) -> SitePageAgentDraftResult:
+    parsed = funnel_ai._extract_json_object(raw_output)
+    assistant_message = funnel_ai._coerce_assistant_message(parsed.get("assistantMessage"))
+    puck_data_raw = funnel_ai._coerce_puck_data(parsed.get("puckData"))
+    puck_data = funnel_ai._sanitize_puck_data(puck_data_raw)
+    puck_data["content"] = _sanitize_imported_component_tree(puck_data.get("content"))
+    zones = puck_data.get("zones")
+    if isinstance(zones, dict):
+        for key, value in list(zones.items()):
+            zones[key] = _sanitize_imported_component_tree(value)
+    funnel_ai._ensure_block_ids(puck_data)
+
+    if not _is_imported_template_page_data(puck_data):
+        raise SitePageAiError(
+            "AI returned an invalid imported-template page. The response must keep ImportedPage as the top-level block."
+        )
+
+    return SitePageAgentDraftResult(
+        assistant_message=assistant_message,
+        puck_data=puck_data,
+    )
+
+
 def generate_site_page_draft(
     *,
     session: Session,
@@ -256,11 +310,12 @@ def generate_site_page_draft(
         raise SitePageAiError(
             "Site-page AI currently supports imported-template pages only. Rebuild this page from the import-native flow first."
         )
+    base_puck = backfill_imported_runtime_override_slots(base_puck) or base_puck
 
     llm = LLMClient()
     model_id = model or llm.default_model
     page_context = _build_site_page_context(session, site_id=site_id)
-    compiled_prompt = _build_site_ai_prompt(
+    compiled_prompt = build_site_page_agent_prompt(
         site=site,
         page=page,
         base_puck=base_puck,
@@ -278,22 +333,9 @@ def generate_site_page_draft(
         response_format=funnel_ai._puck_response_format(),
     )
     raw_output = llm.generate_text(compiled_prompt, params=params)
-    parsed = funnel_ai._extract_json_object(raw_output)
-
-    assistant_message = funnel_ai._coerce_assistant_message(parsed.get("assistantMessage"))
-    puck_data_raw = funnel_ai._coerce_puck_data(parsed.get("puckData"))
-    puck_data = funnel_ai._sanitize_puck_data(puck_data_raw)
-    puck_data["content"] = _sanitize_imported_component_tree(puck_data.get("content"))
-    zones = puck_data.get("zones")
-    if isinstance(zones, dict):
-        for key, value in list(zones.items()):
-            zones[key] = _sanitize_imported_component_tree(value)
-    funnel_ai._ensure_block_ids(puck_data)
-
-    if not _is_imported_template_page_data(puck_data):
-        raise SitePageAiError(
-            "AI returned an invalid imported-template page. The response must keep ImportedPage as the top-level block."
-        )
+    result = parse_site_page_agent_response(raw_output)
+    assistant_message = result.assistant_message
+    puck_data = result.puck_data
 
     page.adapted_puck_data = puck_data
     sites_repo.update_page(page=page)

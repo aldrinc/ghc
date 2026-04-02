@@ -15,6 +15,7 @@ from app.llm_ops import initialize_agenta, shutdown_agenta
 from app.observability import initialize_langfuse, shutdown_langfuse
 from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
+    agent_threads,
     agent_runs,
     artifacts,
     assets,
@@ -26,6 +27,7 @@ from app.routers import (
     clients,
     design_systems,
     products,
+    product_strategy_skills,
     funnels,
     public_funnels,
     public_sites,
@@ -157,11 +159,13 @@ def create_app() -> FastAPI:
     app.include_router(brands.router)
     app.include_router(design_systems.router)
     app.include_router(products.router)
+    app.include_router(product_strategy_skills.router)
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
     app.include_router(compliance.router)
     app.include_router(agent_runs.router)
+    app.include_router(agent_threads.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)
     app.include_router(public_sites.router)

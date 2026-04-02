@@ -8,6 +8,12 @@ import zipfile
 
 import pytest
 
+from app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def enable_llm_imported_section_translation(monkeypatch):
+    monkeypatch.setattr(settings, "SITE_IMPORT_LLM_SOURCE_SECTION_TRANSLATION_ENABLED", True, raising=False)
 
 @pytest.fixture
 def mock_capture_result():
@@ -176,6 +182,117 @@ def mock_generator_and_adapter(monkeypatch):
         "app.services.site_imports.generate_react_tailwind_from_screenshot", _mock_generate
     )
     monkeypatch.setattr("app.services.site_imports.adapt_generator_result", _mock_adapt)
+
+
+@pytest.fixture(autouse=True)
+def mock_imported_source_section_translation(monkeypatch):
+    translations = {
+        "hero-section": {
+            "blockType": "ImportedHeroSection",
+            "textSlots": [
+                {"label": "Badge 1", "originalText": "SPRING SALE", "text": "SPRING SALE"},
+                {
+                    "label": "Headline",
+                    "originalText": "Creatine For Body & Mind",
+                    "text": "Creatine For Body & Mind",
+                },
+                {
+                    "label": "Body copy",
+                    "originalText": "Clinically dosed creatine gummies for strength, recovery, and focus.",
+                    "text": "Clinically dosed creatine gummies for strength, recovery, and focus.",
+                },
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "feature-marquee-1": {
+            "blockType": "ImportedProofBarSection",
+            "textSlots": [
+                {
+                    "label": "Badge 1",
+                    "originalText": "BACKED BY 700+ STUDIES",
+                    "text": "BACKED BY 700+ STUDIES",
+                },
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "feature-marquee-2": {
+            "blockType": "ImportedProofBarSection",
+            "textSlots": [
+                {
+                    "label": "Badge 1",
+                    "originalText": "FRESH & LIGHT TASTE",
+                    "text": "FRESH & LIGHT TASTE",
+                }
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "real-people-real-results": {
+            "blockType": "ImportedTestimonialsSection",
+            "textSlots": [
+                {
+                    "label": "Body copy",
+                    "originalText": "Real people, real results.",
+                    "text": "Real people, real results.",
+                }
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "us-vs-them": {
+            "blockType": "ImportedComparisonSection",
+            "textSlots": [
+                {
+                    "label": "Headline",
+                    "originalText": "Why Choose OMNI?",
+                    "text": "Why Choose OMNI?",
+                },
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "any-last-questions": {
+            "blockType": "ImportedFaqSection",
+            "textSlots": [
+                {
+                    "label": "Headline",
+                    "originalText": "Any Last Questions?",
+                    "text": "Any Last Questions?",
+                },
+                {
+                    "label": "Body copy",
+                    "originalText": "Everything you need to know before ordering.",
+                    "text": "Everything you need to know before ordering.",
+                },
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "join-the-community": {
+            "blockType": "ImportedFeatureSection",
+            "textSlots": [
+                {"label": "Headline", "originalText": "Join The Community", "text": "Join The Community"}
+            ],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+        "global-footer": {
+            "blockType": "ImportedFooterSection",
+            "textSlots": [{"label": "Body copy", "originalText": "All rights reserved.", "text": "All rights reserved."}],
+            "buttonSlots": [],
+            "imageSlots": [],
+        },
+    }
+
+    def _mock_translate(**kwargs):
+        section_id = kwargs["section_id"]
+        if section_id not in translations:
+            raise RuntimeError(f"Missing test translation for section_id={section_id}")
+        return translations[section_id]
+
+    monkeypatch.setattr("app.services.site_import_archive.translate_imported_source_section", _mock_translate)
 
 
 def _wait_for_import_terminal_state(
@@ -451,9 +568,25 @@ def test_create_archive_import_success_and_blocks_legacy_convert(api_client):
         "join-the-community",
         "global-footer",
     ]
-    runtime_block = detail_payload["adaptedPuckData"]["content"][0]["props"]["content"][0]["props"]["content"][0]
+    section_blocks = {
+        section["props"]["sourceSectionId"]: section["props"]["content"][0]["type"]
+        for section in detail_payload["adaptedPuckData"]["content"][0]["props"]["content"]
+    }
+    assert section_blocks["hero-section"] == "ImportedHeroSection"
+    assert section_blocks["feature-marquee-1"] == "ImportedProofBarSection"
+    assert section_blocks["product-purchase-section"] == "ImportedRuntimeSection"
+    assert section_blocks["real-people-real-results"] == "ImportedTestimonialsSection"
+    assert section_blocks["us-vs-them"] == "ImportedComparisonSection"
+    assert section_blocks["any-last-questions"] == "ImportedFaqSection"
+    assert section_blocks["global-footer"] == "ImportedFooterSection"
+    purchase_section = next(
+        section
+        for section in detail_payload["adaptedPuckData"]["content"][0]["props"]["content"]
+        if section["props"]["sourceSectionId"] == "product-purchase-section"
+    )
+    runtime_block = purchase_section["props"]["content"][0]
     assert runtime_block["type"] == "ImportedRuntimeSection"
-    assert runtime_block["props"]["componentName"]
+    assert runtime_block["props"]["componentName"] == "ProductPurchaseSection"
     assert isinstance(runtime_block["props"]["textOverrides"], list)
     assert detail_payload["upstreamMetadata"]["generatorSystem"] == "screenshot-to-code"
     assert len(detail_payload["normalizedSections"]) >= 4
@@ -516,10 +649,16 @@ def test_save_archive_import_as_site_creates_runtime_records(api_client):
     assert draft is not None
     assert draft["puckData"]["content"][0]["type"] == "ImportedPage"
     assert draft["puckData"]["content"][0]["props"]["content"][0]["type"] == "ImportedSection"
-    assert (
-        draft["puckData"]["content"][0]["props"]["content"][0]["props"]["content"][0]["type"]
-        == "ImportedRuntimeSection"
-    )
+    section_blocks = {
+        section["props"]["sourceSectionId"]: section["props"]["content"][0]["type"]
+        for section in draft["puckData"]["content"][0]["props"]["content"]
+    }
+    assert section_blocks["hero-section"] == "ImportedHeroSection"
+    assert section_blocks["feature-marquee-1"] == "ImportedProofBarSection"
+    assert section_blocks["product-purchase-section"] == "ImportedRuntimeSection"
+    assert section_blocks["real-people-real-results"] == "ImportedTestimonialsSection"
+    assert section_blocks["us-vs-them"] == "ImportedComparisonSection"
+    assert section_blocks["any-last-questions"] == "ImportedFaqSection"
 
 
 def test_create_archive_import_rejects_missing_app_file(api_client):

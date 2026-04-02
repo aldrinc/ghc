@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import io
 import json
 import os
@@ -12,6 +13,12 @@ from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
+
+from app.config import settings
+from app.services.site_import_section_translation import (
+    normalize_imported_section_translation,
+    translate_imported_source_section,
+)
 
 class SiteImportArchiveError(ValueError):
     """Raised when an uploaded archive cannot be imported into the standard import flow."""
@@ -40,8 +47,16 @@ class ArchiveImportAnalysis:
     adapted_puck_data: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class ImportedSectionMaterialization:
+    blocks: list[dict[str, Any]]
+    surface: str
+    render_mode: str
+
+
 _MAX_ARCHIVE_BYTES = 5 * 1024 * 1024
 _IMPORTED_TEMPLATE_FAMILY = "imported-template"
+_RUNTIME_PRESERVED_COMPONENT_NAMES = {"ProductPurchaseSection"}
 _ALLOWED_PAGE_TYPES = {
     "home": "home",
     "landing": "landing",
@@ -157,7 +172,7 @@ def analyze_site_import_archive(
     )
     head_assets = _build_imported_head_assets(index_html=index_html, compiled_css=compiled_css)
     runtime_source = _build_runtime_source(app_source=app_source)
-    adapted_puck_data = _build_imported_template_puck_data(
+    adapted_puck_data = rebuild_imported_template_puck_data(
         title=page_title,
         description=source_url,
         page_type=resolved_page_type,
@@ -726,6 +741,7 @@ def _extract_text_candidates(snippet: str) -> list[str]:
     results.extend(_extract_paragraphs(snippet))
     results.extend(_extract_button_labels(snippet))
     results.extend(_extract_inline_text_nodes(snippet))
+    results.extend(_extract_jsx_text_fragments(snippet))
     for _, candidate in _QUOTED_STRING_RE.findall(snippet):
         normalized = " ".join(candidate.strip().split())
         if _looks_like_human_text(normalized):
@@ -762,23 +778,44 @@ def _extract_inline_text_nodes(snippet: str) -> list[str]:
     return results
 
 
+def _extract_jsx_text_fragments(snippet: str) -> list[str]:
+    cleaned = re.sub(r"\{/\*.*?\*/\}", "\n", snippet, flags=re.DOTALL)
+    cleaned = re.sub(r"<[^>]+>", "\n", cleaned)
+    cleaned = re.sub(r"\{[^{}]*\}", "\n", cleaned)
+
+    results: list[str] = []
+    for raw_line in cleaned.splitlines():
+        normalized = " ".join(raw_line.strip().split())
+        if not normalized:
+            continue
+        lowered = normalized.lower()
+        if lowered.startswith(("const ", "return", "export ", "import ", "from ", "globalthis.")):
+            continue
+        if _looks_like_human_text(normalized):
+            results.append(normalized)
+    return results
+
+
 def _extract_button_labels(snippet: str) -> list[str]:
     return [button["label"] for button in _extract_buttons(snippet)]
 
 
 def _extract_buttons(snippet: str) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
-    for tag_name, attrs, inner_html in re.findall(
-        r"<(button|a)([^>]*)>(.*?)</(?:button|a)>",
-        snippet,
-        re.DOTALL,
-    ):
-        label = _normalize_markup_text(inner_html)
-        if not _looks_like_human_text(label):
-            continue
-        href_match = re.search(r'href="([^"]+)"', attrs)
-        href = href_match.group(1).strip() if href_match else ""
-        results.append({"label": label, "href": href, "tag": tag_name})
+    for tag_name in ("button", "a"):
+        for match in re.finditer(
+            rf"<{tag_name}\b([^>]*)>(.*?)</{tag_name}>",
+            snippet,
+            re.DOTALL,
+        ):
+            attrs = match.group(1)
+            inner_html = match.group(2)
+            label = _normalize_markup_text(inner_html)
+            if not _looks_like_human_text(label):
+                continue
+            href_match = re.search(r'href="([^"]+)"', attrs)
+            href = href_match.group(1).strip() if href_match else ""
+            results.append({"label": label, "href": href, "tag": tag_name})
     unique_results: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for result in results:
@@ -995,6 +1032,7 @@ def _parse_js_array(
         else ': null',
         raw,
     )
+    raw = re.sub(r",\s*$", "", raw)
     raw = re.sub(r",\s*([}\]])", r"\1", raw)
     try:
         payload = json.loads(f"[{raw}]")
@@ -1004,7 +1042,7 @@ def _parse_js_array(
 
 
 def _looks_like_human_text(value: str) -> bool:
-    if len(value) < 4 or len(value) > 180:
+    if len(value) < 4 or len(value) > 400:
         return False
     if not re.search(r"[A-Za-z]", value):
         return False
@@ -1019,12 +1057,16 @@ def _looks_like_human_text(value: str) -> bool:
             "viewbox",
             "class",
             "data-section-id",
+            "classname",
             "auto=format",
             "fit=crop",
             "mix-blend",
             "clip-path",
             "transition-",
             "object-cover",
+            ".map(",
+            "setselected",
+            "setmainimage",
         )
     ):
         return False
@@ -1060,13 +1102,40 @@ def _looks_like_human_text(value: str) -> bool:
         utility_like = sum(
             1
             for token in tokens
-            if any(marker in token for marker in ("-", "[", "]", "/", ":"))
+            if _looks_like_utility_token(token)
         )
         if utility_like >= max(2, len(tokens) // 2):
             return False
-    if re.fullmatch(r"[a-z0-9_.:/-]+", lowered):
+    if re.fullmatch(r"[a-z0-9_.:/-]+", lowered) and re.search(r"[0-9_./:-]", lowered):
         return False
     return True
+
+
+def _looks_like_utility_token(token: str) -> bool:
+    stripped = (token or "").strip().lower()
+    if not stripped:
+        return False
+    if stripped in {
+        "flex",
+        "grid",
+        "block",
+        "inline",
+        "inline-block",
+        "relative",
+        "absolute",
+        "fixed",
+        "sticky",
+        "hidden",
+    }:
+        return True
+    if any(marker in stripped for marker in ("[", "]", "/", ":")):
+        return True
+    return bool(
+        re.match(
+            r"^(w|h|min|max|px|py|pt|pb|pl|pr|mx|my|mt|mb|ml|mr|gap|flex|grid|bg|text|font|rounded|border|object|justify|items|content|tracking|leading|shadow|opacity|z|top|right|left|bottom|inset|hover|focus|sm|md|lg|xl|2xl)-",
+            stripped,
+        )
+    )
 
 
 def _extract_title(app_source: str, sections: list[dict[str, Any]]) -> str | None:
@@ -1501,9 +1570,23 @@ def _build_imported_template_puck_data(
     section_nodes = [
         _build_imported_section_block(
             section=section,
+            index=index,
+            runtime_source=runtime_source,
         )
-        for section in normalized_sections
+        for index, section in enumerate(normalized_sections)
     ]
+
+    page_props: dict[str, Any] = {
+        "pageName": title,
+        "pageType": page_type,
+        "theme": theme_candidate,
+        "renderMode": "source",
+        "content": section_nodes,
+    }
+    if runtime_source.strip():
+        page_props["sharedRuntimeSource"] = runtime_source
+    if head_assets:
+        page_props["sharedHeadAssets"] = head_assets
 
     return {
         "root": {
@@ -1515,17 +1598,41 @@ def _build_imported_template_puck_data(
         "content": [
             _make_imported_block(
                 "ImportedPage",
-                pageName=title,
-                pageType=page_type,
-                theme=theme_candidate,
-                renderMode="source",
-                sharedRuntimeSource=runtime_source,
-                sharedHeadAssets=head_assets,
-                content=section_nodes,
+                **page_props,
             )
         ],
         "zones": {},
     }
+
+
+def rebuild_imported_template_puck_data(
+    *,
+    title: str,
+    description: str,
+    page_type: str,
+    theme_candidate: dict[str, Any] | None,
+    normalized_sections: list[dict[str, Any]],
+    runtime_source: str | None = None,
+    head_assets: dict[str, Any] | None = None,
+    existing_puck_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    shared_runtime_source = runtime_source
+    if not isinstance(shared_runtime_source, str) or not shared_runtime_source.strip():
+        shared_runtime_source = _extract_imported_page_shared_runtime_source(existing_puck_data)
+
+    shared_head_assets = head_assets
+    if not isinstance(shared_head_assets, dict) or not shared_head_assets:
+        shared_head_assets = _extract_imported_page_shared_head_assets(existing_puck_data)
+
+    return _build_imported_template_puck_data(
+        title=title,
+        description=description,
+        page_type=page_type,
+        theme_candidate=theme_candidate or {},
+        normalized_sections=normalized_sections,
+        runtime_source=shared_runtime_source or "",
+        head_assets=shared_head_assets or {},
+    )
 
 
 def _make_imported_block(block_type: str, **props: Any) -> dict[str, Any]:
@@ -1541,13 +1648,14 @@ def _make_imported_block(block_type: str, **props: Any) -> dict[str, Any]:
 def _build_imported_section_block(
     *,
     section: dict[str, Any],
+    index: int,
+    runtime_source: str,
 ) -> dict[str, Any]:
     semantic_tags = section.get("semanticTags") or []
     semantic_tags_text = ", ".join(
         tag.strip() for tag in semantic_tags if isinstance(tag, str) and tag.strip()
     )
-    component_name = str(section.get("componentName") or "").strip() or "App"
-    section_id = str(section.get("id") or "").strip()
+    section_build = _materialize_imported_section(section=section, index=index, runtime_source=runtime_source)
 
     return _make_imported_block(
         "ImportedSection",
@@ -1556,20 +1664,388 @@ def _build_imported_section_block(
         sectionKey=section.get("sectionKey") or _slugify_token(str(section.get("id") or "section")),
         sectionType=section.get("sectionType") or "generic_content",
         semanticTagsText=semantic_tags_text,
-        surface="source",
-        renderMode="source",
-        content=[
-            _make_imported_block(
-                "ImportedRuntimeSection",
-                sectionLabel=section.get("displayName") or _humanize_identifier(section_id or "Section"),
-                componentName=component_name,
-                sectionTargetId=section_id if component_name == "App" else "",
-                textOverrides=_build_text_override_items(section=section),
-                buttonOverrides=_build_button_override_items(section=section),
-                imageOverrides=_build_image_override_items(section=section),
-            )
-        ],
+        surface=section_build.surface,
+        renderMode=section_build.render_mode,
+        content=section_build.blocks,
     )
+
+
+def _materialize_imported_section(
+    *,
+    section: dict[str, Any],
+    index: int,
+    runtime_source: str,
+) -> ImportedSectionMaterialization:
+    component_name = str(section.get("componentName") or "").strip() or "App"
+
+    if component_name in _RUNTIME_PRESERVED_COMPONENT_NAMES:
+        return ImportedSectionMaterialization(
+            blocks=[_build_imported_runtime_section_block(section=section, runtime_source=runtime_source)],
+            surface="source",
+            render_mode="source",
+        )
+
+    return ImportedSectionMaterialization(
+        blocks=[_build_source_backed_section_block(section=section, runtime_source=runtime_source)],
+        surface="source",
+        render_mode="source",
+    )
+
+
+def _build_imported_runtime_section_block(*, section: dict[str, Any], runtime_source: str) -> dict[str, Any]:
+    component_name = str(section.get("componentName") or "").strip() or "App"
+    section_id = str(section.get("id") or "").strip()
+    block = _make_imported_block(
+        "ImportedRuntimeSection",
+        sectionLabel=section.get("displayName") or _humanize_identifier(section_id or "Section"),
+        componentName=component_name,
+        sectionTargetId=section_id if component_name == "App" else "",
+        textOverrides=_build_text_override_items(section=section),
+        buttonOverrides=_build_button_override_items(section=section),
+        imageOverrides=_build_image_override_items(section=section),
+    )
+    block_props = block.get("props")
+    if isinstance(block_props, dict):
+        _populate_imported_runtime_override_slots(
+            block_props=block_props,
+            section=section,
+            runtime_source=runtime_source,
+        )
+    return block
+
+
+def backfill_imported_runtime_override_slots(puck_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return puck_data
+
+    next_puck = deepcopy(puck_data)
+    content = next_puck.get("content")
+    if not isinstance(content, list) or not content:
+        return next_puck
+
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "ImportedPage":
+        return next_puck
+
+    page_props = first.get("props")
+    if not isinstance(page_props, dict):
+        return next_puck
+
+    runtime_source = str(page_props.get("sharedRuntimeSource") or "").strip()
+    sections = page_props.get("content")
+    if not runtime_source or not isinstance(sections, list):
+        return next_puck
+
+    for section in sections:
+        if not isinstance(section, dict) or section.get("type") != "ImportedSection":
+            continue
+        section_props = section.get("props")
+        if not isinstance(section_props, dict):
+            continue
+        blocks = section_props.get("content")
+        if not isinstance(blocks, list):
+            continue
+
+        semantic_tags = [
+            candidate.strip()
+            for candidate in str(section_props.get("semanticTagsText") or "").split(",")
+            if candidate.strip()
+        ]
+        section_descriptor = {
+            "id": str(
+                section_props.get("sourceSectionId")
+                or section_props.get("sectionKey")
+                or section_props.get("id")
+                or ""
+            ).strip(),
+            "displayName": str(section_props.get("displayName") or "").strip(),
+            "sectionType": str(section_props.get("sectionType") or "generic_content").strip(),
+            "semanticTags": semantic_tags,
+        }
+
+        for block in blocks:
+            if not isinstance(block, dict) or block.get("type") != "ImportedRuntimeSection":
+                continue
+            block_props = block.get("props")
+            if not isinstance(block_props, dict):
+                continue
+
+            component_name = str(block_props.get("componentName") or "").strip() or "App"
+            descriptor = {
+                **section_descriptor,
+                "componentName": component_name,
+            }
+            _populate_imported_runtime_override_slots(
+                block_props=block_props,
+                section=descriptor,
+                runtime_source=runtime_source,
+            )
+
+    return next_puck
+
+
+def refresh_imported_page_copy_slots(puck_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return puck_data
+
+    next_puck = backfill_imported_runtime_override_slots(puck_data)
+    if not isinstance(next_puck, dict):
+        return next_puck
+
+    content = next_puck.get("content")
+    if not isinstance(content, list) or not content:
+        return next_puck
+
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "ImportedPage":
+        return next_puck
+
+    page_props = first.get("props")
+    if not isinstance(page_props, dict):
+        return next_puck
+
+    runtime_source = str(page_props.get("sharedRuntimeSource") or "").strip()
+    sections = page_props.get("content")
+    if not runtime_source or not isinstance(sections, list):
+        return next_puck
+
+    for section in sections:
+        if not isinstance(section, dict) or section.get("type") != "ImportedSection":
+            continue
+        section_props = section.get("props")
+        if not isinstance(section_props, dict):
+            continue
+        blocks = section_props.get("content")
+        if not isinstance(blocks, list):
+            continue
+
+        semantic_tags = [
+            candidate.strip()
+            for candidate in str(section_props.get("semanticTagsText") or "").split(",")
+            if candidate.strip()
+        ]
+        section_descriptor = {
+            "id": str(
+                section_props.get("sourceSectionId")
+                or section_props.get("sectionKey")
+                or section_props.get("id")
+                or ""
+            ).strip(),
+            "displayName": str(section_props.get("displayName") or "").strip(),
+            "sectionType": str(section_props.get("sectionType") or "generic_content").strip(),
+            "semanticTags": semantic_tags,
+        }
+
+        for block_index, block in enumerate(blocks):
+            if not isinstance(block, dict):
+                continue
+            block_type = str(block.get("type") or "").strip()
+            if block_type in {"", "ImportedPage", "ImportedSection", "ImportedRuntimeSection"}:
+                continue
+            if not block_type.startswith("Imported"):
+                continue
+
+            block_props = block.get("props")
+            if not isinstance(block_props, dict):
+                continue
+
+            descriptor = {
+                **section_descriptor,
+                "componentName": str(block_props.get("componentName") or "").strip() or "App",
+            }
+            refreshed_block = _build_source_backed_section_block(
+                section=descriptor,
+                runtime_source=runtime_source,
+            )
+            blocks[block_index] = _merge_refreshed_source_backed_block(
+                existing_block=block,
+                refreshed_block=refreshed_block,
+            )
+
+    return next_puck
+
+
+def _populate_imported_runtime_override_slots(
+    *,
+    block_props: dict[str, Any],
+    section: dict[str, Any],
+    runtime_source: str,
+) -> None:
+    try:
+        section_source, _ = _resolve_source_backed_section_source(
+            section=section,
+            runtime_source=runtime_source,
+        )
+    except SiteImportArchiveError:
+        return
+
+    button_anchors = _extract_translation_button_anchors(section_source=section_source)
+    component_name = str(section.get("componentName") or "").strip()
+    if component_name in _RUNTIME_PRESERVED_COMPONENT_NAMES:
+        text_anchors = _extract_runtime_preserved_text_anchors(
+            section_source=section_source,
+            button_anchors=button_anchors,
+        )
+    else:
+        text_anchors = _extract_translation_text_anchors(section_source=section_source)
+    image_anchors = _extract_translation_image_anchors(
+        section=section,
+        section_source=section_source,
+        text_anchors=text_anchors,
+    )
+
+    block_props["textOverrides"] = _merge_imported_runtime_text_overrides(
+        block_props.get("textOverrides"),
+        text_anchors,
+    )
+    existing_button_overrides = block_props.get("buttonOverrides")
+    if (
+        component_name in _RUNTIME_PRESERVED_COMPONENT_NAMES
+        and isinstance(existing_button_overrides, list)
+        and existing_button_overrides
+    ):
+        block_props["buttonOverrides"] = deepcopy(existing_button_overrides)
+    else:
+        block_props["buttonOverrides"] = _merge_imported_runtime_button_overrides(
+            existing_button_overrides,
+            button_anchors,
+        )
+    block_props["imageOverrides"] = _merge_imported_runtime_image_overrides(
+        block_props.get("imageOverrides"),
+        image_anchors,
+    )
+
+
+def _extract_runtime_preserved_text_anchors(
+    *,
+    section_source: str,
+    button_anchors: list[dict[str, str]],
+) -> list[str]:
+    button_labels = {
+        str(anchor.get("label") or "").strip()
+        for anchor in button_anchors
+        if isinstance(anchor, dict) and str(anchor.get("label") or "").strip()
+    }
+    results: list[str] = []
+    for candidate in _extract_text_candidates(section_source):
+        normalized = str(candidate or "").strip()
+        if (
+            not normalized
+            or normalized in button_labels
+            or _looks_like_reference_text(normalized)
+            or _looks_like_anchor_identifier_text(candidate=normalized, section_source=section_source)
+            or _looks_like_image_alt_text(candidate=normalized, section_source=section_source)
+        ):
+            continue
+        results.append(normalized)
+    return _ordered_unique(results)
+
+
+def _merge_refreshed_source_backed_block(
+    *,
+    existing_block: dict[str, Any],
+    refreshed_block: dict[str, Any],
+) -> dict[str, Any]:
+    next_block = deepcopy(refreshed_block)
+    next_props = next_block.get("props")
+    existing_props = existing_block.get("props")
+    if not isinstance(next_props, dict) or not isinstance(existing_props, dict):
+        return next_block
+
+    existing_id = str(existing_props.get("id") or "").strip()
+    if existing_id:
+        next_props["id"] = existing_id
+
+    next_props["textSlots"] = _merge_refreshed_text_slots(
+        existing_items=existing_props.get("textSlots"),
+        refreshed_items=next_props.get("textSlots"),
+    )
+    next_props["buttonSlots"] = _merge_refreshed_button_slots(
+        existing_items=existing_props.get("buttonSlots"),
+        refreshed_items=next_props.get("buttonSlots"),
+    )
+    next_props["imageSlots"] = _merge_refreshed_image_slots(
+        existing_items=existing_props.get("imageSlots"),
+        refreshed_items=next_props.get("imageSlots"),
+    )
+    return next_block
+
+
+def _merge_refreshed_text_slots(*, existing_items: Any, refreshed_items: Any) -> list[dict[str, Any]]:
+    existing_by_anchor: dict[str, dict[str, Any]] = {}
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        anchor = str(item.get("originalText") or "").strip()
+        if anchor:
+            existing_by_anchor[anchor] = item
+
+    merged: list[dict[str, Any]] = []
+    for item in refreshed_items if isinstance(refreshed_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        normalized = deepcopy(item)
+        anchor = str(normalized.get("originalText") or "").strip()
+        existing = existing_by_anchor.get(anchor)
+        if existing and isinstance(existing.get("text"), str) and str(existing.get("text")).strip():
+            normalized["text"] = str(existing.get("text")).strip()
+        merged.append(normalized)
+    return merged
+
+
+def _merge_refreshed_button_slots(*, existing_items: Any, refreshed_items: Any) -> list[dict[str, Any]]:
+    existing_by_anchor: dict[tuple[str, str], dict[str, Any]] = {}
+    existing_by_text: dict[str, dict[str, Any]] = {}
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        original_text = str(item.get("originalText") or "").strip()
+        href = str(item.get("href") or "").strip()
+        if original_text:
+            existing_by_anchor[(original_text, href)] = item
+            existing_by_text.setdefault(original_text, item)
+
+    merged: list[dict[str, Any]] = []
+    for item in refreshed_items if isinstance(refreshed_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        normalized = deepcopy(item)
+        original_text = str(normalized.get("originalText") or "").strip()
+        href = str(normalized.get("href") or "").strip()
+        existing = existing_by_anchor.get((original_text, href)) or existing_by_text.get(original_text)
+        if existing and isinstance(existing.get("text"), str) and str(existing.get("text")).strip():
+            normalized["text"] = str(existing.get("text")).strip()
+        merged.append(normalized)
+    return merged
+
+
+def _merge_refreshed_image_slots(*, existing_items: Any, refreshed_items: Any) -> list[dict[str, Any]]:
+    existing_by_anchor: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        original_src = str(item.get("originalSrc") or "").strip()
+        original_text = str(item.get("originalText") or "").strip()
+        if original_src or original_text:
+            existing_by_anchor[(original_src, original_text)] = item
+
+    merged: list[dict[str, Any]] = []
+    for item in refreshed_items if isinstance(refreshed_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        normalized = deepcopy(item)
+        original_src = str(normalized.get("originalSrc") or "").strip()
+        original_text = str(normalized.get("originalText") or "").strip()
+        existing = existing_by_anchor.get((original_src, original_text))
+        if existing:
+            src = str(existing.get("src") or "").strip()
+            alt = str(existing.get("alt") or "").strip()
+            if src:
+                normalized["src"] = src
+            if alt:
+                normalized["alt"] = alt
+        merged.append(normalized)
+    return merged
 
 
 def _build_text_override_items(*, section: dict[str, Any]) -> list[dict[str, str]]:
@@ -1613,15 +2089,70 @@ def _build_text_override_items(*, section: dict[str, Any]) -> list[dict[str, str
             if isinstance(value, str) and value.strip():
                 labeled_candidates.append((f"Text {index}", value.strip()))
 
+    links = parsed_data.get("links") or []
+    if isinstance(links, list):
+        for index, value in enumerate(links, start=1):
+            if not isinstance(value, dict):
+                continue
+            label = str(value.get("label") or "").strip()
+            if label:
+                labeled_candidates.append((f"Link label {index}", label))
+
+    faqs = parsed_data.get("faqs") or []
+    if isinstance(faqs, list):
+        for index, faq in enumerate(faqs, start=1):
+            if not isinstance(faq, dict):
+                continue
+            question = str(faq.get("question") or "").strip()
+            answer = str(faq.get("answer") or "").strip()
+            if question:
+                labeled_candidates.append((f"FAQ {index} question", question))
+            if answer:
+                labeled_candidates.append((f"FAQ {index} answer", answer))
+
+    comparisons = parsed_data.get("comparisons") or []
+    if isinstance(comparisons, list) and comparisons:
+        comparison_keys: list[str] = []
+        first_row = comparisons[0]
+        if isinstance(first_row, dict):
+            comparison_keys = [
+                str(key).strip()
+                for key in first_row.keys()
+                if str(key).strip() and key not in {"feature", "label", "title"}
+            ]
+            for index, key in enumerate(comparison_keys, start=1):
+                labeled_candidates.append((f"Comparison column {index}", _humanize_identifier(key)))
+        for row_index, comparison in enumerate(comparisons, start=1):
+            if not isinstance(comparison, dict):
+                continue
+            feature = str(
+                comparison.get("feature") or comparison.get("label") or comparison.get("title") or ""
+            ).strip()
+            if feature:
+                labeled_candidates.append((f"Comparison row {row_index} feature", feature))
+            for column_index, key in enumerate(comparison_keys, start=1):
+                value = comparison.get(key)
+                if isinstance(value, bool):
+                    continue
+                rendered_value = _stringify_comparison_value(value).strip()
+                if rendered_value:
+                    labeled_candidates.append(
+                        (f"Comparison row {row_index} value {column_index}", rendered_value)
+                    )
+
     if not labeled_candidates:
         for index, candidate in enumerate(section.get("keyText") or [], start=1):
-            if isinstance(candidate, str) and candidate.strip():
+            if isinstance(candidate, str) and candidate.strip() and not _looks_like_reference_text(candidate):
                 labeled_candidates.append((f"Text {index}", candidate.strip()))
 
     results: list[dict[str, str]] = []
     seen: set[str] = set()
     for index, (label, candidate) in enumerate(labeled_candidates, start=1):
-        if candidate in button_texts or candidate in seen:
+        if (
+            candidate in button_texts
+            or candidate in seen
+            or _looks_like_reference_text(candidate)
+        ):
             continue
         seen.add(candidate)
         results.append(
@@ -1632,6 +2163,55 @@ def _build_text_override_items(*, section: dict[str, Any]) -> list[dict[str, str
                 "text": candidate,
             }
         )
+    return results
+
+
+def _merge_imported_runtime_text_overrides(
+    existing_items: Any,
+    text_anchors: list[str],
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    allowed_anchors = {
+        str(anchor).strip()
+        for anchor in _ordered_unique(text_anchors)
+        if isinstance(anchor, str) and str(anchor).strip()
+    }
+
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        original_text = str(item.get("originalText") or "").strip()
+        if not original_text or original_text in seen or original_text not in allowed_anchors:
+            continue
+        seen.add(original_text)
+        normalized = deepcopy(item)
+        normalized["originalText"] = original_text
+        normalized["text"] = (
+            str(item.get("text")).strip()
+            if isinstance(item.get("text"), str) and str(item.get("text")).strip()
+            else original_text
+        )
+        if not str(normalized.get("key") or "").strip():
+            normalized["key"] = f"text-{len(results) + 1}"
+        if not str(normalized.get("label") or "").strip():
+            normalized["label"] = f"Text {len(results) + 1}"
+        results.append(normalized)
+
+    for anchor in _ordered_unique(text_anchors):
+        original_text = str(anchor or "").strip()
+        if not original_text or original_text in seen or _looks_like_reference_text(original_text):
+            continue
+        seen.add(original_text)
+        results.append(
+            {
+                "key": f"text-{len(results) + 1}",
+                "label": f"Text {len(results) + 1}",
+                "originalText": original_text,
+                "text": original_text,
+            }
+        )
+
     return results
 
 
@@ -1658,6 +2238,69 @@ def _build_button_override_items(*, section: dict[str, Any]) -> list[dict[str, s
     return results
 
 
+def _merge_imported_runtime_button_overrides(
+    existing_items: Any,
+    button_anchors: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    allowed_anchors = {
+        (str(anchor.get("label") or "").strip(), str(anchor.get("href") or "").strip())
+        for anchor in button_anchors
+        if isinstance(anchor, dict) and str(anchor.get("label") or "").strip()
+    }
+    allowed_labels = {label for label, _ in allowed_anchors}
+
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        original_text = str(item.get("originalText") or "").strip()
+        href = str(item.get("href") or "").strip()
+        if (
+            not original_text
+            or (original_text, href) in seen
+            or (
+                (original_text, href) not in allowed_anchors
+                and not ((original_text, "") in allowed_anchors or original_text in allowed_labels)
+            )
+        ):
+            continue
+        seen.add((original_text, href))
+        normalized = deepcopy(item)
+        normalized["originalText"] = original_text
+        normalized["text"] = (
+            str(item.get("text")).strip()
+            if isinstance(item.get("text"), str) and str(item.get("text")).strip()
+            else original_text
+        )
+        normalized["href"] = href
+        if not str(normalized.get("key") or "").strip():
+            normalized["key"] = f"button-{len(results) + 1}"
+        if not str(normalized.get("label") or "").strip():
+            normalized["label"] = f"Button {len(results) + 1}"
+        results.append(normalized)
+
+    for anchor in button_anchors:
+        if not isinstance(anchor, dict):
+            continue
+        original_text = str(anchor.get("label") or "").strip()
+        href = str(anchor.get("href") or "").strip()
+        if not original_text or (original_text, href) in seen:
+            continue
+        seen.add((original_text, href))
+        results.append(
+            {
+                "key": f"button-{len(results) + 1}",
+                "label": f"Button {len(results) + 1}",
+                "originalText": original_text,
+                "text": original_text,
+                "href": href,
+            }
+        )
+
+    return results
+
+
 def _build_image_override_items(*, section: dict[str, Any]) -> list[dict[str, str]]:
     parsed_data = section.get("parsedData") or {}
     candidates: list[str] = []
@@ -1675,7 +2318,7 @@ def _build_image_override_items(*, section: dict[str, Any]) -> list[dict[str, st
     results: list[dict[str, str]] = []
     seen: set[str] = set()
     for index, candidate in enumerate(candidates):
-        if candidate in seen:
+        if candidate in seen or _looks_like_non_asset_image_value(candidate):
             continue
         seen.add(candidate)
         results.append(
@@ -1687,320 +2330,856 @@ def _build_image_override_items(*, section: dict[str, Any]) -> list[dict[str, st
                 "alt": "",
             }
         )
+
+    if not results and _section_matches_header(
+        section_type=str(section.get("sectionType") or "generic_content").strip(),
+        section_id=str(section.get("id") or "").strip().lower(),
+        component_name=str(section.get("componentName") or "").strip().lower(),
+        semantic_tokens={
+            str(tag).strip().lower()
+            for tag in (section.get("semanticTags") or [])
+            if isinstance(tag, str) and tag.strip()
+        },
+    ):
+        logo_text = _resolve_logo_text_candidate(section)
+        if logo_text:
+            results.append(
+                {
+                    "key": "image-logo-1",
+                    "label": "Logo image",
+                    "originalSrc": "",
+                    "originalText": logo_text,
+                    "src": "",
+                    "alt": logo_text,
+                }
+            )
     return results
 
 
-def _build_imported_section_content(*, section: dict[str, Any], index: int) -> list[dict[str, Any]]:
-    section_type = str(section.get("sectionType") or "generic_content")
-    parsed_data = section.get("parsedData") or {}
-    section_id = str(section.get("id") or "")
+def _build_source_backed_section_block(*, section: dict[str, Any], runtime_source: str) -> dict[str, Any]:
+    if not settings.SITE_IMPORT_LLM_SOURCE_SECTION_TRANSLATION_ENABLED:
+        return _build_legacy_source_backed_section_block(section=section)
 
-    if section_type == "proof_bar" and (
-        "marquee" in section_id or "feature-marquee" in section_id or not parsed_data
-    ):
-        badges = _build_badge_items(section)
-        if badges:
-            return [_build_badge_strip_block(section=section, badges=badges)]
-
-    if section_type in {"bundle_selector", "sticky_offer_rail"}:
-        return [_build_offer_selector_block(section=section)]
-
-    if section_type == "testimonial_wall" or parsed_data.get("testimonials"):
-        return [_build_testimonials_block(section=section)]
-
-    if section_type == "comparison_table" or parsed_data.get("comparisons"):
-        return [_build_comparison_block(section=section)]
-
-    if section_type == "faq" or parsed_data.get("faqs"):
-        return [_build_accordion_block(section=section)]
-
-    if section_type == "footer":
-        return [_build_footer_links_block(section=section)]
-
-    blocks: list[dict[str, Any]] = []
-    narrative_block = _build_narrative_block(section=section, index=index)
-    if narrative_block is not None:
-        blocks.append(narrative_block)
-
-    item_grid_block = _build_item_grid_block(section=section)
-    if item_grid_block is not None:
-        blocks.append(item_grid_block)
-
-    return blocks
-
-
-def _build_narrative_block(*, section: dict[str, Any], index: int) -> dict[str, Any] | None:
-    title = _section_title(section)
-    body = _section_body(section)
-    image_src = _section_primary_media(section)
-    buttons = _section_buttons(section)
-    badges = _build_badge_items(section)
-    quote = _section_quote(section)
-
-    if not any((title, body, image_src, buttons, quote, badges)):
-        return None
-
-    return _make_imported_block(
-        "ImportedNarrativeBlock",
-        eyebrow=_section_eyebrow(section),
-        title=title,
-        body=body,
-        quote=quote,
-        imageSrc=image_src or "",
-        imageAlt=title or section.get("displayName") or "Imported image",
-        mediaPosition="left" if index % 2 else "right",
-        align="center" if not image_src else "left",
-        badges=[{"label": badge} for badge in badges[:4]],
-        buttons=buttons,
-    )
-
-
-def _build_item_grid_block(*, section: dict[str, Any]) -> dict[str, Any] | None:
-    parsed_data = section.get("parsedData") or {}
-    items = _normalize_grid_items(parsed_data)
-    if not items:
-        return None
-
-    return _make_imported_block(
-        "ImportedItemGrid",
-        title=_section_title(section),
-        body=_section_body(section),
-        columns=min(4, max(2, len(items))),
-        items=items,
-    )
-
-
-def _build_badge_strip_block(*, section: dict[str, Any], badges: list[str]) -> dict[str, Any]:
-    return _make_imported_block(
-        "ImportedBadgeStrip",
-        title=_section_title(section),
-        items=[{"label": badge} for badge in badges[:8]],
-    )
-
-
-def _build_offer_selector_block(*, section: dict[str, Any]) -> dict[str, Any]:
-    parsed_data = section.get("parsedData") or {}
-    gallery_images = parsed_data.get("galleryImages") or parsed_data.get("media") or section.get("keyMedia") or []
-    tiers = parsed_data.get("tiers") or []
-    benefits = _normalize_benefit_items(parsed_data)
-    review_text = _section_review_text(section)
-
-    return _make_imported_block(
-        "ImportedOfferSelector",
-        eyebrow=_section_eyebrow(section),
-        title=_section_title(section),
-        body=_section_body(section),
-        reviewText=review_text,
-        ctaLabel=_section_primary_button_label(section) or "Shop now",
-        galleryImages=[
-            {"src": image, "alt": f"{_section_title(section) or 'Imported product'} image {index + 1}"}
-            for index, image in enumerate(gallery_images[:8])
-            if isinstance(image, str) and image.strip()
-        ],
-        benefits=[{"text": item} for item in benefits[:6]],
-        offers=_normalize_offer_items(tiers),
-    )
-
-
-def _build_testimonials_block(*, section: dict[str, Any]) -> dict[str, Any]:
-    parsed_data = section.get("parsedData") or {}
-    testimonials = parsed_data.get("testimonials") or []
-    items = []
-    for testimonial in testimonials:
-        if not isinstance(testimonial, dict):
-            continue
-        items.append(
-            {
-                "name": str(testimonial.get("name") or testimonial.get("title") or "Customer"),
-                "quote": str(
-                    testimonial.get("review")
-                    or testimonial.get("quote")
-                    or testimonial.get("description")
-                    or ""
-                ),
-                "role": str(testimonial.get("subtitle") or ""),
-                "imageSrc": str(testimonial.get("image") or ""),
-            }
+    component_name = str(section.get("componentName") or "").strip() or "App"
+    section_id = str(section.get("id") or "").strip()
+    translation = _translate_source_backed_section(section=section, runtime_source=runtime_source)
+    text_slots = translation.get("textSlots") or []
+    button_slots = translation.get("buttonSlots") or []
+    image_slots = translation.get("imageSlots") or []
+    if not any((text_slots, button_slots, image_slots)):
+        raise SiteImportArchiveError(
+            "Archive import could not expose editable slots for source-backed section "
+            f"'{section_id or section.get('displayName') or 'section'}'."
         )
 
-    if not items:
-        fallback_quote = _section_body(section)
-        if fallback_quote:
-            items = [{"name": _section_title(section) or "Customer", "quote": fallback_quote, "role": "", "imageSrc": ""}]
-
     return _make_imported_block(
-        "ImportedTestimonialsGrid",
-        title=_section_title(section),
-        body=_section_body(section),
-        items=items,
+        str(translation.get("blockType") or "").strip() or _resolve_source_backed_section_block_type(section=section),
+        sectionLabel=section.get("displayName") or _humanize_identifier(section_id or "Section"),
+        componentName=component_name,
+        sectionTargetId=section_id if component_name == "App" else "",
+        textSlots=text_slots,
+        buttonSlots=button_slots,
+        imageSlots=image_slots,
     )
 
 
-def _build_comparison_block(*, section: dict[str, Any]) -> dict[str, Any]:
-    comparisons = (section.get("parsedData") or {}).get("comparisons") or []
-    rows = []
-    primary_label = "Primary"
-    secondary_label = "Option 2"
-    tertiary_label = "Option 3"
-    if comparisons and isinstance(comparisons[0], dict):
-        comparison_keys = [
-            key for key in comparisons[0].keys() if key not in {"feature", "label", "title"}
-        ]
-        if comparison_keys:
-            primary_label = _humanize_identifier(comparison_keys[0])
-        if len(comparison_keys) > 1:
-            secondary_label = _humanize_identifier(comparison_keys[1])
-        if len(comparison_keys) > 2:
-            tertiary_label = _humanize_identifier(comparison_keys[2])
-        for comparison in comparisons:
-            if not isinstance(comparison, dict):
+def _build_legacy_source_backed_section_block(*, section: dict[str, Any]) -> dict[str, Any]:
+    component_name = str(section.get("componentName") or "").strip() or "App"
+    section_id = str(section.get("id") or "").strip()
+    text_slots = _normalize_legacy_imported_slot_items(_build_text_override_items(section=section))
+    button_slots = _normalize_legacy_imported_slot_items(_build_button_override_items(section=section))
+    image_slots = _normalize_legacy_imported_slot_items(_build_image_override_items(section=section))
+    if not any((text_slots, button_slots, image_slots)):
+        raise SiteImportArchiveError(
+            "Archive import could not expose editable slots for source-backed section "
+            f"'{section_id or section.get('displayName') or 'section'}'."
+        )
+
+    return _make_imported_block(
+        _resolve_source_backed_section_block_type(section=section),
+        sectionLabel=section.get("displayName") or _humanize_identifier(section_id or "Section"),
+        componentName=component_name,
+        sectionTargetId=section_id if component_name == "App" else "",
+        textSlots=text_slots,
+        buttonSlots=button_slots,
+        imageSlots=image_slots,
+    )
+
+
+def _normalize_legacy_imported_slot_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        cleaned = {
+            key: value
+            for key, value in item.items()
+            if key in {"label", "originalText", "text", "href", "originalSrc", "src", "alt"}
+        }
+        if cleaned:
+            normalized.append(cleaned)
+    return normalized
+
+
+def _translate_source_backed_section(*, section: dict[str, Any], runtime_source: str) -> dict[str, Any]:
+    section_id = str(section.get("id") or "").strip()
+    display_name = str(section.get("displayName") or "").strip() or _humanize_identifier(section_id or "Section")
+    component_name = str(section.get("componentName") or "").strip() or "App"
+    block_type_hint = _resolve_source_backed_section_block_type(section=section)
+    section_source, source_extraction_mode = _resolve_source_backed_section_source(
+        section=section,
+        runtime_source=runtime_source,
+    )
+    available_text_anchors = _extract_translation_text_anchors(section_source=section_source)
+    available_button_anchors = _extract_translation_button_anchors(section_source=section_source)
+    available_image_anchors = _extract_translation_image_anchors(
+        section=section,
+        section_source=section_source,
+        text_anchors=available_text_anchors,
+    )
+    available_stat_pairs = _extract_translation_stat_pairs(section_source=section_source)
+    available_faq_pairs = _extract_translation_faq_pairs(section_source=section_source)
+    translation = translate_imported_source_section(
+        section_id=section_id,
+        display_name=display_name,
+        component_name=component_name,
+        section_type_hint=str(section.get("sectionType") or "generic_content").strip() or "generic_content",
+        block_type_hint=block_type_hint,
+        semantic_tags=[
+            str(tag).strip()
+            for tag in (section.get("semanticTags") or [])
+            if isinstance(tag, str) and tag.strip()
+        ],
+        source_extraction_mode=source_extraction_mode,
+        section_source=section_source,
+        available_text_anchors=available_text_anchors,
+        available_button_anchors=available_button_anchors,
+        available_image_anchors=available_image_anchors,
+        available_stat_pairs=available_stat_pairs,
+        available_faq_pairs=available_faq_pairs,
+    )
+    translation = normalize_imported_section_translation(translation)
+    translation = _sanitize_translated_source_backed_section(
+        translation=translation,
+        available_text_anchors=available_text_anchors,
+        available_button_anchors=available_button_anchors,
+        available_image_anchors=available_image_anchors,
+    )
+    _validate_translated_source_backed_section(
+        section=section,
+        section_source=section_source,
+        translation=translation,
+        available_text_anchors=available_text_anchors,
+        available_button_anchors=available_button_anchors,
+        available_image_anchors=available_image_anchors,
+        available_stat_pairs=available_stat_pairs,
+        available_faq_pairs=available_faq_pairs,
+    )
+    return translation
+
+
+def _sanitize_translated_source_backed_section(
+    *,
+    translation: dict[str, Any],
+    available_text_anchors: list[str],
+    available_button_anchors: list[dict[str, str]],
+    available_image_anchors: list[dict[str, str]],
+) -> dict[str, Any]:
+    sanitized = deepcopy(translation)
+    allowed_text_anchor_set = {
+        str(anchor).strip()
+        for anchor in available_text_anchors
+        if isinstance(anchor, str) and str(anchor).strip()
+    }
+    allowed_button_hrefs: dict[str, set[str]] = {}
+    for anchor in available_button_anchors:
+        if not isinstance(anchor, dict):
+            continue
+        label = str(anchor.get("label") or "").strip()
+        href = str(anchor.get("href") or "").strip()
+        if not label:
+            continue
+        allowed_button_hrefs.setdefault(label, set()).add(href)
+    allowed_image_anchors = {
+        (str(anchor.get("originalSrc") or "").strip(), str(anchor.get("originalText") or "").strip())
+        for anchor in available_image_anchors
+        if isinstance(anchor, dict)
+        and (
+            str(anchor.get("originalSrc") or "").strip()
+            or str(anchor.get("originalText") or "").strip()
+        )
+    }
+
+    cleaned_text_slots: list[dict[str, Any]] = []
+    seen_text_anchors: set[str] = set()
+    for entry in sanitized.get("textSlots") or []:
+        if not isinstance(entry, dict):
+            continue
+        normalized = deepcopy(entry)
+        original_text = str(normalized.get("originalText") or "").strip()
+        if not original_text:
+            continue
+        resolved_anchors = (
+            [original_text]
+            if original_text in allowed_text_anchor_set
+            else _split_composite_translation_anchor(
+                original_text=original_text,
+                allowed_text_anchors=list(allowed_text_anchor_set),
+            )
+        )
+        if not resolved_anchors:
+            continue
+        for part_index, anchor in enumerate(resolved_anchors, start=1):
+            if anchor in seen_text_anchors:
                 continue
-            values = [
-                _stringify_comparison_value(comparison.get(key))
-                for key in comparison_keys[:3]
-            ]
-            while len(values) < 3:
-                values.append("")
-            rows.append(
-                {
-                    "feature": str(
-                        comparison.get("feature") or comparison.get("label") or comparison.get("title") or "Feature"
-                    ),
-                    "primaryValue": values[0],
-                    "secondaryValue": values[1],
-                    "tertiaryValue": values[2],
-                }
+            part_slot = deepcopy(normalized)
+            part_slot["originalText"] = anchor
+            part_slot["text"] = anchor
+            if len(resolved_anchors) > 1:
+                base_label = str(normalized.get("label") or "").strip() or "Text"
+                part_slot["label"] = _make_split_slot_label(
+                    base_label=base_label,
+                    part_index=part_index,
+                    part_count=len(resolved_anchors),
+                )
+            seen_text_anchors.add(anchor)
+            cleaned_text_slots.append(part_slot)
+
+    cleaned_button_slots: list[dict[str, Any]] = []
+    seen_button_anchors: set[tuple[str, str]] = set()
+    for entry in sanitized.get("buttonSlots") or []:
+        if not isinstance(entry, dict):
+            continue
+        normalized = deepcopy(entry)
+        original_text = str(normalized.get("originalText") or "").strip()
+        href = str(normalized.get("href") or "").strip()
+        allowed_hrefs = allowed_button_hrefs.get(original_text)
+        if not original_text or not allowed_hrefs:
+            continue
+        if href not in allowed_hrefs:
+            if len(allowed_hrefs) == 1:
+                href = next(iter(allowed_hrefs))
+            elif "" in allowed_hrefs:
+                href = ""
+            else:
+                continue
+            normalized["href"] = href
+        anchor_key = (original_text, href)
+        if anchor_key in seen_button_anchors:
+            continue
+        seen_button_anchors.add(anchor_key)
+        cleaned_button_slots.append(normalized)
+
+    cleaned_image_slots: list[dict[str, Any]] = []
+    seen_image_anchors: set[tuple[str, str]] = set()
+    for entry in sanitized.get("imageSlots") or []:
+        if not isinstance(entry, dict):
+            continue
+        normalized = deepcopy(entry)
+        original_src = str(normalized.get("originalSrc") or "").strip()
+        original_text = str(normalized.get("originalText") or "").strip()
+        anchor_key = (original_src, original_text)
+        if anchor_key not in allowed_image_anchors or anchor_key in seen_image_anchors:
+            continue
+        seen_image_anchors.add(anchor_key)
+        cleaned_image_slots.append(normalized)
+
+    sanitized["textSlots"] = cleaned_text_slots
+    sanitized["buttonSlots"] = cleaned_button_slots
+    sanitized["imageSlots"] = cleaned_image_slots
+    return sanitized
+
+
+def _resolve_source_backed_section_source(*, section: dict[str, Any], runtime_source: str) -> tuple[str, str]:
+    normalized_runtime_source = str(runtime_source or "").strip()
+    if not normalized_runtime_source:
+        raise SiteImportArchiveError(
+            "Archive import cannot translate source-backed sections without shared runtime source."
+        )
+
+    component_name = str(section.get("componentName") or "").strip()
+    if component_name and component_name != "App":
+        component_source = _extract_named_component_source(normalized_runtime_source, component_name)
+        if component_source and component_source.strip():
+            return _trim_source_to_target_section(
+                source=component_source.strip(),
+                section_id=str(section.get("id") or "").strip(),
+            ), "exact_component"
+
+    section_id = str(section.get("id") or "").strip()
+    if section_id:
+        anchor = f'data-section-id="{section_id}"'
+        anchor_index = normalized_runtime_source.find(anchor)
+        if anchor_index >= 0:
+            _, snippet = _extract_section_source(normalized_runtime_source, anchor_index)
+            if snippet.strip():
+                return _trim_source_to_target_section(
+                    source=snippet.strip(),
+                    section_id=section_id,
+                ), "anchored_snippet"
+
+    raise SiteImportArchiveError(
+        "Archive import could not resolve section source for source-backed section "
+        f"'{section_id or section.get('displayName') or component_name or 'section'}'."
+    )
+
+
+def _validate_translated_source_backed_section(
+    *,
+    section: dict[str, Any],
+    section_source: str,
+    translation: dict[str, Any],
+    available_text_anchors: list[str],
+    available_button_anchors: list[dict[str, str]],
+    available_image_anchors: list[dict[str, str]],
+    available_stat_pairs: list[dict[str, str]],
+    available_faq_pairs: list[dict[str, str]],
+) -> None:
+    block_type = str(translation.get("blockType") or "").strip()
+    if block_type not in {
+        "ImportedHeaderSection",
+        "ImportedHeroSection",
+        "ImportedProofBarSection",
+        "ImportedFeatureSection",
+        "ImportedOfferSection",
+        "ImportedTestimonialsSection",
+        "ImportedComparisonSection",
+        "ImportedFaqSection",
+        "ImportedFooterSection",
+    }:
+        raise SiteImportArchiveError(
+            "Archive import Gemini translation returned an invalid source-backed block type "
+            f"for section '{section.get('id') or section.get('displayName') or 'section'}': {block_type or '<empty>'}."
+        )
+
+    available_text_anchor_set = {
+        str(value).strip()
+        for value in available_text_anchors
+        if isinstance(value, str) and str(value).strip()
+    }
+    available_button_anchor_set = {
+        (str(entry.get("label") or "").strip(), str(entry.get("href") or "").strip())
+        for entry in available_button_anchors
+        if isinstance(entry, dict) and str(entry.get("label") or "").strip()
+    }
+    available_image_srcs = {
+        str(entry.get("originalSrc") or "").strip()
+        for entry in available_image_anchors
+        if isinstance(entry, dict) and str(entry.get("originalSrc") or "").strip()
+    }
+    available_image_texts = {
+        str(entry.get("originalText") or "").strip()
+        for entry in available_image_anchors
+        if isinstance(entry, dict) and str(entry.get("originalText") or "").strip()
+    }
+    text_slots = translation.get("textSlots") or []
+    button_slots = translation.get("buttonSlots") or []
+    image_slots = translation.get("imageSlots") or []
+
+    def ensure_present(value: str, *, kind: str, allowed_values: set[str]) -> None:
+        stripped = str(value or "").strip()
+        if not stripped:
+            raise SiteImportArchiveError(
+                "Archive import Gemini translation returned an empty "
+                f"{kind} anchor for section '{section.get('id') or section.get('displayName') or 'section'}'."
+            )
+        if stripped not in allowed_values:
+            raise SiteImportArchiveError(
+                "Archive import Gemini translation returned a "
+                f"{kind} anchor not present in allowed section anchors for section "
+                f"'{section.get('id') or section.get('displayName') or 'section'}': {stripped!r}."
             )
 
-    return _make_imported_block(
-        "ImportedComparisonTable",
-        title=_section_title(section),
-        body=_section_body(section),
-        primaryLabel=primary_label,
-        secondaryLabel=secondary_label,
-        tertiaryLabel=tertiary_label,
-        rows=rows,
-    )
+    for entry in text_slots:
+        if not isinstance(entry, dict):
+            raise SiteImportArchiveError("Archive import Gemini translation returned a non-object text slot.")
+        ensure_present(
+            str(entry.get("originalText") or ""),
+            kind="text",
+            allowed_values=available_text_anchor_set,
+        )
+    for entry in button_slots:
+        if not isinstance(entry, dict):
+            raise SiteImportArchiveError("Archive import Gemini translation returned a non-object button slot.")
+        original_text = str(entry.get("originalText") or "").strip()
+        href = str(entry.get("href") or "").strip()
+        if not original_text:
+            raise SiteImportArchiveError("Archive import Gemini translation returned a button slot without originalText.")
+        if (original_text, href) not in available_button_anchor_set and (original_text, "") not in available_button_anchor_set:
+            raise SiteImportArchiveError(
+                "Archive import Gemini translation returned a button anchor not present in allowed section anchors for section "
+                f"'{section.get('id') or section.get('displayName') or 'section'}': {(original_text, href)!r}."
+            )
+    for entry in image_slots:
+        if not isinstance(entry, dict):
+            raise SiteImportArchiveError("Archive import Gemini translation returned a non-object image slot.")
+        original_src = str(entry.get("originalSrc") or "").strip()
+        original_text = str(entry.get("originalText") or "").strip()
+        if original_src:
+            ensure_present(original_src, kind="image", allowed_values=available_image_srcs)
+        elif original_text:
+            ensure_present(original_text, kind="image", allowed_values=available_image_texts)
+        else:
+            raise SiteImportArchiveError("Archive import Gemini translation returned an image slot without an anchor.")
 
-
-def _build_accordion_block(*, section: dict[str, Any]) -> dict[str, Any]:
-    faqs = (section.get("parsedData") or {}).get("faqs") or []
-    items = [
-        {
-            "question": str(faq.get("question") or "Question"),
-            "answer": str(faq.get("answer") or ""),
-        }
-        for faq in faqs
-        if isinstance(faq, dict)
+    translated_texts = {
+        str(entry.get("originalText") or "").strip()
+        for entry in text_slots
+        if isinstance(entry, dict) and str(entry.get("originalText") or "").strip()
+    }
+    missing_stat_values = [
+        pair["percent"]
+        for pair in available_stat_pairs
+        if str(pair.get("percent") or "").strip() and str(pair.get("percent") or "").strip() not in translated_texts
     ]
-    if not items and _section_body(section):
-        items = [{"question": _section_title(section) or "Question", "answer": _section_body(section) or ""}]
-    return _make_imported_block(
-        "ImportedAccordion",
-        title=_section_title(section),
-        body=_section_body(section),
-        items=items,
-    )
+    missing_stat_descriptions = [
+        pair["description"]
+        for pair in available_stat_pairs
+        if str(pair.get("description") or "").strip()
+        and str(pair.get("description") or "").strip() not in translated_texts
+    ]
+    if missing_stat_values or missing_stat_descriptions:
+        raise SiteImportArchiveError(
+            "Archive import Gemini translation failed to expose all stat pairs for section "
+            f"'{section.get('id') or section.get('displayName') or 'section'}': "
+            + ", ".join([*missing_stat_values, *missing_stat_descriptions])
+        )
+
+    missing_faq_questions = [
+        pair["question"]
+        for pair in available_faq_pairs
+        if str(pair.get("question") or "").strip() and str(pair.get("question") or "").strip() not in translated_texts
+    ]
+    missing_faq_answers = [
+        pair["answer"]
+        for pair in available_faq_pairs
+        if str(pair.get("answer") or "").strip() and str(pair.get("answer") or "").strip() not in translated_texts
+    ]
+    if missing_faq_questions or missing_faq_answers:
+        raise SiteImportArchiveError(
+            "Archive import Gemini translation failed to expose all FAQ pairs for section "
+            f"'{section.get('id') or section.get('displayName') or 'section'}': "
+            + ", ".join([*missing_faq_questions, *missing_faq_answers])
+        )
 
 
-def _build_footer_links_block(*, section: dict[str, Any]) -> dict[str, Any]:
-    parsed_data = section.get("parsedData") or {}
-    links = parsed_data.get("links") or []
-    return _make_imported_block(
-        "ImportedFooterLinks",
-        brandName=_section_brand_name(section),
-        body=_section_body(section),
-        legalText=_section_legal_text(section),
-        links=[
-            {
-                "label": str(link.get("label") or "Link"),
-                "href": str(link.get("href") or ""),
-            }
-            for link in links
-            if isinstance(link, dict)
-        ],
-    )
+def _extract_translation_text_anchors(*, section_source: str) -> list[str]:
+    results = [
+        candidate
+        for candidate in _extract_text_candidates(section_source)
+        if isinstance(candidate, str) and candidate.strip() and not _looks_like_reference_text(candidate)
+    ]
+    results.extend(_extract_translation_array_text_candidates(section_source=section_source))
+    for pair in _extract_translation_stat_pairs(section_source=section_source):
+        percent = str(pair.get("percent") or "").strip()
+        description = str(pair.get("description") or "").strip()
+        if percent:
+            results.append(percent)
+        if description:
+            results.append(description)
+    for pair in _extract_translation_faq_pairs(section_source=section_source):
+        question = str(pair.get("question") or "").strip()
+        answer = str(pair.get("answer") or "").strip()
+        if question:
+            results.append(question)
+        if answer:
+            results.append(answer)
+    for inner_html in re.findall(r"<(?:span|div)[^>]*>(.*?)</(?:span|div)>", section_source, re.DOTALL):
+        normalized = _normalize_markup_text(inner_html)
+        if normalized and not _looks_like_reference_text(normalized):
+            results.append(normalized)
+    for candidate in re.findall(r"\d+%", section_source):
+        stripped = candidate.strip()
+        if stripped:
+            results.append(stripped)
+    for _, label in re.findall(r'<a\s+href="([^"]+)"[^>]*>(.*?)</a>', section_source, re.DOTALL):
+        normalized = _normalize_markup_text(label)
+        if normalized and not _looks_like_reference_text(normalized):
+            results.append(normalized)
+    results.extend(_expand_compound_text_candidates(results))
+    return _ordered_unique(results)
 
 
-def _normalize_grid_items(parsed_data: dict[str, Any]) -> list[dict[str, str]]:
-    if parsed_data.get("features"):
-        return [
-            {
-                "label": "",
-                "title": str(item.get("title") or "Feature"),
-                "text": str(item.get("description") or item.get("text") or ""),
-                "value": "",
-            }
-            for item in parsed_data["features"]
-            if isinstance(item, dict)
-        ]
-    if parsed_data.get("stats"):
-        return [
-            {
-                "label": str(item.get("label") or ""),
-                "title": str(item.get("title") or item.get("percent") or item.get("value") or ""),
-                "text": str(item.get("description") or ""),
-                "value": str(item.get("percent") or item.get("value") or ""),
-            }
-            for item in parsed_data["stats"]
-            if isinstance(item, dict)
-        ]
-    if parsed_data.get("checklist"):
-        return [
-            {
-                "label": "",
-                "title": str(item),
-                "text": "",
-                "value": "",
-            }
-            for item in parsed_data["checklist"]
-            if isinstance(item, str) and item.strip()
-        ]
-    if parsed_data.get("items"):
-        return [
-            {
-                "label": str(item.get("label") or ""),
-                "title": str(item.get("title") or item.get("text") or "Item"),
-                "text": str(item.get("description") or item.get("body") or ""),
-                "value": str(item.get("value") or ""),
-            }
-            for item in parsed_data["items"]
-            if isinstance(item, dict)
-        ]
-    return []
+def _extract_translation_array_text_candidates(*, section_source: str) -> list[str]:
+    results: list[str] = []
+    for variable_name, payload in _extract_js_arrays(section_source).items():
+        classified = _classify_array_payload(variable_name=variable_name, payload=payload)
+        for key, value in classified.items():
+            if key in {"checklist", "badges", "strings"} and isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str):
+                        normalized = " ".join(item.strip().split())
+                        if normalized and _looks_like_human_text(normalized):
+                            results.append(normalized)
+                continue
+            if key == "faqs" and isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    for field_name in ("question", "answer"):
+                        normalized = " ".join(str(item.get(field_name) or "").strip().split())
+                        if normalized and _looks_like_human_text(normalized):
+                            results.append(normalized)
+                continue
+            if key == "comparisons" and isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    for field_name, field_value in item.items():
+                        if field_name in {"feature", "label", "title"} and isinstance(field_value, str):
+                            normalized = " ".join(field_value.strip().split())
+                            if normalized and _looks_like_human_text(normalized):
+                                results.append(normalized)
+                continue
+            if key == "stats" and isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    for field_name in ("percent", "value", "description", "label", "title", "name"):
+                        normalized = " ".join(str(item.get(field_name) or "").strip().split())
+                        if normalized and _looks_like_human_text(normalized):
+                            results.append(normalized)
+                continue
+            if isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    for field_value in item.values():
+                        if isinstance(field_value, str):
+                            normalized = " ".join(field_value.strip().split())
+                            if normalized and _looks_like_human_text(normalized):
+                                results.append(normalized)
+    return _ordered_unique(results)
 
 
-def _normalize_benefit_items(parsed_data: dict[str, Any]) -> list[str]:
-    if parsed_data.get("checklist"):
-        return [str(item) for item in parsed_data["checklist"] if isinstance(item, str) and item.strip()]
-    if parsed_data.get("features"):
-        return [
-            str(item.get("title") or "")
-            for item in parsed_data["features"]
-            if isinstance(item, dict) and str(item.get("title") or "").strip()
-        ]
-    if parsed_data.get("badges"):
-        return [str(item) for item in parsed_data["badges"] if isinstance(item, str) and item.strip()]
-    return []
+def _expand_compound_text_candidates(candidates: list[str]) -> list[str]:
+    normalized_candidates = [
+        str(candidate).strip()
+        for candidate in candidates
+        if isinstance(candidate, str) and str(candidate).strip()
+    ]
+    results: list[str] = []
+    for candidate in normalized_candidates:
+        for other in normalized_candidates:
+            if other == candidate or len(other) >= len(candidate):
+                continue
+            if candidate.startswith(f"{other} "):
+                remainder = candidate[len(other) :].strip(" |:-")
+                if _looks_like_human_text(remainder):
+                    results.append(remainder)
+            if candidate.endswith(f" {other}"):
+                remainder = candidate[: -len(other)].strip(" |:-")
+                if _looks_like_human_text(remainder):
+                    results.append(remainder)
+    return _ordered_unique(results)
 
 
-def _normalize_offer_items(tiers: list[Any]) -> list[dict[str, str]]:
-    offer_items = []
-    for tier in tiers:
-        if not isinstance(tier, dict):
+def _extract_translation_button_anchors(*, section_source: str) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for action in _extract_buttons(section_source):
+        label = str(action.get("label") or "").strip()
+        href = str(action.get("href") or "").strip()
+        if not label:
             continue
-        offer_items.append(
+        key = (label, href)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({"label": label, "href": href})
+    return results
+
+
+def _split_composite_translation_anchor(
+    *,
+    original_text: str,
+    allowed_text_anchors: list[str],
+) -> list[str] | None:
+    normalized_target = " ".join(str(original_text or "").split())
+    if not normalized_target:
+        return None
+
+    normalized_anchors = [
+        (" ".join(anchor.split()), anchor)
+        for anchor in allowed_text_anchors
+        if isinstance(anchor, str) and anchor.strip()
+    ]
+
+    def _search(remainder: str, *, depth: int) -> list[str] | None:
+        if not remainder:
+            return []
+        if depth >= 4:
+            return None
+        for normalized_anchor, raw_anchor in normalized_anchors:
+            if remainder == normalized_anchor:
+                return [raw_anchor]
+            if not remainder.startswith(f"{normalized_anchor} "):
+                continue
+            tail = remainder[len(normalized_anchor) :].strip()
+            suffix = _search(tail, depth=depth + 1)
+            if suffix is not None:
+                return [raw_anchor, *suffix]
+        return None
+
+    resolved = _search(normalized_target, depth=0)
+    if resolved and len(resolved) > 1:
+        return resolved
+    return None
+
+
+def _make_split_slot_label(*, base_label: str, part_index: int, part_count: int) -> str:
+    return f"{base_label} part {part_index} of {part_count}"
+
+
+def _extract_translation_image_anchors(
+    *,
+    section: dict[str, Any],
+    section_source: str,
+    text_anchors: list[str],
+) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+    seen_srcs: set[str] = set()
+    for candidate in _ordered_unique(_URL_RE.findall(section_source)):
+        if candidate in seen_srcs or _looks_like_non_asset_image_value(candidate):
+            continue
+        seen_srcs.add(candidate)
+        results.append({"originalSrc": candidate, "originalText": ""})
+
+    if _section_matches_header(
+        section_type=str(section.get("sectionType") or "generic_content").strip(),
+        section_id=str(section.get("id") or "").strip().lower(),
+        component_name=str(section.get("componentName") or "").strip().lower(),
+        semantic_tokens={
+            str(tag).strip().lower()
+            for tag in (section.get("semanticTags") or [])
+            if isinstance(tag, str) and tag.strip()
+        },
+    ):
+        logo_text = _resolve_logo_text_candidate_from_text_anchors(text_anchors)
+        if logo_text:
+            results.append({"originalSrc": "", "originalText": logo_text})
+    return results
+
+
+def _merge_imported_runtime_image_overrides(
+    existing_items: Any,
+    image_anchors: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    allowed_anchors = {
+        (str(anchor.get("originalSrc") or "").strip(), str(anchor.get("originalText") or "").strip())
+        for anchor in image_anchors
+        if isinstance(anchor, dict)
+        and (
+            str(anchor.get("originalSrc") or "").strip()
+            or str(anchor.get("originalText") or "").strip()
+        )
+    }
+
+    for item in existing_items if isinstance(existing_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        original_src = str(item.get("originalSrc") or "").strip()
+        original_text = str(item.get("originalText") or "").strip()
+        if not original_src and not original_text:
+            continue
+        key = (original_src, original_text)
+        if key in seen or key not in allowed_anchors:
+            continue
+        seen.add(key)
+        normalized = deepcopy(item)
+        normalized["originalSrc"] = original_src
+        if original_text:
+            normalized["originalText"] = original_text
+        if not str(normalized.get("key") or "").strip():
+            normalized["key"] = f"image-{len(results) + 1}"
+        if not str(normalized.get("label") or "").strip():
+            normalized["label"] = f"Image {len(results) + 1}"
+        normalized["src"] = (
+            str(item.get("src")).strip()
+            if isinstance(item.get("src"), str) and str(item.get("src")).strip()
+            else original_src
+        )
+        normalized["alt"] = str(item.get("alt") or "")
+        results.append(normalized)
+
+    for anchor in image_anchors:
+        if not isinstance(anchor, dict):
+            continue
+        original_src = str(anchor.get("originalSrc") or "").strip()
+        original_text = str(anchor.get("originalText") or "").strip()
+        if not original_src and not original_text:
+            continue
+        key = (original_src, original_text)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(
             {
-                "title": str(tier.get("title") or "Offer"),
-                "subtitle": str(tier.get("subtitle") or ""),
-                "price": str(tier.get("price") or ""),
-                "total": str(tier.get("total") or ""),
-                "regularPrice": str(tier.get("regularPrice") or ""),
-                "savings": str(tier.get("savings") or ""),
-                "badge": str(tier.get("badge") or ""),
+                "key": f"image-{len(results) + 1}",
+                "label": f"Image {len(results) + 1}",
+                "originalSrc": original_src,
+                "originalText": original_text,
+                "src": original_src,
+                "alt": "",
             }
         )
-    return offer_items
+
+    return results
+
+
+def _extract_translation_stat_pairs(*, section_source: str) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+    for percent, description in re.findall(
+        r'percent\s*:\s*"([^"]+)"\s*,\s*description\s*:\s*"([^"]+)"',
+        section_source,
+        re.DOTALL,
+    ):
+        normalized_percent = str(percent or "").strip()
+        normalized_description = str(description or "").strip()
+        if not normalized_percent or not normalized_description:
+            continue
+        results.append(
+            {
+                "percent": normalized_percent,
+                "description": normalized_description,
+            }
+        )
+    return results
+
+
+def _extract_translation_faq_pairs(*, section_source: str) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+    for question, answer in re.findall(
+        r'question\s*:\s*"([^"]+)"\s*,\s*answer\s*:\s*"([^"]+)"',
+        section_source,
+        re.DOTALL,
+    ):
+        normalized_question = str(question or "").strip()
+        normalized_answer = str(answer or "").strip()
+        if not normalized_question or not normalized_answer:
+            continue
+        results.append(
+            {
+                "question": normalized_question,
+                "answer": normalized_answer,
+            }
+        )
+    return results
+
+
+def _resolve_logo_text_candidate_from_text_anchors(candidates: list[str]) -> str | None:
+    preferred = [
+        candidate.strip()
+        for candidate in candidates
+        if isinstance(candidate, str)
+        and candidate.strip()
+        and len(candidate.strip().split()) <= 3
+        and len(candidate.strip()) <= 24
+        and not _looks_like_cta(candidate.strip())
+    ]
+    if not preferred:
+        return None
+    exact_upper = [candidate for candidate in preferred if candidate.upper() == candidate]
+    if exact_upper:
+        exact_upper.sort(key=lambda candidate: (len(candidate.split()), len(candidate)))
+        return exact_upper[0]
+    preferred.sort(key=lambda candidate: (len(candidate.split()), len(candidate)))
+    return preferred[0]
+
+
+def _trim_source_to_target_section(*, source: str, section_id: str) -> str:
+    if not source.strip() or not section_id.strip():
+        return source
+    anchor = f'data-section-id="{section_id}"'
+    anchor_index = source.find(anchor)
+    if anchor_index < 0:
+        return source
+    next_anchor_index = source.find('data-section-id="', anchor_index + len(anchor))
+    if next_anchor_index < 0:
+        return source
+    return source[:next_anchor_index].rstrip()
+
+
+def _resolve_source_backed_section_block_type(*, section: dict[str, Any]) -> str:
+    section_type = str(section.get("sectionType") or "generic_content").strip()
+    section_id = str(section.get("id") or "").strip().lower()
+    component_name = str(section.get("componentName") or "").strip().lower()
+    semantic_tokens = {
+        str(tag).strip().lower()
+        for tag in (section.get("semanticTags") or [])
+        if isinstance(tag, str) and tag.strip()
+    }
+
+    if _section_matches_header(
+        section_type=section_type,
+        section_id=section_id,
+        component_name=component_name,
+        semantic_tokens=semantic_tokens,
+    ):
+        return "ImportedHeaderSection"
+    if _section_matches_footer(
+        section_type=section_type,
+        section_id=section_id,
+        component_name=component_name,
+        semantic_tokens=semantic_tokens,
+    ):
+        return "ImportedFooterSection"
+    if section_type == "hero" or "hero" in section_id or "hero" in component_name or "hero" in semantic_tokens:
+        return "ImportedHeroSection"
+    if (
+        section_type == "proof_bar"
+        or "proof" in section_id
+        or "marquee" in section_id
+        or "proof_bar" in semantic_tokens
+    ):
+        return "ImportedProofBarSection"
+    if (
+        section_type == "testimonial_wall"
+        or "testimonial" in section_id
+        or "testimonial_wall" in semantic_tokens
+    ):
+        return "ImportedTestimonialsSection"
+    if (
+        section_type == "comparison_table"
+        or "comparison" in section_id
+        or "comparison_table" in semantic_tokens
+    ):
+        return "ImportedComparisonSection"
+    if section_type == "faq" or "faq" in section_id or "faq" in semantic_tokens:
+        return "ImportedFaqSection"
+    if section_type in {"bundle_selector", "sticky_offer_rail"}:
+        return "ImportedOfferSection"
+    return "ImportedFeatureSection"
+
+
+def _section_matches_header(
+    *,
+    section_type: str,
+    section_id: str,
+    component_name: str,
+    semantic_tokens: set[str],
+) -> bool:
+    if section_type == "header":
+        return True
+    if "header" in section_id or component_name.endswith("header") or component_name == "header":
+        return True
+    return bool({"header", "navigation", "nav"} & semantic_tokens)
+
+
+def _section_matches_footer(
+    *,
+    section_type: str,
+    section_id: str,
+    component_name: str,
+    semantic_tokens: set[str],
+) -> bool:
+    if section_type == "footer":
+        return True
+    if "footer" in section_id or component_name.endswith("footer") or component_name == "footer":
+        return True
+    return bool({"footer", "legal"} & semantic_tokens)
 
 
 def _build_badge_items(section: dict[str, Any]) -> list[str]:
@@ -2123,6 +3302,14 @@ def _section_review_text(section: dict[str, Any]) -> str:
 
 
 def _section_brand_name(section: dict[str, Any]) -> str:
+    parsed_data = section.get("parsedData") or {}
+    links = parsed_data.get("links") or []
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        label = str(link.get("label") or "").strip()
+        if label and not _looks_like_cta(label):
+            return label
     for candidate in section.get("keyText") or []:
         if not isinstance(candidate, str):
             continue
@@ -2131,6 +3318,44 @@ def _section_brand_name(section: dict[str, Any]) -> str:
             return stripped
     display_name = str(section.get("displayName") or "").strip()
     return display_name.split()[0].upper() if display_name else ""
+
+
+def _extract_imported_page_shared_runtime_source(puck_data: dict[str, Any] | None) -> str | None:
+    if not isinstance(puck_data, dict):
+        return None
+    content = puck_data.get("content")
+    if not isinstance(content, list) or not content:
+        return None
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "ImportedPage":
+        return None
+    props = first.get("props")
+    if not isinstance(props, dict):
+        return None
+    runtime_source = props.get("sharedRuntimeSource")
+    if isinstance(runtime_source, str) and runtime_source.strip():
+        return runtime_source
+    return None
+
+
+def _extract_imported_page_shared_head_assets(
+    puck_data: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return None
+    content = puck_data.get("content")
+    if not isinstance(content, list) or not content:
+        return None
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "ImportedPage":
+        return None
+    props = first.get("props")
+    if not isinstance(props, dict):
+        return None
+    head_assets = props.get("sharedHeadAssets")
+    if isinstance(head_assets, dict) and head_assets:
+        return head_assets
+    return None
 
 
 def _section_legal_text(section: dict[str, Any]) -> str:
@@ -2173,3 +3398,69 @@ def _looks_like_cta(value: str) -> bool:
             "contact us",
         )
     )
+
+
+def _looks_like_reference_text(value: str) -> bool:
+    stripped = (value or "").strip()
+    if not stripped:
+        return True
+    if stripped.startswith("#") and not re.search(r"\s", stripped):
+        return True
+    return bool(_URL_RE.fullmatch(stripped))
+
+
+def _looks_like_anchor_identifier_text(*, candidate: str, section_source: str) -> bool:
+    stripped = (candidate or "").strip()
+    if not stripped or not re.fullmatch(r"[a-z0-9-]+", stripped):
+        return False
+    return any(
+        marker in section_source
+        for marker in (
+            f'href="#{stripped}"',
+            f"id=\"{stripped}\"",
+            f"href='#{stripped}'",
+            f"id='{stripped}'",
+        )
+    )
+
+
+def _looks_like_image_alt_text(*, candidate: str, section_source: str) -> bool:
+    stripped = (candidate or "").strip()
+    if not stripped:
+        return False
+    return any(
+        marker in section_source
+        for marker in (
+            f'alt="{stripped}"',
+            f"alt='{stripped}'",
+        )
+    )
+
+
+def _looks_like_non_asset_image_value(value: str) -> bool:
+    stripped = (value or "").strip()
+    if not stripped:
+        return True
+    if stripped == "http://www.w3.org/2000/svg":
+        return True
+    return False
+
+
+def _resolve_logo_text_candidate(section: dict[str, Any]) -> str | None:
+    parsed_data = section.get("parsedData") or {}
+    links = parsed_data.get("links") or []
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        label = str(link.get("label") or "").strip()
+        if label and not _looks_like_cta(label) and not _looks_like_reference_text(label):
+            return label
+    for candidate in section.get("keyText") or []:
+        if not isinstance(candidate, str):
+            continue
+        stripped = candidate.strip()
+        if not stripped or _looks_like_cta(stripped) or _looks_like_reference_text(stripped):
+            continue
+        if len(stripped.split()) <= 4:
+            return stripped
+    return None

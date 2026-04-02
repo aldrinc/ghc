@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import json
+import re
 from typing import Any, Optional
 from uuid import uuid4
 from uuid import UUID
@@ -19,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import (
     DesignSystem,
+    Product,
+    ProductVariant,
     Site,
     SitePage,
     SitePageVersion,
@@ -35,6 +39,10 @@ from app.db.models import (
 from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_templates import apply_template_assets, get_funnel_template
+from app.services.site_import_archive import (
+    rebuild_imported_template_puck_data,
+    refresh_imported_page_copy_slots,
+)
 from app.services.site_blueprints import (
     SiteFamilyDescriptor,
     SitePageBlueprint,
@@ -259,6 +267,428 @@ def _button_override_matches_buy_now(override: dict[str, Any]) -> bool:
     return False
 
 
+def _extract_imported_page_props(puck_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return None
+    content = puck_data.get("content")
+    if not isinstance(content, list) or not content:
+        return None
+    imported_page = content[0]
+    if not isinstance(imported_page, dict) or imported_page.get("type") != "ImportedPage":
+        return None
+    props = imported_page.get("props")
+    return props if isinstance(props, dict) else None
+
+
+def _find_medusa_one_product_runtime_props(puck_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return None
+    for block in _iter_puck_blocks(puck_data):
+        if block.get("type") != "ImportedRuntimeSection":
+            continue
+        props = block.get("props")
+        if not isinstance(props, dict):
+            continue
+        if str(props.get("componentName") or "").strip() == "ProductPurchaseSection":
+            return props
+    return None
+
+
+def _format_variant_price_label(*, amount_cents: int | None, currency: str | None) -> str:
+    if amount_cents is None:
+        return ""
+    normalized_currency = str(currency or "USD").strip().upper() or "USD"
+    amount = amount_cents / 100
+    if float(amount).is_integer():
+        formatted_amount = f"{int(amount):,}"
+    else:
+        formatted_amount = f"{amount:,.2f}".rstrip("0").rstrip(".")
+    if normalized_currency == "USD":
+        return f"${formatted_amount}"
+    return f"{normalized_currency} {formatted_amount}"
+
+
+def _to_javascript_literal(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return json.dumps(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        return "[" + ", ".join(_to_javascript_literal(item) for item in value) + "]"
+    if isinstance(value, dict):
+        parts: list[str] = []
+        for key, item in value.items():
+            normalized_key = str(key).strip()
+            key_literal = normalized_key if re.match(r"^[A-Za-z_$][A-Za-z0-9_$]*$", normalized_key) else json.dumps(normalized_key)
+            parts.append(f"{key_literal}: {_to_javascript_literal(item)}")
+        return "{ " + ", ".join(parts) + " }"
+    raise SiteTemplateError(f"Unsupported runtime literal type for Medusa one-product component: {type(value)!r}")
+
+
+def _build_medusa_one_product_purchase_runtime_payload(
+    session: Session,
+    *,
+    product_id: str,
+    puck_data: dict[str, Any],
+) -> dict[str, Any]:
+    product = session.scalars(select(Product).where(Product.id == product_id)).first()
+    if product is None:
+        raise SiteTemplateError(
+            f"Medusa one-product template instantiation requires a valid product. Could not find product '{product_id}'."
+        )
+
+    variants = list(
+        session.scalars(
+            select(ProductVariant)
+            .where(ProductVariant.product_id == product_id)
+            .order_by(ProductVariant.title.asc())
+        ).all()
+    )
+    if not variants:
+        raise SiteTemplateError(
+            "Medusa one-product template instantiation requires at least one real product variant."
+        )
+
+    purchase_props = _find_medusa_one_product_runtime_props(puck_data)
+    image_urls: list[str] = []
+    if purchase_props:
+        image_overrides = purchase_props.get("imageOverrides")
+        if isinstance(image_overrides, list):
+            for item in image_overrides:
+                if not isinstance(item, dict):
+                    continue
+                candidate = str(item.get("src") or item.get("originalSrc") or "").strip()
+                if candidate:
+                    image_urls.append(candidate)
+
+    variant_payloads: list[dict[str, Any]] = []
+    for variant in variants:
+        compare_at_label = _format_variant_price_label(
+            amount_cents=variant.compare_at_price,
+            currency=variant.currency,
+        )
+        price_label = _format_variant_price_label(
+            amount_cents=variant.price,
+            currency=variant.currency,
+        )
+        savings_label = None
+        if variant.compare_at_price and variant.compare_at_price > variant.price:
+            savings_amount = variant.compare_at_price - variant.price
+            savings_label = f"Save {_format_variant_price_label(amount_cents=savings_amount, currency=variant.currency)}"
+        variant_payloads.append(
+            {
+                "id": str(variant.id),
+                "title": variant.title,
+                "priceLabel": price_label,
+                "compareAtLabel": compare_at_label or None,
+                "savingsLabel": savings_label,
+            }
+        )
+
+    product_description = str(product.description or "").strip()
+    return {
+        "productTitle": product.title,
+        "productDescription": product_description,
+        "variants": variant_payloads,
+        "imageUrls": image_urls,
+    }
+
+
+def _render_medusa_one_product_purchase_component(*, payload: dict[str, Any]) -> str:
+    product_title = str(payload.get("productTitle") or "").strip()
+    if not product_title:
+        raise SiteTemplateError("Medusa one-product purchase runtime payload is missing productTitle.")
+
+    product_description = str(payload.get("productDescription") or "").strip()
+    variants = payload.get("variants")
+    if not isinstance(variants, list) or not variants:
+        raise SiteTemplateError("Medusa one-product purchase runtime payload is missing variants.")
+
+    description_block = ""
+    if product_description:
+        description_block = """
+                    <p className="text-[18px] leading-[1.6] text-text-dark/80 font-medium mb-8">
+                        {{{product_description_json}}}
+                    </p>
+""".format(product_description_json=json.dumps(product_description, ensure_ascii=False))
+
+    return """
+const ProductPurchaseSection = () => {{
+    const images = {images_json};
+    const variants = {variants_json};
+    const [mainImage, setMainImage] = React.useState(0);
+    const [selectedVariantId, setSelectedVariantId] = React.useState(variants[0]?.id || null);
+
+    const selectedVariant =
+        variants.find((variant) => variant.id === selectedVariantId) || variants[0] || null;
+    const hasGallery = images.length > 0;
+    const containerClassName = hasGallery
+        ? "max-w-[1380px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20"
+        : "max-w-[860px] mx-auto";
+
+    return (
+        <section
+            data-section-id="product-purchase-section"
+            className="w-full bg-white py-16 md:py-24 px-6 md:px-12 border-b border-black/5"
+        >
+            <div className={{containerClassName}}>
+                {{hasGallery ? (
+                    <div className="flex flex-col gap-4">
+                        <div className="aspect-square bg-bg-light rounded-[24px] overflow-hidden border border-black/5 relative">
+                            <img
+                                src={{images[mainImage]}}
+                                alt={{{product_title_json}}}
+                                className="w-full h-full object-cover absolute inset-0"
+                            />
+                        </div>
+                        {{images.length > 1 ? (
+                            <div className="grid grid-cols-6 gap-2 md:gap-4">
+                                {{images.map((img, idx) => {{
+                                    const isActive = mainImage === idx;
+                                    const thumbnailClassName = [
+                                        "aspect-square rounded-[12px] overflow-hidden border-2 transition-all",
+                                        isActive ? "border-primary" : "border-transparent hover:border-black/10",
+                                    ].join(" ");
+                                    return (
+                                        <button
+                                            key={{img}}
+                                            onClick={{() => setMainImage(idx)}}
+                                            className={{thumbnailClassName}}
+                                        >
+                                            <img
+                                                src={{img}}
+                                                alt={{`Thumbnail ${{idx + 1}}`}}
+                                                className="w-full h-full object-cover bg-bg-light"
+                                            />
+                                        </button>
+                                    );
+                                }})}}
+                            </div>
+                        ) : null}}
+                    </div>
+                ) : null}}
+
+                <div className="flex flex-col pt-4">
+                    <h1 className="text-[36px] md:text-[48px] font-bold leading-[1.1] text-text-dark mb-4 tracking-tight">
+                        {{{product_title_json}}}
+                    </h1>
+{description_block}                    <div className="flex flex-col gap-4 mb-8">
+                        {{variants.map((variant) => {{
+                            const isSelected = selectedVariant && selectedVariant.id === variant.id;
+                            const cardClassName = [
+                                "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center",
+                                isSelected ? "border-primary bg-bg-card" : "border-black/10 hover:border-black/20 bg-white",
+                            ].join(" ");
+                            const radioClassName = [
+                                "w-6 h-6 rounded-circle border-2 flex items-center justify-center shrink-0",
+                                isSelected ? "border-primary bg-white" : "border-black/20 bg-white",
+                            ].join(" ");
+                            return (
+                                <div
+                                    key={{variant.id}}
+                                    onClick={{() => setSelectedVariantId(variant.id)}}
+                                    className={{cardClassName}}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={{radioClassName}}>
+                                            {{isSelected ? <div className="w-3 h-3 rounded-circle bg-primary"></div> : null}}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-[18px] font-bold text-text-dark leading-none">
+                                                {{variant.title}}
+                                            </h3>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        {{variant.compareAtLabel ? (
+                                            <div className="text-[14px] text-text-dark/40 line-through font-medium mb-1">
+                                                {{variant.compareAtLabel}}
+                                            </div>
+                                        ) : null}}
+                                        <div className="text-[20px] font-bold text-text-dark leading-none">
+                                            {{variant.priceLabel}}
+                                        </div>
+                                        {{variant.savingsLabel ? (
+                                            <span className="text-[13px] font-bold text-sale-red">
+                                                {{variant.savingsLabel}}
+                                            </span>
+                                        ) : null}}
+                                    </div>
+                                </div>
+                            );
+                        }})}}
+                    </div>
+
+                    <button className="w-full bg-primary hover:bg-primary-dark transition-colors text-bg-light font-bold uppercase text-[14px] md:text-[20px] tracking-wide py-[21px] px-[24px] rounded-pill flex items-center justify-center gap-3 border-2 border-[#193b68]">
+                        ADD TO CART - {{selectedVariant?.priceLabel || ""}}
+                        <ArrowRightIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+        </section>
+    );
+}};
+""".format(
+        images_json=_to_javascript_literal(payload.get("imageUrls") or []),
+        variants_json=_to_javascript_literal(variants),
+        product_title_json=json.dumps(product_title, ensure_ascii=False),
+        description_block=description_block,
+    )
+
+
+def _rewrite_runtime_component(
+    *,
+    runtime_source: str,
+    component_name: str,
+    replacement: str,
+) -> str:
+    start_match = re.search(
+        rf"const\s+{re.escape(component_name)}\s*=\s*\(\)\s*=>",
+        runtime_source,
+    )
+    if not start_match:
+        raise SiteTemplateError(
+            f"Could not rewrite imported runtime component '{component_name}' for the Medusa one-product template."
+        )
+
+    tail = runtime_source[start_match.end() :]
+    end_match = re.search(
+        r"\n(?=const\s+[A-Z][A-Za-z0-9_]*\s*=|globalThis\.__mosImportedRuntimeComponents|const\s+ImportedSection\b)",
+        tail,
+    )
+    if not end_match:
+        raise SiteTemplateError(
+            f"Could not rewrite imported runtime component '{component_name}' for the Medusa one-product template."
+        )
+    end_index = start_match.end() + end_match.start()
+    return runtime_source[: start_match.start()] + replacement.rstrip() + runtime_source[end_index:]
+
+
+def _inject_medusa_one_product_purchase_runtime(
+    puck_data: dict[str, Any],
+    *,
+    purchase_runtime_payload: dict[str, Any],
+) -> dict[str, Any]:
+    imported_page_props = _extract_imported_page_props(puck_data)
+    if not imported_page_props:
+        raise SiteTemplateError("Imported template puckData is missing its ImportedPage wrapper.")
+    runtime_source = str(imported_page_props.get("sharedRuntimeSource") or "").strip()
+    if not runtime_source:
+        raise SiteTemplateError("Imported template puckData is missing sharedRuntimeSource.")
+
+    imported_page_props["sharedRuntimeSource"] = _rewrite_runtime_component(
+        runtime_source=runtime_source,
+        component_name="ProductPurchaseSection",
+        replacement=_render_medusa_one_product_purchase_component(payload=purchase_runtime_payload),
+    )
+    refreshed = refresh_imported_page_copy_slots(puck_data)
+    if not isinstance(refreshed, dict):
+        raise SiteTemplateError("Refreshing imported runtime slots failed after product runtime injection.")
+    return refreshed
+
+
+def _button_like_label(value: dict[str, Any]) -> str:
+    for key in ("text", "originalText", "label"):
+        candidate = str(value.get(key) or "").strip()
+        if candidate:
+            return candidate
+    return ""
+
+
+def _normalize_button_like_href(value: dict[str, Any]) -> str:
+    return str(value.get("href") or "").strip()
+
+
+def _resolve_medusa_one_product_button_href(button: dict[str, Any]) -> str | None:
+    label = _button_like_label(button).lower()
+    href = _normalize_button_like_href(button).lower()
+
+    if label == "home" or href == "/":
+        return "/"
+    if "privacy" in label:
+        return "policies/privacy-policy"
+    if "terms" in label:
+        return "policies/terms-of-service"
+    if "refund" in label or "return" in label:
+        return "policies/refund-policy"
+    if "shipping" in label:
+        return "policies/shipping-policy"
+    if "contact" in label or "support" in label or href in {"#contact", "contact", "contact-support"}:
+        return "policies/contact-support"
+    if (
+        "account" in label
+        or "login" in label
+        or "log in" in label
+        or "sign in" in label
+        or href in {"#login", "login", "account"}
+    ):
+        return "account"
+    if any(
+        token in label
+        for token in (
+            "shop",
+            "buy",
+            "order",
+            "try",
+            "get started",
+            "get the",
+            "get your",
+            "handbook",
+            "copy",
+            "start reading",
+            "claim",
+        )
+    ) or href in {"", "#", "#shop", "shop", "/shop"}:
+        return "#product-purchase-section"
+    return None
+
+
+def _rewrite_medusa_one_product_button_slots(puck_data: dict[str, Any]) -> dict[str, Any]:
+    for block in _iter_puck_blocks(puck_data):
+        block_type = str(block.get("type") or "").strip()
+        props = block.get("props") or {}
+        if not isinstance(props, dict):
+            continue
+
+        if block_type == "ImportedRuntimeSection":
+            if str(props.get("componentName") or "").strip() != "ProductPurchaseSection":
+                continue
+            props["sectionTargetId"] = "product-purchase-section"
+        for prop_name in ("buttonSlots", "buttonOverrides"):
+            button_slots = props.get(prop_name)
+            if not isinstance(button_slots, list):
+                continue
+            for button in button_slots:
+                if not isinstance(button, dict):
+                    continue
+                if str(button.get("action") or "").strip() == "medusa_buy_now":
+                    button["href"] = ""
+                    continue
+                rewritten_href = _resolve_medusa_one_product_button_href(button)
+                if not rewritten_href:
+                    continue
+                button["href"] = rewritten_href
+
+    return puck_data
+
+
+def normalize_medusa_one_product_puck_data(
+    puck_data: dict[str, Any],
+    *,
+    purchase_runtime_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if purchase_runtime_payload is not None:
+        puck_data = _inject_medusa_one_product_purchase_runtime(
+            puck_data,
+            purchase_runtime_payload=purchase_runtime_payload,
+        )
+    return _rewrite_medusa_one_product_button_slots(puck_data)
+
+
 def _load_latest_site_page_puck_data(session: Session, *, page: SitePage) -> dict[str, Any] | None:
     version = session.scalars(
         select(SitePageVersion)
@@ -270,6 +700,79 @@ def _load_latest_site_page_puck_data(session: Session, *, page: SitePage) -> dic
     if isinstance(page.adapted_puck_data, dict):
         return page.adapted_puck_data
     return None
+
+
+def _is_legacy_imported_template_puck_data(puck_data: dict[str, Any] | None) -> bool:
+    if not isinstance(puck_data, dict):
+        return False
+    content = puck_data.get("content")
+    if not isinstance(content, list) or not content:
+        return False
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "ImportedPage":
+        return False
+
+    has_runtime_section = False
+    has_native_imported_block = False
+    for block in _iter_puck_blocks(puck_data):
+        block_type = block.get("type")
+        if not isinstance(block_type, str):
+            continue
+        if block_type == "ImportedRuntimeSection":
+            has_runtime_section = True
+            continue
+        if block_type.startswith("Imported") and block_type not in {
+            "ImportedPage",
+            "ImportedSection",
+            "ImportedRuntimeSection",
+        }:
+            has_native_imported_block = True
+
+    return has_runtime_section and not has_native_imported_block
+
+
+def _rebuild_legacy_imported_source_page_puck_data(
+    session: Session,
+    *,
+    source_page: SitePage,
+    current_puck_data: dict[str, Any],
+) -> dict[str, Any] | None:
+    source_site = session.scalars(
+        select(Site).where(Site.id == source_page.site_id)
+    ).first()
+    if source_site is None or not source_site.site_import_id:
+        return None
+
+    source_import = session.scalars(
+        select(SiteImport).where(SiteImport.id == source_site.site_import_id)
+    ).first()
+    if source_import is None or not source_import.normalized_sections:
+        return None
+
+    root_props = ((current_puck_data.get("root") or {}).get("props") or {})
+    root_title = root_props.get("title")
+    source_page_name = str(source_page.name or "").strip() or "Imported page"
+    title = root_title.strip() if isinstance(root_title, str) and root_title.strip() else source_page_name
+
+    root_description = root_props.get("description")
+    fallback_description = str(
+        source_import.source_url or source_page.source_url or source_page_name
+    ).strip()
+    description = (
+        root_description.strip()
+        if isinstance(root_description, str) and root_description.strip()
+        else fallback_description
+    )
+    page_type = str(source_page.page_type or source_import.resolved_page_type or "home").strip() or "home"
+
+    return rebuild_imported_template_puck_data(
+        title=title,
+        description=description,
+        page_type=page_type,
+        theme_candidate=source_import.theme_candidate or {},
+        normalized_sections=source_import.normalized_sections or [],
+        existing_puck_data=current_puck_data,
+    )
 
 
 def _source_site_supports_medusa_one_product_store(
@@ -317,7 +820,15 @@ def _template_has_mode(template: SiteTemplate, *, mode: str) -> bool:
     return _read_note_value(template.provenance_notes, _TEMPLATE_MODE_NOTE_PREFIX) == mode
 
 
-def _mutate_medusa_one_product_entry_puck_data(puck_data: dict[str, Any]) -> dict[str, Any]:
+def _mutate_medusa_one_product_entry_puck_data(
+    puck_data: dict[str, Any],
+    *,
+    purchase_runtime_payload: dict[str, Any],
+) -> dict[str, Any]:
+    puck_data = normalize_medusa_one_product_puck_data(
+        puck_data,
+        purchase_runtime_payload=purchase_runtime_payload,
+    )
     for block in _iter_puck_blocks(puck_data):
         if block.get("type") != "ImportedRuntimeSection":
             continue
@@ -381,6 +892,7 @@ def _resolve_template_page_puck_data(
     *,
     org_id: str,
     client_id: str,
+    product_id: str | None,
     template: SiteTemplate,
     template_page: SiteTemplatePage,
     design_system_tokens: dict[str, Any] | None,
@@ -415,6 +927,14 @@ def _resolve_template_page_puck_data(
 
         if source_version is not None:
             puck_data = deepcopy(source_version.puck_data)
+            if _is_legacy_imported_template_puck_data(puck_data):
+                rebuilt_puck_data = _rebuild_legacy_imported_source_page_puck_data(
+                    session,
+                    source_page=source_page,
+                    current_puck_data=puck_data,
+                )
+                if rebuilt_puck_data is not None:
+                    puck_data = rebuilt_puck_data
             if (
                 _template_has_mode(template, mode=_MEDUSA_ONE_PRODUCT_TEMPLATE_MODE)
                 and _read_note_value(
@@ -423,7 +943,18 @@ def _resolve_template_page_puck_data(
                 )
                 == _MEDUSA_ONE_PRODUCT_ENTRY_PAGE_MODE
             ):
-                puck_data = _mutate_medusa_one_product_entry_puck_data(puck_data)
+                if not product_id:
+                    raise SiteTemplateError(
+                        "Medusa one-product template instantiation requires productId for the entry page."
+                    )
+                puck_data = _mutate_medusa_one_product_entry_puck_data(
+                    puck_data,
+                    purchase_runtime_payload=_build_medusa_one_product_purchase_runtime_payload(
+                        session,
+                        product_id=product_id,
+                        puck_data=puck_data,
+                    ),
+                )
             return (
                 puck_data,
                 {
@@ -435,6 +966,14 @@ def _resolve_template_page_puck_data(
 
         if source_page.adapted_puck_data:
             puck_data = deepcopy(source_page.adapted_puck_data)
+            if _is_legacy_imported_template_puck_data(puck_data):
+                rebuilt_puck_data = _rebuild_legacy_imported_source_page_puck_data(
+                    session,
+                    source_page=source_page,
+                    current_puck_data=puck_data,
+                )
+                if rebuilt_puck_data is not None:
+                    puck_data = rebuilt_puck_data
             if (
                 _template_has_mode(template, mode=_MEDUSA_ONE_PRODUCT_TEMPLATE_MODE)
                 and _read_note_value(
@@ -443,7 +982,18 @@ def _resolve_template_page_puck_data(
                 )
                 == _MEDUSA_ONE_PRODUCT_ENTRY_PAGE_MODE
             ):
-                puck_data = _mutate_medusa_one_product_entry_puck_data(puck_data)
+                if not product_id:
+                    raise SiteTemplateError(
+                        "Medusa one-product template instantiation requires productId for the entry page."
+                    )
+                puck_data = _mutate_medusa_one_product_entry_puck_data(
+                    puck_data,
+                    purchase_runtime_payload=_build_medusa_one_product_purchase_runtime_payload(
+                        session,
+                        product_id=product_id,
+                        puck_data=puck_data,
+                    ),
+                )
             return (
                 puck_data,
                 {
@@ -835,6 +1385,7 @@ def instantiate_template(
             session,
             org_id=org_id,
             client_id=client_id,
+            product_id=product_id,
             template=template,
             template_page=tpage,
             design_system_tokens=design_system_tokens,

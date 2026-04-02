@@ -42,6 +42,7 @@ dependencies = [
   "stripe",
   "boto3>=1.35.0",
   "Pillow>=10.3.0",
+  "mcp>=1.27.0",
 ]
 
 [project.optional-dependencies]

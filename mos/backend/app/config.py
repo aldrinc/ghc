@@ -158,6 +158,7 @@ class Settings(BaseSettings):
 
     SCREENSHOT_TO_CODE_WS_URL: str = "ws://127.0.0.1:7001/generate-code"
     SITE_IMPORT_DEFAULT_MODEL_SLOT_COUNT: int = 1
+    SITE_IMPORT_LLM_SOURCE_SECTION_TRANSLATION_ENABLED: bool = True
 
     INTEGRATION_SECRETS_KEY: str | None = None
 

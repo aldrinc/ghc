@@ -28,6 +28,7 @@ from app.schemas.campaign_creative_context import (
     CampaignCreativeContextReadinessResponse,
     CampaignManualCreativeContextUpsertRequest,
     CampaignManualCreativeContextUpsertResponse,
+    CampaignSkillsCreativeContextMaterializeResponse,
 )
 from app.schemas.campaign_delivery import (
     CampaignDeliveryResponse,
@@ -76,6 +77,7 @@ from app.services.campaign_delivery import (
 )
 from app.services.campaign_creative_context import (
     ensure_campaign_creative_context_ready,
+    materialize_skills_campaign_creative_context,
     persist_manual_campaign_creative_context,
     set_campaign_creative_context_provider,
 )
@@ -707,6 +709,27 @@ def upsert_campaign_manual_creative_context(
         created_by_user=auth.user_id,
     )
     return CampaignManualCreativeContextUpsertResponse.model_validate(response_payload).model_dump(
+        mode="json"
+    )
+
+
+@router.post("/{campaign_id}/creative-context/materialize")
+def materialize_campaign_skills_creative_context(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    try:
+        response_payload = materialize_skills_campaign_creative_context(
+            session=session,
+            org_id=auth.org_id,
+            campaign=campaign,
+            created_by_user=auth.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return CampaignSkillsCreativeContextMaterializeResponse.model_validate(response_payload).model_dump(
         mode="json"
     )
 
