@@ -1408,16 +1408,20 @@ class AgentThreadsService:
                 " Use the projected bundle files plus the explicit page editor MCP tools to audit, explain, plan, and answer the user's request."
                 " Do not force a full page draft unless the user explicitly asks for one."
                 f" If the user explicitly asks you to make a direct page change, first call `mcp_{self.hermes.PAGE_EDITOR_MCP_SERVER_NAME}_get_page_context`"
-                " to inspect the current canonical page state, editableSectionIndex, and explicit editable paths."
+                " to inspect the current canonical page state, editableSectionIndex, semanticBindings, and explicit editable paths."
                 " Match the user's requested section against editableSectionIndex before editing."
+                " If the requested change maps to a semanticBinding such as a multi-part hero headline, use that semanticBinding instead of editing member paths manually."
+                f" Prefer `mcp_{self.hermes.PAGE_EDITOR_MCP_SERVER_NAME}_apply_semantic_page_edits` for semanticBindings."
+                f" Use `mcp_{self.hermes.PAGE_EDITOR_MCP_SERVER_NAME}_apply_page_edits` only for raw paths that are not covered by a semanticBinding."
                 " 'Header' means the Global Header / GlobalHeader section."
                 " It does not mean the hero headline unless the user explicitly says hero or headline."
                 " The get_page_context tool returns baseVersionId/baseVersionStatus for the pre-edit page state."
                 " That baseVersionId is not the new draft version id."
-                f" Then call `mcp_{self.hermes.PAGE_EDITOR_MCP_SERVER_NAME}_apply_page_edits` to create the draft page version."
+                " When using a semanticBinding, never edit only one member path unless the user explicitly asks for a partial change."
+                " If the latest user turn conflicts with older thread history, follow the latest user turn exactly."
                 " Never edit runtime files or bundle files to change the page."
                 " Never claim that the page was updated unless the MCP tool returned a successful resultingSitePageVersionId."
-                " If you mention a sitePageVersionId in your response, copy the exact resultingSitePageVersionId returned by apply_page_edits."
+                " If you mention a sitePageVersionId in your response, copy the exact resultingSitePageVersionId returned by the page editor MCP tool."
             )
         elif thread.page_id:
             page_note = (

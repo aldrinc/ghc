@@ -11,6 +11,7 @@ from app.agent_platform.page_editor_runtime import (
     PageEditOperation,
     PageEditorRuntimeError,
     PageEditorRuntimeService,
+    SemanticPageEditOperation,
 )
 from app.db.base import SessionLocal
 
@@ -71,6 +72,27 @@ def build_server(*, thread_id: str) -> FastMCP:
     ) -> str:
         with _runtime_service(thread_id=thread_id) as service:
             payload = service.apply_page_edits(
+                edits=edits,
+                change_summary=change_summary,
+                expected_base_version_id=expected_base_version_id,
+        )
+        return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
+
+    @server.tool(
+        name="apply_semantic_page_edits",
+        description=(
+            "Apply grouped semantic page edits such as hero headlines or other multi-part fields. "
+            "Use the semanticBindings returned by get_page_context to choose the groupId. "
+            "This tool expands grouped edits into canonical draft page changes."
+        ),
+    )
+    def apply_semantic_page_edits(
+        edits: list[SemanticPageEditOperation],
+        change_summary: str,
+        expected_base_version_id: str | None = None,
+    ) -> str:
+        with _runtime_service(thread_id=thread_id) as service:
+            payload = service.apply_semantic_page_edits(
                 edits=edits,
                 change_summary=change_summary,
                 expected_base_version_id=expected_base_version_id,

@@ -65,6 +65,57 @@ def _build_imported_page_puck() -> dict:
     }
 
 
+def _build_imported_page_with_split_hero_puck() -> dict:
+    return {
+        "root": {"props": {"title": "Imported Page"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Imported Page",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "hero-section",
+                                "displayName": "Hero",
+                                "sourceSectionId": "hero",
+                                "sectionType": "hero",
+                                "content": [
+                                    {
+                                        "type": "ImportedHeroSection",
+                                        "props": {
+                                            "id": "hero-block",
+                                            "componentName": "HeroSection",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Headline part 1 of 2",
+                                                    "originalText": "Creatine For",
+                                                    "text": "Creatine For",
+                                                },
+                                                {
+                                                    "label": "Headline part 2 of 2",
+                                                    "originalText": "Body & Mind",
+                                                    "text": "Body & Mind",
+                                                },
+                                            ],
+                                            "buttonSlots": [],
+                                            "imageSlots": [],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
 def test_extract_editable_bindings_includes_text_button_and_image_fields():
     bindings = PageEditorRuntimeService._extract_editable_bindings(_build_imported_page_puck())
     binding_map = {item["path"]: item for item in bindings}
@@ -104,3 +155,52 @@ def test_write_json_pointer_rejects_missing_path():
         assert "does not exist" in str(exc)
     else:
         raise AssertionError("Expected PageEditorRuntimeError for a missing JSON pointer path.")
+
+
+def test_extract_semantic_bindings_groups_split_hero_headline():
+    bindings = PageEditorRuntimeService._extract_editable_bindings(_build_imported_page_with_split_hero_puck())
+    semantic_bindings = PageEditorRuntimeService._extract_semantic_bindings(bindings)
+
+    assert semantic_bindings == [
+        {
+            "groupId": "hero_headline",
+            "kind": "semantic_text",
+            "applyStrategy": "split_text_parts",
+            "label": "Hero headline",
+            "sectionDisplayName": "Hero",
+            "sectionType": "hero",
+            "componentName": "HeroSection",
+            "memberPaths": [
+                "/content/0/props/content/0/props/content/0/props/textSlots/0/text",
+                "/content/0/props/content/0/props/content/0/props/textSlots/1/text",
+            ],
+            "memberLabels": [
+                "Headline part 1 of 2",
+                "Headline part 2 of 2",
+            ],
+            "currentValue": "Creatine For\nBody & Mind",
+        }
+    ]
+
+
+def test_expand_semantic_edit_clears_trailing_members_for_single_line_replacement():
+    expanded = PageEditorRuntimeService._expand_semantic_edit(
+        binding={
+            "groupId": "hero_headline",
+            "applyStrategy": "split_text_parts",
+            "memberPaths": [
+                "/content/0/props/content/0/props/content/0/props/textSlots/0/text",
+                "/content/0/props/content/0/props/content/0/props/textSlots/1/text",
+            ],
+        },
+        value="Honest Herbalist Reference",
+    )
+
+    assert [edit.path for edit in expanded] == [
+        "/content/0/props/content/0/props/content/0/props/textSlots/0/text",
+        "/content/0/props/content/0/props/content/0/props/textSlots/1/text",
+    ]
+    assert [edit.value for edit in expanded] == [
+        "Honest Herbalist Reference",
+        "",
+    ]

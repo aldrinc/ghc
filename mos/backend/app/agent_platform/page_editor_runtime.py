@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import re
 from typing import Any, Literal
 from uuid import UUID
 
@@ -28,6 +29,11 @@ class PageEditorRuntimeError(ValueError):
 class PageEditOperation(BaseModel):
     op: Literal["replace", "set"] = "replace"
     path: str = Field(min_length=1)
+    value: Any
+
+
+class SemanticPageEditOperation(BaseModel):
+    group_id: str = Field(min_length=1, alias="groupId")
     value: Any
 
 
@@ -91,6 +97,7 @@ class PageEditorRuntimeService:
             editable_bindings = self._extract_editable_bindings(working_puck_data)
             payload["editableBindings"] = editable_bindings
             payload["editableSectionIndex"] = self._build_editable_section_index(editable_bindings)
+            payload["semanticBindings"] = self._extract_semantic_bindings(editable_bindings)
         if include_puck_data:
             payload["puckData"] = working_puck_data
         return payload
@@ -179,6 +186,53 @@ class PageEditorRuntimeService:
             "pageSummary": page_summary,
             "puckData": finalized_puck_data,
         }
+
+    def apply_semantic_page_edits(
+        self,
+        *,
+        edits: list[SemanticPageEditOperation],
+        change_summary: str,
+        expected_base_version_id: str | None = None,
+    ) -> dict[str, Any]:
+        if not edits:
+            raise PageEditorRuntimeError(
+                "apply_semantic_page_edits requires at least one semantic edit operation."
+            )
+
+        working_puck_data, _, _ = self._load_working_puck_data()
+        semantic_bindings = self._extract_semantic_bindings(
+            self._extract_editable_bindings(working_puck_data)
+        )
+        semantic_binding_map = {
+            str(binding.get("groupId") or "").strip(): binding for binding in semantic_bindings
+        }
+
+        expanded_edits: list[PageEditOperation] = []
+        for edit in edits:
+            binding = semantic_binding_map.get(edit.group_id)
+            if not binding:
+                raise PageEditorRuntimeError(
+                    f"Semantic edit group '{edit.group_id}' was not found in the current page context."
+                )
+            expanded_edits.extend(
+                self._expand_semantic_edit(
+                    binding=binding,
+                    value=edit.value,
+                )
+            )
+
+        if not expanded_edits:
+            raise PageEditorRuntimeError(
+                "Semantic page edits resolved to a no-op. No draft page version was created."
+            )
+
+        payload = self.apply_page_edits(
+            edits=expanded_edits,
+            change_summary=change_summary,
+            expected_base_version_id=expected_base_version_id,
+        )
+        payload["semanticEditCount"] = len(edits)
+        return payload
 
     def _load_target(self, *, thread_id: str) -> PageEditorTarget:
         thread = self.session.scalars(
@@ -356,6 +410,76 @@ class PageEditorRuntimeService:
         return results
 
     @staticmethod
+    def _extract_semantic_bindings(bindings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        grouped_parts: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
+        for binding in bindings:
+            if str(binding.get("kind") or "").strip() != "text":
+                continue
+            label = str(binding.get("label") or "").strip()
+            match = re.fullmatch(r"(.+?) part (\d+) of (\d+)", label, flags=re.IGNORECASE)
+            if not match:
+                continue
+            base_label = match.group(1).strip()
+            part_index = int(match.group(2))
+            part_count = int(match.group(3))
+            if part_count < 2:
+                continue
+            key = (
+                str(binding.get("sectionDisplayName") or "").strip(),
+                str(binding.get("sectionType") or "").strip(),
+                str(binding.get("componentName") or "").strip(),
+                str(binding.get("slotGroup") or "").strip(),
+                base_label.lower(),
+            )
+            entry = grouped_parts.setdefault(
+                key,
+                {
+                    "sectionDisplayName": binding.get("sectionDisplayName"),
+                    "sectionType": binding.get("sectionType"),
+                    "componentName": binding.get("componentName"),
+                    "slotGroup": binding.get("slotGroup"),
+                    "baseLabel": base_label,
+                    "partCount": part_count,
+                    "members": {},
+                },
+            )
+            entry["members"][part_index] = binding
+
+        semantic_bindings: list[dict[str, Any]] = []
+        for entry in grouped_parts.values():
+            part_count = int(entry["partCount"])
+            members_map = entry["members"]
+            if any(index not in members_map for index in range(1, part_count + 1)):
+                continue
+            ordered_members = [members_map[index] for index in range(1, part_count + 1)]
+            section_type = str(entry.get("sectionType") or "").strip()
+            base_label = str(entry.get("baseLabel") or "").strip() or "Text"
+            semantic_bindings.append(
+                {
+                    "groupId": PageEditorRuntimeService._semantic_group_id(
+                        section_type=section_type,
+                        section_display_name=str(entry.get("sectionDisplayName") or "").strip(),
+                        base_label=base_label,
+                    ),
+                    "kind": "semantic_text",
+                    "applyStrategy": "split_text_parts",
+                    "label": PageEditorRuntimeService._semantic_binding_label(
+                        section_type=section_type,
+                        base_label=base_label,
+                    ),
+                    "sectionDisplayName": entry.get("sectionDisplayName"),
+                    "sectionType": entry.get("sectionType"),
+                    "componentName": entry.get("componentName"),
+                    "memberPaths": [str(member.get("path")) for member in ordered_members],
+                    "memberLabels": [str(member.get("label") or "") for member in ordered_members],
+                    "currentValue": "\n".join(
+                        str(member.get("currentValue") or "").strip() for member in ordered_members
+                    ).strip(),
+                }
+            )
+        return semantic_bindings
+
+    @staticmethod
     def _extract_binding_group(
         *,
         block_props: dict[str, Any],
@@ -417,6 +541,67 @@ class PageEditorRuntimeService:
                     }
                 )
         return bindings
+
+    @staticmethod
+    def _expand_semantic_edit(*, binding: dict[str, Any], value: Any) -> list[PageEditOperation]:
+        apply_strategy = str(binding.get("applyStrategy") or "").strip()
+        if apply_strategy != "split_text_parts":
+            raise PageEditorRuntimeError(
+                f"Unsupported semantic edit apply strategy '{apply_strategy}'."
+            )
+
+        raw_value = value if isinstance(value, str) else str(value)
+        normalized_value = raw_value.strip()
+        if not normalized_value:
+            raise PageEditorRuntimeError(
+                f"Semantic edit group '{binding.get('groupId')}' requires a non-empty value."
+            )
+
+        member_paths = [
+            str(path).strip()
+            for path in (binding.get("memberPaths") or [])
+            if isinstance(path, str) and str(path).strip()
+        ]
+        if not member_paths:
+            raise PageEditorRuntimeError(
+                f"Semantic edit group '{binding.get('groupId')}' does not have editable member paths."
+            )
+
+        lines = [line.strip() for line in normalized_value.splitlines() if line.strip()]
+        if not lines:
+            lines = [normalized_value]
+        if len(lines) > len(member_paths):
+            raise PageEditorRuntimeError(
+                f"Semantic edit group '{binding.get('groupId')}' accepts at most {len(member_paths)} line(s)."
+            )
+
+        next_values = [""] * len(member_paths)
+        if len(lines) == 1:
+            next_values[0] = normalized_value
+        else:
+            for index, line in enumerate(lines):
+                next_values[index] = line
+
+        return [
+            PageEditOperation(path=member_path, value=next_values[index])
+            for index, member_path in enumerate(member_paths)
+        ]
+
+    @staticmethod
+    def _semantic_group_id(*, section_type: str, section_display_name: str, base_label: str) -> str:
+        def _slug(value: str) -> str:
+            normalized = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+            return normalized or "section"
+
+        if section_type == "hero" and base_label.lower() == "headline":
+            return "hero_headline"
+        return f"{_slug(section_type or section_display_name)}_{_slug(base_label)}"
+
+    @staticmethod
+    def _semantic_binding_label(*, section_type: str, base_label: str) -> str:
+        if section_type == "hero" and base_label.lower() == "headline":
+            return "Hero headline"
+        return base_label
 
     @staticmethod
     def _read_json_pointer(payload: Any, path: str) -> Any:
