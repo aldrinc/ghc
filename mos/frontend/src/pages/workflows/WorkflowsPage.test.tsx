@@ -28,6 +28,10 @@ vi.mock("@/contexts/ProductContext", () => ({
   useProductContext: () => mockUseProductContext(),
 }));
 
+vi.mock("@/components/strategy/StrategySkillsWorkflowPanel", () => ({
+  StrategySkillsWorkflowPanel: () => <div>Skills Workflow</div>,
+}));
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -66,7 +70,7 @@ describe("WorkflowsPage", () => {
     renderPage();
 
     expect(mockUseWorkflows).toHaveBeenCalledWith(undefined, { enabled: false });
-    expect(screen.getByText("Loading workflows…")).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
   it("requests workflows with both the workspace and product ids", () => {
@@ -76,6 +80,6 @@ describe("WorkflowsPage", () => {
       { clientId: "client-1", productId: "product-1" },
       { enabled: true },
     );
-    expect(screen.getByText("Workflow runs")).toBeInTheDocument();
+    expect(screen.getByText("Workflow Run History")).toBeInTheDocument();
   });
 });

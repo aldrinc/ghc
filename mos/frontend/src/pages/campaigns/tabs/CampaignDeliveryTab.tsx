@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  useMaterializeCampaignCreativeContext,
   useUpdateCampaignDelivery,
   useValidateCampaignDelivery,
 } from "@/api/campaigns";
@@ -53,6 +54,7 @@ export function CampaignDeliveryTab() {
   } = useCampaignContext();
   const updateDelivery = useUpdateCampaignDelivery(campaignId);
   const validateDelivery = useValidateCampaignDelivery(campaignId);
+  const materializeCreativeContext = useMaterializeCampaignCreativeContext(campaignId);
 
   // ---- Delivery config ----------------------------------------------------
   const [draftDeliveryConfig, setDraftDeliveryConfig] = useState<CampaignDeliveryConfig>(DEFAULT_DELIVERY_CONFIG);
@@ -184,26 +186,68 @@ export function CampaignDeliveryTab() {
   };
 
   // ---- Render -------------------------------------------------------------
+  const readinessProvider = launchContextReadiness?.provider || "strategy_v2";
+  const readinessTitle =
+    readinessProvider === "skills"
+      ? "Strategy bundle readiness"
+      : readinessProvider === "manual"
+        ? "Manual creative context readiness"
+        : "Launch context readiness";
+  const readinessDescription = launchContextReadinessLoading
+    ? "Checking campaign creative context readiness."
+    : readinessProvider === "skills"
+      ? launchContextReadiness?.ready
+        ? "Approved skills bundle and campaign compatibility snapshot are available for downstream execution."
+        : launchContextReadiness?.reason || "This campaign is missing a materialized skills compatibility snapshot."
+      : readinessProvider === "manual"
+        ? launchContextReadiness?.ready
+          ? "Manual campaign creative context is available for downstream execution."
+          : launchContextReadiness?.reason || "This campaign is missing required manual creative context artifacts."
+        : launchContextReadiness?.ready
+          ? "Pinned Strategy V2 launch context is available for downstream execution."
+          : launchContextReadiness?.reason || "This campaign is missing required Strategy V2 launch context.";
+  const showSkillsMaterializeAction =
+    readinessProvider === "skills" &&
+    !launchContextReadinessLoading &&
+    launchContextReadiness?.missingArtifacts?.includes("materialized_creative_context");
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-border bg-surface px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-sm font-semibold text-content">Launch context readiness</div>
-          {launchContextReadinessLoading ? (
-            <Badge tone="neutral">Checking…</Badge>
-          ) : launchContextReadiness?.ready ? (
-            <Badge tone="success">Ready</Badge>
-          ) : (
-            <Badge tone="danger">Blocked</Badge>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-sm font-semibold text-content">{readinessTitle}</div>
+            {launchContextReadinessLoading ? (
+              <Badge tone="neutral">Checking…</Badge>
+            ) : launchContextReadiness?.ready ? (
+              <Badge tone="success">Ready</Badge>
+            ) : (
+              <Badge tone="danger">Blocked</Badge>
+            )}
+          </div>
+          {showSkillsMaterializeAction ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void materializeCreativeContext.mutateAsync()}
+              disabled={materializeCreativeContext.isPending}
+            >
+              {materializeCreativeContext.isPending ? "Materializing…" : "Materialize skills context"}
+            </Button>
+          ) : null}
         </div>
-        <div className="mt-2 text-sm text-content-muted">
-          {launchContextReadinessLoading
-            ? "Checking Strategy V2 launch lineage for this campaign."
-            : launchContextReadiness?.ready
-              ? "Pinned Strategy V2 launch context is available for downstream execution."
-              : launchContextReadiness?.reason || "This campaign is missing required Strategy V2 launch context."}
-        </div>
+        <div className="mt-2 text-sm text-content-muted">{readinessDescription}</div>
+        {launchContextReadiness?.strategyBundleId ? (
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-content-muted">
+            <span>bundle: {launchContextReadiness.strategyBundleType || "skills_handoff"}</span>
+            <span>id: {launchContextReadiness.strategyBundleId}</span>
+          </div>
+        ) : null}
+        {launchContextReadiness?.materializedArtifactIds ? (
+          <div className="mt-2 text-xs text-content-muted">
+            Materialized artifacts: {Object.keys(launchContextReadiness.materializedArtifactIds).join(", ")}
+          </div>
+        ) : null}
       </div>
 
       {/* Delivery mode selector */}
