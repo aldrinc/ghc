@@ -707,7 +707,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
           ),
           React.createElement(
             "div",
-            { className: "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-white" },
+            { className: "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-surface" },
             React.createElement("div", null, React.createElement("h3", null, "Single Book")),
             React.createElement(
               "div",
@@ -830,7 +830,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
           ),
           React.createElement(
             "div",
-            { className: "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-white" },
+            { className: "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-surface" },
             React.createElement("div", null, React.createElement("h3", null, "3-Book Bundle")),
             React.createElement("div", { className: "text-right" }, React.createElement("div", null, "$204")),
           ),
@@ -958,7 +958,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
           {
             className: selected
               ? "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-primary bg-bg-card"
-              : "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-white",
+              : "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-black/10 bg-surface",
           },
           React.createElement(
             "div",

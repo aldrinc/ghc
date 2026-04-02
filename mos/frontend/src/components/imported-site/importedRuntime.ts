@@ -745,7 +745,7 @@ ${compiledRuntime}
     card.classList.toggle("bg-bg-card", selected);
     card.classList.toggle("border-black/10", !selected);
     card.classList.toggle("hover:border-black/20", !selected);
-    card.classList.toggle("bg-white", !selected);
+    card.classList.toggle("bg-surface", !selected);
   };
   const findPurchaseVariantByTitle = (displayTitle) => {
     if (!purchaseRuntimeData || !Array.isArray(purchaseRuntimeData.variants)) {
