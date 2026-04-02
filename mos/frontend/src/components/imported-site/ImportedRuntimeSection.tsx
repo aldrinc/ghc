@@ -5,8 +5,9 @@ import {
   normalizeImportedHeadAssets,
 } from "@/components/imported-site/importedRuntime";
 import { useImportedRuntimeContext } from "@/components/imported-site/ImportedTemplateBlocks";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
 import { toast } from "@/components/ui/toast";
+import type { MedusaProduct, MedusaProductVariant } from "@/types/commerce";
 
 type ImportedRuntimeSectionProps = {
   id?: string;
@@ -31,6 +32,19 @@ type ImportedRuntimeCommerceActionPayload = {
   selectedOfferTitle?: unknown;
   selectionStrategy?: unknown;
   replaceCart?: unknown;
+};
+
+type ImportedRuntimeNavigationPayload = {
+  href?: unknown;
+};
+
+type ImportedPurchaseRuntimeData = {
+  ctaBaseLabel?: string;
+  variants: Array<{
+    title: string;
+    priceLabel: string;
+    compareAtLabel?: string;
+  }>;
 };
 
 const compiledSourceCache = new Map<string, Promise<string>>();
@@ -99,6 +113,86 @@ function normalizeComparableLabel(value: unknown): string {
     .toLowerCase();
 }
 
+function isExternalNavigationHref(href: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//");
+}
+
+function formatCurrencyLabel(amountCents: number | null | undefined, currencyCode: string | null | undefined): string {
+  if (typeof amountCents !== "number" || !Number.isFinite(amountCents)) {
+    return "";
+  }
+  const normalizedCurrencyCode = (currencyCode || "USD").trim().toUpperCase() || "USD";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: normalizedCurrencyCode,
+    maximumFractionDigits: 0,
+  }).format(amountCents / 100);
+}
+
+function resolveVariantAmounts(variant: MedusaProductVariant): {
+  amountCents: number | null;
+  compareAtAmountCents: number | null;
+  currencyCode: string | null;
+} {
+  const calculatedAmount = variant.calculated_price?.calculated_amount;
+  const originalAmount = variant.calculated_price?.original_amount;
+  const calculatedCurrencyCode = variant.calculated_price?.currency_code;
+  const fallbackPrice = Array.isArray(variant.prices) ? variant.prices[0] : null;
+  const amountCents =
+    typeof calculatedAmount === "number"
+      ? calculatedAmount
+      : typeof fallbackPrice?.amount === "number"
+        ? fallbackPrice.amount
+        : null;
+  const compareAtAmountCents =
+    typeof originalAmount === "number" && typeof amountCents === "number" && originalAmount > amountCents
+      ? originalAmount
+      : null;
+  const currencyCode =
+    typeof calculatedCurrencyCode === "string" && calculatedCurrencyCode.trim()
+      ? calculatedCurrencyCode
+      : typeof fallbackPrice?.currency_code === "string" && fallbackPrice.currency_code.trim()
+        ? fallbackPrice.currency_code
+        : null;
+  return {
+    amountCents,
+    compareAtAmountCents,
+    currencyCode,
+  };
+}
+
+function buildImportedPurchaseRuntimeData(
+  product: MedusaProduct,
+  actionLabel: string | null,
+): ImportedPurchaseRuntimeData | null {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const runtimeVariants = variants
+    .map((variant) => {
+      const title = String(variant.title || "").trim();
+      const { amountCents, compareAtAmountCents, currencyCode } = resolveVariantAmounts(variant);
+      const priceLabel = formatCurrencyLabel(amountCents, currencyCode);
+      if (!title || !priceLabel) {
+        return null;
+      }
+      const compareAtLabel = formatCurrencyLabel(compareAtAmountCents, currencyCode);
+      return {
+        title,
+        priceLabel,
+        compareAtLabel: compareAtLabel || undefined,
+      };
+    })
+    .filter((variant): variant is ImportedPurchaseRuntimeData["variants"][number] => Boolean(variant));
+
+  if (!runtimeVariants.length) {
+    return null;
+  }
+
+  return {
+    ctaBaseLabel: actionLabel?.trim() || undefined,
+    variants: runtimeVariants,
+  };
+}
+
 export function ImportedRuntimeSection({
   id,
   originalType,
@@ -126,10 +220,17 @@ export function ImportedRuntimeSection({
   const [height, setHeight] = useState(96);
   const [error, setError] = useState<string | null>(null);
   const [viewportHeightPx, setViewportHeightPx] = useState<number>(readViewportHeightPx);
+  const [purchaseRuntimeData, setPurchaseRuntimeData] = useState<ImportedPurchaseRuntimeData | null>(null);
   const resolvedRuntimeSource = runtimeSource || sharedRuntime.runtimeSource;
   const textOverridesJson = JSON.stringify(textOverrides || []);
   const buttonOverridesJson = JSON.stringify(buttonOverrides || []);
   const imageOverridesJson = JSON.stringify(imageOverrides || []);
+  const medusaActionLabel = useMemo(() => {
+    const actionOverride = Array.isArray(buttonOverrides)
+      ? buttonOverrides.find((entry) => String(entry?.action || "").trim() === "medusa_buy_now")
+      : null;
+    return typeof actionOverride?.text === "string" ? actionOverride.text.trim() : "";
+  }, [buttonOverrides]);
   const normalizedHeadAssets = useMemo(
     () => normalizeImportedHeadAssets(headAssets ?? sharedRuntime.headAssets),
     [headAssets, sharedRuntime.headAssets],
@@ -146,6 +247,7 @@ export function ImportedRuntimeSection({
           viewportHeightPx,
           componentName,
           sectionTargetId,
+          purchaseRuntimeData,
         }),
       ),
     [
@@ -154,6 +256,7 @@ export function ImportedRuntimeSection({
       frameAssets,
       frameId,
       normalizedHeadAssets,
+      purchaseRuntimeData,
       sectionLabel,
       sectionTargetId,
       viewportHeightPx,
@@ -188,12 +291,14 @@ export function ImportedRuntimeSection({
       initialTextOverrides: initialTextOverridesRef.current,
       initialButtonOverrides: initialButtonOverridesRef.current,
       initialImageOverrides: initialImageOverridesRef.current,
+      purchaseRuntimeData,
     });
   }, [
     compiledSource,
     frameAssets,
     frameId,
     normalizedHeadAssets,
+    purchaseRuntimeData,
     sectionLabel,
     viewportHeightPx,
     componentName,
@@ -271,80 +376,81 @@ export function ImportedRuntimeSection({
     [b2cRuntime, funnelRuntime?.productSlug],
   );
 
-  const handleHashNavigation = useCallback((hash: string) => {
-    const targetId = hash.replace(/^#/, "").trim();
-    if (!targetId) return;
-
-    const ownerDocument = frameRef.current?.ownerDocument || document;
-    const iframes = Array.from(ownerDocument.querySelectorAll("iframe"));
-    for (const iframe of iframes) {
-      try {
-        const frameDocument = iframe.contentDocument;
-        if (!frameDocument?.getElementById(targetId)) continue;
-        iframe.scrollIntoView({ behavior: "smooth", block: "start" });
+  const handleNavigationAction = useCallback(
+    (payload: ImportedRuntimeNavigationPayload) => {
+      const href = String(payload.href || "").trim();
+      if (!href) {
         return;
-      } catch {
-        continue;
       }
+
+      if (href.startsWith("#")) {
+        const targetId = href.slice(1).trim();
+        if (!targetId) {
+          return;
+        }
+        const target =
+          document.getElementById(targetId) ||
+          Array.from(document.querySelectorAll("[data-imported-section-id]")).find(
+            (candidate) => candidate.getAttribute("data-imported-section-id") === targetId,
+        );
+        if (!(target instanceof HTMLElement)) {
+          if (funnelRuntime) {
+            const homeHref = resolveRuntimeSitePath(funnelRuntime, "");
+            window.location.assign(`${homeHref}#${encodeURIComponent(targetId)}`);
+            return;
+          }
+          toast.error(`Imported section target "${targetId}" was not found in this page.`);
+          return;
+        }
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (typeof window.history?.replaceState === "function") {
+          window.history.replaceState(window.history.state, "", `#${encodeURIComponent(targetId)}`);
+        }
+        return;
+      }
+
+      const resolvedHref = isExternalNavigationHref(href)
+        ? href
+        : funnelRuntime
+          ? resolveRuntimeSitePath(funnelRuntime, href)
+          : href;
+      window.location.assign(resolvedHref);
+    },
+    [funnelRuntime],
+  );
+
+  useEffect(() => {
+    if (componentName !== "ProductPurchaseSection") {
+      setPurchaseRuntimeData(null);
+      return;
     }
 
-    ownerDocument.getElementById(targetId)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
+    const productHandle = (funnelRuntime?.productSlug || "").trim();
+    if (!b2cRuntime || !productHandle || productHandle === "preview-product") {
+      setPurchaseRuntimeData(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPurchaseRuntimeData = async () => {
+      const product = await b2cRuntime.loadProductByHandle(productHandle);
+      if (cancelled || !product) {
+        return;
+      }
+      setPurchaseRuntimeData(buildImportedPurchaseRuntimeData(product, medusaActionLabel));
+    };
+
+    void loadPurchaseRuntimeData().catch(() => {
+      if (!cancelled) {
+        setPurchaseRuntimeData(null);
+      }
     });
-  }, []);
 
-  const syncHostedPurchaseFrame = useCallback(() => {
-    const frame = frameRef.current;
-    const frameDocument = frame?.contentDocument;
-    if (!frameDocument) return;
-
-    const buyButton = frameDocument.querySelector('[data-mos-imported-action="medusa_buy_now"]');
-    if (!(buyButton instanceof HTMLElement)) return;
-
-    const selectedTierCard = Array.from(frameDocument.querySelectorAll("*")).find((candidate) => {
-      if (!(candidate instanceof HTMLElement)) return false;
-      if (candidate.getAttribute("data-mos-imported-selected-tier") === "true") return true;
-      return candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card") && candidate.querySelector("h3") instanceof HTMLElement;
-    });
-    if (!(selectedTierCard instanceof HTMLElement)) return;
-
-    const moneyTokens = (selectedTierCard.textContent || "").match(/(?:[$€£]|EUR|GBP)\s?\d+(?:[.,]\d+)?/g) || [];
-    const selectedPrice = moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2]?.trim() : moneyTokens[0]?.trim();
-    if (!selectedPrice) return;
-
-    const prefix = (buyButton.dataset.mosImportedLabelPrefix || buyButton.textContent || "BUY NOW")
-      .replace(/[$€£]\s?\d+(?:[.,]\d+)?/g, "")
-      .replace(/\s*-\s*$/, "")
-      .trim();
-    buyButton.dataset.mosHostedSelectedPrice = selectedPrice;
-    buyButton.textContent = prefix;
-  }, []);
-
-  const installHostedPurchaseFrameSync = useCallback(() => {
-    const frame = frameRef.current as (HTMLIFrameElement & { __mosPurchaseSyncObserver?: MutationObserver | null }) | null;
-    const frameDocument = frame?.contentDocument;
-    if (!frame || !frameDocument?.body) return;
-    frame.dataset.mosPurchaseSyncInstalled = "true";
-
-    frame.__mosPurchaseSyncObserver?.disconnect();
-
-    const scheduleSync = () => window.setTimeout(() => syncHostedPurchaseFrame(), 0);
-    frameDocument.addEventListener("click", scheduleSync, true);
-
-    const observer = new MutationObserver(() => {
-      syncHostedPurchaseFrame();
-    });
-    observer.observe(frameDocument.body, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-    frame.__mosPurchaseSyncObserver = observer;
-
-    syncHostedPurchaseFrame();
-  }, [syncHostedPurchaseFrame]);
+    return () => {
+      cancelled = true;
+    };
+  }, [b2cRuntime, componentName, funnelRuntime?.productSlug, medusaActionLabel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,17 +536,14 @@ export function ImportedRuntimeSection({
         return;
       }
 
-      if ((payload as { type?: unknown }).type === "navigate-hash") {
-        const hash = (payload as { hash?: unknown }).hash;
-        if (typeof hash === "string" && hash.trim()) {
-          handleHashNavigation(hash.trim());
-        }
+      if ((payload as { type?: unknown }).type === "navigate") {
+        handleNavigationAction(payload as ImportedRuntimeNavigationPayload);
       }
     };
 
     ownerWindow.addEventListener("message", handleMessage);
     return () => ownerWindow.removeEventListener("message", handleMessage);
-  }, [frameId, handleCommerceAction, handleHashNavigation, srcDoc]);
+  }, [frameId, handleCommerceAction, handleNavigationAction, srcDoc]);
 
   useEffect(() => {
     if (!srcDoc) return;
@@ -460,27 +563,6 @@ export function ImportedRuntimeSection({
   }, [frameId, srcDoc]);
 
   useEffect(() => {
-    if (!srcDoc) return;
-    const timeoutId = window.setTimeout(() => {
-      installHostedPurchaseFrameSync();
-    }, 50);
-    return () => window.clearTimeout(timeoutId);
-  }, [installHostedPurchaseFrameSync, srcDoc]);
-
-  useEffect(() => {
-    if (!srcDoc) return;
-    let attempts = 0;
-    const intervalId = window.setInterval(() => {
-      attempts += 1;
-      installHostedPurchaseFrameSync();
-      if (frameRef.current?.dataset.mosPurchaseSyncInstalled === "true" || attempts >= 20) {
-        window.clearInterval(intervalId);
-      }
-    }, 250);
-    return () => window.clearInterval(intervalId);
-  }, [installHostedPurchaseFrameSync, srcDoc]);
-
-  useEffect(() => {
     const frame = frameRef.current;
     if (!frame || !srcDoc) return;
 
@@ -496,65 +578,6 @@ export function ImportedRuntimeSection({
 
     frame.contentWindow?.postMessage(payload, "*");
   }, [frameId, srcDoc, overridesRevision, textOverridesJson, buttonOverridesJson, imageOverridesJson]);
-
-  useEffect(() => {
-    return () => {
-      const frame = frameRef.current as (HTMLIFrameElement & { __mosPurchaseSyncObserver?: MutationObserver | null }) | null;
-      frame?.__mosPurchaseSyncObserver?.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    const ownerWindow = frameRef.current?.ownerDocument?.defaultView || window;
-    const ownerDocument = frameRef.current?.ownerDocument || document;
-    type SyncWindow = Window & {
-      __mosImportedPurchaseFramesIntervalId?: number;
-      __mosImportedPurchaseFramesSyncInstalled?: boolean;
-    };
-    const syncWindow = ownerWindow as SyncWindow;
-    if (syncWindow.__mosImportedPurchaseFramesSyncInstalled) {
-      return;
-    }
-    syncWindow.__mosImportedPurchaseFramesSyncInstalled = true;
-
-    const syncAllPurchaseFrames = () => {
-      for (const iframe of Array.from(ownerDocument.querySelectorAll("iframe"))) {
-        try {
-          const frameDocument = iframe.contentDocument;
-          if (!frameDocument) continue;
-          const buyButton = frameDocument.querySelector('[data-mos-imported-action="medusa_buy_now"]');
-          if (!(buyButton instanceof HTMLElement)) continue;
-          const selectedTierCard = Array.from(frameDocument.querySelectorAll("*")).find((candidate) => {
-            if (!(candidate instanceof HTMLElement)) return false;
-            if (candidate.getAttribute("data-mos-imported-selected-tier") === "true") return true;
-            return candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card") && candidate.querySelector("h3") instanceof HTMLElement;
-          });
-          if (!(selectedTierCard instanceof HTMLElement)) continue;
-          const moneyTokens = (selectedTierCard.textContent || "").match(/(?:[$€£]|EUR|GBP)\s?\d+(?:[.,]\d+)?/g) || [];
-          const selectedPrice = moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2]?.trim() : moneyTokens[0]?.trim();
-          if (!selectedPrice) continue;
-          const prefix = (buyButton.dataset.mosImportedLabelPrefix || buyButton.textContent || "BUY NOW -")
-            .replace(/[$€£]\s?\d+(?:[.,]\d+)?/g, "")
-            .trim();
-          buyButton.dataset.mosHostedSelectedPrice = selectedPrice;
-          buyButton.textContent = `${prefix} ${selectedPrice}`.trim();
-          iframe.dataset.mosPurchaseSyncInstalled = "true";
-        } catch {
-          continue;
-        }
-      }
-    };
-
-    syncAllPurchaseFrames();
-    syncWindow.__mosImportedPurchaseFramesIntervalId = ownerWindow.setInterval(syncAllPurchaseFrames, 250);
-    return () => {
-      if (syncWindow.__mosImportedPurchaseFramesIntervalId) {
-        ownerWindow.clearInterval(syncWindow.__mosImportedPurchaseFramesIntervalId);
-      }
-      syncWindow.__mosImportedPurchaseFramesIntervalId = undefined;
-      syncWindow.__mosImportedPurchaseFramesSyncInstalled = false;
-    };
-  }, []);
 
   const resolvedTitle = sectionLabel?.trim() || originalType?.trim() || "Imported section";
 
@@ -580,7 +603,7 @@ export function ImportedRuntimeSection({
       ref={frameRef}
       title={resolvedTitle}
       srcDoc={srcDoc}
-      sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+      sandbox="allow-forms allow-popups allow-scripts"
       className="block w-full overflow-hidden border-0 bg-transparent"
       style={{ height: `${height}px` }}
       onLoad={() => {
@@ -600,7 +623,6 @@ export function ImportedRuntimeSection({
           },
           "*",
         );
-        window.setTimeout(() => installHostedPurchaseFrameSync(), 0);
       }}
     />
   );

@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "validate:preview": "node scripts/validate-site-preview.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

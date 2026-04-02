@@ -14,8 +14,13 @@ export interface B2CThemeTokens {
   logoUrlDark?: string;
   fontHeading?: string;
   fontBody?: string;
+  colorHeading?: string;
   colorBackground?: string;
   colorBackgroundAlt?: string;
+  colorBackgroundMuted?: string;
+  colorShellBackground?: string;
+  colorFooterBackground?: string;
+  colorFieldBackground?: string;
   colorText?: string;
   colorTextMuted?: string;
   colorTextInverse?: string;
@@ -97,9 +102,34 @@ function extractThemeTokens(rawTokens: unknown): B2CThemeTokens {
     logoUrlDark: buildPublicAssetUrl(brand.logoOnDarkAssetPublicId),
     fontHeading: asString(cssVars["--font-heading"]),
     fontBody: asString(cssVars["--font-sans"] ?? cssVars["--font-body"]),
-    colorBackground: asString(cssVars["--color-bg"]),
+    colorHeading: asString(cssVars["--color-heading"] ?? cssVars["--color-brand"]),
+    colorBackground: asString(cssVars["--b2c-page-canvas-bg"] ?? cssVars["--color-bg"]),
     colorBackgroundAlt: asString(
-      cssVars["--color-page-bg-secondary"] ?? cssVars["--color-page-bg"] ?? cssVars["--hero-bg"],
+      cssVars["--b2c-panel-bg"] ??
+        cssVars["--color-page-bg-secondary"] ??
+        cssVars["--color-page-bg"] ??
+        cssVars["--hero-bg"],
+    ),
+    colorBackgroundMuted: asString(
+      cssVars["--b2c-panel-muted-bg"] ??
+        cssVars["--color-page-bg-secondary"] ??
+        cssVars["--color-page-bg"] ??
+        cssVars["--hero-bg"],
+    ),
+    colorShellBackground: asString(
+      cssVars["--b2c-shell-bg"] ?? cssVars["--color-page-bg"] ?? cssVars["--hero-bg"],
+    ),
+    colorFooterBackground: asString(
+      cssVars["--b2c-footer-bg"] ??
+        cssVars["--b2c-shell-bg"] ??
+        cssVars["--color-page-bg"] ??
+        cssVars["--hero-bg"],
+    ),
+    colorFieldBackground: asString(
+      cssVars["--b2c-field-bg"] ??
+        cssVars["--b2c-panel-bg"] ??
+        cssVars["--color-bg"] ??
+        cssVars["--color-page-bg"],
     ),
     colorText: asString(cssVars["--color-text"]),
     colorTextMuted: asString(cssVars["--color-muted"] ?? cssVars["--color-text-muted"]),
@@ -111,7 +141,7 @@ function extractThemeTokens(rawTokens: unknown): B2CThemeTokens {
     radiusSmall: asString(cssVars["--radius-sm"]),
     radiusMedium: asString(cssVars["--radius-md"]),
     radiusLarge: asString(cssVars["--radius-lg"]),
-    radiusFull: asString(cssVars["--radius-full"]),
+    radiusFull: asString(cssVars["--radius-full"] ?? cssVars["--pdp-radius-pill"]),
   };
 }
 
@@ -162,7 +192,9 @@ export function useB2CHeaderTheme(): {
 
   return useMemo(() => {
     const style: CSSProperties = {};
-    if (tokens.colorBackground) style.backgroundColor = tokens.colorBackground;
+    if (tokens.colorShellBackground || tokens.colorBackground) {
+      style.backgroundColor = tokens.colorShellBackground || tokens.colorBackground;
+    }
     if (tokens.colorBorder) style.borderBottomColor = tokens.colorBorder;
 
     const logo = tokens.logoUrl
@@ -200,7 +232,7 @@ export function useB2CCTATheme(): {
       hoverStyle.backgroundColor = tokens.colorPrimaryHover;
       hoverStyle.borderColor = tokens.colorPrimaryHover;
     }
-    style.borderRadius = resolveB2CActionRadius(tokens);
+    style.borderRadius = resolveB2CPillRadius(tokens);
 
     return {
       style: Object.keys(style).length ? style : undefined,

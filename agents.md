@@ -14,3 +14,9 @@ Remote dev URL policy:
 - When you need a shareable dev URL, use `./scripts/resolve-dev-access-url.sh <port>` instead of scraping Vite/Uvicorn network output.
 - Prefer URLs in this order: configured private domain for the service, then the VM's `wt0`/NetBird address, then `127.0.0.1` only for commands run inside the VM itself.
 - If tooling prints multiple interfaces, ignore public/NAT addresses such as `178.*` or `172.*` for user-facing instructions.
+
+MOS authenticated UI validation:
+- MOS preview/editor validation should use the repo-local ignored auth file `/Users/aldrinclement/Documents/programming/marketi/.env.mos-test-auth`.
+- Read `MOS_TEST_EMAIL` and `MOS_TEST_PASSWORD` from that file for automated sign-in; do not commit plaintext credentials into tracked files.
+- Use `/Users/aldrinclement/Documents/programming/marketi/mos/frontend/scripts/validate-site-preview.mjs` for authenticated preview checks. It persists Playwright auth state under `/Users/aldrinclement/Documents/programming/marketi/.local/playwright-home/`.
+- If the cached auth state is stale, refresh it by signing in through `/sign-in` with the MOS test credentials before running preview validation.

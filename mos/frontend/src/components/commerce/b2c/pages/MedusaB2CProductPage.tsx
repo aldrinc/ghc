@@ -95,7 +95,8 @@ function readMetadataString(
 function ProductPageSkeleton() {
   const { tokens } = useB2CTheme();
   const skeletonStyle: CSSProperties = {
-    backgroundColor: tokens.colorBackgroundAlt || "rgba(17, 24, 39, 0.08)",
+    backgroundColor:
+      tokens.colorBackgroundMuted || tokens.colorShellBackground || "rgba(17, 24, 39, 0.08)",
     borderRadius: resolveB2CSurfaceRadius(tokens),
   };
 
@@ -320,7 +321,7 @@ export function MedusaB2CProductPage({ productHandle: propHandle }: MedusaB2CPro
     color: tokens.colorText || "#111827",
   };
   const titleStyle: CSSProperties = {
-    color: tokens.colorText || "#111827",
+    color: tokens.colorHeading || tokens.colorText || "#111827",
     fontFamily: resolveB2CHeadingFont(tokens),
   };
   const textStyle: CSSProperties = {

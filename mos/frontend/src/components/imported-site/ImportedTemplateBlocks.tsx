@@ -1,4 +1,4 @@
-import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type CSSProperties, type ReactNode } from "react";
 
 type ImportedThemeTokens = {
   palette?: Record<string, unknown>;
@@ -241,9 +241,27 @@ export function ImportedSection({
 }) {
   const sourceMode = renderMode === "source" || surface === "source";
   const className = sectionSurfaceClass(surface);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !sourceSectionId) {
+      return;
+    }
+    const requestedHash = decodeURIComponent(window.location.hash.replace(/^#/, "").trim());
+    if (!requestedHash || requestedHash !== sourceSectionId) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sourceSectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [sourceSectionId]);
+
   if (sourceMode) {
     return (
       <section
+        id={sourceSectionId || undefined}
         data-imported-section-id={sourceSectionId}
         data-imported-section-key={sectionKey}
         data-imported-section-type={sectionType}
@@ -257,6 +275,7 @@ export function ImportedSection({
   }
   return (
     <section
+      id={sourceSectionId || undefined}
       data-imported-section-id={sourceSectionId}
       data-imported-section-key={sectionKey}
       data-imported-section-type={sectionType}

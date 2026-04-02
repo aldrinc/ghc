@@ -74,11 +74,15 @@ function useB2CPageTheme() {
     const colorBackground = tokens.colorBackground || '#ffffff';
     const colorBackgroundAlt =
       tokens.colorBackgroundAlt || tokens.colorBackground || '#ffffff';
+    const colorBackgroundMuted =
+      tokens.colorBackgroundMuted || tokens.colorShellBackground || colorBackgroundAlt;
     const colorText = tokens.colorText || '#111827';
     const colorTextMuted = tokens.colorTextMuted || 'rgba(17, 24, 39, 0.72)';
     const colorBorder = tokens.colorBorder || 'rgba(17, 24, 39, 0.22)';
     const colorPrimary = tokens.colorPrimary || '#111827';
     const colorPrimaryText = tokens.colorPrimaryText || '#ffffff';
+    const colorFieldBackground =
+      tokens.colorFieldBackground || colorBackgroundAlt || '#ffffff';
     const radiusMedium = resolveB2CActionRadius(tokens);
     const radiusLarge = resolveB2CSurfaceRadius(tokens);
     const radiusFull = resolveB2CPillRadius(tokens);
@@ -94,10 +98,16 @@ function useB2CPageTheme() {
       backgroundColor: colorBackgroundAlt,
       borderColor: colorBorder,
       borderRadius: radiusLarge,
+      boxShadow: '0 24px 60px rgba(15, 23, 42, 0.06)',
+    };
+    const subtleSurfaceStyle: CSSProperties = {
+      backgroundColor: colorBackgroundMuted,
+      borderColor: colorBorder,
+      borderRadius: radiusLarge,
       boxShadow: 'none',
     };
     const headingStyle: CSSProperties = {
-      color: colorText,
+      color: tokens.colorHeading || colorText,
       fontFamily: headingFontFamily,
       letterSpacing: isThemed ? undefined : 'normal',
     };
@@ -115,7 +125,7 @@ function useB2CPageTheme() {
       borderColor: colorBorder,
     };
     const inputStyle: CSSProperties = {
-      backgroundColor: colorBackground,
+      backgroundColor: colorFieldBackground,
       borderColor: colorBorder,
       color: colorText,
       borderRadius: radiusMedium,
@@ -153,6 +163,7 @@ function useB2CPageTheme() {
       tokens,
       pageStyle,
       surfaceStyle,
+      subtleSurfaceStyle,
       headingStyle,
       textStyle,
       mutedTextStyle,
@@ -206,6 +217,32 @@ function PageShell({
         {children}
       </main>
     </B2CStarterShell>
+  );
+}
+
+function InsetPanel({
+  children,
+  wrapperClassName = '',
+  innerClassName = '',
+}: {
+  children: ReactNode;
+  wrapperClassName?: string;
+  innerClassName?: string;
+}) {
+  const theme = useB2CPageTheme();
+
+  return (
+    <div
+      className={`mx-auto w-full rounded-[32px] border p-3 sm:p-4 ${wrapperClassName}`.trim()}
+      style={theme.subtleSurfaceStyle}
+    >
+      <div
+        className={`rounded-[28px] border ${innerClassName}`.trim()}
+        style={theme.surfaceStyle}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -361,7 +398,9 @@ function AccountPageSkeleton({ title }: { title: string }) {
   const theme = useB2CPageTheme();
   const blockStyle: CSSProperties = {
     backgroundColor:
-      theme.tokens.colorBackgroundAlt || 'rgba(17, 24, 39, 0.08)',
+      theme.tokens.colorBackgroundMuted ||
+      theme.tokens.colorBackgroundAlt ||
+      'rgba(17, 24, 39, 0.08)',
     borderRadius: theme.tokens.radiusMedium || '16px',
   };
 
@@ -697,22 +736,22 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
   );
 
   return (
-    <div className="w-full max-w-sm space-y-6">
+    <div className="w-full max-w-md space-y-8">
       <div className="space-y-2 text-center">
         <h2
-          className="text-2xl font-semibold text-content"
+          className="text-[2rem] font-semibold leading-tight text-content"
           style={theme.headingStyle}
         >
           Welcome back
         </h2>
-        <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
+        <p className="text-sm leading-6 text-content-muted" style={theme.mutedTextStyle}>
           Sign in to access your account and orders.
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label
-            className="block text-sm font-medium text-content-muted"
+            className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
             style={theme.labelStyle}
           >
             Email
@@ -722,13 +761,13 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+            className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-content-muted"
+            className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
             style={theme.labelStyle}
           >
             Password
@@ -738,16 +777,23 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+            className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          >
+            {error}
+          </div>
+        ) : null}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
-          style={theme.primaryButtonStyle}
+          className="w-full rounded-lg px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:opacity-50"
+          style={theme.primaryPillStyle}
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
@@ -810,23 +856,23 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
   );
 
   return (
-    <div className="w-full max-w-sm space-y-6">
+    <div className="w-full max-w-md space-y-8">
       <div className="space-y-2 text-center">
         <h2
-          className="text-2xl font-semibold text-content"
+          className="text-[2rem] font-semibold leading-tight text-content"
           style={theme.headingStyle}
         >
           Create an account
         </h2>
-        <p className="text-sm text-content-muted" style={theme.mutedTextStyle}>
+        <p className="text-sm leading-6 text-content-muted" style={theme.mutedTextStyle}>
           Join us for an enhanced shopping experience.
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label
-              className="block text-sm font-medium text-content-muted"
+              className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
               style={theme.labelStyle}
             >
               First name
@@ -838,13 +884,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
                 setForm((f) => ({ ...f, firstName: e.target.value }))
               }
               required
-              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+              className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
               style={theme.inputStyle}
             />
           </div>
           <div>
             <label
-              className="block text-sm font-medium text-content-muted"
+              className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
               style={theme.labelStyle}
             >
               Last name
@@ -856,14 +902,14 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
                 setForm((f) => ({ ...f, lastName: e.target.value }))
               }
               required
-              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+              className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
               style={theme.inputStyle}
             />
           </div>
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-content-muted"
+            className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
             style={theme.labelStyle}
           >
             Email
@@ -873,13 +919,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             required
-            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+            className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-content-muted"
+            className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
             style={theme.labelStyle}
           >
             Phone
@@ -888,13 +934,13 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             type="tel"
             value={form.phone}
             onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+            className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
         <div>
           <label
-            className="block text-sm font-medium text-content-muted"
+            className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-content-muted"
             style={theme.labelStyle}
           >
             Password
@@ -906,16 +952,23 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
               setForm((f) => ({ ...f, password: e.target.value }))
             }
             required
-            className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-content focus:outline-none"
+            className="mt-2 block h-12 w-full rounded-lg border border-border px-4 text-sm focus:border-content focus:outline-none"
             style={theme.inputStyle}
           />
         </div>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          >
+            {error}
+          </div>
+        ) : null}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-content px-4 py-2 text-sm font-medium text-white hover:bg-content/80 disabled:opacity-50"
-          style={theme.primaryButtonStyle}
+          className="w-full rounded-lg px-5 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-white disabled:opacity-50"
+          style={theme.primaryPillStyle}
         >
           {loading ? 'Creating account...' : 'Create account'}
         </button>
@@ -944,13 +997,18 @@ function AuthShell() {
       title="Account"
       description="Sign in or create an account to access your orders and profile."
     >
-      <div className="flex justify-center py-8">
-        {view === 'login' ? (
-          <LoginForm onSwitch={() => setView('register')} />
-        ) : (
-          <RegisterForm onSwitch={() => setView('login')} />
-        )}
-      </div>
+      <InsetPanel
+        wrapperClassName="max-w-4xl"
+        innerClassName="px-6 py-8 sm:px-10 sm:py-12"
+      >
+        <div className="mx-auto flex justify-center">
+          {view === 'login' ? (
+            <LoginForm onSwitch={() => setView('register')} />
+          ) : (
+            <RegisterForm onSwitch={() => setView('login')} />
+          )}
+        </div>
+      </InsetPanel>
     </PageShell>
   );
 }
@@ -961,16 +1019,21 @@ function AccountErrorShell({ message }: { message: string }) {
       title="Account unavailable"
       description="A customer session exists, but the storefront could not load account data from Medusa."
     >
-      <div className="max-w-2xl rounded-xl border border-danger/30 bg-danger/10 p-6">
-        <p className="font-medium text-danger">
-          Account data could not be loaded.
-        </p>
-        <p className="mt-2 text-sm text-danger">
-          This is a storefront or backend failure, not a sign-in problem. Fix
-          the customer or order API and reload this page.
-        </p>
-        <p className="mt-4 text-sm text-danger">{message}</p>
-      </div>
+      <InsetPanel
+        wrapperClassName="max-w-3xl"
+        innerClassName="px-6 py-8 sm:px-8"
+      >
+        <div className="rounded-2xl border border-danger/30 bg-danger/10 p-6">
+          <p className="font-medium text-danger">
+            Account data could not be loaded.
+          </p>
+          <p className="mt-2 text-sm text-danger">
+            This is a storefront or backend failure, not a sign-in problem. Fix
+            the customer or order API and reload this page.
+          </p>
+          <p className="mt-4 text-sm text-danger">{message}</p>
+        </div>
+      </InsetPanel>
     </PageShell>
   );
 }
@@ -1014,7 +1077,7 @@ function AccountNav({
     <div className="space-y-6">
       <div
         className="rounded-xl border border-border p-4"
-        style={theme.surfaceStyle}
+        style={theme.subtleSurfaceStyle}
       >
         <p className="font-medium text-content" style={theme.headingStyle}>
           {[customer?.first_name, customer?.last_name]
@@ -2651,208 +2714,215 @@ export function MedusaB2CCartPage() {
 
   return (
     <PageShell title="Cart" description="Your current Medusa cart contents.">
-      <div className="space-y-6">
-        {!customer ? (
-          <div
-            className="rounded-xl border border-border p-5"
-            style={theme.surfaceStyle}
-          >
-            <p className="font-medium" style={theme.headingStyle}>
-              Already have an account?
-            </p>
-            <p className="mt-1 text-sm" style={theme.mutedTextStyle}>
-              Sign in to link this cart to your order history and saved
-              addresses.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigateToAccount()}
-              className="mt-4 rounded-full px-5 py-2 text-sm font-medium text-white"
-              style={theme.primaryPillStyle}
-            >
-              Sign in
-            </button>
-          </div>
-        ) : null}
-
-        {typeof remainingFreeShipping === 'number' ? (
-          <div
-            className="rounded-xl border border-border p-5"
-            style={theme.surfaceStyle}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm font-medium" style={theme.headingStyle}>
-                {remainingFreeShipping > 0
-                  ? `Spend ${formatPrice(remainingFreeShipping, cart.currency_code)} more for free shipping`
-                  : "You've unlocked free shipping"}
-              </p>
-              <span
-                className="text-xs uppercase tracking-[0.18em]"
-                style={theme.mutedTextStyle}
-              >
-                Shipping
-              </span>
-            </div>
-            <div
-              className="mt-3 h-2 overflow-hidden rounded-full bg-border"
-              style={{
-                backgroundColor:
-                  theme.tokens.colorBorder || 'rgba(17, 24, 39, 0.12)',
-              }}
-            >
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${freeShippingProgress}%`,
-                  backgroundColor: theme.tokens.colorPrimary || '#111827',
-                }}
-              />
-            </div>
-          </div>
-        ) : null}
-
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.8fr)]">
         <div className="space-y-4">
-          {cart.items.map((item) => (
+          {!customer ? (
             <div
-              key={item.id}
-              className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
-              style={theme.surfaceStyle}
+              className="rounded-[24px] border p-5"
+              style={theme.subtleSurfaceStyle}
             >
-              <div className="flex items-center gap-4">
-                {item.thumbnail ? (
-                  <img
-                    src={item.thumbnail}
-                    alt={item.product_title || item.title}
-                    className="h-20 w-20 rounded-xl object-cover"
-                  />
-                ) : (
-                  <div
-                    className="flex h-20 w-20 items-center justify-center rounded-xl border border-dashed"
-                    style={theme.borderStyle}
-                  >
-                    <span className="text-xs" style={theme.mutedTextStyle}>
-                      No image
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <p className="font-medium" style={theme.headingStyle}>
-                    {item.product_title || item.title}
-                  </p>
-                  {formatCartItemVariant(item) ? (
-                    <p className="mt-1 text-sm" style={theme.mutedTextStyle}>
-                      {formatCartItemVariant(item)}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-sm" style={theme.mutedTextStyle}>
-                    {formatPrice(item.unit_price, cart.currency_code)} each
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 sm:min-w-[15rem]">
-                <div
-                  className="flex items-center border border-border"
-                  style={theme.surfaceStyle}
-                >
-                  <button
-                    type="button"
-                    className="px-3 py-2"
-                    style={theme.textStyle}
-                    onClick={() =>
-                      void updateCartItem(item.id, Math.max(1, item.quantity - 1))
-                    }
-                  >
-                    -
-                  </button>
-                  <span
-                    className="min-w-10 px-2 py-2 text-center"
-                    style={theme.textStyle}
-                  >
-                    {item.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    className="px-3 py-2"
-                    style={theme.textStyle}
-                    onClick={() => void updateCartItem(item.id, item.quantity + 1)}
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium" style={theme.headingStyle}>
-                    {formatPrice(
-                      item.total || item.unit_price * item.quantity,
-                      cart.currency_code,
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-1 text-sm text-danger"
-                    onClick={() => void removeCartItem(item.id)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div
-          className="rounded-xl border border-border p-5"
-          style={theme.surfaceStyle}
-        >
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between">
-              <span style={theme.mutedTextStyle}>Subtotal</span>
-              <span style={theme.textStyle}>
-                {formatPrice(cart.subtotal, cart.currency_code)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span style={theme.mutedTextStyle}>Shipping estimate</span>
-              <span style={theme.textStyle}>
-                {formatPrice(cart.shipping_total, cart.currency_code)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span style={theme.mutedTextStyle}>Taxes</span>
-              <span style={theme.textStyle}>
-                {formatPrice(cart.tax_total, cart.currency_code)}
-              </span>
-            </div>
-            {cart.discount_total ? (
-              <div className="flex items-center justify-between">
-                <span style={theme.mutedTextStyle}>Discounts</span>
-                <span style={theme.textStyle}>
-                  -{formatPrice(cart.discount_total, cart.currency_code)}
-                </span>
-              </div>
-            ) : null}
-          </div>
-          <div
-            className="mt-4 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
-            style={theme.borderStyle}
-          >
-            <p className="text-base font-medium" style={theme.headingStyle}>
-              Total
-            </p>
-            <div className="flex items-center gap-4">
-              <p className="text-lg font-medium" style={theme.headingStyle}>
-                {formatPrice(cart.total, cart.currency_code)}
+              <p className="font-medium" style={theme.headingStyle}>
+                Already have an account?
+              </p>
+              <p className="mt-1 text-sm leading-6" style={theme.mutedTextStyle}>
+                Sign in to link this cart to your order history and saved
+                addresses.
               </p>
               <button
+                type="button"
+                onClick={() => navigateToAccount()}
+                className="mt-4 rounded-full px-5 py-2 text-sm font-semibold text-white"
+                style={theme.primaryPillStyle}
+              >
+                Sign in
+              </button>
+            </div>
+          ) : null}
+
+          {typeof remainingFreeShipping === 'number' ? (
+            <div
+              className="rounded-[24px] border p-5"
+              style={theme.subtleSurfaceStyle}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-medium leading-6" style={theme.headingStyle}>
+                  {remainingFreeShipping > 0
+                    ? `Spend ${formatPrice(remainingFreeShipping, cart.currency_code)} more for free shipping`
+                    : "You've unlocked free shipping"}
+                </p>
+                <span
+                  className="text-xs uppercase tracking-[0.18em]"
+                  style={theme.mutedTextStyle}
+                >
+                  Shipping
+                </span>
+              </div>
+              <div
+                className="mt-3 h-2 overflow-hidden rounded-full bg-border"
+                style={{
+                  backgroundColor:
+                    theme.tokens.colorBorder || 'rgba(17, 24, 39, 0.12)',
+                }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${freeShippingProgress}%`,
+                    backgroundColor: theme.tokens.colorPrimary || '#111827',
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            {cart.items.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col gap-4 rounded-[24px] border border-border p-5 sm:flex-row sm:items-center sm:justify-between"
+                style={theme.surfaceStyle}
+              >
+                <div className="flex items-center gap-4">
+                  {item.thumbnail ? (
+                    <img
+                      src={item.thumbnail}
+                      alt={item.product_title || item.title}
+                      className="h-24 w-24 rounded-[20px] object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-24 w-24 items-center justify-center rounded-[20px] border border-dashed"
+                      style={theme.borderStyle}
+                    >
+                      <span className="text-xs" style={theme.mutedTextStyle}>
+                        No image
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium" style={theme.headingStyle}>
+                      {item.product_title || item.title}
+                    </p>
+                    {formatCartItemVariant(item) ? (
+                      <p className="mt-1 text-sm" style={theme.mutedTextStyle}>
+                        {formatCartItemVariant(item)}
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-sm" style={theme.mutedTextStyle}>
+                      {formatPrice(item.unit_price, cart.currency_code)} each
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 sm:min-w-[15rem]">
+                  <div
+                    className="flex items-center border border-border"
+                    style={{
+                      ...theme.subtleSurfaceStyle,
+                      boxShadow: 'none',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="px-3 py-2"
+                      style={theme.textStyle}
+                      onClick={() =>
+                        void updateCartItem(item.id, Math.max(1, item.quantity - 1))
+                      }
+                    >
+                      -
+                    </button>
+                    <span
+                      className="min-w-10 px-2 py-2 text-center"
+                      style={theme.textStyle}
+                    >
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      className="px-3 py-2"
+                      style={theme.textStyle}
+                      onClick={() => void updateCartItem(item.id, item.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium" style={theme.headingStyle}>
+                      {formatPrice(
+                        item.total || item.unit_price * item.quantity,
+                        cart.currency_code,
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-1 text-sm text-danger"
+                      onClick={() => void removeCartItem(item.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
+          <div
+            className="rounded-[24px] border border-border p-6"
+            style={theme.surfaceStyle}
+          >
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span style={theme.mutedTextStyle}>Subtotal</span>
+                <span style={theme.textStyle}>
+                  {formatPrice(cart.subtotal, cart.currency_code)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span style={theme.mutedTextStyle}>Shipping estimate</span>
+                <span style={theme.textStyle}>
+                  {formatPrice(cart.shipping_total, cart.currency_code)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span style={theme.mutedTextStyle}>Taxes</span>
+                <span style={theme.textStyle}>
+                  {formatPrice(cart.tax_total, cart.currency_code)}
+                </span>
+              </div>
+              {cart.discount_total ? (
+                <div className="flex items-center justify-between">
+                  <span style={theme.mutedTextStyle}>Discounts</span>
+                  <span style={theme.textStyle}>
+                    -{formatPrice(cart.discount_total, cart.currency_code)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+            <div
+              className="mt-5 flex flex-col gap-4 border-t pt-5"
+              style={theme.borderStyle}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-base font-medium" style={theme.headingStyle}>
+                  Total
+                </p>
+                <p className="text-lg font-medium" style={theme.headingStyle}>
+                  {formatPrice(cart.total, cart.currency_code)}
+                </p>
+              </div>
+              <button
                 onClick={() => navigateToCheckout()}
-                className="rounded-full px-5 py-2 text-sm font-medium text-white"
+                className="w-full rounded-full px-5 py-3 text-sm font-semibold text-white"
                 style={theme.primaryPillStyle}
               >
                 Checkout
               </button>
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </PageShell>
   );

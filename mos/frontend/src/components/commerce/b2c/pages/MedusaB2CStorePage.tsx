@@ -143,7 +143,7 @@ export function MedusaB2CStorePage() {
     color: tokens.colorText || "#111827",
   };
   const headingStyle: CSSProperties = {
-    color: tokens.colorText || "#111827",
+    color: tokens.colorHeading || tokens.colorText || "#111827",
     fontFamily: resolveB2CHeadingFont(tokens),
   };
   const textMutedStyle: CSSProperties = {

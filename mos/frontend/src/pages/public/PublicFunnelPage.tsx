@@ -695,14 +695,13 @@ export function PublicFunnelPage() {
               siteFamily={siteCommerce?.siteFamily || "medusa-b2c-starter"}
               siteName={pageMetadata?.brandName || pageMetadata?.title || null}
               initialCountryCode={parsedRouteSitePath.countryCode || undefined}
+              designSystemTokens={page.designSystemTokens}
             >
-              <DesignSystemProvider tokens={page.designSystemTokens}>
-                <Render
-                  key={page.pageId}
-                  config={runtimeConfig}
-                  data={(normalizedPuckData ?? page.puckData) as unknown as Data}
-                />
-              </DesignSystemProvider>
+              <Render
+                key={page.pageId}
+                config={runtimeConfig}
+                data={(normalizedPuckData ?? page.puckData) as unknown as Data}
+              />
             </B2CRuntimeProvider>
           ) : (
             <CommerceRuntimeProvider

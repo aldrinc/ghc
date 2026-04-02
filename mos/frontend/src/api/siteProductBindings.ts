@@ -56,14 +56,24 @@ export interface UpdateSiteProductBindingRequest {
   active?: boolean;
 }
 
+type SiteProductBindingQueryOptions = {
+  clientId?: string | null;
+};
+
 // Get all product bindings for a site
-export function useSiteProductBindings(siteId: string | null | undefined) {
+export function useSiteProductBindings(
+  siteId: string | null | undefined,
+  options: SiteProductBindingQueryOptions = {},
+) {
   const { get } = useApiClient();
   const { workspace } = useWorkspace();
+  const clientId = Object.prototype.hasOwnProperty.call(options, "clientId")
+    ? options.clientId ?? null
+    : workspace?.id ?? null;
   return useQuery<SiteProductBindingDetail[]>({
-    queryKey: ["sites", siteId, "product-bindings"],
-    queryFn: () => get<SiteProductBindingDetail[]>(`/sites/${siteId}/product-bindings?clientId=${workspace!.id}`),
-    enabled: !!workspace?.id && !!siteId,
+    queryKey: ["sites", siteId, "product-bindings", clientId ?? "__missing_client__"],
+    queryFn: () => get<SiteProductBindingDetail[]>(`/sites/${siteId}/product-bindings?clientId=${clientId}`),
+    enabled: !!clientId && !!siteId,
   });
 }
 

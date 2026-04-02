@@ -50,6 +50,16 @@ vi.mock("../B2CRuntimeProvider", () => ({
     navigateToCart: vi.fn(),
     navigateToAccount: vi.fn(),
   }),
+  useImportedOneProductShellData: () => ({ status: "unavailable" }),
+}));
+
+vi.mock("@/api/client", () => ({
+  useApiClient: () => ({
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    request: vi.fn(),
+  }),
 }));
 
 vi.mock("../useB2CTheme", () => ({
@@ -61,6 +71,11 @@ vi.mock("../useB2CTheme", () => ({
     tokens.fontHeading
     || tokens.fontBody
     || 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  resolveB2CPillRadius: (tokens: {
+    radiusFull?: string;
+    radiusMedium?: string;
+    radiusLarge?: string;
+  }) => tokens.radiusFull || tokens.radiusMedium || tokens.radiusLarge || "8px",
   resolveB2CSurfaceRadius: (tokens: { radiusLarge?: string; radiusMedium?: string }) =>
     tokens.radiusLarge || tokens.radiusMedium || "12px",
   useB2CTheme: () => ({

@@ -23,6 +23,8 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApiClient } from "@/api/client";
+import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
+import { buildImportedDesignSystemTokens } from "@/components/imported-site/importedDesignSystem";
 import type {
   MedusaProduct,
   MedusaCart,
@@ -89,6 +91,11 @@ import {
   type UpdateAddressInput,
 } from "@/lib/medusa";
 import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
+import {
+  useImportedOneProductShellState,
+  type ImportedOneProductShellState,
+} from "./importedOneProductShellData";
+import type { DesignSystemTokens } from "@/types/designSystems";
 
 // =============================================================================
 // Types
@@ -167,6 +174,8 @@ export type B2CRuntimeContextValue = {
   configError: string | null;
 
   // Site metadata
+  siteId: string | null;
+  siteClientId: string | null;
   siteFamily: string;
   siteName: string | null;
   countryCode: string;
@@ -278,6 +287,7 @@ export type B2CRuntimeContextValue = {
 // =============================================================================
 
 const B2CRuntimeContext = createContext<B2CRuntimeContextValue | null>(null);
+const ImportedOneProductShellContext = createContext<ImportedOneProductShellState>({ status: "unavailable" });
 
 export function useB2CRuntime(): B2CRuntimeContextValue {
   const context = useContext(B2CRuntimeContext);
@@ -291,6 +301,10 @@ export function useMaybeB2CRuntime(): B2CRuntimeContextValue | null {
   return useContext(B2CRuntimeContext);
 }
 
+export function useImportedOneProductShellData(): ImportedOneProductShellState {
+  return useContext(ImportedOneProductShellContext);
+}
+
 // =============================================================================
 // Provider
 // =============================================================================
@@ -300,8 +314,10 @@ export type B2CRuntimeProviderProps = {
   siteFamily: string;
   siteName?: string | null;
   siteId?: string | null;
+  siteClientId?: string | null;
   initialCountryCode?: string;
   initialLocale?: string | null;
+  designSystemTokens?: DesignSystemTokens | Record<string, unknown> | null;
 };
 
 export function B2CRuntimeProvider({
@@ -309,8 +325,10 @@ export function B2CRuntimeProvider({
   siteFamily,
   siteName = null,
   siteId = null,
+  siteClientId = null,
   initialCountryCode,
   initialLocale,
+  designSystemTokens = null,
 }: B2CRuntimeProviderProps): ReactNode {
   const funnelRuntime = useFunnelRuntime();
   const navigate = useNavigate();
@@ -353,6 +371,38 @@ export function B2CRuntimeProvider({
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
   const isAuthenticated = useMemo(() => !!customer, [customer]);
+
+  const importedShell = useImportedOneProductShellState({
+    apiGet,
+    siteId,
+    siteClientId,
+    productSlug: funnelRuntime?.productSlug ?? null,
+    funnelSlug: funnelRuntime?.funnelSlug ?? null,
+  });
+
+  const importedShellBrandName = useMemo(() => {
+    if (importedShell.status !== "ready") {
+      return null;
+    }
+    const textSlots = Array.isArray(importedShell.shell.header.sectionProps.textSlots)
+      ? (importedShell.shell.header.sectionProps.textSlots as Array<Record<string, unknown>>)
+      : [];
+    const logoTextSlot = textSlots.find((slot) => String(slot.label || "").trim() === "Logo text");
+    const brandName = typeof logoTextSlot?.text === "string" ? logoTextSlot.text.trim() : "";
+    return brandName || importedShell.shell.pageName || null;
+  }, [importedShell]);
+
+  const importedShellDesignSystemTokens = useMemo(() => {
+    if (designSystemTokens || importedShell.status !== "ready") {
+      return null;
+    }
+    return buildImportedDesignSystemTokens({
+      theme: importedShell.shell.theme,
+      themeJson: importedShell.shell.themeJson,
+      headAssets: importedShell.shell.sharedHeadAssets,
+      brandName: importedShellBrandName,
+    });
+  }, [designSystemTokens, importedShell, importedShellBrandName]);
 
   // =============================================================================
   // Initialization
@@ -1163,6 +1213,8 @@ export function B2CRuntimeProvider({
   const value: B2CRuntimeContextValue = {
     isConfigured,
     configError,
+    siteId,
+    siteClientId,
     siteFamily,
     siteName,
     countryCode,
@@ -1248,7 +1300,13 @@ export function B2CRuntimeProvider({
 
   return (
     <B2CRuntimeContext.Provider value={value}>
-      {children}
+      <ImportedOneProductShellContext.Provider value={importedShell}>
+        {importedShellDesignSystemTokens ? (
+          <DesignSystemProvider tokens={importedShellDesignSystemTokens}>{children}</DesignSystemProvider>
+        ) : (
+          children
+        )}
+      </ImportedOneProductShellContext.Provider>
     </B2CRuntimeContext.Provider>
   );
 }

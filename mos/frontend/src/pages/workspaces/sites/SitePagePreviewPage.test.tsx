@@ -213,4 +213,14 @@ describe("SitePagePreviewPage", () => {
 
     expect(screen.getByText("Preview Render")).toBeInTheDocument();
   });
+
+  it("does not wrap B2C preview content in the generic max-width shell", async () => {
+    renderPage();
+
+    const previewContent = await screen.findByTestId("site-preview-content");
+
+    expect(previewContent.className).toContain("w-full");
+    expect(previewContent.className).toContain("py-4");
+    expect(previewContent.className).not.toContain("max-w-7xl");
+  });
 });

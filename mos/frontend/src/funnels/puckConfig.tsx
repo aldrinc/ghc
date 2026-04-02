@@ -13,6 +13,17 @@ import {
   ImportedSection,
   ImportedTestimonialsGrid,
 } from "@/components/imported-site/ImportedTemplateBlocks";
+import {
+  ImportedComparisonSection,
+  ImportedFaqSection,
+  ImportedFeatureSection,
+  ImportedFooterSection,
+  ImportedHeaderSection,
+  ImportedHeroSection,
+  ImportedOfferSection,
+  ImportedProofBarSection,
+  ImportedTestimonialsSection,
+} from "@/components/imported-site/ImportedSourceSectionBlocks";
 import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
@@ -148,9 +159,18 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
 }
 
 export function resolveRuntimeSitePath(runtime: FunnelRuntimeContextValue, sitePath: string): string {
-  const normalizedSitePath = (sitePath || "").trim().replace(/^\/+/, "");
+  const rawSitePath = (sitePath || "").trim();
+  const normalizedSitePath = rawSitePath.replace(/^\/+/, "");
   if (!normalizedSitePath) {
-    return "#";
+    if (runtime.resolveSitePath) {
+      return runtime.resolveSitePath("");
+    }
+    return buildPublicFunnelPath({
+      productSlug: runtime.productSlug,
+      funnelSlug: runtime.funnelSlug,
+      bundleMode: runtime.bundleMode || false,
+      sitePath: "",
+    });
   }
   if (runtime.resolveSitePath) {
     return runtime.resolveSitePath(normalizedSitePath);
@@ -186,6 +206,52 @@ function withBlockBoundary<T extends Record<string, unknown>>(
         {render(props)}
       </BlockErrorBoundary>
     );
+  };
+}
+
+function createImportedSourceSectionBlockConfig(
+  blockType: string,
+  renderBlock: (props: Record<string, unknown>) => ReactNode,
+) {
+  return {
+    fields: {
+      textSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalText: { type: "textarea" },
+          text: { type: "textarea" },
+        },
+        defaultItemProps: { label: "", originalText: "", text: "" },
+      },
+      buttonSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalText: { type: "text" },
+          text: { type: "text" },
+          href: { type: "text" },
+        },
+        defaultItemProps: { label: "", originalText: "", text: "", href: "" },
+      },
+      imageSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalSrc: { type: "text" },
+          originalText: { type: "text" },
+          src: { type: "text" },
+          alt: { type: "text" },
+        },
+        defaultItemProps: { label: "", originalSrc: "", originalText: "", src: "", alt: "" },
+      },
+    },
+    defaultProps: {
+      textSlots: [],
+      buttonSlots: [],
+      imageSlots: [],
+    },
+    render: withBlockBoundary(blockType, renderBlock),
   };
 }
 
@@ -1616,6 +1682,150 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           />
         )),
       },
+      ImportedHeaderSection: createImportedSourceSectionBlockConfig(
+        "ImportedHeaderSection",
+        (props: Record<string, unknown>) => (
+          <ImportedHeaderSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedHeroSection: createImportedSourceSectionBlockConfig(
+        "ImportedHeroSection",
+        (props: Record<string, unknown>) => (
+          <ImportedHeroSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedProofBarSection: createImportedSourceSectionBlockConfig(
+        "ImportedProofBarSection",
+        (props: Record<string, unknown>) => (
+          <ImportedProofBarSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFeatureSection: createImportedSourceSectionBlockConfig(
+        "ImportedFeatureSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFeatureSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedOfferSection: createImportedSourceSectionBlockConfig(
+        "ImportedOfferSection",
+        (props: Record<string, unknown>) => (
+          <ImportedOfferSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedTestimonialsSection: createImportedSourceSectionBlockConfig(
+        "ImportedTestimonialsSection",
+        (props: Record<string, unknown>) => (
+          <ImportedTestimonialsSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedComparisonSection: createImportedSourceSectionBlockConfig(
+        "ImportedComparisonSection",
+        (props: Record<string, unknown>) => (
+          <ImportedComparisonSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFaqSection: createImportedSourceSectionBlockConfig(
+        "ImportedFaqSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFaqSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFooterSection: createImportedSourceSectionBlockConfig(
+        "ImportedFooterSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFooterSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
       ImportedNarrativeBlock: {
         fields: {
           eyebrow: { type: "text" },

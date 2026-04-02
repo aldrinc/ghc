@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { PageAgentPanel } from "@/components/agents/PageAgentPanel";
+import { isImportedTemplatePageData } from "@/components/agents/pageAgentAvailability";
 import { useDesignSystems } from "@/api/designSystems";
-import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createPuckFieldTypesPlugin } from "@/funnels/puckFieldTypesPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
@@ -24,7 +25,6 @@ import { normalizePuckData } from "@/funnels/puckData";
 import { buildRuntimePageMap, buildRuntimePageStageMap, buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { setMedusaRuntimeConfig } from "@/lib/medusa";
 import { useSitePreviewDefaults } from "@/pages/workspaces/sites/sitePreviewDefaults";
 import { buildSitePagePreviewPath, buildSitePreviewPath, getSitePagePreviewErrorMessage } from "@/pages/workspaces/sites/sitePreviewRouting";
@@ -135,11 +135,19 @@ function escapeAttributeValue(value: string): string {
 export function SitePageEditorPage() {
   const navigate = useNavigate();
   const { siteId, pageId } = useParams<{ siteId: string; pageId: string }>();
-  const { workspace } = useWorkspace();
-  const { data: site } = useSite(siteId || null);
-  const { data: products = [] } = useProducts(workspace?.id);
-  const { data: pageDetail, isLoading } = useSitePage(siteId, pageId);
-  const { data: productBindings = [] } = useSiteProductBindings(siteId || null);
+  const { clients, selectWorkspace, workspace } = useWorkspace();
+  const { data: site } = useSite(siteId || null, {
+    clientId: null,
+    requireWorkspace: false,
+  });
+  const resolvedClientId = site?.clientId || workspace?.id || null;
+  const { data: products = [] } = useProducts(resolvedClientId || undefined);
+  const { data: pageDetail, isLoading } = useSitePage(siteId, pageId, {
+    clientId: resolvedClientId,
+  });
+  const { data: productBindings = [] } = useSiteProductBindings(siteId || null, {
+    clientId: resolvedClientId,
+  });
   const { data: medusaConfig } = useSiteMedusaConfig(siteId);
   const {
     data: previewDefaults,
@@ -157,7 +165,8 @@ export function SitePageEditorPage() {
   const [draftName, setDraftName] = useState("");
   const [draftSlug, setDraftSlug] = useState("");
   const [draftDesignSystemId, setDraftDesignSystemId] = useState("");
-  const initializedPageIdRef = useRef<string | null>(null);
+  const hydratedVersionKeyRef = useRef<string | null>(null);
+  const blockedVersionKeyRef = useRef<string | null>(null);
 
   /** Snapshot of the last-saved data so we can detect dirty state. */
   const savedDataRef = useRef<Data | null>(null);
@@ -170,16 +179,31 @@ export function SitePageEditorPage() {
 
   useEffect(() => {
     if (!pageId) return;
-    if (initializedPageIdRef.current === pageId) return;
+    hydratedVersionKeyRef.current = null;
+    blockedVersionKeyRef.current = null;
     setData(defaultFunnelPuckData() as unknown as Data);
     setPuckKey(pageId);
+    savedDataRef.current = null;
   }, [pageId]);
 
+  const sourceVersionKey = useMemo(() => {
+    if (!pageDetail || !pageId) return null;
+    return `${pageId}:${pageDetail.latestDraft?.id || pageDetail.latestApproved?.id || "initial"}`;
+  }, [pageDetail, pageId]);
+
   useEffect(() => {
-    if (!pageDetail) return;
-    if (!pageId) return;
-    if (initializedPageIdRef.current === pageId) return;
-    initializedPageIdRef.current = pageId;
+    if (!pageDetail || !pageId || !sourceVersionKey) return;
+    if (hydratedVersionKeyRef.current === sourceVersionKey) return;
+    if (savedDataRef.current && isDirty) {
+      if (blockedVersionKeyRef.current !== sourceVersionKey) {
+        blockedVersionKeyRef.current = sourceVersionKey;
+        toast.error(
+          "A newer canonical page draft exists, but the editor has unsaved local changes. Save or reload before applying the agent update.",
+        );
+      }
+      return;
+    }
+
     const initial =
       (pageDetail.latestDraft?.puckData as Data | undefined) ||
       (pageDetail.latestApproved?.puckData as Data | undefined) ||
@@ -187,11 +211,13 @@ export function SitePageEditorPage() {
     const normalized = normalizePuckData(initial, { designSystemTokens: pageDetail.designSystemTokens ?? null });
     setData(clonePuckData(normalized));
     savedDataRef.current = clonePuckData(normalized);
-    setPuckKey(`${pageId}:${pageDetail.latestDraft?.id || pageDetail.latestApproved?.id || "initial"}`);
+    setPuckKey(sourceVersionKey);
     setMetaName(pageDetail.page.name);
     setMetaSlug(pageDetail.page.slug);
     setMetaDesignSystemId(pageDetail.page.designSystemId || null);
-  }, [pageDetail, pageId]);
+    hydratedVersionKeyRef.current = sourceVersionKey;
+    blockedVersionKeyRef.current = null;
+  }, [isDirty, pageDetail, pageId, sourceVersionKey]);
 
   const pageOptions = useMemo(() => {
     return site?.pages?.map((p) => ({ label: p.name, value: p.id })) || [];
@@ -296,33 +322,12 @@ export function SitePageEditorPage() {
   }, [site?.pages, pageId]);
 
   const designSystemTokens = pageDetail?.designSystemTokens ?? null;
-  const apiBaseUrl = resolveRequiredApiBaseUrl();
-  const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
-  const aiPlugin = useMemo(
-    () =>
-      createFunnelAiPlugin({
-        scope: "site",
-        funnelId: siteId,
-        pageId,
-        templateId: pageDetail?.page?.templateId || undefined,
-        ideaWorkspaceId: workspace?.id,
-        apiBaseUrl,
-        clerkTokenTemplate,
-        supportsAttachments: false,
-        supportsImageGeneration: false,
-        supportsStreaming: false,
-      }),
-    [apiBaseUrl, clerkTokenTemplate, pageDetail?.page?.templateId, pageId, siteId, workspace?.id]
-  );
   const designSystemPlugin = useMemo(
     () => createDesignSystemPlugin({ tokens: designSystemTokens }),
     [designSystemTokens]
   );
   const fieldTypesPlugin = useMemo(() => createPuckFieldTypesPlugin(), []);
-  const plugins = useMemo(
-    () => [designSystemPlugin, fieldTypesPlugin, aiPlugin],
-    [aiPlugin, designSystemPlugin, fieldTypesPlugin]
-  );
+  const plugins = useMemo(() => [designSystemPlugin, fieldTypesPlugin], [designSystemPlugin, fieldTypesPlugin]);
   const editorViewports = useMemo<Viewport[]>(
     () => [
       { width: 375, height: "auto", icon: "Smartphone", label: "Small" },
@@ -343,6 +348,7 @@ export function SitePageEditorPage() {
     [editorViewports]
   );
   const importedRuntimeSyncEntries = useMemo(() => collectImportedRuntimeSyncEntries(data), [data]);
+  const pageAgentEnabled = useMemo(() => isImportedTemplatePageData(data), [data]);
   const importedRuntimeSyncKey = useMemo(
     () =>
       importedRuntimeSyncEntries
@@ -411,7 +417,14 @@ export function SitePageEditorPage() {
     };
   }, [importedRuntimeSyncEntries, importedRuntimeSyncKey]);
 
-  const { data: designSystems = [] } = useDesignSystems(workspace?.id);
+  const { data: designSystems = [] } = useDesignSystems(resolvedClientId || undefined);
+
+  useEffect(() => {
+    if (!resolvedClientId || workspace?.id === resolvedClientId) return;
+    const matchingClient = clients.find((client) => client.id === resolvedClientId);
+    if (!matchingClient) return;
+    selectWorkspace(resolvedClientId);
+  }, [clients, resolvedClientId, selectWorkspace, workspace?.id]);
   const designSystemOptions = useMemo(() => {
     return [
       { label: "Inherit from site theme", value: "" },
@@ -611,7 +624,7 @@ export function SitePageEditorPage() {
       </DialogRoot>
 
       {/* ---- Editor ---- */}
-      <div className="ds-card ds-card--md p-0 overflow-hidden">
+      <div className="ds-card ds-card--md overflow-hidden p-0">
         <FunnelRuntimeProvider
           value={{
             productSlug: previewProductSlug || "preview-product",
@@ -660,6 +673,18 @@ export function SitePageEditorPage() {
           )}
         </FunnelRuntimeProvider>
       </div>
+      <PageAgentPanel
+        defaultOpen
+        clientId={site?.clientId || workspace?.id || null}
+        productId={site?.productId || null}
+        siteId={siteId || null}
+        pageId={pageId || null}
+        pageName={currentPageName}
+        pageSlug={metaSlug || pageDetail.page.slug}
+        mode="editor"
+        enabled={pageAgentEnabled}
+        unavailableReason="The Hermes page agent currently supports imported-template pages only."
+      />
     </div>
   );
 }

@@ -68,7 +68,7 @@ export function MedusaB2CHomePage({
   };
 
   const heroTitleStyle: CSSProperties = {
-    color: tokens.colorText || "#111827",
+    color: tokens.colorHeading || tokens.colorText || "#111827",
     fontFamily: resolveB2CHeadingFont(tokens),
   };
 
@@ -92,7 +92,7 @@ export function MedusaB2CHomePage({
   };
 
   const headingStyle: CSSProperties = {
-    color: tokens.colorText || "#111827",
+    color: tokens.colorHeading || tokens.colorText || "#111827",
     fontFamily: resolveB2CHeadingFont(tokens),
   };
 

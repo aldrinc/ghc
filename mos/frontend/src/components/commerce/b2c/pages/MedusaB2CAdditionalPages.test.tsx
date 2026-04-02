@@ -24,6 +24,16 @@ vi.mock('@/funnels/puckConfig', () => ({
 
 vi.mock('../B2CRuntimeProvider', () => ({
   useB2CRuntime: () => runtimeState.value,
+  useImportedOneProductShellData: () => ({ status: 'unavailable' }),
+}));
+
+vi.mock('@/api/client', () => ({
+  useApiClient: () => ({
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    request: vi.fn(),
+  }),
 }));
 
 vi.mock('../useB2CTheme', () => ({

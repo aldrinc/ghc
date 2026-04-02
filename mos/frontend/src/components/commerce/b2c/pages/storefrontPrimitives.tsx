@@ -3,6 +3,7 @@ import type { MedusaProduct } from "@/types/commerce";
 import {
   resolveB2CActionRadius,
   resolveB2CHeadingFont,
+  resolveB2CPillRadius,
   resolveB2CSurfaceRadius,
   useB2CTheme,
 } from "../useB2CTheme";
@@ -144,16 +145,18 @@ function usePrimitiveStyles() {
     color: tokens.colorTextMuted || "rgba(17, 24, 39, 0.64)",
   };
   const headingStyle: CSSProperties = {
-    color: tokens.colorText || "#111827",
+    color: tokens.colorHeading || tokens.colorText || "#111827",
     fontFamily: resolveB2CHeadingFont(tokens),
   };
   const surfaceStyle: CSSProperties = {
     backgroundColor: tokens.colorBackgroundAlt || tokens.colorBackground || "#ffffff",
     borderColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
     borderRadius: resolveB2CSurfaceRadius(tokens),
+    boxShadow: "0 20px 48px rgba(15, 23, 42, 0.06)",
   };
   const mutedSurfaceStyle: CSSProperties = {
-    backgroundColor: tokens.colorBackgroundAlt || "rgba(17, 24, 39, 0.06)",
+    backgroundColor:
+      tokens.colorBackgroundMuted || tokens.colorShellBackground || "rgba(17, 24, 39, 0.06)",
     borderRadius: resolveB2CActionRadius(tokens),
   };
   const selectedStyle: CSSProperties | undefined = isThemed
@@ -166,13 +169,13 @@ function usePrimitiveStyles() {
   const primaryActionStyle: CSSProperties = selectedStyle
     ? {
         ...selectedStyle,
-        borderRadius: resolveB2CActionRadius(tokens),
+        borderRadius: resolveB2CPillRadius(tokens),
       }
     : {
         backgroundColor: "#111827",
         borderColor: "#111827",
         color: "#ffffff",
-        borderRadius: resolveB2CActionRadius(tokens),
+        borderRadius: resolveB2CPillRadius(tokens),
       };
 
   return {
@@ -383,52 +386,69 @@ export function StorefrontEmptyState({
   actionLabel?: string;
   onAction?: () => void;
 }) {
-  const { headingStyle, mutedTextStyle, primaryActionStyle, surfaceStyle, tokens } =
+  const {
+    headingStyle,
+    mutedTextStyle,
+    mutedSurfaceStyle,
+    primaryActionStyle,
+    surfaceStyle,
+    tokens,
+  } =
     usePrimitiveStyles();
 
   return (
     <div
-      className="flex flex-col items-center justify-center gap-4 border px-6 py-14 text-center"
-      style={surfaceStyle}
+      className="mx-auto w-full max-w-3xl rounded-[32px] border p-3 sm:p-4"
+      style={mutedSurfaceStyle}
     >
       <div
-        className="flex h-14 w-14 items-center justify-center border"
-        style={{ ...surfaceStyle, borderRadius: resolveB2CActionRadius(tokens) }}
+        className="flex flex-col items-center justify-center gap-5 rounded-[28px] border px-6 py-14 text-center sm:px-10"
+        style={surfaceStyle}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="h-6 w-6"
-          style={mutedTextStyle}
+        <div
+          className="flex h-16 w-16 items-center justify-center border"
+          style={{
+            ...mutedSurfaceStyle,
+            borderColor: surfaceStyle.borderColor,
+            borderRadius: resolveB2CSurfaceRadius(tokens),
+            boxShadow: "none",
+          }}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M20.25 8.511c.884.284 1.5 1.11 1.5 2.039v7.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25v-7.5c0-.93.616-1.755 1.5-2.039m16.5 0a2.25 2.25 0 00-.856-1.379L13.5 3.25a2.25 2.25 0 00-3 0L4.606 7.132a2.25 2.25 0 00-.856 1.38m16.5 0L12 13.5 3.75 8.511"
-          />
-        </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="h-6 w-6"
+            style={mutedTextStyle}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20.25 8.511c.884.284 1.5 1.11 1.5 2.039v7.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25v-7.5c0-.93.616-1.755 1.5-2.039m16.5 0a2.25 2.25 0 00-.856-1.379L13.5 3.25a2.25 2.25 0 00-3 0L4.606 7.132a2.25 2.25 0 00-.856 1.38m16.5 0L12 13.5 3.75 8.511"
+            />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-medium" style={headingStyle}>
+            {title}
+          </h2>
+          <p className="max-w-xl text-sm leading-6" style={mutedTextStyle}>
+            {description}
+          </p>
+        </div>
+        {actionLabel && onAction ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="flex min-h-11 items-center justify-center border px-5 text-sm font-semibold"
+            style={primaryActionStyle}
+          >
+            {actionLabel}
+          </button>
+        ) : null}
       </div>
-      <div className="space-y-2">
-        <h2 className="text-xl font-medium" style={headingStyle}>
-          {title}
-        </h2>
-        <p className="max-w-xl text-sm" style={mutedTextStyle}>
-          {description}
-        </p>
-      </div>
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="flex h-10 items-center justify-center border px-4 text-sm font-medium"
-          style={primaryActionStyle}
-        >
-          {actionLabel}
-        </button>
-      ) : null}
     </div>
   );
 }

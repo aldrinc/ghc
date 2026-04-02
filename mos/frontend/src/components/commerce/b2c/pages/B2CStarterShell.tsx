@@ -7,6 +7,7 @@ import {
   type CSSProperties,
 } from "react";
 import { useB2CRuntime } from "../B2CRuntimeProvider";
+import { useImportedOneProductShellData } from "../B2CRuntimeProvider";
 import {
   resolveB2CActionRadius,
   resolveB2CBodyFont,
@@ -14,6 +15,7 @@ import {
   useB2CTheme,
 } from "../useB2CTheme";
 import { formatPrice } from "./storefrontPrimitives";
+import { ImportedOneProductShell } from "./ImportedOneProductShell";
 
 type B2CStarterShellProps = {
   children: ReactNode;
@@ -48,6 +50,7 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
     navigateToAccount,
   } = useB2CRuntime();
   const { tokens, isThemed } = useB2CTheme();
+  const importedShell = useImportedOneProductShellData();
   const [menuOpen, setMenuOpen] = useState(false);
   const [miniCartOpen, setMiniCartOpen] = useState(false);
   const miniCartRef = useRef<HTMLDivElement | null>(null);
@@ -76,12 +79,13 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
   };
 
   const headerStyle: CSSProperties = {
-    backgroundColor: tokens.colorBackground || "#ffffff",
+    backgroundColor: tokens.colorShellBackground || tokens.colorBackground || "#ffffff",
     borderBottomColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
   };
 
   const footerStyle: CSSProperties = {
-    backgroundColor: tokens.colorBackgroundAlt || tokens.colorBackground || "#ffffff",
+    backgroundColor:
+      tokens.colorFooterBackground || tokens.colorShellBackground || tokens.colorBackground || "#ffffff",
     borderTopColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
   };
 
@@ -119,7 +123,11 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
       className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-[10px] font-semibold uppercase tracking-[0.18em]"
       style={{
         borderColor: tokens.colorBorder || "rgba(17, 24, 39, 0.12)",
-        backgroundColor: tokens.colorBackgroundAlt || tokens.colorBackground || "#fafafa",
+        backgroundColor:
+          tokens.colorBackgroundMuted ||
+          tokens.colorShellBackground ||
+          tokens.colorBackground ||
+          "#fafafa",
         color: tokens.colorText || "#111827",
       }}
     >
@@ -167,6 +175,32 @@ export function B2CStarterShell({ children }: B2CStarterShellProps) {
   const handleCartTrigger = () => {
     setMiniCartOpen((open) => !open);
   };
+
+  if (importedShell.status === "ready") {
+    return <ImportedOneProductShell shell={importedShell.shell}>{children}</ImportedOneProductShell>;
+  }
+
+  if (importedShell.status === "loading") {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-surface px-6 text-sm text-content-muted"
+        style={rootStyle}
+      >
+        Loading imported storefront shell...
+      </div>
+    );
+  }
+
+  if (importedShell.status === "error") {
+    return (
+      <div
+        className="mx-auto my-10 max-w-3xl rounded-2xl border border-danger/30 bg-danger/10 px-6 py-5 text-sm text-danger"
+        role="alert"
+      >
+        {importedShell.message}
+      </div>
+    );
+  }
 
   return (
     <div

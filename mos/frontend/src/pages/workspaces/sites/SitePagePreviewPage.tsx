@@ -5,6 +5,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Edit, Loader2 } from "lucide-react";
 import { useProducts } from "@/api/products";
 import { useSite, useSiteMedusaConfig, useSitePage } from "@/api/sites";
+import { PageAgentPanel } from "@/components/agents/PageAgentPanel";
+import { isImportedTemplatePageData } from "@/components/agents/pageAgentAvailability";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import { B2CRuntimeProvider } from "@/components/commerce/b2c/B2CRuntimeProvider";
@@ -18,7 +20,7 @@ import {
   buildRuntimePageStageMap,
   buildRuntimePageTypeMap,
 } from "@/funnels/runtimePageMaps";
-import { parseSitePath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
+import { buildSitePath, parseSitePath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { setMedusaRuntimeConfig } from "@/lib/medusa";
 import { buildSitePreviewPath, resolveSitePreviewPage } from "@/pages/workspaces/sites/sitePreviewRouting";
 
@@ -72,6 +74,10 @@ export function SitePagePreviewPage() {
     () => (siteId && resolvedPage ? buildSitePreviewPath(siteId, resolvedPage.slug) : null),
     [resolvedPage, siteId]
   );
+  const pageAgentEnabled = useMemo(
+    () => isImportedTemplatePageData(normalizedPuckData as Data | null),
+    [normalizedPuckData],
+  );
   const previewBasePath = useMemo(() => (siteId ? buildSitePreviewPath(siteId) : null), [siteId]);
   const productsById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -93,6 +99,7 @@ export function SitePagePreviewPage() {
     siteFamily: site?.siteFamily,
     commerceProvider: site?.commerceProvider,
   }) && Object.keys(runtimePageTypeMap).length > 0;
+  const useFullWidthPreviewFrame = isB2CSitePreview || pageAgentEnabled;
 
   useEffect(() => {
     if (!previewClientId || workspace?.id === previewClientId) return;
@@ -235,6 +242,26 @@ export function SitePagePreviewPage() {
     );
   }
 
+  const activePreviewCountryCode = parsedSitePath.countryCode || "us";
+  const resolvePreviewSitePath = (sitePath: string) => {
+    const normalizedSitePath = (sitePath || "").trim().replace(/^\/+/, "");
+    if (!isB2CSitePreview) {
+      return buildSitePreviewPath(site.id, normalizedSitePath);
+    }
+
+    const parsedTargetPath = parseSitePath(normalizedSitePath);
+    const routePath = parsedTargetPath.countryCode
+      ? normalizedSitePath
+      : buildSitePath({
+          countryCode: activePreviewCountryCode,
+          pageType: parsedTargetPath.pageType === "home" ? undefined : parsedTargetPath.pageType,
+          handle: parsedTargetPath.handle,
+          nestedPath: parsedTargetPath.nestedPath,
+        });
+
+    return buildSitePreviewPath(site.id, routePath);
+  };
+
   const previewRuntimeValue = {
     productSlug: previewProductSlug || "preview-product",
     funnelSlug: previewFunnelSlug || "preview-site",
@@ -243,8 +270,8 @@ export function SitePagePreviewPage() {
     pageTypeMap: runtimePageTypeMap,
     pageId: pageDetail.page.id,
     nextPageId: null,
-    resolvePagePath: (slug: string) => buildSitePreviewPath(site.id, slug),
-    resolveSitePath: (sitePath: string) => buildSitePreviewPath(site.id, sitePath),
+    resolvePagePath: (slug: string) => resolvePreviewSitePath(slug),
+    resolveSitePath: (sitePath: string) => resolvePreviewSitePath(sitePath),
   };
 
   return (
@@ -280,24 +307,41 @@ export function SitePagePreviewPage() {
         </div>
       </div>
 
-      <FunnelRuntimeProvider value={previewRuntimeValue}>
-        {isB2CSitePreview ? (
-          <B2CRuntimeProvider
-            siteFamily={site.siteFamily || "medusa-b2c-starter"}
-            siteName={site.name}
-            siteId={site.id}
-            initialCountryCode={parsedSitePath.countryCode || undefined}
-          >
+      <div
+        data-testid="site-preview-content"
+        className={useFullWidthPreviewFrame ? "w-full py-4" : "mx-auto max-w-7xl px-4 py-4 sm:px-6"}
+      >
+        <FunnelRuntimeProvider value={previewRuntimeValue}>
+          {isB2CSitePreview ? (
+            <B2CRuntimeProvider
+              siteFamily={site.siteFamily || "medusa-b2c-starter"}
+              siteName={site.name}
+              siteId={site.id}
+              siteClientId={site.clientId}
+              initialCountryCode={parsedSitePath.countryCode || undefined}
+              designSystemTokens={pageDetail.designSystemTokens}
+            >
+              <Render config={config} data={normalizedPuckData as unknown as Data} />
+            </B2CRuntimeProvider>
+          ) : (
             <DesignSystemProvider tokens={pageDetail.designSystemTokens}>
               <Render config={config} data={normalizedPuckData as unknown as Data} />
             </DesignSystemProvider>
-          </B2CRuntimeProvider>
-        ) : (
-          <DesignSystemProvider tokens={pageDetail.designSystemTokens}>
-            <Render config={config} data={normalizedPuckData as unknown as Data} />
-          </DesignSystemProvider>
-        )}
-      </FunnelRuntimeProvider>
+          )}
+        </FunnelRuntimeProvider>
+      </div>
+      <PageAgentPanel
+        defaultOpen
+        clientId={site.clientId || workspace?.id || null}
+        productId={site.productId || null}
+        siteId={siteId}
+        pageId={resolvedPage.id}
+        pageName={resolvedPage.name}
+        pageSlug={resolvedPage.slug}
+        mode="preview"
+        enabled={pageAgentEnabled}
+        unavailableReason="The Hermes page agent currently supports imported-template pages only."
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ type BuildImportedRuntimeSrcDocParams = {
   initialTextOverrides?: unknown;
   initialButtonOverrides?: unknown;
   initialImageOverrides?: unknown;
+  purchaseRuntimeData?: unknown;
 };
 
 type ImportedTextOverride = {
@@ -37,8 +38,20 @@ type ImportedButtonOverride = {
 
 type ImportedImageOverride = {
   originalSrc: string;
+  originalText?: string;
   src: string;
   alt: string;
+};
+
+type ImportedPurchaseRuntimeVariant = {
+  title: string;
+  priceLabel: string;
+  compareAtLabel?: string;
+};
+
+type ImportedPurchaseRuntimeData = {
+  ctaBaseLabel?: string;
+  variants: ImportedPurchaseRuntimeVariant[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,16 +124,41 @@ function normalizeImageOverrides(value: unknown): ImportedImageOverride[] {
   for (const entry of value) {
     if (!isRecord(entry)) continue;
     const originalSrc = typeof entry.originalSrc === "string" ? entry.originalSrc.trim() : "";
-    if (!originalSrc) continue;
+    const originalText = typeof entry.originalText === "string" ? entry.originalText.trim() : "";
+    if (!originalSrc && !originalText) continue;
     const src = Object.prototype.hasOwnProperty.call(entry, "src") && typeof entry.src === "string"
       ? entry.src
       : originalSrc;
     const alt = Object.prototype.hasOwnProperty.call(entry, "alt") && typeof entry.alt === "string"
       ? entry.alt
       : "";
-    results.push({ originalSrc, src, alt });
+    results.push({ originalSrc, originalText: originalText || undefined, src, alt });
   }
   return results;
+}
+
+function normalizePurchaseRuntimeData(value: unknown): ImportedPurchaseRuntimeData | null {
+  if (!isRecord(value)) return null;
+  const variantsInput = Array.isArray(value.variants) ? value.variants : [];
+  const variants: ImportedPurchaseRuntimeVariant[] = [];
+  for (const entry of variantsInput) {
+    if (!isRecord(entry)) continue;
+    const title = typeof entry.title === "string" ? entry.title.trim() : "";
+    const priceLabel = typeof entry.priceLabel === "string" ? entry.priceLabel.trim() : "";
+    if (!title || !priceLabel) continue;
+    const compareAtLabel = typeof entry.compareAtLabel === "string" ? entry.compareAtLabel.trim() : "";
+    variants.push({
+      title,
+      priceLabel,
+      compareAtLabel: compareAtLabel || undefined,
+    });
+  }
+  if (!variants.length) return null;
+  const ctaBaseLabel = typeof value.ctaBaseLabel === "string" ? value.ctaBaseLabel.trim() : "";
+  return {
+    ctaBaseLabel: ctaBaseLabel || undefined,
+    variants,
+  };
 }
 
 function escapeHtml(value: string): string {
@@ -205,6 +243,7 @@ export function buildImportedRuntimeSrcDoc({
   initialTextOverrides,
   initialButtonOverrides,
   initialImageOverrides,
+  purchaseRuntimeData,
 }: BuildImportedRuntimeSrcDocParams): string {
   const normalizedHeadAssets = normalizeImportedHeadAssets(headAssets);
   const title = escapeHtml(sectionLabel?.trim() || "Imported section");
@@ -216,6 +255,7 @@ export function buildImportedRuntimeSrcDoc({
   const initialTextOverridesJson = JSON.stringify(normalizeTextOverrides(initialTextOverrides));
   const initialButtonOverridesJson = JSON.stringify(normalizeButtonOverrides(initialButtonOverrides));
   const initialImageOverridesJson = JSON.stringify(normalizeImageOverrides(initialImageOverrides));
+  const purchaseRuntimeDataJson = JSON.stringify(normalizePurchaseRuntimeData(purchaseRuntimeData));
 
   const bridgeScript = escapeInlineTagContent(`
 (() => {
@@ -315,6 +355,7 @@ ${compiledRuntime}
   let textOverrides = ${initialTextOverridesJson};
   let buttonOverrides = ${initialButtonOverridesJson};
   let imageOverrides = ${initialImageOverridesJson};
+  const purchaseRuntimeData = ${purchaseRuntimeDataJson};
   const NEWLINE = String.fromCharCode(10);
   const CARRIAGE_RETURN = String.fromCharCode(13);
   const normalizeText = (value) => {
@@ -361,19 +402,45 @@ ${compiledRuntime}
   };
   const readNormalizedNodeText = (node) => normalizeText(readNodeText(node));
   const readRawButtonText = (element) => normalizeText(readRawText(element));
-  const matchesButtonText = (element, originalText) => {
+  const readButtonAriaLabel = (element) => {
+    if (!(element instanceof Element)) return "";
+    return normalizeText(element.getAttribute("aria-label") || element.getAttribute("title") || "");
+  };
+  const resolveOriginalTextForDisplay = (displayText) => {
+    const normalizedDisplayText = normalizeText(displayText);
+    if (!normalizedDisplayText || !Array.isArray(textOverrides)) {
+      return normalizedDisplayText;
+    }
+    const matchingOverride = textOverrides.find((override) => {
+      const overrideText = normalizeText(typeof override.text === "string" ? override.text : "");
+      return overrideText === normalizedDisplayText && typeof override.originalText === "string";
+    });
+    if (
+      matchingOverride &&
+      typeof matchingOverride.originalText === "string" &&
+      normalizeText(matchingOverride.originalText)
+    ) {
+      return normalizeText(matchingOverride.originalText);
+    }
+    return normalizedDisplayText;
+  };
+  const resolveButtonMatchKind = (element, originalText) => {
     const currentText = readRawButtonText(element);
     const targetText = normalizeText(originalText);
-    if (!targetText) return false;
-    return currentText === targetText || currentText.startsWith(targetText);
+    if (!targetText) return null;
+    if (currentText === targetText || currentText.startsWith(targetText)) {
+      return "text";
+    }
+    const ariaLabel = readButtonAriaLabel(element);
+    if (ariaLabel === targetText || ariaLabel.startsWith(targetText)) {
+      return "accessibility";
+    }
+    return null;
   };
   const buildOverrideButtonText = (element, override) => {
     const originalText = String(override.originalText || "");
     const nextText = typeof override.text === "string" ? override.text : originalText;
-    if (typeof override.action === "string" && override.action.trim() === "medusa_buy_now") {
-      return nextText.replace(/\s*-\s*$/, "").trim();
-    }
-    const currentText = String(element.textContent || "");
+      const currentText = String(element.textContent || "");
     const trimmedCurrentText = currentText.trim();
     const trimmedOriginalText = originalText.trim();
     if (
@@ -386,6 +453,20 @@ ${compiledRuntime}
     }
     return nextText;
   };
+  const applyMatchedButtonText = (element, override, matchKind) => {
+    const originalText = String(override.originalText || "");
+    const nextText = typeof override.text === "string" ? override.text : originalText;
+    if (matchKind === "text") {
+      element.textContent = buildOverrideButtonText(element, override);
+      return;
+    }
+    if (element.hasAttribute("aria-label")) {
+      element.setAttribute("aria-label", nextText);
+    }
+    if (element.hasAttribute("title")) {
+      element.setAttribute("title", nextText);
+    }
+  };
   const postCommerceAction = (payload) => {
     const postEvent =
       typeof window.__postImportedRuntimeEvent === "function"
@@ -393,240 +474,46 @@ ${compiledRuntime}
         : (type, detail) => parent.postMessage({ source: "mos-imported-runtime", frameId: runtimeFrameId, type, ...detail }, "*");
     postEvent("commerce-action", payload);
   };
-  const postHashNavigation = (hash) => {
-    const normalizedHash = String(hash || "").trim();
-    if (!normalizedHash) return;
+  const postNavigationAction = (payload) => {
     const postEvent =
       typeof window.__postImportedRuntimeEvent === "function"
         ? window.__postImportedRuntimeEvent
         : (type, detail) => parent.postMessage({ source: "mos-imported-runtime", frameId: runtimeFrameId, type, ...detail }, "*");
-    postEvent("navigate-hash", { hash: normalizedHash });
+    postEvent("navigate", payload);
   };
-  const readMoneyTokens = (value) => {
-    const matches = String(value || "").match(/[$€£]\s?\d+(?:[.,]\d+)?/g);
-    return Array.isArray(matches) ? matches.map((entry) => entry.trim()) : [];
-  };
-  const readTierCards = (scope) => {
-    if (!(scope instanceof Element)) return [];
-    return Array.from(scope.querySelectorAll("*")).filter((candidate) => {
-      if (!(candidate instanceof HTMLElement)) return false;
-      if (!candidate.classList.contains("cursor-pointer")) return false;
-      const titleElement = candidate.querySelector("h3");
-      if (!(titleElement instanceof HTMLElement)) return false;
-      return /pouch/i.test(normalizeText(titleElement.textContent));
-    });
-  };
-  const readSelectedTierCard = (scope) => {
-    if (!(scope instanceof Element)) return null;
-    const tierCards = readTierCards(scope);
-    if (!tierCards.length) {
-      const fallbackCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
-        if (!(candidate instanceof HTMLElement)) return false;
-        if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
-          return false;
-        }
-        return candidate.querySelector("h3") instanceof HTMLElement;
-      });
-      return fallbackCard instanceof HTMLElement ? fallbackCard : null;
-    }
-    const explicitSelected = tierCards.find((candidate) => candidate.dataset.mosImportedSelectedTier === "true");
-    if (explicitSelected) return explicitSelected;
-    const classSelected = tierCards.find(
-      (candidate) => candidate.classList.contains("border-primary") && candidate.classList.contains("bg-bg-card"),
-    );
-    return classSelected || tierCards[0] || null;
-  };
-  const readTierCardPrice = (tierCard) => {
-    if (!(tierCard instanceof HTMLElement)) return null;
-    const moneyTokens = readMoneyTokens(tierCard.textContent || "");
-    if (!moneyTokens.length) return null;
-    return moneyTokens.length >= 2 ? moneyTokens[moneyTokens.length - 2] : moneyTokens[moneyTokens.length - 1];
-  };
-  const readSelectedTierPrice = (scope) => {
-    const selectedTierCard = readSelectedTierCard(scope);
-    return readTierCardPrice(selectedTierCard);
-  };
-  const setTierCardSelected = (card, selected) => {
-    if (!(card instanceof HTMLElement)) return;
-    card.dataset.mosImportedSelectedTier = selected ? "true" : "false";
-    card.classList.toggle("border-primary", selected);
-    card.classList.toggle("bg-bg-card", selected);
-    card.classList.toggle("border-black/10", !selected);
-    card.classList.toggle("bg-white", !selected);
-
-    const indicator = Array.from(card.querySelectorAll("div")).find((candidate) => {
-      return candidate instanceof HTMLElement && candidate.classList.contains("rounded-circle") && candidate.classList.contains("border-2");
-    });
-    if (indicator instanceof HTMLElement) {
-      indicator.classList.toggle("border-primary", selected);
-      indicator.classList.toggle("border-black/20", !selected);
-      let dot = Array.from(indicator.children).find((child) => child instanceof HTMLElement && child.classList.contains("rounded-circle"));
-      if (selected) {
-        if (!(dot instanceof HTMLElement)) {
-          dot = document.createElement("div");
-          dot.className = "w-3 h-3 rounded-circle bg-primary";
-          indicator.appendChild(dot);
-        }
-      } else if (dot instanceof HTMLElement) {
-        dot.remove();
-      }
-    }
-  };
-  const syncBuyNowButtonText = (scope) => {
-    if (!(scope instanceof Element)) return;
-    const buyButton = scope.querySelector('[data-mos-imported-action="medusa_buy_now"]');
-    if (!(buyButton instanceof HTMLElement)) return;
-    const prefix = String(buyButton.dataset.mosImportedLabelPrefix || readRawButtonText(buyButton) || "BUY NOW").replace(/\s*-\s*$/, "").trim();
-    const price = readSelectedTierPrice(scope);
-    if (price) {
-      buyButton.dataset.mosImportedSelectedPrice = price;
-    }
-    buyButton.textContent = prefix;
-  };
-  const readFlavorButtons = (scope) => {
-    if (!(scope instanceof Element)) return [];
-    const flavorLabel = Array.from(scope.querySelectorAll("*")).find((candidate) => {
-      return candidate instanceof HTMLElement && normalizeText(candidate.textContent) === "Choose Flavor:";
-    });
-    if (!(flavorLabel instanceof HTMLElement) || !(flavorLabel.nextElementSibling instanceof HTMLElement)) return [];
-    return Array.from(flavorLabel.nextElementSibling.querySelectorAll("button")).filter((candidate) => {
-      return normalizeText(candidate.textContent).length > 0;
-    });
-  };
-  const setFlavorButtonSelected = (button, selected) => {
-    if (!(button instanceof HTMLElement)) return;
-    button.dataset.mosImportedSelectedFlavor = selected ? "true" : "false";
-    button.classList.toggle("border-primary", selected);
-    button.classList.toggle("bg-bg-card", selected);
-    button.classList.toggle("text-primary", selected);
-    button.classList.toggle("shadow-sm", selected);
-    button.classList.toggle("border-black/10", !selected);
-    button.classList.toggle("bg-white", !selected);
-    button.classList.toggle("text-text-dark/70", !selected);
-    button.classList.toggle("hover:border-black/20", !selected);
-  };
-  const enhanceOmniPurchaseSelection = (scope) => {
-    if (!(scope instanceof Element)) return;
-    const buyButton = scope.querySelector('[data-mos-imported-action="medusa_buy_now"]');
-    if (!(buyButton instanceof HTMLElement)) return;
-
-    const tierCards = readTierCards(scope);
-    if (tierCards.length) {
-      const applySelectedTierPrice = () => {
-        const selectedPrice = readSelectedTierPrice(scope);
-        const prefix = String(buyButton.dataset.mosImportedLabelPrefix || readRawButtonText(buyButton) || "BUY NOW").replace(/\s*-\s*$/, "").trim();
-        if (selectedPrice) {
-          buyButton.dataset.mosImportedSelectedPrice = selectedPrice;
-        }
-        buyButton.textContent = prefix;
-      };
-      const selectedCard = readSelectedTierCard(scope);
-      tierCards.forEach((candidate) => setTierCardSelected(candidate, candidate === selectedCard));
-      tierCards.forEach((candidate) => {
-        if (candidate.dataset.mosImportedTierBound === "true") return;
-        candidate.dataset.mosImportedTierBound = "true";
-        candidate.tabIndex = 0;
-        candidate.setAttribute("role", "button");
-        candidate.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (typeof event.stopImmediatePropagation === "function") {
-            event.stopImmediatePropagation();
-          }
-          tierCards.forEach((entry) => setTierCardSelected(entry, entry === candidate));
-          applySelectedTierPrice();
-          if (typeof queueMicrotask === "function") {
-            queueMicrotask(applySelectedTierPrice);
-          } else {
-            setTimeout(applySelectedTierPrice, 0);
-          }
-          setTimeout(applySelectedTierPrice, 32);
-          if (typeof window.__notifyImportedRuntimeHeight === "function") {
-            window.__notifyImportedRuntimeHeight();
-          }
-        }, true);
-        candidate.addEventListener("keydown", (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          candidate.click();
-        });
-      });
-      if (typeof MutationObserver === "function" && scope instanceof HTMLElement && scope.dataset.mosImportedTierObserverBound !== "true") {
-        scope.dataset.mosImportedTierObserverBound = "true";
-        const observer = new MutationObserver(() => applySelectedTierPrice());
-        tierCards.forEach((candidate) => {
-          observer.observe(candidate, {
-            attributes: true,
-            attributeFilter: ["data-mos-imported-selected-tier"],
-          });
-        });
-      }
-      applySelectedTierPrice();
-    }
-
-    const flavorButtons = readFlavorButtons(scope);
-    if (flavorButtons.length) {
-      const selectedFlavor = flavorButtons.find((candidate) => candidate.classList.contains("border-primary")) || flavorButtons[0];
-      flavorButtons.forEach((candidate) => setFlavorButtonSelected(candidate, candidate === selectedFlavor));
-      flavorButtons.forEach((candidate) => {
-        if (candidate.dataset.mosImportedFlavorBound === "true") return;
-        candidate.dataset.mosImportedFlavorBound = "true";
-        candidate.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (typeof event.stopImmediatePropagation === "function") {
-            event.stopImmediatePropagation();
-          }
-          flavorButtons.forEach((entry) => setFlavorButtonSelected(entry, entry === candidate));
-          if (typeof window.__notifyImportedRuntimeHeight === "function") {
-            window.__notifyImportedRuntimeHeight();
-          }
-        }, true);
-      });
-    }
-
-    syncBuyNowButtonText(scope);
-  };
-  const resolveImplicitTargetHash = (override) => {
-    const href = typeof override.href === "string" ? override.href.trim() : "";
-    if (href.startsWith("#")) return href;
-    const label = normalizeText(typeof override.text === "string" ? override.text : override.originalText).toUpperCase();
-    if (!label) return "";
-    if (
-      label.includes("TRY OMNI") ||
-      label.includes("SHOP OMNI") ||
-      label === "SHOP NOW" ||
-      label === "GET STARTED"
-    ) {
-      return "#shop";
-    }
-    return "";
-  };
-  const wireHashNavigation = (element, targetHash) => {
+  const wireNavigationAction = (element, override) => {
     if (!(element instanceof HTMLElement)) return;
-    const normalizedHash = String(targetHash || "").trim();
-    if (!normalizedHash || !normalizedHash.startsWith("#")) return;
-    if (element.dataset.mosImportedHashBound === "true") return;
-    element.dataset.mosImportedHashBound = "true";
+    const href = typeof override.href === "string" ? override.href.trim() : "";
+    if (!href) return;
+    if (element.dataset.mosImportedNavigationBound === "true") return;
+    element.dataset.mosImportedNavigationBound = "true";
+    element.dataset.mosImportedNavigationHref = href;
     element.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === "function") {
-        event.stopImmediatePropagation();
-      }
-      postHashNavigation(normalizedHash);
-    }, true);
+      postNavigationAction({
+        href,
+        buttonText: readRawButtonText(element),
+      });
+    });
   };
   const resolveButtonSelection = (scope, strategy) => {
     if (!(scope instanceof Element)) return null;
     if (strategy !== "omni_selected_tier") return null;
 
-    const tierCard = readSelectedTierCard(scope);
+    const tierCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
+        return false;
+      }
+      return candidate.querySelector("h3") instanceof HTMLElement;
+    });
 
     if (!(tierCard instanceof HTMLElement)) return null;
     const titleElement = tierCard.querySelector("h3");
     const selectedOfferTitle = normalizeText(titleElement ? titleElement.textContent : "");
-    return selectedOfferTitle || null;
+    if (!selectedOfferTitle) return null;
+    return resolveOriginalTextForDisplay(selectedOfferTitle);
   };
   const wireCommerceAction = (scope, element, override) => {
     if (!(element instanceof HTMLElement)) return;
@@ -642,9 +529,6 @@ ${compiledRuntime}
     element.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === "function") {
-        event.stopImmediatePropagation();
-      }
       const selectionStrategy = typeof override.selectionStrategy === "string" ? override.selectionStrategy.trim() : "";
       const selectedOfferTitle = resolveButtonSelection(scope, selectionStrategy);
       postCommerceAction({
@@ -654,7 +538,133 @@ ${compiledRuntime}
         selectedOfferTitle,
         buttonText: readRawButtonText(element),
       });
-    }, true);
+    });
+  };
+  const appendFooterNavigationLinks = (scope, unmatchedOverrides) => {
+    if (!(scope instanceof Element)) return;
+    if (componentName !== "GlobalFooter" || !Array.isArray(unmatchedOverrides) || !unmatchedOverrides.length) {
+      return;
+    }
+
+    const existingLinks = Array.from(scope.querySelectorAll("a[href]"));
+    const navContainer =
+      existingLinks.find((candidate) => candidate.getAttribute("href") === "policies/contact-support")?.parentElement ||
+      existingLinks.find((candidate) => candidate.getAttribute("href") === "account")?.parentElement ||
+      null;
+    if (!(navContainer instanceof HTMLElement)) {
+      return;
+    }
+
+    const templateLink = existingLinks.find((candidate) => candidate.parentElement === navContainer) || null;
+    for (const override of unmatchedOverrides) {
+      const href = typeof override.href === "string" ? override.href.trim() : "";
+      const text = typeof override.text === "string" ? override.text.trim() : "";
+      if (!href || !text || typeof override.action === "string") {
+        continue;
+      }
+      const existing = Array.from(navContainer.querySelectorAll("a")).find(
+        (candidate) => normalizeText(candidate.getAttribute("href") || "") === normalizeText(href),
+      );
+      if (existing) {
+        continue;
+      }
+      const link = document.createElement("a");
+      link.href = href;
+      link.textContent = text;
+      if (templateLink instanceof HTMLElement) {
+        link.className = templateLink.className;
+      }
+      navContainer.appendChild(link);
+      wireNavigationAction(link, override);
+    }
+  };
+  const findSelectedPurchaseCard = (scope) => {
+    if (!(scope instanceof Element)) return null;
+    return (
+      Array.from(scope.querySelectorAll("*")).find((candidate) => {
+        if (!(candidate instanceof HTMLElement)) return false;
+        if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
+          return false;
+        }
+        return candidate.querySelector("h3") instanceof HTMLElement;
+      }) || null
+    );
+  };
+  const findPurchaseVariantByTitle = (displayTitle) => {
+    if (!purchaseRuntimeData || !Array.isArray(purchaseRuntimeData.variants)) {
+      return null;
+    }
+    const normalizedOriginalTitle = resolveOriginalTextForDisplay(displayTitle);
+    return (
+      purchaseRuntimeData.variants.find(
+        (variant) => normalizeText(variant.title) === normalizedOriginalTitle,
+      ) || null
+    );
+  };
+  const renderPurchasePriceColumn = (container, variant) => {
+    if (!(container instanceof HTMLElement) || !variant) return;
+    container.replaceChildren();
+    if (variant.compareAtLabel) {
+      const compareAt = document.createElement("div");
+      compareAt.className = "text-[14px] text-text-dark/40 line-through font-medium mb-1";
+      compareAt.textContent = variant.compareAtLabel;
+      container.appendChild(compareAt);
+    }
+    const price = document.createElement("div");
+    price.className = "text-[20px] font-bold text-text-dark leading-none";
+    price.textContent = variant.priceLabel;
+    container.appendChild(price);
+  };
+  const syncPurchaseRuntime = (scope) => {
+    if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
+      return;
+    }
+
+    const titleElements = Array.from(scope.querySelectorAll("h3"));
+    for (const titleElement of titleElements) {
+      const displayTitle = normalizeText(titleElement.textContent || "");
+      const variant = findPurchaseVariantByTitle(displayTitle);
+      if (!variant) {
+        continue;
+      }
+      const card = titleElement.closest('[class*="cursor-pointer"]');
+      if (!(card instanceof HTMLElement)) {
+        continue;
+      }
+      const priceColumn = card.lastElementChild;
+      if (priceColumn instanceof HTMLElement) {
+        renderPurchasePriceColumn(priceColumn, variant);
+      }
+    }
+
+    const selectedCard = findSelectedPurchaseCard(scope);
+    const selectedTitle = normalizeText(selectedCard?.querySelector("h3")?.textContent || "");
+    const selectedVariant = findPurchaseVariantByTitle(selectedTitle) || purchaseRuntimeData.variants[0] || null;
+    const ctaButton = Array.from(scope.querySelectorAll("button, a")).find((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      return candidate.dataset.mosImportedAction === "medusa_buy_now";
+    });
+    if (ctaButton instanceof HTMLElement && selectedVariant) {
+      const ctaBaseLabel = String(purchaseRuntimeData.ctaBaseLabel || "").trim();
+      ctaButton.textContent = [ctaBaseLabel, selectedVariant.priceLabel].filter(Boolean).join(" ").trim();
+    }
+  };
+  const bindPurchaseRuntime = (scope) => {
+    if (!(scope instanceof HTMLElement) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
+      return;
+    }
+    if (scope.dataset.mosImportedPurchaseRuntimeBound !== "true") {
+      scope.dataset.mosImportedPurchaseRuntimeBound = "true";
+      scope.addEventListener("click", () => {
+        const run = () => syncPurchaseRuntime(scope);
+        if (typeof queueMicrotask === "function") {
+          queueMicrotask(run);
+        } else {
+          requestAnimationFrame(run);
+        }
+      });
+    }
+    syncPurchaseRuntime(scope);
   };
   const componentRegistry =
     globalThis.__mosImportedRuntimeComponents &&
@@ -704,16 +714,30 @@ ${compiledRuntime}
     if (!(target instanceof HTMLElement)) {
       throw new Error('Imported section target "' + sectionTargetId + '" was not found in the rendered runtime.');
     }
-    const isolatedTarget = target.cloneNode(true);
-    if (!(isolatedTarget instanceof HTMLElement)) {
-      throw new Error('Imported section target "' + sectionTargetId + '" could not be isolated.');
-    }
-    container.replaceChildren(isolatedTarget);
-    return isolatedTarget;
+    Array.from(container.querySelectorAll("[data-section-id]")).forEach((candidate) => {
+      if (!(candidate instanceof HTMLElement) || candidate === target) {
+        return;
+      }
+      candidate.hidden = true;
+      candidate.style.setProperty("display", "none", "important");
+    });
+    target.hidden = false;
+    target.style.removeProperty("display");
+    return target;
   };
 
   const applyTextOverrides = (scope) => {
     if (!scope || !textOverrides.length || typeof document.createTreeWalker !== "function") return;
+    const overrideModeByText = new Map();
+    for (const override of textOverrides) {
+      const originalText = normalizeText(override.originalText);
+      if (!originalText) continue;
+      const nextText = typeof override.text === "string" ? override.text : override.originalText;
+      const current = overrideModeByText.get(originalText) || { count: 0, values: new Set() };
+      current.count += 1;
+      current.values.add(nextText);
+      overrideModeByText.set(originalText, current);
+    }
     const textNodes = [];
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -735,17 +759,150 @@ ${compiledRuntime}
       const originalText = normalizeText(override.originalText);
       if (!originalText) continue;
       const nextText = typeof override.text === "string" ? override.text : override.originalText;
+      const overrideMode = overrideModeByText.get(originalText);
+      const replaceAllMatches = Boolean(overrideMode) && overrideMode.values.size === 1;
       let matched = false;
+      const matchedNodeIndexes = [];
       for (let index = 0; index < textNodes.length; index += 1) {
         if (used.has(index)) continue;
         const node = textNodes[index];
         if (normalizeText(node.textContent) !== originalText) continue;
-        node.textContent = nextText;
+        matchedNodeIndexes.push(index);
+        if (!replaceAllMatches) break;
+      }
+      if (matchedNodeIndexes.length) {
+        for (const index of matchedNodeIndexes) {
+          const node = textNodes[index];
+          node.textContent = nextText;
+          used.add(index);
+        }
+        matched = true;
+      }
+      if (matched || !(scope instanceof Element)) continue;
+
+      const elementDepth = (element) => {
+        let depth = 0;
+        let current = element.parentElement;
+        while (current) {
+          depth += 1;
+          current = current.parentElement;
+        }
+        return depth;
+      };
+
+      const allElements = [scope, ...Array.from(scope.querySelectorAll("*"))];
+      const matchingElements = allElements
+        .filter((element) => readNormalizedNodeText(element) === originalText)
+        .filter(
+          (element) =>
+            !Array.from(element.querySelectorAll("*")).some(
+              (child) => readNormalizedNodeText(child) === originalText,
+            ),
+        )
+        .sort((left, right) => {
+          const leftDepth = elementDepth(left);
+          const rightDepth = elementDepth(right);
+          return rightDepth - leftDepth;
+        });
+
+      const targets = replaceAllMatches ? matchingElements : matchingElements.slice(0, 1);
+      for (const target of targets) {
+        if (!(target instanceof HTMLElement)) continue;
+
+        const slots = [];
+        target.childNodes.forEach((node) => {
+          if (node.nodeType === Node.TEXT_NODE && normalizeText(node.textContent)) {
+            slots.push(node);
+            return;
+          }
+          if (node instanceof HTMLElement && node.tagName.toLowerCase() !== "br" && readNormalizedNodeText(node)) {
+            slots.push(node);
+          }
+        });
+
+        const segments = splitOverrideSegments(nextText);
+
+        if (segments.length > 1 && slots.length === segments.length) {
+          slots.forEach((slot, slotIndex) => {
+            const segment = segments[slotIndex] || "";
+            slot.textContent = segment;
+          });
+        } else {
+          target.textContent = nextText;
+        }
+      }
+    }
+  };
+
+  const applyButtonOverrides = (scope) => {
+    if (!(scope instanceof Element) || !buttonOverrides.length) return;
+    const actions = Array.from(scope.querySelectorAll("a, button"));
+    const used = new Set();
+    const unmatchedOverrides = [];
+    for (const override of buttonOverrides) {
+      const originalText = normalizeText(override.originalText);
+      if (!originalText) continue;
+      let matched = false;
+      for (let index = 0; index < actions.length; index += 1) {
+        if (used.has(index)) continue;
+        const element = actions[index];
+        const matchKind = resolveButtonMatchKind(element, originalText);
+        if (!matchKind) continue;
+        applyMatchedButtonText(element, override, matchKind);
+        if (element instanceof HTMLAnchorElement && typeof override.href === "string") {
+          if (override.href) {
+            element.setAttribute("href", override.href);
+          } else {
+            element.removeAttribute("href");
+          }
+        }
+        wireCommerceAction(scope, element, override);
+        wireNavigationAction(element, override);
         used.add(index);
         matched = true;
         break;
       }
-      if (matched || !(scope instanceof Element)) continue;
+      if (!matched) {
+        unmatchedOverrides.push(override);
+      }
+    }
+    appendFooterNavigationLinks(scope, unmatchedOverrides);
+  };
+
+  const applyImageOverrides = (scope) => {
+    if (!(scope instanceof Element) || !imageOverrides.length) return;
+    const images = Array.from(scope.querySelectorAll("img"));
+    const used = new Set();
+    for (const override of imageOverrides) {
+      const originalSrc = typeof override.originalSrc === "string" ? override.originalSrc.trim() : "";
+      const originalText = typeof override.originalText === "string" ? normalizeText(override.originalText) : "";
+      if (!originalSrc && !originalText) continue;
+      if (!override.src) continue;
+      for (let index = 0; index < images.length; index += 1) {
+        if (used.has(index)) continue;
+        const image = images[index];
+        const currentSrc = image.getAttribute("src") || "";
+        if (
+          currentSrc !== originalSrc &&
+          !currentSrc.endsWith(originalSrc) &&
+          !currentSrc.includes(originalSrc)
+        ) {
+          continue;
+        }
+        const nextSrc = typeof override.src === "string" ? override.src : originalSrc;
+        if (nextSrc) {
+          image.setAttribute("src", nextSrc);
+        } else {
+          image.removeAttribute("src");
+        }
+        if (typeof override.alt === "string") {
+          image.setAttribute("alt", override.alt);
+        }
+        used.add(index);
+        break;
+      }
+
+      if (!originalText) continue;
 
       const elementDepth = (element) => {
         let depth = 0;
@@ -775,89 +932,16 @@ ${compiledRuntime}
       const target = matchingElements[0];
       if (!(target instanceof HTMLElement)) continue;
 
-      const slots = [];
-      target.childNodes.forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE && normalizeText(node.textContent)) {
-          slots.push(node);
-          return;
-        }
-        if (node instanceof HTMLElement && node.tagName.toLowerCase() !== "br" && readNormalizedNodeText(node)) {
-          slots.push(node);
-        }
-      });
-
-      const segments = splitOverrideSegments(nextText);
-
-      if (segments.length > 1 && slots.length === segments.length) {
-        slots.forEach((slot, slotIndex) => {
-          const segment = segments[slotIndex] || "";
-          slot.textContent = segment;
-        });
-      } else {
-        target.textContent = nextText;
-      }
-    }
-  };
-
-  const applyButtonOverrides = (scope) => {
-    if (!(scope instanceof Element) || !buttonOverrides.length) return;
-    const actions = Array.from(scope.querySelectorAll("a, button"));
-    const used = new Set();
-    for (const override of buttonOverrides) {
-      const originalText = normalizeText(override.originalText);
-      if (!originalText) continue;
-      for (let index = 0; index < actions.length; index += 1) {
-        if (used.has(index)) continue;
-        const element = actions[index];
-        if (!matchesButtonText(element, originalText)) continue;
-        const nextText = buildOverrideButtonText(element, override);
-        element.dataset.mosImportedLabelPrefix = typeof override.text === "string" ? override.text : override.originalText;
-        element.textContent = nextText;
-        if (element instanceof HTMLAnchorElement && typeof override.href === "string") {
-          if (override.href) {
-            element.setAttribute("href", override.href);
-          } else {
-            element.removeAttribute("href");
-          }
-        }
-        wireCommerceAction(scope, element, override);
-        wireHashNavigation(element, resolveImplicitTargetHash(override));
-        used.add(index);
-        break;
-      }
-    }
-  };
-
-  const applyImageOverrides = (scope) => {
-    if (!(scope instanceof Element) || !imageOverrides.length) return;
-    const images = Array.from(scope.querySelectorAll("img"));
-    const used = new Set();
-    for (const override of imageOverrides) {
-      const originalSrc = typeof override.originalSrc === "string" ? override.originalSrc.trim() : "";
-      if (!originalSrc) continue;
-      for (let index = 0; index < images.length; index += 1) {
-        if (used.has(index)) continue;
-        const image = images[index];
-        const currentSrc = image.getAttribute("src") || "";
-        if (
-          currentSrc !== originalSrc &&
-          !currentSrc.endsWith(originalSrc) &&
-          !currentSrc.includes(originalSrc)
-        ) {
-          continue;
-        }
-        const nextSrc = typeof override.src === "string" ? override.src : originalSrc;
-        if (nextSrc) {
-          image.setAttribute("src", nextSrc);
-        } else {
-          image.removeAttribute("src");
-        }
-        if (typeof override.alt === "string") {
-          image.setAttribute("alt", override.alt);
-        }
-        used.add(index);
-        break;
-      }
+      const replacementImage = document.createElement("img");
+      replacementImage.src = override.src;
+      replacementImage.alt = typeof override.alt === "string" ? override.alt : "";
+      replacementImage.style.display = "block";
+      replacementImage.style.maxWidth = "100%";
+      replacementImage.style.maxHeight = "48px";
+      replacementImage.style.width = "auto";
+      replacementImage.style.objectFit = "contain";
+      replacementImage.setAttribute("data-mos-imported-replacement-image", "true");
+      target.replaceChildren(replacementImage);
     }
   };
 
@@ -866,7 +950,7 @@ ${compiledRuntime}
     applyTextOverrides(sectionRoot);
     applyButtonOverrides(sectionRoot);
     applyImageOverrides(sectionRoot);
-    enhanceOmniPurchaseSelection(sectionRoot);
+    bindPurchaseRuntime(sectionRoot);
   };
 
   const renderAndFinalizeSection = () => {
