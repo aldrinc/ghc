@@ -52,6 +52,7 @@ type ImportedPurchaseRuntimeVariant = {
 type ImportedPurchaseRuntimeData = {
   ctaBaseLabel?: string;
   variants: ImportedPurchaseRuntimeVariant[];
+  imageUrls?: string[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,9 +156,13 @@ function normalizePurchaseRuntimeData(value: unknown): ImportedPurchaseRuntimeDa
   }
   if (!variants.length) return null;
   const ctaBaseLabel = typeof value.ctaBaseLabel === "string" ? value.ctaBaseLabel.trim() : "";
+  const imageUrls = Array.isArray(value.imageUrls)
+    ? value.imageUrls.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
   return {
     ctaBaseLabel: ctaBaseLabel || undefined,
     variants,
+    imageUrls,
   };
 }
 
@@ -424,16 +429,20 @@ ${compiledRuntime}
     }
     return normalizedDisplayText;
   };
-  const resolveButtonMatchKind = (element, originalText) => {
+  const resolveButtonMatchKind = (element, override) => {
     const currentText = readRawButtonText(element);
-    const targetText = normalizeText(originalText);
-    if (!targetText) return null;
-    if (currentText === targetText || currentText.startsWith(targetText)) {
-      return "text";
-    }
     const ariaLabel = readButtonAriaLabel(element);
-    if (ariaLabel === targetText || ariaLabel.startsWith(targetText)) {
-      return "accessibility";
+    const candidateTexts = [
+      normalizeText(typeof override.originalText === "string" ? override.originalText : ""),
+      normalizeText(typeof override.text === "string" ? override.text : ""),
+    ].filter(Boolean);
+    for (const candidateText of candidateTexts) {
+      if (currentText === candidateText || currentText.startsWith(candidateText)) {
+        return "text";
+      }
+      if (ariaLabel === candidateText || ariaLabel.startsWith(candidateText)) {
+        return "accessibility";
+      }
     }
     return null;
   };
@@ -556,6 +565,11 @@ ${compiledRuntime}
     }
 
     const templateLink = existingLinks.find((candidate) => candidate.parentElement === navContainer) || null;
+    const insertionAnchor =
+      Array.from(navContainer.querySelectorAll("a")).find((candidate) => {
+        const href = candidate.getAttribute("href") || "";
+        return href === "#product-purchase-section" || href === "account";
+      }) || null;
     for (const override of unmatchedOverrides) {
       const href = typeof override.href === "string" ? override.href.trim() : "";
       const text = typeof override.text === "string" ? override.text.trim() : "";
@@ -574,7 +588,11 @@ ${compiledRuntime}
       if (templateLink instanceof HTMLElement) {
         link.className = templateLink.className;
       }
-      navContainer.appendChild(link);
+      if (insertionAnchor instanceof HTMLElement) {
+        navContainer.insertBefore(link, insertionAnchor);
+      } else {
+        navContainer.appendChild(link);
+      }
       wireNavigationAction(link, override);
     }
   };
@@ -615,6 +633,28 @@ ${compiledRuntime}
     price.textContent = variant.priceLabel;
     container.appendChild(price);
   };
+  const syncPurchaseImages = (scope) => {
+    if (
+      !(scope instanceof Element) ||
+      !purchaseRuntimeData ||
+      !Array.isArray(purchaseRuntimeData.imageUrls) ||
+      !purchaseRuntimeData.imageUrls.length
+    ) {
+      return;
+    }
+    const images = Array.from(scope.querySelectorAll("img"));
+    if (!images.length) {
+      return;
+    }
+    const fallbackImageUrl = purchaseRuntimeData.imageUrls[0];
+    images.forEach((image, index) => {
+      const nextImageUrl = purchaseRuntimeData.imageUrls[index] || fallbackImageUrl;
+      if (!nextImageUrl) {
+        return;
+      }
+      image.setAttribute("src", nextImageUrl);
+    });
+  };
   const syncPurchaseRuntime = (scope) => {
     if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
       return;
@@ -648,6 +688,7 @@ ${compiledRuntime}
       const ctaBaseLabel = String(purchaseRuntimeData.ctaBaseLabel || "").trim();
       ctaButton.textContent = [ctaBaseLabel, selectedVariant.priceLabel].filter(Boolean).join(" ").trim();
     }
+    syncPurchaseImages(scope);
   };
   const bindPurchaseRuntime = (scope) => {
     if (!(scope instanceof HTMLElement) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
@@ -846,7 +887,7 @@ ${compiledRuntime}
       for (let index = 0; index < actions.length; index += 1) {
         if (used.has(index)) continue;
         const element = actions[index];
-        const matchKind = resolveButtonMatchKind(element, originalText);
+        const matchKind = resolveButtonMatchKind(element, override);
         if (!matchKind) continue;
         applyMatchedButtonText(element, override, matchKind);
         if (element instanceof HTMLAnchorElement && typeof override.href === "string") {

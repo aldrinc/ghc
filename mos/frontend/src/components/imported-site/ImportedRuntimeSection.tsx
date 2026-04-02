@@ -40,6 +40,7 @@ type ImportedRuntimeNavigationPayload = {
 
 type ImportedPurchaseRuntimeData = {
   ctaBaseLabel?: string;
+  imageUrls?: string[];
   variants: Array<{
     title: string;
     priceLabel: string;
@@ -189,6 +190,14 @@ function buildImportedPurchaseRuntimeData(
 
   return {
     ctaBaseLabel: actionLabel?.trim() || undefined,
+    imageUrls: [
+      ...new Set(
+        [
+          ...(Array.isArray(product.images) ? product.images.map((image) => String(image?.url || "").trim()) : []),
+          String(product.thumbnail || "").trim(),
+        ].filter(Boolean),
+      ),
+    ],
     variants: runtimeVariants,
   };
 }
