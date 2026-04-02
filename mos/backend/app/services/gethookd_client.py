@@ -52,6 +52,7 @@ class GetHookdAdResult:
     external_id: Optional[str]
     platform: str
     display_format: Optional[str]
+    ad_unit_format: Optional[str]
     title: Optional[str]
     body: Optional[str]
     cta_type: Optional[str]
@@ -244,6 +245,7 @@ class GetHookdClient:
                     external_id=item.get("external_id"),
                     platform=item.get("platform", ""),
                     display_format=item.get("display_format"),
+                    ad_unit_format=ad_unit_format,
                     title=item.get("title"),
                     body=item.get("body"),
                     cta_type=item.get("cta_type"),

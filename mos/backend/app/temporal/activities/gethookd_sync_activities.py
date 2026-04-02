@@ -270,6 +270,7 @@ async def gethookd_sync_workspace_activity(
         assets_marked_stale = 0
         assets_failed = 0
         credits_used = 0
+        feed_errors: list[str] = []
 
         # Ensure GetHookd inbox collection exists
         collections_repo = SwipeCollectionsRepository(session)
@@ -310,6 +311,7 @@ async def gethookd_sync_workspace_activity(
                 feed_assets_updated = 0
                 feed_assets_marked_stale = 0
                 feed_assets_failed = 0
+                feed_error_message: str | None = None
 
                 # Fetch pages
                 for page in range(1, max_pages + 1):
@@ -365,6 +367,7 @@ async def gethookd_sync_workspace_activity(
                                         title=ad_result.title,
                                         body=ad_result.body,
                                         platforms=ad_result.platform,
+                                        ad_unit_format=ad_result.ad_unit_format,
                                         cta_type=ad_result.cta_type,
                                         cta_text=ad_result.cta_text,
                                         display_format=ad_result.display_format,
@@ -451,6 +454,7 @@ async def gethookd_sync_workspace_activity(
                                         title=ad_result.title,
                                         body=ad_result.body,
                                         platforms=ad_result.platform,
+                                        ad_unit_format=ad_result.ad_unit_format,
                                         cta_type=ad_result.cta_type,
                                         cta_text=ad_result.cta_text,
                                         display_format=ad_result.display_format,
@@ -520,14 +524,21 @@ async def gethookd_sync_workspace_activity(
                                 "error": str(exc),
                             },
                         )
+                        feed_assets_failed += 1
+                        feed_error_message = (
+                            f"Feed '{feed.name}' failed on page {page}: {exc}"
+                        )
                         break  # Stop fetching this feed on error
 
                 session.commit()
-                feeds_succeeded += 1
                 assets_new += feed_assets_new
                 assets_updated += feed_assets_updated
                 assets_marked_stale += feed_assets_marked_stale
                 assets_failed += feed_assets_failed
+                if feed_error_message is None:
+                    feeds_succeeded += 1
+                else:
+                    feed_errors.append(feed_error_message)
 
             except Exception as exc:
                 logger.warning(
@@ -538,11 +549,15 @@ async def gethookd_sync_workspace_activity(
                     },
                 )
                 session.rollback()
+                feed_errors.append(f"Feed '{feed.name}' failed: {exc}")
+
+        error_summary = "; ".join(feed_errors)[:1000] if feed_errors else None
+        final_status = "failed" if feed_errors else "completed"
 
         # Complete the run
         runs_repo.complete(
             run_id=str(run.id),
-            status="completed",
+            status=final_status,
             feeds_attempted=feeds_attempted,
             feeds_succeeded=feeds_succeeded,
             assets_new=assets_new,
@@ -550,10 +565,11 @@ async def gethookd_sync_workspace_activity(
             assets_marked_stale=assets_marked_stale,
             assets_failed=assets_failed,
             credits_used=credits_used,
+            error_summary=error_summary,
         )
 
         return GetHookdSyncActivityOutput(
-            status="completed",
+            status=final_status,
             feeds_attempted=feeds_attempted,
             feeds_succeeded=feeds_succeeded,
             assets_new=assets_new,
@@ -561,6 +577,7 @@ async def gethookd_sync_workspace_activity(
             assets_marked_stale=assets_marked_stale,
             assets_failed=assets_failed,
             credits_used=credits_used,
+            error_summary=error_summary,
         )
 
     except Exception as exc:

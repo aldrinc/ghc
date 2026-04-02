@@ -421,6 +421,84 @@ class TestGetHookdSyncStatus:
         assert "SWIPE_TAXONOMY_MODEL" in output.error_summary
 
 
+def test_gethookd_sync_workspace_surfaces_page_failures(
+    db_session,
+    seed_data,
+    monkeypatch,
+):
+    """Feed-level page failures should return a failed activity result."""
+    client = seed_data["client"]
+    db_session.add(
+        ClientGetHookdCredentials(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            credentials_encrypted="encrypted",
+        )
+    )
+    db_session.add(
+        ClientGetHookdSyncFeed(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            name="Winning feed",
+            enabled=True,
+            filters_json={"query": "supplements"},
+            max_pages_per_run=1,
+            per_page=25,
+        )
+    )
+    db_session.commit()
+
+    def fake_get_session():
+        yield db_session
+
+    class FakeGetHookdClient:
+        def explore(self, *, filters, page, per_page):
+            raise GetHookdClientError("Insufficient credits")
+
+    class FakeRemoteMediaService:
+        def __init__(self, session):
+            self.session = session
+
+    monkeypatch.setattr(gethookd_sync_activities_module, "get_session", fake_get_session)
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "create_gethookd_client",
+        lambda api_token: FakeGetHookdClient(),
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "decrypt_secret_json",
+        lambda _: {"apiToken": "token"},
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module.settings,
+        "SWIPE_TAXONOMY_MODEL",
+        "gemini-test",
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "RemoteMediaService",
+        FakeRemoteMediaService,
+    )
+
+    result = asyncio.run(
+        gethookd_sync_workspace_activity(
+            GetHookdSyncActivityInput(
+                org_id=str(TEST_ORG_ID),
+                client_id=str(client.id),
+            )
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.feeds_attempted == 1
+    assert result.feeds_succeeded == 0
+    assert result.assets_failed == 1
+    assert result.error_summary is not None
+    assert "Winning feed" in result.error_summary
+    assert "Insufficient credits" in result.error_summary
+
+
 class TestGetHookdCreativeChangeDetection:
     """Tests for creative change detection logic."""
 
@@ -459,6 +537,140 @@ class TestGetHookdCreativeChangeDetection:
         creative_changed = old_cta != new_cta
 
         assert creative_changed is True
+
+
+def test_new_gethookd_assets_persist_ad_unit_format(
+    db_session,
+    seed_data,
+    monkeypatch,
+):
+    """New synced assets should keep the normalized ad unit format."""
+    client = seed_data["client"]
+    db_session.add(
+        ClientGetHookdCredentials(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            credentials_encrypted="encrypted",
+        )
+    )
+    db_session.add(
+        ClientGetHookdSyncFeed(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            name="Carousel feed",
+            enabled=True,
+            filters_json={"query": "supplements", "ad_format": "carousel"},
+            max_pages_per_run=1,
+            per_page=25,
+        )
+    )
+    db_session.commit()
+
+    def fake_get_session():
+        yield db_session
+
+    class FakeGetHookdClient:
+        def explore(self, *, filters, page, per_page):
+            return [
+                GetHookdAdResult(
+                    id="carousel-123",
+                    external_id="9999999",
+                    platform="facebook",
+                    display_format="DCO",
+                    ad_unit_format="carousel",
+                    title="Carousel creative",
+                    body="Same body",
+                    cta_type="LEARN_MORE",
+                    cta_text="Learn More",
+                    landing_page="https://example.com",
+                    start_date=None,
+                    end_date=None,
+                    days_active=21,
+                    active_in_library=True,
+                    used_count=4,
+                    performance_score=120,
+                    performance_score_title="Winning",
+                    share_url="https://app.gethookd.ai/share/ad/carousel-123",
+                    ad_library_link=None,
+                    brand_id="brand-1",
+                    brand_name="Acme",
+                    brand_logo_url=None,
+                    media=[
+                        {"type": "image", "url": "https://cdn.example/carousel-1.jpg"},
+                        {"type": "image", "url": "https://cdn.example/carousel-2.jpg"},
+                    ],
+                    raw_json={"id": "carousel-123", "creativeVersion": "v1"},
+                )
+            ]
+
+    class FakeRemoteMediaService:
+        def __init__(self, session):
+            self.session = session
+
+        def upsert_and_mirror(self, *, channel, remote_media):
+            mirrored = self.session.scalar(
+                select(MediaAsset).where(MediaAsset.source_url == remote_media.source_url)
+            )
+            if mirrored is None:
+                mirrored = MediaAsset(
+                    channel=AdChannelEnum.META_ADS_LIBRARY,
+                    asset_type=remote_media.asset_type,
+                    source_url=remote_media.source_url,
+                    mirror_status=MediaMirrorStatusEnum.succeeded,
+                    metadata_json=remote_media.metadata or {},
+                )
+                self.session.add(mirrored)
+                self.session.flush()
+            return RemoteMediaOutput(
+                media_asset_id=str(mirrored.id),
+                storage_key=None,
+                preview_storage_key=None,
+                sha256=None,
+                mirror_status="mirrored",
+            )
+
+    monkeypatch.setattr(gethookd_sync_activities_module, "get_session", fake_get_session)
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "create_gethookd_client",
+        lambda api_token: FakeGetHookdClient(),
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "decrypt_secret_json",
+        lambda _: {"apiToken": "token"},
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module.settings,
+        "SWIPE_TAXONOMY_MODEL",
+        "gemini-test",
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "RemoteMediaService",
+        FakeRemoteMediaService,
+    )
+
+    result = asyncio.run(
+        gethookd_sync_workspace_activity(
+            GetHookdSyncActivityInput(
+                org_id=str(TEST_ORG_ID),
+                client_id=str(client.id),
+            )
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.assets_new == 1
+
+    synced_asset = db_session.scalar(
+        select(CompanySwipeAsset).where(
+            CompanySwipeAsset.org_id == TEST_ORG_ID,
+            CompanySwipeAsset.external_ad_id == "carousel-123",
+        )
+    )
+    assert synced_asset is not None
+    assert synced_asset.ad_unit_format == "carousel"
 
 
 def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership(
@@ -526,6 +738,7 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
                     external_id="9999999",
                     platform="facebook",
                     display_format="image",
+                    ad_unit_format="image",
                     title="Same title",
                     body="Same body",
                     cta_type="LEARN_MORE",
@@ -611,6 +824,7 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
     db_session.expire_all()
     refreshed_asset = db_session.get(CompanySwipeAsset, existing_asset_id)
     assert refreshed_asset is not None
+    assert refreshed_asset.ad_unit_format == "image"
     assert refreshed_asset.review_status == "stale_after_sync"
 
     media_rows = db_session.scalars(
