@@ -559,7 +559,7 @@ ${compiledRuntime}
     for (const override of unmatchedOverrides) {
       const href = typeof override.href === "string" ? override.href.trim() : "";
       const text = typeof override.text === "string" ? override.text.trim() : "";
-      if (!href || !text || typeof override.action === "string") {
+      if (!href || !text || typeof override.action === "string" || !href.startsWith("policies/")) {
         continue;
       }
       const existing = Array.from(navContainer.querySelectorAll("a")).find(
