@@ -481,7 +481,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
     }
 
     const button = dom.window.document.querySelector("button");
-    expect(button?.textContent).toBe("BUY NOW");
+    expect(button?.textContent).toBe("BUY NOW - $117");
 
     button?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
@@ -500,7 +500,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
       selectionStrategy: "omni_selected_tier",
       replaceCart: true,
       selectedOfferTitle: "3 Pouches",
-      buttonText: "BUY NOW",
+      buttonText: "BUY NOW - $117",
     });
   });
 
@@ -1567,7 +1567,7 @@ describe("buildImportedRuntimeSrcDoc", () => {
         {
           originalText: "TRY OMNI TODAY",
           text: "TRY OMNI TODAY",
-          href: "",
+          href: "#shop",
         },
       ],
     });
@@ -1592,14 +1592,14 @@ describe("buildImportedRuntimeSrcDoc", () => {
     button?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
     const navigationMessage = postedMessages.find(
-      (payload) => typeof payload === "object" && payload !== null && (payload as { type?: unknown }).type === "navigate-hash",
+      (payload) => typeof payload === "object" && payload !== null && (payload as { type?: unknown }).type === "navigate",
     ) as Record<string, unknown> | undefined;
 
     expect(navigationMessage).toMatchObject({
       source: "mos-imported-runtime",
       frameId: "frame-hash-nav",
-      type: "navigate-hash",
-      hash: "#shop",
+      type: "navigate",
+      href: "#shop",
     });
   });
 
@@ -2129,6 +2129,131 @@ describe("buildImportedRuntimeSrcDoc", () => {
 
     const lastHeightMessage = [...postedMessages].reverse().find((message) => message.type === "height");
     expect(lastHeightMessage?.height).toBe(82);
+  });
+
+  it("hides legacy flavor selectors and restores the safety badge layout in purchase sections", () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              element.setAttribute(key === "className" ? "class" : key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return { render(node) { container.replaceChildren(renderNode(node)); } };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ProductPurchaseSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "product-purchase-section" },
+          React.createElement(
+            "div",
+            null,
+            React.createElement("span", null, "Get Your Copy:"),
+            React.createElement(
+              "div",
+              { id: "legacy-selector" },
+              React.createElement("button", null, "Watermelon"),
+              React.createElement("button", null, "Peach"),
+            ),
+            React.createElement(
+              "div",
+              { className: "relative cursor-pointer border-primary bg-bg-card" },
+              React.createElement("div", { className: "absolute -top-3 left-1/2" }, "Safety-First"),
+              React.createElement(
+                "div",
+                null,
+                React.createElement("h3", null, "2-Book Bundle"),
+                React.createElement("p", null, "PDF + Printable Checklist"),
+              ),
+              React.createElement(
+                "div",
+                null,
+                React.createElement("span", null, "$117"),
+              ),
+            ),
+          ),
+        );
+      globalThis.__mosImportedRuntimeComponents = { ProductPurchaseSection };
+      const ImportedSection = ProductPurchaseSection;
+    `;
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-purchase-runtime",
+      sectionLabel: "Purchase",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "ProductPurchaseSection",
+      sectionTargetId: "product-purchase-section",
+      initialTextOverrides: [{ label: "Text 17", originalText: "BEST VALUE", text: "Safety-First" }],
+      purchaseRuntimeData: {
+        ctaBaseLabel: "Get Your Handbook",
+        variants: [
+          { title: "Single Book", priceLabel: "$49" },
+          { title: "2-Book Bundle", priceLabel: "$88", compareAtLabel: "$98" },
+        ],
+      },
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage: () => {} };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    const flavorSelector = dom.window.document.getElementById("legacy-selector") as HTMLElement | null;
+    const purchaseCard = dom.window.document.querySelector('[class*="cursor-pointer"]') as HTMLElement | null;
+    const badge = Array.from(dom.window.document.querySelectorAll("*")).find((candidate) => {
+      return candidate instanceof dom.window.HTMLElement && candidate.textContent?.trim() === "Safety-First";
+    }) as HTMLElement | undefined;
+
+    expect(flavorSelector?.style.display).toBe("none");
+    expect(purchaseCard?.style.marginTop).toBe("0.9rem");
+    expect(badge?.style.top).toBe("-0.95rem");
+    expect(badge?.style.whiteSpace).toBe("nowrap");
   });
 
   it("stabilizes viewport units against the host viewport height", () => {

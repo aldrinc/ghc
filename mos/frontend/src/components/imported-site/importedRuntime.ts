@@ -25,6 +25,7 @@ type BuildImportedRuntimeSrcDocParams = {
 type ImportedTextOverride = {
   originalText: string;
   text: string;
+  label?: string;
 };
 
 type ImportedButtonOverride = {
@@ -78,7 +79,11 @@ function normalizeTextOverrides(value: unknown): ImportedTextOverride[] {
     const text = Object.prototype.hasOwnProperty.call(entry, "text") && typeof entry.text === "string"
       ? entry.text
       : originalText;
-    results.push({ originalText, text });
+    const label =
+      Object.prototype.hasOwnProperty.call(entry, "label") && typeof entry.label === "string"
+        ? entry.label.trim()
+        : "";
+    results.push({ originalText, text, label: label || undefined });
   }
   return results;
 }
@@ -471,6 +476,17 @@ ${compiledRuntime}
     }
     return normalizedDisplayText;
   };
+  const findTextOverrideValueByLabel = (labelFragment) => {
+    const normalizedLabelFragment = normalizeText(labelFragment);
+    if (!normalizedLabelFragment || !Array.isArray(textOverrides)) {
+      return "";
+    }
+    const matchingOverride = textOverrides.find((override) => {
+      const label = typeof override.label === "string" ? override.label : "";
+      return normalizeText(label).includes(normalizedLabelFragment) && typeof override.text === "string";
+    });
+    return matchingOverride && typeof matchingOverride.text === "string" ? matchingOverride.text.trim() : "";
+  };
   const resolveButtonMatchKind = (element, override) => {
     const currentText = readRawButtonText(element);
     const ariaLabel = readButtonAriaLabel(element);
@@ -817,6 +833,60 @@ ${compiledRuntime}
       image.setAttribute("src", nextImageUrl);
     });
   };
+  const hideLegacyPurchaseVariantSelector = (scope) => {
+    if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
+      return;
+    }
+    const candidateGroups = Array.from(scope.querySelectorAll("div")).filter((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      const childButtons = Array.from(candidate.children).filter((child) => child instanceof HTMLButtonElement);
+      if (childButtons.length < 2) return false;
+      if (childButtons.some((button) => button.querySelector("img"))) return false;
+      const buttonTexts = childButtons
+        .map((button) => normalizeText(button.textContent || ""))
+        .filter(Boolean);
+      if (!buttonTexts.length) return false;
+      return buttonTexts.every((text) => !findPurchaseVariantByTitle(text));
+    });
+    const selectorGroup = candidateGroups[0];
+    if (!(selectorGroup instanceof HTMLElement)) {
+      return;
+    }
+    selectorGroup.hidden = true;
+    selectorGroup.style.setProperty("display", "none", "important");
+  };
+  const syncPurchaseBadgeLayout = (scope) => {
+    if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection") {
+      return;
+    }
+    const badgeTexts = new Set(
+      [
+        findTextOverrideValueByLabel("text 17"),
+        "Safety-First",
+        "Safety First",
+        "BEST VALUE",
+      ]
+        .map((value) => normalizeText(value))
+        .filter(Boolean),
+    );
+    listPurchaseCards(scope).forEach((card) => {
+      card.style.overflow = "visible";
+      const badge = Array.from(card.querySelectorAll("*")).find((candidate) => {
+        if (!(candidate instanceof HTMLElement)) return false;
+        return badgeTexts.has(normalizeText(candidate.textContent || ""));
+      });
+      if (!(badge instanceof HTMLElement)) {
+        return;
+      }
+      card.style.marginTop = "0.9rem";
+      badge.style.top = "-0.95rem";
+      badge.style.left = "50%";
+      badge.style.transform = "translateX(-50%)";
+      badge.style.zIndex = "2";
+      badge.style.whiteSpace = "nowrap";
+      badge.style.padding = "0.35rem 0.9rem";
+    });
+  };
   const syncPurchaseRuntime = (scope) => {
     if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
       return;
@@ -850,6 +920,8 @@ ${compiledRuntime}
       const ctaBaseLabel = String(purchaseRuntimeData.ctaBaseLabel || "").trim();
       ctaButton.textContent = [ctaBaseLabel, selectedVariant.priceLabel].filter(Boolean).join(" ").trim();
     }
+    hideLegacyPurchaseVariantSelector(scope);
+    syncPurchaseBadgeLayout(scope);
     syncPurchaseImages(scope);
   };
   const bindPurchaseRuntime = (scope) => {
@@ -996,6 +1068,11 @@ ${compiledRuntime}
     for (const override of textOverrides) {
       const originalText = normalizeText(override.originalText);
       if (!originalText) continue;
+      const overrideLabel = normalizeText(typeof override.label === "string" ? override.label : "");
+      const originalTextCandidates = [originalText];
+      if (overrideLabel.includes("chart legend omni label")) {
+        originalTextCandidates.push("omni");
+      }
       const nextText = typeof override.text === "string" ? override.text : override.originalText;
       const overrideMode = overrideModeByText.get(originalText);
       const replaceAllMatches = Boolean(overrideMode) && overrideMode.values.size === 1;
@@ -1004,7 +1081,7 @@ ${compiledRuntime}
       for (let index = 0; index < textNodes.length; index += 1) {
         if (used.has(index)) continue;
         const node = textNodes[index];
-        if (normalizeText(node.textContent) !== originalText) continue;
+        if (!originalTextCandidates.includes(normalizeText(node.textContent))) continue;
         matchedNodeIndexes.push(index);
         if (!replaceAllMatches) break;
       }
@@ -1033,11 +1110,11 @@ ${compiledRuntime}
 
       const allElements = [scope, ...Array.from(scope.querySelectorAll("*"))];
       const matchingElements = allElements
-        .filter((element) => readNormalizedNodeText(element) === originalText)
+        .filter((element) => originalTextCandidates.includes(readNormalizedNodeText(element)))
         .filter(
           (element) =>
             !Array.from(element.querySelectorAll("*")).some(
-              (child) => readNormalizedNodeText(child) === originalText,
+              (child) => originalTextCandidates.includes(readNormalizedNodeText(child)),
             ),
         )
         .sort((left, right) => {

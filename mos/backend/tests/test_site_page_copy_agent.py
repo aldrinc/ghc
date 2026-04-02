@@ -151,6 +151,14 @@ def _build_imported_page_puck() -> dict:
                                                     "href": "#shop",
                                                 }
                                             ],
+                                            "imageOverrides": [
+                                                {
+                                                    "label": "Hero cover",
+                                                    "originalSrc": "https://cdn.example.com/omni-cover.jpg",
+                                                    "src": "",
+                                                    "alt": "",
+                                                }
+                                            ],
                                         },
                                     }
                                 ],
@@ -174,18 +182,21 @@ def test_extract_site_page_copy_slots_includes_source_backed_imported_blocks():
     proof_button_path = "/content/0/props/content/1/props/content/0/props/buttonSlots/0/text"
     faq_path = "/content/0/props/content/2/props/content/0/props/textSlots/1/text"
     runtime_path = "/content/0/props/content/3/props/content/0/props/textOverrides/0/text"
+    runtime_image_path = "/content/0/props/content/3/props/content/0/props/imageOverrides/0/src"
 
     assert comparison_path in by_path
     assert proof_stat_path in by_path
     assert proof_button_path in by_path
     assert faq_path in by_path
     assert runtime_path in by_path
+    assert runtime_image_path in by_path
 
     assert by_path[comparison_path].current_value == "OMNI Gummies"
     assert by_path[proof_stat_path].current_value == "80%"
     assert by_path[proof_button_path].current_value == "TRY OMNI NOW"
     assert by_path[faq_path].current_value == "Take 3 gummies daily."
     assert by_path[runtime_path].current_value == "OMNI Creatine Gummy"
+    assert by_path[runtime_image_path].current_value == "https://cdn.example.com/omni-cover.jpg"
 
 
 def test_apply_site_page_copy_assignments_updates_imported_text_slots_and_legacy_overrides():
@@ -214,6 +225,10 @@ def test_apply_site_page_copy_assignments_updates_imported_text_slots_and_legacy
                 "path": "/content/0/props/content/3/props/content/0/props/textOverrides/0/text",
                 "value": "Handbook + Bonus Guide",
             },
+            {
+                "path": "/content/0/props/content/3/props/content/0/props/imageOverrides/0/src",
+                "value": "https://cdn.example.com/handbook-cover.jpg",
+            },
         ],
     )
 
@@ -223,6 +238,7 @@ def test_apply_site_page_copy_assignments_updates_imported_text_slots_and_legacy
     assert content[1]["props"]["content"][0]["props"]["buttonSlots"][0]["text"] == "GET THE HANDBOOK"
     assert content[2]["props"]["content"][0]["props"]["textSlots"][0]["text"] == "How much should I take?"
     assert content[3]["props"]["content"][0]["props"]["textOverrides"][0]["text"] == "Handbook + Bonus Guide"
+    assert content[3]["props"]["content"][0]["props"]["imageOverrides"][0]["src"] == "https://cdn.example.com/handbook-cover.jpg"
 
 
 def test_parse_site_page_copy_agent_response_errors_cleanly_on_non_json_output():
@@ -258,8 +274,9 @@ def test_chunk_site_page_copy_batches_keeps_button_slots_with_section_context():
     ]
 
     assert len(runtime_chunks) == 1
-    assert [slot.kind for slot in runtime_chunks[0].slots] == ["text", "button"]
+    assert [slot.kind for slot in runtime_chunks[0].slots] == ["text", "button", "image_src"]
     assert [slot.path for slot in runtime_chunks[0].slots] == [
         "/content/0/props/content/3/props/content/0/props/textOverrides/0/text",
         "/content/0/props/content/3/props/content/0/props/buttonOverrides/0/text",
+        "/content/0/props/content/3/props/content/0/props/imageOverrides/0/src",
     ]

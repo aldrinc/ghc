@@ -3,7 +3,6 @@ import type { Data } from "@measured/puck";
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Edit, Loader2 } from "lucide-react";
-import { useProducts } from "@/api/products";
 import { useSite, useSiteMedusaConfig, useSitePage } from "@/api/sites";
 import { PageAgentPanel } from "@/components/agents/PageAgentPanel";
 import { isImportedTemplatePageData } from "@/components/agents/pageAgentAvailability";
@@ -46,7 +45,6 @@ export function SitePagePreviewPage() {
     { clientId: previewClientId }
   );
   const { data: medusaConfig } = useSiteMedusaConfig(siteId);
-  const { data: products = [] } = useProducts(previewClientId);
 
   const pageOptions = useMemo(
     () => site?.pages?.map((page) => ({ label: page.name, value: page.id })) || [],
@@ -79,17 +77,9 @@ export function SitePagePreviewPage() {
     [normalizedPuckData],
   );
   const previewBasePath = useMemo(() => (siteId ? buildSitePreviewPath(siteId) : null), [siteId]);
-  const productsById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
-  );
-  const previewProductHandle = useMemo(
-    () => (site?.productId ? productsById.get(site.productId)?.handle?.trim() || null : null),
-    [productsById, site?.productId],
-  );
   const previewProductSlug = useMemo(
-    () => previewProductHandle || shortUuidRouteToken(site?.productId || site?.id || ""),
-    [previewProductHandle, site?.id, site?.productId]
+    () => shortUuidRouteToken(site?.productId || site?.id || ""),
+    [site?.id, site?.productId]
   );
   const previewFunnelSlug = useMemo(
     () => site?.routeSlug || shortUuidRouteToken(site?.id || ""),

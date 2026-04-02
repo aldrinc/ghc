@@ -304,8 +304,8 @@ export function SitePageEditorPage() {
     ]
   );
   const previewProductSlug = useMemo(
-    () => primaryProductHandle || shortUuidRouteToken(site?.productId || site?.id || ""),
-    [primaryProductHandle, site?.id, site?.productId]
+    () => shortUuidRouteToken(site?.productId || site?.id || ""),
+    [site?.id, site?.productId]
   );
   const previewFunnelSlug = useMemo(
     () => site?.routeSlug || shortUuidRouteToken(site?.id || ""),

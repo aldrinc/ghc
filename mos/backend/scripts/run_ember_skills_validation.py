@@ -39,7 +39,7 @@ from app.services.skills_runtime_registry import (  # noqa: E402
 
 WORKSPACE_NAME = "Ember Gummies"
 PRODUCT_TITLE = "Ember: Brain Clarity Protocol"
-TEMPLATE_NAME = "OMNI One Product Store"
+TEMPLATE_NAME = "Honest Herbalist One Product Final"
 DEFAULT_RELEASE_VERSION = "2026-04-01-ember-skills-hermes-v1"
 DEFAULT_STRATEGY_ROOT = REPO_ROOT.parent / "mos_strategy_v3"
 DEFAULT_FOUNDATIONAL_ROOT = (

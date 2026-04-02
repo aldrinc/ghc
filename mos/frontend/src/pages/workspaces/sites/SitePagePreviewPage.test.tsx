@@ -7,12 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SitePagePreviewPage } from "./SitePagePreviewPage";
 
-const mockUseProducts = vi.fn();
 const mockUseSite = vi.fn();
 const mockUseSitePage = vi.fn();
 const mockUseSiteMedusaConfig = vi.fn();
 const mockSelectWorkspace = vi.fn();
 const mockSetMedusaRuntimeConfig = vi.fn();
+const mockB2CRuntimeProvider = vi.fn();
+const mockFunnelRuntimeProvider = vi.fn();
 
 const workspaceState = {
   clients: [{ id: "workspace-1", name: "Acme", industry: "Supplements" }],
@@ -98,10 +99,6 @@ vi.mock("@/api/sites", () => ({
   useSiteMedusaConfig: (...args: unknown[]) => mockUseSiteMedusaConfig(...args),
 }));
 
-vi.mock("@/api/products", () => ({
-  useProducts: (...args: unknown[]) => mockUseProducts(...args),
-}));
-
 vi.mock("@/contexts/WorkspaceContext", () => ({
   useWorkspace: () => workspaceState,
 }));
@@ -115,7 +112,10 @@ vi.mock("@/components/design-system/DesignSystemProvider", () => ({
 }));
 
 vi.mock("@/components/commerce/b2c/B2CRuntimeProvider", () => ({
-  B2CRuntimeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  B2CRuntimeProvider: ({ children, ...props }: { children: ReactNode }) => {
+    mockB2CRuntimeProvider(props);
+    return <>{children}</>;
+  },
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -130,7 +130,10 @@ vi.mock("@/components/ui/badge", () => ({
 
 vi.mock("@/funnels/puckConfig", () => ({
   createFunnelPuckConfig: () => ({}),
-  FunnelRuntimeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  FunnelRuntimeProvider: ({ children, value }: { children: ReactNode; value: unknown }) => {
+    mockFunnelRuntimeProvider(value);
+    return <>{children}</>;
+  },
 }));
 
 vi.mock("@/funnels/puckData", () => ({
@@ -176,7 +179,8 @@ describe("SitePagePreviewPage", () => {
     mockUseSite.mockReset();
     mockUseSitePage.mockReset();
     mockUseSiteMedusaConfig.mockReset();
-    mockUseProducts.mockReset();
+    mockB2CRuntimeProvider.mockReset();
+    mockFunnelRuntimeProvider.mockReset();
 
     mockUseSite.mockReturnValue({
       data: previewSite,
@@ -190,9 +194,6 @@ describe("SitePagePreviewPage", () => {
     });
     mockUseSiteMedusaConfig.mockReturnValue({
       data: { siteFamily: "medusa-b2c-starter", commerceProvider: "medusa", medusaConfig: null },
-    });
-    mockUseProducts.mockReturnValue({
-      data: [{ id: "product-1", handle: "omni-creatine-gummy" }],
     });
   });
 
@@ -220,7 +221,28 @@ describe("SitePagePreviewPage", () => {
     const previewContent = await screen.findByTestId("site-preview-content");
 
     expect(previewContent.className).toContain("w-full");
-    expect(previewContent.className).toContain("py-4");
+    expect(previewContent.className).toContain("pb-4");
     expect(previewContent.className).not.toContain("max-w-7xl");
+  });
+
+  it("uses the canonical short product route token for B2C preview runtime", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockB2CRuntimeProvider).toHaveBeenCalled();
+    });
+
+    expect(mockB2CRuntimeProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        siteId: "site-1",
+        siteClientId: "workspace-1",
+      })
+    );
+    expect(mockFunnelRuntimeProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        productSlug: "preview-token",
+        funnelSlug: "preview-site",
+      })
+    );
   });
 });

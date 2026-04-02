@@ -3,10 +3,13 @@ from uuid import uuid4
 import pytest
 
 from app.config import settings
-from app.db.models import SiteImport
+from app.db.models import Site, SiteImport, SitePage
 from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.services.site_import_archive import rebuild_imported_template_puck_data
-from app.services.site_templates import normalize_medusa_one_product_puck_data
+from app.services.site_templates import (
+    _source_site_supports_medusa_one_product_store,
+    normalize_medusa_one_product_puck_data,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -261,6 +264,33 @@ def _create_variant(
     )
     assert response.status_code == 201, response.text
     return response.json()["id"]
+
+
+def test_source_site_supports_medusa_one_product_store_after_home_copy_restore(monkeypatch):
+    source_site = Site(
+        id=str(uuid4()),
+        site_import_id=str(uuid4()),
+        site_family="imported-template",
+    )
+    entry_page = SitePage(
+        id=str(uuid4()),
+        site_id=str(source_site.id),
+        name="The Honest Herbalist Handbook",
+        page_type="home",
+    )
+    source_site.entry_page_id = entry_page.id
+
+    monkeypatch.setattr(
+        "app.services.site_templates._load_latest_site_page_puck_data",
+        lambda _session, *, page: _imported_page_puck_data(),
+    )
+
+    assert (
+        _source_site_supports_medusa_one_product_store(
+            None, site=source_site, site_pages=[entry_page]
+        )
+        is True
+    )
 
 
 def test_rebuild_imported_template_puck_data_defaults_to_legacy_source_slots(monkeypatch):

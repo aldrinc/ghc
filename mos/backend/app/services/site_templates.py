@@ -781,7 +781,7 @@ def _source_site_supports_medusa_one_product_store(
     site: Site,
     site_pages: list[SitePage],
 ) -> bool:
-    if not site.site_import_id or not site_pages:
+    if not site_pages:
         return False
 
     entry_page_id = str(site.entry_page_id) if site.entry_page_id else None
@@ -798,6 +798,7 @@ def _source_site_supports_medusa_one_product_store(
         return False
 
     imported_page_found = False
+    purchase_runtime_found = False
     for block in _iter_puck_blocks(puck_data):
         if block.get("type") == "ImportedPage":
             imported_page_found = True
@@ -812,8 +813,11 @@ def _source_site_supports_medusa_one_product_store(
             continue
         for override in button_overrides:
             if isinstance(override, dict) and _button_override_matches_buy_now(override):
-                return imported_page_found
-    return False
+                purchase_runtime_found = True
+                break
+        if purchase_runtime_found and imported_page_found:
+            return True
+    return imported_page_found and purchase_runtime_found
 
 
 def _template_has_mode(template: SiteTemplate, *, mode: str) -> bool:

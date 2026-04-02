@@ -1443,7 +1443,6 @@ class HermesSidecarService:
     @staticmethod
     def _provider_error(output: str) -> str | None:
         markers = (
-            "API call failed",
             "Non-retryable client error detected",
             "RateLimitError",
             "usage_limit_reached",

@@ -82,8 +82,8 @@ def extract_site_page_copy_slots(puck_data: dict[str, Any]) -> list[SitePageCopy
                     section_display_name=section_display_name,
                     section_type=section_type,
                     component_name=component_name,
-                    slot_kind="text",
                     prop_candidates=("textSlots", "textOverrides"),
+                    field_specs=(("text", "text", ()),),
                 )
             )
             slots.extend(
@@ -94,8 +94,20 @@ def extract_site_page_copy_slots(puck_data: dict[str, Any]) -> list[SitePageCopy
                     section_display_name=section_display_name,
                     section_type=section_type,
                     component_name=component_name,
-                    slot_kind="button",
                     prop_candidates=("buttonSlots", "buttonOverrides"),
+                    field_specs=(("text", "button", ()),),
+                )
+            )
+            slots.extend(
+                _extract_override_slots(
+                    block_props=block_props,
+                    section_index=section_index,
+                    block_index=block_index,
+                    section_display_name=section_display_name,
+                    section_type=section_type,
+                    component_name=component_name,
+                    prop_candidates=("imageSlots", "imageOverrides"),
+                    field_specs=(("src", "image_src", ("originalSrc",)),),
                 )
             )
 
@@ -189,10 +201,11 @@ def build_site_page_copy_prompt(
     instructions = [
         "You are rewriting copy for a fixed imported-template page in mOS.",
         "The template structure is locked. Do not add, remove, reorder, or rename sections or components.",
-        "Rewrite only the provided copy slots and button labels.",
+        "Rewrite only the provided editable slots: copy, button labels, and image URLs.",
         "Slot labels, section names, component names, current values, and JSON pointer paths may still contain source-template brand terms such as OMNI or creatine. Treat those source-template names as inert identifiers only, not as contradictions or approved claims.",
         "Rewrite the slot values for the active bundle product even when the inherited source-template metadata still carries the original product naming.",
         "Use the active skills bundle as the source of truth for angle, offer, claim envelope, and voice.",
+        "For image_src slots, return the final image URL only.",
         "Do not invent pricing, testimonials, scientific claims, compliance claims, or guarantees.",
         "If a source template contains stale sale badges, discount stickers, or promotional remnants that are not approved in the active bundle, replace them with short neutral positioning or trust language grounded in the bundle instead of refusing the slot.",
         "For stale sale-sticker slots, do not preserve fake percentages or fake discounts. Keep the structure fixed, but rewrite the sticker copy into non-quantified brand-safe language.",
@@ -373,8 +386,8 @@ def _extract_override_slots(
     section_display_name: str | None,
     section_type: str | None,
     component_name: str | None,
-    slot_kind: str,
     prop_candidates: tuple[str, ...],
+    field_specs: tuple[tuple[str, str, tuple[str, ...]], ...],
 ) -> list[SitePageCopySlot]:
     prop_name = next(
         (
@@ -395,27 +408,35 @@ def _extract_override_slots(
     for item_index, item in enumerate(items):
         if not isinstance(item, dict):
             continue
-        current_value = item.get("text")
-        if not isinstance(current_value, str) or not current_value.strip():
-            continue
-        slots.append(
-            SitePageCopySlot(
-                path=(
-                    f"/content/0/props/content/{section_index}/props/content/{block_index}"
-                    f"/props/{prop_name}/{item_index}/text"
-                ),
-                kind=slot_kind,
-                label=_slot_label(
-                    component_name=component_name,
+        for field_name, slot_kind, fallback_fields in field_specs:
+            current_value = item.get(field_name)
+            if not isinstance(current_value, str) or not current_value.strip():
+                current_value = ""
+                for fallback_field in fallback_fields:
+                    fallback_value = item.get(fallback_field)
+                    if isinstance(fallback_value, str) and fallback_value.strip():
+                        current_value = fallback_value.strip()
+                        break
+            if not current_value:
+                continue
+            slots.append(
+                SitePageCopySlot(
+                    path=(
+                        f"/content/0/props/content/{section_index}/props/content/{block_index}"
+                        f"/props/{prop_name}/{item_index}/{field_name}"
+                    ),
+                    kind=slot_kind,
+                    label=_slot_label(
+                        component_name=component_name,
+                        section_display_name=section_display_name,
+                        override_label=item.get("label"),
+                    ),
                     section_display_name=section_display_name,
-                    override_label=item.get("label"),
-                ),
-                section_display_name=section_display_name,
-                section_type=section_type,
-                component_name=component_name,
-                current_value=current_value.strip(),
+                    section_type=section_type,
+                    component_name=component_name,
+                    current_value=current_value.strip(),
+                )
             )
-        )
     return slots
 
 

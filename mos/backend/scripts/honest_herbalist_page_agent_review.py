@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 from typing import Any
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -32,8 +33,9 @@ from app.main import app  # noqa: E402
 
 BUNDLE_KEY = "honest_herbalist_v1"
 PAGE_AGENT_OBJECTIVE_TYPE = "page_copy_agent"
-SOURCE_SITE_NAME = "OMNI Creatine Gummy"
-ONE_PRODUCT_TEMPLATE_NAME = "OMNI One Product Store"
+SOURCE_SITE_ID = "ca83fb7c-3c51-4fe7-a23a-795e3101005d"
+SOURCE_SITE_NAME = "Honest Herbalist One Product Store 20260401t181809z"
+ONE_PRODUCT_TEMPLATE_NAME = "Honest Herbalist One Product Final"
 OUTPUT_PUCK_NAME = "HONEST-HERBALIST-ONE-PRODUCT-STORE-HOME.json"
 OUTPUT_SUMMARY_NAME = "HONEST-HERBALIST-ONE-PRODUCT-STORE-HOME-SUMMARY.json"
 OUTPUT_ASSIGNMENTS_NAME = "HONEST-HERBALIST-ONE-PRODUCT-STORE-HOME-SLOT-ASSIGNMENTS.json"
@@ -66,18 +68,27 @@ def _load_workspace(session) -> tuple[Client, Product]:
 
 
 def _load_source_site(session, *, client_id: str) -> Site:
-    source_site = session.scalars(
-        select(Site)
-        .where(
-            Site.client_id == client_id,
-            Site.name == SOURCE_SITE_NAME,
-        )
-        .order_by(Site.created_at.desc())
-    ).first()
+    source_site = None
+    if SOURCE_SITE_ID:
+        source_site = session.scalars(
+            select(Site).where(
+                Site.client_id == client_id,
+                Site.id == UUID(SOURCE_SITE_ID),
+            )
+        ).first()
     if source_site is None:
-        raise RuntimeError(f"Could not find source site '{SOURCE_SITE_NAME}' in the local database.")
-    if not source_site.site_import_id:
-        raise RuntimeError(f"Source site '{SOURCE_SITE_NAME}' is missing its import provenance.")
+        source_site = session.scalars(
+            select(Site)
+            .where(
+                Site.client_id == client_id,
+                Site.name == SOURCE_SITE_NAME,
+            )
+            .order_by(Site.created_at.desc())
+        ).first()
+    if source_site is None:
+        raise RuntimeError(
+            f"Could not find source site '{SOURCE_SITE_NAME}' ({SOURCE_SITE_ID}) in the local database."
+        )
     return source_site
 
 

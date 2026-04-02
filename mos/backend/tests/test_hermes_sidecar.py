@@ -15,6 +15,21 @@ def test_session_error_ignores_normal_output():
     assert HermesSidecarService._session_error('{"assistantMessage":"ok"}') is None
 
 
+def test_provider_error_ignores_retriable_api_failure_logs():
+    output = (
+        "⚠️  API call failed (attempt 1/3): SSLError\n"
+        "session_id: 20260402_145807_54550f\n"
+    )
+
+    assert HermesSidecarService._provider_error(output) is None
+
+
+def test_provider_error_detects_non_retryable_provider_failures():
+    output = "Non-retryable client error detected: usage_limit_reached"
+
+    assert HermesSidecarService._provider_error(output) == output
+
+
 def test_load_usage_from_session_reads_exact_usage_payload(tmp_path):
     sessions_dir = tmp_path / "sessions"
     sessions_dir.mkdir()
