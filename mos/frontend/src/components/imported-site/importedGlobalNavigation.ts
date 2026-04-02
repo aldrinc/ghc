@@ -77,6 +77,9 @@ export function augmentImportedSourceSectionProps(props: Record<string, unknown>
   const buttonSlots = getButtonSlots(next);
 
   if (isGlobalHeader(next)) {
+    if (typeof next.sectionTargetId !== "string" || !next.sectionTargetId.trim()) {
+      next.sectionTargetId = "global-header";
+    }
     upsertButtonSlot(buttonSlots, {
       label: "Logo link",
       originalText: "OMNI",
@@ -105,6 +108,9 @@ export function augmentImportedSourceSectionProps(props: Record<string, unknown>
   }
 
   if (isGlobalFooter(next)) {
+    if (typeof next.sectionTargetId !== "string" || !next.sectionTargetId.trim()) {
+      next.sectionTargetId = "global-footer";
+    }
     upsertButtonSlot(buttonSlots, {
       label: "Footer Logo link",
       originalText: "OMNI",

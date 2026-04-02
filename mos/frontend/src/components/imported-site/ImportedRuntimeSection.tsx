@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMaybeB2CRuntime } from "@/components/commerce/b2c";
+import { useApiClient } from "@/api/client";
+import type { SiteDetail } from "@/api/sites";
 import {
   buildImportedRuntimeSrcDoc,
   normalizeImportedHeadAssets,
@@ -8,6 +10,7 @@ import { useImportedRuntimeContext } from "@/components/imported-site/ImportedTe
 import { resolveRuntimeSitePath, useFunnelRuntime } from "@/funnels/puckConfig";
 import { toast } from "@/components/ui/toast";
 import type { MedusaProduct, MedusaProductVariant } from "@/types/commerce";
+import type { ProductAsset, ProductDetail } from "@/types/products";
 
 type ImportedRuntimeSectionProps = {
   id?: string;
@@ -45,6 +48,7 @@ type ImportedPurchaseRuntimeData = {
     title: string;
     priceLabel: string;
     compareAtLabel?: string;
+    commerceVariantId?: string;
   }>;
 };
 
@@ -180,6 +184,7 @@ function buildImportedPurchaseRuntimeData(
         title,
         priceLabel,
         compareAtLabel: compareAtLabel || undefined,
+        commerceVariantId: String(variant.id || "").trim() || undefined,
       };
     })
     .filter((variant): variant is ImportedPurchaseRuntimeData["variants"][number] => Boolean(variant));
@@ -202,6 +207,63 @@ function buildImportedPurchaseRuntimeData(
   };
 }
 
+function collectProductAssetImageUrls(product: ProductDetail): string[] {
+  const nextUrls = new Set<string>();
+
+  const pushIfPresent = (value: unknown) => {
+    if (typeof value !== "string") return;
+    const normalized = value.trim();
+    if (normalized) nextUrls.add(normalized);
+  };
+
+  pushIfPresent(product.primary_asset_url);
+  for (const asset of Array.isArray(product.assets) ? product.assets : []) {
+    pushIfPresent(asset.download_url);
+    if (asset && asset.content && typeof asset.content === "object") {
+      const record = asset.content as ProductAsset["content"];
+      pushIfPresent(record.url);
+      pushIfPresent(record.src);
+      pushIfPresent(record.download_url);
+      pushIfPresent(record.downloadUrl);
+    }
+  }
+
+  return Array.from(nextUrls);
+}
+
+function buildImportedPurchaseRuntimeDataFromSiteProduct(
+  product: ProductDetail,
+  actionLabel: string | null,
+): ImportedPurchaseRuntimeData | null {
+  const runtimeVariants = (Array.isArray(product.variants) ? product.variants : [])
+    .map((variant) => {
+      const title = String(variant.title || "").trim();
+      const currencyCode = String(variant.currency || "USD").trim().toUpperCase() || "USD";
+      const priceLabel = formatCurrencyLabel(variant.price, currencyCode);
+      if (!title || !priceLabel) {
+        return null;
+      }
+      const compareAtLabel = formatCurrencyLabel(variant.compare_at_price, currencyCode);
+      return {
+        title,
+        priceLabel,
+        compareAtLabel: compareAtLabel || undefined,
+        commerceVariantId: String(variant.external_price_id || "").trim() || undefined,
+      };
+    })
+    .filter((variant): variant is ImportedPurchaseRuntimeData["variants"][number] => Boolean(variant));
+
+  if (!runtimeVariants.length) {
+    return null;
+  }
+
+  return {
+    ctaBaseLabel: actionLabel?.trim() || undefined,
+    imageUrls: collectProductAssetImageUrls(product),
+    variants: runtimeVariants,
+  };
+}
+
 export function ImportedRuntimeSection({
   id,
   originalType,
@@ -217,6 +279,8 @@ export function ImportedRuntimeSection({
   const sharedRuntime = useImportedRuntimeContext();
   const funnelRuntime = useFunnelRuntime();
   const b2cRuntime = useMaybeB2CRuntime();
+  const { get: apiGet } = useApiClient();
+  const loadProductByHandle = b2cRuntime?.loadProductByHandle;
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const commerceActionPendingRef = useRef(false);
   const initialOverridesFrameRevisionRef = useRef<string | null>(null);
@@ -328,13 +392,12 @@ export function ImportedRuntimeSection({
         return;
       }
 
-      const productHandle = (funnelRuntime?.productSlug || "").trim();
-      if (!productHandle || productHandle === "preview-product") {
-        toast.error("This imported purchase section needs a real Medusa product binding before Buy now can work.");
-        return;
-      }
       if (!b2cRuntime) {
         toast.error("The Medusa storefront runtime is not available for this imported section.");
+        return;
+      }
+      if (!purchaseRuntimeData?.variants?.length) {
+        toast.error("This imported purchase section is missing its Medusa product mapping.");
         return;
       }
 
@@ -351,21 +414,19 @@ export function ImportedRuntimeSection({
 
       commerceActionPendingRef.current = true;
       try {
-        const product = await b2cRuntime.loadProductByHandle(productHandle);
-        if (!product) {
-          throw new Error(`No Medusa product could be loaded for handle "${productHandle}".`);
-        }
-
-        const variants = Array.isArray(product.variants) ? product.variants : [];
         const normalizedSelectedOfferTitle = normalizeComparableLabel(selectedOfferTitle);
-        const selectedVariant = variants.find((variant) => {
-          return normalizeComparableLabel(variant.title) === normalizedSelectedOfferTitle;
-        });
+        const selectedVariant =
+          purchaseRuntimeData.variants.find((variant) => {
+            return normalizeComparableLabel(variant.title) === normalizedSelectedOfferTitle;
+          }) || null;
 
         if (!selectedVariant) {
           throw new Error(
-            `No Medusa variant title matches the imported offer "${selectedOfferTitle}" on product "${product.title}".`,
+            `No Medusa variant title matches the imported offer "${selectedOfferTitle}".`,
           );
+        }
+        if (!selectedVariant.commerceVariantId) {
+          throw new Error(`The imported offer "${selectedOfferTitle}" is missing its Medusa variant binding.`);
         }
 
         if (payload.replaceCart && Array.isArray(b2cRuntime.cart?.items) && b2cRuntime.cart.items.length > 0) {
@@ -374,7 +435,7 @@ export function ImportedRuntimeSection({
           }
         }
 
-        await b2cRuntime.addToCart(selectedVariant.id, 1);
+        await b2cRuntime.addToCart(selectedVariant.commerceVariantId, 1);
         b2cRuntime.navigateToCheckout();
       } catch (reason) {
         toast.error(reason instanceof Error ? reason.message : "Failed to start Medusa checkout from the imported section.");
@@ -382,7 +443,7 @@ export function ImportedRuntimeSection({
         commerceActionPendingRef.current = false;
       }
     },
-    [b2cRuntime, funnelRuntime?.productSlug],
+    [b2cRuntime, purchaseRuntimeData],
   );
 
   const handleNavigationAction = useCallback(
@@ -434,20 +495,47 @@ export function ImportedRuntimeSection({
       return;
     }
 
-    const productHandle = (funnelRuntime?.productSlug || "").trim();
-    if (!b2cRuntime || !productHandle || productHandle === "preview-product") {
-      setPurchaseRuntimeData(null);
-      return;
-    }
-
     let cancelled = false;
 
     const loadPurchaseRuntimeData = async () => {
-      const product = await b2cRuntime.loadProductByHandle(productHandle);
+      if (b2cRuntime?.siteId && b2cRuntime.siteClientId) {
+        const site = await apiGet<Pick<SiteDetail, "productId">>(
+          `/sites/${encodeURIComponent(b2cRuntime.siteId)}?clientId=${encodeURIComponent(b2cRuntime.siteClientId)}`,
+        );
+        const productId = String(site.productId || "").trim();
+        if (!productId) {
+          throw new Error(`Site "${b2cRuntime.siteId}" is missing a bound product.`);
+        }
+        const product = await apiGet<ProductDetail>(`/products/${encodeURIComponent(productId)}`);
+        if (cancelled) {
+          return;
+        }
+        const nextPurchaseRuntimeData = buildImportedPurchaseRuntimeDataFromSiteProduct(product, medusaActionLabel);
+        setPurchaseRuntimeData((current) => {
+          if (JSON.stringify(current) === JSON.stringify(nextPurchaseRuntimeData)) {
+            return current;
+          }
+          return nextPurchaseRuntimeData;
+        });
+        return;
+      }
+
+      const productHandle = (funnelRuntime?.productSlug || "").trim();
+      if (!loadProductByHandle || !productHandle || productHandle === "preview-product") {
+        throw new Error("Imported purchase runtime requires a bound site product or a real storefront product handle.");
+      }
+
+      const product = await loadProductByHandle(productHandle);
       if (cancelled || !product) {
         return;
       }
-      setPurchaseRuntimeData(buildImportedPurchaseRuntimeData(product, medusaActionLabel));
+      const nextPurchaseRuntimeData = buildImportedPurchaseRuntimeData(product, medusaActionLabel);
+      setPurchaseRuntimeData((current) => {
+        if (JSON.stringify(current) === JSON.stringify(nextPurchaseRuntimeData)) {
+          return current;
+        }
+        return nextPurchaseRuntimeData;
+      });
     };
 
     void loadPurchaseRuntimeData().catch(() => {
@@ -459,7 +547,7 @@ export function ImportedRuntimeSection({
     return () => {
       cancelled = true;
     };
-  }, [b2cRuntime, componentName, funnelRuntime?.productSlug, medusaActionLabel]);
+  }, [apiGet, b2cRuntime?.siteClientId, b2cRuntime?.siteId, componentName, funnelRuntime?.productSlug, loadProductByHandle, medusaActionLabel]);
 
   useEffect(() => {
     let cancelled = false;

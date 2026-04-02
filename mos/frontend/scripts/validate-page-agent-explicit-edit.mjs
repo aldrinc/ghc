@@ -104,11 +104,35 @@ async function assistantMessageCount(page) {
   return page.locator('[data-page-agent-message-role="assistant"]').count();
 }
 
+async function assertPreviewContentState(page, { expectedText, forbiddenText }) {
+  const previewContent = page.getByTestId("site-preview-content");
+  await previewContent.waitFor({ timeout: 120000 });
+  await page.waitForFunction(
+    ({ selector, needle }) => {
+      const element = document.querySelector(selector);
+      return Boolean(element?.textContent?.includes(needle));
+    },
+    { selector: '[data-testid="site-preview-content"]', needle: expectedText },
+    { timeout: 120000 },
+  );
+  if (forbiddenText) {
+    await page.waitForFunction(
+      ({ selector, needle }) => {
+        const element = document.querySelector(selector);
+        return !element?.textContent?.includes(needle);
+      },
+      { selector: '[data-testid="site-preview-content"]', needle: forbiddenText },
+      { timeout: 120000 },
+    );
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const siteId = (args["site-id"] || "").trim();
   const pageId = (args["page-id"] || "").trim();
   const expectedText = (args["expected-text"] || "").trim();
+  const forbiddenText = (args["forbidden-text"] || "").trim();
   const prompt = (args["prompt"] || "").trim();
   const baseUrl = (args["base-url"] || "http://127.0.0.1:5275").trim().replace(/\/+$/, "");
   if (!siteId || !pageId || !expectedText || !prompt) {
@@ -166,11 +190,10 @@ async function main() {
     );
     await page.reload({ waitUntil: "networkidle", timeout: 120000 });
     await ensureAgentSidebar(page);
-    await page.waitForSelector(`text=${expectedText}`, { timeout: 120000 });
     await page.screenshot({ path: path.join(runDir, "editor-after-edit.png"), fullPage: true });
 
     await page.goto(previewUrl, { waitUntil: "networkidle", timeout: 120000 });
-    await page.waitForSelector(`text=${expectedText}`, { timeout: 120000 });
+    await assertPreviewContentState(page, { expectedText, forbiddenText });
     await page.screenshot({ path: path.join(runDir, "preview-after-edit.png"), fullPage: true });
 
     const sessionFailureVisible = await page.getByText("Current session failed").isVisible().catch(() => false);
@@ -181,6 +204,7 @@ async function main() {
       previewUrl,
       signedIn,
       expectedText,
+      forbiddenText,
       prompt,
       outputDir: runDir,
       sessionFailureVisible,

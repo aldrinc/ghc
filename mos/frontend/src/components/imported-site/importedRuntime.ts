@@ -47,6 +47,7 @@ type ImportedPurchaseRuntimeVariant = {
   title: string;
   priceLabel: string;
   compareAtLabel?: string;
+  commerceVariantId?: string;
 };
 
 type ImportedPurchaseRuntimeData = {
@@ -148,10 +149,12 @@ function normalizePurchaseRuntimeData(value: unknown): ImportedPurchaseRuntimeDa
     const priceLabel = typeof entry.priceLabel === "string" ? entry.priceLabel.trim() : "";
     if (!title || !priceLabel) continue;
     const compareAtLabel = typeof entry.compareAtLabel === "string" ? entry.compareAtLabel.trim() : "";
+    const commerceVariantId = typeof entry.commerceVariantId === "string" ? entry.commerceVariantId.trim() : "";
     variants.push({
       title,
       priceLabel,
       compareAtLabel: compareAtLabel || undefined,
+      commerceVariantId: commerceVariantId || undefined,
     });
   }
   if (!variants.length) return null;
@@ -265,19 +268,50 @@ export function buildImportedRuntimeSrcDoc({
   const bridgeScript = escapeInlineTagContent(`
 (() => {
   const frameId = ${JSON.stringify(frameId)};
+  const sectionTargetId = ${JSON.stringify(resolvedSectionTargetId)};
   const post = (type, payload = {}) => {
     parent.postMessage({ source: "mos-imported-runtime", frameId, type, ...payload }, "*");
   };
   window.__postImportedRuntimeEvent = post;
 
+  const getSectionHeightTarget = () => {
+    if (!sectionTargetId) return null;
+    const candidates = Array.from(document.querySelectorAll("[data-section-id]"));
+    const exactMatches = candidates.filter((candidate) => candidate.getAttribute("data-section-id") === sectionTargetId);
+    const visibleMatch = exactMatches.find(
+      (candidate) => candidate instanceof HTMLElement && !candidate.hidden && getComputedStyle(candidate).display !== "none",
+    );
+    return visibleMatch || exactMatches[0] || null;
+  };
+
+  const measureElementHeight = (element) => {
+    if (!(element instanceof HTMLElement)) return 0;
+    const rectHeight =
+      typeof element.getBoundingClientRect === "function" ? element.getBoundingClientRect().height : 0;
+    return Math.max(
+      Number.isFinite(element.scrollHeight) ? element.scrollHeight : 0,
+      Number.isFinite(element.offsetHeight) ? element.offsetHeight : 0,
+      Number.isFinite(rectHeight) ? Math.ceil(rectHeight) : 0,
+      0,
+    );
+  };
+
   const reportHeight = () => {
     const body = document.body;
     const root = document.documentElement;
-    const height = Math.max(
+    const sectionHeightTarget = getSectionHeightTarget();
+    const intrinsicHeight = measureElementHeight(sectionHeightTarget);
+    const documentHeight = Math.max(
       body ? body.scrollHeight : 0,
       body ? body.offsetHeight : 0,
       root ? root.scrollHeight : 0,
       root ? root.offsetHeight : 0,
+      0,
+    );
+    const height = Math.max(
+      sectionHeightTarget instanceof HTMLElement && intrinsicHeight > 0
+        ? intrinsicHeight
+        : intrinsicHeight || documentHeight,
       64,
     );
     post("height", { height });
@@ -319,6 +353,14 @@ export function buildImportedRuntimeSrcDoc({
       const observer = new ResizeObserver(() => reportHeight());
       if (document.body) observer.observe(document.body);
       if (document.documentElement) observer.observe(document.documentElement);
+      const sectionHeightTarget = getSectionHeightTarget();
+      if (
+        sectionHeightTarget instanceof HTMLElement &&
+        sectionHeightTarget !== document.body &&
+        sectionHeightTarget !== document.documentElement
+      ) {
+        observer.observe(sectionHeightTarget);
+      }
     }
 
     if (typeof MutationObserver === "function" && document.body) {
@@ -462,6 +504,37 @@ ${compiledRuntime}
     }
     return nextText;
   };
+  const setTemporaryVisibility = (element, visible) => {
+    if (!(element instanceof HTMLElement)) return;
+    if (visible) {
+      if (element.dataset.mosHiddenForEmptyOverride === "true") {
+        delete element.dataset.mosHiddenForEmptyOverride;
+        element.hidden = false;
+        element.style.removeProperty("display");
+      }
+      return;
+    }
+    element.dataset.mosHiddenForEmptyOverride = "true";
+    element.hidden = true;
+    element.style.setProperty("display", "none", "important");
+  };
+  const toggleAdjacentBreakForElement = (element, visible) => {
+    if (!(element instanceof HTMLElement)) return;
+    const previous = element.previousSibling;
+    if (previous instanceof HTMLBRElement) {
+      setTemporaryVisibility(previous, visible);
+    }
+    const next = element.nextSibling;
+    if (next instanceof HTMLBRElement) {
+      setTemporaryVisibility(next, visible);
+    }
+  };
+  const syncEmptyElementVisibility = (element) => {
+    if (!(element instanceof HTMLElement)) return;
+    const hasVisibleText = normalizeText(element.textContent).length > 0;
+    setTemporaryVisibility(element, hasVisibleText);
+    toggleAdjacentBreakForElement(element, hasVisibleText);
+  };
   const applyMatchedButtonText = (element, override, matchKind) => {
     const originalText = String(override.originalText || "");
     const nextText = typeof override.text === "string" ? override.text : originalText;
@@ -510,19 +583,18 @@ ${compiledRuntime}
     if (!(scope instanceof Element)) return null;
     if (strategy !== "omni_selected_tier") return null;
 
-    const tierCard = Array.from(scope.querySelectorAll("*")).find((candidate) => {
-      if (!(candidate instanceof HTMLElement)) return false;
-      if (!candidate.classList.contains("border-primary") || !candidate.classList.contains("bg-bg-card")) {
-        return false;
-      }
-      return candidate.querySelector("h3") instanceof HTMLElement;
-    });
+    const storedSelectedOfferTitle = normalizeText(scope.getAttribute("data-mos-imported-selected-title") || "");
+    if (storedSelectedOfferTitle) {
+      const matchedStoredVariant = findPurchaseVariantByTitle(storedSelectedOfferTitle);
+      return matchedStoredVariant?.title || resolveOriginalTextForDisplay(storedSelectedOfferTitle);
+    }
 
+    const tierCard = findSelectedPurchaseCard(scope);
     if (!(tierCard instanceof HTMLElement)) return null;
-    const titleElement = tierCard.querySelector("h3");
-    const selectedOfferTitle = normalizeText(titleElement ? titleElement.textContent : "");
+    const selectedOfferTitle = resolvePurchaseCardTitle(tierCard);
     if (!selectedOfferTitle) return null;
-    return resolveOriginalTextForDisplay(selectedOfferTitle);
+    const matchedVariant = findPurchaseVariantByTitle(selectedOfferTitle);
+    return matchedVariant?.title || resolveOriginalTextForDisplay(selectedOfferTitle);
   };
   const wireCommerceAction = (scope, element, override) => {
     if (!(element instanceof HTMLElement)) return;
@@ -596,8 +668,56 @@ ${compiledRuntime}
       wireNavigationAction(link, override);
     }
   };
+  const enhanceFooterLayout = (scope) => {
+    if (!(scope instanceof Element) || componentName !== "GlobalFooter") {
+      return;
+    }
+
+    const footer = scope instanceof HTMLElement ? scope : null;
+    const navContainer =
+      footer?.querySelector('a[href="policies/contact-support"]')?.parentElement instanceof HTMLElement
+        ? footer.querySelector('a[href="policies/contact-support"]')?.parentElement
+        : null;
+    const row = navContainer?.parentElement instanceof HTMLElement ? navContainer.parentElement : null;
+
+    if (row instanceof HTMLElement) {
+      row.style.alignItems = "flex-start";
+      row.style.gap = "2rem";
+    }
+
+    if (!(navContainer instanceof HTMLElement)) {
+      return;
+    }
+
+    navContainer.style.display = "flex";
+    navContainer.style.flexWrap = "wrap";
+    navContainer.style.justifyContent = "flex-end";
+    navContainer.style.alignItems = "flex-start";
+    navContainer.style.columnGap = "1.25rem";
+    navContainer.style.rowGap = "0.5rem";
+    navContainer.style.maxWidth = "60rem";
+    navContainer.style.flex = "1 1 48rem";
+
+    Array.from(navContainer.querySelectorAll("a")).forEach((link) => {
+      if (!(link instanceof HTMLElement)) return;
+      link.style.whiteSpace = "nowrap";
+      link.style.display = "inline-flex";
+      link.style.alignItems = "center";
+      link.style.lineHeight = "1.25";
+      link.style.letterSpacing = "0.06em";
+    });
+  };
   const findSelectedPurchaseCard = (scope) => {
     if (!(scope instanceof Element)) return null;
+    const selectedTitle = normalizeText(scope.getAttribute("data-mos-imported-selected-title") || "");
+    if (selectedTitle) {
+      const matchingCard = listPurchaseCards(scope).find((candidate) => {
+        return resolvePurchaseCardTitle(candidate) === selectedTitle;
+      });
+      if (matchingCard instanceof HTMLElement) {
+        return matchingCard;
+      }
+    }
     return (
       Array.from(scope.querySelectorAll("*")).find((candidate) => {
         if (!(candidate instanceof HTMLElement)) return false;
@@ -608,30 +728,72 @@ ${compiledRuntime}
       }) || null
     );
   };
+  const listPurchaseCards = (scope) => {
+    if (!(scope instanceof Element)) return [];
+    return Array.from(scope.querySelectorAll("*")).filter((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      const className = candidate.className || "";
+      if (typeof className !== "string" || !className.includes("cursor-pointer")) return false;
+      if (!(candidate.querySelector("h3") instanceof HTMLElement)) return false;
+      const title = resolvePurchaseCardTitle(candidate);
+      return Boolean(title) && Boolean(findPurchaseVariantByTitle(title));
+    });
+  };
+  const setPurchaseCardSelected = (card, selected) => {
+    if (!(card instanceof HTMLElement)) return;
+    card.classList.toggle("border-primary", selected);
+    card.classList.toggle("bg-bg-card", selected);
+    card.classList.toggle("border-black/10", !selected);
+    card.classList.toggle("hover:border-black/20", !selected);
+    card.classList.toggle("bg-white", !selected);
+  };
   const findPurchaseVariantByTitle = (displayTitle) => {
     if (!purchaseRuntimeData || !Array.isArray(purchaseRuntimeData.variants)) {
       return null;
     }
+    const normalizedDisplayTitle = normalizeText(displayTitle);
     const normalizedOriginalTitle = resolveOriginalTextForDisplay(displayTitle);
     return (
       purchaseRuntimeData.variants.find(
-        (variant) => normalizeText(variant.title) === normalizedOriginalTitle,
+        (variant) => {
+          const normalizedVariantTitle = normalizeText(variant.title);
+          return (
+            normalizedVariantTitle === normalizedDisplayTitle ||
+            normalizedVariantTitle === normalizedOriginalTitle
+          );
+        },
       ) || null
     );
   };
+  const resolvePurchaseCardTitle = (card) => {
+    if (!(card instanceof HTMLElement)) return "";
+    const headingTexts = Array.from(card.querySelectorAll("h3"))
+      .map((heading) => normalizeText(heading.textContent || ""))
+      .filter(Boolean);
+    if (!headingTexts.length) {
+      return "";
+    }
+    const runtimeMatchedTitle = headingTexts.find((title) => Boolean(findPurchaseVariantByTitle(title)));
+    return runtimeMatchedTitle || headingTexts[headingTexts.length - 1] || "";
+  };
   const renderPurchasePriceColumn = (container, variant) => {
     if (!(container instanceof HTMLElement) || !variant) return;
-    container.replaceChildren();
-    if (variant.compareAtLabel) {
-      const compareAt = document.createElement("div");
-      compareAt.className = "text-[14px] text-text-dark/40 line-through font-medium mb-1";
-      compareAt.textContent = variant.compareAtLabel;
-      container.appendChild(compareAt);
+    const elements = Array.from(container.children).filter((candidate) => candidate instanceof HTMLElement);
+    if (!elements.length) {
+      container.textContent = variant.priceLabel;
+      return;
     }
-    const price = document.createElement("div");
-    price.className = "text-[20px] font-bold text-text-dark leading-none";
-    price.textContent = variant.priceLabel;
-    container.appendChild(price);
+
+    const compareAtElement = elements.length > 1 ? elements[0] : null;
+    const priceElement = elements.length > 1 ? elements[1] : elements[0];
+
+    if (compareAtElement instanceof HTMLElement) {
+      compareAtElement.textContent = variant.compareAtLabel || "";
+      compareAtElement.style.display = variant.compareAtLabel ? "" : "none";
+    }
+    if (priceElement instanceof HTMLElement) {
+      priceElement.textContent = variant.priceLabel;
+    }
   };
   const syncPurchaseImages = (scope) => {
     if (
@@ -678,7 +840,7 @@ ${compiledRuntime}
     }
 
     const selectedCard = findSelectedPurchaseCard(scope);
-    const selectedTitle = normalizeText(selectedCard?.querySelector("h3")?.textContent || "");
+    const selectedTitle = resolvePurchaseCardTitle(selectedCard);
     const selectedVariant = findPurchaseVariantByTitle(selectedTitle) || purchaseRuntimeData.variants[0] || null;
     const ctaButton = Array.from(scope.querySelectorAll("button, a")).find((candidate) => {
       if (!(candidate instanceof HTMLElement)) return false;
@@ -694,16 +856,46 @@ ${compiledRuntime}
     if (!(scope instanceof HTMLElement) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
       return;
     }
+    const schedulePurchaseRuntimeSync = () => {
+      const run = () => syncPurchaseRuntime(scope);
+      if (typeof queueMicrotask === "function") {
+        queueMicrotask(run);
+      }
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => run());
+      }
+      setTimeout(run, 0);
+      setTimeout(run, 75);
+    };
     if (scope.dataset.mosImportedPurchaseRuntimeBound !== "true") {
       scope.dataset.mosImportedPurchaseRuntimeBound = "true";
       scope.addEventListener("click", () => {
-        const run = () => syncPurchaseRuntime(scope);
-        if (typeof queueMicrotask === "function") {
-          queueMicrotask(run);
-        } else {
-          requestAnimationFrame(run);
-        }
+        schedulePurchaseRuntimeSync();
       });
+    }
+    const purchaseCards = listPurchaseCards(scope);
+    purchaseCards.forEach((card) => {
+      if (card.dataset.mosImportedPurchaseCardBound === "true") {
+        return;
+      }
+      card.dataset.mosImportedPurchaseCardBound = "true";
+      card.addEventListener("click", () => {
+        const currentCards = listPurchaseCards(scope);
+        const selectedTitle = resolvePurchaseCardTitle(card);
+        if (selectedTitle) {
+          scope.dataset.mosImportedSelectedTitle = selectedTitle;
+        }
+        currentCards.forEach((candidate) => setPurchaseCardSelected(candidate, candidate === card));
+        schedulePurchaseRuntimeSync();
+      });
+    });
+    const selectedCard = findSelectedPurchaseCard(scope);
+    if (selectedCard instanceof HTMLElement) {
+      const selectedTitle = resolvePurchaseCardTitle(selectedCard);
+      if (selectedTitle) {
+        scope.dataset.mosImportedSelectedTitle = selectedTitle;
+      }
+      purchaseCards.forEach((card) => setPurchaseCardSelected(card, card === selectedCard));
     }
     syncPurchaseRuntime(scope);
   };
@@ -756,7 +948,12 @@ ${compiledRuntime}
       throw new Error('Imported section target "' + sectionTargetId + '" was not found in the rendered runtime.');
     }
     Array.from(container.querySelectorAll("[data-section-id]")).forEach((candidate) => {
-      if (!(candidate instanceof HTMLElement) || candidate === target) {
+      if (
+        !(candidate instanceof HTMLElement) ||
+        candidate === target ||
+        candidate.contains(target) ||
+        target.contains(candidate)
+      ) {
         return;
       }
       candidate.hidden = true;
@@ -815,6 +1012,9 @@ ${compiledRuntime}
         for (const index of matchedNodeIndexes) {
           const node = textNodes[index];
           node.textContent = nextText;
+          if (node.parentElement) {
+            syncEmptyElementVisibility(node.parentElement);
+          }
           used.add(index);
         }
         matched = true;
@@ -867,6 +1067,9 @@ ${compiledRuntime}
           slots.forEach((slot, slotIndex) => {
             const segment = segments[slotIndex] || "";
             slot.textContent = segment;
+            if (slot instanceof HTMLElement) {
+              syncEmptyElementVisibility(slot);
+            }
           });
         } else {
           target.textContent = nextText;
@@ -908,6 +1111,7 @@ ${compiledRuntime}
       }
     }
     appendFooterNavigationLinks(scope, unmatchedOverrides);
+    enhanceFooterLayout(scope);
   };
 
   const applyImageOverrides = (scope) => {

@@ -309,7 +309,7 @@ export function SitePagePreviewPage() {
 
       <div
         data-testid="site-preview-content"
-        className={useFullWidthPreviewFrame ? "w-full py-4" : "mx-auto max-w-7xl px-4 py-4 sm:px-6"}
+        className={useFullWidthPreviewFrame ? "w-full pb-4" : "mx-auto max-w-7xl px-4 py-4 sm:px-6"}
       >
         <FunnelRuntimeProvider value={previewRuntimeValue}>
           {isB2CSitePreview ? (
@@ -331,7 +331,6 @@ export function SitePagePreviewPage() {
         </FunnelRuntimeProvider>
       </div>
       <PageAgentPanel
-        defaultOpen
         clientId={site.clientId || workspace?.id || null}
         productId={site.productId || null}
         siteId={siteId}

@@ -1987,8 +1987,8 @@ def _merge_refreshed_text_slots(*, existing_items: Any, refreshed_items: Any) ->
         normalized = deepcopy(item)
         anchor = str(normalized.get("originalText") or "").strip()
         existing = existing_by_anchor.get(anchor)
-        if existing and isinstance(existing.get("text"), str) and str(existing.get("text")).strip():
-            normalized["text"] = str(existing.get("text")).strip()
+        if existing and isinstance(existing.get("text"), str):
+            normalized["text"] = str(existing.get("text"))
         merged.append(normalized)
     return merged
 

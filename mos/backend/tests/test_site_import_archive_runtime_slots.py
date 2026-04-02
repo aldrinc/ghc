@@ -1,5 +1,6 @@
 from app.services.site_import_archive import (
     _extract_translation_text_anchors,
+    _merge_refreshed_text_slots,
     _sanitize_translated_source_backed_section,
     backfill_imported_runtime_override_slots,
     refresh_imported_page_copy_slots,
@@ -422,3 +423,45 @@ const App = () => (
     assert text_slots[0]["text"] == "#1 TASTING CREATINE"
     assert text_slots[1]["originalText"] == "Optimize Your Routine"
     assert text_slots[1]["text"] == "Use Herbs With More Confidence"
+
+
+def test_merge_refreshed_text_slots_preserves_intentional_empty_text():
+    merged = _merge_refreshed_text_slots(
+        existing_items=[
+            {
+                "label": "Headline part 1 of 2",
+                "originalText": "Creatine For",
+                "text": "Honest Herbalist Reference",
+            },
+            {
+                "label": "Headline part 2 of 2",
+                "originalText": "Body & Mind",
+                "text": "",
+            },
+        ],
+        refreshed_items=[
+            {
+                "label": "Headline part 1 of 2",
+                "originalText": "Creatine For",
+                "text": "Creatine For",
+            },
+            {
+                "label": "Headline part 2 of 2",
+                "originalText": "Body & Mind",
+                "text": "Body & Mind",
+            },
+        ],
+    )
+
+    assert merged == [
+        {
+            "label": "Headline part 1 of 2",
+            "originalText": "Creatine For",
+            "text": "Honest Herbalist Reference",
+        },
+        {
+            "label": "Headline part 2 of 2",
+            "originalText": "Body & Mind",
+            "text": "",
+        },
+    ]
