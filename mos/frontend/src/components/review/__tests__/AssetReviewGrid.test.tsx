@@ -73,8 +73,9 @@ describe("AssetReviewGrid", () => {
 
     await user.type(screen.getByPlaceholderText(/search brand, headline, body, or asset id/i), "Northwind");
 
-    expect(screen.getByText("Northwind")).toBeInTheDocument();
-    expect(screen.queryByText("Bluebird")).not.toBeInTheDocument();
+    expect(screen.getByText("Winning wellness creative")).toBeInTheDocument();
+    expect(screen.getByLabelText("Select Northwind")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Select Bluebird")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue("All sources"), {
       target: { value: "catalog" },
@@ -102,10 +103,10 @@ describe("AssetReviewGrid", () => {
       target: { value: "catalog" },
     });
 
-    expect(screen.getByText(/0 in view • 1 total selected/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 in view [•·] 1 total selected/i)).toBeInTheDocument();
 
     await user.click(screen.getByLabelText(/select all/i));
-    expect(screen.getByText(/1 in view • 2 total selected/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 in view [•·] 2 total selected/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue("Catalog"), {
       target: { value: "all" },
