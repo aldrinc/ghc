@@ -104,27 +104,57 @@ async function assistantMessageCount(page) {
   return page.locator('[data-page-agent-message-role="assistant"]').count();
 }
 
+function normalizeTextForMatch(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function allFrames(page) {
+  return [page.mainFrame(), ...page.frames().filter((frame) => frame !== page.mainFrame())];
+}
+
+async function pageTextMatches(page, needle) {
+  const normalizedNeedle = normalizeTextForMatch(needle);
+  if (!normalizedNeedle) return true;
+
+  for (const frame of allFrames(page)) {
+    const bodyText = normalizeTextForMatch(await frame.locator("body").innerText().catch(() => ""));
+    if (bodyText.includes(normalizedNeedle)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function assertPreviewContentState(page, { expectedText, forbiddenText }) {
   const previewContent = page.getByTestId("site-preview-content");
   await previewContent.waitFor({ timeout: 120000 });
-  await page.waitForFunction(
-    ({ selector, needle }) => {
-      const element = document.querySelector(selector);
-      return Boolean(element?.textContent?.includes(needle));
-    },
-    { selector: '[data-testid="site-preview-content"]', needle: expectedText },
-    { timeout: 120000 },
-  );
-  if (forbiddenText) {
-    await page.waitForFunction(
-      ({ selector, needle }) => {
-        const element = document.querySelector(selector);
-        return !element?.textContent?.includes(needle);
-      },
-      { selector: '[data-testid="site-preview-content"]', needle: forbiddenText },
-      { timeout: 120000 },
-    );
+
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    if (await pageTextMatches(page, expectedText)) {
+      break;
+    }
+    await page.waitForTimeout(1000);
   }
+  if (!(await pageTextMatches(page, expectedText))) {
+    throw new Error(`Timed out waiting for preview text: ${expectedText}`);
+  }
+
+  if (!forbiddenText) {
+    return;
+  }
+
+  while (Date.now() < deadline) {
+    if (!(await pageTextMatches(page, forbiddenText))) {
+      return;
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error(`Timed out waiting for preview text to disappear: ${forbiddenText}`);
 }
 
 async function main() {

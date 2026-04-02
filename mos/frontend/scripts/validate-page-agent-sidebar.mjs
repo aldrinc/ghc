@@ -75,11 +75,18 @@ async function maybeSignIn(page, context, { email, password, baseUrl, targetUrl 
 }
 
 async function ensureAgentSidebar(page) {
-  await page.waitForSelector("text=Hermes Page Agent", { timeout: 120000 });
-  await page.waitForSelector(
-    "text=Cmd/Ctrl+Enter sends directly to the live Hermes-backed page thread.",
-    { timeout: 120000 },
-  );
+  const composerSelector = 'textarea[placeholder="Tell Hermes what to change on this page."]';
+  const composer = page.locator(composerSelector).first();
+  const composerVisible = await composer.isVisible().catch(() => false);
+  if (!composerVisible) {
+    const trigger = page.getByRole("button", { name: /Hermes/i }).first();
+    if (await trigger.isVisible().catch(() => false)) {
+      await trigger.click();
+    }
+  }
+
+  await page.waitForSelector(composerSelector, { timeout: 120000 });
+  await page.waitForSelector('button:has-text("Send")', { timeout: 120000 });
   await page.waitForSelector('[data-page-agent-live-activity="true"]', { timeout: 120000 });
 }
 
