@@ -166,6 +166,8 @@ class FunnelPageAIGenerateRequest(BaseModel):
     messages: list[FunnelAIChatMessage] = Field(default_factory=list)
     attachedAssets: list[FunnelAIAttachment] = Field(default_factory=list)
     copyPack: Optional[str] = None
+    referenceHtml: Optional[str] = Field(default=None, min_length=1, max_length=250_000)
+    referenceLabel: Optional[str] = Field(default=None, max_length=200)
     currentPuckData: Optional[dict[str, Any]] = None
     templateId: Optional[str] = None
     ideaWorkspaceId: Optional[str] = None
