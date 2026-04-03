@@ -25,6 +25,11 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnel_templates import get_funnel_template
 from app.services.funnels import extract_internal_links, publish_funnel
+from app.services.html_funnel_reference import (
+    HtmlReferenceError,
+    build_html_reference_prompt_context,
+    summarize_html_reference,
+)
 from app.services.funnel_testimonials import (
     generate_funnel_page_testimonials,
     generate_sales_pdp_carousel_images,
@@ -451,6 +456,77 @@ class ContextLoadBrandDocsTool(BaseTool[ContextLoadBrandDocsArgs]):
         return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
 
 
+class ContextLoadHtmlReferenceArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    artifactKey: str
+    referenceLabel: Optional[str] = None
+
+
+class ContextLoadHtmlReferenceTool(BaseTool[ContextLoadHtmlReferenceArgs]):
+    name = "context.load_html_reference"
+    ArgsModel = ContextLoadHtmlReferenceArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadHtmlReferenceArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        if not ctx.run_id:
+            raise RuntimeError("run_id is required to load HTML reference context.")
+
+        artifacts_repo = AgentArtifactsRepository(ctx.session)
+        artifacts = artifacts_repo.list_for_run(
+            run_id=ctx.run_id,
+            kind="html_reference.raw",
+            key=args.artifactKey,
+            limit=1,
+            newest_first=True,
+        )
+        artifact = artifacts[0] if artifacts else None
+        if artifact is None or not isinstance(artifact.data_json, dict):
+            raise HtmlReferenceError("HTML reference artifact was not found for this run.")
+
+        reference_html = artifact.data_json.get("referenceHtml")
+        if not isinstance(reference_html, str) or not reference_html.strip():
+            raise HtmlReferenceError("HTML reference artifact is missing a non-empty referenceHtml payload.")
+
+        reference_label = args.referenceLabel
+        if not isinstance(reference_label, str) or not reference_label.strip():
+            artifact_label = artifact.data_json.get("referenceLabel")
+            reference_label = artifact_label if isinstance(artifact_label, str) else None
+
+        summary = summarize_html_reference(reference_html=reference_html, label=reference_label)
+        prompt_context = build_html_reference_prompt_context(summary)
+
+        _persist_agent_artifact(
+            ctx=ctx,
+            kind="html_reference.summary",
+            key=summary.sha256,
+            data_json=summary.model_dump(mode="json"),
+        )
+        _persist_agent_artifact(
+            ctx=ctx,
+            kind="html_reference.prompt_context",
+            key=summary.sha256,
+            data_json=prompt_context,
+        )
+
+        ui_details = {
+            "htmlReferenceSummary": summary.model_dump(mode="json"),
+            "htmlReferencePromptContext": prompt_context,
+        }
+        llm_output = json.dumps(
+            {
+                "title": summary.title,
+                "sectionOrder": summary.sectionOrder,
+                "ctaTexts": summary.ctaTexts,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
 class DraftGeneratePageArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -472,6 +548,7 @@ class DraftGeneratePageArgs(BaseModel):
     attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
+    htmlReferencePromptContext: Optional[dict[str, Any]] = None
 
 
 class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
@@ -543,6 +620,17 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             if args.brandDocuments
             else ""
         )
+
+        html_reference_guidance = ""
+        if isinstance(args.htmlReferencePromptContext, dict) and args.htmlReferencePromptContext:
+            html_reference_guidance = (
+                "HTML reference guidance:\n"
+                "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
+                "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
+                "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
+                "- If the HTML reference conflicts with product context, brand docs, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
+            )
 
         # Claude structured outputs: support brand docs and vision attachments (non-stream).
         #
@@ -766,6 +854,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             f"{layout_guidance}"
             f"{context_guidance}"
             f"{copy_pack_guidance}"
+            f"{html_reference_guidance}"
             f"{args.productContext}"
             f"{attachment_guidance}"
             f"{template_guidance}"
@@ -2142,6 +2231,7 @@ class DraftPersistVersionArgs(BaseModel):
     ideaWorkspaceId: Optional[str] = None
     templateId: Optional[str] = None
     attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
+    htmlReferenceSummary: Optional[dict[str, Any]] = None
     imagePlans: list[dict[str, Any]] = Field(default_factory=list)
     generatedImages: list[dict[str, Any]] = Field(default_factory=list)
     agentRunId: Optional[str] = None
@@ -2190,6 +2280,8 @@ class DraftPersistVersionTool(BaseTool[DraftPersistVersionArgs]):
             ai_metadata["agentRunId"] = args.agentRunId
         if args.attachmentSummaries:
             ai_metadata["attachedAssets"] = args.attachmentSummaries
+        if isinstance(args.htmlReferenceSummary, dict) and args.htmlReferenceSummary:
+            ai_metadata["htmlReference"] = args.htmlReferenceSummary
 
         normalize_public_page_metadata_for_context(
             session=ctx.session,
