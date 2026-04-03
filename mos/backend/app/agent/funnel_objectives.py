@@ -10,6 +10,7 @@ from app.agent.funnel_tools import (
     ContextLoadBrandDocsTool,
     ContextLoadDesignTokensTool,
     ContextLoadFunnelTool,
+    ContextLoadHtmlReferenceTool,
     ContextLoadProductOfferTool,
     DraftApplyOverridesTool,
     DraftGeneratePageTool,
@@ -25,8 +26,10 @@ from app.agent.funnel_tools import (
 from app.agent.runtime import AgentRuntime
 from app.config import settings
 from app.db.enums import AgentRunStatusEnum
+from app.db.repositories.agent_artifacts import AgentArtifactsRepository
 from app.llm.client import LLMClient
 from app.services import funnel_ai as funnel_ai
+from app.services.html_funnel_reference import describe_html_reference_input
 
 
 DEFAULT_RULESET_VERSION = "v1"
@@ -45,6 +48,8 @@ def run_generate_page_draft_stream(
     prompt: str,
     messages: Optional[list[dict[str, str]]] = None,
     attachments: Optional[list[dict[str, Any]]] = None,
+    reference_html: Optional[str] = None,
+    reference_label: Optional[str] = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -89,6 +94,11 @@ def run_generate_page_draft_stream(
             "generateTestimonials": generate_testimonials,
             "skipDraftGeneration": skip_draft_generation,
             "maxImages": max_images,
+            "htmlReference": describe_html_reference_input(
+                reference_html=reference_html,
+                label=reference_label,
+            )
+            or {},
         },
     )
 
@@ -152,6 +162,40 @@ def run_generate_page_draft_stream(
         )
         docs_ctx = docs_res.ui_details
 
+        html_ctx: dict[str, Any] = {}
+        normalized_reference_html = str(reference_html or "").strip()
+        if normalized_reference_html:
+            html_reference_meta = describe_html_reference_input(
+                reference_html=normalized_reference_html,
+                label=reference_label,
+            )
+            if not isinstance(html_reference_meta, dict):
+                raise RuntimeError("Failed to describe HTML reference input.")
+            html_artifact_key = str(html_reference_meta["sha256"])
+            AgentArtifactsRepository(session).create(
+                run_id=handle.run_id,
+                kind="html_reference.raw",
+                key=html_artifact_key,
+                data_json={
+                    **html_reference_meta,
+                    "referenceLabel": reference_label,
+                    "referenceHtml": normalized_reference_html,
+                },
+            )
+            html_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=ContextLoadHtmlReferenceTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "artifactKey": html_artifact_key,
+                    "referenceLabel": reference_label,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            html_ctx = html_res.ui_details
+
         # Normalize attachments. Vision blocks are built inside DraftGeneratePageTool (Claude-only) to
         # avoid persisting base64 image payloads in agent tool call traces.
         attachment_summaries = funnel_ai._normalize_attachment_list(attachments)
@@ -196,6 +240,7 @@ def run_generate_page_draft_stream(
                     "attachmentSummaries": attachment_summaries,
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
+                    "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
                 },
                 client_id=client_id,
                 funnel_id=funnel_id,
@@ -318,6 +363,7 @@ def run_generate_page_draft_stream(
                 "ideaWorkspaceId": docs_ctx.get("ideaWorkspaceId"),
                 "templateId": funnel_ctx.get("templateId"),
                 "attachmentSummaries": attachment_summaries,
+                "htmlReferenceSummary": html_ctx.get("htmlReferenceSummary"),
                 "imagePlans": image_plans,
                 "generatedImages": generated_images,
                 "agentRunId": handle.run_id,
@@ -452,6 +498,8 @@ def run_generate_page_draft(
     prompt: str,
     messages: Optional[list[dict[str, str]]] = None,
     attachments: Optional[list[dict[str, Any]]] = None,
+    reference_html: Optional[str] = None,
+    reference_label: Optional[str] = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -474,6 +522,8 @@ def run_generate_page_draft(
         prompt=prompt,
         messages=messages,
         attachments=attachments,
+        reference_html=reference_html,
+        reference_label=reference_label,
         current_puck_data=current_puck_data,
         template_id=template_id,
         idea_workspace_id=idea_workspace_id,

@@ -57,6 +57,7 @@ from app.agent.funnel_objectives import (
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
+from app.services.html_funnel_reference import HtmlReferenceError
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
 from app.services.funnel_testimonials import (
@@ -1072,6 +1073,8 @@ def ai_generate_page_draft(
             prompt=payload.prompt,
             messages=[m.model_dump() for m in payload.messages] if payload.messages else None,
             attachments=[a.model_dump() for a in payload.attachedAssets] if payload.attachedAssets else None,
+            reference_html=payload.referenceHtml,
+            reference_label=payload.referenceLabel,
             current_puck_data=payload.currentPuckData,
             template_id=payload.templateId,
             idea_workspace_id=payload.ideaWorkspaceId,
@@ -1083,6 +1086,8 @@ def ai_generate_page_draft(
             copy_pack=getattr(payload, "copyPack", None),
         )
     except AiAttachmentError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HtmlReferenceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -1208,6 +1213,8 @@ def ai_generate_page_draft_stream(
             prompt=payload.prompt,
             messages=[m.model_dump() for m in payload.messages] if payload.messages else None,
             attachments=[a.model_dump() for a in payload.attachedAssets] if payload.attachedAssets else None,
+            reference_html=payload.referenceHtml,
+            reference_label=payload.referenceLabel,
             current_puck_data=payload.currentPuckData,
             template_id=payload.templateId,
             idea_workspace_id=payload.ideaWorkspaceId,

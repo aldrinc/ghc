@@ -350,6 +350,8 @@ export function useGenerateFunnelPageAi() {
       prompt,
       messages,
       currentPuckData,
+      referenceHtml,
+      referenceLabel,
       generateImages = true,
       maxImages = 3,
     }: {
@@ -358,6 +360,8 @@ export function useGenerateFunnelPageAi() {
       prompt: string;
       messages: FunnelAIChatMessage[];
       currentPuckData?: unknown;
+      referenceHtml?: string;
+      referenceLabel?: string;
       generateImages?: boolean;
       maxImages?: number;
     }) =>
@@ -365,6 +369,8 @@ export function useGenerateFunnelPageAi() {
         prompt,
         messages,
         currentPuckData,
+        referenceHtml,
+        referenceLabel,
         generateImages,
         maxImages,
       }),

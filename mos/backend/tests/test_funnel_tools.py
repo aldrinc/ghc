@@ -57,6 +57,25 @@ def test_draft_persist_version_loads_funnel_context(db_session, monkeypatch):
         assistantMessage="done",
         model="baseten:moonshotai/Kimi-K2.5",
         temperature=0.7,
+        htmlReferenceSummary={
+            "label": "sleep-guide.html",
+            "sha256": "a" * 64,
+            "characterCount": 1024,
+            "title": "Sleep Guide",
+            "metaDescription": "A better bedtime sales page.",
+            "sectionOrder": ["Hero", "Proof", "FAQ"],
+            "headings": [{"level": 1, "text": "Sleep better tonight"}],
+            "ctaTexts": ["Get My Guide"],
+            "faqQuestions": ["Is it printable?"],
+            "proofSignals": ["Reviews / ratings"],
+            "landmarks": ["header", "main", "footer"],
+            "imageCount": 1,
+            "imageAltTexts": ["Guide cover"],
+            "formCount": 1,
+            "formFieldHints": ["email: Email address"],
+            "textPreview": "Sleep better tonight with a printable guide.",
+            "htmlPreview": "<html><body><h1>Sleep better tonight</h1></body></html>",
+        },
     )
 
     result = tool.run(ctx=ctx, args=args)
@@ -67,4 +86,6 @@ def test_draft_persist_version_loads_funnel_context(db_session, monkeypatch):
     assert captured["funnel_id"] == str(funnel.id)
     assert page.review_status == FunnelPageReviewStatusEnum.review
     assert version.status == FunnelPageVersionStatusEnum.draft
+    assert version.ai_metadata["htmlReference"]["label"] == "sleep-guide.html"
+    assert version.ai_metadata["htmlReference"]["sectionOrder"] == ["Hero", "Proof", "FAQ"]
     assert result.ui_details["draftVersionId"] == str(version.id)
