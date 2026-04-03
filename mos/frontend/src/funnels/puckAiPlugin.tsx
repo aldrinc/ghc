@@ -11,16 +11,12 @@ import type { FunnelAIChatMessage } from "@/types/funnels";
 import { normalizePuckData } from "@/funnels/puckData";
 
 type FunnelAiPluginOptions = {
-  scope?: "funnel" | "site";
   funnelId?: string;
   pageId?: string;
   templateId?: string;
   ideaWorkspaceId?: string;
   apiBaseUrl: string;
   clerkTokenTemplate: string;
-  supportsAttachments?: boolean;
-  supportsImageGeneration?: boolean;
-  supportsStreaming?: boolean;
 };
 
 type FunnelAiFieldsProps = FunnelAiPluginOptions & {
@@ -30,7 +26,6 @@ type FunnelAiFieldsProps = FunnelAiPluginOptions & {
 const usePuck = createUsePuck();
 
 const AI_ATTACHMENT_MAX = 8;
-const AI_HTML_REFERENCE_MAX_CHARS = 250_000;
 
 type AiAttachment = {
   id: string;
@@ -55,8 +50,6 @@ type StoredAiState = {
   prompt?: string;
   messages?: FunnelAIChatMessage[];
   generateImages?: boolean;
-  referenceHtml?: string;
-  referenceLabel?: string;
 };
 
 function readStoredAiState(key: string | null): StoredAiState | null {
@@ -161,42 +154,23 @@ function FunnelAiFields({ children, ...options }: FunnelAiFieldsProps) {
   );
 }
 
-function AiAssistantPanel({
-  scope = "funnel",
-  funnelId,
-  pageId,
-  templateId,
-  ideaWorkspaceId,
-  apiBaseUrl,
-  clerkTokenTemplate,
-  supportsAttachments = true,
-  supportsImageGeneration = true,
-  supportsStreaming = true,
-}: FunnelAiPluginOptions) {
+function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBaseUrl, clerkTokenTemplate }: FunnelAiPluginOptions) {
   const appState = usePuck((state) => state.appState);
   const dispatch = usePuck((state) => state.dispatch);
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
-  const resourceId = funnelId;
-  const basePath =
-    resourceId && pageId
-      ? `${apiBaseUrl}/${scope === "site" ? "sites" : "funnels"}/${resourceId}/pages/${pageId}/ai`
-      : null;
-  const storageKey = pageId ? `${scope}-ai:${resourceId ?? "unknown"}:${pageId}` : null;
+  const storageKey = pageId ? `funnel-ai:${funnelId ?? "unknown"}:${pageId}` : null;
 
   const [aiMessages, setAiMessages] = useState<FunnelAIChatMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiGenerateImages, setAiGenerateImages] = useState(supportsImageGeneration);
+  const [aiGenerateImages, setAiGenerateImages] = useState(true);
   const [aiIsGenerating, setAiIsGenerating] = useState(false);
   const [aiStreamText, setAiStreamText] = useState<string | null>(null);
   const [aiRawStreamText, setAiRawStreamText] = useState<string | null>(null);
   const [aiGeneratedImages, setAiGeneratedImages] = useState<Array<Record<string, unknown>>>([]);
-  const [aiHtmlReference, setAiHtmlReference] = useState("");
-  const [aiHtmlReferenceLabel, setAiHtmlReferenceLabel] = useState<string | null>(null);
   const [aiAttachments, setAiAttachments] = useState<AiAttachment[]>([]);
   const aiBottomRef = useRef<HTMLDivElement | null>(null);
   const aiFileInputRef = useRef<HTMLInputElement | null>(null);
-  const aiHtmlFileInputRef = useRef<HTMLInputElement | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
   const aiAttachmentsRef = useRef<AiAttachment[]>([]);
   const rawStreamBufferRef = useRef("");
@@ -221,19 +195,11 @@ function AiAssistantPanel({
     if (stored) {
       setAiMessages(Array.isArray(stored.messages) ? stored.messages : []);
       setAiPrompt(typeof stored.prompt === "string" ? stored.prompt : "");
-      setAiGenerateImages(
-        supportsImageGeneration
-          ? (typeof stored.generateImages === "boolean" ? stored.generateImages : true)
-          : false
-      );
-      setAiHtmlReference(typeof stored.referenceHtml === "string" ? stored.referenceHtml : "");
-      setAiHtmlReferenceLabel(typeof stored.referenceLabel === "string" ? stored.referenceLabel : null);
+      setAiGenerateImages(typeof stored.generateImages === "boolean" ? stored.generateImages : true);
     } else {
       setAiMessages([]);
       setAiPrompt("");
-      setAiGenerateImages(supportsImageGeneration);
-      setAiHtmlReference("");
-      setAiHtmlReferenceLabel(null);
+      setAiGenerateImages(true);
     }
     setAiStreamText(null);
     setAiRawStreamText(null);
@@ -246,7 +212,7 @@ function AiAssistantPanel({
     rawStreamBufferRef.current = "";
     assistantStreamBufferRef.current = "";
     hasRestoredRef.current = true;
-  }, [pageId, storageKey, supportsImageGeneration]);
+  }, [pageId, storageKey]);
 
   useEffect(() => {
     if (!storageKey || !hasRestoredRef.current) return;
@@ -254,10 +220,8 @@ function AiAssistantPanel({
       prompt: aiPrompt,
       messages: aiMessages,
       generateImages: aiGenerateImages,
-      referenceHtml: aiHtmlReference,
-      referenceLabel: aiHtmlReferenceLabel ?? undefined,
     });
-  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages, aiHtmlReference, aiHtmlReferenceLabel]);
+  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages]);
 
   useEffect(() => {
     return () => {
@@ -269,8 +233,6 @@ function AiAssistantPanel({
   const handleClear = () => {
     setAiMessages([]);
     setAiPrompt("");
-    setAiHtmlReference("");
-    setAiHtmlReferenceLabel(null);
     setAiStreamText(null);
     setAiRawStreamText(null);
     setAiIsGenerating(false);
@@ -282,48 +244,12 @@ function AiAssistantPanel({
 
   const aiAttachmentsUploading = aiAttachments.some((item) => item.status === "uploading");
   const aiReadyAttachments = aiAttachments.filter((item) => item.status === "ready" && item.assetId && item.publicId);
-  const aiTrimmedHtmlReference = aiHtmlReference.trim();
-
-  const handleHtmlReferenceSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (file.size > AI_HTML_REFERENCE_MAX_CHARS) {
-      toast.error(`HTML reference files must be ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} characters or smaller.`);
-      return;
-    }
-
-    const readHtml = async () => {
-      try {
-        const text = await file.text();
-        const trimmed = text.trim();
-        if (!trimmed) throw new Error("Selected HTML file is empty.");
-        if (trimmed.length > AI_HTML_REFERENCE_MAX_CHARS) {
-          throw new Error(
-            `HTML reference exceeds the ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} character limit.`
-          );
-        }
-        setAiHtmlReference(trimmed);
-        setAiHtmlReferenceLabel(file.name);
-        toast.success("HTML reference loaded");
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to read HTML reference file";
-        toast.error(message);
-      }
-    };
-
-    void readHtml();
-  };
 
   const handleAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
-    if (!supportsAttachments) {
-      toast.error("Image attachments are not available for this editor yet.");
-      return;
-    }
-    if (!resourceId || !pageId || !basePath) {
-      toast.error(`Select a ${scope === "site" ? "site" : "funnel"} page before attaching images.`);
+    if (!funnelId || !pageId) {
+      toast.error("Select a funnel page before attaching images.");
       return;
     }
     const remainingSlots = AI_ATTACHMENT_MAX - aiAttachments.length;
@@ -350,7 +276,7 @@ function AiAssistantPanel({
           const formData = new FormData();
           formData.append("files", file);
           const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-          const resp = await fetch(`${basePath}/attachments`, {
+          const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/attachments`, {
             method: "POST",
             headers,
             body: formData,
@@ -405,15 +331,11 @@ function AiAssistantPanel({
   };
 
   const handleAiGenerate = () => {
-    if (!resourceId || !pageId || !basePath) return;
+    if (!funnelId || !pageId) return;
     const prompt = aiPrompt.trim();
     if (!prompt) return;
     if (aiAttachmentsUploading) {
       toast.error("Wait for image uploads to finish.");
-      return;
-    }
-    if (aiTrimmedHtmlReference.length > AI_HTML_REFERENCE_MAX_CHARS) {
-      toast.error(`HTML reference exceeds the ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} character limit.`);
       return;
     }
 
@@ -465,17 +387,12 @@ function AiAssistantPanel({
         if (Array.isArray(draft.generatedImages)) setAiGeneratedImages(draft.generatedImages as Array<Record<string, unknown>>);
         setAiMessages((prev) => [...prev, { role: "assistant", content: assistantMessage || "Draft generated." }]);
         toast.success(`AI draft applied (${blocks} blocks)`);
-        if (scope === "site") {
-          queryClient.invalidateQueries({ queryKey: ["sites", resourceId, "pages", pageId] });
-          queryClient.invalidateQueries({ queryKey: ["sites"] });
-        } else {
-          queryClient.invalidateQueries({ queryKey: ["funnels", "page", resourceId, pageId] });
-          queryClient.invalidateQueries({ queryKey: ["funnels", "detail", resourceId] });
-        }
+        queryClient.invalidateQueries({ queryKey: ["funnels", "page", funnelId, pageId] });
+        queryClient.invalidateQueries({ queryKey: ["funnels", "detail", funnelId] });
       };
 
       const fallbackNonStream = async (headers: Headers) => {
-        const resp = await fetch(`${basePath}/generate`, {
+        const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/generate`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -489,12 +406,10 @@ function AiAssistantPanel({
               width: item.width ?? null,
               height: item.height ?? null,
             })),
-            referenceHtml: aiTrimmedHtmlReference || undefined,
-            referenceLabel: aiTrimmedHtmlReference ? aiHtmlReferenceLabel ?? "pasted-html" : undefined,
             currentPuckData: appState.data,
             templateId,
             ideaWorkspaceId,
-            generateImages: supportsImageGeneration ? aiGenerateImages : false,
+            generateImages: aiGenerateImages,
           }),
           signal: controller.signal,
         });
@@ -515,12 +430,7 @@ function AiAssistantPanel({
         headers.set("Content-Type", "application/json");
         if (token) headers.set("Authorization", `Bearer ${token}`);
 
-        if (!supportsStreaming) {
-          await fallbackNonStream(headers);
-          return;
-        }
-
-        const resp = await fetch(`${basePath}/generate/stream`, {
+        const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/generate/stream`, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -534,13 +444,10 @@ function AiAssistantPanel({
               width: item.width ?? null,
               height: item.height ?? null,
             })),
-            referenceHtml: aiTrimmedHtmlReference || undefined,
-            referenceLabel: aiTrimmedHtmlReference ? aiHtmlReferenceLabel ?? "pasted-html" : undefined,
             currentPuckData: appState.data,
             templateId,
             ideaWorkspaceId,
-            generateImages: supportsImageGeneration ? aiGenerateImages : false,
-            maxImages: supportsImageGeneration && aiGenerateImages ? 3 : 0,
+            generateImages: aiGenerateImages,
           }),
           signal: controller.signal,
         });
@@ -679,19 +586,17 @@ function AiAssistantPanel({
       </div>
 
       <div className="border-t border-border p-3 space-y-3">
-        {supportsImageGeneration ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={aiGenerateImages}
-                onChange={(e) => setAiGenerateImages(e.target.checked)}
-                className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary"
-              />
-              Generate images
-            </label>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={aiGenerateImages}
+              onChange={(e) => setAiGenerateImages(e.target.checked)}
+              className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary"
+            />
+            Generate images
+          </label>
+        </div>
 
         <div className="flex flex-col gap-3">
           <div className="space-y-1">
@@ -712,133 +617,76 @@ function AiAssistantPanel({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-content">HTML reference (optional)</div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" type="button" onClick={() => aiHtmlFileInputRef.current?.click()}>
-                  Upload HTML
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  onClick={() => {
-                    setAiHtmlReference("");
-                    setAiHtmlReferenceLabel(null);
-                  }}
-                  disabled={!aiHtmlReference}
-                >
-                  Clear HTML
-                </Button>
+              <div className="text-xs font-semibold text-content">
+                Attached images ({aiAttachments.length}/{AI_ATTACHMENT_MAX})
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={() => aiFileInputRef.current?.click()}
+                disabled={!funnelId || !pageId || aiAttachments.length >= AI_ATTACHMENT_MAX}
+              >
+                Attach images
+              </Button>
               <input
-                ref={aiHtmlFileInputRef}
+                ref={aiFileInputRef}
                 type="file"
-                accept="text/html,.html,.htm,text/plain"
+                multiple
+                accept="image/png,image/jpeg,image/webp,image/gif"
                 className="hidden"
-                onChange={handleHtmlReferenceSelect}
+                onChange={handleAttachmentSelect}
               />
             </div>
             <div className="text-xs text-content-muted">
-              Paste or upload an existing sales page HTML file. The assistant will use it as structural reference for
-              section order, CTA rhythm, proof, and FAQ patterns instead of treating it as a literal import target.
+              Attach reference images (PNG, JPEG, WebP, GIF). The assistant can place them directly or use them as
+              references for new generated scenes.
             </div>
-            <textarea
-              rows={8}
-              value={aiHtmlReference}
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setAiHtmlReference(nextValue);
-                setAiHtmlReferenceLabel(nextValue.trim() ? "pasted-html" : null);
-              }}
-              placeholder="Paste full HTML here, or upload a .html file."
-              className={cn(
-                "min-h-[180px] w-full resize-y rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface placeholder:text-content-muted"
-              )}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
-              <span>
-                Source: {aiHtmlReferenceLabel || "none"}
-              </span>
-              <span>
-                {aiHtmlReference.length.toLocaleString()} / {AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} characters
-              </span>
-            </div>
-          </div>
-
-          {supportsAttachments ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-semibold text-content">
-                  Attached images ({aiAttachments.length}/{AI_ATTACHMENT_MAX})
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  onClick={() => aiFileInputRef.current?.click()}
-                  disabled={!resourceId || !pageId || !basePath || aiAttachments.length >= AI_ATTACHMENT_MAX}
-                >
-                  Attach images
-                </Button>
-                <input
-                  ref={aiFileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  onChange={handleAttachmentSelect}
-                />
-              </div>
-              <div className="text-xs text-content-muted">
-                Attach reference images (PNG, JPEG, WebP, GIF). The assistant can place them directly or use them as
-                references for new generated scenes.
-              </div>
-              {aiAttachments.length ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {aiAttachments.map((item) => (
-                    <div key={item.id} className="rounded-md border border-border bg-surface p-2 space-y-2">
-                      <div className="relative overflow-hidden rounded-md border border-border bg-surface-2">
-                        <img src={item.previewUrl} alt={item.name} className="h-28 w-full object-cover" />
-                        {item.status === "uploading" ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-surface/80 text-xs text-content">
-                            Uploading...
-                          </div>
-                        ) : null}
-                        {item.status === "error" ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-danger/10 text-xs text-danger">
-                            Upload failed
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate text-xs text-content-muted">{item.name}</div>
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-content hover:text-content/80"
-                          onClick={() => handleRemoveAttachment(item.id)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      {item.error ? <div className="text-xs text-danger">{item.error}</div> : null}
+            {aiAttachments.length ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {aiAttachments.map((item) => (
+                  <div key={item.id} className="rounded-md border border-border bg-surface p-2 space-y-2">
+                    <div className="relative overflow-hidden rounded-md border border-border bg-surface-2">
+                      <img src={item.previewUrl} alt={item.name} className="h-28 w-full object-cover" />
+                      {item.status === "uploading" ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-surface/80 text-xs text-content">
+                          Uploading...
+                        </div>
+                      ) : null}
+                      {item.status === "error" ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-danger/10 text-xs text-danger">
+                          Upload failed
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-xs text-content-muted">{item.name}</div>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-content hover:text-content/80"
+                        onClick={() => handleRemoveAttachment(item.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {item.error ? <div className="text-xs text-danger">{item.error}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
           <Button
             size="sm"
             type="button"
             onClick={handleAiGenerate}
-            disabled={!aiPrompt.trim() || aiIsGenerating || aiAttachmentsUploading || !resourceId || !pageId || !basePath}
+            disabled={!aiPrompt.trim() || aiIsGenerating || aiAttachmentsUploading || !funnelId || !pageId}
           >
             {aiIsGenerating ? "Generating..." : "Generate draft"}
           </Button>
         </div>
 
-        {supportsImageGeneration && aiGeneratedImages.length ? (
+        {aiGeneratedImages.length ? (
           <div className="pt-2">
             <div className="text-xs font-semibold text-content">Generated images</div>
             <div className="mt-2 grid gap-3">

@@ -12,6 +12,7 @@ from app.agent.funnel_tools import (
     ContextLoadFunnelTool,
     ContextLoadHtmlReferenceTool,
     ContextLoadProductOfferTool,
+    ContextLoadStrategyCopyTool,
     DraftApplyOverridesTool,
     DraftGeneratePageTool,
     DraftPersistVersionTool,
@@ -61,6 +62,7 @@ def run_generate_page_draft_stream(
     skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
+    require_latest_strategy_copy: bool = False,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
     raise_on_error: bool = False,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
@@ -94,6 +96,7 @@ def run_generate_page_draft_stream(
             "generateTestimonials": generate_testimonials,
             "skipDraftGeneration": skip_draft_generation,
             "maxImages": max_images,
+            "requireLatestStrategyCopy": require_latest_strategy_copy,
             "htmlReference": describe_html_reference_input(
                 reference_html=reference_html,
                 label=reference_label,
@@ -139,6 +142,24 @@ def run_generate_page_draft_stream(
             page_id=page_id,
         )
         product_ctx = product_res.ui_details
+
+        strategy_ctx: dict[str, Any] = {}
+        if require_latest_strategy_copy:
+            template_kind = str(funnel_ctx.get("templateKind") or "").strip()
+            strategy_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=ContextLoadStrategyCopyTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "clientId": client_id,
+                    "productId": str(product_id),
+                    "templateKind": template_kind,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            strategy_ctx = strategy_res.ui_details
 
         # 3) Load design system tokens
         tokens_res = yield from runtime.invoke_tool_stream(
@@ -241,6 +262,7 @@ def run_generate_page_draft_stream(
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
                     "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
+                    "strategyPromptContext": strategy_ctx.get("strategyPromptContext"),
                 },
                 client_id=client_id,
                 funnel_id=funnel_id,
@@ -511,6 +533,7 @@ def run_generate_page_draft(
     skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
+    require_latest_strategy_copy: bool = False,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
 ) -> dict[str, Any]:
     gen = run_generate_page_draft_stream(
@@ -535,6 +558,7 @@ def run_generate_page_draft(
         skip_draft_generation=skip_draft_generation,
         max_images=max_images,
         copy_pack=copy_pack,
+        require_latest_strategy_copy=require_latest_strategy_copy,
         ruleset_version=ruleset_version,
         raise_on_error=True,
     )

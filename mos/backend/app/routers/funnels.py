@@ -55,6 +55,7 @@ from app.agent.funnel_objectives import (
     run_generate_page_testimonials,
     run_publish_funnel,
 )
+from app.agent.funnel_tools import StrategyCopyError
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
 from app.services.html_funnel_reference import HtmlReferenceError
@@ -1084,10 +1085,13 @@ def ai_generate_page_draft(
             generate_images=payload.generateImages,
             max_images=payload.maxImages,
             copy_pack=getattr(payload, "copyPack", None),
+            require_latest_strategy_copy=payload.requireLatestStrategyCopy,
         )
     except AiAttachmentError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except HtmlReferenceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except StrategyCopyError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -1224,6 +1228,7 @@ def ai_generate_page_draft_stream(
             generate_images=payload.generateImages,
             max_images=payload.maxImages,
             copy_pack=getattr(payload, "copyPack", None),
+            require_latest_strategy_copy=payload.requireLatestStrategyCopy,
         ):
             yield _sse(event)
 

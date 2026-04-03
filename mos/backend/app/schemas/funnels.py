@@ -3,12 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
-
-from app.services.puck_data_validation import (
-    LegacySectionPropError,
-    validate_puck_data_no_legacy_section_props,
-)
+from pydantic import BaseModel, Field
 
 
 class FunnelCreateRequest(BaseModel):
@@ -78,29 +73,14 @@ class FunnelPageUpdateRequest(BaseModel):
 class FunnelPageSaveDraftRequest(BaseModel):
     puckData: dict[str, Any]
 
-    @model_validator(mode="after")
-    def validate_no_legacy_section_props(self) -> "FunnelPageSaveDraftRequest":
-        """Reject Puck data containing legacy Section props."""
-        try:
-            validate_puck_data_no_legacy_section_props(self.puckData)
-        except LegacySectionPropError as e:
-            raise ValueError(str(e)) from e
-        return self
-
 
 class PublicFunnelMetaResponse(BaseModel):
-    class MedusaRuntimeConfig(BaseModel):
-        backendUrl: str
-        publishableKey: str
-        defaultCountryCode: Optional[str] = None
-
     productSlug: str
     funnelSlug: str
     funnelId: str
     publicationId: str
     entrySlug: str
     pages: list[dict[str, str]]
-    medusaRuntimeConfig: Optional[MedusaRuntimeConfig] = None
 
 
 class PublicFunnelPageResponse(BaseModel):
@@ -188,6 +168,7 @@ class FunnelPageAIGenerateRequest(BaseModel):
     copyPack: Optional[str] = None
     referenceHtml: Optional[str] = Field(default=None, min_length=1, max_length=250_000)
     referenceLabel: Optional[str] = Field(default=None, max_length=200)
+    requireLatestStrategyCopy: bool = False
     currentPuckData: Optional[dict[str, Any]] = None
     templateId: Optional[str] = None
     ideaWorkspaceId: Optional[str] = None

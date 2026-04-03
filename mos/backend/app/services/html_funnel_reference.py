@@ -538,7 +538,9 @@ def _build_text_preview(chunks: list[str]) -> str:
         if projected_length > MAX_TEXT_PREVIEW_CHARS:
             remaining = MAX_TEXT_PREVIEW_CHARS - current_length - len(separator)
             if remaining > 12:
-                preview_parts.append(cleaned[:remaining].rstrip() + "...")
+                clipped = _clip_text(cleaned, max_length=remaining)
+                if clipped:
+                    preview_parts.append(separator + clipped if separator else clipped)
             break
         preview_parts.append(separator + cleaned if separator else cleaned)
         current_length = projected_length

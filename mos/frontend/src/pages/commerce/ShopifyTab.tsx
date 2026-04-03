@@ -6,6 +6,7 @@ import { useShopifyAppCredentials } from "@/hooks/useShopifyAppCredentials";
 import { useShopifyConnection } from "@/hooks/useShopifyConnection";
 import { ShopifyAppCredentialsCard } from "@/components/commerce/ShopifyAppCredentialsCard";
 import { ShopifyConnectionCard } from "@/components/commerce/ShopifyConnectionCard";
+import { SiteImportsCard } from "@/components/commerce/SiteImportsCard";
 import { ThemeTemplateWorkflowCard } from "@/components/commerce/ThemeTemplateWorkflowCard";
 import { CompliancePolicyCard } from "@/components/commerce/CompliancePolicyCard";
 
@@ -66,6 +67,8 @@ export function ShopifyTab() {
         updateShopifyInstallation={connection.updateShopifyInstallation}
         disconnectShopifyInstallation={connection.disconnectShopifyInstallation}
       />
+
+      <SiteImportsCard workspaceId={workspace.id} activeWorkspaceProduct={activeWorkspaceProduct} />
 
       {isConnected ? (
         <>

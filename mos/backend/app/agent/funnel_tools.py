@@ -34,6 +34,7 @@ from app.services.funnel_testimonials import (
     generate_funnel_page_testimonials,
     generate_sales_pdp_carousel_images,
 )
+from app.strategy_v2.downstream import load_strategy_v2_outputs
 
 # Reuse funnel_ai internals to keep behavior consistent while we split orchestration.
 from app.services import funnel_ai as funnel_ai
@@ -140,6 +141,145 @@ class _TemplateContext:
     template_id: str | None
     template_mode: bool
     template_kind: str | None
+
+
+class StrategyCopyError(RuntimeError):
+    pass
+
+
+_STRATEGY_PAGE_MARKDOWN_MAX_CHARS = 16_000
+_STRATEGY_COPY_CONTEXT_PREVIEW_MAX_CHARS = 6_000
+_STRATEGY_TOP_QUOTES_MAX = 3
+
+
+def _truncate_prompt_text(text: str, *, limit: int) -> str:
+    stripped = text.strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[:limit].rstrip() + "\n...[truncated]"
+
+
+def _compact_prompt_payload(payload: Any, *, max_chars: int) -> Any:
+    if payload is None:
+        return None
+    try:
+        serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        return str(payload)
+    if len(serialized) <= max_chars:
+        return payload
+    return {
+        "truncated": True,
+        "preview": serialized[:max_chars],
+        "originalCharacterCount": len(serialized),
+    }
+
+
+def _build_strategy_prompt_context(*, outputs: dict[str, Any], template_kind: str) -> dict[str, Any]:
+    if template_kind not in ("sales-pdp", "pre-sales-listicle"):
+        raise StrategyCopyError(
+            "Latest strategy copy can only be required for sales-pdp or pre-sales-listicle page generation."
+        )
+
+    stage3 = outputs.get("stage3")
+    offer = outputs.get("offer")
+    copy = outputs.get("copy")
+    copy_context = outputs.get("copy_context")
+    artifact_ids = outputs.get("artifact_ids")
+
+    missing: list[str] = []
+    if not isinstance(stage3, dict):
+        missing.append("strategy_v2_stage3")
+    if not isinstance(offer, dict):
+        missing.append("strategy_v2_offer")
+    if not isinstance(copy, dict):
+        missing.append("strategy_v2_copy")
+    if not isinstance(copy_context, dict):
+        missing.append("strategy_v2_copy_context")
+    if missing:
+        raise StrategyCopyError(
+            "Latest strategy copy is required for imported template generation. "
+            f"Missing artifacts: {', '.join(missing)}. "
+            "Run Strategy V2 through approved copy for this product before generating this page."
+        )
+
+    promise_contract = copy.get("promise_contract")
+    if not isinstance(promise_contract, dict) or not promise_contract:
+        raise StrategyCopyError(
+            "Latest strategy copy is missing promise_contract. "
+            "Regenerate or approve Strategy V2 copy before generating this page."
+        )
+
+    page_markdown_key = "sales_page_markdown" if template_kind == "sales-pdp" else "presell_markdown"
+    page_markdown = str(copy.get(page_markdown_key) or "").strip()
+    if not page_markdown:
+        raise StrategyCopyError(
+            f"Latest strategy copy is missing {page_markdown_key}. "
+            "Regenerate or approve Strategy V2 copy before generating this page."
+        )
+
+    template_payloads = copy.get("template_payloads")
+    if not isinstance(template_payloads, dict):
+        raise StrategyCopyError(
+            "Latest strategy copy is missing template_payloads. "
+            "Regenerate or approve Strategy V2 copy before generating this page."
+        )
+    template_entry = template_payloads.get(template_kind)
+    if not isinstance(template_entry, dict):
+        raise StrategyCopyError(
+            f"Latest strategy copy is missing template_payloads['{template_kind}']. "
+            "Regenerate or approve Strategy V2 copy before generating this page."
+        )
+
+    selected_angle = stage3.get("selected_angle") if isinstance(stage3.get("selected_angle"), dict) else {}
+    angle_evidence = selected_angle.get("evidence") if isinstance(selected_angle.get("evidence"), dict) else {}
+    top_quotes_raw = angle_evidence.get("top_quotes") if isinstance(angle_evidence.get("top_quotes"), list) else []
+    top_quotes: list[str] = []
+    for item in top_quotes_raw:
+        if not isinstance(item, dict):
+            continue
+        quote = str(item.get("quote") or "").strip()
+        if quote:
+            top_quotes.append(quote)
+        if len(top_quotes) >= _STRATEGY_TOP_QUOTES_MAX:
+            break
+
+    template_patch = template_entry.get("template_patch") if isinstance(template_entry.get("template_patch"), list) else []
+    selected_variant = offer.get("selected_variant") if isinstance(offer.get("selected_variant"), dict) else None
+    product_offer = offer.get("product_offer") if isinstance(offer.get("product_offer"), dict) else None
+
+    return {
+        "source": "latest_strategy_v2_outputs",
+        "templateKind": template_kind,
+        "artifactIds": artifact_ids if isinstance(artifact_ids, dict) else {},
+        "selectedAngle": {
+            "angleId": selected_angle.get("angle_id"),
+            "angleName": selected_angle.get("angle_name"),
+            "supportingVocCount": angle_evidence.get("supporting_voc_count"),
+            "topQuotes": top_quotes,
+        },
+        "offer": {
+            "headline": copy.get("headline"),
+            "ump": stage3.get("ump"),
+            "ums": stage3.get("ums"),
+            "corePromise": stage3.get("core_promise"),
+            "valueStackSummary": stage3.get("value_stack_summary"),
+            "guaranteeType": stage3.get("guarantee_type"),
+            "pricingRationale": stage3.get("pricing_rationale"),
+            "selectedVariant": selected_variant,
+            "productOffer": product_offer,
+        },
+        "copy": {
+            "headline": copy.get("headline"),
+            "promiseContract": promise_contract,
+            "pageMarkdown": _truncate_prompt_text(page_markdown, limit=_STRATEGY_PAGE_MARKDOWN_MAX_CHARS),
+            "templatePatchOperationCount": len(template_patch),
+            "qualityGateReport": _compact_prompt_payload(copy.get("quality_gate_report"), max_chars=2_000),
+            "semanticGates": _compact_prompt_payload(copy.get("semantic_gates"), max_chars=2_000),
+            "congruency": _compact_prompt_payload(copy.get("congruency"), max_chars=2_000),
+        },
+        "copyContext": _compact_prompt_payload(copy_context, max_chars=_STRATEGY_COPY_CONTEXT_PREVIEW_MAX_CHARS),
+    }
 
 
 def _build_attachment_guidance(attachment_summaries: list[dict[str, Any]]) -> str:
@@ -341,6 +481,61 @@ class ContextLoadProductOfferTool(BaseTool[ContextLoadProductOfferArgs]):
 
         llm_output = product_context
         return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ContextLoadStrategyCopyArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    clientId: str
+    productId: str
+    templateKind: str
+
+
+class ContextLoadStrategyCopyTool(BaseTool[ContextLoadStrategyCopyArgs]):
+    name = "context.load_strategy_copy"
+    ArgsModel = ContextLoadStrategyCopyArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadStrategyCopyArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        strategy_outputs = load_strategy_v2_outputs(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            client_id=args.clientId,
+            product_id=args.productId,
+        )
+        prompt_context = _build_strategy_prompt_context(
+            outputs=strategy_outputs,
+            template_kind=args.templateKind,
+        )
+        prompt_context_key = _sha256_text(json.dumps(prompt_context, ensure_ascii=False, sort_keys=True))
+
+        _persist_agent_artifact(
+            ctx=ctx,
+            kind="strategy_copy.prompt_context",
+            key=prompt_context_key,
+            data_json=prompt_context,
+        )
+
+        copy_payload = prompt_context.get("copy") if isinstance(prompt_context.get("copy"), dict) else {}
+        offer_payload = prompt_context.get("offer") if isinstance(prompt_context.get("offer"), dict) else {}
+        llm_output = json.dumps(
+            {
+                "templateKind": args.templateKind,
+                "headline": copy_payload.get("headline"),
+                "corePromise": offer_payload.get("corePromise"),
+                "artifactIds": prompt_context.get("artifactIds"),
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return ToolResult(
+            llm_output=llm_output,
+            ui_details={"strategyPromptContext": prompt_context},
+            attachments=[],
+        )
 
 
 class ContextLoadDesignTokensArgs(BaseModel):
@@ -549,6 +744,7 @@ class DraftGeneratePageArgs(BaseModel):
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
     htmlReferencePromptContext: Optional[dict[str, Any]] = None
+    strategyPromptContext: Optional[dict[str, Any]] = None
 
 
 class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
@@ -605,12 +801,29 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             else ""
         )
 
+        strategy_prompt_guidance = ""
+        has_strategy_prompt_context = isinstance(args.strategyPromptContext, dict) and bool(args.strategyPromptContext)
+        if has_strategy_prompt_context:
+            page_markdown_key = "sales page markdown" if template_kind == "sales-pdp" else "pre-sales markdown"
+            strategy_prompt_guidance = (
+                "Latest strategy copy guidance:\n"
+                "- Treat the structured strategy context below as the required source of truth for promise, offer framing, angle, and CTA language.\n"
+                f"- Use the included {page_markdown_key} as the canonical copy blueprint for this page.\n"
+                "- Preserve the promise contract and compliance boundaries. Do not invent claims or drift away from the selected angle.\n"
+                "- If HTML reference context suggests a different section rhythm, adapt the structure while keeping the strategy promise and offer intact.\n"
+                f"{json.dumps(args.strategyPromptContext, ensure_ascii=False)}\n\n"
+            )
+
         copy_pack_guidance = ""
         if isinstance(args.copyPack, str) and args.copyPack.strip():
             copy_pack_guidance = (
-                "Copy pack (source of truth):\n"
-                "- Use this copy as the default wording for headlines, claims, and offers.\n"
-                "- Do not invent missing facts; keep health/medical claims conservative.\n"
+                "Copy pack guidance:\n"
+                + (
+                    "- Treat this as supplemental guidance only when it does not conflict with the required strategy copy context.\n"
+                    if has_strategy_prompt_context
+                    else "- Use this copy as the default wording for headlines, claims, and offers.\n"
+                )
+                + "- Do not invent missing facts; keep health/medical claims conservative.\n"
                 f"{args.copyPack.strip()}\n\n"
             )
 
@@ -628,7 +841,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
                 "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
                 "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
-                "- If the HTML reference conflicts with product context, brand docs, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
                 f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
             )
 
@@ -775,9 +988,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if not template_mode:
             layout_guidance = (
                 "Layout guidance:\n"
-                "- Default to Section.bandWidth='bleed' for most sections (do not place bare Heading/Text directly at the root)\n"
-                "- For standard content sections, use contentWidth='xl', contentAlign='center', surface='none', padY='md', and padX='md'\n"
-                "- For storefront shell sections whose child block owns the inner container (for example starter headers, promo bars, heroes, and footers), use contentWidth='none'\n"
+                "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
+                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             )
         else:
@@ -794,13 +1006,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         else:
             available_components_block = (
                 "Available primitives (component types) and their props:\n"
-                "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
+                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
                 "   - purpose: 'header' | 'section' | 'footer'\n"
-                "   - bandWidth: 'bleed' | 'page' | 'narrow'\n"
-                "   - contentWidth: 'none' | 'prose' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'\n"
-                "   - contentAlign: 'left' | 'center' | 'right'\n"
-                "   - surface: 'none' | 'subtle' | 'card'\n"
-                "   - padY / padX: 'none' | 'sm' | 'md' | 'lg' | 'xl'\n"
+                "   - layout: 'full' | 'contained' | 'card'\n"
+                "     - full = full-width background, content constrained to containerWidth\n"
+                "     - contained = background constrained to containerWidth (no card styling)\n"
+                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
+                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
                 "   - left/right are slots: ComponentData[]\n"
@@ -853,6 +1065,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "- Use ethical persuasion; avoid fear-mongering\n\n"
             f"{layout_guidance}"
             f"{context_guidance}"
+            f"{strategy_prompt_guidance}"
             f"{copy_pack_guidance}"
             f"{html_reference_guidance}"
             f"{args.productContext}"
@@ -1103,12 +1316,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             requirements: list[str] = []
             if missing_header:
                 requirements.append(
-                    "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', contentAlign='center', surface='none', padY='sm', and padX='md'."
+                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
                 )
                 requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
             if missing_footer:
                 requirements.append(
-                    "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', contentAlign='center', surface='none', variant='muted', padY='md', and padX='md'."
+                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
                 )
                 requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 
