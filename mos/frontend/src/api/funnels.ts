@@ -352,6 +352,8 @@ export function useGenerateFunnelPageAi() {
       currentPuckData,
       referenceHtml,
       referenceLabel,
+      referenceHtmlMode,
+      requireLatestStrategyCopy = false,
       generateImages = true,
       maxImages = 3,
     }: {
@@ -362,6 +364,8 @@ export function useGenerateFunnelPageAi() {
       currentPuckData?: unknown;
       referenceHtml?: string;
       referenceLabel?: string;
+      referenceHtmlMode?: "guide" | "template";
+      requireLatestStrategyCopy?: boolean;
       generateImages?: boolean;
       maxImages?: number;
     }) =>
@@ -371,6 +375,8 @@ export function useGenerateFunnelPageAi() {
         currentPuckData,
         referenceHtml,
         referenceLabel,
+        referenceHtmlMode,
+        requireLatestStrategyCopy,
         generateImages,
         maxImages,
       }),

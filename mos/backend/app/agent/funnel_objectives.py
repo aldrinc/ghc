@@ -12,6 +12,7 @@ from app.agent.funnel_tools import (
     ContextLoadFunnelTool,
     ContextLoadHtmlReferenceTool,
     ContextLoadProductOfferTool,
+    ContextLoadStrategyCopyTool,
     DraftApplyOverridesTool,
     DraftGeneratePageTool,
     DraftPersistVersionTool,
@@ -50,6 +51,7 @@ def run_generate_page_draft_stream(
     attachments: Optional[list[dict[str, Any]]] = None,
     reference_html: Optional[str] = None,
     reference_label: Optional[str] = None,
+    reference_html_mode: str | None = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -61,6 +63,7 @@ def run_generate_page_draft_stream(
     skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
+    require_latest_strategy_copy: bool = False,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
     raise_on_error: bool = False,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
@@ -74,6 +77,7 @@ def run_generate_page_draft_stream(
 
     llm = LLMClient()
     model_id = model or llm.default_model
+    resolved_reference_html_mode = "template" if reference_html_mode == "template" else "guide"
 
     runtime = AgentRuntime(session=session, org_id=org_id, user_id=user_id)
     objective_type = "objective.page_media_enrichment" if skip_draft_generation else "objective.page_draft"
@@ -94,6 +98,8 @@ def run_generate_page_draft_stream(
             "generateTestimonials": generate_testimonials,
             "skipDraftGeneration": skip_draft_generation,
             "maxImages": max_images,
+            "requireLatestStrategyCopy": require_latest_strategy_copy,
+            "referenceHtmlMode": resolved_reference_html_mode,
             "htmlReference": describe_html_reference_input(
                 reference_html=reference_html,
                 label=reference_label,
@@ -117,6 +123,7 @@ def run_generate_page_draft_stream(
                 "pageId": page_id,
                 "currentPuckData": current_puck_data,
                 "templateId": template_id,
+                "referenceHtmlMode": resolved_reference_html_mode,
             },
             funnel_id=funnel_id,
             page_id=page_id,
@@ -139,6 +146,30 @@ def run_generate_page_draft_stream(
             page_id=page_id,
         )
         product_ctx = product_res.ui_details
+
+        strategy_ctx: dict[str, Any] = {}
+        if require_latest_strategy_copy:
+            template_kind = str(funnel_ctx.get("templateKind") or "").strip()
+            campaign_id = str(funnel_ctx.get("campaignId") or "").strip()
+            if not campaign_id:
+                raise ValueError(
+                    "campaign_id is required to load the latest strategy copy for imported template generation."
+                )
+            strategy_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=ContextLoadStrategyCopyTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "clientId": client_id,
+                    "productId": str(product_id),
+                    "campaignId": campaign_id,
+                    "templateKind": template_kind,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            strategy_ctx = strategy_res.ui_details
 
         # 3) Load design system tokens
         tokens_res = yield from runtime.invoke_tool_stream(
@@ -164,6 +195,8 @@ def run_generate_page_draft_stream(
 
         html_ctx: dict[str, Any] = {}
         normalized_reference_html = str(reference_html or "").strip()
+        if resolved_reference_html_mode == "template" and not normalized_reference_html:
+            raise ValueError("referenceHtmlMode='template' requires a non-empty referenceHtml payload.")
         if normalized_reference_html:
             html_reference_meta = describe_html_reference_input(
                 reference_html=normalized_reference_html,
@@ -240,7 +273,9 @@ def run_generate_page_draft_stream(
                     "attachmentSummaries": attachment_summaries,
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
+                    "referenceHtmlMode": resolved_reference_html_mode,
                     "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
+                    "strategyPromptContext": strategy_ctx.get("strategyPromptContext"),
                 },
                 client_id=client_id,
                 funnel_id=funnel_id,
@@ -500,6 +535,7 @@ def run_generate_page_draft(
     attachments: Optional[list[dict[str, Any]]] = None,
     reference_html: Optional[str] = None,
     reference_label: Optional[str] = None,
+    reference_html_mode: str | None = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -511,6 +547,7 @@ def run_generate_page_draft(
     skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
+    require_latest_strategy_copy: bool = False,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
 ) -> dict[str, Any]:
     gen = run_generate_page_draft_stream(
@@ -524,6 +561,7 @@ def run_generate_page_draft(
         attachments=attachments,
         reference_html=reference_html,
         reference_label=reference_label,
+        reference_html_mode=reference_html_mode,
         current_puck_data=current_puck_data,
         template_id=template_id,
         idea_workspace_id=idea_workspace_id,
@@ -535,6 +573,7 @@ def run_generate_page_draft(
         skip_draft_generation=skip_draft_generation,
         max_images=max_images,
         copy_pack=copy_pack,
+        require_latest_strategy_copy=require_latest_strategy_copy,
         ruleset_version=ruleset_version,
         raise_on_error=True,
     )
