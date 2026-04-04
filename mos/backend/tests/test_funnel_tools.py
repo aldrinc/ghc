@@ -13,6 +13,7 @@ from app.agent.funnel_tools import (
     _ensure_sales_pdp_import_review_wall_image_prompts,
     _ensure_sales_pdp_guarantee_icon_prompt,
     _ensure_sales_pdp_free_gifts_icon_prompt,
+    _persist_synced_object_prop,
     _resolve_base_puck_data,
 )
 from app.agent.types import ToolContext
@@ -294,6 +295,41 @@ def test_ensure_sales_pdp_guarantee_icon_prompt_fills_missing_icon_slot():
     assert changed is True
     assert "Guarantee seal" in config["prompt"]
     assert config["aspectRatio"] == "1:1"
+
+
+def test_persist_synced_object_prop_updates_config_and_config_json():
+    props = {
+        "config": {
+            "headline": "90-Day Risk Free Guarantee",
+            "iconAlt": "Guarantee seal",
+            "iconAssetPublicId": "",
+        },
+        "configJson": json.dumps(
+            {
+                "headline": "90-Day Risk Free Guarantee",
+                "iconAlt": "Guarantee seal",
+                "iconAssetPublicId": "",
+            }
+        ),
+    }
+    value = {
+        "headline": "90-Day Risk Free Guarantee",
+        "iconAlt": "Guarantee seal",
+        "iconAssetPublicId": "",
+        "prompt": "Minimal flat vector ecommerce guarantee icon representing Guarantee seal.",
+        "aspectRatio": "1:1",
+    }
+
+    _persist_synced_object_prop(
+        props,
+        source="configJson",
+        object_key="config",
+        json_key="configJson",
+        value=value,
+    )
+
+    assert props["config"] == value
+    assert json.loads(props["configJson"]) == value
 
 
 def test_coerce_sales_pdp_import_comparison_config_converts_legacy_shape():

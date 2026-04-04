@@ -637,6 +637,19 @@ def _build_puck_prompt_seed(puck_data: dict[str, Any] | None) -> dict[str, Any] 
     }
 
 
+def _persist_synced_object_prop(
+    props: dict[str, Any],
+    *,
+    source: str | None,
+    object_key: str,
+    json_key: str,
+    value: dict[str, Any],
+) -> None:
+    props[object_key] = deepcopy(value)
+    if source == json_key or json_key in props:
+        props[json_key] = json.dumps(value, ensure_ascii=False)
+
+
 def _allowed_component_types(template_kind: str | None, *, template_mode: bool = False) -> set[str]:
     # Template pages should preserve structure, so restrict "creative" primitives to avoid
     # the LLM inserting extra sections/blocks that are not part of the template.
@@ -2420,10 +2433,13 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                 json_key: str,
                 value: dict[str, Any],
             ) -> None:
-                if source == json_key:
-                    props[json_key] = json.dumps(value, ensure_ascii=False)
-                    return
-                props[object_key] = value
+                _persist_synced_object_prop(
+                    props,
+                    source=source,
+                    object_key=object_key,
+                    json_key=json_key,
+                    value=value,
+                )
 
             def _restore_sales_pdp_required_fields(candidate: dict[str, Any], base_child: dict[str, Any]) -> None:
                 """
