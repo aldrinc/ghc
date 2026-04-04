@@ -1,8 +1,7 @@
-import { Play } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { Pause, Play } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { cn } from "@/lib/utils";
 import type { MediaAsset } from "@/types/library";
-
-const VIDEO_HOVER_PREVIEW_DELAY_MS = 1000;
 
 function aspectToClass(aspect: "1/1" | "4/5" | "9/16" | "16/9") {
   switch (aspect) {
@@ -89,6 +88,11 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
   );
 }
 
+/**
+ * Video card with explicit play/pause controls.
+ * The media surface itself is reserved for playback so card-level open actions
+ * are not triggered when the user interacts with the video.
+ */
 function VideoHoverPreview({
   asset,
   aspectClass,
@@ -99,71 +103,63 @@ function VideoHoverPreview({
   onClick?: () => void;
 }) {
   const [errored, setErrored] = useState(false);
-  const [previewActive, setPreviewActive] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hoverDelayTimerRef = useRef<number | null>(null);
 
   const sourceUrl = asset.fullUrl || asset.url;
   const posterUrl = asset.posterUrl || asset.thumbUrl;
 
-  const clearHoverDelay = useCallback(() => {
-    if (hoverDelayTimerRef.current !== null) {
-      window.clearTimeout(hoverDelayTimerRef.current);
-      hoverDelayTimerRef.current = null;
-    }
-  }, []);
-
-  const stopPreview = useCallback(() => {
-    clearHoverDelay();
-    setPreviewActive(false);
-  }, [clearHoverDelay]);
-
+  // Reset when the asset changes
   useEffect(() => {
     setErrored(false);
-    stopPreview();
-  }, [asset.fullUrl, asset.posterUrl, asset.status, asset.thumbUrl, asset.url, stopPreview]);
+    setPlaying(false);
+    videoRef.current?.pause();
+  }, [asset.fullUrl, asset.posterUrl, asset.status, asset.thumbUrl, asset.url]);
 
-  useEffect(() => {
-    return () => {
-      clearHoverDelay();
-    };
-  }, [clearHoverDelay]);
+  const setPaused = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    setPlaying(false);
+  };
 
-  useEffect(() => {
+  const togglePlayback = async () => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (!previewActive) {
-      video.pause();
-      video.currentTime = 0;
+    if (playing) {
+      setPaused();
       return;
     }
 
-    video.currentTime = 0;
-    const playPromise = video.play();
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => {
-        setPreviewActive(false);
-      });
+    try {
+      await video.play();
+      setPlaying(true);
+    } catch {
+      setPlaying(false);
     }
-  }, [previewActive]);
+  };
 
-  const handlePointerEnter = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse") return;
-    if (asset.status === "pending" || asset.status === "failed" || errored || !sourceUrl) return;
-    clearHoverDelay();
-    hoverDelayTimerRef.current = window.setTimeout(() => {
-      setPreviewActive(true);
-      hoverDelayTimerRef.current = null;
-    }, VIDEO_HOVER_PREVIEW_DELAY_MS);
+  const handleTogglePlayback = async (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    await togglePlayback();
+  };
+
+  const handleVideoClick = async (event: ReactMouseEvent<HTMLVideoElement>) => {
+    event.stopPropagation();
+    await togglePlayback();
+  };
+
+  const handleContainerClick = () => {
+    if (!sourceUrl) {
+      onClick?.();
+    }
   };
 
   return (
     <div
       className={`group relative overflow-hidden rounded-xl border border-border bg-surface-2 ${aspectClass}`}
-      onClick={onClick}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={stopPreview}
+      onClick={handleContainerClick}
       role="presentation"
     >
       {asset.status === "pending" ? (
@@ -174,19 +170,21 @@ function VideoHoverPreview({
         <div className="flex h-full items-center justify-center text-sm text-content-muted">
           Media unavailable
         </div>
-      ) : previewActive && sourceUrl ? (
+      ) : sourceUrl ? (
         <video
           ref={videoRef}
           src={sourceUrl}
           poster={posterUrl}
           className="h-full w-full object-cover"
-          muted
           playsInline
-          loop
           preload="metadata"
+          onClick={handleVideoClick}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
           onError={() => {
             setErrored(true);
-            setPreviewActive(false);
+            setPlaying(false);
           }}
         />
       ) : posterUrl ? (
@@ -202,12 +200,33 @@ function VideoHoverPreview({
         <div className="flex h-full items-center justify-center text-sm text-content-muted">Video</div>
       )}
 
-      {!previewActive && asset.status !== "pending" && asset.status !== "failed" && !errored ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white shadow-md backdrop-blur-sm">
-            <Play className="h-5 w-5 fill-white" />
-          </div>
-        </div>
+      {/* Play / Pause toggle */}
+      {asset.status !== "pending" && asset.status !== "failed" && !errored ? (
+        <>
+          {!playing ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <button
+                type="button"
+                aria-label="Play video with sound"
+                className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white shadow-md backdrop-blur-sm transition-opacity"
+                onClick={handleTogglePlayback}
+              >
+                <Play className="h-5 w-5 fill-white" />
+              </button>
+            </div>
+          ) : (
+            <div className="pointer-events-none absolute right-3 top-3">
+              <button
+                type="button"
+                aria-label="Pause video"
+                className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white shadow-md backdrop-blur-sm transition-opacity hover:bg-black/70"
+                onClick={handleTogglePlayback}
+              >
+                <Pause className="h-4 w-4 fill-white" />
+              </button>
+            </div>
+          )}
+        </>
       ) : null}
     </div>
   );

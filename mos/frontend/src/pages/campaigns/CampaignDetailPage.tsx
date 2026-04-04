@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { SwipeCollectionSelector } from "@/components/campaigns/SwipeCollectionSelector";
 import { MetaPublishWorkspace } from "@/components/campaigns/meta";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
@@ -243,6 +244,7 @@ export function CampaignDetailPage() {
   const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
   const [selectedVariantIdsByExperiment, setSelectedVariantIdsByExperiment] = useState<Record<string, string[]>>({});
   const [selectedAssetBriefIds, setSelectedAssetBriefIds] = useState<string[]>([]);
+  const [selectedSwipeCollectionId, setSelectedSwipeCollectionId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSpec, setEditingSpec] = useState<ExperimentSpec | null>(null);
   const [editingDraft, setEditingDraft] = useState<ExperimentSpecEditDraft | null>(null);
@@ -726,11 +728,16 @@ export function CampaignDetailPage() {
       setCreativeProductionError("Select at least one creative brief to generate assets.");
       return;
     }
+    if (!selectedSwipeCollectionId) {
+      setCreativeProductionError("Select a swipe collection before generating assets.");
+      return;
+    }
 
     setCreativeProductionPending(true);
     try {
       const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, {
         assetBriefIds: selectedAssetBriefIds,
+        swipeCollectionId: selectedSwipeCollectionId,
       });
       if (!response?.workflow_run_id) {
         setCreativeProductionError("Creative production started but no workflow id was returned.");
@@ -1576,11 +1583,17 @@ export function CampaignDetailPage() {
                       variant="primary"
                       size="sm"
                       onClick={handleStartCreativeProduction}
-                      disabled={creativeProductionPending || selectedAssetBriefIds.length === 0}
+                      disabled={creativeProductionPending || selectedAssetBriefIds.length === 0 || !selectedSwipeCollectionId}
                     >
                       {creativeProductionPending ? "Starting…" : "Generate assets"}
                     </Button>
                   </div>
+                  <SwipeCollectionSelector
+                    className="mt-4"
+                    campaignId={campaign.id}
+                    value={selectedSwipeCollectionId}
+                    onChange={setSelectedSwipeCollectionId}
+                  />
                   <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-content-muted">
                     <label className="flex items-center gap-2">
                       <input

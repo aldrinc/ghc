@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-product",
+  "name": "Medusa B2C Product Detail",
+  "description": "Product detail page with gallery, pricing, variants, and add-to-cart.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Product",
+        "description": "Product detail"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CProductPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

@@ -21,6 +21,7 @@ except Exception as exc:  # pragma: no cover - environment-specific dependency i
     _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from pydantic import ValidationError
 
 from app.config import settings
@@ -46,6 +47,7 @@ from app.services.creative_service_client import (
 )
 from app.services.campaign_destinations import (
     campaign_delivery_snapshot,
+    destination_label_for_type,
     requirement_destination_type,
     resolve_campaign_delivery_destination,
 )
@@ -60,6 +62,7 @@ from app.services.gemini_file_search import (
 )
 from app.services.swipe_prompt import (
     SwipePromptParseError,
+    build_swipe_context_block,
     extract_new_image_prompt_from_markdown,
     inline_swipe_render_placeholders,
     load_swipe_to_image_ad_prompt,
@@ -81,6 +84,15 @@ _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
 _SWIPE_COPY_GEMINI_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _SWIPE_COPY_GEMINI_MAX_ATTEMPTS = max(1, int(os.getenv("SWIPE_COPY_GEMINI_MAX_ATTEMPTS", "5")))
 _SWIPE_GEMINI_GENERATE_CONTENT_SEMAPHORE_STATE: Tuple[int, threading.BoundedSemaphore] | None = None
+_SWIPE_CONTEXT_MODE_WORKSPACE = "workspace"
+_SWIPE_CONTEXT_MODE_MINIMAL = "minimal"
+_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES: Dict[str, str] = {
+    "swipe_stage1_campaign_asset_brief": "Swipe Stage1 Campaign Asset Brief",
+    "swipe_stage1_campaign_loaded_copy": "Swipe Stage1 Campaign Loaded Copy",
+    "swipe_stage1_campaign_creative_context": "Swipe Stage1 Campaign Creative Context",
+    "swipe_stage1_strategy_v2_copy": "Swipe Stage1 Strategy V2 Copy",
+    "swipe_stage1_strategy_v2_copy_context": "Swipe Stage1 Strategy V2 Copy Context",
+}
 
 
 def _resolve_swipe_gemini_timeout_seconds() -> int:
@@ -280,6 +292,18 @@ def _is_retryable_swipe_copy_gemini_error(exc: Exception, *, error_text: str) ->
     return any(marker in normalized for marker in retryable_markers)
 
 
+def _is_non_retryable_swipe_copy_gemini_error(*, error_text: str) -> bool:
+    normalized = error_text.lower()
+    if "resource_exhausted" not in normalized and "quota exceeded" not in normalized:
+        return False
+    non_retryable_markers = (
+        "generaterequestsperdayperprojectpermodel",
+        "quota exceeded for metric",
+        "please retry in ",
+    )
+    return any(marker in normalized for marker in non_retryable_markers)
+
+
 def _call_gemini_generate_content_with_retries(
     *,
     gemini_client: Any,
@@ -302,6 +326,12 @@ def _call_gemini_generate_content_with_retries(
             error_text = str(exc)
             if "File search tool is not enabled for this model" in error_text:
                 raise RuntimeError(file_search_model_error_message) from exc
+            if _is_non_retryable_swipe_copy_gemini_error(error_text=error_text):
+                raise ApplicationError(
+                    f"{operation_name} failed with Gemini: {error_text}",
+                    type="GeminiQuotaExceeded",
+                    non_retryable=True,
+                ) from exc
             status_code = _extract_swipe_copy_gemini_status_code(exc)
             if attempt < _SWIPE_COPY_GEMINI_MAX_ATTEMPTS and _is_retryable_swipe_copy_gemini_error(
                 exc,
@@ -337,6 +367,20 @@ def _optional_clean_string(value: Any) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def _normalize_swipe_context_mode(value: Any) -> str:
+    cleaned = _optional_clean_string(value)
+    if cleaned is None:
+        return _SWIPE_CONTEXT_MODE_WORKSPACE
+    normalized = cleaned.lower()
+    if normalized not in {_SWIPE_CONTEXT_MODE_WORKSPACE, _SWIPE_CONTEXT_MODE_MINIMAL}:
+        raise ValueError(
+            "swipe_context_mode must be one of "
+            f"{sorted({_SWIPE_CONTEXT_MODE_WORKSPACE, _SWIPE_CONTEXT_MODE_MINIMAL})}; "
+            f"received {value!r}."
+        )
+    return normalized
 
 
 def _strip_markdown_code_fence(value: str) -> str:
@@ -727,6 +771,72 @@ def _extract_brand_context(
         "product_title": getattr(product, "title", None),
         "canon": canon,
         "design_system_tokens": design_system_tokens,
+    }
+
+
+def _resolve_swipe_minimal_context(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    brand_name_override: str | None,
+    product_name_override: str | None,
+    angle_override: str | None,
+    hook_override: str | None,
+    channel_id: str,
+) -> Dict[str, Any]:
+    client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
+    if client is None:
+        raise ValueError(f"Client not found: {client_id}")
+
+    product = ProductsRepository(session).get(org_id=org_id, product_id=product_id)
+    if product is None:
+        raise ValueError(f"Product not found: {product_id}")
+    if str(getattr(product, "client_id", "")) != str(client_id):
+        raise ValueError("Product does not belong to the provided client_id.")
+
+    brand_name = (
+        brand_name_override
+        or _optional_clean_string(getattr(product, "vendor", None))
+        or _optional_clean_string(getattr(client, "name", None))
+        or "[UNKNOWN]"
+    )
+    product_name = (
+        product_name_override
+        or _optional_clean_string(getattr(product, "title", None))
+        or "[UNKNOWN]"
+    )
+
+    context_block = build_swipe_context_block(
+        brand_name=brand_name,
+        product_name=product_name,
+        creative_concept="Swipe image remix",
+        channel=channel_id or "image",
+        angle=angle_override,
+        hook=hook_override,
+        constraints=[
+            "Use the attached competitor swipe image as the composition and design reference.",
+            "Use the attached product reference image as the exact brand and packaging source of truth.",
+            "Do not change the packaging format. If the attached product reference is a stand-up pouch or bag, keep it a pouch or bag rather than converting it into a bottle, jar, tub, or box.",
+            "Replace competitor branding, packaging, and readable product copy with the attached product identity.",
+            "Do not invent ingredients, servings, certifications, guarantees, or efficacy claims that are not visible in the attached product image.",
+            "If a product detail is unreadable in the attached product image, keep the replacement copy minimal instead of guessing.",
+        ],
+        tone_guidelines=[
+            "Direct-response, concise, and visually faithful to the swipe.",
+            "Prioritize product identity accuracy over adding new marketing claims.",
+        ],
+        visual_guidelines=[
+            "Preserve the source swipe's composition, spacing, color energy, and typography zones.",
+            "Keep the attached product image's silhouette, packaging colors, visible brand marks, and container construction recognizable.",
+            "Preserve the packaging form factor, closure style, and front-of-pack layout from the attached product image.",
+        ],
+    )
+    return {
+        "brand_name": brand_name,
+        "product_name": product_name,
+        "context_block": context_block,
     }
 
 
@@ -1693,18 +1803,97 @@ def _build_swipe_stage1_prompt_input(
     prompt_template: str,
     brand_name: str,
     angle: str | None,
+    destination_context: str | None = None,
+    brand_colors_fonts: str | None = None,
 ) -> str:
     if not isinstance(prompt_template, str) or not prompt_template.strip():
         raise ValueError("swipe stage-1 prompt template is required and must be non-empty.")
     clean_brand = _normalize_prompt_value(brand_name)
     clean_angle = _normalize_prompt_value(angle)
-    return (
-        f"{prompt_template.strip()}\n\n"
-        "RUNTIME INPUTS (INJECTED)\n"
-        f"Brand: {clean_brand}\n"
-        f"Angle: {clean_angle}\n"
-        "Competitor swipe image is attached as image input."
+    runtime_lines = [
+        prompt_template.strip(),
+        "",
+        "RUNTIME INPUTS (INJECTED)",
+        f"Brand: {clean_brand}",
+        f"Angle: {clean_angle}",
+    ]
+    if isinstance(brand_colors_fonts, str) and brand_colors_fonts.strip():
+        runtime_lines.append(f"Brand colors/fonts: {brand_colors_fonts.strip()}")
+    if isinstance(destination_context, str) and destination_context.strip():
+        runtime_lines.append(destination_context.strip())
+    runtime_lines.append("Competitor swipe image is attached as image input.")
+    return "\n".join(runtime_lines)
+
+
+def _build_swipe_stage1_destination_context(
+    *,
+    destination_type_slug: str | None,
+    resolved_destination_url: str | None,
+    gemini_rag_doc_keys: list[str],
+) -> str | None:
+    normalized_doc_keys = {
+        str(doc_key).strip()
+        for doc_key in gemini_rag_doc_keys
+        if isinstance(doc_key, str) and str(doc_key).strip()
+    }
+    if not normalized_doc_keys:
+        return None
+
+    lines: list[str] = []
+    normalized_destination_type = (
+        str(destination_type_slug).strip().lower() if isinstance(destination_type_slug, str) else ""
     )
+    destination_label = destination_label_for_type(normalized_destination_type)
+    if destination_label:
+        lines.append(f"Destination page type: {destination_label} ({normalized_destination_type})")
+    if isinstance(resolved_destination_url, str) and resolved_destination_url.strip():
+        lines.append(f"Resolved destination URL: {resolved_destination_url.strip()}")
+
+    asset_brief_doc_key = "swipe_stage1_campaign_asset_brief"
+    if asset_brief_doc_key in normalized_doc_keys:
+        lines.append(
+            "Artifact that defines the post-click destination in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[asset_brief_doc_key]}"
+        )
+
+    copy_doc_key: str | None = None
+    for candidate in ("swipe_stage1_campaign_loaded_copy", "swipe_stage1_strategy_v2_copy"):
+        if candidate in normalized_doc_keys:
+            copy_doc_key = candidate
+            break
+    if copy_doc_key is not None:
+        lines.append(
+            "Primary destination-page artifact in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[copy_doc_key]}"
+        )
+        if normalized_destination_type == "pre-sales":
+            lines.append(
+                "Within that artifact, use the presell or pre-sales page content as the post-click continuity anchor."
+            )
+        elif normalized_destination_type == "sales":
+            lines.append("Within that artifact, use the sales page content as the post-click continuity anchor.")
+
+    supporting_doc_key: str | None = None
+    for candidate in ("swipe_stage1_campaign_creative_context", "swipe_stage1_strategy_v2_copy_context"):
+        if candidate in normalized_doc_keys:
+            supporting_doc_key = candidate
+            break
+    if supporting_doc_key is not None:
+        lines.append(
+            "Supporting destination-page artifact in File Search: "
+            f"{_SWIPE_STAGE1_FILE_SEARCH_DOC_TITLES[supporting_doc_key]}"
+        )
+
+    if copy_doc_key is not None or supporting_doc_key is not None:
+        lines.append("Use Gemini File Search to inspect those destination-page artifacts before writing the image concept.")
+        lines.append(
+            "If you reference a named person, title, domain, or claim, pull it from those artifacts instead of inventing it."
+        )
+        lines.append(
+            "Do not reveal critical elements on the downstream page like the narrative devices used to sell."
+        )
+
+    return "\n".join(lines) if lines else None
 
 
 def _resolve_swipe_copy_platform(*, channel_id: str) -> str:
@@ -1898,6 +2087,19 @@ def _normalize_blind_angle_text(value: str) -> str:
 
 def _collect_blind_angle_forbidden_terms(*values: str | None) -> list[str]:
     phrases: set[str] = set()
+
+    def _add_phrase_candidate(candidate_text: str) -> None:
+        candidate = _normalize_blind_angle_text(candidate_text)
+        if not candidate:
+            return
+        candidate_tokens = candidate.split()
+        # The lexical blacklist is for explicit reveal phrases, not generic
+        # taxonomy nouns like "safety" that can appear innocuously.
+        if len(candidate_tokens) < 2:
+            return
+        if any(token in _BLIND_ANGLE_MECHANISM_TERMS for token in candidate_tokens):
+            phrases.add(candidate)
+
     for raw_value in values:
         if not isinstance(raw_value, str) or not raw_value.strip():
             continue
@@ -1908,19 +2110,13 @@ def _collect_blind_angle_forbidden_terms(*values: str | None) -> list[str]:
         for idx, token in enumerate(tokens):
             if token not in _BLIND_ANGLE_MECHANISM_TERMS:
                 continue
-            phrases.add(token)
             start = max(0, idx - 2)
             end = min(len(tokens), idx + 3)
             phrase = " ".join(tokens[start:end]).strip()
             if phrase and phrase != token:
-                phrases.add(phrase)
+                _add_phrase_candidate(phrase)
         for match in re.finditer(r"['\"]([^'\"]{2,120})['\"]", raw_value):
-            candidate = _normalize_blind_angle_text(match.group(1))
-            if not candidate:
-                continue
-            candidate_tokens = candidate.split()
-            if any(token in _BLIND_ANGLE_MECHANISM_TERMS for token in candidate_tokens):
-                phrases.add(candidate)
+            _add_phrase_candidate(match.group(1))
     return sorted((phrase for phrase in phrases if phrase), key=lambda item: (-len(item), item))
 
 
@@ -2125,6 +2321,10 @@ def _build_rendered_asset_swipe_copy_prompt(
         "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
         "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
         "same angle.\n\n"
+        "ANGLE LABEL HANDLING:\n"
+        "Treat the supplied Angle Used and hook as internal taxonomy labels, not copy to repeat verbatim. Preserve "
+        "the same strategic promise, but rewrite it into fresh feed language and never echo the label itself inside "
+        "variation titles or ad copy.\n\n"
         "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
         "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
         "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "
@@ -2270,6 +2470,10 @@ def _build_swipe_copy_stage1_prompt(
         "All 3 variations must focus exclusively on the supplied Angle Used. Do not invent a new angle. "
         "Variation 1, Variation 2, and Variation 3 must be different emotional or structural approaches to the "
         "same angle.\n\n"
+        "ANGLE LABEL HANDLING:\n"
+        "Treat the supplied Angle Used and hook as internal taxonomy labels, not copy to repeat verbatim. Preserve "
+        "the same strategic promise, but rewrite it into fresh feed language and never echo the label itself inside "
+        "variation titles or ad copy.\n\n"
         "THE BLIND ANGLE AND INFORMATION BLACKOUT RULE:\n"
         "Never explain how the product works, what the exact solution is, or list specific requirements for success. "
         "If the Angle Used names a mechanism, dosage, interaction, ingredient, or other specific lever, you must "
@@ -3313,6 +3517,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     creative_generation_plan_item_id = _optional_clean_string(params.get("creative_generation_plan_item_id"))
     ad_copy_pack_artifact_id = _optional_clean_string(params.get("ad_copy_pack_artifact_id"))
     ad_copy_pack_id = _optional_clean_string(params.get("ad_copy_pack_id"))
+    swipe_context_mode = _normalize_swipe_context_mode(params.get("swipe_context_mode"))
+    swipe_brand_name = _optional_clean_string(params.get("swipe_brand_name"))
+    swipe_product_name = _optional_clean_string(params.get("swipe_product_name"))
+    swipe_angle_override = _optional_clean_string(params.get("swipe_angle"))
+    swipe_hook_override = _optional_clean_string(params.get("swipe_hook"))
     swipe_requires_product_image_raw = params.get("swipe_requires_product_image")
     if swipe_requires_product_image_raw is None:
         swipe_requires_product_image: bool | None = None
@@ -3389,6 +3598,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "company_swipe_id": company_swipe_id,
             "swipe_image_url": swipe_image_url,
             "swipe_requires_product_image": swipe_requires_product_image,
+            "swipe_context_mode": swipe_context_mode,
+            "swipe_brand_name": swipe_brand_name,
+            "swipe_product_name": swipe_product_name,
+            "swipe_angle": swipe_angle_override,
+            "swipe_hook": swipe_hook_override,
             "model": model_name,
             "render_model_id_requested": requested_render_model_id,
             "render_model_id_used": render_model_id,
@@ -3451,16 +3665,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
         channel_id = (requirement.get("channel") or "meta").strip()
         fmt = (requirement.get("format") or "image").strip()
-        angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
-
-        # Creative brief / brand context.
-        brand_ctx = _extract_brand_context(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-        )
-        client_name = brand_ctx.get("client_name") or ""
+        requirement_angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
 
         # Swipe image bytes.
         swipe_bytes, swipe_mime_type, swipe_source_url = _resolve_swipe_image(
@@ -3544,10 +3749,81 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_product_references_v1",
             *reference_signature_parts,
         )
+        prompt_context_parts: list[str] = []
+        minimal_context_block: str | None = None
+        brand_colors_fonts: str | None = None
+        if swipe_context_mode == _SWIPE_CONTEXT_MODE_MINIMAL:
+            minimal_context = _resolve_swipe_minimal_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                brand_name_override=swipe_brand_name,
+                product_name_override=swipe_product_name,
+                angle_override=swipe_angle_override,
+                hook_override=swipe_hook_override,
+                channel_id=channel_id,
+            )
+            client_name = str(minimal_context["brand_name"])
+            effective_angle = swipe_angle_override
+            minimal_context_block = str(minimal_context["context_block"])
+            prompt_context_parts.append(minimal_context_block)
+            gemini_store_names = []
+            gemini_rag_doc_keys = []
+            gemini_rag_bundle_doc_keys = []
+            gemini_rag_document_names = []
+            linked_ad_copy_pack_context = None
+        else:
+            brand_ctx = _extract_brand_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+            )
+            client_name = brand_ctx.get("client_name") or ""
+            brand_colors_fonts = _brand_colors_fonts_from_design_tokens(
+                brand_ctx.get("design_system_tokens") or {}
+            )
+            effective_angle = requirement_angle
+            (
+                gemini_store_names,
+                gemini_rag_doc_keys,
+                gemini_rag_bundle_doc_keys,
+                gemini_rag_document_names,
+            ) = _resolve_swipe_stage1_gemini_file_search_context(
+                session=session,
+                org_id=org_id,
+                idea_workspace_id=idea_workspace_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                funnel_id=funnel_id,
+                asset_brief_artifact_id=brief_artifact_id,
+            )
+            linked_ad_copy_pack_context = _resolve_linked_ad_copy_pack_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                asset_brief_id=asset_brief_id,
+                requirement_index=requirement_index,
+                ad_copy_pack_artifact_id=ad_copy_pack_artifact_id,
+                ad_copy_pack_id=ad_copy_pack_id,
+            )
+        destination_context = _build_swipe_stage1_destination_context(
+            destination_type_slug=destination_type_slug,
+            resolved_destination_url=(
+                destination_resolution.resolved_url if destination_resolution is not None else None
+            ),
+            gemini_rag_doc_keys=gemini_rag_doc_keys,
+        )
         rendered_prompt_template = _build_swipe_stage1_prompt_input(
             prompt_template=prompt_template,
             brand_name=str(client_name),
-            angle=angle,
+            angle=effective_angle,
+            destination_context=destination_context,
+            brand_colors_fonts=brand_colors_fonts,
         )
         rendered_prompt_signature = _stable_idempotency_key(
             "swipe_prompt_input_v1",
@@ -3569,35 +3845,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             product_prompt_image_sha256 = hashlib.sha256(product_prompt_image_bytes).hexdigest()
             product_prompt_image_size_bytes = len(product_prompt_image_bytes)
 
-        # The Gemini input must be only the rendered swipe prompt template plus the competitor image.
-        # File Search attaches foundational documents as external context.
-        (
-            gemini_store_names,
-            gemini_rag_doc_keys,
-            gemini_rag_bundle_doc_keys,
-            gemini_rag_document_names,
-        ) = _resolve_swipe_stage1_gemini_file_search_context(
-            session=session,
-            org_id=org_id,
-            idea_workspace_id=idea_workspace_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            funnel_id=funnel_id,
-            asset_brief_artifact_id=brief_artifact_id,
-        )
-        linked_ad_copy_pack_context = _resolve_linked_ad_copy_pack_context(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-            campaign_id=campaign_id,
-            asset_brief_id=asset_brief_id,
-            requirement_index=requirement_index,
-            ad_copy_pack_artifact_id=ad_copy_pack_artifact_id,
-            ad_copy_pack_id=ad_copy_pack_id,
-        )
-
         # Run Gemini vision with File Search context to generate the generation-ready image prompt.
         gemini_client = _ensure_gemini_client()
         generation_config = {
@@ -3607,6 +3854,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "product_reference_images_attached": 1 if product_prompt_image_bytes is not None else 0,
         }
         contents: List[Any] = [
+            *prompt_context_parts,
             rendered_prompt_template,
             genai_types.Part.from_bytes(data=swipe_bytes, mime_type=swipe_mime_type),
         ]
@@ -3614,15 +3862,17 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             contents.append(
                 genai_types.Part.from_bytes(data=product_prompt_image_bytes, mime_type=product_prompt_image_mime_type)
             )
-        generate_config = genai_types.GenerateContentConfig(
-            temperature=0.2,
-            max_output_tokens=max_output_tokens,
-            tools=[
+        generate_config_kwargs: Dict[str, Any] = {
+            "temperature": 0.2,
+            "max_output_tokens": max_output_tokens,
+        }
+        if gemini_store_names:
+            generate_config_kwargs["tools"] = [
                 genai_types.Tool(
                     file_search=genai_types.FileSearch(file_search_store_names=gemini_store_names)
                 )
-            ],
-        )
+            ]
+        generate_config = genai_types.GenerateContentConfig(**generate_config_kwargs)
 
         trace_context = LangfuseTraceContext(
             name="workflow.swipe_image_ad",
@@ -3784,50 +4034,57 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
             rendered_ad_sha256 = hashlib.sha256(rendered_ad_bytes).hexdigest()
             rendered_ad_size_bytes = len(rendered_ad_bytes)
-            (
-                swipe_copy_pack,
-                swipe_copy_response,
-                swipe_copy_model,
-                swipe_copy_prompt_text,
-            ) = _generate_rendered_asset_swipe_copy_pack(
-                session=session,
-                brief=brief,
-                requirement_index=requirement_index,
-                requirement=requirement,
-                copy_model=model_name,
-                gemini_store_names=gemini_store_names,
-                rendered_ad_bytes=rendered_ad_bytes,
-                rendered_ad_mime_type=rendered_ad_mime_type,
-                rendered_ad_source_url=output.primary_url,
-                rendered_ad_source_label=rendered_ad_source_label,
-                linked_ad_copy_pack=linked_ad_copy_pack_context["copyPack"],
-                product_prompt_image_bytes=product_prompt_image_bytes,
-                product_prompt_image_mime_type=product_prompt_image_mime_type,
-            )
-            swipe_copy_pack_payload = swipe_copy_pack.model_dump(mode="json", by_alias=True)
-            swipe_copy_pack_payloads.append(swipe_copy_pack_payload)
-            swipe_copy_prompt_sha256 = hashlib.sha256(swipe_copy_prompt_text.encode("utf-8")).hexdigest()
-            swipe_copy_inputs = SwipeCopyInputs(
-                platform=swipe_copy_pack.platform,
-                adImageOrVideo={
-                    "sourceKind": "rendered_output",
-                    "assetType": _resolve_swipe_copy_asset_type(mime_type=rendered_ad_mime_type),
-                    "sourceLabel": rendered_ad_source_label,
-                    "sourceUrl": output.primary_url,
-                    "mimeType": rendered_ad_mime_type,
-                    "remoteAssetId": output.asset_id,
-                },
-                angleUsed=str(requirement.get("angle") or ""),
-                destinationPage=swipe_copy_pack.destination_type,
-                adCopyPackId=linked_ad_copy_pack_context["copyPackId"],
-                adCopyPackArtifactId=linked_ad_copy_pack_context["artifactId"],
-                sourceSwipe=SwipeCopySourceSwipeProvenance(
-                    companySwipeId=company_swipe_id,
-                    sourceLabel=swipe_source_label,
-                    sourceUrl=swipe_source_url,
-                    mimeType=swipe_mime_type,
-                ).model_dump(mode="json", by_alias=True, exclude_none=True),
-            ).model_dump(mode="json", by_alias=True, exclude_none=True)
+            swipe_copy_pack_payload: dict[str, Any] | None = None
+            swipe_copy_response: Dict[str, Any] | None = None
+            swipe_copy_model: str | None = None
+            swipe_copy_prompt_text: str | None = None
+            swipe_copy_prompt_sha256: str | None = None
+            swipe_copy_inputs: dict[str, Any] | None = None
+            if swipe_context_mode == _SWIPE_CONTEXT_MODE_WORKSPACE:
+                (
+                    swipe_copy_pack,
+                    swipe_copy_response,
+                    swipe_copy_model,
+                    swipe_copy_prompt_text,
+                ) = _generate_rendered_asset_swipe_copy_pack(
+                    session=session,
+                    brief=brief,
+                    requirement_index=requirement_index,
+                    requirement=requirement,
+                    copy_model=model_name,
+                    gemini_store_names=gemini_store_names,
+                    rendered_ad_bytes=rendered_ad_bytes,
+                    rendered_ad_mime_type=rendered_ad_mime_type,
+                    rendered_ad_source_url=output.primary_url,
+                    rendered_ad_source_label=rendered_ad_source_label,
+                    linked_ad_copy_pack=linked_ad_copy_pack_context["copyPack"],
+                    product_prompt_image_bytes=product_prompt_image_bytes,
+                    product_prompt_image_mime_type=product_prompt_image_mime_type,
+                )
+                swipe_copy_pack_payload = swipe_copy_pack.model_dump(mode="json", by_alias=True)
+                swipe_copy_pack_payloads.append(swipe_copy_pack_payload)
+                swipe_copy_prompt_sha256 = hashlib.sha256(swipe_copy_prompt_text.encode("utf-8")).hexdigest()
+                swipe_copy_inputs = SwipeCopyInputs(
+                    platform=swipe_copy_pack.platform,
+                    adImageOrVideo={
+                        "sourceKind": "rendered_output",
+                        "assetType": _resolve_swipe_copy_asset_type(mime_type=rendered_ad_mime_type),
+                        "sourceLabel": rendered_ad_source_label,
+                        "sourceUrl": output.primary_url,
+                        "mimeType": rendered_ad_mime_type,
+                        "remoteAssetId": output.asset_id,
+                    },
+                    angleUsed=str(requirement.get("angle") or ""),
+                    destinationPage=swipe_copy_pack.destination_type,
+                    adCopyPackId=linked_ad_copy_pack_context["copyPackId"],
+                    adCopyPackArtifactId=linked_ad_copy_pack_context["artifactId"],
+                    sourceSwipe=SwipeCopySourceSwipeProvenance(
+                        companySwipeId=company_swipe_id,
+                        sourceLabel=swipe_source_label,
+                        sourceUrl=swipe_source_url,
+                        mimeType=swipe_mime_type,
+                    ).model_dump(mode="json", by_alias=True, exclude_none=True),
+                ).model_dump(mode="json", by_alias=True, exclude_none=True)
 
             extra_ai_metadata: Dict[str, Any] = {
                 "remoteJobId": completed_job.id,
@@ -3840,16 +4097,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeRenderModelIdRequested": requested_render_model_id,
                 "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
                 "swipeRenderProvider": render_provider,
-                "swipeCopyPipelineVersion": 2,
-                "swipeCopyPack": swipe_copy_pack_payload,
-                "swipeCopyModel": swipe_copy_model,
-                "swipeCopyRequestId": swipe_copy_response.get("request_id"),
-                "swipeCopyStopReason": swipe_copy_response.get("stop_reason"),
-                "swipeCopyOutputTokens": swipe_copy_response.get("output_tokens"),
-                "swipeCopyPromptText": swipe_copy_prompt_text,
-                "swipeCopyPromptSha256": swipe_copy_prompt_sha256,
-                "swipeCopyInputs": swipe_copy_inputs,
-                "swipeCopyGeminiStoreNames": gemini_store_names,
+                "swipeContextMode": swipe_context_mode,
                 "swipeGeminiStoreNames": gemini_store_names,
                 "swipeGeminiRagDocKeys": gemini_rag_doc_keys,
                 "swipeGeminiRagBundleDocKeys": gemini_rag_bundle_doc_keys,
@@ -3857,6 +4105,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipePromptTemplateKey": "prompts/swipe/swipe_to_image_ad.md",
                 "swipePromptTemplateSha256": prompt_sha,
                 "swipePromptInputText": rendered_prompt_template,
+                "swipePromptContextBlock": minimal_context_block,
                 "swipePromptImageAttached": True,
                 "swipePromptImageSourceUrl": swipe_source_url,
                 "swipeSourceFilename": swipe_source_filename,
@@ -3920,8 +4169,29 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 extra_ai_metadata["creativeGenerationPlanArtifactId"] = creative_generation_plan_artifact_id
             if creative_generation_plan_item_id:
                 extra_ai_metadata["creativeGenerationPlanItemId"] = creative_generation_plan_item_id
-            extra_ai_metadata["adCopyPackArtifactId"] = linked_ad_copy_pack_context["artifactId"]
-            extra_ai_metadata["adCopyPackId"] = linked_ad_copy_pack_context["copyPackId"]
+            if swipe_context_mode == _SWIPE_CONTEXT_MODE_WORKSPACE:
+                extra_ai_metadata["swipeCopyPipelineVersion"] = 2
+                extra_ai_metadata["swipeCopyPack"] = swipe_copy_pack_payload
+                extra_ai_metadata["swipeCopyModel"] = swipe_copy_model
+                extra_ai_metadata["swipeCopyRequestId"] = (
+                    swipe_copy_response.get("request_id") if isinstance(swipe_copy_response, dict) else None
+                )
+                extra_ai_metadata["swipeCopyStopReason"] = (
+                    swipe_copy_response.get("stop_reason") if isinstance(swipe_copy_response, dict) else None
+                )
+                extra_ai_metadata["swipeCopyOutputTokens"] = (
+                    swipe_copy_response.get("output_tokens") if isinstance(swipe_copy_response, dict) else None
+                )
+                extra_ai_metadata["swipeCopyPromptText"] = swipe_copy_prompt_text
+                extra_ai_metadata["swipeCopyPromptSha256"] = swipe_copy_prompt_sha256
+                extra_ai_metadata["swipeCopyInputs"] = swipe_copy_inputs
+                extra_ai_metadata["swipeCopyGeminiStoreNames"] = gemini_store_names
+                extra_ai_metadata["adCopyPackArtifactId"] = linked_ad_copy_pack_context["artifactId"]
+                extra_ai_metadata["adCopyPackId"] = linked_ad_copy_pack_context["copyPackId"]
+                extra_ai_metadata["swipeCopyGenerationSkipped"] = False
+            else:
+                extra_ai_metadata["swipeCopyGenerationSkipped"] = True
+                extra_ai_metadata["swipeCopyGenerationReason"] = "minimal_context_mode"
 
             local_asset_id = _create_generated_asset_from_url(
                 session=session,
@@ -3957,6 +4227,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipe_prompt_model": model_name,
                 "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
                 "swipe_render_provider": render_provider,
+                "swipe_context_mode": swipe_context_mode,
                 "prompt_template_sha256": prompt_sha,
                 "stores_attached": len(gemini_store_names),
                 "gemini_rag_doc_keys": gemini_rag_doc_keys,
@@ -3972,9 +4243,10 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_prompt_model": model_name,
             "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
             "swipe_render_provider": render_provider,
+            "swipe_context_mode": swipe_context_mode,
             "swipe_copy_pack": swipe_copy_pack_payloads[0] if swipe_copy_pack_payloads else None,
             "swipe_copy_packs": swipe_copy_pack_payloads,
-            "swipe_copy_model": model_name,
+            "swipe_copy_model": model_name if swipe_context_mode == _SWIPE_CONTEXT_MODE_WORKSPACE else None,
             "stores_attached": len(gemini_store_names),
             "gemini_rag_doc_keys": gemini_rag_doc_keys,
             "gemini_rag_bundle_doc_keys": gemini_rag_bundle_doc_keys,

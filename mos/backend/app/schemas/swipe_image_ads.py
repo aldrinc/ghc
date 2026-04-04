@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -32,6 +34,31 @@ class SwipeImageAdGenerateRequest(BaseModel):
         None,
         validation_alias="swipeRequiresProductImage",
         serialization_alias="swipeRequiresProductImage",
+    )
+    swipe_context_mode: Literal["workspace", "minimal"] = Field(
+        "workspace",
+        validation_alias="swipeContextMode",
+        serialization_alias="swipeContextMode",
+    )
+    swipe_brand_name: str | None = Field(
+        None,
+        validation_alias="swipeBrandName",
+        serialization_alias="swipeBrandName",
+    )
+    swipe_product_name: str | None = Field(
+        None,
+        validation_alias="swipeProductName",
+        serialization_alias="swipeProductName",
+    )
+    swipe_angle: str | None = Field(
+        None,
+        validation_alias="swipeAngle",
+        serialization_alias="swipeAngle",
+    )
+    swipe_hook: str | None = Field(
+        None,
+        validation_alias="swipeHook",
+        serialization_alias="swipeHook",
     )
 
     model: str | None = Field(None, description="Gemini model name to use for swipe prompt generation.")

@@ -1,9 +1,11 @@
 from contextlib import contextmanager
+import io
 import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
+import zipfile
 
 import pytest
 
@@ -19,6 +21,7 @@ from app.db.models import (
     ResearchArtifact,
     WorkflowRun,
 )
+from app.routers import workflows as workflows_router
 from app.routers.workflows import _normalize_strategy_v2_artifact_refs
 from app.strategy_v2.errors import (
     StrategyV2DecisionError,
@@ -1935,6 +1938,165 @@ def test_workflow_research_artifact_endpoint_supports_artifact_scheme(
     payload = response.json()
     assert payload["step_key"] == "v2-01"
     assert payload["content"] == {"payload": {"hello": "world"}}
+
+
+def test_workflow_research_artifact_endpoint_supports_canon_only_refs(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="CanonOnlyRef",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-canon-only-workflow",
+        temporal_run_id="strategy-v2-canon-only-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    client_canon = Artifact(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        type=ArtifactTypeEnum.client_canon,
+        data={
+            "precanon_research": {
+                "artifact_refs": [
+                    {
+                        "step_key": "04",
+                        "title": "Deep research",
+                        "doc_url": "https://docs.google.com/document/d/doc-04/edit",
+                        "doc_id": "doc-04",
+                    }
+                ],
+                "step_summaries": {"04": "Canon summary"},
+            }
+        },
+    )
+    db_session.add(client_canon)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        workflows_router,
+        "download_drive_text_file",
+        lambda *, file_id, encoding="utf-8": f"# Canon content for {file_id}\n",
+    )
+
+    response = api_client.get(f"/workflows/{workflow_run.id}/research/04")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["step_key"] == "04"
+    assert payload["title"] == "Deep research"
+    assert payload["doc_id"] == "doc-04"
+    assert payload["summary"] == "Canon summary"
+    assert payload["content"] == "# Canon content for doc-04\n"
+
+
+def test_workflow_research_archive_download_includes_workflow_and_canon_docs(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="ArchiveDownload",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-archive-workflow",
+        temporal_run_id="strategy-v2-archive-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    workflow_artifact = Artifact(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        type=ArtifactTypeEnum.strategy_v2_step_payload,
+        data={"payload": {"content": "# Workflow document\n\nBody"}},
+    )
+    db_session.add(workflow_artifact)
+    db_session.commit()
+    db_session.refresh(workflow_artifact)
+
+    research = ResearchArtifact(
+        org_id=org_uuid,
+        workflow_run_id=workflow_run.id,
+        step_key="v2-01",
+        title="Stage 0",
+        doc_id=str(workflow_artifact.id),
+        doc_url=f"artifact://{workflow_artifact.id}",
+        prompt_sha256=None,
+        summary="Stage 0 complete",
+    )
+    db_session.add(research)
+
+    client_canon = Artifact(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        type=ArtifactTypeEnum.client_canon,
+        data={
+            "precanon_research": {
+                "artifact_refs": [
+                    {
+                        "step_key": "04",
+                        "title": "Deep research",
+                        "doc_url": "https://docs.google.com/document/d/doc-04/edit",
+                        "doc_id": "doc-04",
+                    }
+                ],
+                "step_summaries": {"04": "Canon summary"},
+            }
+        },
+    )
+    db_session.add(client_canon)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        workflows_router,
+        "download_drive_text_file",
+        lambda *, file_id, encoding="utf-8": "# Canon document\n\nBody\n" if file_id == "doc-04" else "",
+    )
+
+    response = api_client.get(f"/workflows/{workflow_run.id}/research/download-all")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/zip")
+    assert "research-documents" in response.headers["content-disposition"]
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    assert set(archive.namelist()) == {"v2-01-stage-0.md", "04-deep-research.md"}
+    assert archive.read("v2-01-stage-0.md").decode("utf-8") == "# Workflow document\n\nBody"
+    assert archive.read("04-deep-research.md").decode("utf-8") == "# Canon document\n\nBody\n"
 
 
 def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_context):

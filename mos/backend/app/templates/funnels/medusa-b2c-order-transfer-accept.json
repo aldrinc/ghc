@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-order-transfer-accept",
+  "name": "Medusa B2C Accept Transfer",
+  "description": "Accept order transfer action page.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Accept Transfer",
+        "description": "Accept order transfer"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2COrderTransferAcceptPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

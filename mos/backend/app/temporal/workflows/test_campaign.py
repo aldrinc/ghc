@@ -7,11 +7,23 @@ from typing import Any, Dict
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from app.temporal.activities.client_onboarding_activities import build_client_canon_activity, build_metric_schema_activity
+    from app.temporal.activities.client_onboarding_activities import (
+        build_client_canon_activity,
+        build_metric_schema_activity,
+    )
     from app.temporal.activities.strategy_activities import build_strategy_sheet_activity
-    from app.temporal.activities.experiment_activities import build_experiment_specs_activity, create_asset_briefs_for_experiments_activity
-    from app.temporal.activities.asset_activities import generate_assets_for_brief_activity
-    from app.temporal.activities.qa_activities import run_brand_qa_activity, run_compliance_qa_activity
+    from app.temporal.activities.experiment_activities import (
+        build_experiment_specs_activity,
+        create_asset_briefs_for_experiments_activity,
+    )
+    from app.temporal.activities.asset_activities import (
+        generate_assets_for_brief_activity,
+        resolve_default_swipe_collection_activity,
+    )
+    from app.temporal.activities.qa_activities import (
+        run_brand_qa_activity,
+        run_compliance_qa_activity,
+    )
 
 
 @dataclass
@@ -86,6 +98,39 @@ class TestCampaignWorkflow:
         if not isinstance(brief_ids, list) or not brief_ids:
             raise RuntimeError("Asset brief generation returned no asset_brief_ids.")
         brief_id = brief_ids[0]
+        swipe_collection = await workflow.execute_activity(
+            resolve_default_swipe_collection_activity,
+            {"org_id": input.org_id},
+            schedule_to_close_timeout=timedelta(minutes=2),
+        )
+        swipe_collection_id = (
+            str(swipe_collection.get("swipe_collection_id") or "").strip()
+            if isinstance(swipe_collection, dict)
+            else ""
+        )
+        swipe_collection_name = (
+            str(swipe_collection.get("swipe_collection_name") or "").strip()
+            if isinstance(swipe_collection, dict)
+            else ""
+        )
+        raw_swipe_asset_ids = (
+            swipe_collection.get("swipe_asset_ids") if isinstance(swipe_collection, dict) else []
+        )
+        swipe_asset_ids = (
+            [str(asset_id).strip() for asset_id in raw_swipe_asset_ids if str(asset_id).strip()]
+            if isinstance(raw_swipe_asset_ids, list)
+            else []
+        )
+        if not swipe_collection_id:
+            raise RuntimeError(
+                "Default swipe collection resolution returned no swipe_collection_id."
+            )
+        if not swipe_collection_name:
+            raise RuntimeError(
+                "Default swipe collection resolution returned no swipe_collection_name."
+            )
+        if not swipe_asset_ids:
+            raise RuntimeError("Default swipe collection resolution returned no swipe_asset_ids.")
 
         assets = await workflow.execute_activity(
             generate_assets_for_brief_activity,
@@ -95,10 +140,18 @@ class TestCampaignWorkflow:
                 "campaign_id": None,
                 "product_id": input.product_id,
                 "asset_brief_id": brief_id,
+                "swipe_collection_id": swipe_collection_id,
+                "swipe_collection_name": swipe_collection_name,
+                "swipe_asset_ids": swipe_asset_ids,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
-        asset_ids = assets.get("asset_ids") if isinstance(assets, dict) else []
+        raw_asset_ids = assets.get("asset_ids") if isinstance(assets, dict) else []
+        asset_ids = (
+            [str(asset_id) for asset_id in raw_asset_ids if str(asset_id).strip()]
+            if isinstance(raw_asset_ids, list)
+            else []
+        )
 
         brand_qa = await workflow.execute_activity(
             run_brand_qa_activity,

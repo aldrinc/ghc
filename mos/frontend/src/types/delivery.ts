@@ -46,12 +46,20 @@ export interface CampaignDeliveryValidationResponse {
 }
 
 export interface CampaignLaunchContextReadiness {
+  provider?: "strategy_v2" | "manual" | "skills";
   ready: boolean;
   checkedAt: string;
   reason?: string | null;
   sourceStrategyV2WorkflowRunId?: string | null;
   sourceStrategyV2TemporalWorkflowId?: string | null;
   launchContextArtifactId?: string | null;
+  manualCreativeContextArtifactId?: string | null;
+  creativeContextArtifactId?: string | null;
+  materializedCreativeContextArtifactId?: string | null;
+  materializedArtifactIds?: Record<string, string> | null;
+  strategyBundleId?: string | null;
+  strategyBundleType?: string | null;
+  missingArtifacts?: string[];
   refreshed: boolean;
   staleArtifactId?: string | null;
 }

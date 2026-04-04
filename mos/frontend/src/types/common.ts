@@ -16,7 +16,145 @@ export interface Campaign {
   name: string;
   channels?: string[];
   asset_brief_types?: AssetBriefType[];
+  default_swipe_collection_id?: string | null;
 }
+
+export interface CampaignSwipeDefault {
+  swipeCollectionId: string | null;
+  swipeCollectionName: string | null;
+  readySwipeCount: number;
+}
+
+export interface GetHookdCredentials {
+  hasCredentials: boolean;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+}
+
+export interface PostizCredentials {
+  hasCredentials: boolean;
+  baseUrl?: string | null;
+  authType?: string | null;
+  lastValidatedAt?: string | null;
+  lastValidationError?: string | null;
+}
+
+export interface PostizBrowserLaunchSession {
+  launchUrl: string;
+  autoConfiguredCredentials: boolean;
+}
+
+export interface PostizChannel {
+  id: string;
+  postizIntegrationId: string;
+  postizChannelId: string;
+  identifier: string;
+  name: string;
+  profile?: string | null;
+  pictureUrl?: string | null;
+  disabled: boolean;
+  isDefault: boolean;
+  metadata: Record<string, unknown>;
+  lastSyncedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPostingProfile {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  defaultChannelIds: string[];
+  timezone?: string | null;
+  shortLink?: boolean | null;
+  providerSettings: Record<string, unknown>;
+  postizPostingProfileId?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPostingProfileInput {
+  name: string;
+  isDefault?: boolean;
+  defaultChannelIds?: string[];
+  timezone?: string | null;
+  shortLink?: boolean | null;
+  providerSettings?: Record<string, unknown>;
+}
+
+export interface PostizPostingProfileUpdateInput extends Partial<PostizPostingProfileInput> {}
+
+export interface PostizPublication {
+  id: string;
+  postizPostId?: string | null;
+  postizPostIds?: string[];
+  content: string;
+  postType: string;
+  scheduledFor?: string | null;
+  targetChannels: Record<string, unknown>;
+  mediaUrls: string[];
+  linkUrl?: string | null;
+  status: string;
+  postizPostStatus?: string | null;
+  releaseUrls: string[];
+  errorPayload?: Record<string, unknown> | null;
+  lastSyncedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostizPublicationListResponse {
+  posts: PostizPublication[];
+  total: number;
+}
+
+export interface PostizCreatePostInput {
+  content: string;
+  postType: "now" | "schedule" | "draft";
+  scheduledFor?: string | null;
+  channelIds: string[];
+  mediaUrls?: string[];
+  linkUrl?: string | null;
+  postingProfileId?: string | null;
+  providerSettingsByIdentifier?: Record<string, unknown>;
+}
+
+export interface GetHookdSyncFeedFilters {
+  query?: string;
+  platforms?: string;
+  niche?: string;
+  ad_format?: string;
+  location?: string;
+  language?: string;
+  performance_scores?: string;
+  status?: string;
+  sort_column?: string;
+  sort_direction?: string;
+  ads_per_brand_limit?: number;
+  active_ads_count?: number;
+}
+
+export interface GetHookdSyncFeed {
+  id: string;
+  name: string;
+  enabled: boolean;
+  filters: GetHookdSyncFeedFilters;
+  maxPagesPerRun: number;
+  perPage: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetHookdSyncFeedInput {
+  name: string;
+  enabled?: boolean;
+  filters: GetHookdSyncFeedFilters;
+  maxPagesPerRun?: number;
+  perPage?: number;
+}
+
+export interface GetHookdSyncFeedUpdateInput extends Partial<GetHookdSyncFeedInput> {}
 
 export interface WorkflowRun {
   id: string;

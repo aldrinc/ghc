@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-order-transfer-decline",
+  "name": "Medusa B2C Decline Transfer",
+  "description": "Decline order transfer action page.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Decline Transfer",
+        "description": "Decline order transfer"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2COrderTransferDeclinePage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

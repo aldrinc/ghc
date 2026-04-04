@@ -179,11 +179,7 @@ export function AdDetailPanel({
                         Exclude
                       </Button>
                     ) : null}
-                    <Dialog.Close>
-                      <Button variant="ghost" size="xs">
-                        Close
-                      </Button>
-                    </Dialog.Close>
+                    <Dialog.Close render={<Button variant="ghost" size="xs">Close</Button>} />
                   </div>
                 </div>
 

@@ -71,4 +71,38 @@
     padding: calc(var(--ds-card-padding) * 0.75) var(--ds-card-padding);
     border-top: 1px solid var(--divider);
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Section card – the outer container used inside tab content panels.  */
+  /* ------------------------------------------------------------------ */
+  .ds-section-card {
+    --ds-card-padding: var(--space-5, 1.25rem);
+    border-radius: var(--radius-card, var(--radius-panel, var(--radius-lg)));
+    background-color: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: var(--ds-card-padding);
+  }
+
+  .ds-section-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Overline – small uppercased section label.                          */
+  /* ------------------------------------------------------------------ */
+  .text-overline {
+    font-size: 0.75rem;   /* 12px */
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
 }

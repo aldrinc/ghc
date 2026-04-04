@@ -149,6 +149,10 @@ class MetaAdsClient:
         path = f"{_normalize_ad_account_id(ad_account_id)}/campaigns"
         return self._request("POST", path, data=_encode_payload(payload))
 
+    def create_ad_pixel(self, *, ad_account_id: str, name: str) -> dict[str, Any]:
+        path = f"{_normalize_ad_account_id(ad_account_id)}/adspixels"
+        return self._request("POST", path, data=_encode_payload({"name": name}))
+
     def create_adset(self, *, ad_account_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         path = f"{_normalize_ad_account_id(ad_account_id)}/adsets"
         return self._request("POST", path, data=_encode_payload(payload))

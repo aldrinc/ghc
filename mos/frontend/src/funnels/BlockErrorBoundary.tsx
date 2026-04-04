@@ -37,6 +37,18 @@ export class BlockErrorBoundary extends Component<Props, State> {
 
     const { blockType, blockId } = this.props;
     const message = this.state.error.message || "Unknown render error";
+    const isPublicRuntime =
+      typeof document !== "undefined" && Boolean(document.querySelector('[data-public-funnel-page="true"]'));
+
+    if (isPublicRuntime) {
+      return (
+        <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 text-sm text-content">
+          <div className="font-semibold text-danger">This storefront section is unavailable.</div>
+          <div className="mt-2 whitespace-pre-wrap text-content">{message}</div>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 text-sm text-content">
         <div className="font-semibold text-danger">Block failed to render</div>

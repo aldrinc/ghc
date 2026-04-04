@@ -1,0 +1,28 @@
+{
+  "runtimeSchemaVersion": "2026-04-02-explicit-page-editor-v4",
+  "toolsets": ["file", "skills"],
+  "defaults": {
+    "model": "claude-haiku-4-5-20251001",
+    "provider": "custom",
+    "baseUrl": "https://api.anthropic.com/v1",
+    "compressionEnabled": true,
+    "compressionThreshold": 0.85,
+    "compressionSummaryProvider": "main",
+    "compressionSummaryModel": null
+  },
+  "adapterSpec": {
+    "requiredRunAgentMarkers": [
+      "self._use_prompt_caching = is_claude and (is_openrouter or is_direct_anthropic)",
+      "\"cache_read_tokens\": self.session_cache_read_tokens",
+      "\"cache_write_tokens\": self.session_cache_write_tokens",
+      "cache_read_tokens = getattr(response.usage, 'cache_read_input_tokens', 0) or 0",
+      "cache_write_tokens = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0",
+      "\"anthropic-beta\": ANTHROPIC_PROMPT_CACHING_BETA",
+      "Anthropic rejects cache_control on empty text blocks."
+    ],
+    "forbiddenRunAgentMarkers": [
+      "payload[\"cache_control\"] = {\"type\": \"ephemeral\"}",
+      "_append_text(\"\", cache_control=message_cache_control)"
+    ]
+  }
+}

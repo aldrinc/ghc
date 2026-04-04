@@ -264,7 +264,7 @@ export function normalizeBreakdownAdToLibraryItem(ad: any): LibraryItem {
   };
 }
 
-function mapSwipePlatforms(swipe: CompanySwipeAsset, snapshot: any): string[] {
+export function mapSwipePlatforms(swipe: CompanySwipeAsset, snapshot: any): string[] {
   const set = new Set<string>();
   if (swipe.platforms) {
     swipe.platforms
@@ -282,7 +282,7 @@ function mapSwipePlatforms(swipe: CompanySwipeAsset, snapshot: any): string[] {
   return Array.from(set);
 }
 
-function mapSwipeImages(snapshot: any, fallbackAlt?: string): MediaAsset[] {
+export function mapSwipeImages(snapshot: any, fallbackAlt?: string): MediaAsset[] {
   const images = Array.isArray(snapshot?.images) ? snapshot.images : [];
   const cards = Array.isArray(snapshot?.cards) ? snapshot.cards : [];
   return [...images, ...cards]
@@ -307,7 +307,7 @@ function mapSwipeImages(snapshot: any, fallbackAlt?: string): MediaAsset[] {
     .filter(Boolean) as MediaAsset[];
 }
 
-function mapSwipeVideos(snapshot: any, posterFallback?: string): MediaAsset[] {
+export function mapSwipeVideos(snapshot: any, posterFallback?: string): MediaAsset[] {
   const videos = Array.isArray(snapshot?.videos) ? snapshot.videos : [];
   const cards = Array.isArray(snapshot?.cards) ? snapshot.cards : [];
   return [...videos, ...cards]
@@ -326,7 +326,7 @@ function mapSwipeVideos(snapshot: any, posterFallback?: string): MediaAsset[] {
     .filter(Boolean) as MediaAsset[];
 }
 
-function mapSwipeStoredMedia(mediaList: CompanySwipeAsset["media"], fallbackAlt?: string): MediaAsset[] {
+export function mapSwipeStoredMedia(mediaList: CompanySwipeAsset["media"], fallbackAlt?: string): MediaAsset[] {
   if (!mediaList || !Array.isArray(mediaList)) return [];
   return mediaList
     .map((m: any) => {

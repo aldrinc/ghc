@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from temporalio.exceptions import ApplicationError
 
 from app.temporal.activities import swipe_image_ad_activities as swipe_activity
 
@@ -225,6 +226,196 @@ def _fake_swipe_copy_pack_parsed(*, angle: str) -> dict[str, object]:
     }
 
 
+def test_collect_blind_angle_forbidden_terms_skips_single_generic_taxonomy_words():
+    terms = swipe_activity._collect_blind_angle_forbidden_terms(
+        "Interaction-First Safety Checker",
+        "Interaction-First Safety Checker framed for Contraindications-First Monographs",
+    )
+
+    assert "interaction first safety checker" in terms
+    assert "interaction first safety" in terms
+    assert "interaction" not in terms
+    assert "safety" not in terms
+
+
+def test_build_swipe_stage1_destination_context_uses_manual_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="pre-sales",
+        resolved_destination_url="https://example.com/presell",
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_campaign_loaded_copy",
+            "swipe_stage1_campaign_creative_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Pre-Sales Landing Page (pre-sales)" in destination_context
+    assert "Resolved destination URL: https://example.com/presell" in destination_context
+    assert "Swipe Stage1 Campaign Asset Brief" in destination_context
+    assert "Swipe Stage1 Campaign Loaded Copy" in destination_context
+    assert "Swipe Stage1 Campaign Creative Context" in destination_context
+    assert "presell or pre-sales page content" in destination_context
+    assert "pull it from those artifacts instead of inventing it" in destination_context
+
+
+def test_build_swipe_stage1_destination_context_uses_strategy_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="sales",
+        resolved_destination_url=None,
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_strategy_v2_copy",
+            "swipe_stage1_strategy_v2_copy_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Sales Page (sales)" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy Context" in destination_context
+    assert "sales page content as the post-click continuity anchor" in destination_context
+
+
+def test_build_swipe_stage1_prompt_input_includes_workspace_brand_colors_fonts():
+    rendered = swipe_activity._build_swipe_stage1_prompt_input(
+        prompt_template="Base swipe prompt",
+        brand_name="Ember",
+        angle="Clinical proof",
+        destination_context="Destination page type: Sales Page (sales)",
+        brand_colors_fonts="Heading font: Bookmania | Body font: Proxima Nova | Brand color: #C41423",
+    )
+
+    assert "Base swipe prompt" in rendered
+    assert "RUNTIME INPUTS (INJECTED)" in rendered
+    assert "Brand: Ember" in rendered
+    assert "Angle: Clinical proof" in rendered
+    assert "Brand colors/fonts: Heading font: Bookmania | Body font: Proxima Nova | Brand color: #C41423" in rendered
+    assert "Destination page type: Sales Page (sales)" in rendered
+    assert "Competitor swipe image is attached as image input." in rendered
+
+
+def test_validate_swipe_copy_blind_angle_blackout_rejects_exact_internal_angle_phrase():
+    copy_pack = swipe_activity.SwipeAdCopyPack.model_validate(
+        {
+            "platform": "meta",
+            "requirementIndex": 0,
+            "channel": "facebook",
+            "format": "image",
+            "funnelStage": "mid",
+            "angle": "Interaction-First Safety Checker",
+            "hook": "Interaction-First Safety Checker framed for Contraindications-First Monographs",
+            "destinationType": "presell",
+            "selectedVariation": "Variation 1: Interaction First Safety Checker",
+            "formattedVariationsMarkdown": (
+                "```text\n"
+                "**Variation 1: Interaction First Safety Checker**\n\n"
+                "**Primary Text:**\n"
+                "This interaction first safety checker shows you what to do before you add anything new.\n\n"
+                "**Headline:** Interaction First Safety Checker\n"
+                "**Description:** See the exact warning now.\n"
+                "**CTA:** Learn More\n"
+                "```"
+            ),
+            "metaPrimaryText": "This interaction first safety checker shows you what to do before you add anything new.",
+            "metaHeadline": "Interaction First Safety Checker",
+            "metaDescription": "See the exact warning now.",
+            "metaCta": "Learn More",
+            "claimsGuardrails": ["Do not promise medical outcomes."],
+        }
+    )
+
+    with pytest.raises(ValueError, match="interaction first safety checker"):
+        swipe_activity._validate_swipe_copy_blind_angle_blackout(
+            copy_pack=copy_pack,
+            forbidden_terms=swipe_activity._collect_blind_angle_forbidden_terms(
+                "Interaction-First Safety Checker",
+                "Interaction-First Safety Checker framed for Contraindications-First Monographs",
+            ),
+        )
+
+
+def test_generate_swipe_stage1_copy_pack_allows_generic_safety_language_for_honest_herbalist(monkeypatch):
+    captured_prompts: list[str] = []
+    original_build_prompt = swipe_activity._build_swipe_copy_stage1_prompt
+
+    def _fake_build_prompt(**kwargs):
+        prompt = original_build_prompt(**kwargs)
+        captured_prompts.append(prompt)
+        return prompt
+
+    parsed_payload = {
+        "selectedVariation": "Variation 1: The Missing Warning",
+        "formattedVariationsMarkdown": (
+            "```text\n"
+            "**Variation 1: The Missing Warning**\n\n"
+            "**Primary Text:**\n"
+            "You can feel fine and still miss the one detail that changes everything.\n\n"
+            "For women juggling daily prescriptions, that missing detail can quietly turn a simple routine into a bigger problem.\n\n"
+            "Before you add one more capsule, see the safety gap almost nobody warns you about.\n\n"
+            "Tap below to see what to look for first.\n\n"
+            "**Headline:** The Warning Most Women Never See\n"
+            "**Description:** Catch the red flag before it compounds.\n"
+            "**CTA:** Learn More\n"
+            "```"
+        ),
+        "metaPrimaryText": (
+            "You can feel fine and still miss the one detail that changes everything.\n\n"
+            "For women juggling daily prescriptions, that missing detail can quietly turn a simple routine into a bigger problem.\n\n"
+            "Before you add one more capsule, see the safety gap almost nobody warns you about.\n\n"
+            "Tap below to see what to look for first."
+        ),
+        "metaHeadline": "The Warning Most Women Never See",
+        "metaDescription": "Catch the red flag before it compounds.",
+        "metaCta": "Learn More",
+        "claimsGuardrails": ["Do not promise medical outcomes."],
+    }
+
+    monkeypatch.setattr(swipe_activity, "_resolve_destination_type", lambda **_kwargs: "presell")
+    monkeypatch.setattr(swipe_activity, "_build_swipe_copy_stage1_prompt", _fake_build_prompt)
+    monkeypatch.setattr(
+        swipe_activity,
+        "_call_swipe_copy_gemini_json_message",
+        lambda **_kwargs: {
+            "parsed": parsed_payload,
+            "text": "",
+            "stop_reason": "STOP",
+            "output_tokens": 111,
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_audit_swipe_copy_blind_angle_blackout",
+        lambda **_kwargs: (True, None),
+    )
+
+    validated, response, model = swipe_activity._generate_swipe_stage1_copy_pack(
+        session=object(),
+        brief={"id": "brief-1"},
+        requirement_index=0,
+        requirement={
+            "channel": "facebook",
+            "format": "image",
+            "angle": "Interaction-First Safety Checker",
+            "hook": "Interaction-First Safety Checker framed for Contraindications-First Monographs",
+            "funnelStage": "mid",
+        },
+        copy_model="models/gemini-2.5-flash",
+        gemini_store_names=["fileSearchStores/context-store"],
+        swipe_bytes=b"image-bytes",
+        swipe_mime_type="image/png",
+        swipe_source_url="https://example.com/swipe.png",
+        swipe_source_label="10.png",
+        product_prompt_image_bytes=None,
+        product_prompt_image_mime_type=None,
+    )
+
+    assert "safety gap" in (validated.meta_primary_text or "").lower()
+    assert "internal taxonomy labels" in captured_prompts[0]
+    assert response["output_tokens"] == 111
+    assert model == "models/gemini-2.5-flash"
+
+
 def test_resolve_gemini_store_names_uses_existing_files(api_client, db_session, auth_context, monkeypatch):
     monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
     client_id, product_id, campaign_id = _create_campaign_with_product(
@@ -302,6 +493,45 @@ def test_resolve_gemini_store_names_seeds_when_missing(api_client, db_session, a
     assert stores == [seeded_store]
     assert len(bundle_doc_keys) == 5
     assert len(document_names) == 5
+
+
+def test_build_swipe_stage1_destination_context_uses_manual_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="pre-sales",
+        resolved_destination_url="https://example.com/presell",
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_campaign_loaded_copy",
+            "swipe_stage1_campaign_creative_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Pre-Sales Landing Page (pre-sales)" in destination_context
+    assert "Resolved destination URL: https://example.com/presell" in destination_context
+    assert "Swipe Stage1 Campaign Asset Brief" in destination_context
+    assert "Swipe Stage1 Campaign Loaded Copy" in destination_context
+    assert "Swipe Stage1 Campaign Creative Context" in destination_context
+    assert "presell or pre-sales page content" in destination_context
+    assert "pull it from those artifacts instead of inventing it" in destination_context
+
+
+def test_build_swipe_stage1_destination_context_uses_strategy_artifact_names():
+    destination_context = swipe_activity._build_swipe_stage1_destination_context(
+        destination_type_slug="sales",
+        resolved_destination_url=None,
+        gemini_rag_doc_keys=[
+            "swipe_stage1_campaign_asset_brief",
+            "swipe_stage1_strategy_v2_copy",
+            "swipe_stage1_strategy_v2_copy_context",
+        ],
+    )
+
+    assert destination_context is not None
+    assert "Destination page type: Sales Page (sales)" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy" in destination_context
+    assert "Swipe Stage1 Strategy V2 Copy Context" in destination_context
+    assert "sales page content as the post-click continuity anchor" in destination_context
 
 
 def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
@@ -412,7 +642,13 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             "client_name": "Brand Name",
             "product_title": "Product Name",
             "canon": {"constraints": {"legal": ["No medical claims"]}},
-            "design_system_tokens": {},
+            "design_system_tokens": {
+                "cssVars": {
+                    "--font-heading": "Bookmania, 'Times New Roman', serif",
+                    "--font-sans": "'Proxima Nova', Helvetica, Arial, sans-serif",
+                    "--color-brand": "#C41423",
+                }
+            },
         },
     )
     monkeypatch.setattr(
@@ -459,7 +695,16 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     monkeypatch.setattr(
         swipe_activity,
         "_resolve_swipe_stage1_gemini_file_search_context",
-        _fake_file_search_context,
+        lambda **_kwargs: (
+            ["fileSearchStores/context-store"],
+            [
+                "swipe_stage1_campaign_asset_brief",
+                "swipe_stage1_campaign_loaded_copy",
+                "swipe_stage1_campaign_creative_context",
+            ],
+            [],
+            [],
+        ),
     )
     monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
     def _fake_create_generated_asset_from_url(**kwargs):
@@ -504,6 +749,15 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert "RUNTIME INPUTS (INJECTED)" in prompt_input
     assert "Brand: Brand Name" in prompt_input
     assert "Angle: Clinical proof and fast results" in prompt_input
+    assert (
+        "Brand colors/fonts: Heading font: Bookmania, 'Times New Roman', serif | "
+        "Body font: 'Proxima Nova', Helvetica, Arial, sans-serif | Brand color: #C41423"
+    ) in prompt_input
+    assert "Destination page type: Sales Page (sales)" in prompt_input
+    assert "Swipe Stage1 Campaign Asset Brief" in prompt_input
+    assert "Swipe Stage1 Campaign Loaded Copy" in prompt_input
+    assert "Swipe Stage1 Campaign Creative Context" in prompt_input
+    assert "pull it from those artifacts instead of inventing it" in prompt_input
     assert "Competitor swipe image is attached as image input." in prompt_input
     assert len(captured_calls[0]["contents"]) == 3
     rendered_copy_prompt = captured_calls[1]["contents"][0]
@@ -537,8 +791,34 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert extra_ai_metadata["adCopyPackId"] == "copy-pack-1"
     config = captured_calls[0]["config"]
     assert hasattr(config, "tools")
-    assert config.tools
-    assert config.tools[0].file_search.file_search_store_names == ["fileSearchStores/context-store"]
+    assert len(config.tools) == 1
+    file_search_tool = config.tools[0]
+    assert file_search_tool.file_search.file_search_store_names == ["fileSearchStores/context-store"]
+
+
+def test_call_gemini_generate_content_with_retries_treats_daily_quota_as_non_retryable():
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            raise RuntimeError(
+                "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: "
+                "generativelanguage.googleapis.com/generate_requests_per_model_per_day, "
+                "quotaId=GenerateRequestsPerDayPerProjectPerModel. Please retry in 5h."
+            )
+
+    client = SimpleNamespace(models=_FakeModels())
+
+    with pytest.raises(ApplicationError, match="Swipe prompt generation failed with Gemini") as exc_info:
+        swipe_activity._call_gemini_generate_content_with_retries(
+            gemini_client=client,
+            model="gemini-3.1-pro-preview",
+            contents=["prompt"],
+            config=SimpleNamespace(),
+            operation_name="Swipe prompt generation",
+            file_search_model_error_message="File Search model mismatch.",
+        )
+
+    assert exc_info.value.type == "GeminiQuotaExceeded"
+    assert exc_info.value.non_retryable is True
 
 
 def test_call_swipe_copy_gemini_json_message_repairs_literal_newlines_in_json_strings(monkeypatch):

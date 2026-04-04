@@ -173,6 +173,8 @@ class AgentRuntime:
                 "attachmentBlocks",
                 "messages",
                 "copyPack",
+                "htmlReferencePromptContext",
+                "strategyPromptContext",
             }
             if isinstance(payload, dict):
                 return {k: ("<omitted>" if k in large_keys else v) for k, v in payload.items()}

@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-account-profile",
+  "name": "Medusa B2C Account Profile",
+  "description": "Customer profile management.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Profile",
+        "description": "Account profile"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CAccountProfilePage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

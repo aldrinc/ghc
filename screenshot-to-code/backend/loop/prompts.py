@@ -12,6 +12,8 @@ import re
 from typing import cast
 
 from loop.contracts import (
+    BlueprintValidationIssue,
+    BlueprintValidationReport,
     DesignSystemPreflight,
     DesignTokenSet,
     InteractionCheckpoint,
@@ -627,6 +629,55 @@ def compact_validator_requirements_for_prompt(
         "acceptance_criteria": compact.acceptance_criteria,
         "known_unknowns": compact.known_unknowns,
     }
+
+
+def _compact_blueprint_validation_issue(
+    issue: BlueprintValidationIssue,
+) -> BlueprintValidationIssue:
+    return BlueprintValidationIssue(
+        severity=issue.severity,
+        category=issue.category,
+        title=_truncate_text(issue.title, 160),
+        detail=_truncate_text(issue.detail, 320),
+        affected_fields=_truncate_list(
+            issue.affected_fields,
+            max_items=6,
+            max_chars=80,
+        ),
+        fix_instructions=_truncate_text(issue.fix_instructions, 320),
+    )
+
+
+def compact_blueprint_validation_report_for_prompt(
+    validation_report: BlueprintValidationReport,
+) -> BlueprintValidationReport:
+    return BlueprintValidationReport(
+        verdict=validation_report.verdict,
+        overall_score=validation_report.overall_score,
+        coverage_score=validation_report.coverage_score,
+        consistency_score=validation_report.consistency_score,
+        execution_readiness_score=validation_report.execution_readiness_score,
+        summary=_truncate_text(validation_report.summary, MAX_REQUIREMENTS_SUMMARY_CHARS),
+        strengths=_truncate_list(
+            validation_report.strengths,
+            max_items=6,
+            max_chars=220,
+        ),
+        issues=[
+            _compact_blueprint_validation_issue(issue)
+            for issue in validation_report.issues[:MAX_ISSUE_COUNT]
+        ],
+        missing_sections=_truncate_list(
+            validation_report.missing_sections,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=160,
+        ),
+        repair_instructions=_truncate_list(
+            validation_report.repair_instructions,
+            max_items=MAX_PATCH_INSTRUCTION_COUNT,
+            max_chars=320,
+        ),
+    )
 
 
 def _compact_validation_issue(issue: ValidationIssue) -> ValidationIssue:

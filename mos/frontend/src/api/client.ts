@@ -83,5 +83,11 @@ export function useApiClient(baseUrl: string = defaultBaseUrl) {
     [request],
   );
 
-  return useMemo(() => ({ request, get, post }), [get, post, request]);
+  const put = useCallback(
+    <T,>(path: string, body?: unknown): Promise<T> =>
+      request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
+    [request],
+  );
+
+  return useMemo(() => ({ request, get, post, put }), [get, post, put, request]);
 }

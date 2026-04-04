@@ -1,12 +1,19 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Download, ExternalLink, FileText } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
-import { useWorkflows, useWorkflowDetail } from "@/api/workflows";
+import {
+  useWorkflows,
+  useWorkflowDetail,
+  useDownloadResearchMarkdown,
+  useDownloadResearchMarkdownArchive,
+} from "@/api/workflows";
 import type { ResearchArtifactRef } from "@/types/common";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 
 type DocumentRow = {
@@ -53,10 +60,19 @@ function isExternalDocUrl(value?: string): boolean {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+function formatStepLabel(step: string) {
+  return step
+    .split("_")
+    .map((chunk) => (chunk ? chunk[0].toUpperCase() + chunk.slice(1) : chunk))
+    .join(" ");
+}
+
 export function DocumentsPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
+  const downloadMarkdown = useDownloadResearchMarkdown();
+  const downloadArchive = useDownloadResearchMarkdownArchive();
   const {
     data: workflows = [],
     isLoading: isWorkflowsLoading,
@@ -108,15 +124,12 @@ export function DocumentsPage() {
         seenSteps.add(stepKey);
 
         const canonRef = canonByStep.get(stepKey);
-        const title = typeof art.title === "string" ? art.title.trim() : "";
-        if (!title) {
-          throw new Error(`Missing title for research artifact step ${stepKey} in workflow ${latestWorkflow.id}`);
-        }
+        const rawTitle = typeof art.title === "string" ? art.title.trim() : "";
         out.push({
           key: `${latestWorkflow.id}:${stepKey}`,
           workflowId: latestWorkflow.id,
           stepKey,
-          title,
+          title: rawTitle || formatStepLabel(stepKey),
           summary: art.summary || stepSummaries[stepKey] || "",
           docUrl: art.doc_url || canonRef?.doc_url || undefined,
           source: canonRef ? "mixed" : "workflow",
@@ -128,15 +141,12 @@ export function DocumentsPage() {
         if (!stepKey) return;
         if (seenSteps.has(stepKey)) return;
         seenSteps.add(stepKey);
-        const title = typeof ref.title === "string" ? ref.title.trim() : "";
-        if (!title) {
-          throw new Error(`Missing title for canon research artifact step ${stepKey} in workflow ${latestWorkflow.id}`);
-        }
+        const rawTitle = typeof ref.title === "string" ? ref.title.trim() : "";
         out.push({
           key: `${latestWorkflow.id}:${stepKey}`,
           workflowId: latestWorkflow.id,
           stepKey,
-          title,
+          title: rawTitle || formatStepLabel(stepKey),
           summary: stepSummaries[stepKey] || "",
           docUrl: ref.doc_url || undefined,
           source: "canon",
@@ -236,7 +246,31 @@ export function DocumentsPage() {
 
       <div className="max-w-6xl mx-auto">
         {isLoading ? (
-          <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading documents…</div>
+          <div className="ds-card ds-card--md p-0 shadow-none">
+            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-32 rounded-md" />
+                <Skeleton className="h-8 w-28 rounded-md" />
+              </div>
+            </div>
+            <div className="divide-y divide-border/40">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <Skeleton className="h-4 w-4 shrink-0 rounded" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <Skeleton className="h-3 w-64" />
+                  <Skeleton className="ml-auto h-7 w-16 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : !latestWorkflow?.id ? (
           <div className="space-y-3">
             <EmptyState
@@ -272,9 +306,20 @@ export function DocumentsPage() {
                 <div className="text-sm font-semibold text-content">Research documents</div>
                 <div className="text-xs text-content-muted">Open workflow-backed research detail pages.</div>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => navigate(`/strategy/${latestWorkflow.id}`)}>
-                View workflow
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={downloadArchive.isPending}
+                  onClick={() => downloadArchive.mutate({ workflowId: latestWorkflow.id })}
+                >
+                  <Download className="h-4 w-4" />
+                  {downloadArchive.isPending ? "Downloading..." : "Download all"}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => navigate(`/strategy/${latestWorkflow.id}`)}>
+                  View workflow
+                </Button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <Table variant="ghost">
@@ -295,39 +340,66 @@ export function DocumentsPage() {
                     >
                       <TableCell className="font-semibold text-content">
                         <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 shrink-0 text-content-muted" />
                           <div className="min-w-0">
                             <div className="truncate">{row.title}</div>
-                            <div className="text-xs font-normal text-content-muted">Step {row.stepKey}</div>
+                            <div className="text-xs font-normal text-content-muted">
+                              {formatStepLabel(row.stepKey)}
+                            </div>
                           </div>
-                          {row.source === "canon" ? <Badge>Canon</Badge> : null}
-                          {row.source === "mixed" ? <Badge tone="accent">Canon + Workflow</Badge> : null}
+                          {row.source === "canon" ? <Badge className="shrink-0">Canon</Badge> : null}
+                          {row.source === "mixed" ? (
+                            <Badge tone="accent" className="shrink-0">Canon + Workflow</Badge>
+                          ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-content-muted">
-                        {row.summary || "No summary provided."}
+                      <TableCell className="text-sm text-content-muted max-w-xs">
+                        <span className="line-clamp-2">
+                          {row.summary || "No summary provided."}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="secondary"
-                          size="xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/strategy/${row.workflowId}/research/${row.stepKey}`);
-                          }}
-                        >
-                          View
-                        </Button>
-                        {isExternalDocUrl(row.docUrl) ? (
-                          <a
-                            href={row.docUrl as string}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary underline"
-                            onClick={(e) => e.stopPropagation()}
+                      <TableCell className="text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            aria-label="Download as Markdown"
+                            title="Download as Markdown"
+                            disabled={downloadMarkdown.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadMarkdown.mutate({
+                                workflowId: row.workflowId,
+                                stepKey: row.stepKey,
+                                title: row.title,
+                              });
+                            }}
                           >
-                            Open doc
-                          </a>
-                        ) : null}
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/strategy/${row.workflowId}/research/${row.stepKey}`);
+                            }}
+                          >
+                            View
+                          </Button>
+                          {isExternalDocUrl(row.docUrl) ? (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="xs"
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            >
+                              <a href={row.docUrl as string} target="_blank" rel="noreferrer">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

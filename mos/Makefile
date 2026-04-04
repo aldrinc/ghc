@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help run-backend run-worker run-frontend db-migrate db-revise temporal-up temporal-down
+.PHONY: help run-backend run-worker run-frontend db-migrate db-revise temporal-up postiz-up temporal-down
 
 help:
 	@echo "Available targets:"
@@ -9,6 +9,7 @@ help:
 	@echo "  db-migrate      - Apply database migrations (Alembic)"
 	@echo "  db-revise       - Create new Alembic revision (NAME=message)"
 	@echo "  temporal-up     - Start Temporal + Postgres stack via docker-compose"
+	@echo "  postiz-up       - Start Postiz + dedicated dependencies via docker-compose"
 	@echo "  temporal-down   - Stop Temporal + Postgres stack"
 
 run-backend:
@@ -28,6 +29,9 @@ db-revise:
 
 temporal-up:
 	cd infra && docker compose up -d temporal temporal-ui postgres
+
+postiz-up:
+	../scripts/start-postiz.sh
 
 temporal-down:
 	cd infra && docker compose down

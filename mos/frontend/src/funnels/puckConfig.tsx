@@ -1,7 +1,31 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Config } from "@measured/puck";
 import { Link } from "react-router-dom";
-import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import {
+  ImportedAccordion,
+  ImportedBadgeStrip,
+  ImportedComparisonTable,
+  ImportedFooterLinks,
+  ImportedItemGrid,
+  ImportedNarrativeBlock,
+  ImportedOfferSelector,
+  ImportedPage,
+  ImportedSection,
+  ImportedTestimonialsGrid,
+} from "@/components/imported-site/ImportedTemplateBlocks";
+import {
+  ImportedComparisonSection,
+  ImportedFaqSection,
+  ImportedFeatureSection,
+  ImportedFooterSection,
+  ImportedHeaderSection,
+  ImportedHeroSection,
+  ImportedOfferSection,
+  ImportedProofBarSection,
+  ImportedTestimonialsSection,
+} from "@/components/imported-site/ImportedSourceSectionBlocks";
+import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
+import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
   navigationClickEventForStages,
   resolvePublicFunnelStage,
@@ -39,8 +63,47 @@ import {
   preSalesDefaults,
 } from "@/funnels/templates/preSalesListicle/PreSalesTemplate";
 import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
-import type { PublicFunnelCommerce } from "@/types/commerce";
-import type { PublicFunnelStage } from "@/types/funnels";
+import type { PublicFunnelCommerce, PublicFunnelStage, SitePageType } from "@/types/funnels";
+import {
+  CommerceCatalogHero,
+  CommerceProductGrid,
+  CommerceProductDetail,
+  CommerceCart,
+  CommerceCheckout,
+  CommerceCategoryList,
+  CommerceCategoryHeading,
+  CommerceCartSummary,
+  CommerceStoreHeader,
+  CommerceStoreFooter,
+  CommerceStoreTemplate,
+} from "@/components/commerce/CommerceBlocks";
+import {
+  StarterStoreHeader,
+  StarterPromoBar,
+  StarterHomeHero,
+  StarterPolicyPage,
+  StarterCollectionRails,
+  StarterStoreFooter,
+} from "@/components/commerce/StarterStorefrontBlocks";
+import {
+  MedusaB2CHomePage,
+  MedusaB2CStorePage,
+  MedusaB2CCollectionPage,
+  MedusaB2CCategoryPage,
+  MedusaB2CProductPage,
+  MedusaB2CCartPage,
+  MedusaB2CCheckoutPage,
+  MedusaB2CPolicyPage,
+  MedusaB2CAccountDashboardPage,
+  MedusaB2CAccountProfilePage,
+  MedusaB2CAccountAddressesPage,
+  MedusaB2CAccountOrdersPage,
+  MedusaB2CAccountOrderDetailPage,
+  MedusaB2COrderConfirmedPage,
+  MedusaB2COrderTransferPage,
+  MedusaB2COrderTransferAcceptPage,
+  MedusaB2COrderTransferDeclinePage,
+} from "@/components/commerce/b2c";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -50,6 +113,7 @@ type FunnelRuntimeContextValue = {
   funnelSlug: string;
   pageMap: Record<string, string>;
   pageStageMap: Record<string, PublicFunnelStage>;
+  pageTypeMap?: Record<string, SitePageType>;
   bundleMode?: boolean;
   entrySlug?: string | null;
   pageStage?: PublicFunnelStage;
@@ -60,6 +124,8 @@ type FunnelRuntimeContextValue = {
   nextPageId?: string | null;
   visitorId?: string | null;
   sessionId?: string | null;
+  resolvePagePath?: (slug: string) => string;
+  resolveSitePath?: (sitePath: string) => string;
 };
 
 const FunnelRuntimeContext = createContext<FunnelRuntimeContextValue | null>(null);
@@ -83,10 +149,38 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
   if (!normalizedSlug) {
     return "#";
   }
+  if (runtime.resolvePagePath) {
+    return runtime.resolvePagePath(normalizedSlug);
+  }
   if (runtime.bundleMode) {
     return `/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
   return `/f/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
+}
+
+export function resolveRuntimeSitePath(runtime: FunnelRuntimeContextValue, sitePath: string): string {
+  const rawSitePath = (sitePath || "").trim();
+  const normalizedSitePath = rawSitePath.replace(/^\/+/, "");
+  if (!normalizedSitePath) {
+    if (runtime.resolveSitePath) {
+      return runtime.resolveSitePath("");
+    }
+    return buildPublicFunnelPath({
+      productSlug: runtime.productSlug,
+      funnelSlug: runtime.funnelSlug,
+      bundleMode: runtime.bundleMode || false,
+      sitePath: "",
+    });
+  }
+  if (runtime.resolveSitePath) {
+    return runtime.resolveSitePath(normalizedSitePath);
+  }
+  return buildPublicFunnelPath({
+    productSlug: runtime.productSlug,
+    funnelSlug: runtime.funnelSlug,
+    bundleMode: runtime.bundleMode || false,
+    sitePath: normalizedSitePath,
+  });
 }
 
 type PageOption = { label: string; value: string };
@@ -115,6 +209,52 @@ function withBlockBoundary<T extends Record<string, unknown>>(
   };
 }
 
+function createImportedSourceSectionBlockConfig(
+  blockType: string,
+  renderBlock: (props: Record<string, unknown>) => ReactNode,
+) {
+  return {
+    fields: {
+      textSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalText: { type: "textarea" },
+          text: { type: "textarea" },
+        },
+        defaultItemProps: { label: "", originalText: "", text: "" },
+      },
+      buttonSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalText: { type: "text" },
+          text: { type: "text" },
+          href: { type: "text" },
+        },
+        defaultItemProps: { label: "", originalText: "", text: "", href: "" },
+      },
+      imageSlots: {
+        type: "array",
+        arrayFields: {
+          label: { type: "text" },
+          originalSrc: { type: "text" },
+          originalText: { type: "text" },
+          src: { type: "text" },
+          alt: { type: "text" },
+        },
+        defaultItemProps: { label: "", originalSrc: "", originalText: "", src: "", alt: "" },
+      },
+    },
+    defaultProps: {
+      textSlots: [],
+      buttonSlots: [],
+      imageSlots: [],
+    },
+    render: withBlockBoundary(blockType, renderBlock),
+  };
+}
+
 function containerWidthClass(width?: ContainerWidth): string {
   switch (width) {
     case "sm":
@@ -129,7 +269,8 @@ function containerWidthClass(width?: ContainerWidth): string {
   }
 }
 
-function sectionPaddingClass(padding?: "sm" | "md" | "lg"): { inner: string; outerY: string } {
+function sectionPaddingClass(padding?: "none" | "sm" | "md" | "lg"): { inner: string; outerY: string } {
+  if (padding === "none") return { inner: "p-0", outerY: "py-0" };
   if (padding === "lg") return { inner: "p-10", outerY: "py-16" };
   if (padding === "sm") return { inner: "p-5", outerY: "py-10" };
   return { inner: "p-7", outerY: "py-12" };
@@ -323,33 +464,60 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
               { label: "Footer", value: "footer" },
             ],
           },
-          layout: {
+          // Modern Section props - bandWidth replaces layout
+          bandWidth: {
             type: "select",
             options: [
-              { label: "Full width", value: "full" },
+              { label: "Full bleed", value: "full" },
               { label: "Contained", value: "contained" },
-              { label: "Card", value: "card" },
             ],
           },
-          containerWidth: {
+          // Modern Section props - contentWidth replaces containerWidth
+          contentWidth: {
             type: "select",
             options: [
+              { label: "Small (640px)", value: "sm" },
+              { label: "Medium (768px)", value: "md" },
+              { label: "Large (1024px)", value: "lg" },
+              { label: "Extra large (1280px)", value: "xl" },
+              { label: "Full width", value: "full" },
+            ],
+          },
+          // Modern Section props - contentAlign
+          contentAlign: {
+            type: "select",
+            options: [
+              { label: "Left", value: "left" },
+              { label: "Center", value: "center" },
+              { label: "Right", value: "right" },
+            ],
+          },
+          // Modern Section props - surface replaces variant
+          surface: {
+            type: "select",
+            options: [
+              { label: "Default", value: "default" },
+              { label: "Muted", value: "muted" },
+              { label: "Primary", value: "primary" },
+              { label: "Dark", value: "dark" },
+            ],
+          },
+          // Modern Section props - padY replaces padding (vertical)
+          padY: {
+            type: "select",
+            options: [
+              { label: "None", value: "none" },
               { label: "Small", value: "sm" },
               { label: "Medium", value: "md" },
               { label: "Large", value: "lg" },
               { label: "Extra large", value: "xl" },
             ],
           },
-          variant: {
+          // Modern Section props - padX (horizontal)
+          padX: {
             type: "select",
             options: [
-              { label: "Default", value: "default" },
-              { label: "Muted", value: "muted" },
-            ],
-          },
-          padding: {
-            type: "select",
-            options: [
+              { label: "None", value: "none" },
               { label: "Small", value: "sm" },
               { label: "Medium", value: "md" },
               { label: "Large", value: "lg" },
@@ -357,58 +525,106 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           },
           content: { type: "slot" },
         },
-        defaultProps: { purpose: "section", layout: "full", containerWidth: "lg", variant: "default", padding: "md" },
+        defaultProps: {
+          purpose: "section",
+          bandWidth: "contained",
+          contentWidth: "lg",
+          contentAlign: "left",
+          surface: "default",
+          padY: "md",
+          padX: "md",
+        },
         render: ({
           purpose,
-          layout,
-          containerWidth,
-          variant,
-          padding,
+          bandWidth,
+          contentWidth,
+          contentAlign,
+          surface,
+          padY,
+          padX,
           content,
         }: {
           purpose?: "header" | "section" | "footer";
-          layout?: "full" | "contained" | "card";
-          containerWidth?: ContainerWidth;
-          variant?: "default" | "muted";
-          padding?: "sm" | "md" | "lg";
+          bandWidth?: "full" | "contained";
+          contentWidth?: "sm" | "md" | "lg" | "xl" | "full";
+          contentAlign?: "left" | "center" | "right";
+          surface?: "default" | "muted" | "primary" | "dark";
+          padY?: "none" | "sm" | "md" | "lg" | "xl";
+          padX?: "none" | "sm" | "md" | "lg";
           content?: (props?: Record<string, unknown>) => ReactNode;
         }) => {
           const resolvedPurpose = purpose || "section";
-          const resolvedLayout = layout || (resolvedPurpose === "section" ? "card" : "full");
 
-          const effectivePadding =
-            padding || (resolvedPurpose === "header" ? "sm" : resolvedPurpose === "footer" ? "md" : "md");
-          const { inner, outerY } = sectionPaddingClass(effectivePadding);
-          const outerYClass = resolvedPurpose === "header" ? "py-4" : outerY;
+          // Resolve surface (background) style
+          const surfaceClass =
+            surface === "muted"
+              ? "bg-surface-2"
+              : surface === "primary"
+                ? "bg-primary text-primary-foreground"
+                : surface === "dark"
+                  ? "bg-content text-white"
+                  : "bg-surface";
 
-          const effectiveVariant = variant || (resolvedPurpose === "footer" ? "muted" : "default");
-          const bg = effectiveVariant === "muted" ? "bg-surface-2" : "bg-surface";
+          // Resolve content width
+          const widthClass =
+            contentWidth === "sm"
+              ? "max-w-xl"
+              : contentWidth === "md"
+                ? "max-w-3xl"
+                : contentWidth === "lg"
+                  ? "max-w-5xl"
+                  : contentWidth === "xl"
+                    ? "max-w-7xl"
+                    : "w-full";
 
-          const container = containerWidthClass(containerWidth);
-          const innerContent = content ? content({ className: "space-y-5" }) : null;
+          // Resolve vertical padding
+          const padYClass =
+            padY === "none"
+              ? "py-0"
+              : padY === "sm"
+                ? "py-4"
+                : padY === "lg"
+                  ? "py-16"
+                  : padY === "xl"
+                    ? "py-24"
+                    : "py-10";
 
-          if (resolvedLayout === "full") {
+          // Resolve horizontal padding
+          const padXClass =
+            padX === "none"
+              ? "px-0"
+              : padX === "sm"
+                ? "px-3"
+                : padX === "lg"
+                  ? "px-8"
+                  : "px-6";
+
+          // Resolve content alignment
+          const alignClass =
+            contentAlign === "center"
+              ? "text-center"
+              : contentAlign === "right"
+                ? "text-right"
+                : "text-left";
+
+          const innerContent = content ? content({ className: `space-y-5 ${alignClass}` }) : null;
+
+          // Full bleed: background extends full width, content is contained
+          if (bandWidth === "full") {
             return (
-              <section className={`${bg} ${outerYClass}`}>
-                <div className={`mx-auto w-full ${container} px-6`}>{innerContent}</div>
+              <section className={`${surfaceClass} ${padYClass}`}>
+                <div className={`mx-auto ${widthClass} ${padXClass}`}>{innerContent}</div>
               </section>
             );
           }
 
-          if (resolvedLayout === "contained") {
-            return (
-              <section className={`${outerYClass}`}>
-                <div className={`mx-auto w-full ${container} px-6`}>
-                  <div className={`${bg} ${inner}`}>{innerContent}</div>
-                </div>
-              </section>
-            );
-          }
-
+          // Contained: both background and content are contained
           return (
-            <section className={`${outerYClass}`}>
-              <div className={`mx-auto w-full ${container} px-6`}>
-                <div className={`rounded-2xl border border-border ${bg} shadow-sm ${inner}`}>{innerContent}</div>
+            <section className={`${padYClass}`}>
+              <div className={`mx-auto ${widthClass} ${padXClass}`}>
+                <div className={`rounded-2xl border border-border ${surfaceClass} shadow-sm p-6`}>
+                  {innerContent}
+                </div>
               </div>
             </section>
           );
@@ -1004,11 +1220,962 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         },
         render: withBlockBoundary("PreSalesTemplate", (props: Record<string, unknown>) => <PreSalesTemplate {...props} />),
       },
+      // Commerce blocks for site pages - render from runtime commerce data
+      CommerceCatalogHero: {
+        fields: {
+          title: { type: "text" },
+          description: { type: "textarea" },
+        },
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCatalogHero", (props: Record<string, unknown>) => (
+          <CommerceCatalogHero
+            title={typeof props.title === "string" ? props.title : undefined}
+            description={typeof props.description === "string" ? props.description : undefined}
+          />
+        )),
+      },
+      CommerceProductGrid: {
+        fields: {
+          columns: {
+            type: "select",
+            options: [
+              { label: "2 columns", value: 2 },
+              { label: "3 columns", value: 3 },
+              { label: "4 columns", value: 4 },
+            ],
+          },
+        },
+        defaultProps: { columns: 3 },
+        render: withBlockBoundary("CommerceProductGrid", (props: Record<string, unknown>) => (
+          <CommerceProductGrid
+            columns={typeof props.columns === "number" ? props.columns : 3}
+          />
+        )),
+      },
+      CommerceProductDetail: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceProductDetail", () => <CommerceProductDetail />),
+      },
+      CommerceCart: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCart", () => <CommerceCart />),
+      },
+      CommerceCheckout: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCheckout", () => <CommerceCheckout />),
+      },
+      CommerceCategoryList: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCategoryList", () => <CommerceCategoryList />),
+      },
+      CommerceCategoryHeading: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCategoryHeading", () => <CommerceCategoryHeading />),
+      },
+      CommerceCartSummary: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("CommerceCartSummary", () => <CommerceCartSummary />),
+      },
+      CommerceStoreHeader: {
+        fields: {
+          storeName: { type: "text" },
+          showSearch: { type: "checkbox" },
+          showCart: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showSearch: false, showCart: true },
+        render: withBlockBoundary("CommerceStoreHeader", (props: Record<string, unknown>) => (
+          <CommerceStoreHeader
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showSearch={props.showSearch === true}
+            showCart={props.showCart !== false}
+          />
+        )),
+      },
+      CommerceStoreFooter: {
+        fields: {
+          storeName: { type: "text" },
+          showCategories: { type: "checkbox" },
+          showCollections: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showCategories: true, showCollections: true },
+        render: withBlockBoundary("CommerceStoreFooter", (props: Record<string, unknown>) => (
+          <CommerceStoreFooter
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showCategories={props.showCategories !== false}
+            showCollections={props.showCollections !== false}
+          />
+        )),
+      },
+      StarterStoreHeader: {
+        fields: {
+          storeName: { type: "text" },
+          showSearch: { type: "checkbox" },
+          showCart: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showSearch: true, showCart: true },
+        render: withBlockBoundary("StarterStoreHeader", (props: Record<string, unknown>) => (
+          <StarterStoreHeader
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showSearch={props.showSearch !== false}
+            showCart={props.showCart !== false}
+          />
+        )),
+      },
+      StarterPromoBar: {
+        fields: {
+          message: { type: "text" },
+          ctaLabel: { type: "text" },
+          linkType: {
+            type: "select",
+            options: [
+              { label: "Funnel page", value: "funnelPage" },
+              { label: "Next page", value: "nextPage" },
+              { label: "External URL", value: "external" },
+            ],
+          },
+          targetPageId: {
+            type: "select",
+            options: [{ label: "Select a page", value: "" }, ...pageOptions],
+          },
+          href: { type: "text" },
+        },
+        defaultProps: {
+          message: "Practical tools for herbal practitioners and wellness professionals.",
+          ctaLabel: "Browse catalog",
+          linkType: "funnelPage",
+          targetPageId: "",
+          href: "",
+        },
+        render: withBlockBoundary("StarterPromoBar", (props: Record<string, unknown>) => (
+          <StarterPromoBar
+            message={typeof props.message === "string" ? props.message : undefined}
+            ctaLabel={typeof props.ctaLabel === "string" ? props.ctaLabel : undefined}
+            linkType={
+              props.linkType === "external" || props.linkType === "nextPage" || props.linkType === "funnelPage"
+                ? props.linkType
+                : undefined
+            }
+            targetPageId={typeof props.targetPageId === "string" ? props.targetPageId : undefined}
+            href={typeof props.href === "string" ? props.href : undefined}
+          />
+        )),
+      },
+      StarterHomeHero: {
+        fields: {
+          eyebrow: { type: "text" },
+          title: { type: "text" },
+          description: { type: "textarea" },
+          primaryCtaLabel: { type: "text" },
+          primaryLinkType: {
+            type: "select",
+            options: [
+              { label: "Funnel page", value: "funnelPage" },
+              { label: "Next page", value: "nextPage" },
+              { label: "External URL", value: "external" },
+            ],
+          },
+          primaryTargetPageId: {
+            type: "select",
+            options: [{ label: "Select a page", value: "" }, ...pageOptions],
+          },
+          primaryHref: { type: "text" },
+          featuredProductHandles: {
+            type: "array",
+            arrayFields: {
+              value: { type: "text" },
+            },
+            defaultItemProps: { value: "" },
+          },
+        },
+        defaultProps: {
+          eyebrow: "Honest Herbalist",
+          title: "Practical tools for herbal practitioners",
+          description: "Explore reference materials, worksheet pads, and client-facing tools grounded in the live catalog.",
+          primaryCtaLabel: "Browse catalog",
+          primaryLinkType: "funnelPage",
+          primaryTargetPageId: "",
+          primaryHref: "",
+          featuredProductHandles: [{ value: "the-honest-herbalist-handbook" }],
+        },
+        render: withBlockBoundary("StarterHomeHero", (props: Record<string, unknown>) => (
+          <StarterHomeHero
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            description={typeof props.description === "string" ? props.description : undefined}
+            primaryCtaLabel={typeof props.primaryCtaLabel === "string" ? props.primaryCtaLabel : undefined}
+            primaryLinkType={
+              props.primaryLinkType === "external" || props.primaryLinkType === "nextPage" || props.primaryLinkType === "funnelPage"
+                ? props.primaryLinkType
+                : undefined
+            }
+            primaryTargetPageId={typeof props.primaryTargetPageId === "string" ? props.primaryTargetPageId : undefined}
+            primaryHref={typeof props.primaryHref === "string" ? props.primaryHref : undefined}
+            featuredProductHandles={
+              Array.isArray(props.featuredProductHandles)
+                ? props.featuredProductHandles
+                    .map((item) => {
+                      if (typeof item === "string") return item;
+                      if (item && typeof item === "object" && typeof (item as { value?: unknown }).value === "string") {
+                        return (item as { value: string }).value;
+                      }
+                      return "";
+                    })
+                    .filter(Boolean)
+                : undefined
+            }
+          />
+        )),
+      },
+      StarterPolicyPage: {
+        fields: {
+          pageKey: {
+            type: "select",
+            options: [
+              { label: "Privacy Policy", value: "privacy_policy" },
+              { label: "Terms of Service", value: "terms_of_service" },
+              { label: "Returns and Refunds", value: "returns_refunds_policy" },
+              { label: "Shipping Policy", value: "shipping_policy" },
+              { label: "Contact and Support", value: "contact_support" },
+            ],
+          },
+          pageTitle: { type: "text" },
+        },
+        defaultProps: {
+          pageKey: "privacy_policy",
+          pageTitle: "Privacy Policy",
+        },
+        render: withBlockBoundary("StarterPolicyPage", (props: Record<string, unknown>) => (
+          <StarterPolicyPage
+            pageKey={
+              props.pageKey === "privacy_policy" ||
+              props.pageKey === "terms_of_service" ||
+              props.pageKey === "returns_refunds_policy" ||
+              props.pageKey === "shipping_policy" ||
+              props.pageKey === "contact_support"
+                ? props.pageKey
+                : "privacy_policy"
+            }
+            pageTitle={typeof props.pageTitle === "string" ? props.pageTitle : undefined}
+          />
+        )),
+      },
+      StarterCollectionRails: {
+        fields: {
+          maxCollections: { type: "number" },
+          productsPerCollection: { type: "number" },
+        },
+        defaultProps: { maxCollections: 3, productsPerCollection: 4 },
+        render: withBlockBoundary("StarterCollectionRails", (props: Record<string, unknown>) => (
+          <StarterCollectionRails
+            maxCollections={typeof props.maxCollections === "number" ? props.maxCollections : 3}
+            productsPerCollection={typeof props.productsPerCollection === "number" ? props.productsPerCollection : 4}
+          />
+        )),
+      },
+      StarterStoreFooter: {
+        fields: {
+          storeName: { type: "text" },
+          showCategories: { type: "checkbox" },
+          showCollections: { type: "checkbox" },
+        },
+        defaultProps: { storeName: "Store", showCategories: true, showCollections: true },
+        render: withBlockBoundary("StarterStoreFooter", (props: Record<string, unknown>) => (
+          <StarterStoreFooter
+            storeName={typeof props.storeName === "string" ? props.storeName : "Store"}
+            showCategories={props.showCategories !== false}
+            showCollections={props.showCollections !== false}
+          />
+        )),
+      },
+      CommerceStoreTemplate: {
+        fields: {
+          content: { type: "slot" },
+        },
+        defaultProps: {},
+        render: withBlockBoundary("CommerceStoreTemplate", (props: Record<string, unknown>) => (
+          <CommerceStoreTemplate>
+            {typeof props.content === "function" ? props.content({ className: "space-y-5" }) : null}
+          </CommerceStoreTemplate>
+        )),
+      },
+      MedusaB2CHomePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CHomePage", () => <MedusaB2CHomePage />),
+      },
+      MedusaB2CStorePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CStorePage", () => <MedusaB2CStorePage />),
+      },
+      MedusaB2CCollectionPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCollectionPage", () => <MedusaB2CCollectionPage />),
+      },
+      MedusaB2CCategoryPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCategoryPage", () => <MedusaB2CCategoryPage />),
+      },
+      MedusaB2CProductPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CProductPage", () => <MedusaB2CProductPage />),
+      },
+      MedusaB2CCartPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCartPage", () => <MedusaB2CCartPage />),
+      },
+      MedusaB2CCheckoutPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CCheckoutPage", () => <MedusaB2CCheckoutPage />),
+      },
+      MedusaB2CPolicyPage: {
+        fields: {
+          pageKey: {
+            type: "select",
+            options: [
+              { label: "Privacy Policy", value: "privacy_policy" },
+              { label: "Terms of Service", value: "terms_of_service" },
+              { label: "Refund Policy", value: "returns_refunds_policy" },
+              { label: "Shipping Policy", value: "shipping_policy" },
+              { label: "Contact Support", value: "contact_support" },
+            ],
+          },
+          pageTitle: { type: "text" },
+          description: { type: "textarea" },
+        },
+        defaultProps: {
+          pageKey: "privacy_policy",
+          pageTitle: "Privacy Policy",
+        },
+        render: withBlockBoundary(
+          "MedusaB2CPolicyPage",
+          (props: { pageKey: string; pageTitle?: string; description?: string }) => (
+            <MedusaB2CPolicyPage
+              pageKey={props.pageKey as
+                | "privacy_policy"
+                | "terms_of_service"
+                | "returns_refunds_policy"
+                | "shipping_policy"
+                | "contact_support"}
+              pageTitle={props.pageTitle}
+              description={props.description}
+            />
+          ),
+        ),
+      },
+      MedusaB2CAccountDashboardPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountDashboardPage", () => <MedusaB2CAccountDashboardPage />),
+      },
+      MedusaB2CAccountProfilePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountProfilePage", () => <MedusaB2CAccountProfilePage />),
+      },
+      MedusaB2CAccountAddressesPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountAddressesPage", () => <MedusaB2CAccountAddressesPage />),
+      },
+      MedusaB2CAccountOrdersPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountOrdersPage", () => <MedusaB2CAccountOrdersPage />),
+      },
+      MedusaB2CAccountOrderDetailPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2CAccountOrderDetailPage", () => <MedusaB2CAccountOrderDetailPage />),
+      },
+      MedusaB2COrderConfirmedPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderConfirmedPage", () => <MedusaB2COrderConfirmedPage />),
+      },
+      MedusaB2COrderTransferPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferPage", () => <MedusaB2COrderTransferPage />),
+      },
+      MedusaB2COrderTransferAcceptPage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferAcceptPage", () => <MedusaB2COrderTransferAcceptPage />),
+      },
+      MedusaB2COrderTransferDeclinePage: {
+        fields: {},
+        defaultProps: {},
+        render: withBlockBoundary("MedusaB2COrderTransferDeclinePage", () => <MedusaB2COrderTransferDeclinePage />),
+      },
       Spacer: {
         fields: {
           height: { type: "number" },
         },
         render: ({ height }: { height?: number }) => <div style={{ height: Math.max(0, height || 24) }} />,
+      },
+      ImportedPage: {
+        fields: {
+          pageName: { type: "text" },
+          themeJson: { type: "textarea" },
+          content: { type: "slot" },
+        },
+        defaultProps: {
+          pageName: "Imported Page",
+        },
+        render: withBlockBoundary("ImportedPage", (props: Record<string, unknown>) => (
+          <ImportedPage
+            pageName={typeof props.pageName === "string" ? props.pageName : undefined}
+            theme={props.theme}
+            themeJson={typeof props.themeJson === "string" ? props.themeJson : undefined}
+            renderMode={typeof props.renderMode === "string" ? props.renderMode : undefined}
+            sharedRuntimeSource={
+              typeof props.sharedRuntimeSource === "string" ? props.sharedRuntimeSource : undefined
+            }
+            sharedHeadAssets={props.sharedHeadAssets}
+            content={typeof props.content === "function" ? props.content : undefined}
+          />
+        )),
+      },
+      ImportedSection: {
+        fields: {
+          displayName: { type: "text" },
+          sourceSectionId: { type: "text" },
+          sectionKey: { type: "text" },
+          sectionType: { type: "text" },
+          semanticTagsText: { type: "text" },
+          surface: {
+            type: "select",
+            options: [
+              { label: "Source", value: "source" },
+              { label: "Default", value: "default" },
+              { label: "Muted", value: "muted" },
+              { label: "Primary", value: "primary" },
+            ],
+          },
+          content: { type: "slot" },
+        },
+        defaultProps: {
+          surface: "default",
+        },
+        render: withBlockBoundary("ImportedSection", (props: Record<string, unknown>) => (
+          <ImportedSection
+            displayName={typeof props.displayName === "string" ? props.displayName : undefined}
+            sourceSectionId={typeof props.sourceSectionId === "string" ? props.sourceSectionId : undefined}
+            sectionKey={typeof props.sectionKey === "string" ? props.sectionKey : undefined}
+            sectionType={typeof props.sectionType === "string" ? props.sectionType : undefined}
+            semanticTagsText={typeof props.semanticTagsText === "string" ? props.semanticTagsText : undefined}
+            surface={typeof props.surface === "string" ? props.surface : undefined}
+            renderMode={typeof props.renderMode === "string" ? props.renderMode : undefined}
+            content={typeof props.content === "function" ? props.content : undefined}
+          />
+        )),
+      },
+      ImportedHeaderSection: createImportedSourceSectionBlockConfig(
+        "ImportedHeaderSection",
+        (props: Record<string, unknown>) => (
+          <ImportedHeaderSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedHeroSection: createImportedSourceSectionBlockConfig(
+        "ImportedHeroSection",
+        (props: Record<string, unknown>) => (
+          <ImportedHeroSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedProofBarSection: createImportedSourceSectionBlockConfig(
+        "ImportedProofBarSection",
+        (props: Record<string, unknown>) => (
+          <ImportedProofBarSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFeatureSection: createImportedSourceSectionBlockConfig(
+        "ImportedFeatureSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFeatureSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedOfferSection: createImportedSourceSectionBlockConfig(
+        "ImportedOfferSection",
+        (props: Record<string, unknown>) => (
+          <ImportedOfferSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedTestimonialsSection: createImportedSourceSectionBlockConfig(
+        "ImportedTestimonialsSection",
+        (props: Record<string, unknown>) => (
+          <ImportedTestimonialsSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedComparisonSection: createImportedSourceSectionBlockConfig(
+        "ImportedComparisonSection",
+        (props: Record<string, unknown>) => (
+          <ImportedComparisonSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFaqSection: createImportedSourceSectionBlockConfig(
+        "ImportedFaqSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFaqSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedFooterSection: createImportedSourceSectionBlockConfig(
+        "ImportedFooterSection",
+        (props: Record<string, unknown>) => (
+          <ImportedFooterSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textSlots={Array.isArray(props.textSlots) ? (props.textSlots as Array<Record<string, unknown>>) : undefined}
+            buttonSlots={
+              Array.isArray(props.buttonSlots) ? (props.buttonSlots as Array<Record<string, unknown>>) : undefined
+            }
+            imageSlots={Array.isArray(props.imageSlots) ? (props.imageSlots as Array<Record<string, unknown>>) : undefined}
+          />
+        ),
+      ),
+      ImportedNarrativeBlock: {
+        fields: {
+          eyebrow: { type: "text" },
+          title: { type: "text" },
+          body: { type: "textarea" },
+          quote: { type: "textarea" },
+          imageSrc: { type: "text" },
+          imageAlt: { type: "text" },
+          mediaPosition: {
+            type: "select",
+            options: [
+              { label: "Right", value: "right" },
+              { label: "Left", value: "left" },
+            ],
+          },
+          align: {
+            type: "select",
+            options: [
+              { label: "Left", value: "left" },
+              { label: "Center", value: "center" },
+            ],
+          },
+          badges: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+            },
+            defaultItemProps: { label: "" },
+          },
+          buttons: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", href: "" },
+          },
+        },
+        defaultProps: {
+          mediaPosition: "right",
+          align: "left",
+          badges: [],
+          buttons: [],
+        },
+        render: withBlockBoundary("ImportedNarrativeBlock", (props: Record<string, unknown>) => (
+          <ImportedNarrativeBlock
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            quote={typeof props.quote === "string" ? props.quote : undefined}
+            imageSrc={typeof props.imageSrc === "string" ? props.imageSrc : undefined}
+            imageAlt={typeof props.imageAlt === "string" ? props.imageAlt : undefined}
+            mediaPosition={props.mediaPosition === "left" ? "left" : "right"}
+            align={props.align === "center" ? "center" : "left"}
+            badges={Array.isArray(props.badges) ? (props.badges as Array<{ label?: string }>) : undefined}
+            buttons={Array.isArray(props.buttons) ? (props.buttons as Array<{ label?: string; href?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedItemGrid: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          columns: {
+            type: "select",
+            options: [
+              { label: "1 column", value: 1 },
+              { label: "2 columns", value: 2 },
+              { label: "3 columns", value: 3 },
+              { label: "4 columns", value: 4 },
+            ],
+          },
+          items: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              title: { type: "text" },
+              text: { type: "textarea" },
+              value: { type: "text" },
+            },
+            defaultItemProps: { label: "", title: "", text: "", value: "" },
+          },
+        },
+        defaultProps: {
+          columns: 3,
+          items: [],
+        },
+        render: withBlockBoundary("ImportedItemGrid", (props: Record<string, unknown>) => (
+          <ImportedItemGrid
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            columns={typeof props.columns === "number" ? props.columns : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ label?: string; title?: string; text?: string; value?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedBadgeStrip: {
+        fields: {
+          title: { type: "text" },
+          items: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+            },
+            defaultItemProps: { label: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedBadgeStrip", (props: Record<string, unknown>) => (
+          <ImportedBadgeStrip
+            title={typeof props.title === "string" ? props.title : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ label?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedOfferSelector: {
+        fields: {
+          eyebrow: { type: "text" },
+          title: { type: "text" },
+          body: { type: "textarea" },
+          reviewText: { type: "text" },
+          ctaLabel: { type: "text" },
+          galleryImages: {
+            type: "array",
+            arrayFields: {
+              src: { type: "text" },
+              alt: { type: "text" },
+            },
+            defaultItemProps: { src: "", alt: "" },
+          },
+          benefits: {
+            type: "array",
+            arrayFields: {
+              text: { type: "text" },
+            },
+            defaultItemProps: { text: "" },
+          },
+          offers: {
+            type: "array",
+            arrayFields: {
+              title: { type: "text" },
+              subtitle: { type: "text" },
+              price: { type: "text" },
+              total: { type: "text" },
+              regularPrice: { type: "text" },
+              savings: { type: "text" },
+              badge: { type: "text" },
+            },
+            defaultItemProps: {
+              title: "",
+              subtitle: "",
+              price: "",
+              total: "",
+              regularPrice: "",
+              savings: "",
+              badge: "",
+            },
+          },
+        },
+        defaultProps: {
+          galleryImages: [],
+          benefits: [],
+          offers: [],
+        },
+        render: withBlockBoundary("ImportedOfferSelector", (props: Record<string, unknown>) => (
+          <ImportedOfferSelector
+            eyebrow={typeof props.eyebrow === "string" ? props.eyebrow : undefined}
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            reviewText={typeof props.reviewText === "string" ? props.reviewText : undefined}
+            ctaLabel={typeof props.ctaLabel === "string" ? props.ctaLabel : undefined}
+            galleryImages={Array.isArray(props.galleryImages) ? (props.galleryImages as Array<{ src?: string; alt?: string }>) : undefined}
+            benefits={Array.isArray(props.benefits) ? (props.benefits as Array<{ text?: string }>) : undefined}
+            offers={Array.isArray(props.offers) ? (props.offers as Array<{ title?: string; subtitle?: string; price?: string; total?: string; regularPrice?: string; savings?: string; badge?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedTestimonialsGrid: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          items: {
+            type: "array",
+            arrayFields: {
+              name: { type: "text" },
+              quote: { type: "textarea" },
+              role: { type: "text" },
+              imageSrc: { type: "text" },
+            },
+            defaultItemProps: { name: "", quote: "", role: "", imageSrc: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedTestimonialsGrid", (props: Record<string, unknown>) => (
+          <ImportedTestimonialsGrid
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ name?: string; quote?: string; role?: string; imageSrc?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedComparisonTable: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          primaryLabel: { type: "text" },
+          secondaryLabel: { type: "text" },
+          tertiaryLabel: { type: "text" },
+          rows: {
+            type: "array",
+            arrayFields: {
+              feature: { type: "text" },
+              primaryValue: { type: "text" },
+              secondaryValue: { type: "text" },
+              tertiaryValue: { type: "text" },
+            },
+            defaultItemProps: { feature: "", primaryValue: "", secondaryValue: "", tertiaryValue: "" },
+          },
+        },
+        defaultProps: {
+          rows: [],
+        },
+        render: withBlockBoundary("ImportedComparisonTable", (props: Record<string, unknown>) => (
+          <ImportedComparisonTable
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            primaryLabel={typeof props.primaryLabel === "string" ? props.primaryLabel : undefined}
+            secondaryLabel={typeof props.secondaryLabel === "string" ? props.secondaryLabel : undefined}
+            tertiaryLabel={typeof props.tertiaryLabel === "string" ? props.tertiaryLabel : undefined}
+            rows={Array.isArray(props.rows) ? (props.rows as Array<{ feature?: string; primaryValue?: string; secondaryValue?: string; tertiaryValue?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedAccordion: {
+        fields: {
+          title: { type: "text" },
+          body: { type: "textarea" },
+          items: {
+            type: "array",
+            arrayFields: {
+              question: { type: "text" },
+              answer: { type: "textarea" },
+            },
+            defaultItemProps: { question: "", answer: "" },
+          },
+        },
+        defaultProps: {
+          items: [],
+        },
+        render: withBlockBoundary("ImportedAccordion", (props: Record<string, unknown>) => (
+          <ImportedAccordion
+            title={typeof props.title === "string" ? props.title : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            items={Array.isArray(props.items) ? (props.items as Array<{ question?: string; answer?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedFooterLinks: {
+        fields: {
+          brandName: { type: "text" },
+          body: { type: "textarea" },
+          legalText: { type: "textarea" },
+          links: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", href: "" },
+          },
+        },
+        defaultProps: {
+          links: [],
+        },
+        render: withBlockBoundary("ImportedFooterLinks", (props: Record<string, unknown>) => (
+          <ImportedFooterLinks
+            brandName={typeof props.brandName === "string" ? props.brandName : undefined}
+            body={typeof props.body === "string" ? props.body : undefined}
+            legalText={typeof props.legalText === "string" ? props.legalText : undefined}
+            links={Array.isArray(props.links) ? (props.links as Array<{ label?: string; href?: string }>) : undefined}
+          />
+        )),
+      },
+      ImportedRuntimeSection: {
+        fields: {
+          textOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalText: { type: "textarea" },
+              text: { type: "textarea" },
+            },
+            defaultItemProps: { label: "", originalText: "", text: "" },
+          },
+          buttonOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalText: { type: "text" },
+              text: { type: "text" },
+              href: { type: "text" },
+            },
+            defaultItemProps: { label: "", originalText: "", text: "", href: "" },
+          },
+          imageOverrides: {
+            type: "array",
+            arrayFields: {
+              label: { type: "text" },
+              originalSrc: { type: "text" },
+              src: { type: "text" },
+              alt: { type: "text" },
+            },
+            defaultItemProps: { label: "", originalSrc: "", src: "", alt: "" },
+          },
+        },
+        defaultProps: {
+          textOverrides: [],
+          buttonOverrides: [],
+          imageOverrides: [],
+        },
+        render: withBlockBoundary("ImportedRuntimeSection", (props: Record<string, unknown>) => (
+          <ImportedRuntimeSection
+            id={typeof props.id === "string" ? props.id : undefined}
+            originalType={typeof props.originalType === "string" ? props.originalType : undefined}
+            runtimeSource={typeof props.runtimeSource === "string" ? props.runtimeSource : undefined}
+            headAssets={props.headAssets}
+            sectionLabel={typeof props.sectionLabel === "string" ? props.sectionLabel : undefined}
+            componentName={typeof props.componentName === "string" ? props.componentName : undefined}
+            sectionTargetId={typeof props.sectionTargetId === "string" ? props.sectionTargetId : undefined}
+            textOverrides={
+              Array.isArray(props.textOverrides)
+                ? (props.textOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
+            buttonOverrides={
+              Array.isArray(props.buttonOverrides)
+                ? (props.buttonOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
+            imageOverrides={
+              Array.isArray(props.imageOverrides)
+                ? (props.imageOverrides as Array<Record<string, unknown>>)
+                : undefined
+            }
+          />
+        )),
       },
     },
   };

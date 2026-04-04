@@ -245,6 +245,7 @@ class MetaPublishRunRequest(BaseModel):
     campaignObjective: str
     buyingType: str | None = None
     specialAdCategories: list[str] = Field(default_factory=list)
+    campaignDailyBudget: int | None = None
 
     @field_validator("generationKey")
     @classmethod
@@ -329,6 +330,8 @@ class MetaPublishPlanValidationResponse(BaseModel):
     adsetCount: int
     publishBaseUrl: str
     publishDomain: str | None = None
+    budgetScope: Literal["campaign", "adset", "mixed"] = "campaign"
+    campaignDailyBudget: int | None = None
     blockers: list[str] = Field(default_factory=list)
     items: list[MetaPublishPlanValidationItemResponse] = Field(default_factory=list)
 

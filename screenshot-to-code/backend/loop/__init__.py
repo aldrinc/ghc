@@ -1,4 +1,6 @@
 from loop.contracts import (
+    BlueprintValidationIssue,
+    BlueprintValidationReport,
     LoopRunResult,
     ReferenceBundle,
     RenderArtifact,
@@ -11,6 +13,8 @@ from loop.contracts import (
 from loop.orchestrator import ValidationLoopOrchestrator
 
 __all__ = [
+    "BlueprintValidationIssue",
+    "BlueprintValidationReport",
     "LoopRunResult",
     "ReferenceBundle",
     "RenderArtifact",

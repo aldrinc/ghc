@@ -1,5 +1,6 @@
 from app.services.html_funnel_reference import (
     HtmlReferenceError,
+    MAX_TEXT_PREVIEW_CHARS,
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
@@ -81,3 +82,14 @@ def test_summarize_html_reference_rejects_blank_html() -> None:
         assert "non-empty" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected HtmlReferenceError for blank HTML reference.")
+
+
+def test_summarize_html_reference_clips_long_text_preview_without_validation_error() -> None:
+    repeated = " ".join(f"Section {index} conversion proof guarantee faq" for index in range(120))
+    html = f"<html><body><main><section><h1>Hero</h1><p>{repeated}</p></section></main></body></html>"
+
+    summary = summarize_html_reference(reference_html=html, label="long.html")
+
+    assert summary.label == "long.html"
+    assert len(summary.textPreview) <= MAX_TEXT_PREVIEW_CHARS
+    assert summary.textPreview

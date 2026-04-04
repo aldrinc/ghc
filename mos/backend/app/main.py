@@ -15,6 +15,7 @@ from app.llm_ops import initialize_agenta, shutdown_agenta
 from app.observability import initialize_langfuse, shutdown_langfuse
 from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
+    agent_threads,
     agent_runs,
     artifacts,
     assets,
@@ -26,8 +27,10 @@ from app.routers import (
     clients,
     design_systems,
     products,
+    product_strategy_skills,
     funnels,
     public_funnels,
+    public_sites,
     explore,
     deep_research,
     experiments,
@@ -41,6 +44,15 @@ from app.routers import (
     shopify_webhooks,
     deploy,
     paid_ads_qa,
+    storefront_templates,
+    gethookd,
+    sites,
+    site_templates,
+    page_templates,
+    site_funnels,
+    site_product_bindings,
+    site_imports,
+    postiz,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,16 +155,20 @@ def create_app() -> FastAPI:
             return {"db": f"error: {exc}"}
 
     app.include_router(clients.router)
+    app.include_router(clients.stripe_profiles_router)
     app.include_router(brands.router)
     app.include_router(design_systems.router)
     app.include_router(products.router)
+    app.include_router(product_strategy_skills.router)
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
     app.include_router(compliance.router)
     app.include_router(agent_runs.router)
+    app.include_router(agent_threads.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)
+    app.include_router(public_sites.router)
     app.include_router(experiments.router)
     app.include_router(explore.router)
     app.include_router(swipes.router)
@@ -168,6 +184,17 @@ def create_app() -> FastAPI:
     app.include_router(claude.router)
     app.include_router(gemini.router)
     app.include_router(deploy.router)
+    app.include_router(storefront_templates.router)
+    app.include_router(gethookd.router)
+    app.include_router(sites.router)
+    app.include_router(site_templates.router)
+    app.include_router(page_templates.router)
+    app.include_router(site_funnels.router)
+    app.include_router(site_funnels.workspace_router)
+    app.include_router(site_product_bindings.router)
+    app.include_router(site_product_bindings.products_router)
+    app.include_router(site_imports.router)
+    app.include_router(postiz.router)
 
     return app
 

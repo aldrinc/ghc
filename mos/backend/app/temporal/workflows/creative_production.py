@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Dict, List, Set
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.asset_activities import generate_assets_for_brief_activity
     from app.temporal.activities.qa_activities import run_brand_qa_activity, run_compliance_qa_activity
+
+
+_CREATIVE_ASSET_GENERATION_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 
 
 @dataclass
@@ -18,7 +23,22 @@ class CreativeProductionInput:
     product_id: str
     campaign_id: str
     asset_brief_ids: List[str]
+    swipe_collection_id: str = ""
+    swipe_collection_name: str = ""
+    swipe_asset_ids: List[str] = field(default_factory=list)
     workflow_run_id: str | None = None
+
+
+def _raise_invalid_creative_production_input(*missing_fields: str) -> None:
+    joined_fields = ", ".join(field_name for field_name in missing_fields if field_name)
+    raise ApplicationError(
+        "CreativeProductionWorkflow received invalid input: "
+        f"missing required field(s): {joined_fields}. "
+        "This workflow input is already recorded in Temporal history, so retrying the workflow task "
+        "will not populate missing fields.",
+        type="InvalidWorkflowInput",
+        non_retryable=True,
+    )
 
 
 @workflow.defn
@@ -43,8 +63,17 @@ class CreativeProductionWorkflow:
 
     @workflow.run
     async def run(self, input: CreativeProductionInput) -> None:
+        missing_fields: list[str] = []
         if not input.asset_brief_ids:
-            raise RuntimeError("asset_brief_ids are required to start creative production.")
+            missing_fields.append("asset_brief_ids")
+        if not input.swipe_collection_id:
+            missing_fields.append("swipe_collection_id")
+        if not input.swipe_collection_name:
+            missing_fields.append("swipe_collection_name")
+        if not input.swipe_asset_ids:
+            missing_fields.append("swipe_asset_ids")
+        if missing_fields:
+            _raise_invalid_creative_production_input(*missing_fields)
 
         for brief_id in input.asset_brief_ids:
             result = await workflow.execute_activity(
@@ -55,9 +84,13 @@ class CreativeProductionWorkflow:
                     "campaign_id": input.campaign_id,
                     "product_id": input.product_id,
                     "asset_brief_id": brief_id,
+                    "swipe_collection_id": input.swipe_collection_id,
+                    "swipe_collection_name": input.swipe_collection_name,
+                    "swipe_asset_ids": list(input.swipe_asset_ids),
                     "workflow_run_id": input.workflow_run_id,
                 },
                 start_to_close_timeout=timedelta(hours=6),
+                retry_policy=_CREATIVE_ASSET_GENERATION_RETRY_POLICY,
             )
             created_ids = result.get("asset_ids") if isinstance(result, dict) else None
             if not isinstance(created_ids, list) or not created_ids:
