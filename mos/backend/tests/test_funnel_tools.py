@@ -4,7 +4,10 @@ from app.agent.funnel_tools import (
     DraftPersistVersionArgs,
     DraftPersistVersionTool,
     _build_puck_prompt_seed,
+    _coerce_sales_pdp_import_guarantee_config,
+    _coerce_sales_pdp_import_story_config,
     _coerce_sales_pdp_import_videos_config,
+    _ensure_sales_pdp_guarantee_icon_prompt,
     _ensure_sales_pdp_free_gifts_icon_prompt,
     _resolve_base_puck_data,
 )
@@ -194,3 +197,96 @@ def test_ensure_sales_pdp_free_gifts_icon_prompt_fills_placeholder_slot():
     icon = gallery["freeGifts"]["icon"]
     assert "Bonus guide icon" in icon["prompt"]
     assert icon["aspectRatio"] == "1:1"
+
+
+def test_coerce_sales_pdp_import_story_config_converts_legacy_shape():
+    config = {
+        "badge": "THE PROBLEM",
+        "title": "What is draining your focus",
+        "paragraphs": [
+            "Your brain keeps fighting low-grade stress.",
+            "That leaves you foggy and depleted by noon.",
+        ],
+        "emphasisLine": "It does not have to feel this hard.",
+        "bullets": [
+            {
+                "title": "Stress overload",
+                "body": "Your system never gets to reset.",
+            }
+        ],
+    }
+
+    changed = _coerce_sales_pdp_import_story_config(config)
+
+    assert changed is True
+    assert config["eyebrow"] == "THE PROBLEM"
+    assert config["headline"] == "What is draining your focus"
+    assert config["body"] == [
+        "Your brain keeps fighting low-grade stress.",
+        "That leaves you foggy and depleted by noon.",
+        "It does not have to feel this hard.",
+    ]
+    assert config["steps"] == [
+        {
+            "title": "Stress overload",
+            "body": "Your system never gets to reset.",
+        }
+    ]
+
+
+def test_coerce_sales_pdp_import_guarantee_config_converts_legacy_shape():
+    config = {
+        "badge": "RISK FREE GUARANTEE",
+        "title": "90-Day Risk Free Guarantee",
+        "paragraphs": [
+            "Try EMBER for a full 90 days.",
+            "If it is not a fit, we will refund you.",
+        ],
+        "whyTitle": "Why we can do this",
+        "whyBody": "Because the protocol works when people actually follow it.",
+        "closingLine": "You have nothing to lose but the brain fog.",
+        "right": {
+            "image": {
+                "alt": "Customer with supplement box",
+                "src": "https://cdn.example.com/guarantee.jpg",
+            }
+        },
+        "iconSrc": "",
+    }
+
+    changed = _coerce_sales_pdp_import_guarantee_config(
+        config=config,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed is True
+    assert config["badgeText"] == "RISK FREE GUARANTEE"
+    assert config["headline"] == "90-Day Risk Free Guarantee"
+    assert config["body"] == [
+        "Try EMBER for a full 90 days.",
+        "If it is not a fit, we will refund you.",
+        "Why we can do this: Because the protocol works when people actually follow it.",
+        "You have nothing to lose but the brain fog.",
+    ]
+    assert config["image"] == {
+        "alt": "Customer with supplement box",
+        "src": "https://cdn.example.com/guarantee.jpg",
+    }
+    assert config["iconAlt"] == "RISK FREE GUARANTEE icon"
+
+
+def test_ensure_sales_pdp_guarantee_icon_prompt_fills_missing_icon_slot():
+    config = {
+        "headline": "90-Day Risk Free Guarantee",
+        "iconAlt": "Guarantee seal",
+        "iconAssetPublicId": None,
+    }
+
+    changed = _ensure_sales_pdp_guarantee_icon_prompt(
+        config=config,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed is True
+    assert "Guarantee seal" in config["prompt"]
+    assert config["aspectRatio"] == "1:1"
