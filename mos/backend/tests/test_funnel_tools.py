@@ -13,6 +13,7 @@ from app.agent.funnel_tools import (
     _ensure_sales_pdp_import_review_wall_image_prompts,
     _ensure_sales_pdp_guarantee_icon_prompt,
     _ensure_sales_pdp_free_gifts_icon_prompt,
+    _normalize_sales_pdp_import_template_tree,
     _persist_synced_object_prop,
     _resolve_base_puck_data,
 )
@@ -330,6 +331,37 @@ def test_persist_synced_object_prop_updates_config_and_config_json():
 
     assert props["config"] == value
     assert json.loads(props["configJson"]) == value
+
+
+def test_normalize_sales_pdp_import_template_tree_updates_zone_guarantee_icon_prompt():
+    puck_data = {
+        "zones": {
+            "sales-pdp-page:content": [
+                {
+                    "type": "SalesPdpGuarantee",
+                    "props": {
+                        "id": "sales-pdp-guarantee",
+                        "config": {
+                            "headline": "The Complete Clarity Promise",
+                            "iconAlt": "Guarantee seal",
+                            "iconSrc": "",
+                            "iconAssetPublicId": "",
+                        },
+                    },
+                }
+            ]
+        }
+    }
+
+    changed = _normalize_sales_pdp_import_template_tree(
+        puck_data=puck_data,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed == 1
+    config = puck_data["zones"]["sales-pdp-page:content"][0]["props"]["config"]
+    assert "Guarantee seal" in config["prompt"]
+    assert config["aspectRatio"] == "1:1"
 
 
 def test_coerce_sales_pdp_import_comparison_config_converts_legacy_shape():
