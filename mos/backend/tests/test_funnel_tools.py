@@ -6,6 +6,7 @@ from app.agent.funnel_tools import (
     _build_puck_prompt_seed,
     _coerce_sales_pdp_import_comparison_config,
     _coerce_sales_pdp_import_guarantee_config,
+    _coerce_sales_pdp_import_review_wall_config,
     _coerce_sales_pdp_import_story_config,
     _coerce_sales_pdp_import_videos_config,
     _ensure_sales_pdp_import_guarantee_image_prompt,
@@ -348,3 +349,39 @@ def test_ensure_sales_pdp_import_guarantee_image_prompt_fills_placeholder_image(
     assert changed is True
     assert "90-Day Risk Free Guarantee" in config["image"]["prompt"]
     assert config["image"]["aspectRatio"] == "4:3"
+
+
+def test_coerce_sales_pdp_import_review_wall_config_converts_legacy_shape():
+    config = {
+        "badge": "REAL RESULTS",
+        "title": "What customers are saying",
+        "ratingLabel": "4.9 out of 5 from verified buyers",
+        "showMoreLabel": "See more reviews",
+        "tiles": [
+            {
+                "id": "tile-1",
+                "image": {
+                    "alt": "Clearer thinking after two weeks",
+                    "src": "https://cdn.example.com/review-1.jpg",
+                },
+            }
+        ],
+    }
+
+    changed = _coerce_sales_pdp_import_review_wall_config(config)
+
+    assert changed is True
+    assert config["badgeText"] == "REAL RESULTS"
+    assert config["headline"] == "What customers are saying"
+    assert config["body"] == "4.9 out of 5 from verified buyers"
+    assert config["ctaLabel"] == "See more reviews"
+    assert config["reviews"] == [
+        {
+            "id": "tile-1",
+            "body": "Clearer thinking after two weeks",
+            "image": {
+                "alt": "Clearer thinking after two weeks",
+                "src": "https://cdn.example.com/review-1.jpg",
+            },
+        }
+    ]
