@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { Container } from "./Container";
 import { Marquee } from "./Marquee";
 import { Modal } from "./Modal";
@@ -13,11 +22,18 @@ import type {
   HeaderConfig,
   HeroConfig,
   ImageAsset,
+  ImportComparisonConfig,
+  ImportGuaranteeConfig,
+  ImportReviewWallConfig,
+  ImportStoryRow,
+  ImportStorySectionConfig,
+  ImportVideoSectionConfig,
   MarqueeConfig,
   ModalsConfig,
   OfferOption,
   PdpConfig,
   ReviewWallConfig,
+  SalesPdpSchemaVersion,
   SizeOption,
   StorySectionConfig,
   VideoItem,
@@ -142,6 +158,132 @@ function parseJson<T>(raw?: string): T | null {
   } catch {
     return null;
   }
+}
+
+type JsonRecord = Record<string, unknown>
+
+const SalesPdpSchemaContext = createContext<SalesPdpSchemaVersion>("legacy")
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+function toStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => isNonEmptyString(item))
+  }
+  if (isNonEmptyString(value)) return [value]
+  return []
+}
+
+function readImageAsset(value: unknown): ImageAsset | null {
+  if (!isRecord(value) || !isNonEmptyString(value.alt)) return null
+  const src = typeof value.src === "string" ? value.src : ""
+  const image: ImageAsset = { alt: value.alt, src }
+  if (typeof value.assetPublicId === "string") image.assetPublicId = value.assetPublicId
+  if (typeof value.referenceAssetPublicId === "string") image.referenceAssetPublicId = value.referenceAssetPublicId
+  return image
+}
+
+function isImportVideoSectionConfig(config: unknown): config is ImportVideoSectionConfig {
+  return isRecord(config) && Array.isArray(config.cards)
+}
+
+function isImportStorySectionConfig(config: unknown): config is ImportStorySectionConfig {
+  return isRecord(config) && isNonEmptyString(config.headline) && (Array.isArray(config.steps) || Array.isArray(config.ingredients) || Array.isArray(config.timeline) || "body" in config)
+}
+
+function isImportComparisonConfig(config: unknown): config is ImportComparisonConfig {
+  return isRecord(config) && isNonEmptyString(config.headline) && "emberColumn" in config && "competitorColumn" in config
+}
+
+function isImportGuaranteeConfig(config: unknown): config is ImportGuaranteeConfig {
+  return isRecord(config) && isNonEmptyString(config.headline) && ("stats" in config || "iconAlt" in config || "iconAssetPublicId" in config)
+}
+
+function isImportReviewWallConfig(config: unknown): config is ImportReviewWallConfig {
+  return isRecord(config) && isNonEmptyString(config.headline) && Array.isArray(config.reviews)
+}
+
+function requireImportSchemaConfig<T>(
+  componentName: string,
+  config: unknown,
+  guard: (value: unknown) => value is T,
+  pageSchemaVersion: SalesPdpSchemaVersion
+): T | null {
+  if (guard(config)) return config
+  if (pageSchemaVersion === "import-v1") {
+    throw new Error(`${componentName} requires import-v1 config when SalesPdpPage.schemaVersion is import-v1.`)
+  }
+  return null
+}
+
+function extractSectionId(config: JsonRecord): string | undefined {
+  const ids = [config.id, config.anchorId]
+  return ids.find((value): value is string => isNonEmptyString(value))
+}
+
+function normalizeImportStoryRows(value: unknown): ImportStoryRow[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const title = isNonEmptyString(item.title)
+      ? item.title
+      : isNonEmptyString(item.label)
+        ? item.label
+        : isNonEmptyString(item.value)
+          ? item.value
+          : ""
+    if (!title) return []
+    return [
+      {
+        label: isNonEmptyString(item.label) ? item.label : undefined,
+        title,
+        body: isNonEmptyString(item.body)
+          ? item.body
+          : isNonEmptyString(item.detail)
+            ? item.detail
+            : isNonEmptyString(item.description)
+              ? item.description
+              : undefined,
+      },
+    ]
+  })
+}
+
+function normalizeImportComparisonColumn(value: unknown, fallbackTitle: string) {
+  if (isNonEmptyString(value)) return { title: value }
+  if (isRecord(value) && isNonEmptyString(value.title)) {
+    return {
+      title: value.title,
+      subtitle: isNonEmptyString(value.subtitle) ? value.subtitle : undefined,
+    }
+  }
+  return { title: fallbackTitle }
+}
+
+function normalizeImportMetricList(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!isRecord(item) || !isNonEmptyString(item.label) || !isNonEmptyString(item.value)) return []
+    return [
+      {
+        label: item.label,
+        value: item.value,
+        detail: isNonEmptyString(item.detail)
+          ? item.detail
+          : isNonEmptyString(item.body)
+            ? item.body
+            : isNonEmptyString(item.description)
+              ? item.description
+              : undefined,
+      },
+    ]
+  })
 }
 
 function selectionFromIds(selection: Record<string, string | undefined>) {
@@ -559,7 +701,7 @@ function Gallery({
   return (
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
-        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchpriority="high" />
+        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchPriority="high" />
       </div>
 
       <div className={styles.galleryControls}>
@@ -764,13 +906,14 @@ function VideoGrid({ videos }: { videos: VideoItem[] }) {
 
 type SalesPdpPageProps = {
   anchorId?: string
+  schemaVersion?: SalesPdpSchemaVersion
   theme?: ThemeConfig
   themeJson?: string
   content?: (props?: Record<string, unknown>) => ReactNode
   children?: ReactNode
 }
 
-export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: SalesPdpPageProps) {
+export function SalesPdpPage({ anchorId, schemaVersion, theme, themeJson, content, children }: SalesPdpPageProps) {
   useTemplateFonts();
   const designSystemTokens = useDesignSystemTokens() as { cssVars?: Record<string, string | number>; dataTheme?: string } | null
   const themeFromJson = parseJson<ThemeConfig>(themeJson)
@@ -796,7 +939,7 @@ export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: 
       }
     }
     if (explicitTheme?.tokens) {
-      for (const [rawKey, rawValue] of Object.entries(resolvedTheme.tokens)) {
+      for (const [rawKey, rawValue] of Object.entries(explicitTheme.tokens)) {
         if (rawValue === undefined || rawValue === null) continue
         const cssVarName = toCssVarName(rawKey)
         if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue
@@ -810,14 +953,17 @@ export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: 
   const body = content ? content({}) : children
 
   return (
-    <div
-      className={`${baseStyles.root} ${styles.page}`}
-      id={resolvedAnchorId}
-      data-theme={explicitTheme?.dataTheme ?? designSystemTokens?.dataTheme ?? resolvedTheme?.dataTheme}
-      style={themeStyle}
-    >
-      {body}
-    </div>
+    <SalesPdpSchemaContext.Provider value={schemaVersion ?? "legacy"}>
+      <div
+        className={`${baseStyles.root} ${styles.page}`}
+        id={resolvedAnchorId}
+        data-theme={explicitTheme?.dataTheme ?? designSystemTokens?.dataTheme ?? resolvedTheme?.dataTheme}
+        data-schema-version={schemaVersion ?? "legacy"}
+        style={themeStyle}
+      >
+        {body}
+      </div>
+    </SalesPdpSchemaContext.Provider>
   )
 }
 
@@ -1657,14 +1803,85 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 }
 
 type SalesPdpVideosProps = {
-  config?: VideoSectionConfig
+  config?: VideoSectionConfig | ImportVideoSectionConfig
   configJson?: string
 }
 
 export function SalesPdpVideos({ config, configJson }: SalesPdpVideosProps) {
-  void config
-  void configJson
-  return null
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
+  const resolvedConfig = parseJson<VideoSectionConfig | ImportVideoSectionConfig>(configJson) ?? config
+
+  if (!resolvedConfig) return null
+
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpVideos",
+    resolvedConfig,
+    isImportVideoSectionConfig,
+    pageSchemaVersion
+  )
+
+  if (importConfig) {
+    const stats = normalizeImportMetricList(importConfig.stats)
+    return (
+      <section id={importConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad}`}>
+        <Container>
+          <div className={styles.reviewWallHeader}>
+            {importConfig.badgeText ? <div className={styles.sectionBadge}>{importConfig.badgeText}</div> : null}
+            <h2 className={styles.sectionHeading}>{importConfig.sectionTitle}</h2>
+            {importConfig.sectionSubtitle ? <p className={styles.importSectionSubtitle}>{importConfig.sectionSubtitle}</p> : null}
+          </div>
+
+          <div className={styles.importCardGrid}>
+            {importConfig.cards.map((card: ImportVideoSectionConfig["cards"][number], index: number) => {
+              const image = readImageAsset(card.image)
+              const cardKey = card.id ?? `${card.title}-${index}`
+              return (
+                <article key={cardKey} className={styles.importCard}>
+                  {image ? (
+                    <div className={styles.importCardImageWrap}>
+                      <img className={styles.importCardImage} src={resolveImageSrc(image)} alt={image.alt} />
+                    </div>
+                  ) : null}
+                  <div className={styles.importCardBody}>
+                    {card.eyebrow ? <div className={styles.importCardEyebrow}>{card.eyebrow}</div> : null}
+                    <h3 className={styles.importCardTitle}>{card.title}</h3>
+                    {card.body ? <p className={styles.importCardText}>{card.body}</p> : null}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+
+          {stats.length ? (
+            <div className={styles.importMetricGrid}>
+              {stats.map((metric) => (
+                <div key={`${metric.label}-${metric.value}`} className={styles.importMetricCard}>
+                  <div className={styles.importMetricValue}>{metric.value}</div>
+                  <div className={styles.importMetricLabel}>{metric.label}</div>
+                  {metric.detail ? <div className={styles.importMetricDetail}>{metric.detail}</div> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {importConfig.footnote ? <p className={styles.importSectionFootnote}>{importConfig.footnote}</p> : null}
+        </Container>
+      </section>
+    )
+  }
+
+  const legacyConfig = resolvedConfig as VideoSectionConfig
+  return (
+    <section className={`${styles.sectionPeach} ${styles.sectionPad}`}>
+      <Container>
+        <div className={styles.reviewWallHeader}>
+          <div className={styles.sectionBadge}>{legacyConfig.badge}</div>
+          <h2 className={styles.sectionHeading}>{legacyConfig.title}</h2>
+        </div>
+        <VideoGrid videos={legacyConfig.videos} />
+      </Container>
+    </section>
+  )
 }
 
 type SalesPdpMarqueeProps = {
@@ -1678,12 +1895,12 @@ export function SalesPdpMarquee({ config, configJson }: SalesPdpMarqueeProps) {
 }
 
 type SalesPdpStoryProblemProps = {
-  config?: StorySectionConfig
+  config?: StorySectionConfig | ImportStorySectionConfig
   configJson?: string
 }
 
 type SalesPdpStorySolutionProps = {
-  config?: StorySectionConfig & { callout: CalloutConfig }
+  config?: (StorySectionConfig & { callout: CalloutConfig }) | ImportStorySectionConfig
   configJson?: string
 }
 
@@ -1738,39 +1955,195 @@ function SalesPdpStorySection({
 }
 
 export function SalesPdpStoryProblem({ config, configJson }: SalesPdpStoryProblemProps) {
-  const resolvedConfig = parseJson<StorySectionConfig>(configJson) ?? config ?? salesPdpDefaults.config.story.problem
-  return <SalesPdpStorySection section={resolvedConfig} />
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
+  const resolvedConfig =
+    parseJson<StorySectionConfig | ImportStorySectionConfig>(configJson) ?? config ?? salesPdpDefaults.config.story.problem
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpStoryProblem",
+    resolvedConfig,
+    isImportStorySectionConfig,
+    pageSchemaVersion
+  )
+  if (importConfig) {
+    return <SalesPdpImportStorySection section={importConfig} backgroundClass={styles.sectionPeach} />
+  }
+  return <SalesPdpStorySection section={resolvedConfig as StorySectionConfig} />
 }
 
 export function SalesPdpStorySolution({ config, configJson }: SalesPdpStorySolutionProps) {
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
   const resolvedConfig =
-    parseJson<StorySectionConfig & { callout: CalloutConfig }>(configJson) ??
+    parseJson<(StorySectionConfig & { callout: CalloutConfig }) | ImportStorySectionConfig>(configJson) ??
     config ??
     salesPdpDefaults.config.story.solution
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpStorySolution",
+    resolvedConfig,
+    isImportStorySectionConfig,
+    pageSchemaVersion
+  )
+  if (importConfig) {
+    return <SalesPdpImportStorySection section={importConfig} backgroundClass={styles.sectionBlue} />
+  }
+  const legacyConfig = resolvedConfig as StorySectionConfig & { callout: CalloutConfig }
   return (
     <SalesPdpStorySection
-      section={resolvedConfig}
-      callout={resolvedConfig.callout}
+      section={legacyConfig}
+      callout={legacyConfig.callout}
       className={styles.solutionSection}
     />
   )
 }
 
+function SalesPdpImportStorySection({
+  section,
+  backgroundClass,
+}: {
+  section: ImportStorySectionConfig
+  backgroundClass: string
+}) {
+  const rows = [
+    ...normalizeImportStoryRows(section.steps),
+    ...normalizeImportStoryRows(section.ingredients),
+    ...normalizeImportStoryRows(section.timeline),
+  ]
+  const bodyParagraphs = toStringList(section.body)
+  const image = readImageAsset(section.image)
+  return (
+    <section
+      id={extractSectionId(section)}
+      className={`${backgroundClass} ${styles.sectionPad} ${styles.importStorySection}`.trim()}
+    >
+      <Container className={styles.storyContainerTight}>
+        <div className={`${styles.storyGrid} ${styles.storyGridTextLeft}`}>
+          <div className={styles.storyText}>
+            {section.eyebrow ? (
+              <div className={styles.sectionBadge} style={{ marginLeft: 0 }}>
+                {section.eyebrow}
+              </div>
+            ) : null}
+            <h2 className={styles.storyTitle}>{section.headline}</h2>
+            {bodyParagraphs.map((paragraph) => (
+              <p key={paragraph} className={styles.storyPara}>
+                {paragraph}
+              </p>
+            ))}
+            {rows.length ? (
+              <div className={styles.importStoryRowList}>
+                {rows.map((row, index) => (
+                  <div key={`${row.title}-${index}`} className={styles.importStoryRow}>
+                    {row.label ? <div className={styles.importStoryRowLabel}>{row.label}</div> : null}
+                    <div className={styles.importStoryRowTitle}>{row.title}</div>
+                    {row.body ? <div className={styles.importStoryRowBody}>{row.body}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {image ? (
+            <div className={styles.storyMediaFrame}>
+              <img className={styles.storyImage} src={resolveImageSrc(image)} alt={image.alt} />
+            </div>
+          ) : null}
+        </div>
+      </Container>
+    </section>
+  )
+}
+
 type SalesPdpComparisonProps = {
-  config?: ComparisonConfig
+  config?: ComparisonConfig | ImportComparisonConfig
   configJson?: string
 }
 
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
-  const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
-  const comparisonTitle = normalizeComparisonTitle(resolvedConfig.title, resolvedConfig.columns)
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
+  const resolvedConfig =
+    parseJson<ComparisonConfig | ImportComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
+
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpComparison",
+    resolvedConfig,
+    isImportComparisonConfig,
+    pageSchemaVersion
+  )
+
+  if (importConfig) {
+    const emberColumn = normalizeImportComparisonColumn(importConfig.emberColumn, "Our approach")
+    const competitorColumn = normalizeImportComparisonColumn(importConfig.competitorColumn, "Typical alternative")
+    return (
+      <section
+        id={extractSectionId(importConfig)}
+        className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}
+      >
+        <Container>
+          <div style={{ textAlign: "center" }}>
+            {importConfig.badgeText ? <div className={styles.sectionBadge}>{importConfig.badgeText}</div> : null}
+            <h2 className={styles.sectionHeading}>{importConfig.headline}</h2>
+            {importConfig.subheadline ? <div className={styles.comparisonHint}>{importConfig.subheadline}</div> : null}
+          </div>
+
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th style={{ width: 240 }} />
+                  <th>
+                    <div>{emberColumn.title}</div>
+                    {emberColumn.subtitle ? <div className={styles.importColumnSubtitle}>{emberColumn.subtitle}</div> : null}
+                  </th>
+                  <th>
+                    <div>{competitorColumn.title}</div>
+                    {competitorColumn.subtitle ? (
+                      <div className={styles.importColumnSubtitle}>{competitorColumn.subtitle}</div>
+                    ) : null}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {importConfig.rows.map((row) => {
+                  const leftValue = row.ember ?? row.left ?? ""
+                  const rightValue = row.competitor ?? row.right ?? ""
+                  return (
+                    <tr key={row.label}>
+                      <td className={styles.tableLabel}>{row.label}</td>
+                      <td>
+                        <div className={styles.cell}>
+                          <span className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`} aria-hidden="true">
+                            <IconCheck size={12} />
+                          </span>
+                          {leftValue}
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.cell}>
+                          <span className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`} aria-hidden="true">
+                            <IconClose size={12} />
+                          </span>
+                          {rightValue}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Container>
+      </section>
+    )
+  }
+
+  const legacyConfig = resolvedConfig as ComparisonConfig
+  const comparisonTitle = normalizeComparisonTitle(legacyConfig.title, legacyConfig.columns)
   return (
-    <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
+    <section id={legacyConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
       <Container>
         <div style={{ textAlign: 'center' }}>
-          <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
+          <div className={styles.sectionBadge}>{legacyConfig.badge}</div>
           <h2 className={styles.sectionHeading}>{comparisonTitle}</h2>
-          <div className={styles.comparisonHint}>{resolvedConfig.swipeHint}</div>
+          <div className={styles.comparisonHint}>{legacyConfig.swipeHint}</div>
         </div>
 
         <div className={styles.tableWrap}>
@@ -1778,12 +2151,12 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
             <thead>
               <tr>
                 <th style={{ width: 240 }} />
-                <th>{resolvedConfig.columns.pup}</th>
-                <th>{resolvedConfig.columns.disposable}</th>
+                <th>{legacyConfig.columns.pup}</th>
+                <th>{legacyConfig.columns.disposable}</th>
               </tr>
             </thead>
             <tbody>
-              {resolvedConfig.rows.map((r) => (
+              {legacyConfig.rows.map((r) => (
                 <tr key={r.label}>
                   <td className={styles.tableLabel}>{r.label}</td>
                   <td>
@@ -1813,22 +2186,34 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
 }
 
 type SalesPdpGuaranteeProps = {
-  config?: GuaranteeConfig
+  config?: GuaranteeConfig | ImportGuaranteeConfig
   configJson?: string
   feedImages?: ImageAsset[]
   feedImagesJson?: string
 }
 
 export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJson }: SalesPdpGuaranteeProps) {
-  const resolvedConfig = parseJson<GuaranteeConfig>(configJson) ?? config ?? salesPdpDefaults.config.guarantee
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
+  const resolvedConfig =
+    parseJson<GuaranteeConfig | ImportGuaranteeConfig>(configJson) ?? config ?? salesPdpDefaults.config.guarantee
   const defaultFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((t) => t.image) ?? []
   const resolvedFeedImages =
     parseJson<ImageAsset[]>(feedImagesJson) ?? feedImages ?? defaultFeedImages
+  const isImportSchema = pageSchemaVersion === "import-v1" || isImportGuaranteeConfig(resolvedConfig)
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpGuarantee",
+    resolvedConfig,
+    isImportGuaranteeConfig,
+    pageSchemaVersion
+  )
+  const legacyFallbackImage =
+    !isImportSchema && isRecord(resolvedConfig.right) ? readImageAsset(resolvedConfig.right.image) : null
 
   const guaranteeImages = useMemo(() => {
     if (resolvedFeedImages.length) return resolvedFeedImages
-    return [resolvedConfig.right.image]
-  }, [resolvedFeedImages, resolvedConfig.right.image])
+    if (legacyFallbackImage) return [legacyFallbackImage]
+    return []
+  }, [legacyFallbackImage, resolvedFeedImages])
 
   const guaranteeFeedColumns = useMemo(() => {
     const left: typeof guaranteeImages = []
@@ -1844,6 +2229,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
   const manualScrollPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    if (isImportSchema) return
     const panel = manualScrollPanelRef.current
     if (!panel) return
 
@@ -1863,8 +2249,6 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
       if (!paused) {
         const maxScroll = panel.scrollHeight - panel.clientHeight
         if (maxScroll > 0) {
-          // Use a separate accumulator so sub-pixel deltas still make progress on browsers
-          // that quantize `scrollTop` to whole pixels.
           scrollPos += delta * 0.008
           if (scrollPos >= maxScroll) {
             scrollPos = 0
@@ -1872,7 +2256,6 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
           panel.scrollTop = scrollPos
         }
       } else {
-        // Keep the accumulator aligned with manual scrolling while paused.
         scrollPos = panel.scrollTop
       }
 
@@ -1907,31 +2290,95 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
       panel.removeEventListener('pointerdown', pause)
       panel.removeEventListener('pointerup', resume)
     }
-  }, [])
+  }, [isImportSchema])
 
+  if (isImportSchema) {
+    if (!importConfig) {
+      throw new Error("SalesPdpGuarantee requires import-v1 config when rendering import schema.")
+    }
+    const bodyParagraphs = toStringList(importConfig.body)
+    const stats = normalizeImportMetricList(importConfig.stats)
+    const iconImage =
+      readImageAsset(importConfig.image) ??
+      (importConfig.iconAlt
+        ? {
+            alt: importConfig.iconAlt,
+            src: typeof importConfig.iconSrc === "string" ? importConfig.iconSrc : "",
+            assetPublicId: typeof importConfig.iconAssetPublicId === "string" ? importConfig.iconAssetPublicId : undefined,
+          }
+        : null)
+    return (
+      <section
+        id={extractSectionId(importConfig)}
+        className={`${styles.sectionBlue} ${styles.sectionPad} ${styles.guaranteeSection}`}
+      >
+        <Container className={styles.guaranteeContainer}>
+          <div className={styles.guaranteeGrid}>
+            <div className={styles.guaranteeText}>
+              {importConfig.badgeText ? (
+                <div className={styles.sectionBadge} style={{ marginLeft: 0 }}>
+                  {importConfig.badgeText}
+                </div>
+              ) : null}
+              <h2>{importConfig.headline}</h2>
+              {bodyParagraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+
+            <div className={styles.importGuaranteePanel}>
+              {iconImage ? (
+                <div className={styles.importGuaranteeIconWrap}>
+                  <img className={styles.importGuaranteeIcon} src={resolveImageSrc(iconImage)} alt={iconImage.alt} />
+                </div>
+              ) : null}
+
+              {stats.length ? (
+                <div className={styles.importMetricGrid}>
+                  {stats.map((stat) => (
+                    <div key={`${stat.label}-${stat.value}`} className={styles.importMetricCard}>
+                      <div className={styles.importMetricValue}>{stat.value}</div>
+                      <div className={styles.importMetricLabel}>{stat.label}</div>
+                      {stat.detail ? <div className={styles.importMetricDetail}>{stat.detail}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {importConfig.statsFootnote ? (
+                <p className={styles.importSectionFootnote}>{importConfig.statsFootnote}</p>
+              ) : null}
+            </div>
+          </div>
+        </Container>
+      </section>
+    )
+  }
+
+  const legacyConfig = resolvedConfig as GuaranteeConfig
   return (
-    <section id={resolvedConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad} ${styles.guaranteeSection}`}>
+    <section id={legacyConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad} ${styles.guaranteeSection}`}>
       <Container className={styles.guaranteeContainer}>
         <div className={styles.guaranteeGrid}>
           <div className={styles.guaranteeText}>
             <div className={styles.sectionBadge} style={{ marginLeft: 0 }}>
-              {resolvedConfig.badge}
+              {legacyConfig.badge}
             </div>
-            <h2>{resolvedConfig.title}</h2>
-            {resolvedConfig.paragraphs.map((p) => (
+            <h2>{legacyConfig.title}</h2>
+            {legacyConfig.paragraphs.map((p) => (
               <p key={p} className={p === 'No hoops. No hassles. No questions.' ? styles.guaranteeBold : undefined}>
                 {p}
               </p>
             ))}
-            <div className={styles.whyTitle}>{resolvedConfig.whyTitle}</div>
-            <p>{resolvedConfig.whyBody}</p>
-            <p className={styles.guaranteeClosing}>{resolvedConfig.closingLine}</p>
+            <div className={styles.whyTitle}>{legacyConfig.whyTitle}</div>
+            <p>{legacyConfig.whyBody}</p>
+            <p className={styles.guaranteeClosing}>{legacyConfig.closingLine}</p>
           </div>
 
           <div className={styles.manualScrollPanelWrap}>
             <div className={styles.manualScrollHint} aria-hidden="true">
               <IconScrollIndicator size={16} />
-              {resolvedConfig.right.commentThread.label}
+              {legacyConfig.right.commentThread.label}
             </div>
 
             <div
@@ -1970,11 +2417,12 @@ type SalesPdpFaqProps = {
 
 export function SalesPdpFaq({ config, configJson }: SalesPdpFaqProps) {
   const resolvedConfig = parseJson<FaqConfig>(configJson) ?? config ?? salesPdpDefaults.config.faq
+  const sectionId = resolvedConfig.id || resolvedConfig.anchorId
   return (
-    <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad}`}>
+    <section id={sectionId} className={`${styles.sectionPeach} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.faqWrap}>
-          <h2 className={styles.faqHeading}>Frequently Asked Questions</h2>
+          <h2 className={styles.faqHeading}>{resolvedConfig.title || "Frequently Asked Questions"}</h2>
           <FaqAccordion items={resolvedConfig.items} />
         </div>
       </Container>
@@ -1983,21 +2431,83 @@ export function SalesPdpFaq({ config, configJson }: SalesPdpFaqProps) {
 }
 
 type SalesPdpReviewWallProps = {
-  config?: ReviewWallConfig
+  config?: ReviewWallConfig | ImportReviewWallConfig
   configJson?: string
   hidden?: boolean
 }
 
 export function SalesPdpReviewWall({ config, configJson, hidden }: SalesPdpReviewWallProps) {
   if (hidden) return null
-  const resolvedConfig = parseJson<ReviewWallConfig>(configJson) ?? config ?? salesPdpDefaults.config.reviewWall
+  const pageSchemaVersion = useContext(SalesPdpSchemaContext)
+  const resolvedConfig =
+    parseJson<ReviewWallConfig | ImportReviewWallConfig>(configJson) ?? config ?? salesPdpDefaults.config.reviewWall
+
+  const importConfig = requireImportSchemaConfig(
+    "SalesPdpReviewWall",
+    resolvedConfig,
+    isImportReviewWallConfig,
+    pageSchemaVersion
+  )
+
+  if (importConfig) {
+    return (
+      <section id={extractSectionId(importConfig)} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
+        <Container>
+          <div className={styles.reviewWallHeader}>
+            {importConfig.badgeText ? <div className={styles.sectionBadge}>{importConfig.badgeText}</div> : null}
+            <h2 className={styles.sectionHeading} style={{ marginBottom: 10 }}>
+              {importConfig.headline}
+            </h2>
+            {importConfig.body ? <p className={styles.importSectionSubtitle}>{importConfig.body}</p> : null}
+          </div>
+
+          <div className={styles.importReviewGrid}>
+            {importConfig.reviews.map((review: ImportReviewWallConfig["reviews"][number], index: number) => {
+              const image = readImageAsset(review.image)
+              const author = review.name ?? review.author
+              return (
+                <article key={review.id ?? `${author ?? "review"}-${index}`} className={styles.importReviewCard}>
+                  <div className={styles.importReviewHeader}>
+                    {review.title ? <h3 className={styles.importReviewTitle}>{review.title}</h3> : null}
+                    {typeof review.rating === "number" && review.rating > 0 ? (
+                      <StarRow rating={Math.max(1, Math.min(5, Math.round(review.rating)))} ariaLabel={`${review.rating} out of 5 stars`} />
+                    ) : null}
+                  </div>
+                  <p className={styles.importReviewBody}>{review.body}</p>
+                  {image ? (
+                    <div className={styles.importReviewImageWrap}>
+                      <img className={styles.importReviewImage} src={resolveImageSrc(image)} alt={image.alt} />
+                    </div>
+                  ) : null}
+                  {author || review.meta ? (
+                    <div className={styles.importReviewMeta}>
+                      {author ? <span>{author}</span> : null}
+                      {review.meta ? <span>{review.meta}</span> : null}
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })}
+          </div>
+
+          {importConfig.ctaLabel ? (
+            <button type="button" className={styles.showMore}>
+              {importConfig.ctaLabel}
+            </button>
+          ) : null}
+        </Container>
+      </section>
+    )
+  }
+
+  const legacyConfig = resolvedConfig as ReviewWallConfig
   return (
-    <section id={resolvedConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
+    <section id={legacyConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.reviewWallHeader}>
-          <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
+          <div className={styles.sectionBadge}>{legacyConfig.badge}</div>
           <h2 className={styles.sectionHeading} style={{ marginBottom: 10 }}>
-            {resolvedConfig.title}
+            {legacyConfig.title}
           </h2>
           <div className={styles.ratingRow}>
             <img
@@ -2005,12 +2515,12 @@ export function SalesPdpReviewWall({ config, configJson, hidden }: SalesPdpRevie
               src="https://cdn.shopify.com/s/files/1/0433/0510/7612/files/StarRating.svg?v=1754231046"
               alt="5 star rating"
             />
-            {resolvedConfig.ratingLabel}
+            {legacyConfig.ratingLabel}
           </div>
         </div>
 
         <div className={styles.masonry}>
-          {resolvedConfig.tiles.map((t) => (
+          {legacyConfig.tiles.map((t) => (
             <div key={t.id} className={styles.tile}>
               <img src={resolveImageSrc(t.image)} alt={t.image.alt} />
             </div>
@@ -2018,7 +2528,7 @@ export function SalesPdpReviewWall({ config, configJson, hidden }: SalesPdpRevie
         </div>
 
         <button type="button" className={styles.showMore}>
-          {resolvedConfig.showMoreLabel}
+          {legacyConfig.showMoreLabel}
         </button>
       </Container>
     </section>

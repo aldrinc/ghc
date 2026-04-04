@@ -32,12 +32,16 @@ def _pre_sales_template_puck_data() -> dict:
 
 
 def _find_sales_hero_props(puck_data: dict) -> dict:
+    return _find_sales_component_props(puck_data, "SalesPdpHero")
+
+
+def _find_sales_component_props(puck_data: dict, component_type: str) -> dict:
     for obj in _walk_json(puck_data):
-        if isinstance(obj, dict) and obj.get("type") == "SalesPdpHero":
+        if isinstance(obj, dict) and obj.get("type") == component_type:
             props = obj.get("props")
             if isinstance(props, dict):
                 return props
-    raise AssertionError("SalesPdpHero props not found in template puck data")
+    raise AssertionError(f"{component_type} props not found in template puck data")
 
 
 def _find_sales_hero_urgency(puck_data: dict) -> dict:
@@ -79,6 +83,118 @@ def _find_pre_sales_reasons_config(puck_data: dict) -> list[dict]:
 
 def test_sales_template_validation_accepts_default_sales_hero_modal_shape():
     puck_data = _sales_template_puck_data()
+    assert funnel_ai.uses_sales_pdp_import_schema(puck_data) is False
+    funnel_ai._validate_sales_pdp_component_configs(puck_data)
+
+
+def test_sales_template_validation_accepts_import_schema_sections():
+    puck_data = _sales_template_puck_data()
+
+    page_props = _find_sales_component_props(puck_data, "SalesPdpPage")
+    page_props["schemaVersion"] = "import-v1"
+
+    videos_props = _find_sales_component_props(puck_data, "SalesPdpVideos")
+    videos_props["config"] = {
+        "id": "social-proof-videos",
+        "badgeText": "WATCH IT WORK",
+        "sectionTitle": "See how the protocol fits real routines.",
+        "sectionSubtitle": "Lead with the same structure as the imported HTML, not the legacy PuppyPad page.",
+        "cards": [
+            {
+                "id": "video-card-1",
+                "eyebrow": "Morning",
+                "title": "A fast reset before work",
+                "body": "The imported template leads with short behavior snapshots and compact proof blocks.",
+                "image": {"alt": "Jar on a breakfast table", "src": "/assets/ph-video-1.webp"},
+            }
+        ],
+        "stats": [{"label": "Readers", "value": "50,000+", "detail": "Handbook copies in circulation"}],
+        "footnote": "Keep the HTML-led rhythm intact instead of normalizing it into a different PDP layout.",
+    }
+
+    problem_props = _find_sales_component_props(puck_data, "SalesPdpStoryProblem")
+    problem_props["config"] = {
+        "anchorId": "how-it-works",
+        "eyebrow": "THE PROBLEM",
+        "headline": "Most natural remedy guides stay too generic to be useful.",
+        "body": [
+            "The imported page uses tighter, more editorial sections with concrete takeaways.",
+            "That structure should survive generation instead of being rewritten into generic PDP paragraphs.",
+        ],
+        "image": {"alt": "Marked-up notebook", "src": "/assets/ph-problem.webp"},
+        "steps": [
+            {"label": "1", "title": "Generic advice", "body": "Readers do not know what to do next."},
+            {"label": "2", "title": "No sequence", "body": "The proof and CTA cadence becomes muddy."},
+        ],
+    }
+
+    solution_props = _find_sales_component_props(puck_data, "SalesPdpStorySolution")
+    solution_props["config"] = {
+        "anchorId": "guarantee",
+        "eyebrow": "THE FIX",
+        "headline": "Turn the uploaded HTML into the active template baseline.",
+        "body": "Keep the imported structure, then layer strategy, product context, and compliant copy onto it.",
+        "image": {"alt": "Guide pages with tabs", "src": "/assets/ph-solution.webp"},
+        "ingredients": [
+            {"title": "Template fidelity", "body": "Preserve the original section flow."},
+            {"title": "Campaign context", "body": "Use the EMBER copy packet for substance, not layout."},
+        ],
+        "timeline": [{"label": "Result", "title": "Higher fidelity", "body": "The rendered page stays closer to the uploaded HTML."}],
+    }
+
+    comparison_props = _find_sales_component_props(puck_data, "SalesPdpComparison")
+    comparison_props["config"] = {
+        "id": "comparison",
+        "badgeText": "SIDE BY SIDE",
+        "headline": "Why import-v1 beats forcing everything into the legacy PDP schema",
+        "subheadline": "The imported structure stays readable on desktop and mobile.",
+        "emberColumn": {"title": "Import v1", "subtitle": "HTML-led structure"},
+        "competitorColumn": {"title": "Legacy coercion", "subtitle": "PuppyPad-shaped fallback"},
+        "rows": [
+            {"label": "Section rhythm", "ember": "Matches the uploaded page", "competitor": "Rewritten into legacy order"},
+            {"label": "Proof blocks", "ember": "Text cards and metrics stay intact", "competitor": "Collapsed into old tiles"},
+        ],
+    }
+
+    guarantee_props = _find_sales_component_props(puck_data, "SalesPdpGuarantee")
+    guarantee_props["config"] = {
+        "anchorId": "guarantee",
+        "badgeText": "SAFE TO SHIP",
+        "headline": "The renderer now understands the import-native guarantee section.",
+        "body": [
+            "This path no longer assumes right.image and commentThread are always present.",
+            "It can render stat-led guarantee sections that are closer to the uploaded HTML.",
+        ],
+        "iconAlt": "Shield icon",
+        "iconSrc": "/assets/ph-guarantee-icon.webp",
+        "stats": [
+            {"label": "Guarantee", "value": "90 Days", "detail": "Try the handbook without pressure"},
+            {"label": "Support", "value": "Human", "detail": "Clear help if something feels off"},
+        ],
+        "statsFootnote": "Import-native sections are validated before they ever reach the public renderer.",
+    }
+
+    review_wall_props = _find_sales_component_props(puck_data, "SalesPdpReviewWall")
+    review_wall_props["config"] = {
+        "id": "reviews",
+        "badgeText": "READER NOTES",
+        "headline": "Text-first review walls are now valid import-native Sales PDP blocks.",
+        "body": "This keeps review-heavy imported pages close to the uploaded layout.",
+        "reviews": [
+            {
+                "id": "review-1",
+                "title": "Finally usable",
+                "body": "The page now reads like the imported design instead of a leftover PuppyPad funnel.",
+                "author": "Ingrid B.",
+                "meta": "Verified reader",
+                "rating": 5,
+                "image": {"alt": "Open handbook on a kitchen counter", "src": "/assets/ph-review-1.webp"},
+            }
+        ],
+        "ctaLabel": "Read more stories",
+    }
+
+    assert funnel_ai.uses_sales_pdp_import_schema(puck_data) is True
     funnel_ai._validate_sales_pdp_component_configs(puck_data)
 
 
