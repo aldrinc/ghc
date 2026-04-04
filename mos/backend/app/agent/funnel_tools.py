@@ -650,6 +650,196 @@ def _persist_synced_object_prop(
         props[json_key] = json.dumps(value, ensure_ascii=False)
 
 
+def _normalize_sales_pdp_import_template_component(
+    component: dict[str, Any],
+    *,
+    product_title: str,
+) -> bool:
+    props = component.get("props")
+    if not isinstance(props, dict):
+        return False
+
+    def load_object_prop(
+        *,
+        object_key: str,
+        json_key: str,
+        label: str,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        raw_json = props.get(json_key)
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                parsed = json.loads(raw_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{label}.{json_key} must be valid JSON: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError(f"{label}.{json_key} must decode to a JSON object.")
+            return parsed, json_key
+        value = props.get(object_key)
+        if isinstance(value, dict):
+            return value, object_key
+        return None, None
+
+    def persist_object_prop(
+        *,
+        source: str | None,
+        object_key: str,
+        json_key: str,
+        value: dict[str, Any],
+    ) -> None:
+        _persist_synced_object_prop(
+            props,
+            source=source,
+            object_key=object_key,
+            json_key=json_key,
+            value=value,
+        )
+
+    component_type = component.get("type")
+    if component_type == "SalesPdpVideos":
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label="SalesPdpVideos",
+        )
+        if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_videos_config(cur_cfg):
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+            return True
+        return False
+
+    if component_type in {"SalesPdpStoryProblem", "SalesPdpStorySolution"}:
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label=str(component_type or "SalesPdpStorySection"),
+        )
+        if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_story_config(cur_cfg):
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+            return True
+        return False
+
+    if component_type == "SalesPdpComparison":
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label="SalesPdpComparison",
+        )
+        if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_comparison_config(cur_cfg):
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+            return True
+        return False
+
+    if component_type == "SalesPdpGuarantee":
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label="SalesPdpGuarantee",
+        )
+        if not isinstance(cur_cfg, dict):
+            return False
+        changed = _coerce_sales_pdp_import_guarantee_config(
+            config=cur_cfg,
+            product_title=product_title,
+        )
+        changed = _ensure_sales_pdp_import_guarantee_image_prompt(
+            config=cur_cfg,
+            product_title=product_title,
+        ) or changed
+        changed = _ensure_sales_pdp_guarantee_icon_prompt(
+            config=cur_cfg,
+            product_title=product_title,
+        ) or changed
+        if changed:
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+        return changed
+
+    if component_type == "SalesPdpReviewWall":
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label="SalesPdpReviewWall",
+        )
+        if not isinstance(cur_cfg, dict):
+            return False
+        changed = _coerce_sales_pdp_import_review_wall_config(cur_cfg)
+        changed = _ensure_sales_pdp_import_review_wall_image_prompts(
+            config=cur_cfg,
+            product_title=product_title,
+        ) or changed
+        if changed:
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+        return changed
+
+    if component_type == "SalesPdpHero":
+        cur_cfg, cur_source = load_object_prop(
+            object_key="config",
+            json_key="configJson",
+            label="SalesPdpHero",
+        )
+        if not isinstance(cur_cfg, dict):
+            return False
+        gallery = cur_cfg.get("gallery")
+        if not isinstance(gallery, dict):
+            return False
+        if _ensure_sales_pdp_free_gifts_icon_prompt(
+            gallery=gallery,
+            product_title=product_title,
+        ):
+            persist_object_prop(
+                source=cur_source,
+                object_key="config",
+                json_key="configJson",
+                value=cur_cfg,
+            )
+            return True
+        return False
+
+    return False
+
+
+def _normalize_sales_pdp_import_template_tree(
+    *,
+    puck_data: dict[str, Any],
+    product_title: str,
+) -> int:
+    changed = 0
+    for obj in funnel_ai.walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        if not isinstance(obj.get("type"), str):
+            continue
+        if _normalize_sales_pdp_import_template_component(
+            obj,
+            product_title=product_title,
+        ):
+            changed += 1
+    return changed
+
+
 def _allowed_component_types(template_kind: str | None, *, template_mode: bool = False) -> set[str]:
     # Template pages should preserve structure, so restrict "creative" primitives to avoid
     # the LLM inserting extra sections/blocks that are not part of the template.
@@ -2518,139 +2708,10 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             def _normalize_sales_pdp_import_template_fields(candidate: dict[str, Any]) -> None:
                 if not sales_pdp_import_template_mode:
                     return
-                cprops = candidate.get("props")
-                if not isinstance(cprops, dict):
-                    return
-
-                if candidate.get("type") == "SalesPdpVideos":
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label="SalesPdpVideos",
-                    )
-                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_videos_config(cur_cfg):
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
-                    return
-
-                if candidate.get("type") in {"SalesPdpStoryProblem", "SalesPdpStorySolution"}:
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label=str(candidate.get("type") or "SalesPdpStorySection"),
-                    )
-                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_story_config(cur_cfg):
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
-                    return
-
-                if candidate.get("type") == "SalesPdpComparison":
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label="SalesPdpComparison",
-                    )
-                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_comparison_config(cur_cfg):
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
-                    return
-
-                if candidate.get("type") == "SalesPdpGuarantee":
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label="SalesPdpGuarantee",
-                    )
-                    if not isinstance(cur_cfg, dict):
-                        return
-                    changed = _coerce_sales_pdp_import_guarantee_config(
-                        config=cur_cfg,
-                        product_title=getattr(product, "title", "") or "",
-                    )
-                    changed = _ensure_sales_pdp_import_guarantee_image_prompt(
-                        config=cur_cfg,
-                        product_title=getattr(product, "title", "") or "",
-                    ) or changed
-                    changed = _ensure_sales_pdp_guarantee_icon_prompt(
-                        config=cur_cfg,
-                        product_title=getattr(product, "title", "") or "",
-                    ) or changed
-                    if changed:
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
-                    return
-
-                if candidate.get("type") == "SalesPdpReviewWall":
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label="SalesPdpReviewWall",
-                    )
-                    if not isinstance(cur_cfg, dict):
-                        return
-                    changed = _coerce_sales_pdp_import_review_wall_config(cur_cfg)
-                    changed = _ensure_sales_pdp_import_review_wall_image_prompts(
-                        config=cur_cfg,
-                        product_title=getattr(product, "title", "") or "",
-                    ) or changed
-                    if changed:
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
-                    return
-
-                if candidate.get("type") == "SalesPdpHero":
-                    cur_cfg, cur_source = _load_object_prop(
-                        cprops,
-                        object_key="config",
-                        json_key="configJson",
-                        label="SalesPdpHero",
-                    )
-                    if not isinstance(cur_cfg, dict):
-                        return
-                    gallery = cur_cfg.get("gallery")
-                    if not isinstance(gallery, dict):
-                        return
-                    if _ensure_sales_pdp_free_gifts_icon_prompt(
-                        gallery=gallery,
-                        product_title=getattr(product, "title", "") or "",
-                    ):
-                        _persist_object_prop(
-                            cprops,
-                            source=cur_source,
-                            object_key="config",
-                            json_key="configJson",
-                            value=cur_cfg,
-                        )
+                _normalize_sales_pdp_import_template_component(
+                    candidate,
+                    product_title=getattr(product, "title", "") or "",
+                )
 
             def _coerce_pre_sales_hero_badges_to_list(component: dict[str, Any]) -> int:
                 """
@@ -2878,6 +2939,12 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                                 )
 
                         cur_props["content"] = merged
+
+        if sales_pdp_import_template_mode:
+            _normalize_sales_pdp_import_template_tree(
+                puck_data=args.puckData,
+                product_title=getattr(product, "title", "") or "",
+            )
 
         config_contexts: list[funnel_ai._ConfigJsonContext] = []
         if args.templateKind:
