@@ -1016,6 +1016,14 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             if html_template_mode and isinstance(args.basePuckData, dict)
             else args.basePuckData
         )
+        if html_template_mode and template_component_kind == "sales-pdp" and isinstance(prompt_puck_data, dict):
+            for component in prompt_puck_data.get("content") or []:
+                if not isinstance(component, dict) or component.get("type") != "SalesPdpPage":
+                    continue
+                prop_keys = component.get("propKeys")
+                if isinstance(prop_keys, list):
+                    merged_keys = sorted({str(key) for key in prop_keys} | {"schemaVersion"})
+                    component["propKeys"] = merged_keys
 
         # Layout guidance varies based on template mode.
         if not template_mode:
@@ -1213,16 +1221,30 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if template_mode and template_component_kind == "sales-pdp":
             template_config_guidance = (
                 "Sales PDP config requirements:\n"
-                "- SalesPdpHeader.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string, href?:string }, nav: [{ label:string, href:string }], cta: { label:string, href:string } }\n"
-                "- SalesPdpHero.config MUST be: { header: { ...same as SalesPdpHeader.config }, gallery: { watchInAction: { label:string }, slides: [{ alt:string, src?:string, assetPublicId?:string, thumbSrc?:string, thumbAssetPublicId?:string }], freeGifts: { icon:{ alt:string, src?:string, assetPublicId?:string }, title:string, body:string, ctaLabel:string } }, purchase: { faqPills: [{ label:string, answer:string }], title:string, benefits:[{ text:string }], size:{ title:string, helpLinkLabel:string, options:[{ id:string, label:string, sizeIn:string, sizeCm:string }], shippingDelayLabel:string }, color:{ title:string, options:[{ id:string, label:string, swatch?:string, swatchImageSrc?:string, swatchAssetPublicId?:string }], outOfStockTitle:string, outOfStockBody:string }, offer:{ title:string, helperText:string, seeWhyLabel:string, options:[{ id:string, title:string, image:{ alt:string, src?:string, assetPublicId?:string }, price:number, compareAt?:number, saveLabel?:string, productOfferId?:string } ] }, cta:{ labelTemplate:string, subBullets:string[], urgency:{ message:string, rows:[{ label:string, value:string, tone?:'muted'|'highlight' }] } }, outOfStock?:[{ sizeId:string, colorId:string }], shippingDelay?:[{ sizeId:string, colorId:string }] } }\n"
-                "- SalesPdpHero.modals MUST be: { sizeChart: { title:string, sizes:[{ label:string, size:string, idealFor:string, weight:string }], note:string }, whyBundle: { title:string, body:string, quotes:[{ text:string, author:string }] }, freeGifts: { title:string, body:string } }\n"
-                "- Checkout requirement: purchase selector ids MUST match productContext.selected_offer.price_points[].option_values using normalized checkout keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
-                "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
-                "- SalesPdpFaq.config MUST be: { title: string, items: [{ question: string, answer: string }] }\n"
-                "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
-                "- SalesPdpFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string }, copyright: string }\n"
-                "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
-                "- Do NOT use legacy keys like headline/subheadline/trustBadges/ctaLabel/ctaLinkType/reviews inside SalesPdp* configs.\n\n"
+                + (
+                    "- SalesPdpPage.props.schemaVersion MUST be 'import-v1' when referenceHtmlMode='template'.\n"
+                    if html_template_mode
+                    else ""
+                )
+                + "- SalesPdpHeader.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string, href?:string }, nav: [{ label:string, href:string }], cta: { label:string, href:string } }\n"
+                + "- SalesPdpHero.config MUST be: { header: { ...same as SalesPdpHeader.config }, gallery: { watchInAction: { label:string }, slides: [{ alt:string, src?:string, assetPublicId?:string, thumbSrc?:string, thumbAssetPublicId?:string }], freeGifts: { icon:{ alt:string, src?:string, assetPublicId?:string }, title:string, body:string, ctaLabel:string } }, purchase: { faqPills: [{ label:string, answer:string }], title:string, benefits:[{ text:string }], size:{ title:string, helpLinkLabel:string, options:[{ id:string, label:string, sizeIn:string, sizeCm:string }], shippingDelayLabel:string }, color:{ title:string, options:[{ id:string, label:string, swatch?:string, swatchImageSrc?:string, swatchAssetPublicId?:string }], outOfStockTitle:string, outOfStockBody:string }, offer:{ title:string, helperText:string, seeWhyLabel:string, options:[{ id:string, title:string, image:{ alt:string, src?:string, assetPublicId?:string }, price:number, compareAt?:number, saveLabel?:string, productOfferId?:string } ] }, cta:{ labelTemplate:string, subBullets:string[], urgency:{ message:string, rows:[{ label:string, value:string, tone?:'muted'|'highlight' }] } }, outOfStock?:[{ sizeId:string, colorId:string }], shippingDelay?:[{ sizeId:string, colorId:string }] } }\n"
+                + "- SalesPdpHero.modals MUST be: { sizeChart: { title:string, sizes:[{ label:string, size:string, idealFor:string, weight:string }], note:string }, whyBundle: { title:string, body:string, quotes:[{ text:string, author:string }] }, freeGifts: { title:string, body:string } }\n"
+                + "- Checkout requirement: purchase selector ids MUST match productContext.selected_offer.price_points[].option_values using normalized checkout keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
+                + "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
+                + "- SalesPdpFaq.config MUST be: { id?: string, anchorId?: string, title: string, items: [{ question: string, answer: string }] }\n"
+                + "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
+                + "- SalesPdpFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string }, copyright: string }\n"
+                + "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
+                + (
+                    "- In imported HTML template mode, SalesPdpVideos.config MUST be: { id?:string, badgeText?:string, sectionTitle:string, sectionSubtitle?:string, cards:[{ id?:string, eyebrow?:string, title:string, body?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], stats?:[{ label:string, value:string, detail?:string }], footnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST be: { id?:string, anchorId?:string, eyebrow?:string, headline:string, body:string|string[], image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, steps?:[{ label?:string, title:string, body?:string }], ingredients?:[{ label?:string, title:string, body?:string }], timeline?:[{ label?:string, title:string, body?:string }] }\n"
+                    "- In imported HTML template mode, SalesPdpComparison.config MUST be: { id?:string, badgeText?:string, headline:string, subheadline?:string, emberColumn:string|{ title:string, subtitle?:string }, competitorColumn:string|{ title:string, subtitle?:string }, rows:[{ label:string, ember?:string, competitor?:string, left?:string, right?:string }] }\n"
+                    "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
+                    "- In imported HTML template mode, do NOT force legacy Sales PDP keys like badge/title/videos, paragraphs, columns.pup/disposable, right.image/commentThread, or tiles into those import-native sections.\n\n"
+                    if html_template_mode
+                    else "- Do NOT use legacy keys like headline/subheadline/trustBadges/ctaLabel/ctaLinkType/reviews inside SalesPdp* configs.\n\n"
+                )
             )
         elif template_mode and template_component_kind == "pre-sales-listicle":
             template_config_guidance = (
@@ -1241,7 +1263,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             template_component = ""
         elif template_component_kind == "sales-pdp":
             template_component = (
-                "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
+                "11) SalesPdpPage: props { id, anchorId?, schemaVersion?, theme, themeJson?, content? }\n"
                 "12) SalesPdpHeader: props { id, config, configJson? }\n"
                 "13) SalesPdpHero: props { id, config, configJson?, modals?, modalsJson?, copy?, copyJson? }\n"
                 "14) SalesPdpVideos: props { id, config, configJson? }\n"
