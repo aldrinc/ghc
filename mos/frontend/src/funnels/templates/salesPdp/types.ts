@@ -155,6 +155,8 @@ export type HeroConfig = {
   purchase: PurchaseConfig
 }
 
+export type SalesPdpSchemaVersion = "legacy" | "import-v1"
+
 export type VideoItem = {
   id: string
   thumbnail: ImageAsset
@@ -164,6 +166,30 @@ export type VideoSectionConfig = {
   badge: string
   title: string
   videos: VideoItem[]
+}
+
+export type ImportMetric = {
+  label: string
+  value: string
+  detail?: string
+}
+
+export type ImportSectionCard = {
+  id?: string
+  eyebrow?: string
+  title: string
+  body?: string
+  image?: ImageAsset
+}
+
+export type ImportVideoSectionConfig = {
+  id?: string
+  badgeText?: string
+  sectionTitle: string
+  sectionSubtitle?: string
+  cards: ImportSectionCard[]
+  stats?: ImportMetric[]
+  footnote?: string
 }
 
 export type StoryBullet = {
@@ -182,6 +208,24 @@ export type StorySectionConfig = {
   image: ImageAsset
   /** 'textLeft' matches the screenshots (text left, image right) */
   layout?: 'textLeft' | 'textRight'
+}
+
+export type ImportStoryRow = {
+  label?: string
+  title: string
+  body?: string
+}
+
+export type ImportStorySectionConfig = {
+  id?: string
+  anchorId?: string
+  eyebrow?: string
+  headline: string
+  body: string | string[]
+  image?: ImageAsset
+  steps?: ImportStoryRow[]
+  ingredients?: ImportStoryRow[]
+  timeline?: ImportStoryRow[]
 }
 
 export type CalloutConfig = {
@@ -207,6 +251,29 @@ export type ComparisonConfig = {
     disposable: string
   }
   rows: ComparisonRow[]
+}
+
+export type ImportComparisonColumn = {
+  title: string
+  subtitle?: string
+}
+
+export type ImportComparisonRow = {
+  label: string
+  ember?: string
+  competitor?: string
+  left?: string
+  right?: string
+}
+
+export type ImportComparisonConfig = {
+  id?: string
+  badgeText?: string
+  headline: string
+  subheadline?: string
+  emberColumn: string | ImportComparisonColumn
+  competitorColumn: string | ImportComparisonColumn
+  rows: ImportComparisonRow[]
 }
 
 export type ReviewSliderConfig = {
@@ -242,6 +309,20 @@ export type GuaranteeConfig = {
   }
 }
 
+export type ImportGuaranteeConfig = {
+  id?: string
+  anchorId?: string
+  badgeText?: string
+  headline: string
+  body: string | string[]
+  iconAlt?: string
+  iconAssetPublicId?: string
+  iconSrc?: string
+  image?: ImageAsset
+  stats?: ImportMetric[]
+  statsFootnote?: string
+}
+
 export type FaqItem = {
   question: string
   answer: string
@@ -249,6 +330,7 @@ export type FaqItem = {
 
 export type FaqConfig = {
   id?: string
+  anchorId?: string
   title: string
   items: FaqItem[]
 }
@@ -265,6 +347,26 @@ export type ReviewWallConfig = {
   ratingLabel: string
   tiles: ReviewTile[]
   showMoreLabel: string
+}
+
+export type ImportReviewWallReview = {
+  id?: string
+  title?: string
+  body: string
+  name?: string
+  author?: string
+  meta?: string
+  rating?: number
+  image?: ImageAsset
+}
+
+export type ImportReviewWallConfig = {
+  id?: string
+  badgeText?: string
+  headline: string
+  body?: string
+  reviews: ImportReviewWallReview[]
+  ctaLabel?: string
 }
 
 export type FooterConfig = {

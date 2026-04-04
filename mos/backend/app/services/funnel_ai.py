@@ -812,6 +812,46 @@ def _apply_icon_remix_overrides_for_ai(
         )
 
 
+def uses_sales_pdp_import_schema(puck_data: dict[str, Any]) -> bool:
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("type") == "SalesPdpPage":
+            props = obj.get("props")
+            if isinstance(props, dict) and props.get("schemaVersion") == "import-v1":
+                return True
+
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+
+        raw_json = props.get("configJson")
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                config = json.loads(raw_json)
+            except json.JSONDecodeError:
+                continue
+        else:
+            config = props.get("config")
+
+        if not isinstance(config, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type == "SalesPdpVideos" and isinstance(config.get("cards"), list):
+            return True
+        if comp_type in {"SalesPdpStoryProblem", "SalesPdpStorySolution"} and isinstance(config.get("headline"), str):
+            return True
+        if comp_type == "SalesPdpComparison" and "emberColumn" in config:
+            return True
+        if comp_type == "SalesPdpGuarantee" and isinstance(config.get("headline"), str) and (
+            isinstance(config.get("stats"), list) or "iconAlt" in config or "iconAssetPublicId" in config
+        ):
+            return True
+        if comp_type == "SalesPdpReviewWall" and isinstance(config.get("reviews"), list):
+            return True
+    return False
+
+
 def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
     """
     Ensure SalesPdp* blocks won't crash the editor/runtime due to basic shape issues.
@@ -880,6 +920,8 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
             )
         return value, object_key
 
+    schema_version: Literal["legacy", "import-v1"] = "import-v1" if uses_sales_pdp_import_schema(puck_data) else "legacy"
+
     for obj in walk_json(puck_data):
         if not isinstance(obj, dict):
             continue
@@ -896,7 +938,15 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
         block_id = props.get("id")
         id_suffix = f" (id={block_id})" if isinstance(block_id, str) and block_id else ""
 
-        if comp_type == "SalesPdpHeader":
+        if comp_type == "SalesPdpPage":
+            schema_value = props.get("schemaVersion")
+            if schema_value is not None and schema_value not in {"legacy", "import-v1"}:
+                raise ValueError(
+                    f"SalesPdpPage.props.schemaVersion must be 'legacy' or 'import-v1'{id_suffix}. "
+                    f"Received {_describe_value(schema_value)}."
+                )
+
+        elif comp_type == "SalesPdpHeader":
             if not isinstance(config, dict):
                 raise ValueError(
                     f"SalesPdpHeader.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
@@ -943,17 +993,390 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                     f"SalesPdpMarquee.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
                 )
 
+        elif comp_type == "SalesPdpVideos":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpVideos.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if schema_version == "import-v1" or isinstance(config.get("cards"), list):
+                section_title = config.get("sectionTitle")
+                cards = config.get("cards")
+                if not isinstance(section_title, str) or not section_title.strip():
+                    raise ValueError(
+                        f"SalesPdpVideos.{source}.sectionTitle must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(section_title)}."
+                    )
+                if not isinstance(cards, list) or not cards:
+                    raise ValueError(
+                        f"SalesPdpVideos.{source}.cards must be a non-empty list{id_suffix}. "
+                        f"Received {_describe_value(cards)}."
+                    )
+                for idx, card in enumerate(cards):
+                    if not isinstance(card, dict):
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.cards[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(card)}."
+                        )
+                    if not isinstance(card.get("title"), str) or not card.get("title").strip():
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.cards[{idx}].title must be a non-empty string{id_suffix}."
+                        )
+                    image = card.get("image")
+                    if image is not None and (
+                        not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt")
+                    ):
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.cards[{idx}].image must be an image object with string alt when provided{id_suffix}. "
+                            f"Received {_describe_value(image)}."
+                        )
+            else:
+                badge = config.get("badge")
+                title = config.get("title")
+                videos = config.get("videos")
+                if not isinstance(badge, str) or not badge.strip():
+                    raise ValueError(
+                        f"SalesPdpVideos.{source}.badge must be a non-empty string{id_suffix}. Received {_describe_value(badge)}."
+                    )
+                if not isinstance(title, str) or not title.strip():
+                    raise ValueError(
+                        f"SalesPdpVideos.{source}.title must be a non-empty string{id_suffix}. Received {_describe_value(title)}."
+                    )
+                if not isinstance(videos, list) or not videos:
+                    raise ValueError(
+                        f"SalesPdpVideos.{source}.videos must be a non-empty list{id_suffix}. Received {_describe_value(videos)}."
+                    )
+                for idx, video in enumerate(videos):
+                    if not isinstance(video, dict):
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.videos[{idx}] must be an object{id_suffix}. Received {_describe_value(video)}."
+                        )
+                    if not isinstance(video.get("id"), str) or not video.get("id").strip():
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.videos[{idx}].id must be a non-empty string{id_suffix}."
+                        )
+                    thumbnail = video.get("thumbnail")
+                    if (
+                        not isinstance(thumbnail, dict)
+                        or not isinstance(thumbnail.get("alt"), str)
+                        or not thumbnail.get("alt")
+                    ):
+                        raise ValueError(
+                            f"SalesPdpVideos.{source}.videos[{idx}].thumbnail must be an image object with string alt{id_suffix}. "
+                            f"Received {_describe_value(thumbnail)}."
+                        )
+
+        elif comp_type in {"SalesPdpStoryProblem", "SalesPdpStorySolution"}:
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"{comp_type}.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if schema_version == "import-v1" or isinstance(config.get("headline"), str):
+                headline = config.get("headline")
+                body = config.get("body")
+                if not isinstance(headline, str) or not headline.strip():
+                    raise ValueError(
+                        f"{comp_type}.{source}.headline must be a non-empty string{id_suffix}. Received {_describe_value(headline)}."
+                    )
+                if not (
+                    isinstance(body, str)
+                    and body.strip()
+                    or isinstance(body, list)
+                    and any(isinstance(item, str) and item.strip() for item in body)
+                ):
+                    raise ValueError(
+                        f"{comp_type}.{source}.body must be a non-empty string or string list{id_suffix}. "
+                        f"Received {_describe_value(body)}."
+                    )
+                image = config.get("image")
+                if image is not None and (
+                    not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt")
+                ):
+                    raise ValueError(
+                        f"{comp_type}.{source}.image must be an image object with string alt when provided{id_suffix}. "
+                        f"Received {_describe_value(image)}."
+                    )
+            else:
+                title = config.get("title")
+                paragraphs = config.get("paragraphs")
+                image = config.get("image")
+                if not isinstance(title, str) or not title.strip():
+                    raise ValueError(
+                        f"{comp_type}.{source}.title must be a non-empty string{id_suffix}. Received {_describe_value(title)}."
+                    )
+                if not isinstance(paragraphs, list) or not paragraphs:
+                    raise ValueError(
+                        f"{comp_type}.{source}.paragraphs must be a non-empty list{id_suffix}. Received {_describe_value(paragraphs)}."
+                    )
+                if not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt"):
+                    raise ValueError(
+                        f"{comp_type}.{source}.image must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(image)}."
+                    )
+
+        elif comp_type == "SalesPdpComparison":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpComparison.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            rows = config.get("rows")
+            if not isinstance(rows, list) or not rows:
+                raise ValueError(
+                    f"SalesPdpComparison.{source}.rows must be a non-empty list{id_suffix}. Received {_describe_value(rows)}."
+                )
+            if schema_version == "import-v1" or "emberColumn" in config:
+                headline = config.get("headline")
+                if not isinstance(headline, str) or not headline.strip():
+                    raise ValueError(
+                        f"SalesPdpComparison.{source}.headline must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(headline)}."
+                    )
+                for key in ("emberColumn", "competitorColumn"):
+                    value = config.get(key)
+                    if not (
+                        isinstance(value, str)
+                        and value.strip()
+                        or isinstance(value, dict)
+                        and isinstance(value.get("title"), str)
+                        and value.get("title").strip()
+                    ):
+                        raise ValueError(
+                            f"SalesPdpComparison.{source}.{key} must be a non-empty string or object with string title{id_suffix}. "
+                            f"Received {_describe_value(value)}."
+                        )
+                for idx, row in enumerate(rows):
+                    if not isinstance(row, dict):
+                        raise ValueError(
+                            f"SalesPdpComparison.{source}.rows[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(row)}."
+                        )
+                    if not isinstance(row.get("label"), str) or not row.get("label").strip():
+                        raise ValueError(
+                            f"SalesPdpComparison.{source}.rows[{idx}].label must be a non-empty string{id_suffix}."
+                        )
+                    left = row.get("ember") if "ember" in row else row.get("left")
+                    right = row.get("competitor") if "competitor" in row else row.get("right")
+                    if not isinstance(left, str) or not left.strip() or not isinstance(right, str) or not right.strip():
+                        raise ValueError(
+                            f"SalesPdpComparison.{source}.rows[{idx}] must include non-empty left/right comparison copy{id_suffix}."
+                        )
+            else:
+                badge = config.get("badge")
+                title = config.get("title")
+                swipe_hint = config.get("swipeHint")
+                columns = config.get("columns")
+                if not isinstance(badge, str) or not badge.strip():
+                    raise ValueError(
+                        f"SalesPdpComparison.{source}.badge must be a non-empty string{id_suffix}. Received {_describe_value(badge)}."
+                    )
+                if not isinstance(title, str) or not title.strip():
+                    raise ValueError(
+                        f"SalesPdpComparison.{source}.title must be a non-empty string{id_suffix}. Received {_describe_value(title)}."
+                    )
+                if not isinstance(swipe_hint, str):
+                    raise ValueError(
+                        f"SalesPdpComparison.{source}.swipeHint must be a string{id_suffix}. Received {_describe_value(swipe_hint)}."
+                    )
+                if not isinstance(columns, dict) or not isinstance(columns.get("pup"), str) or not isinstance(columns.get("disposable"), str):
+                    raise ValueError(
+                        f"SalesPdpComparison.{source}.columns must include string pup/disposable{id_suffix}. Received {_describe_value(columns)}."
+                    )
+                for idx, row in enumerate(rows):
+                    if not isinstance(row, dict):
+                        raise ValueError(
+                            f"SalesPdpComparison.{source}.rows[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(row)}."
+                        )
+                    for key in ("label", "pup", "disposable"):
+                        value = row.get(key)
+                        if not isinstance(value, str) or not value.strip():
+                            raise ValueError(
+                                f"SalesPdpComparison.{source}.rows[{idx}].{key} must be a non-empty string{id_suffix}."
+                            )
+
+        elif comp_type == "SalesPdpGuarantee":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpGuarantee.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if schema_version == "import-v1" or isinstance(config.get("headline"), str) and (
+                isinstance(config.get("stats"), list) or "iconAlt" in config or "iconAssetPublicId" in config
+            ):
+                headline = config.get("headline")
+                body = config.get("body")
+                if not isinstance(headline, str) or not headline.strip():
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.headline must be a non-empty string{id_suffix}. Received {_describe_value(headline)}."
+                    )
+                if not (
+                    isinstance(body, str)
+                    and body.strip()
+                    or isinstance(body, list)
+                    and any(isinstance(item, str) and item.strip() for item in body)
+                ):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.body must be a non-empty string or string list{id_suffix}. "
+                        f"Received {_describe_value(body)}."
+                    )
+                image = config.get("image")
+                if image is not None and (
+                    not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt")
+                ):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.image must be an image object with string alt when provided{id_suffix}. "
+                        f"Received {_describe_value(image)}."
+                    )
+                stats = config.get("stats")
+                if stats is not None:
+                    if not isinstance(stats, list) or not stats:
+                        raise ValueError(
+                            f"SalesPdpGuarantee.{source}.stats must be a non-empty list when provided{id_suffix}. "
+                            f"Received {_describe_value(stats)}."
+                        )
+                    for idx, stat in enumerate(stats):
+                        if not isinstance(stat, dict):
+                            raise ValueError(
+                                f"SalesPdpGuarantee.{source}.stats[{idx}] must be an object{id_suffix}. "
+                                f"Received {_describe_value(stat)}."
+                            )
+                        if not isinstance(stat.get("label"), str) or not stat.get("label").strip():
+                            raise ValueError(
+                                f"SalesPdpGuarantee.{source}.stats[{idx}].label must be a non-empty string{id_suffix}."
+                            )
+                        if not isinstance(stat.get("value"), str) or not stat.get("value").strip():
+                            raise ValueError(
+                                f"SalesPdpGuarantee.{source}.stats[{idx}].value must be a non-empty string{id_suffix}."
+                            )
+            else:
+                right = config.get("right")
+                paragraphs = config.get("paragraphs")
+                if not isinstance(config.get("badge"), str) or not isinstance(config.get("title"), str):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source} must include string badge/title{id_suffix}. Received {_describe_value(config)}."
+                    )
+                if not isinstance(paragraphs, list) or not paragraphs:
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.paragraphs must be a non-empty list{id_suffix}. Received {_describe_value(paragraphs)}."
+                    )
+                for key in ("whyTitle", "whyBody", "closingLine"):
+                    value = config.get(key)
+                    if not isinstance(value, str) or not value.strip():
+                        raise ValueError(
+                            f"SalesPdpGuarantee.{source}.{key} must be a non-empty string{id_suffix}. Received {_describe_value(value)}."
+                        )
+                if not isinstance(right, dict):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.right must be an object{id_suffix}. Received {_describe_value(right)}."
+                    )
+                image = right.get("image")
+                if not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt"):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.right.image must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(image)}."
+                    )
+                review_card = right.get("reviewCard")
+                comment_thread = right.get("commentThread")
+                if not isinstance(review_card, dict):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.right.reviewCard must be an object{id_suffix}. "
+                        f"Received {_describe_value(review_card)}."
+                    )
+                if not isinstance(comment_thread, dict) or not isinstance(comment_thread.get("label"), str):
+                    raise ValueError(
+                        f"SalesPdpGuarantee.{source}.right.commentThread must be an object with string label{id_suffix}. "
+                        f"Received {_describe_value(comment_thread)}."
+                    )
+
+        elif comp_type == "SalesPdpReviewWall":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpReviewWall.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if schema_version == "import-v1" or isinstance(config.get("reviews"), list):
+                headline = config.get("headline")
+                reviews = config.get("reviews")
+                if not isinstance(headline, str) or not headline.strip():
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.headline must be a non-empty string{id_suffix}. Received {_describe_value(headline)}."
+                    )
+                if not isinstance(reviews, list) or not reviews:
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.reviews must be a non-empty list{id_suffix}. Received {_describe_value(reviews)}."
+                    )
+                for idx, review in enumerate(reviews):
+                    if not isinstance(review, dict):
+                        raise ValueError(
+                            f"SalesPdpReviewWall.{source}.reviews[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(review)}."
+                        )
+                    if not isinstance(review.get("body"), str) or not review.get("body").strip():
+                        raise ValueError(
+                            f"SalesPdpReviewWall.{source}.reviews[{idx}].body must be a non-empty string{id_suffix}."
+                        )
+                    image = review.get("image")
+                    if image is not None and (
+                        not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt")
+                    ):
+                        raise ValueError(
+                            f"SalesPdpReviewWall.{source}.reviews[{idx}].image must be an image object with string alt when provided{id_suffix}. "
+                            f"Received {_describe_value(image)}."
+                        )
+            else:
+                badge = config.get("badge")
+                title = config.get("title")
+                rating_label = config.get("ratingLabel")
+                tiles = config.get("tiles")
+                show_more = config.get("showMoreLabel")
+                if not isinstance(badge, str) or not badge.strip():
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.badge must be a non-empty string{id_suffix}. Received {_describe_value(badge)}."
+                    )
+                if not isinstance(title, str) or not title.strip():
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.title must be a non-empty string{id_suffix}. Received {_describe_value(title)}."
+                    )
+                if not isinstance(rating_label, str):
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.ratingLabel must be a string{id_suffix}. Received {_describe_value(rating_label)}."
+                    )
+                if not isinstance(show_more, str):
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.showMoreLabel must be a string{id_suffix}. Received {_describe_value(show_more)}."
+                    )
+                if not isinstance(tiles, list) or not tiles:
+                    raise ValueError(
+                        f"SalesPdpReviewWall.{source}.tiles must be a non-empty list{id_suffix}. Received {_describe_value(tiles)}."
+                    )
+                for idx, tile in enumerate(tiles):
+                    if not isinstance(tile, dict):
+                        raise ValueError(
+                            f"SalesPdpReviewWall.{source}.tiles[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(tile)}."
+                        )
+                    image = tile.get("image")
+                    if not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt"):
+                        raise ValueError(
+                            f"SalesPdpReviewWall.{source}.tiles[{idx}].image must be an image object with string alt{id_suffix}. "
+                            f"Received {_describe_value(image)}."
+                        )
+
         elif comp_type == "SalesPdpFaq":
             if not isinstance(config, dict):
                 raise ValueError(
                     f"SalesPdpFaq.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
                 )
             faq_id = config.get("id")
+            anchor_id = config.get("anchorId")
             title = config.get("title")
             items = config.get("items")
-            if not isinstance(faq_id, str) or not faq_id:
+            if not (
+                isinstance(faq_id, str)
+                and faq_id
+                or isinstance(anchor_id, str)
+                and anchor_id
+            ):
                 raise ValueError(
-                    f"SalesPdpFaq.{source}.id must be a string{id_suffix}. Received {_describe_value(faq_id)}."
+                    f"SalesPdpFaq.{source}.id or anchorId must be a string{id_suffix}. "
+                    f"Received {_describe_value(faq_id)} / {_describe_value(anchor_id)}."
                 )
             if not isinstance(title, str) or not title.strip():
                 raise ValueError(
@@ -5265,20 +5688,35 @@ def generate_funnel_page_draft(
     if template_mode and template_kind == "sales-pdp":
         template_config_guidance = (
             "Sales PDP config requirements:\n"
-            "- SalesPdpReviews.config MUST include: id, data.\n"
-            "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
-            "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
-            "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
-            "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
-            "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
-            "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
-            "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
-            "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
-            "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
-            "Anchor id requirements:\n"
-            "- Do not change section ids or header nav href anchors.\n"
-            "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
-            "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
+            + (
+                "- SalesPdpPage.props.schemaVersion MUST be 'import-v1' when referenceHtmlMode='template'.\n"
+                if html_template_mode
+                else ""
+            )
+            + "- SalesPdpReviews.config MUST include: id, data.\n"
+            + "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+            + "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
+            + "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+            + "- SalesPdpFaq.config MUST include: id or anchorId, title, items[] (do not replace it with the primitive FAQ component).\n"
+            + "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
+            + "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
+            + "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
+            + "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
+            + "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n"
+            + (
+                "- In imported HTML template mode, SalesPdpVideos.config MUST be: { id?:string, badgeText?:string, sectionTitle:string, sectionSubtitle?:string, cards:[{ id?:string, eyebrow?:string, title:string, body?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], stats?:[{ label:string, value:string, detail?:string }], footnote?:string }\n"
+                "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST be: { id?:string, anchorId?:string, eyebrow?:string, headline:string, body:string|string[], image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, steps?:[{ label?:string, title:string, body?:string }], ingredients?:[{ label?:string, title:string, body?:string }], timeline?:[{ label?:string, title:string, body?:string }] }\n"
+                "- In imported HTML template mode, SalesPdpComparison.config MUST be: { id?:string, badgeText?:string, headline:string, subheadline?:string, emberColumn:string|{ title:string, subtitle?:string }, competitorColumn:string|{ title:string, subtitle?:string }, rows:[{ label:string, ember?:string, competitor?:string, left?:string, right?:string }] }\n"
+                "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
+                "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
+                "- In imported HTML template mode, do NOT force legacy Sales PDP keys like badge/title/videos, paragraphs, columns.pup/disposable, right.image/commentThread, or tiles into those import-native sections.\n\n"
+                if html_template_mode
+                else "\n"
+            )
+            + "Anchor id requirements:\n"
+            + "- Do not change section ids or header nav href anchors.\n"
+            + "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+            + "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
         )
     elif template_mode and template_component_kind == "pre-sales-listicle":
         template_config_guidance = (
@@ -5294,7 +5732,7 @@ def generate_funnel_page_draft(
         template_component = ""
     elif template_component_kind == "sales-pdp":
         template_component = (
-            "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
+            "11) SalesPdpPage: props { id, anchorId?, schemaVersion?, theme, themeJson?, content? }\n"
             "12) SalesPdpHeader: props { id, config, configJson? }\n"
             "13) SalesPdpHero: props { id, config, configJson?, modals?, modalsJson?, copy?, copyJson? }\n"
             "14) SalesPdpVideos: props { id, config, configJson? }\n"
@@ -6034,20 +6472,35 @@ def stream_funnel_page_draft(
         if template_mode and template_kind == "sales-pdp":
             template_config_guidance = (
                 "Sales PDP config requirements:\n"
-                "- SalesPdpReviews.config MUST include: id, data.\n"
-                "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
-                "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
-                "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
-                "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
-                "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
-                "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
-                "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
-                "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
-                "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
-                "Anchor id requirements:\n"
-                "- Do not change section ids or header nav href anchors.\n"
-                "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
-                "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
+            + (
+                "- SalesPdpPage.props.schemaVersion MUST be 'import-v1' when referenceHtmlMode='template'.\n"
+                if html_template_mode
+                else ""
+            )
+                + "- SalesPdpReviews.config MUST include: id, data.\n"
+                + "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+                + "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
+                + "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+                + "- SalesPdpFaq.config MUST include: id or anchorId, title, items[] (do not replace it with the primitive FAQ component).\n"
+                + "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
+                + "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
+                + "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
+                + "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
+                + "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n"
+                + (
+                    "- In imported HTML template mode, SalesPdpVideos.config MUST be: { id?:string, badgeText?:string, sectionTitle:string, sectionSubtitle?:string, cards:[{ id?:string, eyebrow?:string, title:string, body?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], stats?:[{ label:string, value:string, detail?:string }], footnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST be: { id?:string, anchorId?:string, eyebrow?:string, headline:string, body:string|string[], image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, steps?:[{ label?:string, title:string, body?:string }], ingredients?:[{ label?:string, title:string, body?:string }], timeline?:[{ label?:string, title:string, body?:string }] }\n"
+                    "- In imported HTML template mode, SalesPdpComparison.config MUST be: { id?:string, badgeText?:string, headline:string, subheadline?:string, emberColumn:string|{ title:string, subtitle?:string }, competitorColumn:string|{ title:string, subtitle?:string }, rows:[{ label:string, ember?:string, competitor?:string, left?:string, right?:string }] }\n"
+                    "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
+                    "- In imported HTML template mode, do NOT force legacy Sales PDP keys like badge/title/videos, paragraphs, columns.pup/disposable, right.image/commentThread, or tiles into those import-native sections.\n\n"
+                    if html_template_mode
+                    else "\n"
+                )
+                + "Anchor id requirements:\n"
+                + "- Do not change section ids or header nav href anchors.\n"
+                + "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+                + "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
             )
         elif template_mode and template_component_kind == "pre-sales-listicle":
             template_config_guidance = (
@@ -6063,7 +6516,7 @@ def stream_funnel_page_draft(
             template_component = ""
         elif template_component_kind == "sales-pdp":
             template_component = (
-                "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
+                "11) SalesPdpPage: props { id, anchorId?, schemaVersion?, theme, themeJson?, content? }\n"
                 "12) SalesPdpHeader: props { id, config, configJson? }\n"
                 "13) SalesPdpHero: props { id, config, configJson?, modals?, modalsJson?, copy?, copyJson? }\n"
                 "14) SalesPdpVideos: props { id, config, configJson? }\n"

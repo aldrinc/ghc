@@ -1215,6 +1215,120 @@
   margin: 0 0 22px;
 }
 
+.importSectionSubtitle {
+  max-width: 720px;
+  margin: 0 auto;
+  color: var(--color-muted);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  text-align: center;
+}
+
+.importSectionFootnote {
+  margin: 20px auto 0;
+  max-width: 720px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  text-align: center;
+}
+
+.importCardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.importCard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  border: 1px solid var(--pdp-brand-12);
+  border-radius: var(--pdp-radius-12);
+  background: var(--color-bg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.importCardImageWrap {
+  aspect-ratio: 4 / 3;
+  background: var(--pdp-surface-soft);
+}
+
+.importCardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.importCardBody {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.importCardEyebrow {
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+}
+
+.importCardTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(20px, 1.8vw, 28px);
+  line-height: 1.15;
+  color: var(--heading-color, var(--pdp-brand-strong));
+}
+
+.importCardText {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.importMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.importMetricCard {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: var(--pdp-radius-12);
+  background: var(--color-bg);
+  border: 1px solid var(--pdp-brand-12);
+}
+
+.importMetricValue {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 2.6vw, 42px);
+  line-height: 1;
+  color: var(--heading-color, var(--pdp-brand-strong));
+}
+
+.importMetricLabel {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+}
+
+.importMetricDetail {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
 /* Videos */
 
 .videoGrid {
@@ -1346,6 +1460,10 @@
   padding: var(--story-media-frame-padding);
 }
 
+.importStorySection .storyGrid {
+  align-items: start;
+}
+
 .storyImage {
   width: 100%;
   height: 100%;
@@ -1386,6 +1504,41 @@
   max-width: 30ch;
 }
 
+.importStoryRowList {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.importStoryRow {
+  padding: 16px 18px;
+  border-radius: var(--pdp-radius-12);
+  background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  border: 1px solid var(--pdp-brand-12);
+}
+
+.importStoryRowLabel {
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+}
+
+.importStoryRowTitle {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--heading-color, var(--pdp-brand-strong));
+  font-size: var(--text-base);
+}
+
+.importStoryRowBody {
+  margin-top: 6px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
 /* Comparison */
 
 .comparisonSection .sectionHeading {
@@ -1404,6 +1557,13 @@
   color: var(--comparison-hint-color);
   font-weight: 600;
   margin: 10px 0 28px;
+}
+
+.importColumnSubtitle {
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 500;
 }
 
 .tableWrap {
@@ -1828,6 +1988,29 @@
   overflow: hidden;
 }
 
+.importGuaranteePanel {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.importGuaranteeIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 18px;
+  border-radius: var(--pdp-radius-12);
+  background: var(--color-bg);
+  border: 1px solid var(--pdp-brand-12);
+}
+
+.importGuaranteeIcon {
+  width: min(220px, 100%);
+  height: auto;
+  display: block;
+}
+
 .panelImg {
   width: 100%;
   height: auto;
@@ -1942,6 +2125,68 @@
 .reviewWallHeader {
   text-align: center;
   margin-bottom: 24px;
+}
+
+.importReviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.importReviewCard {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 100%;
+  padding: 22px;
+  border-radius: var(--pdp-radius-12);
+  background: var(--color-bg);
+  border: 1px solid var(--pdp-brand-12);
+}
+
+.importReviewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.importReviewTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.2;
+  color: var(--heading-color, var(--pdp-brand-strong));
+}
+
+.importReviewBody {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-base);
+  line-height: 1.65;
+}
+
+.importReviewImageWrap {
+  border-radius: var(--pdp-radius-12);
+  overflow: hidden;
+  background: var(--pdp-surface-soft);
+}
+
+.importReviewImage {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.importReviewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--color-brand);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .ratingRow {
@@ -2067,6 +2312,12 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .importCardGrid,
+  .importMetricGrid,
+  .importReviewGrid {
+    grid-template-columns: 1fr;
+  }
+
   .storyGrid {
     grid-template-columns: 1fr;
     gap: 34px;
@@ -2128,11 +2379,26 @@
   .offerGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .importCardGrid,
+  .importReviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .importMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
   .heroSection {
     padding: 22px 0 34px;
+  }
+
+  .importCardGrid,
+  .importMetricGrid,
+  .importReviewGrid {
+    grid-template-columns: 1fr;
   }
 
   .sectionTitleRow {

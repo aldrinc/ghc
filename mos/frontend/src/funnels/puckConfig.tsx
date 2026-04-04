@@ -758,11 +758,19 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
       SalesPdpPage: {
         fields: {
           anchorId: { type: "text" },
+          schemaVersion: {
+            type: "select",
+            options: [
+              { label: "Legacy", value: "legacy" },
+              { label: "Import v1", value: "import-v1" },
+            ],
+          },
           themeJson: { type: "textarea" },
           content: { type: "slot" },
         },
         defaultProps: {
           anchorId: "top",
+          schemaVersion: "legacy",
           theme: salesPdpDefaults.theme,
         },
         render: (props: Record<string, unknown>) => <SalesPdpPage {...props} />,

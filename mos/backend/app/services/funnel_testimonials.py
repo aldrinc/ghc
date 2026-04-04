@@ -34,6 +34,7 @@ from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.models import Asset, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.llm.client import LLMClient, LLMGenerationParams
+from app.services import funnel_ai
 from app.services.funnels import (
     create_funnel_image_asset,
     create_funnel_upload_asset,
@@ -4756,6 +4757,11 @@ def generate_funnel_page_testimonials(
         template_kind = "pre-sales-listicle"
     else:
         raise TestimonialGenerationError(f"Template {resolved_template_id} is not supported for testimonials.")
+
+    if template_kind == "sales-pdp" and funnel_ai.uses_sales_pdp_import_schema(base_puck):
+        raise TestimonialGenerationError(
+            "Sales PDP import-v1 pages are not supported by testimonials.generate_and_apply."
+        )
 
     _prepare_testimonial_slot_templates(base_puck, template_kind)
 
