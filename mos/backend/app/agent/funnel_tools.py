@@ -58,6 +58,14 @@ def _resolve_reference_html_mode(reference_html_mode: str | None) -> _ReferenceH
     return "guide"
 
 
+def _build_html_template_seed_puck_data() -> dict[str, Any]:
+    return {
+        "root": {"props": {}},
+        "content": [],
+        "zones": {},
+    }
+
+
 def _resolve_base_puck_data(
     *,
     current_puck_data: dict[str, Any] | None,
@@ -67,9 +75,7 @@ def _resolve_base_puck_data(
 ) -> tuple[dict[str, Any] | None, str]:
     normalized_mode = _resolve_reference_html_mode(reference_html_mode)
     if normalized_mode == "template":
-        if isinstance(template_puck_data, dict):
-            return template_puck_data, "template"
-        return None, "none"
+        return _build_html_template_seed_puck_data(), "htmlTemplateSeed"
     if isinstance(current_puck_data, dict):
         return current_puck_data, "currentPuckData"
     if isinstance(latest_draft_puck_data, dict):
@@ -1281,7 +1287,8 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         template = get_funnel_template(resolved_template_id) if resolved_template_id else None
         if resolved_template_id and not template:
             raise ValueError("Template not found")
-        if _resolve_reference_html_mode(args.referenceHtmlMode) == "template" and template is None:
+        html_template_mode = _resolve_reference_html_mode(args.referenceHtmlMode) == "template"
+        if html_template_mode and template is None:
             raise ValueError("referenceHtmlMode='template' requires a supported page template.")
 
         template_kind = None
@@ -1320,7 +1327,7 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         )
 
         required_types: list[str] = []
-        if template is not None:
+        if template is not None and not html_template_mode:
             # Required components should track the active template definition, not the stored page puckData.
             # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
             # upgrades/merges them with the latest template before validation.
@@ -1331,12 +1338,15 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
                 )
 
         allowed_types = sorted(
-            _allowed_component_types(template_kind, template_mode=template is not None)
+            _allowed_component_types(
+                None if html_template_mode else template_kind,
+                template_mode=template is not None and not html_template_mode,
+            )
         )
 
         template_ctx = _TemplateContext(
             template_id=resolved_template_id,
-            template_mode=template is not None,
+            template_mode=template is not None and not html_template_mode,
             template_kind=template_kind,
         )
 
@@ -1698,8 +1708,6 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         template_component_kind: str | None = None
         if template_mode and isinstance(args.basePuckData, dict):
             template_component_kind = funnel_ai._infer_template_component_kind(template_kind, args.basePuckData)
-        if html_template_mode and not template_mode:
-            raise ValueError("referenceHtmlMode='template' requires template mode.")
         if html_template_mode and not (
             isinstance(args.htmlReferencePromptContext, dict) and args.htmlReferencePromptContext
         ):
@@ -1725,6 +1733,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
                 "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
             )
+            if html_template_mode:
+                structure_guidance += (
+                    "- Use ONLY primitive components in imported HTML template mode; do NOT use SalesPdp* or PreSales* components.\n"
+                    "- Recreate the uploaded HTML section order, hierarchy, CTA placement, proof blocks, and FAQ rhythm as closely as possible with Section/Columns/Heading/Text/Image/Button/FeatureGrid/Testimonials/FAQ.\n"
+                    "- If the HTML shows repeated cards, proof tiles, or comparison rows, compose them with primitives instead of falling back to legacy template scaffolds.\n\n"
+                )
         elif template_component_kind == "sales-pdp":
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
@@ -1815,8 +1829,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "HTML reference guidance:\n"
                 + (
                     "- Treat the structured HTML reference below as the PRIMARY structural and persuasive blueprint for this generation.\n"
-                    "- Match its information hierarchy, CTA cadence, proof sequencing, FAQ flow, and section emphasis as closely as the supported template components allow.\n"
-                    "- Use the active Puck template as the rendering scaffold, not as the content source.\n"
+                    "- Recreate its information hierarchy, CTA cadence, proof sequencing, FAQ flow, and section emphasis as closely as the allowed Puck components allow.\n"
+                    "- The uploaded HTML is the layout/content source for imported-template mode. Do not preserve legacy funnel template copy or section scaffolds.\n"
                     if html_template_mode
                     else "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
                 )
@@ -1825,8 +1839,16 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     if html_template_mode
                     else "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
                 )
-                + "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
-                + "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                + (
+                    "- Do NOT paste raw DOM/CSS or unsupported props into puckData. Translate the HTML into supported Puck components while staying visually and structurally close to the uploaded page.\n"
+                    if html_template_mode
+                    else "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
+                )
+                + (
+                    "- If the HTML reference conflicts with product context, brand docs, required strategy copy, or copy pack, preserve the HTML structure and adjust the copy just enough to stay accurate and compliant.\n"
+                    if html_template_mode
+                    else "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                )
                 + f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
             )
 
@@ -2006,6 +2028,11 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             )
+            if html_template_mode:
+                layout_guidance += (
+                    "- Match the uploaded HTML's section pacing and visual rhythm as closely as possible.\n"
+                    "- Keep the page composition grounded in the imported HTML instead of the legacy sales-page scaffold.\n\n"
+                )
         else:
             if html_template_mode:
                 layout_guidance = (
@@ -2109,9 +2136,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "Internal funnel pages you can link to (targetPageId should be one of these ids):\n"
             f"{json.dumps(args.pageContext, ensure_ascii=False)}\n\n"
             + (
-                "Template component structure seed (schema only; not content):\n"
-                if html_template_mode
-                else "Current page puckData (may be null):\n"
+                "Imported HTML freeform seed (schema only; not content):\n"
+                if html_template_mode and not template_mode
+                else (
+                    "Template component structure seed (schema only; not content):\n"
+                    if html_template_mode
+                    else "Current page puckData (may be null):\n"
+                )
             )
             + f"{json.dumps(prompt_puck_data, ensure_ascii=False)}"
         )
@@ -2131,7 +2162,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
 
         allowed_types = _allowed_component_types(
-            template_component_kind if template_mode else template_kind,
+            None
+            if html_template_mode and not template_mode
+            else (template_component_kind if template_mode else template_kind),
             template_mode=template_mode,
         )
 
@@ -2443,6 +2476,7 @@ class DraftApplyOverridesArgs(BaseModel):
     puckData: dict[str, Any]
     basePuckData: Optional[dict[str, Any]] = None
     templateKind: Optional[str] = None
+    referenceHtmlMode: _ReferenceHtmlMode = "guide"
     designSystemTokens: Optional[dict[str, Any]] = None
     brandLogoAssetPublicId: Optional[str] = None
     productId: str
@@ -2467,6 +2501,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         ).first()
         if not product:
             raise ValueError("Product not found")
+        html_template_mode = _resolve_reference_html_mode(args.referenceHtmlMode) == "template"
 
         base_puck_for_restore: dict[str, Any] | None = (
             args.basePuckData if isinstance(args.basePuckData, dict) else None
@@ -2486,16 +2521,16 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         restored_testimonial_image_slots = 0
         checkout_purchase_ids_aligned = 0
         dropped_extra_section_summaries: list[dict[str, str]] = []
-        if args.templateKind and base_puck_for_restore is not None:
+        sales_pdp_import_template_mode = (
+            args.templateKind == "sales-pdp"
+            and funnel_ai.uses_sales_pdp_import_schema(args.puckData)
+        )
+        if args.templateKind and base_puck_for_restore is not None and not html_template_mode:
             page_type: str | None = None
             if args.templateKind == "sales-pdp":
                 page_type = "SalesPdpPage"
             elif args.templateKind == "pre-sales-listicle":
                 page_type = "PreSalesPage"
-            sales_pdp_import_template_mode = (
-                args.templateKind == "sales-pdp"
-                and funnel_ai.uses_sales_pdp_import_schema(args.puckData)
-            )
 
             def _restore_pre_sales_review_image_slots(
                 current_component: dict[str, Any], base_component: dict[str, Any]
@@ -3085,7 +3120,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
 
             restored = restore_missing_src(args.puckData, base_puck_for_restore)
 
-        if args.templateKind == "sales-pdp":
+        if args.templateKind == "sales-pdp" and not html_template_mode:
             funnel = ctx.session.scalars(
                 select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
             ).first()
@@ -3268,7 +3303,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                 product_title=product.title,
             )
 
-        if args.templateKind == "pre-sales-listicle":
+        if args.templateKind == "pre-sales-listicle" and not html_template_mode:
             funnel_ai._enforce_pre_sales_floating_cta_config(
                 puck_data=args.puckData,
                 reference_puck_data=(

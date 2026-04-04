@@ -1,8 +1,17 @@
 import json
 
+import pytest
+
 from app.agent.funnel_tools import (
+    ContextLoadFunnelArgs,
+    ContextLoadFunnelTool,
+    DraftApplyOverridesArgs,
+    DraftApplyOverridesTool,
+    DraftGeneratePageArgs,
+    DraftGeneratePageTool,
     DraftPersistVersionArgs,
     DraftPersistVersionTool,
+    _build_html_template_seed_puck_data,
     _build_puck_prompt_seed,
     _coerce_sales_pdp_import_comparison_config,
     _coerce_sales_pdp_import_guarantee_config,
@@ -19,7 +28,7 @@ from app.agent.funnel_tools import (
 )
 from app.agent.types import ToolContext
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionStatusEnum
-from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion
+from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.services.funnel_templates import get_funnel_template
 from tests.conftest import TEST_ORG_ID
 
@@ -121,8 +130,259 @@ def test_resolve_base_puck_data_prefers_template_for_html_template_mode():
         reference_html_mode="template",
     )
 
-    assert source == "template"
-    assert base_puck == template.puck_data
+    assert source == "htmlTemplateSeed"
+    assert base_puck == _build_html_template_seed_puck_data()
+
+
+@pytest.mark.parametrize("template_id", ["sales-pdp", "pre-sales-listicle"])
+def test_context_load_funnel_uses_freeform_primitives_for_imported_html(db_session, template_id: str):
+    client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(org_id=TEST_ORG_ID, client_id=client.id, title="Ember")
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    funnel = Funnel(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        name="HTML Import Funnel",
+        route_slug="html-import-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Landing",
+        slug="landing",
+        template_id="sales-pdp",
+    )
+    db_session.add(page)
+    db_session.commit()
+    db_session.refresh(page)
+
+    tool = ContextLoadFunnelTool()
+    ctx = ToolContext(
+        session=db_session,
+        org_id=str(TEST_ORG_ID),
+        user_id="test-user",
+        run_id="test-run",
+        tool_call_id="tool-call-1",
+    )
+    result = tool.run(
+        ctx=ctx,
+        args=ContextLoadFunnelArgs(
+            orgId=str(TEST_ORG_ID),
+            funnelId=str(funnel.id),
+            pageId=str(page.id),
+            templateId=template_id,
+            referenceHtmlMode="template",
+        ),
+    )
+
+    assert result.ui_details["templateMode"] is False
+    assert result.ui_details["templateKind"] == template_id
+    assert result.ui_details["basePuckSource"] == "htmlTemplateSeed"
+    assert "Section" in result.ui_details["allowedTypes"]
+    assert "Image" in result.ui_details["allowedTypes"]
+    assert "SalesPdpPage" not in result.ui_details["allowedTypes"]
+    assert "PreSalesPage" not in result.ui_details["allowedTypes"]
+    assert result.ui_details["requiredTypes"] == []
+
+
+def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_session, monkeypatch):
+    captured: dict[str, str] = {}
+
+    class _FakeLLM:
+        def __init__(self) -> None:
+            self.default_model = "gpt-test"
+
+        @staticmethod
+        def _response(prompt_text: str) -> str:
+            captured["prompt"] = prompt_text
+            return json.dumps(
+                {
+                    "assistantMessage": "Ember page preview.",
+                    "puckData": json.dumps(
+                        {
+                            "root": {"props": {}},
+                            "content": [
+                                {
+                                    "type": "Section",
+                                    "props": {
+                                        "id": "hero",
+                                        "content": [
+                                            {
+                                                "type": "Heading",
+                                                "props": {
+                                                    "id": "hero-title",
+                                                    "text": "Sharp mornings start here",
+                                                    "level": 1,
+                                                },
+                                            }
+                                        ],
+                                    },
+                                }
+                            ],
+                            "zones": {},
+                        }
+                    ),
+                }
+            )
+
+        def generate_text(self, prompt_text: str, params=None) -> str:
+            return self._response(prompt_text)
+
+        def stream_text(self, prompt_text: str, params=None):
+            yield self._response(prompt_text)
+
+    monkeypatch.setattr("app.agent.funnel_tools.LLMClient", _FakeLLM)
+    monkeypatch.setattr("app.agent.funnel_tools._persist_agent_artifact", lambda **kwargs: None)
+
+    tool = DraftGeneratePageTool()
+    ctx = ToolContext(
+        session=db_session,
+        org_id=str(TEST_ORG_ID),
+        user_id="test-user",
+        run_id="test-run",
+        tool_call_id="tool-call-1",
+    )
+    gen = tool.run_stream(
+        ctx=ctx,
+        args=DraftGeneratePageArgs(
+            orgId=str(TEST_ORG_ID),
+            funnelId="funnel-id",
+            pageId="page-id",
+            pageName="Landing",
+            prompt="Generate the page from the uploaded HTML.",
+            messages=[],
+            model="gpt-test",
+            templateId="sales-pdp",
+            templateKind="sales-pdp",
+            templateMode=False,
+            pageContext=[],
+            basePuckData=_build_html_template_seed_puck_data(),
+            productContext="Product context",
+            brandDocuments=[],
+            attachmentSummaries=[],
+            referenceHtmlMode="template",
+            htmlReferencePromptContext={
+                "sectionOrder": ["Hero", "Proof", "FAQ"],
+                "ctaTexts": ["Buy now"],
+                "htmlPreview": "<section><h1>Hero</h1><p>Proof</p></section>",
+            },
+        ),
+    )
+    while True:
+        try:
+            next(gen)
+        except StopIteration as stop:
+            result = stop.value
+            break
+
+    assert result.ui_details["puckData"]["content"][0]["type"] == "Section"
+    assert "Use ONLY primitive components in imported HTML template mode" in captured["prompt"]
+    assert "Available primitives (component types) and their props" in captured["prompt"]
+    assert "Available template components" not in captured["prompt"]
+    assert "Use SalesPdpPage as the ONLY top-level block" not in captured["prompt"]
+
+
+def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_session, monkeypatch):
+    client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(org_id=TEST_ORG_ID, client_id=client.id, title="Ember")
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    funnel = Funnel(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        name="HTML Import Funnel",
+        route_slug="html-import-overrides",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Landing",
+        slug="landing",
+        template_id="sales-pdp",
+    )
+    db_session.add(page)
+    db_session.commit()
+    db_session.refresh(page)
+
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._apply_brand_logo_overrides_for_ai", lambda **kwargs: None)
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._apply_product_image_overrides_for_ai", lambda **kwargs: None)
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._sync_sales_pdp_header_cta_labels", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.agent.funnel_tools.funnel_ai._enforce_sales_pdp_guarantee_testimonial_only_images",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._ensure_flat_vector_icon_prompts", lambda **kwargs: None)
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._sync_config_json_contexts", lambda *args, **kwargs: None)
+    monkeypatch.setattr("app.agent.funnel_tools.funnel_ai._enforce_sales_pdp_urgency_month_rows", lambda **kwargs: None)
+
+    tool = DraftApplyOverridesTool()
+    ctx = ToolContext(
+        session=db_session,
+        org_id=str(TEST_ORG_ID),
+        user_id="test-user",
+        run_id="test-run",
+        tool_call_id="tool-call-1",
+    )
+    result = tool.run(
+        ctx=ctx,
+        args=DraftApplyOverridesArgs(
+            orgId=str(TEST_ORG_ID),
+            clientId=str(client.id),
+            funnelId=str(funnel.id),
+            pageId=str(page.id),
+            puckData={
+                "root": {"props": {}},
+                "content": [
+                    {
+                        "type": "Section",
+                        "props": {
+                            "id": "hero",
+                            "content": [
+                                {
+                                    "type": "Heading",
+                                    "props": {
+                                        "id": "hero-title",
+                                        "text": "Imported Hero",
+                                        "level": 1,
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+            basePuckData=_build_html_template_seed_puck_data(),
+            templateKind="sales-pdp",
+            referenceHtmlMode="template",
+            productId=str(product.id),
+        ),
+    )
+
+    assert result.ui_details["droppedExtraSectionCount"] == 0
+    assert result.ui_details["restoredSectionCount"] == 0
+    assert result.ui_details["puckData"]["content"][0]["type"] == "Section"
 
 
 def test_build_puck_prompt_seed_omits_template_copy_content():
