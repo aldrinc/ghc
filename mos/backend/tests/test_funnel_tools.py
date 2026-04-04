@@ -4,6 +4,8 @@ from app.agent.funnel_tools import (
     DraftPersistVersionArgs,
     DraftPersistVersionTool,
     _build_puck_prompt_seed,
+    _coerce_sales_pdp_import_videos_config,
+    _ensure_sales_pdp_free_gifts_icon_prompt,
     _resolve_base_puck_data,
 )
 from app.agent.types import ToolContext
@@ -124,3 +126,71 @@ def test_build_puck_prompt_seed_omits_template_copy_content():
     serialized_seed = json.dumps(prompt_seed, ensure_ascii=False).lower()
     assert "salespdppage" in serialized_seed
     assert "puppypad" not in serialized_seed
+
+
+def test_coerce_sales_pdp_import_videos_config_converts_legacy_shape():
+    config = {
+        "badge": "Watch the shift",
+        "title": "How EMBER feels in real life",
+        "videos": [
+            {
+                "id": "story-1",
+                "thumbnail": {
+                    "alt": "Morning energy story",
+                    "src": "/assets/ph-3x4.svg",
+                },
+            },
+            {
+                "id": "story-2",
+                "thumbnail": {
+                    "alt": "Sharper focus story",
+                    "assetPublicId": "asset-video-2",
+                },
+            },
+        ],
+    }
+
+    changed = _coerce_sales_pdp_import_videos_config(config)
+
+    assert changed is True
+    assert config["badgeText"] == "Watch the shift"
+    assert config["sectionTitle"] == "How EMBER feels in real life"
+    assert "badge" not in config
+    assert "title" not in config
+    assert "videos" not in config
+    assert config["cards"] == [
+        {
+            "id": "story-1",
+            "title": "Morning energy story",
+        },
+        {
+            "id": "story-2",
+            "title": "Sharper focus story",
+            "image": {
+                "alt": "Sharper focus story",
+                "assetPublicId": "asset-video-2",
+            },
+        },
+    ]
+
+
+def test_ensure_sales_pdp_free_gifts_icon_prompt_fills_placeholder_slot():
+    gallery = {
+        "freeGifts": {
+            "title": "Bonus protocol guide",
+            "icon": {
+                "alt": "Bonus guide icon",
+                "src": "/assets/ph-square.svg",
+            },
+        }
+    }
+
+    changed = _ensure_sales_pdp_free_gifts_icon_prompt(
+        gallery=gallery,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed is True
+    icon = gallery["freeGifts"]["icon"]
+    assert "Bonus guide icon" in icon["prompt"]
+    assert icon["aspectRatio"] == "1:1"

@@ -86,6 +86,109 @@ def _is_component_slot(value: Any) -> bool:
     )
 
 
+def _coerce_sales_pdp_import_videos_config(config: dict[str, Any]) -> bool:
+    changed = False
+
+    badge = config.get("badge")
+    if (not isinstance(config.get("badgeText"), str) or not str(config.get("badgeText") or "").strip()) and isinstance(
+        badge, str
+    ) and badge.strip():
+        config["badgeText"] = badge.strip()
+        changed = True
+
+    legacy_title = config.get("title")
+    if (
+        not isinstance(config.get("sectionTitle"), str)
+        or not str(config.get("sectionTitle") or "").strip()
+    ) and isinstance(legacy_title, str) and legacy_title.strip():
+        config["sectionTitle"] = legacy_title.strip()
+        changed = True
+
+    if not isinstance(config.get("cards"), list):
+        cards: list[dict[str, Any]] = []
+        for index, video in enumerate(config.get("videos") or []):
+            if not isinstance(video, dict):
+                continue
+            thumbnail = video.get("thumbnail")
+            title = f"Protocol story {index + 1}"
+            image: dict[str, Any] | None = None
+            if isinstance(thumbnail, dict):
+                alt = thumbnail.get("alt")
+                if isinstance(alt, str) and alt.strip():
+                    title = alt.strip()
+                asset_public_id = thumbnail.get("assetPublicId")
+                reference_asset_public_id = thumbnail.get("referenceAssetPublicId")
+                raw_src = thumbnail.get("src")
+                src = raw_src.strip() if isinstance(raw_src, str) else ""
+                has_real_src = bool(src) and not funnel_ai._is_placeholder_src(src)
+                if (
+                    isinstance(asset_public_id, str)
+                    and asset_public_id.strip()
+                    or isinstance(reference_asset_public_id, str)
+                    and reference_asset_public_id.strip()
+                    or has_real_src
+                ):
+                    image = {"alt": title}
+                    if has_real_src:
+                        image["src"] = src
+                    if isinstance(asset_public_id, str) and asset_public_id.strip():
+                        image["assetPublicId"] = asset_public_id.strip()
+                    if isinstance(reference_asset_public_id, str) and reference_asset_public_id.strip():
+                        image["referenceAssetPublicId"] = reference_asset_public_id.strip()
+
+            card: dict[str, Any] = {"title": title}
+            video_id = video.get("id")
+            if isinstance(video_id, str) and video_id.strip():
+                card["id"] = video_id.strip()
+            if image:
+                card["image"] = image
+            cards.append(card)
+
+        config["cards"] = cards
+        changed = True
+
+    for legacy_key in ("badge", "title", "videos"):
+        if legacy_key in config:
+            config.pop(legacy_key, None)
+            changed = True
+
+    return changed
+
+
+def _ensure_sales_pdp_free_gifts_icon_prompt(*, gallery: dict[str, Any], product_title: str) -> bool:
+    free_gifts = gallery.get("freeGifts")
+    if not isinstance(free_gifts, dict):
+        return False
+    icon = free_gifts.get("icon")
+    if not isinstance(icon, dict):
+        return False
+    asset_public_id = icon.get("assetPublicId")
+    if isinstance(asset_public_id, str) and asset_public_id.strip():
+        return False
+    prompt = icon.get("prompt")
+    if isinstance(prompt, str) and prompt.strip():
+        return False
+    raw_src = icon.get("src")
+    src = raw_src.strip() if isinstance(raw_src, str) else ""
+    if src and not funnel_ai._is_placeholder_src(src):
+        return False
+
+    subject = (
+        icon.get("alt")
+        or free_gifts.get("title")
+        or f"{product_title.strip() or 'Product'} bonus guide icon"
+    )
+    if not isinstance(subject, str) or not subject.strip():
+        return False
+
+    icon["prompt"] = (
+        f"Minimal flat vector ecommerce bonus icon representing {subject.strip()}. "
+        "Clean wellness style, simple shapes, warm neutral palette, transparent background, no text."
+    )
+    icon["aspectRatio"] = "1:1"
+    return True
+
+
 def _summarize_component_for_prompt(component: dict[str, Any]) -> dict[str, Any]:
     summary: dict[str, Any] = {"type": str(component.get("type") or "")}
     props = component.get("props")
@@ -1237,10 +1340,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 + "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
                 + (
                     "- In imported HTML template mode, SalesPdpVideos.config MUST be: { id?:string, badgeText?:string, sectionTitle:string, sectionSubtitle?:string, cards:[{ id?:string, eyebrow?:string, title:string, body?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], stats?:[{ label:string, value:string, detail?:string }], footnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpVideos.config MUST NOT use legacy keys badge/title/videos. If a card has no real image asset or generated prompt yet, omit image instead of leaving placeholder thumbnail slots.\n"
                     "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST be: { id?:string, anchorId?:string, eyebrow?:string, headline:string, body:string|string[], image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, steps?:[{ label?:string, title:string, body?:string }], ingredients?:[{ label?:string, title:string, body?:string }], timeline?:[{ label?:string, title:string, body?:string }] }\n"
                     "- In imported HTML template mode, SalesPdpComparison.config MUST be: { id?:string, badgeText?:string, headline:string, subheadline?:string, emberColumn:string|{ title:string, subtitle?:string }, competitorColumn:string|{ title:string, subtitle?:string }, rows:[{ label:string, ember?:string, competitor?:string, left?:string, right?:string }] }\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
                     "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
+                    "- In imported HTML template mode, SalesPdpHero.config.gallery.freeGifts.icon MUST include assetPublicId or prompt. Never leave placeholder src values like /assets/ph-square.svg without a prompt.\n"
                     "- In imported HTML template mode, do NOT force legacy Sales PDP keys like badge/title/videos, paragraphs, columns.pup/disposable, right.image/commentThread, or tiles into those import-native sections.\n\n"
                     if html_template_mode
                     else "- Do NOT use legacy keys like headline/subheadline/trustBadges/ctaLabel/ctaLinkType/reviews inside SalesPdp* configs.\n\n"
@@ -1789,6 +1894,10 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                 page_type = "SalesPdpPage"
             elif args.templateKind == "pre-sales-listicle":
                 page_type = "PreSalesPage"
+            sales_pdp_import_template_mode = (
+                args.templateKind == "sales-pdp"
+                and funnel_ai.uses_sales_pdp_import_schema(args.puckData)
+            )
 
             def _restore_pre_sales_review_image_slots(
                 current_component: dict[str, Any], base_component: dict[str, Any]
@@ -1995,6 +2104,54 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         value=cur_modals,
                     )
 
+            def _normalize_sales_pdp_import_template_fields(candidate: dict[str, Any]) -> None:
+                if not sales_pdp_import_template_mode:
+                    return
+                cprops = candidate.get("props")
+                if not isinstance(cprops, dict):
+                    return
+
+                if candidate.get("type") == "SalesPdpVideos":
+                    cur_cfg, cur_source = _load_object_prop(
+                        cprops,
+                        object_key="config",
+                        json_key="configJson",
+                        label="SalesPdpVideos",
+                    )
+                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_videos_config(cur_cfg):
+                        _persist_object_prop(
+                            cprops,
+                            source=cur_source,
+                            object_key="config",
+                            json_key="configJson",
+                            value=cur_cfg,
+                        )
+                    return
+
+                if candidate.get("type") == "SalesPdpHero":
+                    cur_cfg, cur_source = _load_object_prop(
+                        cprops,
+                        object_key="config",
+                        json_key="configJson",
+                        label="SalesPdpHero",
+                    )
+                    if not isinstance(cur_cfg, dict):
+                        return
+                    gallery = cur_cfg.get("gallery")
+                    if not isinstance(gallery, dict):
+                        return
+                    if _ensure_sales_pdp_free_gifts_icon_prompt(
+                        gallery=gallery,
+                        product_title=getattr(product, "title", "") or "",
+                    ):
+                        _persist_object_prop(
+                            cprops,
+                            source=cur_source,
+                            object_key="config",
+                            json_key="configJson",
+                            value=cur_cfg,
+                        )
+
             def _coerce_pre_sales_hero_badges_to_list(component: dict[str, Any]) -> int:
                 """
                 The frontend expects PreSalesHero.config.badges to be an array.
@@ -2104,6 +2261,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                                     used_ids.add(cid)
 
                                 _restore_sales_pdp_required_fields(candidate, tmpl_child)
+                                _normalize_sales_pdp_import_template_fields(candidate)
                                 _coerce_pre_sales_hero_badges_to_list(candidate)
 
                                 if args.templateKind == "pre-sales-listicle":
@@ -2192,6 +2350,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                                 used_ids.add(cid)
 
                             _restore_sales_pdp_required_fields(candidate, base_child)
+                            _normalize_sales_pdp_import_template_fields(candidate)
                             _coerce_pre_sales_hero_badges_to_list(candidate)
 
                             if args.templateKind == "pre-sales-listicle":
