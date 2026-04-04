@@ -372,6 +372,64 @@ def _coerce_sales_pdp_import_review_wall_config(config: dict[str, Any]) -> bool:
     return changed
 
 
+def _ensure_sales_pdp_import_review_wall_image_prompts(*, config: dict[str, Any], product_title: str) -> bool:
+    reviews = config.get("reviews")
+    if not isinstance(reviews, list):
+        return False
+
+    changed = False
+    for index, review in enumerate(reviews):
+        if not isinstance(review, dict):
+            continue
+        image = review.get("image")
+        if not isinstance(image, dict):
+            continue
+        asset_public_id = image.get("assetPublicId")
+        if isinstance(asset_public_id, str) and asset_public_id.strip():
+            continue
+        reference_asset_public_id = image.get("referenceAssetPublicId")
+        if isinstance(reference_asset_public_id, str) and reference_asset_public_id.strip():
+            continue
+        prompt = image.get("prompt")
+        if isinstance(prompt, str) and prompt.strip():
+            continue
+        raw_src = image.get("src")
+        src = raw_src.strip() if isinstance(raw_src, str) else ""
+        if src and not funnel_ai._is_placeholder_src(src):
+            continue
+
+        alt = image.get("alt")
+        if not isinstance(alt, str) or not alt.strip():
+            fallback_alt = (
+                review.get("name")
+                or review.get("author")
+                or review.get("title")
+                or f"{product_title.strip() or 'Customer'} review portrait {index + 1}"
+            )
+            if isinstance(fallback_alt, str) and fallback_alt.strip():
+                image["alt"] = fallback_alt.strip()
+
+        subject = (
+            review.get("title")
+            or review.get("body")
+            or review.get("name")
+            or review.get("author")
+            or image.get("alt")
+            or f"{product_title.strip() or 'Product'} customer review"
+        )
+        if not isinstance(subject, str) or not subject.strip():
+            continue
+
+        image["prompt"] = (
+            f"Authentic customer testimonial portrait or lifestyle image representing: {subject.strip()}. "
+            "Natural lighting, credible ecommerce review aesthetic, premium wellness brand style, no text overlay."
+        )
+        image["aspectRatio"] = "3:4"
+        changed = True
+
+    return changed
+
+
 def _coerce_sales_pdp_import_guarantee_config(*, config: dict[str, Any], product_title: str) -> bool:
     changed = False
 
@@ -1679,6 +1737,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     "- In imported HTML template mode, SalesPdpGuarantee.config MUST NOT use legacy keys badge/title/paragraphs/whyTitle/whyBody/closingLine/right. Use badgeText/headline/body/iconAlt/iconAssetPublicId/iconSrc/image/stats/statsFootnote instead.\n"
                     "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
                     "- In imported HTML template mode, SalesPdpReviewWall.config MUST NOT use legacy keys badge/title/ratingLabel/tiles/showMoreLabel.\n"
+                    "- In imported HTML template mode, if a review image has no real asset or generated prompt yet, omit it or add a prompt. Never leave placeholder src values like /assets/ph-3x4.svg inside SalesPdpReviewWall reviews.\n"
                     "- In imported HTML template mode, SalesPdpHero.config.gallery.freeGifts.icon MUST include assetPublicId or prompt. Never leave placeholder src values like /assets/ph-square.svg without a prompt.\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config icon slots MUST include iconAlt and either iconAssetPublicId or prompt. Never leave blank iconAssetPublicId/iconSrc fields without a prompt.\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config.image MUST include assetPublicId/referenceAssetPublicId or prompt. Never leave placeholder src values like /assets/ph-4x3.svg without a prompt.\n"
@@ -2536,7 +2595,14 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         json_key="configJson",
                         label="SalesPdpReviewWall",
                     )
-                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_review_wall_config(cur_cfg):
+                    if not isinstance(cur_cfg, dict):
+                        return
+                    changed = _coerce_sales_pdp_import_review_wall_config(cur_cfg)
+                    changed = _ensure_sales_pdp_import_review_wall_image_prompts(
+                        config=cur_cfg,
+                        product_title=getattr(product, "title", "") or "",
+                    ) or changed
+                    if changed:
                         _persist_object_prop(
                             cprops,
                             source=cur_source,

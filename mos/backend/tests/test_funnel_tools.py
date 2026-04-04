@@ -10,6 +10,7 @@ from app.agent.funnel_tools import (
     _coerce_sales_pdp_import_story_config,
     _coerce_sales_pdp_import_videos_config,
     _ensure_sales_pdp_import_guarantee_image_prompt,
+    _ensure_sales_pdp_import_review_wall_image_prompts,
     _ensure_sales_pdp_guarantee_icon_prompt,
     _ensure_sales_pdp_free_gifts_icon_prompt,
     _resolve_base_puck_data,
@@ -385,3 +386,28 @@ def test_coerce_sales_pdp_import_review_wall_config_converts_legacy_shape():
             },
         }
     ]
+
+
+def test_ensure_sales_pdp_import_review_wall_image_prompts_fills_placeholders():
+    config = {
+        "reviews": [
+            {
+                "title": "Sharper mornings",
+                "body": "I feel clear and steady before work now.",
+                "image": {
+                    "alt": "Customer portrait",
+                    "src": "/assets/ph-3x4.svg",
+                },
+            }
+        ]
+    }
+
+    changed = _ensure_sales_pdp_import_review_wall_image_prompts(
+        config=config,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed is True
+    image = config["reviews"][0]["image"]
+    assert "Sharper mornings" in image["prompt"]
+    assert image["aspectRatio"] == "3:4"
