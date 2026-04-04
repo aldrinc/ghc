@@ -1,7 +1,15 @@
-from app.agent.funnel_tools import DraftPersistVersionArgs, DraftPersistVersionTool
+import json
+
+from app.agent.funnel_tools import (
+    DraftPersistVersionArgs,
+    DraftPersistVersionTool,
+    _build_puck_prompt_seed,
+    _resolve_base_puck_data,
+)
 from app.agent.types import ToolContext
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionStatusEnum
 from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion
+from app.services.funnel_templates import get_funnel_template
 from tests.conftest import TEST_ORG_ID
 
 
@@ -89,3 +97,30 @@ def test_draft_persist_version_loads_funnel_context(db_session, monkeypatch):
     assert version.ai_metadata["htmlReference"]["label"] == "sleep-guide.html"
     assert version.ai_metadata["htmlReference"]["sectionOrder"] == ["Hero", "Proof", "FAQ"]
     assert result.ui_details["draftVersionId"] == str(version.id)
+
+
+def test_resolve_base_puck_data_prefers_template_for_html_template_mode():
+    template = get_funnel_template("sales-pdp")
+    assert template is not None
+
+    base_puck, source = _resolve_base_puck_data(
+        current_puck_data={"content": [{"type": "Text", "props": {"id": "current", "text": "Current"}}]},
+        latest_draft_puck_data={"content": [{"type": "Text", "props": {"id": "draft", "text": "Draft"}}]},
+        template_puck_data=template.puck_data,
+        reference_html_mode="template",
+    )
+
+    assert source == "template"
+    assert base_puck == template.puck_data
+
+
+def test_build_puck_prompt_seed_omits_template_copy_content():
+    template = get_funnel_template("sales-pdp")
+    assert template is not None
+
+    prompt_seed = _build_puck_prompt_seed(template.puck_data)
+
+    assert isinstance(prompt_seed, dict)
+    serialized_seed = json.dumps(prompt_seed, ensure_ascii=False).lower()
+    assert "salespdppage" in serialized_seed
+    assert "puppypad" not in serialized_seed

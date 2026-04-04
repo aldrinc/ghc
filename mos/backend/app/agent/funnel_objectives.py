@@ -51,6 +51,7 @@ def run_generate_page_draft_stream(
     attachments: Optional[list[dict[str, Any]]] = None,
     reference_html: Optional[str] = None,
     reference_label: Optional[str] = None,
+    reference_html_mode: str | None = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -76,6 +77,7 @@ def run_generate_page_draft_stream(
 
     llm = LLMClient()
     model_id = model or llm.default_model
+    resolved_reference_html_mode = "template" if reference_html_mode == "template" else "guide"
 
     runtime = AgentRuntime(session=session, org_id=org_id, user_id=user_id)
     objective_type = "objective.page_media_enrichment" if skip_draft_generation else "objective.page_draft"
@@ -97,6 +99,7 @@ def run_generate_page_draft_stream(
             "skipDraftGeneration": skip_draft_generation,
             "maxImages": max_images,
             "requireLatestStrategyCopy": require_latest_strategy_copy,
+            "referenceHtmlMode": resolved_reference_html_mode,
             "htmlReference": describe_html_reference_input(
                 reference_html=reference_html,
                 label=reference_label,
@@ -120,6 +123,7 @@ def run_generate_page_draft_stream(
                 "pageId": page_id,
                 "currentPuckData": current_puck_data,
                 "templateId": template_id,
+                "referenceHtmlMode": resolved_reference_html_mode,
             },
             funnel_id=funnel_id,
             page_id=page_id,
@@ -146,6 +150,11 @@ def run_generate_page_draft_stream(
         strategy_ctx: dict[str, Any] = {}
         if require_latest_strategy_copy:
             template_kind = str(funnel_ctx.get("templateKind") or "").strip()
+            campaign_id = str(funnel_ctx.get("campaignId") or "").strip()
+            if not campaign_id:
+                raise ValueError(
+                    "campaign_id is required to load the latest strategy copy for imported template generation."
+                )
             strategy_res = yield from runtime.invoke_tool_stream(
                 handle=handle,
                 tool=ContextLoadStrategyCopyTool(),
@@ -153,6 +162,7 @@ def run_generate_page_draft_stream(
                     "orgId": org_id,
                     "clientId": client_id,
                     "productId": str(product_id),
+                    "campaignId": campaign_id,
                     "templateKind": template_kind,
                 },
                 client_id=client_id,
@@ -185,6 +195,8 @@ def run_generate_page_draft_stream(
 
         html_ctx: dict[str, Any] = {}
         normalized_reference_html = str(reference_html or "").strip()
+        if resolved_reference_html_mode == "template" and not normalized_reference_html:
+            raise ValueError("referenceHtmlMode='template' requires a non-empty referenceHtml payload.")
         if normalized_reference_html:
             html_reference_meta = describe_html_reference_input(
                 reference_html=normalized_reference_html,
@@ -261,6 +273,7 @@ def run_generate_page_draft_stream(
                     "attachmentSummaries": attachment_summaries,
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
+                    "referenceHtmlMode": resolved_reference_html_mode,
                     "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
                     "strategyPromptContext": strategy_ctx.get("strategyPromptContext"),
                 },
@@ -522,6 +535,7 @@ def run_generate_page_draft(
     attachments: Optional[list[dict[str, Any]]] = None,
     reference_html: Optional[str] = None,
     reference_label: Optional[str] = None,
+    reference_html_mode: str | None = None,
     current_puck_data: Optional[dict[str, Any]] = None,
     template_id: Optional[str] = None,
     idea_workspace_id: Optional[str] = None,
@@ -547,6 +561,7 @@ def run_generate_page_draft(
         attachments=attachments,
         reference_html=reference_html,
         reference_label=reference_label,
+        reference_html_mode=reference_html_mode,
         current_puck_data=current_puck_data,
         template_id=template_id,
         idea_workspace_id=idea_workspace_id,

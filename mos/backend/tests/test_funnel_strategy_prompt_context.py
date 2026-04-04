@@ -78,3 +78,68 @@ def test_build_strategy_prompt_context_requires_latest_page_markdown():
 
     with pytest.raises(StrategyCopyError, match="sales_page_markdown"):
         _build_strategy_prompt_context(outputs=outputs, template_kind="sales-pdp")
+
+
+def test_build_strategy_prompt_context_supports_manual_campaign_creative_context_without_template_payloads():
+    outputs = {
+        "provider": "manual",
+        "angles": {
+            "selectedAngleId": "angle-1",
+            "angleLibrary": [
+                {
+                    "angleId": "angle-1",
+                    "angleName": "Brain Fuel Deficit",
+                    "description": "Reframe the fog as depletion, not decline.",
+                    "evidence": [
+                        "Doctors keep dismissing the symptom cluster.",
+                        "Women fear they are losing their minds.",
+                    ],
+                }
+            ],
+        },
+        "offer": {
+            "ump": "Restore the brain fuel perimenopause drains away.",
+            "ums": "Clinical-dose creatine in a format she will actually take.",
+            "corePromise": "Trust your own brain again.",
+            "valueStackSummary": "60 Day Supply plus tracker",
+            "guaranteeType": "Complete Clarity Promise",
+            "pricingRationale": "Less than the monthly spend on nootropic stacks.",
+            "selectedVariantId": "60-day-supply",
+            "selectedVariantName": "60 Day Supply",
+        },
+        "copy": {
+            "headline": "A little-known fuel deficit may explain the fog",
+            "promiseContract": {
+                "loopQuestion": "Why does it feel like dementia when it may be a fuel deficit?",
+                "specificPromise": "Trust your own brain again.",
+                "deliveryTest": "Feel the fog thinning across the first 30 days.",
+                "minimumDelivery": "Finish the first 30 Day Supply.",
+            },
+            "salesPageMarkdown": "## Hero\nLead with the fuel-deficit reframe.",
+            "presellMarkdown": "## Story\nOpen on the disappearing-word moment.",
+            "templatePayloads": None,
+        },
+        "copy_context": {
+            "brandVoiceMarkdown": "Clinical expertise softened by personal vulnerability.",
+            "complianceMarkdown": "No disease claims.",
+        },
+        "artifact_ids": {
+            "angles": "angles-1",
+            "offer": "offer-1",
+            "copy": "copy-1",
+            "copy_context": "ctx-1",
+            "creative_context": "aggregate-1",
+        },
+    }
+
+    context = _build_strategy_prompt_context(outputs=outputs, template_kind="sales-pdp")
+
+    assert context["source"] == "campaign_creative_context.manual"
+    assert context["selectedAngle"]["angleId"] == "angle-1"
+    assert context["selectedAngle"]["supportingPoints"] == [
+        "Doctors keep dismissing the symptom cluster.",
+        "Women fear they are losing their minds.",
+    ]
+    assert context["offer"]["corePromise"] == "Trust your own brain again."
+    assert context["copy"]["templatePatchOperationCount"] == 0
+    assert context["artifactIds"]["creative_context"] == "aggregate-1"

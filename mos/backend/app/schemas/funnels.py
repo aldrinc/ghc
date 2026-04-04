@@ -168,6 +168,7 @@ class FunnelPageAIGenerateRequest(BaseModel):
     copyPack: Optional[str] = None
     referenceHtml: Optional[str] = Field(default=None, min_length=1, max_length=250_000)
     referenceLabel: Optional[str] = Field(default=None, max_length=200)
+    referenceHtmlMode: Literal["guide", "template"] = "guide"
     requireLatestStrategyCopy: bool = False
     currentPuckData: Optional[dict[str, Any]] = None
     templateId: Optional[str] = None

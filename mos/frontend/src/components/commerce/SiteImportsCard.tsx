@@ -80,8 +80,8 @@ function buildGenerationPrompt(args: {
   const productTitle = args.productTitle.trim() || "the active product";
   const basePrompt =
     args.templateId === "sales-pdp"
-      ? `Generate a sales page for ${productTitle}. Use the imported HTML as structural and persuasive reference, but adapt it to the sales-pdp funnel template and the product context.`
-      : `Generate a pre-sales listicle page for ${productTitle}. Use the imported HTML as structural and persuasive reference, but adapt it to the pre-sales-listicle funnel template and the product context.`;
+      ? `Generate a sales page for ${productTitle}. Use the imported HTML as the primary structure and persuasion template, then rebuild it for the product inside the supported sales-pdp component system.`
+      : `Generate a pre-sales listicle page for ${productTitle}. Use the imported HTML as the primary structure and persuasion template, then rebuild it for the product inside the supported pre-sales-listicle component system.`;
   const instructions = args.additionalInstructions.trim();
   if (!instructions) return basePrompt;
   return `${basePrompt}\n\nAdditional instructions:\n${instructions}`;
@@ -306,6 +306,7 @@ export function SiteImportsCard({ workspaceId, activeWorkspaceProduct }: SiteImp
       messages: [],
       referenceHtml: trimmedReferenceHtml,
       referenceLabel: referenceLabel ?? "pasted-html",
+      referenceHtmlMode: "template",
       requireLatestStrategyCopy: true,
       generateImages,
     });

@@ -30,17 +30,18 @@ from app.services.html_funnel_reference import (
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
+from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.funnel_testimonials import (
     generate_funnel_page_testimonials,
     generate_sales_pdp_carousel_images,
 )
-from app.strategy_v2.downstream import load_strategy_v2_outputs
 
 # Reuse funnel_ai internals to keep behavior consistent while we split orchestration.
 from app.services import funnel_ai as funnel_ai
 
 
 _ObjectiveTemplateKind = Literal["sales-pdp", "pre-sales-listicle"]
+_ReferenceHtmlMode = Literal["guide", "template"]
 
 
 def _resolve_template_kind(template_id: str) -> _ObjectiveTemplateKind | None:
@@ -49,6 +50,100 @@ def _resolve_template_kind(template_id: str) -> _ObjectiveTemplateKind | None:
     if template_id == "pre-sales-listicle":
         return "pre-sales-listicle"
     return None
+
+
+def _resolve_reference_html_mode(reference_html_mode: str | None) -> _ReferenceHtmlMode:
+    if reference_html_mode == "template":
+        return "template"
+    return "guide"
+
+
+def _resolve_base_puck_data(
+    *,
+    current_puck_data: dict[str, Any] | None,
+    latest_draft_puck_data: dict[str, Any] | None,
+    template_puck_data: dict[str, Any] | None,
+    reference_html_mode: str | None,
+) -> tuple[dict[str, Any] | None, str]:
+    normalized_mode = _resolve_reference_html_mode(reference_html_mode)
+    if normalized_mode == "template":
+        if isinstance(template_puck_data, dict):
+            return template_puck_data, "template"
+        return None, "none"
+    if isinstance(current_puck_data, dict):
+        return current_puck_data, "currentPuckData"
+    if isinstance(latest_draft_puck_data, dict):
+        return latest_draft_puck_data, "latestDraft"
+    if isinstance(template_puck_data, dict):
+        return template_puck_data, "templateFallback"
+    return None, "none"
+
+
+def _is_component_slot(value: Any) -> bool:
+    return isinstance(value, list) and any(
+        isinstance(item, dict) and isinstance(item.get("type"), str) and isinstance(item.get("props"), dict)
+        for item in value
+    )
+
+
+def _summarize_component_for_prompt(component: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {"type": str(component.get("type") or "")}
+    props = component.get("props")
+    if not isinstance(props, dict):
+        return summary
+
+    component_id = props.get("id")
+    if isinstance(component_id, str) and component_id.strip():
+        summary["id"] = component_id.strip()
+
+    prop_keys: list[str] = []
+    slots: dict[str, list[dict[str, Any]]] = {}
+    for key, value in props.items():
+        if key == "id":
+            continue
+        if _is_component_slot(value):
+            slots[key] = [
+                _summarize_component_for_prompt(item)
+                for item in value
+                if isinstance(item, dict) and isinstance(item.get("type"), str) and isinstance(item.get("props"), dict)
+            ]
+            continue
+        prop_keys.append(str(key))
+
+    if prop_keys:
+        summary["propKeys"] = sorted(set(prop_keys))
+    if slots:
+        summary["slots"] = slots
+    return summary
+
+
+def _build_puck_prompt_seed(puck_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(puck_data, dict):
+        return None
+
+    root = puck_data.get("root")
+    root_props = root.get("props") if isinstance(root, dict) else None
+    root_prop_keys = sorted(str(key) for key in root_props.keys()) if isinstance(root_props, dict) else []
+
+    content = puck_data.get("content")
+    content_summary = (
+        [
+            _summarize_component_for_prompt(item)
+            for item in content
+            if isinstance(item, dict) and isinstance(item.get("type"), str) and isinstance(item.get("props"), dict)
+        ]
+        if isinstance(content, list)
+        else []
+    )
+
+    zones = puck_data.get("zones")
+    zone_keys = sorted(str(key) for key in zones.keys()) if isinstance(zones, dict) else []
+
+    return {
+        "root": {"propKeys": root_prop_keys},
+        "content": content_summary,
+        "zones": zone_keys,
+    }
 
 
 def _allowed_component_types(template_kind: str | None, *, template_mode: bool = False) -> set[str]:
@@ -175,7 +270,7 @@ def _compact_prompt_payload(payload: Any, *, max_chars: int) -> Any:
     }
 
 
-def _build_strategy_prompt_context(*, outputs: dict[str, Any], template_kind: str) -> dict[str, Any]:
+def _build_strategy_prompt_context_from_v2_outputs(*, outputs: dict[str, Any], template_kind: str) -> dict[str, Any]:
     if template_kind not in ("sales-pdp", "pre-sales-listicle"):
         raise StrategyCopyError(
             "Latest strategy copy can only be required for sales-pdp or pre-sales-listicle page generation."
@@ -282,6 +377,137 @@ def _build_strategy_prompt_context(*, outputs: dict[str, Any], template_kind: st
     }
 
 
+def _build_strategy_prompt_context_from_manual_campaign_context(
+    *,
+    outputs: dict[str, Any],
+    template_kind: str,
+) -> dict[str, Any]:
+    if template_kind not in ("sales-pdp", "pre-sales-listicle"):
+        raise StrategyCopyError(
+            "Latest strategy copy can only be required for sales-pdp or pre-sales-listicle page generation."
+        )
+
+    angles = outputs.get("angles")
+    offer = outputs.get("offer")
+    copy = outputs.get("copy")
+    copy_context = outputs.get("copy_context")
+    artifact_ids = outputs.get("artifact_ids")
+
+    missing: list[str] = []
+    if not isinstance(angles, dict):
+        missing.append("campaign_loaded_angles")
+    if not isinstance(offer, dict):
+        missing.append("campaign_loaded_offer")
+    if not isinstance(copy, dict):
+        missing.append("campaign_loaded_copy")
+    if not isinstance(copy_context, dict):
+        missing.append("campaign_loaded_copy_context")
+    if missing:
+        raise StrategyCopyError(
+            "Latest campaign strategy copy is required for imported template generation. "
+            f"Missing artifacts: {', '.join(missing)}. "
+            "Load the campaign creative context for this campaign before generating this page."
+        )
+
+    promise_contract = copy.get("promiseContract")
+    if not isinstance(promise_contract, dict) or not promise_contract:
+        raise StrategyCopyError(
+            "Latest campaign strategy copy is missing promiseContract. "
+            "Update the campaign copy document before generating this page."
+        )
+
+    page_markdown_key = "salesPageMarkdown" if template_kind == "sales-pdp" else "presellMarkdown"
+    page_markdown = str(copy.get(page_markdown_key) or "").strip()
+    if not page_markdown:
+        raise StrategyCopyError(
+            f"Latest campaign strategy copy is missing {page_markdown_key}. "
+            "Update the campaign copy document before generating this page."
+        )
+
+    template_payloads = copy.get("templatePayloads")
+    if template_payloads is not None and not isinstance(template_payloads, dict):
+        raise StrategyCopyError(
+            "Latest campaign strategy copy has an invalid templatePayloads shape. "
+            "Update the campaign copy document before generating this page."
+        )
+    template_entry = template_payloads.get(template_kind) if isinstance(template_payloads, dict) else None
+    template_patch_raw = None
+    if isinstance(template_entry, dict):
+        if isinstance(template_entry.get("template_patch"), list):
+            template_patch_raw = template_entry.get("template_patch")
+        elif isinstance(template_entry.get("templatePatch"), list):
+            template_patch_raw = template_entry.get("templatePatch")
+    template_patch = (
+        template_patch_raw
+        if isinstance(template_patch_raw, list)
+        else []
+    )
+
+    angle_library = angles.get("angleLibrary") if isinstance(angles.get("angleLibrary"), list) else []
+    selected_angle_id = str(angles.get("selectedAngleId") or "").strip()
+    selected_angle = next(
+        (
+            entry
+            for entry in angle_library
+            if isinstance(entry, dict) and str(entry.get("angleId") or "").strip() == selected_angle_id
+        ),
+        {},
+    )
+    evidence_points = [
+        str(point).strip()
+        for point in (selected_angle.get("evidence") if isinstance(selected_angle.get("evidence"), list) else [])
+        if str(point).strip()
+    ]
+
+    return {
+        "source": "campaign_creative_context.manual",
+        "templateKind": template_kind,
+        "artifactIds": artifact_ids if isinstance(artifact_ids, dict) else {},
+        "selectedAngle": {
+            "angleId": selected_angle.get("angleId"),
+            "angleName": selected_angle.get("angleName"),
+            "supportingVocCount": None,
+            "topQuotes": [],
+            "supportingPoints": evidence_points[:5],
+        },
+        "offer": {
+            "headline": copy.get("headline"),
+            "ump": offer.get("ump"),
+            "ums": offer.get("ums"),
+            "corePromise": offer.get("corePromise"),
+            "valueStackSummary": offer.get("valueStackSummary"),
+            "guaranteeType": offer.get("guaranteeType"),
+            "pricingRationale": offer.get("pricingRationale"),
+            "selectedVariant": {
+                "id": offer.get("selectedVariantId"),
+                "name": offer.get("selectedVariantName"),
+            },
+            "productOffer": None,
+        },
+        "copy": {
+            "headline": copy.get("headline"),
+            "promiseContract": promise_contract,
+            "pageMarkdown": _truncate_prompt_text(page_markdown, limit=_STRATEGY_PAGE_MARKDOWN_MAX_CHARS),
+            "templatePatchOperationCount": len(template_patch),
+            "qualityGateReport": None,
+            "semanticGates": None,
+            "congruency": None,
+        },
+        "copyContext": _compact_prompt_payload(copy_context, max_chars=_STRATEGY_COPY_CONTEXT_PREVIEW_MAX_CHARS),
+    }
+
+
+def _build_strategy_prompt_context(*, outputs: dict[str, Any], template_kind: str) -> dict[str, Any]:
+    provider = outputs.get("provider")
+    provider_value = str(getattr(provider, "value", provider) or "").strip()
+    if provider_value == "manual":
+        return _build_strategy_prompt_context_from_manual_campaign_context(
+            outputs=outputs,
+            template_kind=template_kind,
+        )
+    return _build_strategy_prompt_context_from_v2_outputs(outputs=outputs, template_kind=template_kind)
+
+
 def _build_attachment_guidance(attachment_summaries: list[dict[str, Any]]) -> str:
     if not attachment_summaries:
         return ""
@@ -334,6 +560,7 @@ class ContextLoadFunnelArgs(BaseModel):
     pageId: str
     currentPuckData: Optional[dict[str, Any]] = None
     templateId: Optional[str] = None
+    referenceHtmlMode: _ReferenceHtmlMode = "guide"
 
 
 class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
@@ -360,6 +587,8 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         template = get_funnel_template(resolved_template_id) if resolved_template_id else None
         if resolved_template_id and not template:
             raise ValueError("Template not found")
+        if _resolve_reference_html_mode(args.referenceHtmlMode) == "template" and template is None:
+            raise ValueError("referenceHtmlMode='template' requires a supported page template.")
 
         template_kind = None
         if template is not None:
@@ -386,18 +615,22 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
         ).first()
 
-        base_puck = args.currentPuckData or (latest_draft.puck_data if latest_draft else None)
-        if not isinstance(base_puck, dict):
-            base_puck = None
-        if template is not None and base_puck is None:
-            base_puck = template.puck_data
+        template_puck_data = template.puck_data if template is not None and isinstance(template.puck_data, dict) else None
+        latest_draft_puck_data = latest_draft.puck_data if latest_draft and isinstance(latest_draft.puck_data, dict) else None
+        current_puck_data = args.currentPuckData if isinstance(args.currentPuckData, dict) else None
+        base_puck, base_puck_source = _resolve_base_puck_data(
+            current_puck_data=current_puck_data,
+            latest_draft_puck_data=latest_draft_puck_data,
+            template_puck_data=template_puck_data,
+            reference_html_mode=args.referenceHtmlMode,
+        )
 
         required_types: list[str] = []
         if template is not None:
             # Required components should track the active template definition, not the stored page puckData.
             # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
             # upgrades/merges them with the latest template before validation.
-            required_source = template.puck_data if isinstance(template.puck_data, dict) else base_puck
+            required_source = template_puck_data if isinstance(template_puck_data, dict) else base_puck
             if isinstance(required_source, dict):
                 required_types = sorted(
                     funnel_ai._required_template_component_types(required_source, template_kind=template_kind)
@@ -424,6 +657,8 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             "pageContext": page_context,
             "pageIdSet": sorted(page_id_set),
             "basePuckData": base_puck,
+            "basePuckSource": base_puck_source,
+            "referenceHtmlMode": _resolve_reference_html_mode(args.referenceHtmlMode),
             "templateId": template_ctx.template_id,
             "templateMode": template_ctx.template_mode,
             "templateKind": template_ctx.template_kind,
@@ -489,6 +724,7 @@ class ContextLoadStrategyCopyArgs(BaseModel):
     orgId: str
     clientId: str
     productId: str
+    campaignId: str
     templateKind: str
 
 
@@ -500,11 +736,12 @@ class ContextLoadStrategyCopyTool(BaseTool[ContextLoadStrategyCopyArgs]):
         if args.orgId != ctx.org_id:
             raise ValueError("orgId mismatch")
 
-        strategy_outputs = load_strategy_v2_outputs(
+        strategy_outputs = load_campaign_creative_context(
             session=ctx.session,
             org_id=ctx.org_id,
             client_id=args.clientId,
             product_id=args.productId,
+            campaign_id=args.campaignId,
         )
         prompt_context = _build_strategy_prompt_context(
             outputs=strategy_outputs,
@@ -743,6 +980,7 @@ class DraftGeneratePageArgs(BaseModel):
     attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
+    referenceHtmlMode: _ReferenceHtmlMode = "guide"
     htmlReferencePromptContext: Optional[dict[str, Any]] = None
     strategyPromptContext: Optional[dict[str, Any]] = None
 
@@ -761,9 +999,23 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
 
         template_kind = args.templateKind
         template_mode = bool(args.templateMode)
+        reference_html_mode = _resolve_reference_html_mode(args.referenceHtmlMode)
+        html_template_mode = reference_html_mode == "template"
         template_component_kind: str | None = None
         if template_mode and isinstance(args.basePuckData, dict):
             template_component_kind = funnel_ai._infer_template_component_kind(template_kind, args.basePuckData)
+        if html_template_mode and not template_mode:
+            raise ValueError("referenceHtmlMode='template' requires template mode.")
+        if html_template_mode and not (
+            isinstance(args.htmlReferencePromptContext, dict) and args.htmlReferencePromptContext
+        ):
+            raise ValueError("referenceHtmlMode='template' requires htmlReferencePromptContext.")
+
+        prompt_puck_data = (
+            _build_puck_prompt_seed(args.basePuckData)
+            if html_template_mode and isinstance(args.basePuckData, dict)
+            else args.basePuckData
+        )
 
         # Layout guidance varies based on template mode.
         if not template_mode:
@@ -776,20 +1028,41 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
                 "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
                 "- Do NOT add primitives like Section/Columns/Heading/Text/Spacer in template mode\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
             )
+            if html_template_mode:
+                structure_guidance += (
+                    "- Treat the imported HTML as the primary conversion blueprint and map its hierarchy onto the available SalesPdp sections.\n"
+                    "- Replace all legacy/default template messaging; use the template only as a supported component scaffold.\n\n"
+                )
+            else:
+                structure_guidance += (
+                    "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+                )
         elif template_component_kind == "pre-sales-listicle":
             structure_guidance = (
                 "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
                 "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
                 "- Do NOT add primitives like Section/Columns/Heading/Text/Spacer in template mode\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
             )
+            if html_template_mode:
+                structure_guidance += (
+                    "- Treat the imported HTML as the primary conversion blueprint and map its hierarchy onto the available PreSales sections.\n"
+                    "- Replace all legacy/default template messaging; use the template only as a supported component scaffold.\n\n"
+                )
+            else:
+                structure_guidance += (
+                    "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+                )
         else:
             structure_guidance = (
-                "- Preserve the template's existing top-level structure in puckData.content.\n"
-                "- Do not introduce new component types; only edit props fields.\n\n"
+                "- Do not introduce new component types; only edit props fields.\n"
             )
+            if html_template_mode:
+                structure_guidance += (
+                    "- Treat the imported HTML as the primary structural reference while staying inside the supported component system.\n\n"
+                )
+            else:
+                structure_guidance += "- Preserve the template's existing top-level structure in puckData.content.\n\n"
 
         header_footer_guidance = (
             "Header/Footer guidance:\n"
@@ -838,11 +1111,21 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if isinstance(args.htmlReferencePromptContext, dict) and args.htmlReferencePromptContext:
             html_reference_guidance = (
                 "HTML reference guidance:\n"
-                "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
-                "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
-                "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
-                "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
-                f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
+                + (
+                    "- Treat the structured HTML reference below as the PRIMARY structural and persuasive blueprint for this generation.\n"
+                    "- Match its information hierarchy, CTA cadence, proof sequencing, FAQ flow, and section emphasis as closely as the supported template components allow.\n"
+                    "- Use the active Puck template as the rendering scaffold, not as the content source.\n"
+                    if html_template_mode
+                    else "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
+                )
+                + (
+                    ""
+                    if html_template_mode
+                    else "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
+                )
+                + "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
+                + "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                + f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
             )
 
         # Claude structured outputs: support brand docs and vision attachments (non-stream).
@@ -874,8 +1157,14 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
 
         template_guidance = (
             f"Template guidance:\n- Template id: {args.templateId}\n"
-            "- Do not introduce new component types not listed below.\n"
-            "- Do not remove or rename existing template components in the current page puckData; only edit their props/config/copy fields.\n"
+            + (
+                "- Use the template only as a supported component scaffold for the imported HTML.\n"
+                "- Do not introduce new component types not listed below.\n"
+                "- Replace legacy/default template content; keep ids and supported component shapes intact.\n"
+                if html_template_mode
+                else "- Do not introduce new component types not listed below.\n"
+                "- Do not remove or rename existing template components in the current page puckData; only edit their props/config/copy fields.\n"
+            )
             if template_mode and args.templateId
             else ""
         )
@@ -993,12 +1282,20 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             )
         else:
-            # In template mode we preserve the template layout and only update copy/config fields.
-            layout_guidance = (
-                "Layout guidance:\n"
-                "- Preserve the template layout and section order.\n"
-                "- Do NOT add new sections or new component types; only edit existing template component props.\n\n"
-            )
+            if html_template_mode:
+                layout_guidance = (
+                    "Layout guidance:\n"
+                    "- Use the imported HTML as the primary structural baseline for messaging flow and conversion rhythm.\n"
+                    "- Match its headline-to-proof-to-CTA sequencing as closely as the supported template components allow.\n"
+                    "- The template structure seed below is schema guidance only, not copy to preserve.\n\n"
+                )
+            else:
+                # In template mode we preserve the template layout and only update copy/config fields.
+                layout_guidance = (
+                    "Layout guidance:\n"
+                    "- Preserve the template layout and section order.\n"
+                    "- Do NOT add new sections or new component types; only edit existing template component props.\n\n"
+                )
 
         available_components_block = ""
         if template_mode and template_component:
@@ -1086,8 +1383,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "- root.props.description\n\n"
             "Internal funnel pages you can link to (targetPageId should be one of these ids):\n"
             f"{json.dumps(args.pageContext, ensure_ascii=False)}\n\n"
-            "Current page puckData (may be null):\n"
-            f"{json.dumps(args.basePuckData, ensure_ascii=False)}"
+            + (
+                "Template component structure seed (schema only; not content):\n"
+                if html_template_mode
+                else "Current page puckData (may be null):\n"
+            )
+            + f"{json.dumps(prompt_puck_data, ensure_ascii=False)}"
         )
 
         conversation: list[dict[str, str]] = []
@@ -1126,6 +1427,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "model": model_id,
             "temperature": args.temperature,
             "maxTokens": max_tokens,
+            "referenceHtmlMode": reference_html_mode,
             "templateMode": template_mode,
             "templateKind": template_kind,
             "templateComponentKind": template_component_kind,
