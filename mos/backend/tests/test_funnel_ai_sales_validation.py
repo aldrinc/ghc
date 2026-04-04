@@ -215,6 +215,18 @@ def test_sales_template_validation_rejects_missing_free_gifts_modal_block():
         funnel_ai._validate_sales_pdp_component_configs(puck_data)
 
 
+def test_sales_template_validation_rejects_empty_sales_reviews_payload():
+    puck_data = _sales_template_puck_data()
+    reviews_props = _find_sales_component_props(puck_data, "SalesPdpReviews")
+    reviews_props["config"] = {
+        "id": "reviews-section",
+        "data": {},
+    }
+
+    with pytest.raises(ValueError, match=r"SalesPdpReviews\.config\.data\.productId must be a non-empty string"):
+        funnel_ai._validate_sales_pdp_component_configs(puck_data)
+
+
 def test_sales_pdp_urgency_rows_restore_monthly_sold_out_format():
     reference_puck_data = _sales_template_puck_data()
     generated_puck_data = _sales_template_puck_data()

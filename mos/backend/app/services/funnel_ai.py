@@ -982,6 +982,47 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"SalesPdpReviews.{source}.data must be a JSON object{id_suffix}. Received {_describe_value(data)}."
                 )
+            if not isinstance(data.get("productId"), str) or not data.get("productId"):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.productId must be a non-empty string{id_suffix}. "
+                    f"Received {_describe_value(data.get('productId'))}."
+                )
+            summary = data.get("summary")
+            if not isinstance(summary, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.summary must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(summary)}."
+                )
+            for key in ("breakdown", "topics", "mediaGallery"):
+                if not isinstance(summary.get(key), list):
+                    raise ValueError(
+                        f"SalesPdpReviews.{source}.data.summary.{key} must be a list{id_suffix}. "
+                        f"Received {_describe_value(summary.get(key))}."
+                    )
+            filters = data.get("filters")
+            if not isinstance(filters, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.filters must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(filters)}."
+                )
+            for key in ("ratings", "countries", "sorts"):
+                if not isinstance(filters.get(key), list):
+                    raise ValueError(
+                        f"SalesPdpReviews.{source}.data.filters.{key} must be a list{id_suffix}. "
+                        f"Received {_describe_value(filters.get(key))}."
+                    )
+            pagination = data.get("pagination")
+            if not isinstance(pagination, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.pagination must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(pagination)}."
+                )
+            reviews = data.get("reviews")
+            if not isinstance(reviews, list):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.reviews must be a list{id_suffix}. "
+                    f"Received {_describe_value(reviews)}."
+                )
 
         elif comp_type == "SalesPdpMarquee":
             if not isinstance(config, dict):

@@ -142,6 +142,10 @@ function describeValue(value: unknown): string {
   return `${typeof value}(${String(value).slice(0, 120)})`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 export function SalesPdpReviews({
   config,
   configJson,
@@ -170,6 +174,61 @@ export function SalesPdpReviews({
   }
 
   const data = resolved.data;
+  if (typeof data.productId !== "string" || !data.productId.trim()) {
+    throw new Error(
+      `SalesPdpReviews.config.data.productId must be a non-empty string. Received ${describeValue(data.productId)}.`
+    );
+  }
+  if (!isRecord(data.summary)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.summary must be an object. Received ${describeValue(data.summary)}.`
+    );
+  }
+  if (!Array.isArray(data.summary.breakdown)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.summary.breakdown must be an array. Received ${describeValue(data.summary.breakdown)}.`
+    );
+  }
+  if (!Array.isArray(data.summary.topics)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.summary.topics must be an array. Received ${describeValue(data.summary.topics)}.`
+    );
+  }
+  if (!Array.isArray(data.summary.mediaGallery)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.summary.mediaGallery must be an array. Received ${describeValue(data.summary.mediaGallery)}.`
+    );
+  }
+  if (!isRecord(data.filters)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.filters must be an object. Received ${describeValue(data.filters)}.`
+    );
+  }
+  if (!Array.isArray(data.filters.ratings)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.filters.ratings must be an array. Received ${describeValue(data.filters.ratings)}.`
+    );
+  }
+  if (!Array.isArray(data.filters.countries)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.filters.countries must be an array. Received ${describeValue(data.filters.countries)}.`
+    );
+  }
+  if (!Array.isArray(data.filters.sorts)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.filters.sorts must be an array. Received ${describeValue(data.filters.sorts)}.`
+    );
+  }
+  if (!isRecord(data.pagination)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.pagination must be an object. Received ${describeValue(data.pagination)}.`
+    );
+  }
+  if (!Array.isArray(data.reviews)) {
+    throw new Error(
+      `SalesPdpReviews.config.data.reviews must be an array. Received ${describeValue(data.reviews)}.`
+    );
+  }
 
   const [query, setQuery] = useState<ReviewsQuery>(() => ({
     productId: data.productId,
