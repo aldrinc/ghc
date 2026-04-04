@@ -302,6 +302,76 @@ def _coerce_sales_pdp_import_comparison_config(config: dict[str, Any]) -> bool:
     return changed
 
 
+def _coerce_sales_pdp_import_review_wall_config(config: dict[str, Any]) -> bool:
+    changed = False
+
+    badge = config.get("badge")
+    if (
+        not isinstance(config.get("badgeText"), str) or not str(config.get("badgeText") or "").strip()
+    ) and isinstance(badge, str) and badge.strip():
+        config["badgeText"] = badge.strip()
+        changed = True
+
+    legacy_title = config.get("title")
+    if (not isinstance(config.get("headline"), str) or not str(config.get("headline") or "").strip()) and isinstance(
+        legacy_title, str
+    ) and legacy_title.strip():
+        config["headline"] = legacy_title.strip()
+        changed = True
+
+    rating_label = config.get("ratingLabel")
+    if (not isinstance(config.get("body"), str) or not str(config.get("body") or "").strip()) and isinstance(
+        rating_label, str
+    ) and rating_label.strip():
+        config["body"] = rating_label.strip()
+        changed = True
+
+    show_more_label = config.get("showMoreLabel")
+    if (
+        not isinstance(config.get("ctaLabel"), str) or not str(config.get("ctaLabel") or "").strip()
+    ) and isinstance(show_more_label, str) and show_more_label.strip():
+        config["ctaLabel"] = show_more_label.strip()
+        changed = True
+
+    reviews = config.get("reviews")
+    if not isinstance(reviews, list):
+        tiles = config.get("tiles")
+        if isinstance(tiles, list):
+            normalized_reviews: list[dict[str, Any]] = []
+            fallback_body = None
+            if isinstance(rating_label, str) and rating_label.strip():
+                fallback_body = rating_label.strip()
+            elif isinstance(legacy_title, str) and legacy_title.strip():
+                fallback_body = legacy_title.strip()
+            for tile in tiles:
+                if not isinstance(tile, dict):
+                    continue
+                review: dict[str, Any] = {}
+                tile_id = tile.get("id")
+                if isinstance(tile_id, str) and tile_id.strip():
+                    review["id"] = tile_id.strip()
+                image = tile.get("image")
+                if isinstance(image, dict):
+                    normalized_image: dict[str, Any] = {}
+                    for key in ("alt", "src", "assetPublicId", "referenceAssetPublicId"):
+                        value = image.get(key)
+                        if isinstance(value, str) and value.strip():
+                            normalized_image[key] = value.strip()
+                    if isinstance(normalized_image.get("alt"), str):
+                        review["image"] = normalized_image
+                        review["body"] = normalized_image["alt"]
+                if not isinstance(review.get("body"), str) or not review["body"].strip():
+                    if fallback_body:
+                        review["body"] = fallback_body
+                if isinstance(review.get("body"), str) and review["body"].strip():
+                    normalized_reviews.append(review)
+            if normalized_reviews:
+                config["reviews"] = normalized_reviews
+                changed = True
+
+    return changed
+
+
 def _coerce_sales_pdp_import_guarantee_config(*, config: dict[str, Any], product_title: str) -> bool:
     changed = False
 
@@ -1608,6 +1678,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config MUST NOT use legacy keys badge/title/paragraphs/whyTitle/whyBody/closingLine/right. Use badgeText/headline/body/iconAlt/iconAssetPublicId/iconSrc/image/stats/statsFootnote instead.\n"
                     "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
+                    "- In imported HTML template mode, SalesPdpReviewWall.config MUST NOT use legacy keys badge/title/ratingLabel/tiles/showMoreLabel.\n"
                     "- In imported HTML template mode, SalesPdpHero.config.gallery.freeGifts.icon MUST include assetPublicId or prompt. Never leave placeholder src values like /assets/ph-square.svg without a prompt.\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config icon slots MUST include iconAlt and either iconAssetPublicId or prompt. Never leave blank iconAssetPublicId/iconSrc fields without a prompt.\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config.image MUST include assetPublicId/referenceAssetPublicId or prompt. Never leave placeholder src values like /assets/ph-4x3.svg without a prompt.\n"
@@ -2449,6 +2520,23 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         product_title=getattr(product, "title", "") or "",
                     ) or changed
                     if changed:
+                        _persist_object_prop(
+                            cprops,
+                            source=cur_source,
+                            object_key="config",
+                            json_key="configJson",
+                            value=cur_cfg,
+                        )
+                    return
+
+                if candidate.get("type") == "SalesPdpReviewWall":
+                    cur_cfg, cur_source = _load_object_prop(
+                        cprops,
+                        object_key="config",
+                        json_key="configJson",
+                        label="SalesPdpReviewWall",
+                    )
+                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_review_wall_config(cur_cfg):
                         _persist_object_prop(
                             cprops,
                             source=cur_source,
