@@ -1926,7 +1926,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 + "- Checkout requirement: purchase selector ids MUST match productContext.selected_offer.price_points[].option_values using normalized checkout keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
                 + "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
                 + "- SalesPdpFaq.config MUST be: { id?: string, anchorId?: string, title: string, items: [{ question: string, answer: string }] }\n"
-                + "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
+                + "- SalesPdpReviews.config MUST be: { id: string, data: { productId:string, summary:{ averageRating:number, totalReviews:number, breakdown:list, customersSay:string, topics:list, mediaGallery:list }, filters:{ ratings:list, countries:list, sorts:list }, pagination:{ page:number, pageSize:number, totalReviews:number, totalPages:number }, reviews:list } }\n"
                 + "- SalesPdpFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string }, copyright: string }\n"
                 + "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
                 + (

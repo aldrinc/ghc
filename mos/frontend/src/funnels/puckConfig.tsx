@@ -998,7 +998,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.hero.header,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpHeader {...props} />,
+        render: withBlockBoundary("SalesPdpHeader", (props: Record<string, unknown>) => <SalesPdpHeader {...props} />),
       },
       SalesPdpHero: {
         fields: {
@@ -1011,7 +1011,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           modals: salesPdpDefaults.config.modals,
           copy: salesPdpDefaults.copy,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpHero {...props} />,
+        render: withBlockBoundary("SalesPdpHero", (props: Record<string, unknown>) => <SalesPdpHero {...props} />),
       },
       SalesPdpVideos: {
         fields: {
@@ -1020,7 +1020,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.videos,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpVideos {...props} />,
+        render: withBlockBoundary("SalesPdpVideos", (props: Record<string, unknown>) => <SalesPdpVideos {...props} />),
       },
       SalesPdpMarquee: {
         fields: {
@@ -1029,7 +1029,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.marquee,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpMarquee {...props} />,
+        render: withBlockBoundary("SalesPdpMarquee", (props: Record<string, unknown>) => <SalesPdpMarquee {...props} />),
       },
       SalesPdpStoryProblem: {
         fields: {
@@ -1038,7 +1038,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.story.problem,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpStoryProblem {...props} />,
+        render: withBlockBoundary("SalesPdpStoryProblem", (props: Record<string, unknown>) => <SalesPdpStoryProblem {...props} />),
       },
       SalesPdpStorySolution: {
         fields: {
@@ -1047,7 +1047,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.story.solution,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpStorySolution {...props} />,
+        render: withBlockBoundary("SalesPdpStorySolution", (props: Record<string, unknown>) => <SalesPdpStorySolution {...props} />),
       },
       SalesPdpComparison: {
         fields: {
@@ -1056,7 +1056,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.comparison,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpComparison {...props} />,
+        render: withBlockBoundary("SalesPdpComparison", (props: Record<string, unknown>) => <SalesPdpComparison {...props} />),
       },
       SalesPdpGuarantee: {
         fields: {
@@ -1067,7 +1067,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           config: salesPdpDefaults.config.guarantee,
           feedImages: salesPdpFeedImages,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpGuarantee {...props} />,
+        render: withBlockBoundary("SalesPdpGuarantee", (props: Record<string, unknown>) => <SalesPdpGuarantee {...props} />),
       },
       SalesPdpFaq: {
         fields: {
@@ -1076,13 +1076,13 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.faq,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpFaq {...props} />,
+        render: withBlockBoundary("SalesPdpFaq", (props: Record<string, unknown>) => <SalesPdpFaq {...props} />),
       },
       SalesPdpReviews: {
         fields: {
           configJson: { type: "textarea" },
         },
-        render: (props: Record<string, unknown>) => <SalesPdpReviews {...props} />,
+        render: withBlockBoundary("SalesPdpReviews", (props: Record<string, unknown>) => <SalesPdpReviews {...props} />),
       },
       SalesPdpReviewWall: {
         fields: {
@@ -1091,7 +1091,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.reviewWall,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpReviewWall {...props} />,
+        render: withBlockBoundary("SalesPdpReviewWall", (props: Record<string, unknown>) => <SalesPdpReviewWall {...props} />),
       },
       SalesPdpFooter: {
         fields: {
@@ -1100,7 +1100,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.footer,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpFooter {...props} />,
+        render: withBlockBoundary("SalesPdpFooter", (props: Record<string, unknown>) => <SalesPdpFooter {...props} />),
       },
       SalesPdpReviewSlider: {
         fields: {
@@ -1109,7 +1109,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: salesPdpDefaults.config.reviewSlider,
         },
-        render: (props: Record<string, unknown>) => <SalesPdpReviewSlider {...props} />,
+        render: withBlockBoundary("SalesPdpReviewSlider", (props: Record<string, unknown>) => <SalesPdpReviewSlider {...props} />),
       },
       SalesPdpTemplate: {
         fields: {
