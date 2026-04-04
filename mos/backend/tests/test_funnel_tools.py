@@ -4,9 +4,11 @@ from app.agent.funnel_tools import (
     DraftPersistVersionArgs,
     DraftPersistVersionTool,
     _build_puck_prompt_seed,
+    _coerce_sales_pdp_import_comparison_config,
     _coerce_sales_pdp_import_guarantee_config,
     _coerce_sales_pdp_import_story_config,
     _coerce_sales_pdp_import_videos_config,
+    _ensure_sales_pdp_import_guarantee_image_prompt,
     _ensure_sales_pdp_guarantee_icon_prompt,
     _ensure_sales_pdp_free_gifts_icon_prompt,
     _resolve_base_puck_data,
@@ -290,3 +292,59 @@ def test_ensure_sales_pdp_guarantee_icon_prompt_fills_missing_icon_slot():
     assert changed is True
     assert "Guarantee seal" in config["prompt"]
     assert config["aspectRatio"] == "1:1"
+
+
+def test_coerce_sales_pdp_import_comparison_config_converts_legacy_shape():
+    config = {
+        "badge": "WHY EMBER WINS",
+        "title": "EMBER vs the usual fixes",
+        "swipeHint": "See the difference clearly",
+        "columns": {
+            "pup": "EMBER",
+            "disposable": "Coffee + willpower",
+        },
+        "rows": [
+            {
+                "label": "Steady energy",
+                "pup": "Daily support",
+                "disposable": "Short-lived spike",
+            }
+        ],
+    }
+
+    changed = _coerce_sales_pdp_import_comparison_config(config)
+
+    assert changed is True
+    assert config["badgeText"] == "WHY EMBER WINS"
+    assert config["headline"] == "EMBER vs the usual fixes"
+    assert config["subheadline"] == "See the difference clearly"
+    assert config["emberColumn"] == "EMBER"
+    assert config["competitorColumn"] == "Coffee + willpower"
+    assert config["rows"] == [
+        {
+            "label": "Steady energy",
+            "pup": "Daily support",
+            "disposable": "Short-lived spike",
+            "ember": "Daily support",
+            "competitor": "Short-lived spike",
+        }
+    ]
+
+
+def test_ensure_sales_pdp_import_guarantee_image_prompt_fills_placeholder_image():
+    config = {
+        "headline": "90-Day Risk Free Guarantee",
+        "image": {
+            "alt": "Happy customer",
+            "src": "/assets/ph-4x3.svg",
+        },
+    }
+
+    changed = _ensure_sales_pdp_import_guarantee_image_prompt(
+        config=config,
+        product_title="Ember: Brain Clarity Protocol",
+    )
+
+    assert changed is True
+    assert "90-Day Risk Free Guarantee" in config["image"]["prompt"]
+    assert config["image"]["aspectRatio"] == "4:3"
