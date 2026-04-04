@@ -189,6 +189,173 @@ def _ensure_sales_pdp_free_gifts_icon_prompt(*, gallery: dict[str, Any], product
     return True
 
 
+def _coerce_sales_pdp_import_story_config(config: dict[str, Any]) -> bool:
+    changed = False
+
+    badge = config.get("badge")
+    if (not isinstance(config.get("eyebrow"), str) or not str(config.get("eyebrow") or "").strip()) and isinstance(
+        badge, str
+    ) and badge.strip():
+        config["eyebrow"] = badge.strip()
+        changed = True
+
+    legacy_title = config.get("title")
+    if (not isinstance(config.get("headline"), str) or not str(config.get("headline") or "").strip()) and isinstance(
+        legacy_title, str
+    ) and legacy_title.strip():
+        config["headline"] = legacy_title.strip()
+        changed = True
+
+    body = config.get("body")
+    if not (
+        isinstance(body, str)
+        and body.strip()
+        or isinstance(body, list)
+        and any(isinstance(item, str) and item.strip() for item in body)
+    ):
+        body_parts: list[str] = []
+        paragraphs = config.get("paragraphs")
+        if isinstance(paragraphs, list):
+            body_parts.extend(str(item).strip() for item in paragraphs if isinstance(item, str) and item.strip())
+        emphasis_line = config.get("emphasisLine")
+        if isinstance(emphasis_line, str) and emphasis_line.strip():
+            body_parts.append(emphasis_line.strip())
+        if body_parts:
+            config["body"] = body_parts if len(body_parts) > 1 else body_parts[0]
+            changed = True
+
+    if not isinstance(config.get("steps"), list):
+        legacy_bullets = config.get("bullets")
+        if isinstance(legacy_bullets, list):
+            steps: list[dict[str, str]] = []
+            for bullet in legacy_bullets:
+                if not isinstance(bullet, dict):
+                    continue
+                title = bullet.get("title")
+                if not isinstance(title, str) or not title.strip():
+                    continue
+                step: dict[str, str] = {"title": title.strip()}
+                body_text = bullet.get("body")
+                if isinstance(body_text, str) and body_text.strip():
+                    step["body"] = body_text.strip()
+                steps.append(step)
+            if steps:
+                config["steps"] = steps
+                changed = True
+
+    return changed
+
+
+def _coerce_sales_pdp_import_guarantee_config(*, config: dict[str, Any], product_title: str) -> bool:
+    changed = False
+
+    badge = config.get("badge")
+    if (
+        not isinstance(config.get("badgeText"), str) or not str(config.get("badgeText") or "").strip()
+    ) and isinstance(badge, str) and badge.strip():
+        config["badgeText"] = badge.strip()
+        changed = True
+
+    legacy_title = config.get("title")
+    if (not isinstance(config.get("headline"), str) or not str(config.get("headline") or "").strip()) and isinstance(
+        legacy_title, str
+    ) and legacy_title.strip():
+        config["headline"] = legacy_title.strip()
+        changed = True
+
+    body = config.get("body")
+    if not (
+        isinstance(body, str)
+        and body.strip()
+        or isinstance(body, list)
+        and any(isinstance(item, str) and item.strip() for item in body)
+    ):
+        body_parts: list[str] = []
+        paragraphs = config.get("paragraphs")
+        if isinstance(paragraphs, list):
+            body_parts.extend(str(item).strip() for item in paragraphs if isinstance(item, str) and item.strip())
+        why_title = config.get("whyTitle")
+        why_body = config.get("whyBody")
+        if isinstance(why_title, str) and why_title.strip() and isinstance(why_body, str) and why_body.strip():
+            body_parts.append(f"{why_title.strip()}: {why_body.strip()}")
+        elif isinstance(why_body, str) and why_body.strip():
+            body_parts.append(why_body.strip())
+        closing_line = config.get("closingLine")
+        if isinstance(closing_line, str) and closing_line.strip():
+            body_parts.append(closing_line.strip())
+        if body_parts:
+            config["body"] = body_parts if len(body_parts) > 1 else body_parts[0]
+            changed = True
+
+    image = config.get("image")
+    if not isinstance(image, dict):
+        right = config.get("right")
+        legacy_image = right.get("image") if isinstance(right, dict) else None
+        if isinstance(legacy_image, dict):
+            normalized_image: dict[str, Any] = {}
+            alt = legacy_image.get("alt")
+            if isinstance(alt, str) and alt.strip():
+                normalized_image["alt"] = alt.strip()
+            else:
+                fallback_alt = config.get("headline") or legacy_title or f"{product_title.strip() or 'Product'} guarantee image"
+                if isinstance(fallback_alt, str) and fallback_alt.strip():
+                    normalized_image["alt"] = fallback_alt.strip()
+            for key in ("src", "assetPublicId", "referenceAssetPublicId"):
+                value = legacy_image.get(key)
+                if isinstance(value, str) and value.strip():
+                    normalized_image[key] = value.strip()
+            if isinstance(normalized_image.get("alt"), str) and any(
+                key in normalized_image for key in ("src", "assetPublicId", "referenceAssetPublicId")
+            ):
+                config["image"] = normalized_image
+                changed = True
+
+    if not isinstance(config.get("iconAlt"), str) or not str(config.get("iconAlt") or "").strip():
+        has_icon_slot = any(key in config for key in ("iconAlt", "iconAssetPublicId", "iconSrc", "prompt"))
+        if has_icon_slot:
+            fallback_icon_alt = (
+                config.get("badgeText")
+                or config.get("headline")
+                or legacy_title
+                or f"{product_title.strip() or 'Product'} guarantee"
+            )
+            if isinstance(fallback_icon_alt, str) and fallback_icon_alt.strip():
+                config["iconAlt"] = f"{fallback_icon_alt.strip()} icon"
+                changed = True
+
+    return changed
+
+
+def _ensure_sales_pdp_guarantee_icon_prompt(*, config: dict[str, Any], product_title: str) -> bool:
+    has_icon_slot = any(key in config for key in ("iconAlt", "iconAssetPublicId", "iconSrc", "prompt"))
+    if not has_icon_slot:
+        return False
+    asset_public_id = config.get("iconAssetPublicId")
+    if isinstance(asset_public_id, str) and asset_public_id.strip():
+        return False
+    prompt = config.get("prompt")
+    if isinstance(prompt, str) and prompt.strip():
+        return False
+    raw_src = config.get("iconSrc")
+    src = raw_src.strip() if isinstance(raw_src, str) else ""
+    if src and not funnel_ai._is_placeholder_src(src):
+        return False
+
+    subject = config.get("iconAlt") or config.get("badgeText") or config.get("headline") or (
+        f"{product_title.strip() or 'Product'} guarantee icon"
+    )
+    if not isinstance(subject, str) or not subject.strip():
+        return False
+
+    config["iconAlt"] = subject.strip()
+    config["prompt"] = (
+        f"Minimal flat vector ecommerce guarantee icon representing {subject.strip()}. "
+        "Clean wellness style, simple shapes, warm neutral palette, transparent background, no text."
+    )
+    config["aspectRatio"] = "1:1"
+    return True
+
+
 def _summarize_component_for_prompt(component: dict[str, Any]) -> dict[str, Any]:
     summary: dict[str, Any] = {"type": str(component.get("type") or "")}
     props = component.get("props")
@@ -1342,10 +1509,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     "- In imported HTML template mode, SalesPdpVideos.config MUST be: { id?:string, badgeText?:string, sectionTitle:string, sectionSubtitle?:string, cards:[{ id?:string, eyebrow?:string, title:string, body?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], stats?:[{ label:string, value:string, detail?:string }], footnote?:string }\n"
                     "- In imported HTML template mode, SalesPdpVideos.config MUST NOT use legacy keys badge/title/videos. If a card has no real image asset or generated prompt yet, omit image instead of leaving placeholder thumbnail slots.\n"
                     "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST be: { id?:string, anchorId?:string, eyebrow?:string, headline:string, body:string|string[], image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, steps?:[{ label?:string, title:string, body?:string }], ingredients?:[{ label?:string, title:string, body?:string }], timeline?:[{ label?:string, title:string, body?:string }] }\n"
+                    "- In imported HTML template mode, SalesPdpStoryProblem.config and SalesPdpStorySolution.config MUST NOT use legacy keys badge/title/paragraphs/emphasisLine/bullets/layout.\n"
                     "- In imported HTML template mode, SalesPdpComparison.config MUST be: { id?:string, badgeText?:string, headline:string, subheadline?:string, emberColumn:string|{ title:string, subtitle?:string }, competitorColumn:string|{ title:string, subtitle?:string }, rows:[{ label:string, ember?:string, competitor?:string, left?:string, right?:string }] }\n"
                     "- In imported HTML template mode, SalesPdpGuarantee.config MUST be: { id?:string, anchorId?:string, badgeText?:string, headline:string, body:string|string[], iconAlt?:string, iconAssetPublicId?:string, iconSrc?:string, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string }, stats?:[{ label:string, value:string, detail?:string }], statsFootnote?:string }\n"
+                    "- In imported HTML template mode, SalesPdpGuarantee.config MUST NOT use legacy keys badge/title/paragraphs/whyTitle/whyBody/closingLine/right. Use badgeText/headline/body/iconAlt/iconAssetPublicId/iconSrc/image/stats/statsFootnote instead.\n"
                     "- In imported HTML template mode, SalesPdpReviewWall.config MUST be: { id?:string, badgeText?:string, headline:string, body?:string, reviews:[{ id?:string, title?:string, body:string, name?:string, author?:string, meta?:string, rating?:number, image?:{ alt:string, src?:string, assetPublicId?:string, referenceAssetPublicId?:string } }], ctaLabel?:string }\n"
                     "- In imported HTML template mode, SalesPdpHero.config.gallery.freeGifts.icon MUST include assetPublicId or prompt. Never leave placeholder src values like /assets/ph-square.svg without a prompt.\n"
+                    "- In imported HTML template mode, SalesPdpGuarantee.config icon slots MUST include iconAlt and either iconAssetPublicId or prompt. Never leave blank iconAssetPublicId/iconSrc fields without a prompt.\n"
                     "- In imported HTML template mode, do NOT force legacy Sales PDP keys like badge/title/videos, paragraphs, columns.pup/disposable, right.image/commentThread, or tiles into those import-native sections.\n\n"
                     if html_template_mode
                     else "- Do NOT use legacy keys like headline/subheadline/trustBadges/ctaLabel/ctaLinkType/reviews inside SalesPdp* configs.\n\n"
@@ -2119,6 +2289,50 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         label="SalesPdpVideos",
                     )
                     if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_videos_config(cur_cfg):
+                        _persist_object_prop(
+                            cprops,
+                            source=cur_source,
+                            object_key="config",
+                            json_key="configJson",
+                            value=cur_cfg,
+                        )
+                    return
+
+                if candidate.get("type") in {"SalesPdpStoryProblem", "SalesPdpStorySolution"}:
+                    cur_cfg, cur_source = _load_object_prop(
+                        cprops,
+                        object_key="config",
+                        json_key="configJson",
+                        label=str(candidate.get("type") or "SalesPdpStorySection"),
+                    )
+                    if isinstance(cur_cfg, dict) and _coerce_sales_pdp_import_story_config(cur_cfg):
+                        _persist_object_prop(
+                            cprops,
+                            source=cur_source,
+                            object_key="config",
+                            json_key="configJson",
+                            value=cur_cfg,
+                        )
+                    return
+
+                if candidate.get("type") == "SalesPdpGuarantee":
+                    cur_cfg, cur_source = _load_object_prop(
+                        cprops,
+                        object_key="config",
+                        json_key="configJson",
+                        label="SalesPdpGuarantee",
+                    )
+                    if not isinstance(cur_cfg, dict):
+                        return
+                    changed = _coerce_sales_pdp_import_guarantee_config(
+                        config=cur_cfg,
+                        product_title=getattr(product, "title", "") or "",
+                    )
+                    changed = _ensure_sales_pdp_guarantee_icon_prompt(
+                        config=cur_cfg,
+                        product_title=getattr(product, "title", "") or "",
+                    ) or changed
+                    if changed:
                         _persist_object_prop(
                             cprops,
                             source=cur_source,
