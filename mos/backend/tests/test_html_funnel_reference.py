@@ -72,7 +72,7 @@ def test_summarize_html_reference_extracts_conversion_structure() -> None:
     assert "Fall asleep without melatonin" in summary.textPreview
     assert prompt_context["sectionOrder"] == summary.sectionOrder
     assert prompt_context["imageCount"] == 1
-    assert "htmlPreview" not in prompt_context
+    assert prompt_context["htmlPreview"].startswith("<!doctype html>")
 
 
 def test_summarize_html_reference_rejects_blank_html() -> None:

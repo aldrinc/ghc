@@ -300,6 +300,7 @@ def run_generate_page_draft_stream(
                 "puckData": puck_data,
                 "basePuckData": funnel_ctx.get("basePuckData"),
                 "templateKind": funnel_ctx.get("templateKind"),
+                "referenceHtmlMode": resolved_reference_html_mode,
                 "designSystemTokens": tokens_ctx.get("designSystemTokens"),
                 "brandLogoAssetPublicId": tokens_ctx.get("brandLogoAssetPublicId"),
                 "productId": str(product_id),

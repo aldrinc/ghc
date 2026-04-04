@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 MAX_HTML_REFERENCE_CHARS = 250_000
-MAX_HTML_PREVIEW_CHARS = 2_000
+MAX_HTML_PREVIEW_CHARS = 4_000
 MAX_TEXT_PREVIEW_CHARS = 1_200
 MAX_SECTION_ORDER_ITEMS = 20
 MAX_HEADINGS = 20
@@ -312,6 +312,7 @@ def build_html_reference_prompt_context(summary: HtmlReferenceSummary | dict[str
         "formCount": source.formCount,
         "formFieldHints": source.formFieldHints[:8],
         "textPreview": source.textPreview,
+        "htmlPreview": source.htmlPreview,
     }
 
 
