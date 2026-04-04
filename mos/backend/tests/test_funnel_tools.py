@@ -289,8 +289,15 @@ def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_s
     assert result.ui_details["puckData"]["content"][0]["type"] == "Section"
     assert "Use ONLY primitive components in imported HTML template mode" in captured["prompt"]
     assert "Available primitives (component types) and their props" in captured["prompt"]
+    assert "Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, padY?, padX?, content? }" in captured["prompt"]
+    assert "Section.bandWidth='full'" in captured["prompt"]
+    assert "Section.contentWidth='lg'" in captured["prompt"]
+    assert "Section.surface" in captured["prompt"]
     assert "Available template components" not in captured["prompt"]
     assert "Use SalesPdpPage as the ONLY top-level block" not in captured["prompt"]
+    assert "layout?" not in captured["prompt"]
+    assert "containerWidth?" not in captured["prompt"]
+    assert "padding?" not in captured["prompt"]
 
 
 def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_session, monkeypatch):
