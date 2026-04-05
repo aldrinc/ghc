@@ -173,6 +173,7 @@ class AgentRuntime:
                 "attachmentBlocks",
                 "messages",
                 "copyPack",
+                "referenceHtml",
                 "htmlReferencePromptContext",
                 "strategyPromptContext",
             }

@@ -4866,6 +4866,21 @@ def _puck_output_schema() -> dict[str, Any]:
     }
 
 
+def _html_rewrite_output_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "assistantMessage": {"type": "string"},
+            "htmlDocument": {
+                "type": "string",
+                "description": "Rewritten full HTML document with the exact same DOM structure and attributes.",
+            },
+        },
+        "required": ["assistantMessage", "htmlDocument"],
+    }
+
+
 def _puck_response_format() -> dict[str, Any]:
     return {
         "type": "json_schema",
@@ -4873,6 +4888,17 @@ def _puck_response_format() -> dict[str, Any]:
             "name": "PuckDraft",
             "strict": True,
             "schema": _puck_output_schema(),
+        },
+    }
+
+
+def _html_rewrite_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "ImportedHtmlRewrite",
+            "strict": True,
+            "schema": _html_rewrite_output_schema(),
         },
     }
 
@@ -5044,10 +5070,27 @@ def _sanitize_component_tree(items: Any, allowed_types: set[str]) -> list[dict[s
         elif t == "FAQ":
             if not isinstance(props.get("items"), list):
                 props["items"] = []
+        elif t == "ImportedHtmlDocument":
+            if not isinstance(props.get("htmlDocument"), str):
+                props["htmlDocument"] = ""
 
         cleaned.append(cast(dict[str, Any], raw))
 
     return cleaned
+
+
+def _validate_imported_html_document_components(puck_data: dict[str, Any]) -> None:
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("type") != "ImportedHtmlDocument":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            raise ValueError("ImportedHtmlDocument is missing props.")
+        html_document = props.get("htmlDocument")
+        if not isinstance(html_document, str) or not html_document.strip():
+            raise ValueError("ImportedHtmlDocument.props.htmlDocument must be a non-empty string.")
 
 
 def _resolve_image_asset_key(obj: dict[str, Any]) -> str | None:

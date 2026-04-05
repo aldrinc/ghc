@@ -1,6 +1,8 @@
 from app.services.html_funnel_reference import (
     HtmlReferenceError,
+    HtmlStructureMismatchError,
     MAX_TEXT_PREVIEW_CHARS,
+    assert_html_text_only_rewrite,
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
@@ -93,3 +95,22 @@ def test_summarize_html_reference_clips_long_text_preview_without_validation_err
     assert summary.label == "long.html"
     assert len(summary.textPreview) <= MAX_TEXT_PREVIEW_CHARS
     assert summary.textPreview
+
+
+def test_assert_html_text_only_rewrite_allows_text_changes_only() -> None:
+    original = "<!doctype html><html><body><section><h1>Original title</h1><p>Original body.</p></section></body></html>"
+    rewritten = "<!doctype html><html><body><section><h1>Updated title</h1><p>Updated body.</p></section></body></html>"
+
+    assert_html_text_only_rewrite(original_html=original, rewritten_html=rewritten)
+
+
+def test_assert_html_text_only_rewrite_rejects_attribute_or_structure_changes() -> None:
+    original = "<!doctype html><html><body><section class='hero'><h1>Original title</h1></section></body></html>"
+    rewritten = "<!doctype html><html><body><section class='hero-alt'><h1>Updated title</h1></section></body></html>"
+
+    try:
+        assert_html_text_only_rewrite(original_html=original, rewritten_html=rewritten)
+    except HtmlStructureMismatchError as exc:
+        assert "Only visible text content may change" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected HtmlStructureMismatchError for attribute changes.")

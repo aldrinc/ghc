@@ -135,7 +135,7 @@ def test_resolve_base_puck_data_prefers_template_for_html_template_mode():
 
 
 @pytest.mark.parametrize("template_id", ["sales-pdp", "pre-sales-listicle"])
-def test_context_load_funnel_uses_freeform_primitives_for_imported_html(db_session, template_id: str):
+def test_context_load_funnel_uses_exact_imported_html_component_for_template_mode(db_session, template_id: str):
     client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
     db_session.add(client)
     db_session.commit()
@@ -189,15 +189,22 @@ def test_context_load_funnel_uses_freeform_primitives_for_imported_html(db_sessi
     assert result.ui_details["templateMode"] is False
     assert result.ui_details["templateKind"] == template_id
     assert result.ui_details["basePuckSource"] == "htmlTemplateSeed"
-    assert "Section" in result.ui_details["allowedTypes"]
-    assert "Image" in result.ui_details["allowedTypes"]
+    assert result.ui_details["allowedTypes"] == ["ImportedHtmlDocument"]
     assert "SalesPdpPage" not in result.ui_details["allowedTypes"]
     assert "PreSalesPage" not in result.ui_details["allowedTypes"]
-    assert result.ui_details["requiredTypes"] == []
+    assert result.ui_details["requiredTypes"] == ["ImportedHtmlDocument"]
 
 
-def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_session, monkeypatch):
+def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_session, monkeypatch):
     captured: dict[str, str] = {}
+    reference_html = (
+        "<!doctype html><html><body><section class='hero'><h1>Original title</h1>"
+        "<p>Original body.</p></section></body></html>"
+    )
+    rewritten_html = (
+        "<!doctype html><html><body><section class='hero'><h1>Updated title</h1>"
+        "<p>Updated body.</p></section></body></html>"
+    )
 
     class _FakeLLM:
         def __init__(self) -> None:
@@ -209,30 +216,7 @@ def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_s
             return json.dumps(
                 {
                     "assistantMessage": "Ember page preview.",
-                    "puckData": json.dumps(
-                        {
-                            "root": {"props": {}},
-                            "content": [
-                                {
-                                    "type": "Section",
-                                    "props": {
-                                        "id": "hero",
-                                        "content": [
-                                            {
-                                                "type": "Heading",
-                                                "props": {
-                                                    "id": "hero-title",
-                                                    "text": "Sharp mornings start here",
-                                                    "level": 1,
-                                                },
-                                            }
-                                        ],
-                                    },
-                                }
-                            ],
-                            "zones": {},
-                        }
-                    ),
+                    "htmlDocument": rewritten_html,
                 }
             )
 
@@ -272,7 +256,9 @@ def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_s
             brandDocuments=[],
             attachmentSummaries=[],
             referenceHtmlMode="template",
+            referenceHtml=reference_html,
             htmlReferencePromptContext={
+                "label": "page-1.html",
                 "sectionOrder": ["Hero", "Proof", "FAQ"],
                 "ctaTexts": ["Buy now"],
                 "htmlPreview": "<section><h1>Hero</h1><p>Proof</p></section>",
@@ -286,18 +272,13 @@ def test_draft_generate_page_imported_html_mode_prompts_for_primitives_only(db_s
             result = stop.value
             break
 
-    assert result.ui_details["puckData"]["content"][0]["type"] == "Section"
-    assert "Use ONLY primitive components in imported HTML template mode" in captured["prompt"]
-    assert "Available primitives (component types) and their props" in captured["prompt"]
-    assert "Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, padY?, padX?, content? }" in captured["prompt"]
-    assert "Section.bandWidth='full'" in captured["prompt"]
-    assert "Section.contentWidth='lg'" in captured["prompt"]
-    assert "Section.surface" in captured["prompt"]
-    assert "Available template components" not in captured["prompt"]
-    assert "Use SalesPdpPage as the ONLY top-level block" not in captured["prompt"]
-    assert "layout?" not in captured["prompt"]
-    assert "containerWidth?" not in captured["prompt"]
-    assert "padding?" not in captured["prompt"]
+    saved_component = result.ui_details["puckData"]["content"][0]
+    assert saved_component["type"] == "ImportedHtmlDocument"
+    assert saved_component["props"]["htmlDocument"] == rewritten_html
+    assert "Only replace human-facing copy text inside existing text nodes" in captured["prompt"]
+    assert "Preserve the exact tag order, nesting, attributes, classes, ids" in captured["prompt"]
+    assert "Uploaded HTML document to rewrite in place" in captured["prompt"]
+    assert reference_html in captured["prompt"]
 
 
 def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_session, monkeypatch):
@@ -362,19 +343,11 @@ def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_ses
                 "root": {"props": {}},
                 "content": [
                     {
-                        "type": "Section",
+                        "type": "ImportedHtmlDocument",
                         "props": {
-                            "id": "hero",
-                            "content": [
-                                {
-                                    "type": "Heading",
-                                    "props": {
-                                        "id": "hero-title",
-                                        "text": "Imported Hero",
-                                        "level": 1,
-                                    },
-                                }
-                            ],
+                            "id": "imported-html-document",
+                            "title": "Imported Hero",
+                            "htmlDocument": "<!doctype html><html><body><h1>Imported Hero</h1></body></html>",
                         },
                     }
                 ],
@@ -389,7 +362,7 @@ def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_ses
 
     assert result.ui_details["droppedExtraSectionCount"] == 0
     assert result.ui_details["restoredSectionCount"] == 0
-    assert result.ui_details["puckData"]["content"][0]["type"] == "Section"
+    assert result.ui_details["puckData"]["content"][0]["type"] == "ImportedHtmlDocument"
 
 
 def test_build_puck_prompt_seed_omits_template_copy_content():

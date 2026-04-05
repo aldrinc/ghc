@@ -79,6 +79,10 @@ class HtmlReferenceError(ValueError):
     pass
 
 
+class HtmlStructureMismatchError(HtmlReferenceError):
+    pass
+
+
 class HtmlReferenceHeading(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -230,6 +234,70 @@ class _HtmlReferenceParser(HTMLParser):
             self.meta_description = content
         elif name in {"og:title", "twitter:title"} and self.meta_title is None:
             self.meta_title = _clip_text(content, max_length=240)
+
+
+class _HtmlStructureSignatureParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tokens: list[tuple[Any, ...]] = []
+        self._raw_text_tag_stack: list[str] = []
+
+    def handle_decl(self, decl: str) -> None:
+        cleaned = decl.strip().lower()
+        if cleaned:
+            self.tokens.append(("decl", cleaned))
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized_tag = tag.lower()
+        self.tokens.append(("start", normalized_tag, _canonicalize_attrs(attrs)))
+        if normalized_tag in {"script", "style"}:
+            self._raw_text_tag_stack.append(normalized_tag)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tokens.append(("startend", tag.lower(), _canonicalize_attrs(attrs)))
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized_tag = tag.lower()
+        self.tokens.append(("end", normalized_tag))
+        if self._raw_text_tag_stack and self._raw_text_tag_stack[-1] == normalized_tag:
+            self._raw_text_tag_stack.pop()
+
+    def handle_data(self, data: str) -> None:
+        if not data:
+            return
+        if self._raw_text_tag_stack:
+            self.tokens.append(("raw_text", self._raw_text_tag_stack[-1], data))
+            return
+        if data.strip():
+            self.tokens.append(("text",))
+
+    def handle_comment(self, data: str) -> None:
+        if data.strip():
+            self.tokens.append(("comment", data))
+
+
+def _canonicalize_attrs(attrs: list[tuple[str, str | None]]) -> tuple[tuple[str, str | None], ...]:
+    canonical: list[tuple[str, str | None]] = []
+    for key, value in attrs:
+        canonical.append((str(key).lower().strip(), None if value is None else value.strip()))
+    return tuple(canonical)
+
+
+def _build_html_structure_signature(reference_html: str) -> tuple[tuple[Any, ...], ...]:
+    parser = _HtmlStructureSignatureParser()
+    parser.feed(reference_html)
+    parser.close()
+    return tuple(parser.tokens)
+
+
+def assert_html_text_only_rewrite(*, original_html: str, rewritten_html: str) -> None:
+    original_signature = _build_html_structure_signature(original_html)
+    rewritten_signature = _build_html_structure_signature(rewritten_html)
+    if original_signature != rewritten_signature:
+        raise HtmlStructureMismatchError(
+            "Imported HTML rewrite changed the page structure or attributes. "
+            "Only visible text content may change in exact-template mode."
+        )
 
 
 def summarize_html_reference(*, reference_html: str, label: str | None = None) -> HtmlReferenceSummary:

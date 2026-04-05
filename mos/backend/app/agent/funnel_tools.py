@@ -27,6 +27,8 @@ from app.services.funnel_templates import get_funnel_template
 from app.services.funnels import extract_internal_links, publish_funnel
 from app.services.html_funnel_reference import (
     HtmlReferenceError,
+    HtmlStructureMismatchError,
+    assert_html_text_only_rewrite,
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
@@ -64,6 +66,40 @@ def _build_html_template_seed_puck_data() -> dict[str, Any]:
         "content": [],
         "zones": {},
     }
+
+
+def _build_imported_html_document_puck_data(
+    *,
+    html_document: str,
+    page_name: str,
+    reference_label: str | None = None,
+) -> dict[str, Any]:
+    title = page_name.strip() or "Imported HTML Page"
+    source_label = (reference_label or "").strip() or None
+    return {
+        "root": {"props": {"title": title, "description": f"Imported HTML template for {title}."}},
+        "content": [
+            {
+                "type": "ImportedHtmlDocument",
+                "props": {
+                    "id": "imported-html-document",
+                    "title": title,
+                    "sourceLabel": source_label,
+                    "htmlDocument": html_document,
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _coerce_html_document(raw: Any) -> str:
+    if not isinstance(raw, str):
+        raise RuntimeError("Model response is missing htmlDocument.")
+    document = raw.strip()
+    if not document:
+        raise RuntimeError("Model response returned an empty htmlDocument.")
+    return document
 
 
 def _resolve_base_puck_data(
@@ -1327,7 +1363,9 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         )
 
         required_types: list[str] = []
-        if template is not None and not html_template_mode:
+        if html_template_mode:
+            required_types = ["ImportedHtmlDocument"]
+        elif template is not None and not html_template_mode:
             # Required components should track the active template definition, not the stored page puckData.
             # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
             # upgrades/merges them with the latest template before validation.
@@ -1337,12 +1375,15 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
                     funnel_ai._required_template_component_types(required_source, template_kind=template_kind)
                 )
 
-        allowed_types = sorted(
-            _allowed_component_types(
-                None if html_template_mode else template_kind,
-                template_mode=template is not None and not html_template_mode,
+        if html_template_mode:
+            allowed_types = ["ImportedHtmlDocument"]
+        else:
+            allowed_types = sorted(
+                _allowed_component_types(
+                    None if html_template_mode else template_kind,
+                    template_mode=template is not None and not html_template_mode,
+                )
             )
-        )
 
         template_ctx = _TemplateContext(
             template_id=resolved_template_id,
@@ -1685,6 +1726,7 @@ class DraftGeneratePageArgs(BaseModel):
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
     referenceHtmlMode: _ReferenceHtmlMode = "guide"
+    referenceHtml: Optional[str] = None
     htmlReferencePromptContext: Optional[dict[str, Any]] = None
     strategyPromptContext: Optional[dict[str, Any]] = None
 
@@ -1705,6 +1747,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         template_mode = bool(args.templateMode)
         reference_html_mode = _resolve_reference_html_mode(args.referenceHtmlMode)
         html_template_mode = reference_html_mode == "template"
+        exact_html_mode = html_template_mode and not template_mode
         template_component_kind: str | None = None
         if template_mode and isinstance(args.basePuckData, dict):
             template_component_kind = funnel_ai._infer_template_component_kind(template_kind, args.basePuckData)
@@ -1878,6 +1921,192 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             )
 
         attachment_guidance = _build_attachment_guidance(attachment_summaries)
+
+        if exact_html_mode:
+            reference_html = str(args.referenceHtml or "").strip()
+            if not reference_html:
+                raise ValueError("referenceHtmlMode='template' requires referenceHtml for exact HTML generation.")
+
+            system_content = (
+                "You are updating an uploaded HTML template for a funnel page.\n\n"
+                "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
+                "Return exactly ONE JSON object with this shape:\n"
+                '{ "assistantMessage": string, "htmlDocument": string }\n\n'
+                "assistantMessage requirements:\n"
+                "- Plain text only.\n"
+                f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.\n"
+                "- Summarize the rewritten page briefly and include a medical safety disclaimer.\n\n"
+                "htmlDocument requirements:\n"
+                "- Return the FULL rewritten HTML document.\n"
+                "- Preserve the exact tag order, nesting, attributes, classes, ids, data attributes, inline styles, script blocks, style blocks, and link destinations from the uploaded HTML.\n"
+                "- Do NOT add, remove, rename, reorder, wrap, unwrap, or move elements.\n"
+                "- Do NOT change src, href, class, id, style, role, aria-*, data-*, or any non-text attribute.\n"
+                "- Only replace human-facing copy text inside existing text nodes.\n"
+                "- Keep rewritten text roughly similar in length so the layout stays visually identical.\n"
+                "- Do NOT rewrite script contents, style contents, or comments.\n"
+                "- Do NOT convert the page into Puck primitives or component JSON.\n\n"
+                "Copy goals:\n"
+                "- Keep the uploaded HTML visually identical.\n"
+                "- Inject accurate product, offer, and strategy copy for this funnel.\n"
+                "- Be specific and persuasive without making unsupported medical claims.\n\n"
+                f"{context_guidance}"
+                f"{strategy_prompt_guidance}"
+                f"{copy_pack_guidance}"
+                f"{args.productContext}"
+                f"{attachment_guidance}"
+                "HTML summary for orientation only:\n"
+                f"{json.dumps(args.htmlReferencePromptContext or {}, ensure_ascii=False)}\n\n"
+                "Uploaded HTML document to rewrite in place:\n"
+                f"{reference_html}"
+            )
+
+            conversation: list[dict[str, str]] = []
+            for msg in args.messages or []:
+                role = msg.get("role")
+                content = msg.get("content")
+                if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                    conversation.append({"role": cast(Literal["user", "assistant"], role), "content": content.strip()})
+            if args.prompt and args.prompt.strip():
+                conversation.append({"role": "user", "content": args.prompt.strip()})
+            if not conversation:
+                conversation.append({"role": "user", "content": "Rewrite the uploaded HTML with the correct funnel copy."})
+
+            base_prompt_parts = [system_content] + [f"{m['role'].upper()}: {m['content']}" for m in conversation]
+            compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
+
+            trace_meta = {
+                "runId": ctx.run_id,
+                "toolCallId": ctx.tool_call_id,
+                "toolName": ctx.tool_name,
+                "toolSeq": ctx.tool_seq,
+                "model": model_id,
+                "temperature": args.temperature,
+                "maxTokens": max_tokens,
+                "referenceHtmlMode": reference_html_mode,
+                "templateMode": template_mode,
+                "templateKind": template_kind,
+                "templateComponentKind": template_component_kind,
+                "exactHtmlMode": True,
+            }
+
+            def _trace_prompt(*, phase: str, prompt_text: str) -> str:
+                sha256 = _sha256_text(prompt_text)
+                _persist_agent_artifact(
+                    ctx=ctx,
+                    kind="llm.prompt",
+                    key=f"{ctx.tool_call_id}:{phase}",
+                    data_json={
+                        **trace_meta,
+                        "phase": phase,
+                        "sha256": sha256,
+                        "chars": len(prompt_text),
+                        "preview": _text_preview(prompt_text),
+                        "text": prompt_text,
+                    },
+                )
+                return sha256
+
+            def _trace_output(*, phase: str, output_text: str, duration_ms: int | None) -> str:
+                sha256 = _sha256_text(output_text)
+                payload: dict[str, Any] = {
+                    **trace_meta,
+                    "phase": phase,
+                    "sha256": sha256,
+                    "chars": len(output_text),
+                    "preview": _text_preview(output_text),
+                    "text": output_text,
+                }
+                if duration_ms is not None:
+                    payload["durationMs"] = duration_ms
+                _persist_agent_artifact(
+                    ctx=ctx,
+                    kind="llm.output",
+                    key=f"{ctx.tool_call_id}:{phase}",
+                    data_json=payload,
+                )
+                return sha256
+
+            params = LLMGenerationParams(
+                model=model_id,
+                max_tokens=max_tokens,
+                temperature=args.temperature,
+                use_reasoning=True,
+                use_web_search=False,
+                response_format=funnel_ai._html_rewrite_response_format(),
+            )
+
+            def _claude_structured_html(prompt_text: str) -> tuple[dict[str, Any], str, int]:
+                default_claude_max = 32_000
+                claude_max = args.maxTokens if args.maxTokens is not None else default_claude_max
+                claude_max = min(claude_max, funnel_ai._CLAUDE_MAX_OUTPUT_TOKENS)
+                user_content = [{"type": "text", "text": prompt_text}, *attachment_blocks, *args.brandDocuments]
+                started = time.monotonic()
+                response = call_claude_structured_message(
+                    model=model_id,
+                    system=None,
+                    user_content=user_content,
+                    output_schema=funnel_ai._html_rewrite_output_schema(),
+                    max_tokens=claude_max,
+                    temperature=args.temperature,
+                )
+                duration_ms = int((time.monotonic() - started) * 1000)
+                parsed = response.get("parsed") if isinstance(response, dict) else None
+                if not isinstance(parsed, dict):
+                    raise RuntimeError("Claude structured response returned no parsed JSON.")
+                out_text = json.dumps(parsed, ensure_ascii=False)
+                return parsed, out_text, duration_ms
+
+            obj: dict[str, Any] | None = None
+            out = ""
+            final_model = model_id
+            _trace_prompt(phase="initial", prompt_text=compiled_prompt)
+
+            if is_claude_model:
+                obj, out, duration_ms = _claude_structured_html(compiled_prompt)
+                _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
+            else:
+                started = time.monotonic()
+                out = llm.generate_text(compiled_prompt, params=params)
+                duration_ms = int((time.monotonic() - started) * 1000)
+                _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
+                obj = funnel_ai._extract_json_object(out)
+
+            if obj is None:
+                raise RuntimeError("Model returned no parsable JSON response")
+
+            assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage"))
+            rewritten_html = _coerce_html_document(obj.get("htmlDocument"))
+            try:
+                assert_html_text_only_rewrite(
+                    original_html=reference_html,
+                    rewritten_html=rewritten_html,
+                )
+            except HtmlStructureMismatchError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+            puck_data = _build_imported_html_document_puck_data(
+                html_document=rewritten_html,
+                page_name=args.pageName,
+                reference_label=(args.htmlReferencePromptContext or {}).get("label"),
+            )
+            funnel_ai._ensure_block_ids(puck_data)
+
+            ui_details = {
+                "assistantMessage": assistant_message,
+                "puckData": puck_data,
+                "model": final_model,
+                "attachmentSummaries": attachment_summaries,
+            }
+            llm_output = json.dumps(
+                {
+                    "assistantMessage": assistant_message,
+                    "componentCount": len(puck_data.get("content") or []),
+                    "model": final_model,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
 
         template_guidance = (
             f"Template guidance:\n- Template id: {args.templateId}\n"
@@ -3388,6 +3617,10 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
                 funnel_ai._validate_sales_pdp_component_configs(args.puckData)
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
+        try:
+            funnel_ai._validate_imported_html_document_components(args.puckData)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
 
         allowed_set = set(args.allowedTypes or [])
         if allowed_set:

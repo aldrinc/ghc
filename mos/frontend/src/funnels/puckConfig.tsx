@@ -26,6 +26,7 @@ import {
 } from "@/components/imported-site/ImportedSourceSectionBlocks";
 import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { ImportedHtmlDocument as ImportedHtmlDocumentRenderer } from "@/funnels/ImportedHtmlDocument";
 import {
   navigationClickEventForStages,
   resolvePublicFunnelStage,
@@ -454,6 +455,24 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
       render: ({ children }) => <div className="w-full">{children}</div>,
     },
     components: {
+      ImportedHtmlDocument: {
+        fields: {
+          title: { type: "text" },
+          sourceLabel: { type: "text" },
+          htmlDocument: { type: "textarea" },
+        },
+        defaultProps: {
+          title: "Imported HTML document",
+          sourceLabel: "",
+          htmlDocument: "",
+        },
+        render: withBlockBoundary(
+          "ImportedHtmlDocument",
+          ({ id, title, htmlDocument }: { id?: string; title?: string; htmlDocument?: string }) => (
+            <ImportedHtmlDocumentRenderer id={id} title={title} htmlDocument={htmlDocument} />
+          ),
+        ),
+      },
       Section: {
         fields: {
           purpose: {

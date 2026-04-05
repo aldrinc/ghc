@@ -274,6 +274,7 @@ def run_generate_page_draft_stream(
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
                     "referenceHtmlMode": resolved_reference_html_mode,
+                    "referenceHtml": normalized_reference_html or None,
                     "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
                     "strategyPromptContext": strategy_ctx.get("strategyPromptContext"),
                 },
