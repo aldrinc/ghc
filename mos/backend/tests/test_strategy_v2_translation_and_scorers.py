@@ -552,6 +552,38 @@ def test_translate_stage1_extracts_identity_threat_cluster_label_as_bottleneck()
     assert stage1.bottleneck == "Career competence threat / workplace humiliation"
 
 
+def test_translate_stage1_extracts_numbered_distress_cluster_label_as_bottleneck() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": "Category / Niche: Supplements for women age 42-58\nValidated competitors (3)\n",
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "06": (
+                "## Phase 1 — Segment Discovery\n"
+                "### Step 1: Distinct buyer signals (clusters found in VOC)\n"
+                "1) **Work-performance shame + word-finding failures**\n"
+                "- \"I lose the thread mid-sentence in meetings\"\n"
+                "2) Symptom-stack overwhelm during caregiving hours\n"
+                "- \"Everything hits at once by 4pm\"\n"
+                "3) Prevention-minded protocol optimizers\n"
+                "- \"I want to stay sharp before it gets worse\"\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.bottleneck == "Work-performance shame + word-finding failures"
+
+
 def test_translate_stage1_derives_competitor_domains_from_validated_reference_blocks() -> None:
     stage0 = translate_stage0(
         product_name="Ember: Brain Clarity Protocol",
