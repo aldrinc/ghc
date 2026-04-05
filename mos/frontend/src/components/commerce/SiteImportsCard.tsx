@@ -80,8 +80,8 @@ function buildGenerationPrompt(args: {
   const productTitle = args.productTitle.trim() || "the active product";
   const basePrompt =
     args.templateId === "sales-pdp"
-      ? `Generate a sales page for ${productTitle}. Use the imported HTML as the primary structure and persuasion template, then rebuild it for the product inside the supported sales-pdp component system.`
-      : `Generate a pre-sales listicle page for ${productTitle}. Use the imported HTML as the primary structure and persuasion template, then rebuild it for the product inside the supported pre-sales-listicle component system.`;
+      ? `Generate a sales page for ${productTitle}. Preserve the imported HTML exactly and only inject the correct product and strategy copy into the existing template.`
+      : `Generate a pre-sales listicle page for ${productTitle}. Preserve the imported HTML exactly and only inject the correct product and strategy copy into the existing template.`;
   const instructions = args.additionalInstructions.trim();
   if (!instructions) return basePrompt;
   return `${basePrompt}\n\nAdditional instructions:\n${instructions}`;
@@ -316,12 +316,12 @@ export function SiteImportsCard({ workspaceId, activeWorkspaceProduct }: SiteImp
 
   return (
     <div className="ds-card ds-card--md space-y-4">
-      <div>
-        <div className="text-sm font-semibold text-content">Site imports</div>
-        <div className="text-xs text-content-muted">
-          Import HTML here, choose sales or pre-sales, and generate the funnel page directly from this template using the latest strategy copy.
+        <div>
+          <div className="text-sm font-semibold text-content">Site imports</div>
+          <div className="text-xs text-content-muted">
+          Import HTML here, choose sales or pre-sales, and generate the funnel page by preserving this template and injecting the latest strategy copy.
+          </div>
         </div>
-      </div>
 
       {!activeWorkspaceProduct ? (
         <div className="rounded-md border border-border bg-surface-2 p-3 text-xs text-content-muted">
@@ -371,7 +371,7 @@ export function SiteImportsCard({ workspaceId, activeWorkspaceProduct }: SiteImp
           <div>
             <div className="text-xs font-semibold text-content">Imported HTML template</div>
             <div className="text-[11px] text-content-muted">
-              Paste or upload the HTML export you want the funnel agent to use as reference. This flow requires the latest strategy copy outputs for the selected product.
+              Paste or upload the HTML export you want the funnel agent to preserve. This flow keeps the imported template intact and injects the latest strategy copy for the selected product.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -447,7 +447,7 @@ export function SiteImportsCard({ workspaceId, activeWorkspaceProduct }: SiteImp
           <div className="text-xs font-semibold text-content">Generation target</div>
           <div className="text-xs text-content-muted">{nextActionLabel}</div>
           <div className="text-[11px] text-content-muted">
-            Latest strategy copy is required and will drive the sales or pre-sales messaging before the imported HTML influences structure.
+            Latest strategy copy is required and will be injected into the imported HTML without rebuilding the template structure.
           </div>
         </div>
         <label className="flex items-center gap-2 text-xs text-content-muted">
