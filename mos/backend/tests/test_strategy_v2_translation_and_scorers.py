@@ -306,7 +306,7 @@ def test_translate_stage1_accepts_primary_challenge_label_for_bottleneck() -> No
     assert stage1.bottleneck == "confidence in dosage decisions"
 
 
-def test_translate_stage1_accepts_primary_segment_statement_for_bottleneck() -> None:
+def test_translate_stage1_uses_primary_segment_statement_to_select_primary_segment_profile() -> None:
     stage0 = translate_stage0(
         product_name="Honest Herbalist Handbook",
         product_description="Digital herbal safety guide.",
@@ -320,17 +320,32 @@ def test_translate_stage1_accepts_primary_segment_statement_for_bottleneck() -> 
                 '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
                 '"competitors":[{"name":"Competitor A"}]}'
             ),
+            "04": "Bottleneck: confidence in dosage decisions\n",
             "06": (
-                "1. Busy home herbal caregivers\n"
-                "2. Families researching non-pharma options\n"
-                "3. Skeptics needing sourcing transparency\n"
-                "The PRIMARY SEGMENT is Busy home herbal caregivers. "
-                "All downstream prompts should optimize for this segment first.\n"
+                "### Segment A\n"
+                "- Segment Name: Busy home herbal caregivers\n"
+                "- Estimated Prevalence: Common among daily supplement buyers\n"
+                "- Key Differentiator: They want simple and repeatable routines\n"
+                "\n"
+                "### Segment B\n"
+                "- Segment Name: Families researching non-pharma options\n"
+                "- Estimated Prevalence: Smaller but highly motivated cohort\n"
+                "- Key Differentiator: They compare ingredient sourcing across brands\n"
+                "\n"
+                "### Segment C\n"
+                "- Segment Name: Skeptics needing sourcing transparency\n"
+                "- Estimated Prevalence: Narrow but high-intent segment\n"
+                "- Key Differentiator: They need proof before trusting claims\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment B: Families researching non-pharma options.\n"
             ),
         },
     }
     stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
-    assert stage1.bottleneck == "Busy home herbal caregivers"
+    assert stage1.primary_segment.name == "Families researching non-pharma options"
+    assert stage1.primary_segment.size_estimate == "Smaller but highly motivated cohort"
+    assert stage1.primary_segment.key_differentiator == "They compare ingredient sourcing across brands"
+    assert stage1.bottleneck == "confidence in dosage decisions"
 
 
 def test_translate_stage1_accepts_bottleneck_segment_label_for_bottleneck() -> None:
@@ -359,7 +374,7 @@ def test_translate_stage1_accepts_bottleneck_segment_label_for_bottleneck() -> N
     assert stage1.bottleneck == "Busy home herbal caregivers"
 
 
-def test_translate_stage1_accepts_inline_primary_segment_label_for_bottleneck() -> None:
+def test_translate_stage1_requires_explicit_bottleneck_when_only_primary_segment_statement_is_present() -> None:
     stage0 = translate_stage0(
         product_name="Honest Herbalist Handbook",
         product_description="Digital herbal safety guide.",
@@ -382,8 +397,183 @@ def test_translate_stage1_accepts_inline_primary_segment_label_for_bottleneck() 
             ),
         },
     }
+    with pytest.raises(StrategyV2MissingContextError, match="requires a non-empty bottleneck"):
+        translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+
+def test_translate_stage1_filters_citation_urls_and_parses_segment_blocks_from_foundational_docs() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "Category / Niche: Supplements for women age 42-58\n"
+                "### Validated competitors (13)\n"
+                "- Ember Wellness https://emberwellness.example/products/brain-clarity "
+                "https://www.similarweb.com/website/emberwellness.example\n"
+                "- MenoLabs https://menolabs.example/products/memory-support "
+                "https://www.trustpilot.com/review/menolabs.example\n"
+                "- Clarity Keeper https://claritykeeper.example/protocol https://reference.example/brain-fog.pdf\n"
+                "- Press mention https://www.prnewswire.com/news-releases/ember-brain-clarity.html\n"
+                "Introduction calls are common during customer onboarding.\n"
+            ),
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": "#1 Bottleneck to Solve: fear of losing credibility at work when brain fog shows up\n",
+            "06": (
+                "### Segment A\n"
+                "- Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "- Estimated Prevalence: Dominant in the live VOC corpus across professional women 42-58\n"
+                "- Key Differentiator: Their urgency spikes when verbal fluency slips threaten visible competence\n"
+                "\n"
+                "### Segment B\n"
+                "- Segment Name: Exhausted Midlife Caregiver\n"
+                "- Estimated Prevalence: Secondary segment with recurring family-management overload\n"
+                "- Key Differentiator: They need a format that fits fragmented routines\n"
+                "\n"
+                "### Segment C\n"
+                "- Segment Name: Prevention-Oriented Optimizer\n"
+                "- Estimated Prevalence: Smaller but premium-leaning early adopter segment\n"
+                "- Key Differentiator: They respond to proactive performance framing and regimen precision\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
     stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
-    assert stage1.bottleneck == "Busy home herbal caregivers"
+
+    assert stage1.competitor_count_validated == 13
+    assert stage1.competitor_urls == [
+        "https://emberwellness.example/products/brain-clarity",
+        "https://menolabs.example/products/memory-support",
+        "https://claritykeeper.example/protocol",
+    ]
+    assert stage1.market_maturity_stage is None
+    assert stage1.primary_icps == [
+        "Credibility-on-the-line Knowledge Worker",
+        "Exhausted Midlife Caregiver",
+        "Prevention-Oriented Optimizer",
+    ]
+    assert stage1.primary_segment.name == "Credibility-on-the-line Knowledge Worker"
+    assert stage1.primary_segment.size_estimate == "Dominant in the live VOC corpus across professional women 42-58"
+    assert (
+        stage1.primary_segment.key_differentiator
+        == "Their urgency spikes when verbal fluency slips threaten visible competence"
+    )
+    assert stage1.bottleneck == "fear of losing credibility at work when brain fog shows up"
+
+
+def test_translate_stage1_uses_primary_segment_key_differentiator_when_bottleneck_label_is_missing() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": "Category / Niche: Supplements for women age 42-58\nValidated competitors (3)\n",
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "06": (
+                "### Step 3: Named & bounded segments (3-5)\n"
+                "1) Credibility-on-the-line Knowledge Worker\n"
+                "2) Hormone-Restricted Relief Seeker\n"
+                "3) Evidence-First Protocol Optimizer\n"
+                "\n"
+                "# Segment A - Credibility-on-the-line Knowledge Worker\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "Estimated Prevalence: Large cluster in the live VOC set\n"
+                "Key Differentiator: Their primary pain is public and professional competence loss\n"
+                "\n"
+                "# Segment B - Hormone-Restricted Relief Seeker\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Hormone-Restricted Relief Seeker\n"
+                "Estimated Prevalence: Secondary but recurring cluster\n"
+                "Key Differentiator: They need clear non-hormonal safety framing\n"
+                "\n"
+                "# Segment C - Evidence-First Protocol Optimizer\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Evidence-First Protocol Optimizer\n"
+                "Estimated Prevalence: Smaller high-information cluster\n"
+                "Key Differentiator: They demand dose transparency and proof before trying anything\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.primary_segment.name == "Credibility-on-the-line Knowledge Worker"
+    assert stage1.bottleneck == "Their primary pain is public and professional competence loss"
+
+
+def test_translate_stage1_derives_competitor_domains_from_validated_reference_blocks() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "Category / Niche: Supplements for women age 42-58\n"
+                "### Validated competitors (3)\n"
+                "1) **O Positiv** - passes bar\n"
+                "- Similarweb: 2.6M visits. "
+                "([similarweb.com](https://www.similarweb.com/website/opositiv.com/))\n"
+                "2) **Happy Mammoth** - passes bar\n"
+                "- Trustpilot: 12,348 reviews. "
+                "([trustpilot.com](https://www.trustpilot.com/review/happymammoth.com))\n"
+                "3) **Bonafide (hellobonafide.com)** - passes bar\n"
+                "- Retail expansion press release indicates Target distribution. "
+                "([bankingpressreleases.com](https://bankingpressreleases.com/article/846036254-bonafide-health-announces-expansion))\n"
+            ),
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": "Bottleneck: fear of losing credibility when brain fog shows up at work\n",
+            "06": (
+                "# Segment A - Credibility-on-the-line Knowledge Worker\n"
+                "Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "Estimated Prevalence: Large cluster in the live VOC set\n"
+                "Key Differentiator: Their primary pain is public and professional competence loss\n"
+                "\n"
+                "# Segment B - Hormone-Restricted Relief Seeker\n"
+                "Segment Name: Hormone-Restricted Relief Seeker\n"
+                "Estimated Prevalence: Secondary but recurring cluster\n"
+                "Key Differentiator: They need clear non-hormonal safety framing\n"
+                "\n"
+                "# Segment C - Evidence-First Protocol Optimizer\n"
+                "Segment Name: Evidence-First Protocol Optimizer\n"
+                "Estimated Prevalence: Smaller high-information cluster\n"
+                "Key Differentiator: They demand dose transparency and proof before trying anything\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/",
+        "https://happymammoth.com/",
+        "https://hellobonafide.com/",
+    ]
 
 
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:

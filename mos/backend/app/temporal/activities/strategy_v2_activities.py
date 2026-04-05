@@ -12969,6 +12969,7 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
                 "category_niche": precanon_research.get("category_niche"),
                 "step_contents": {
                     "01": foundational_step_contents["01"],
+                    "04": foundational_step_contents["04"],
                     "06": foundational_step_contents["06"],
                 },
             },
