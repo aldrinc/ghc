@@ -475,6 +475,13 @@ def _extract_bottleneck(step6_content: str) -> str | None:
         match = re.search(pattern, step6_content)
         if match and match.group(1).strip():
             return _strip_markdown_formatting(match.group(1))
+    threat_cluster_patterns = (
+        r"(?im)^\s*(?:[-*]\s*)?([A-Za-z][A-Za-z0-9/&(),'\-\s]+(?:threat|humiliation|embarrassment|stigma)[A-Za-z0-9/&(),'\-\s]*)\s*:\s*(.+)$",
+    )
+    for pattern in threat_cluster_patterns:
+        match = re.search(pattern, step6_content)
+        if match and match.group(1).strip():
+            return _strip_markdown_formatting(match.group(1))
     return None
 
 
