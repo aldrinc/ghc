@@ -74,6 +74,72 @@ export type PublicFunnelMeta = {
 
 export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
 
+export type ImportedHtmlTrackEventType =
+  | "pre_sales_to_sales_click"
+  | "sales_to_checkout_click"
+  | "custom_page_click";
+
+export type ImportedHtmlOptionSelector = {
+  name: string;
+  selector: string;
+  source: "value" | "text";
+};
+
+export type ImportedHtmlVariantResolver =
+  | {
+      type: "fixed";
+      variantId: string;
+    }
+  | {
+      type: "option_values";
+      optionSelectors: ImportedHtmlOptionSelector[];
+    };
+
+export type ImportedHtmlCheckoutConfig =
+  | {
+      mode: "public_checkout";
+      variantResolver: ImportedHtmlVariantResolver;
+    }
+  | {
+      mode: "external_checkout_url";
+      variantResolver: ImportedHtmlVariantResolver;
+      externalUrlsByVariant: Array<{
+        variantId: string;
+        url: string;
+      }>;
+    };
+
+export type ImportedHtmlInstrumentationBinding =
+  | {
+      id: string;
+      type: "internal_navigation";
+      selector: string;
+      event: "click";
+      targetPageId: string;
+      trackEventType: ImportedHtmlTrackEventType;
+    }
+  | {
+      id: string;
+      type: "checkout";
+      selector: string;
+      event: "click";
+      trackEventType: ImportedHtmlTrackEventType;
+      checkout: ImportedHtmlCheckoutConfig;
+    }
+  | {
+      id: string;
+      type: "track_only";
+      selector: string;
+      event: "click";
+      trackEventType: ImportedHtmlTrackEventType;
+    };
+
+export type ImportedHtmlInstrumentationManifest = {
+  schemaVersion: "imported-html-instrumentation-v1";
+  pageStage: PublicFunnelStage;
+  bindings: ImportedHtmlInstrumentationBinding[];
+};
+
 // Site page types for commerce experiences
 export type SitePageType =
   | "home"

@@ -32,6 +32,15 @@ from app.services.html_funnel_reference import (
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    build_imported_html_generation_context,
+    coerce_imported_html_instrumentation_manifest,
+    imported_html_instrumentation_schema,
+    imported_html_selector_hint,
+    resolve_funnel_page_stage,
+    validate_imported_html_document_manifest,
+)
 from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.funnel_testimonials import (
     generate_funnel_page_testimonials,
@@ -73,20 +82,24 @@ def _build_imported_html_document_puck_data(
     html_document: str,
     page_name: str,
     reference_label: str | None = None,
+    instrumentation_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     title = page_name.strip() or "Imported HTML Page"
     source_label = (reference_label or "").strip() or None
+    props: dict[str, Any] = {
+        "id": "imported-html-document",
+        "title": title,
+        "sourceLabel": source_label,
+        "htmlDocument": html_document,
+    }
+    if instrumentation_manifest is not None:
+        props["instrumentationManifest"] = instrumentation_manifest
     return {
         "root": {"props": {"title": title, "description": f"Imported HTML template for {title}."}},
         "content": [
             {
                 "type": "ImportedHtmlDocument",
-                "props": {
-                    "id": "imported-html-document",
-                    "title": title,
-                    "sourceLabel": source_label,
-                    "htmlDocument": html_document,
-                },
+                "props": props,
             }
         ],
         "zones": {},
@@ -1399,6 +1412,12 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             "pageId": str(page.id),
             "pageName": page.name,
             "pageSlug": page.slug,
+            "pageStage": resolve_funnel_page_stage(
+                slug=page.slug,
+                template_id=page.template_id,
+                page_name=page.name,
+            ),
+            "nextPageId": str(page.next_page_id) if page.next_page_id else None,
             "pageContext": page_context,
             "pageIdSet": sorted(page_id_set),
             "basePuckData": base_puck,
@@ -1926,12 +1945,67 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             reference_html = str(args.referenceHtml or "").strip()
             if not reference_html:
                 raise ValueError("referenceHtmlMode='template' requires referenceHtml for exact HTML generation.")
+            funnel = ctx.session.scalars(
+                select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+            ).first()
+            if not funnel:
+                raise ValueError("Funnel not found")
+            page = ctx.session.scalars(
+                select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+            ).first()
+            if not page:
+                raise ValueError("Page not found")
+
+            current_page_stage = resolve_funnel_page_stage(
+                slug=page.slug,
+                template_id=page.template_id,
+                page_name=page.name,
+            )
+            publication_pages = list(
+                ctx.session.scalars(
+                    select(FunnelPage)
+                    .where(FunnelPage.funnel_id == funnel.id)
+                    .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+                ).all()
+            )
+            page_targets = [
+                {
+                    "id": str(candidate.id),
+                    "name": candidate.name,
+                    "slug": candidate.slug,
+                    "stage": resolve_funnel_page_stage(
+                        slug=candidate.slug,
+                        template_id=candidate.template_id,
+                        page_name=candidate.name,
+                    ),
+                }
+                for candidate in publication_pages
+                if str(candidate.id) != str(page.id)
+            ]
+            checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+            if funnel.selected_offer_id:
+                checkout_variants_query = checkout_variants_query.where(
+                    ProductVariant.offer_id == funnel.selected_offer_id
+                )
+            checkout_ready_variants = [
+                variant
+                for variant in ctx.session.scalars(checkout_variants_query).all()
+                if funnel_ai._normalize_variant_provider(variant.provider)
+                and str(variant.external_price_id or "").strip()
+            ]
+            imported_runtime_context = build_imported_html_generation_context(
+                current_page_stage=current_page_stage,
+                current_page_id=str(page.id),
+                next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                page_targets=page_targets,
+                checkout_ready_variants=checkout_ready_variants,
+            )
 
             system_content = (
                 "You are updating an uploaded HTML template for a funnel page.\n\n"
                 "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
                 "Return exactly ONE JSON object with this shape:\n"
-                '{ "assistantMessage": string, "htmlDocument": string }\n\n'
+                '{ "assistantMessage": string, "htmlDocument": string, "instrumentationManifest": object }\n\n'
                 "assistantMessage requirements:\n"
                 "- Plain text only.\n"
                 f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.\n"
@@ -1945,6 +2019,18 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Keep rewritten text roughly similar in length so the layout stays visually identical.\n"
                 "- Do NOT rewrite script contents, style contents, or comments.\n"
                 "- Do NOT convert the page into Puck primitives or component JSON.\n\n"
+                "instrumentationManifest requirements:\n"
+                f"- schemaVersion MUST be '{imported_runtime_context['schemaVersion']}'.\n"
+                f"- pageStage MUST be '{current_page_stage}'.\n"
+                "- Use the exact manifest JSON schema below.\n"
+                f"- {imported_html_selector_hint()}\n"
+                "- Every selector MUST match exactly one existing element in the uploaded HTML.\n"
+                "- Do NOT invent ids, classes, attributes, hrefs, or target page ids.\n"
+                "- For pre-sales pages, bind the primary CTA to the configured next page with an internal_navigation binding.\n"
+                "- For sales pages, bind the primary buy CTA with a checkout binding.\n"
+                "- Prefer checkout.mode='public_checkout'. Use checkout.mode='external_checkout_url' only when an explicit per-variant external URL map is required.\n"
+                "- If the page has variant/pack selectors, use an option_values resolver with selectors that read the live chosen values from the existing HTML controls.\n"
+                "- If exactly one checkout-ready variant exists and there is no visible variant choice, use a fixed resolver with that variantId.\n\n"
                 "Copy goals:\n"
                 "- Keep the uploaded HTML visually identical.\n"
                 "- Inject accurate product, offer, and strategy copy for this funnel.\n"
@@ -1954,6 +2040,10 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 f"{copy_pack_guidance}"
                 f"{args.productContext}"
                 f"{attachment_guidance}"
+                "Imported HTML runtime context:\n"
+                f"{json.dumps(imported_runtime_context, ensure_ascii=False)}\n\n"
+                "instrumentationManifest JSON schema:\n"
+                f"{json.dumps(imported_html_instrumentation_schema(), ensure_ascii=False)}\n\n"
                 "HTML summary for orientation only:\n"
                 f"{json.dumps(args.htmlReferencePromptContext or {}, ensure_ascii=False)}\n\n"
                 "Uploaded HTML document to rewrite in place:\n"
@@ -2076,6 +2166,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
 
             assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage"))
             rewritten_html = _coerce_html_document(obj.get("htmlDocument"))
+            instrumentation_manifest = coerce_imported_html_instrumentation_manifest(obj.get("instrumentationManifest"))
             try:
                 assert_html_text_only_rewrite(
                     original_html=reference_html,
@@ -2083,11 +2174,25 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 )
             except HtmlStructureMismatchError as exc:
                 raise RuntimeError(str(exc)) from exc
+            try:
+                instrumentation_manifest = validate_imported_html_document_manifest(
+                    html_document=rewritten_html,
+                    instrumentation_manifest=instrumentation_manifest,
+                    current_page_stage=current_page_stage,
+                    current_page_id=str(page.id),
+                    next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                    available_target_page_ids={str(candidate.id) for candidate in publication_pages},
+                    checkout_ready_variants=checkout_ready_variants,
+                    require_stage_bindings=current_page_stage in {"pre_sales", "sales"},
+                )
+            except ImportedHtmlRuntimeValidationError as exc:
+                raise RuntimeError(str(exc)) from exc
 
             puck_data = _build_imported_html_document_puck_data(
                 html_document=rewritten_html,
                 page_name=args.pageName,
                 reference_label=(args.htmlReferencePromptContext or {}).get("label"),
+                instrumentation_manifest=instrumentation_manifest,
             )
             funnel_ai._ensure_block_ids(puck_data)
 

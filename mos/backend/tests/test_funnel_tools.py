@@ -28,7 +28,7 @@ from app.agent.funnel_tools import (
 )
 from app.agent.types import ToolContext
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionStatusEnum
-from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product
+from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product, ProductVariant
 from app.services.funnel_templates import get_funnel_template
 from tests.conftest import TEST_ORG_ID
 
@@ -196,6 +196,49 @@ def test_context_load_funnel_uses_exact_imported_html_component_for_template_mod
 
 
 def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_session, monkeypatch):
+    client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(org_id=TEST_ORG_ID, client_id=client.id, title="Ember")
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    funnel = Funnel(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        name="Imported HTML Funnel",
+        route_slug="imported-html-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales Page",
+        slug="sales",
+        template_id="sales-pdp",
+    )
+    db_session.add(page)
+    db_session.commit()
+    db_session.refresh(page)
+
+    variant = ProductVariant(
+        product_id=product.id,
+        title="Default",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
+
     captured: dict[str, str] = {}
     reference_html = (
         "<!doctype html><html><body><section class='hero'><h1>Original title</h1>"
@@ -205,6 +248,26 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
         "<!doctype html><html><body><section class='hero'><h1>Updated title</h1>"
         "<p>Updated body.</p></section></body></html>"
     )
+    instrumentation_manifest = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "sales",
+        "bindings": [
+            {
+                "id": "primary-buy",
+                "type": "checkout",
+                "selector": "section.hero",
+                "event": "click",
+                "trackEventType": "sales_to_checkout_click",
+                "checkout": {
+                    "mode": "public_checkout",
+                    "variantResolver": {
+                        "type": "fixed",
+                        "variantId": str(variant.id),
+                    },
+                },
+            }
+        ],
+    }
 
     class _FakeLLM:
         def __init__(self) -> None:
@@ -217,6 +280,7 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
                 {
                     "assistantMessage": "Ember page preview.",
                     "htmlDocument": rewritten_html,
+                    "instrumentationManifest": instrumentation_manifest,
                 }
             )
 
@@ -241,8 +305,8 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
         ctx=ctx,
         args=DraftGeneratePageArgs(
             orgId=str(TEST_ORG_ID),
-            funnelId="funnel-id",
-            pageId="page-id",
+            funnelId=str(funnel.id),
+            pageId=str(page.id),
             pageName="Landing",
             prompt="Generate the page from the uploaded HTML.",
             messages=[],
@@ -275,8 +339,10 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
     saved_component = result.ui_details["puckData"]["content"][0]
     assert saved_component["type"] == "ImportedHtmlDocument"
     assert saved_component["props"]["htmlDocument"] == rewritten_html
+    assert saved_component["props"]["instrumentationManifest"] == instrumentation_manifest
     assert "Only replace human-facing copy text inside existing text nodes" in captured["prompt"]
     assert "Preserve the exact tag order, nesting, attributes, classes, ids" in captured["prompt"]
+    assert "instrumentationManifest requirements" in captured["prompt"]
     assert "Uploaded HTML document to rewrite in place" in captured["prompt"]
     assert reference_html in captured["prompt"]
 

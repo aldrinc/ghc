@@ -688,6 +688,7 @@ export function PublicFunnelPage() {
             nextPageId: page.nextPageId ?? null,
             visitorId,
             sessionId,
+            publicRuntime: true,
           }}
         >
           {useB2CRuntime ? (
@@ -752,6 +753,7 @@ export function PublicFunnelPage() {
           nextPageId: page.nextPageId ?? null,
           visitorId,
           sessionId,
+          publicRuntime: true,
         }}
       >
         <DesignSystemProvider tokens={page.designSystemTokens}>

@@ -36,10 +36,16 @@ from app.db.models import (
     FunnelPublicationLink,
     FunnelPublicationPage,
     Product,
+    ProductVariant,
 )
 from app.services.funnel_metadata import (
     build_public_page_metadata_for_context,
     normalize_public_page_metadata_for_context,
+)
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    resolve_funnel_page_stage,
+    validate_imported_html_document_manifest,
 )
 from app.services.public_routing import require_product_route_slug
 from app.services.media_storage import MediaStorage
@@ -265,6 +271,51 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
                     "Replace with production testimonials or remove testimonials before publishing."
                 )
         version_by_page[str(page.id)] = version
+
+    page_id_set = {str(page.id) for page in pages}
+    checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+    if funnel.selected_offer_id:
+        checkout_variants_query = checkout_variants_query.where(
+            ProductVariant.offer_id == funnel.selected_offer_id
+        )
+    checkout_ready_variants = [
+        variant
+        for variant in session.scalars(checkout_variants_query).all()
+        if str(variant.external_price_id or "").strip() and str(variant.provider or "").strip()
+    ]
+    for page in pages:
+        page_stage = resolve_funnel_page_stage(
+            slug=page.slug,
+            template_id=page.template_id,
+            page_name=page.name,
+        )
+        puck_data = version_by_page[str(page.id)].puck_data
+        for obj in _walk_json(puck_data):
+            if not isinstance(obj, dict) or obj.get("type") != "ImportedHtmlDocument":
+                continue
+            props = obj.get("props")
+            if not isinstance(props, dict):
+                raise ValueError(f"Page '{page.name}' contains an ImportedHtmlDocument without props.")
+            html_document = props.get("htmlDocument")
+            if not isinstance(html_document, str) or not html_document.strip():
+                raise ValueError(
+                    f"Page '{page.name}' contains an ImportedHtmlDocument without htmlDocument."
+                )
+            try:
+                validate_imported_html_document_manifest(
+                    html_document=html_document,
+                    instrumentation_manifest=props.get("instrumentationManifest"),
+                    current_page_stage=page_stage,
+                    current_page_id=str(page.id),
+                    next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                    available_target_page_ids=page_id_set,
+                    checkout_ready_variants=checkout_ready_variants,
+                    require_stage_bindings=page_stage in {"pre_sales", "sales"},
+                )
+            except ImportedHtmlRuntimeValidationError as exc:
+                raise ValueError(
+                    f"Page '{page.name}' imported HTML runtime validation failed. {exc}"
+                ) from exc
 
     publication = FunnelPublication(
         funnel_id=funnel.id,

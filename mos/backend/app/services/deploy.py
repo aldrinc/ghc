@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.services.funnel_metadata import build_public_page_metadata_for_context
+from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services import namecheap_dns as namecheap_dns_service
 
 
@@ -1023,7 +1024,9 @@ def build_client_funnel_runtime_artifact_payload(
     from app.db.enums import FunnelStatusEnum
     from app.db.models import Funnel, FunnelPage, Product, ProductVariant
     from app.db.repositories.funnels import FunnelPublicRepository
+    from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
     from app.services.design_systems import resolve_design_system_tokens
+    from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
     from app.services.public_routing import require_product_route_slug
 
     template_to_artifact: dict[str, str] = {
@@ -1032,6 +1035,34 @@ def build_client_funnel_runtime_artifact_payload(
         "sales-pdp": "sales",
         "sales_pdp": "sales",
     }
+    mos_meta_tracking_metadata_key = "mosMetaTracking"
+
+    def _resolve_public_meta_tracking_for_funnel(client_funnel: Funnel) -> dict[str, str] | None:
+        profile = PaidAdsQaRepository(session).get_platform_profile(
+            org_id=str(client_funnel.org_id),
+            client_id=str(client_funnel.client_id),
+            platform="meta",
+        )
+        if profile is None:
+            return None
+        metadata_json = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+        mos_tracking = metadata_json.get(mos_meta_tracking_metadata_key)
+        if not isinstance(mos_tracking, dict):
+            return None
+        if normalize_tracking_provider(mos_tracking.get("status")) != "active":
+            return None
+        if normalize_tracking_provider(mos_tracking.get("mode")) != "public_funnel_runtime":
+            return None
+        if normalize_tracking_provider(mos_tracking.get("channel")) != "meta":
+            return None
+        pixel_id = clean_optional_text(mos_tracking.get("pixelId")) or clean_optional_text(profile.pixel_id)
+        if not pixel_id:
+            return None
+        return {
+            "provider": "meta",
+            "mode": "public_funnel_runtime",
+            "metaPixelId": pixel_id,
+        }
 
     client_funnels = list(
         session.scalars(
@@ -1141,6 +1172,15 @@ def build_client_funnel_runtime_artifact_payload(
             )
 
         page_map = {page_id: artifact_slug for artifact_slug, page_id, _, _ in page_details}
+        page_stage_map = {
+            page_id: resolve_funnel_page_stage(
+                slug=artifact_slug,
+                template_id=page.template_id if page else None,
+                page_name=page.name if page else None,
+            )
+            for artifact_slug, page_id, _, page in page_details
+        }
+        tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
         pages_payload: dict[str, dict[str, Any]] = {}
         for artifact_slug, page_id, version, page in page_details:
             tokens = resolve_design_system_tokens(
@@ -1175,10 +1215,13 @@ def build_client_funnel_runtime_artifact_payload(
                 "publicationId": active_publication_id,
                 "pageId": page_id,
                 "slug": artifact_slug,
+                "stage": page_stage_map.get(page_id, "custom"),
                 "puckData": materialized_puck_data,
                 "pageMap": page_map,
+                "pageStageMap": page_stage_map,
                 "designSystemTokens": tokens,
                 "metadata": metadata,
+                "tracking": tracking,
                 "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
             }
 

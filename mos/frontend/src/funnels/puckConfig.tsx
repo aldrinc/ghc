@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Config } from "@measured/puck";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ImportedAccordion,
   ImportedBadgeStrip,
@@ -28,6 +28,15 @@ import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRunti
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { ImportedHtmlDocument as ImportedHtmlDocumentRenderer } from "@/funnels/ImportedHtmlDocument";
 import {
+  matchesVariantOptionValues,
+  normalizeImportedHtmlManifest,
+  resolveExternalCheckoutUrlForVariant,
+  type ImportedHtmlRuntimeCheckoutMessage,
+  type ImportedHtmlRuntimeNavigateMessage,
+  type ImportedHtmlRuntimeTrackMessage,
+} from "@/funnels/importedHtmlRuntime";
+import {
+  checkoutClickEventForStage,
   navigationClickEventForStages,
   resolvePublicFunnelStage,
   type RuntimeTrackingEvent,
@@ -64,7 +73,12 @@ import {
   preSalesDefaults,
 } from "@/funnels/templates/preSalesListicle/PreSalesTemplate";
 import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
-import type { PublicFunnelCommerce, PublicFunnelStage, SitePageType } from "@/types/funnels";
+import type {
+  ImportedHtmlInstrumentationManifest,
+  PublicFunnelCommerce,
+  PublicFunnelStage,
+  SitePageType,
+} from "@/types/funnels";
 import {
   CommerceCatalogHero,
   CommerceProductGrid,
@@ -105,6 +119,7 @@ import {
   MedusaB2COrderTransferAcceptPage,
   MedusaB2COrderTransferDeclinePage,
 } from "@/components/commerce/b2c";
+import { pendingMetaPurchaseStorageKey, writePendingMetaPurchase } from "@/lib/metaCheckout";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
@@ -127,6 +142,7 @@ type FunnelRuntimeContextValue = {
   sessionId?: string | null;
   resolvePagePath?: (slug: string) => string;
   resolveSitePath?: (sitePath: string) => string;
+  publicRuntime?: boolean;
 };
 
 const FunnelRuntimeContext = createContext<FunnelRuntimeContextValue | null>(null);
@@ -445,6 +461,204 @@ function FunnelImage({ src, assetPublicId, alt, radius }: ImageProps) {
   return <img src={resolvedSrc} alt={alt || ""} className={`h-auto w-full ${radiusClass} border border-border`} />;
 }
 
+function getUtmParams(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const utm: Record<string, string> = {};
+  for (const [key, value] of params.entries()) {
+    if (key.startsWith("utm_")) {
+      utm[key] = value;
+    }
+  }
+  return utm;
+}
+
+function importedHtmlTrackingEventFromType(
+  eventType: ImportedHtmlRuntimeNavigateMessage["trackEventType"] | ImportedHtmlRuntimeTrackMessage["trackEventType"],
+  props?: Record<string, unknown>,
+): RuntimeTrackingEvent {
+  if (eventType === "pre_sales_to_sales_click") {
+    return { eventType: "pre_sales_to_sales_click", props };
+  }
+  if (eventType === "sales_to_checkout_click") {
+    return { eventType: "sales_to_checkout_click", props };
+  }
+  return { eventType: "custom_page_click", props };
+}
+
+function ImportedHtmlDocumentBlock({
+  id,
+  title,
+  htmlDocument,
+  instrumentationManifest,
+}: {
+  id?: string;
+  title?: string;
+  htmlDocument?: string;
+  instrumentationManifest?: Record<string, unknown> | null;
+}) {
+  const runtime = useFunnelRuntime();
+  const navigate = useNavigate();
+  const normalizedManifest = normalizeImportedHtmlManifest(
+    instrumentationManifest as ImportedHtmlInstrumentationManifest | Record<string, unknown> | null | undefined,
+  );
+
+  if (!runtime?.publicRuntime) {
+    return (
+      <ImportedHtmlDocumentRenderer
+        id={id}
+        title={title}
+        htmlDocument={htmlDocument}
+        instrumentationManifest={instrumentationManifest}
+      />
+    );
+  }
+
+  const handleNavigate = (message: ImportedHtmlRuntimeNavigateMessage) => {
+    const targetSlug = runtime.pageMap[message.targetPageId];
+    if (!targetSlug) {
+      console.error(
+        `[ImportedHtmlDocument] Missing target slug for page ${message.targetPageId} in funnel ${runtime.funnelSlug}.`,
+      );
+      return;
+    }
+    const targetStage = runtime.pageStageMap[message.targetPageId] || resolvePublicFunnelStage(targetSlug);
+    runtime.trackEvent?.(
+      importedHtmlTrackingEventFromType(message.trackEventType, {
+        fromStage: runtime.pageStage || "custom",
+        toStage: targetStage,
+        targetPageId: message.targetPageId,
+        buttonText: message.buttonText || undefined,
+      }),
+    );
+    navigate(resolveRuntimePagePath(runtime, targetSlug));
+  };
+
+  const handleTrack = (message: ImportedHtmlRuntimeTrackMessage) => {
+    runtime.trackEvent?.(
+      importedHtmlTrackingEventFromType(message.trackEventType, {
+        fromStage: runtime.pageStage || "custom",
+        pageId: runtime.pageId || undefined,
+        buttonText: message.buttonText || undefined,
+        bindingId: message.bindingId,
+      }),
+    );
+  };
+
+  const handleCheckout = async (message: ImportedHtmlRuntimeCheckoutMessage) => {
+    const variants = runtime.commerce?.product?.variants || [];
+    const selectedVariant =
+      (message.variantId ? variants.find((variant) => variant.id === message.variantId) : undefined) ||
+      (message.selection ? variants.find((variant) => matchesVariantOptionValues(variant, message.selection || undefined)) : undefined);
+    const resolvedVariantId = selectedVariant?.id || message.variantId || null;
+
+    const checkoutProps = {
+      bindingId: message.bindingId,
+      buttonText: message.buttonText || undefined,
+      ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
+    };
+    runtime.trackEvent?.(
+      message.trackEventType === "sales_to_checkout_click"
+        ? checkoutClickEventForStage({
+            fromStage: runtime.pageStage || "custom",
+            props: checkoutProps,
+          })
+        : importedHtmlTrackingEventFromType(message.trackEventType, {
+            fromStage: runtime.pageStage || "custom",
+            toStage: "checkout",
+            ...checkoutProps,
+          }),
+    );
+
+    if (message.checkoutMode === "external_checkout_url") {
+      const checkoutUrl = resolveExternalCheckoutUrlForVariant(message.externalUrlsByVariant || [], resolvedVariantId);
+      if (!checkoutUrl) {
+        console.error(
+          `[ImportedHtmlDocument] Missing external checkout URL for binding ${message.bindingId}.`,
+        );
+        return;
+      }
+      window.location.href = checkoutUrl;
+      return;
+    }
+
+    const checkoutReturnUrl = new URL(window.location.href);
+    const checkoutCancelUrl = new URL(window.location.href);
+    checkoutReturnUrl.searchParams.set("checkout", "success");
+    checkoutCancelUrl.searchParams.set("checkout", "cancel");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/public/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          funnelSlug: runtime.funnelSlug,
+          variantId: resolvedVariantId || undefined,
+          selection: message.selection || {},
+          quantity: 1,
+          successUrl: checkoutReturnUrl.toString(),
+          cancelUrl: checkoutCancelUrl.toString(),
+          pageId: runtime.pageId || undefined,
+          visitorId: runtime.visitorId || undefined,
+          sessionId: runtime.sessionId || undefined,
+          utm: getUtmParams(),
+        }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || response.statusText || "Checkout failed.");
+      }
+      const data = (await response.json()) as { checkoutUrl?: string };
+      if (!data.checkoutUrl) {
+        throw new Error("Checkout URL is missing.");
+      }
+      const normalizedProvider =
+        typeof selectedVariant?.provider === "string" ? selectedVariant.provider.trim().toLowerCase() : "";
+      const pendingPurchaseKey = pendingMetaPurchaseStorageKey(runtime.sessionId || null, runtime.funnelSlug);
+      if (normalizedProvider === "stripe" && pendingPurchaseKey && selectedVariant) {
+        writePendingMetaPurchase(sessionStorage, pendingPurchaseKey, {
+          funnelSlug: runtime.funnelSlug,
+          pageId: runtime.pageId || null,
+          variantId: selectedVariant.id,
+          value: selectedVariant.price,
+          currency: selectedVariant.currency || null,
+          quantity: 1,
+          provider: normalizedProvider,
+        });
+      }
+      window.location.href = data.checkoutUrl;
+    } catch (error) {
+      console.error(
+        `[ImportedHtmlDocument] Checkout failed for binding ${message.bindingId}.`,
+        error,
+      );
+    }
+  };
+
+  return (
+    <ImportedHtmlDocumentRenderer
+      id={id}
+      title={title}
+      htmlDocument={htmlDocument}
+      instrumentationManifest={instrumentationManifest}
+      runtimeActions={
+        normalizedManifest
+          ? {
+              manifest: normalizedManifest,
+              onNavigate: handleNavigate,
+              onCheckout: (message) => {
+                void handleCheckout(message);
+              },
+              onTrack: handleTrack,
+              onError: (message) => {
+                console.error(`[ImportedHtmlDocument] ${message.message}`);
+              },
+            }
+          : null
+      }
+    />
+  );
+}
+
 export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
   return {
     root: {
@@ -468,8 +682,23 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         },
         render: withBlockBoundary(
           "ImportedHtmlDocument",
-          ({ id, title, htmlDocument }: { id?: string; title?: string; htmlDocument?: string }) => (
-            <ImportedHtmlDocumentRenderer id={id} title={title} htmlDocument={htmlDocument} />
+          ({
+            id,
+            title,
+            htmlDocument,
+            instrumentationManifest,
+          }: {
+            id?: string;
+            title?: string;
+            htmlDocument?: string;
+            instrumentationManifest?: Record<string, unknown> | null;
+          }) => (
+            <ImportedHtmlDocumentBlock
+              id={id}
+              title={title}
+              htmlDocument={htmlDocument}
+              instrumentationManifest={instrumentationManifest}
+            />
           ),
         ),
       },

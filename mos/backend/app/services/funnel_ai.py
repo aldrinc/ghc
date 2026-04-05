@@ -34,6 +34,11 @@ from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import CLAUDE_DEFAULT_MODEL, build_document_blocks, call_claude_structured_message
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    imported_html_instrumentation_schema,
+    validate_imported_html_document_manifest,
+)
 from app.services.funnels import default_puck_data
 from app.services.funnels import _walk_json as walk_json  # reuse internal helper
 from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
@@ -4876,8 +4881,9 @@ def _html_rewrite_output_schema() -> dict[str, Any]:
                 "type": "string",
                 "description": "Rewritten full HTML document with the exact same DOM structure and attributes.",
             },
+            "instrumentationManifest": imported_html_instrumentation_schema(),
         },
-        "required": ["assistantMessage", "htmlDocument"],
+        "required": ["assistantMessage", "htmlDocument", "instrumentationManifest"],
     }
 
 
@@ -5073,6 +5079,9 @@ def _sanitize_component_tree(items: Any, allowed_types: set[str]) -> list[dict[s
         elif t == "ImportedHtmlDocument":
             if not isinstance(props.get("htmlDocument"), str):
                 props["htmlDocument"] = ""
+            instrumentation_manifest = props.get("instrumentationManifest")
+            if instrumentation_manifest is not None and not isinstance(instrumentation_manifest, dict):
+                props["instrumentationManifest"] = None
 
         cleaned.append(cast(dict[str, Any], raw))
 
@@ -5091,6 +5100,20 @@ def _validate_imported_html_document_components(puck_data: dict[str, Any]) -> No
         html_document = props.get("htmlDocument")
         if not isinstance(html_document, str) or not html_document.strip():
             raise ValueError("ImportedHtmlDocument.props.htmlDocument must be a non-empty string.")
+        instrumentation_manifest = props.get("instrumentationManifest")
+        try:
+            validate_imported_html_document_manifest(
+                html_document=html_document,
+                instrumentation_manifest=instrumentation_manifest,
+                current_page_stage=(
+                    instrumentation_manifest.get("pageStage")
+                    if isinstance(instrumentation_manifest, dict)
+                    else "custom"
+                ),
+                require_stage_bindings=False,
+            )
+        except ImportedHtmlRuntimeValidationError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 def _resolve_image_asset_key(obj: dict[str, Any]) -> str | None:

@@ -54,10 +54,10 @@ from app.services.compliance import (
     list_policy_page_keys,
     render_policy_template_markdown,
 )
-from app.services.campaign_destinations import normalize_destination_type
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
 from app.services.funnel_metadata import build_public_page_metadata_for_context
+from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import normalize_route_token, require_product_route_slug
@@ -132,38 +132,11 @@ def create_shopify_checkout(
 def _public_page_stage(
     *, slug: str | None = None, template_id: str | None = None, page_name: str | None = None
 ) -> str:
-    normalized_template_id = clean_optional_text(template_id)
-    if normalized_template_id in {"pre-sales-listicle", "pre_sales_listicle"}:
-        return "pre_sales"
-    if normalized_template_id in {"sales-pdp", "sales_pdp"}:
-        return "sales"
-
-    normalized = normalize_destination_type(slug)
-    if normalized == "pre-sales":
-        return "pre_sales"
-    if normalized == "sales":
-        return "sales"
-    if normalized == "checkout":
-        return "checkout"
-    if normalized == "thank-you":
-        return "thank_you"
-
-    normalized_name = clean_optional_text(page_name)
-    if normalized_name:
-        lowered_name = normalized_name.lower()
-        if (
-            "pre-sales" in lowered_name
-            or "presales" in lowered_name
-            or "advertorial" in lowered_name
-        ):
-            return "pre_sales"
-        if "sales" in lowered_name or "pdp" in lowered_name or "product page" in lowered_name:
-            return "sales"
-        if "checkout" in lowered_name:
-            return "checkout"
-        if "thank" in lowered_name:
-            return "thank_you"
-    return "custom"
+    return resolve_funnel_page_stage(
+        slug=slug,
+        template_id=template_id,
+        page_name=page_name,
+    )
 
 
 # Site page types for commerce experiences
