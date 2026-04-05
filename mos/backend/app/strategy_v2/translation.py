@@ -475,13 +475,19 @@ def _extract_bottleneck(step6_content: str) -> str | None:
         match = re.search(pattern, step6_content)
         if match and match.group(1).strip():
             return _strip_markdown_formatting(match.group(1))
-    threat_cluster_patterns = (
-        r"(?im)^\s*(?:[-*]\s*)?([A-Za-z][A-Za-z0-9/&(),'\-\s]+(?:threat|humiliation|embarrassment|stigma)[A-Za-z0-9/&(),'\-\s]*)\s*:\s*(.+)$",
+    distress_keywords = re.compile(
+        r"(?i)\b(?:threat|humiliation|embarrassment|stigma|shame|failure|failures|fear|brain\s+blanks?|word[-\s]+finding)\b"
     )
-    for pattern in threat_cluster_patterns:
-        match = re.search(pattern, step6_content)
-        if match and match.group(1).strip():
-            return _strip_markdown_formatting(match.group(1))
+    for raw_line in step6_content.splitlines():
+        if not re.match(r"^\s*(?:[-*]|\d+[.)])\s+", raw_line):
+            continue
+        normalized = _normalize_heading_text(raw_line)
+        candidate = re.sub(r"^\s*(?:[-*]|\d+[.)])\s+", "", normalized).strip()
+        if not candidate:
+            continue
+        label = candidate.split(":", 1)[0].strip()
+        if label and distress_keywords.search(label):
+            return _strip_markdown_formatting(label)
     return None
 
 
