@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 from app.strategy_v2.contracts import (
     AwarenessAngleMatrix,
@@ -75,6 +76,47 @@ _CATEGORY_KEYWORD_STOPWORDS = {
     "products",
 }
 
+_REFERENCE_DOMAIN_TOKENS = {
+    "aftership",
+    "accessnewswire",
+    "accesswire",
+    "bankingpressreleases",
+    "businesswire",
+    "globenewswire",
+    "hienergyrocket",
+    "modernretail",
+    "prnewswire",
+    "similarweb",
+    "trustpilot",
+    "truthinadvertising",
+    "wikipedia",
+}
+
+_NON_COMPETITOR_FILE_SUFFIXES = (".pdf", ".doc", ".docx", ".ppt", ".pptx")
+
+_SOCIAL_POST_HOST_TOKENS = {
+    "facebook.com",
+    "instagram.com",
+    "linkedin.com",
+    "reddit.com",
+    "tiktok.com",
+    "twitter.com",
+    "x.com",
+    "youtube.com",
+    "youtu.be",
+}
+
+_SOCIAL_POST_PATH_TOKENS = (
+    "/comments/",
+    "/p/",
+    "/posts/",
+    "/reel/",
+    "/reels/",
+    "/status/",
+    "/video/",
+    "/videos/",
+)
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[4]
@@ -128,6 +170,30 @@ def _extract_step_content(
             f"Missing precanon step content '{step_key}'. Remediation: {remediation}"
         )
     return step_content
+
+
+def _extract_optional_step_content(
+    *,
+    precanon_research: Mapping[str, object],
+    step_key: str,
+) -> str | None:
+    step_contents_raw = precanon_research.get("step_contents")
+    if not isinstance(step_contents_raw, dict):
+        return None
+    step_content = step_contents_raw.get(step_key)
+    if not isinstance(step_content, str) or not step_content.strip():
+        return None
+    return step_content
+
+
+def _strip_markdown_formatting(value: str) -> str:
+    cleaned = value.replace("**", "").replace("__", "").replace("`", "").strip()
+    return re.sub(r"\s+", " ", cleaned).strip().strip("\"'")
+
+
+def _normalize_heading_text(value: str) -> str:
+    without_heading = re.sub(r"^\s*#+\s*", "", value)
+    return _strip_markdown_formatting(without_heading)
 
 
 def _extract_first_json_object(raw_text: str) -> dict[str, object]:
@@ -209,13 +275,21 @@ def _extract_structured_category_niche(precanon_research: Mapping[str, object]) 
 
 
 def _extract_market_maturity(step1_content: str) -> str | None:
+    patterns = (
+        r"(?im)^\s*market\s+maturity(?:\s+stage)?\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
+        r"(?im)^\s*lifecycle\s+stage\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, step1_content)
+        if match:
+            return match.group(1)
     for candidate in _MARKET_MATURITY_VALUES:
-        if re.search(rf"(?i)\b{re.escape(candidate)}\b", step1_content):
+        if re.search(rf"(?im)^\s*{re.escape(candidate)}\s+market\s*$", step1_content):
             return candidate
     return None
 
 
-def _extract_primary_icps(step6_content: str) -> list[str]:
+def _extract_primary_icps_from_list_items(step6_content: str) -> list[str]:
     candidates: list[str] = []
     for line in step6_content.splitlines():
         cleaned = line.strip()
@@ -227,11 +301,140 @@ def _extract_primary_icps(step6_content: str) -> list[str]:
             text = re.sub(r"^\d+[.)]\s+", "", cleaned).strip()
         else:
             continue
+        if re.match(
+            r"(?i)^(?:segment\s+name|estimated\s+prevalence|estimated\s+segment\s+size|segment\s+size(?:\s+estimate)?|size(?:\s+estimate)?|key\s+differentiator|differentiator)\s*[:=\-]",
+            text,
+        ):
+            continue
         if len(text) >= 8:
             candidates.append(text)
         if len(candidates) >= 3:
             break
     return candidates
+
+
+def _extract_segment_reference(
+    step6_content: str,
+) -> tuple[str | None, str | None]:
+    normalized_content = step6_content.replace("**", "").replace("__", "")
+    label_match = re.search(
+        r"(?im)\b(?:the\s+)?primary\s+segment\s+(?:is|[:=\-])\s*(segment\s+[A-Z0-9]+)(?:\s*[:=\-]\s*(.+?))?(?:[.\n]|$)",
+        normalized_content,
+    )
+    if label_match:
+        segment_label = label_match.group(1).strip()
+        segment_key_match = re.search(r"(?i)\bsegment\s+([A-Z0-9]+)\b", segment_label)
+        segment_key = segment_key_match.group(1).upper() if segment_key_match else None
+        segment_name = label_match.group(2).strip() if label_match.lastindex and label_match.lastindex >= 2 and label_match.group(2) else None
+        return segment_key, _strip_markdown_formatting(segment_name or "")
+
+    name_match = re.search(
+        r"(?im)\b(?:the\s+)?primary\s+segment\s+(?:is|[:=\-])\s*(.+?)(?:[.\n]|$)",
+        normalized_content,
+    )
+    if name_match and name_match.group(1).strip():
+        return None, _strip_markdown_formatting(name_match.group(1))
+
+    return None, None
+
+
+def _parse_segment_start(line: str) -> tuple[str, str | None] | None:
+    normalized = _normalize_heading_text(line)
+    normalized = re.sub(r"^\s*[-*]\s*", "", normalized)
+    if re.match(r"(?i)^segment\s+name\s*[:=\-]", normalized):
+        return None
+    with_name = re.match(r"(?i)^segment\s+([A-Z0-9]+)\s*[:=\-\u2013\u2014]\s*(.+)$", normalized)
+    if with_name:
+        return with_name.group(1).upper(), _strip_markdown_formatting(with_name.group(2))
+    without_name = re.match(r"(?i)^segment\s+([A-Z0-9]+)\b$", normalized)
+    if without_name:
+        return without_name.group(1).upper(), None
+    return None
+
+
+def _extract_labeled_block_value(block_lines: list[str], patterns: tuple[str, ...]) -> str | None:
+    block_text = "\n".join(_normalize_heading_text(line) for line in block_lines)
+    for pattern in patterns:
+        match = re.search(pattern, block_text)
+        if match and match.group(1).strip():
+            return _strip_markdown_formatting(match.group(1))
+    return None
+
+
+def _extract_segment_profiles(step6_content: str) -> list[dict[str, str]]:
+    profiles: list[dict[str, str]] = []
+    current_segment_key: str | None = None
+    current_segment_name: str | None = None
+    current_segment_lines: list[str] = []
+
+    def _flush_segment() -> None:
+        nonlocal current_segment_key, current_segment_name, current_segment_lines
+        if current_segment_key is None:
+            return
+        segment_name = current_segment_name or _extract_labeled_block_value(
+            current_segment_lines,
+            (r"(?im)^\s*(?:[-*]\s*)?segment\s+name\s*[:=\-]\s*(.+)$",),
+        )
+        if not segment_name:
+            current_segment_key = None
+            current_segment_name = None
+            current_segment_lines = []
+            return
+        profiles.append(
+            {
+                "segment_key": current_segment_key,
+                "name": segment_name,
+                "size_estimate": _extract_labeled_block_value(
+                    current_segment_lines,
+                    (
+                        r"(?im)^\s*(?:[-*]\s*)?(?:estimated\s+prevalence|estimated\s+segment\s+size|segment\s+size(?:\s+estimate)?|size(?:\s+estimate)?)\s*[:=\-]\s*(.+)$",
+                    ),
+                )
+                or "",
+                "key_differentiator": _extract_labeled_block_value(
+                    current_segment_lines,
+                    (r"(?im)^\s*(?:[-*]\s*)?(?:key\s+differentiator|differentiator)\s*[:=\-]\s*(.+)$",),
+                )
+                or "",
+            }
+        )
+        current_segment_key = None
+        current_segment_name = None
+        current_segment_lines = []
+
+    for raw_line in step6_content.splitlines():
+        segment_start = _parse_segment_start(raw_line)
+        if segment_start is not None:
+            _flush_segment()
+            current_segment_key, current_segment_name = segment_start
+            current_segment_lines = [raw_line]
+            continue
+        if current_segment_key is not None:
+            current_segment_lines.append(raw_line)
+
+    _flush_segment()
+    return profiles
+
+
+def _extract_primary_icps(step6_content: str, segment_profiles: list[dict[str, str]]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _append(value: str) -> None:
+        cleaned = _strip_markdown_formatting(value)
+        if not cleaned:
+            return
+        normalized = cleaned.lower()
+        if normalized in seen:
+            return
+        seen.add(normalized)
+        ordered.append(cleaned)
+
+    for profile in segment_profiles:
+        _append(profile.get("name", ""))
+    for item in _extract_primary_icps_from_list_items(step6_content):
+        _append(item)
+    return ordered
 
 
 def _extract_primary_segment_size_estimate(step6_content: str) -> str | None:
@@ -260,21 +463,18 @@ def _extract_primary_segment_key_differentiator(step6_content: str) -> str | Non
 
 def _extract_bottleneck(step6_content: str) -> str | None:
     patterns = (
-        r"(?im)^\s*(?:primary|main|core|key|critical)?\s*bottleneck(?:\s+to\s+solve)?\s*[:=\-]\s*(.+)$",
+        r"(?im)^\s*(?:#\d+\s*)?(?:primary|main|core|key|critical)?\s*bottleneck(?:\s+to\s+solve)?\s*[:=\-]\s*(.+)$",
         r"(?im)^\s*(?:primary|main|core|key|critical)?\s*bottleneck\s+segment(?:\s+identification)?\s*[:=\-]\s*(.+)$",
         r"(?im)\bbottleneck\s+segment\s*[:=\-]\s*(.+?)(?:[.\n]|$)",
         r"(?im)\b(?:primary|main|core|key|critical)?\s*bottleneck(?:\s+to\s+solve)?\s*[:=\-]\s*(.+?)(?:[.\n]|$)",
-        r"(?im)^\s*highest(?:[-\s]+leverage)?\s+(?:segment|opportunity)\s*[:=\-]\s*(.+)$",
-        r"(?im)^\s*(?:primary|main|core|key|critical)\s+(?:challenge|obstacle|constraint|friction(?:\s+point)?)\s*[:=\-]\s*(.+)$",
-        r"(?im)^\s*(?:challenge|obstacle|constraint|friction(?:\s+point)?)\s*[:=\-]\s*(.+)$",
-        r"(?im)^\s*primary\s+segment\s*[:=\-]\s*(.+)$",
-        r"(?im)\b(?:the\s+)?primary\s+segment\s*(?:is|[:=\-])\s*(.+?)(?:[.\n]|$)",
-        r"(?im)\bsegment\s+with\s+the\s+highest\s+product\s+is\s+(.+?)(?:[.\n]|$)",
+        r"(?im)^\s*(?:#\d+\s*)?highest(?:[-\s]+leverage)?\s+(?:segment|opportunity)\s*[:=\-]\s*(.+)$",
+        r"(?im)^\s*(?:#\d+\s*)?(?:primary|main|core|key|critical)\s+(?:challenge|obstacle|constraint|friction(?:\s+point)?)\s*[:=\-]\s*(.+)$",
+        r"(?im)^\s*(?:#\d+\s*)?(?:challenge|obstacle|constraint|friction(?:\s+point)?)\s*[:=\-]\s*(.+)$",
     )
     for pattern in patterns:
         match = re.search(pattern, step6_content)
         if match and match.group(1).strip():
-            return match.group(1).strip().strip("\"'")
+            return _strip_markdown_formatting(match.group(1))
     return None
 
 
@@ -305,14 +505,165 @@ def _extract_urls(text: str) -> list[str]:
     return urls
 
 
-def _extract_competitor_count(step1_content: str, competitor_urls: list[str]) -> int | None:
-    explicit = re.search(r"(?im)validated\s+competitor[s]?\s*[:=]\s*(\d+)", step1_content)
-    if explicit:
-        return int(explicit.group(1))
+def _is_probable_competitor_url(url: str) -> bool:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    path = parsed.path.lower()
+    if not host:
+        return False
+    if any(token in host for token in _REFERENCE_DOMAIN_TOKENS):
+        return False
+    if any(path.endswith(suffix) for suffix in _NON_COMPETITOR_FILE_SUFFIXES):
+        return False
+    if any(host.endswith(token) for token in _SOCIAL_POST_HOST_TOKENS):
+        if path == "/watch" or any(token in path for token in _SOCIAL_POST_PATH_TOKENS):
+            return False
+    return True
 
-    urls = _extract_urls(step1_content)
-    if urls:
-        return len(urls)
+
+def _extract_first_probable_competitor_url(text: str) -> str | None:
+    for url in _extract_urls(text):
+        if _is_probable_competitor_url(url):
+            return url
+    return None
+
+
+def _extract_domain_reference(text: str) -> str | None:
+    for match in re.finditer(
+        r"\b([A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]*)?\b",
+        text,
+    ):
+        domain = match.group(1).strip().lower().strip(".")
+        if domain.startswith("www."):
+            domain = domain[4:]
+        if any(token in domain for token in _REFERENCE_DOMAIN_TOKENS):
+            continue
+        return domain
+    return None
+
+
+def _derive_competitor_url_from_reference(url: str) -> str | None:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.")
+    path = parsed.path.strip("/")
+    if not host:
+        return None
+    if "similarweb" in host:
+        match = re.search(r"(?i)(?:^|/)website/([^/]+)", path)
+        if match:
+            domain = _extract_domain_reference(match.group(1))
+            if domain:
+                return f"https://{domain}/"
+    if "trustpilot" in host:
+        match = re.search(r"(?i)(?:^|/)review/([^/]+)", path)
+        if match:
+            domain = _extract_domain_reference(match.group(1))
+            if domain:
+                return f"https://{domain}/"
+    if "aftership.com" in host:
+        match = re.search(r"(?i)(?:^|/)brands/([^/]+)", path)
+        if match:
+            domain = _extract_domain_reference(match.group(1))
+            if domain:
+                return f"https://{domain}/"
+    return None
+
+
+def _extract_validated_competitor_blocks(step1_content: str) -> list[str]:
+    blocks: list[str] = []
+    current_block: list[str] = []
+    in_validated_section = False
+
+    def _flush_current_block() -> None:
+        nonlocal current_block
+        if current_block:
+            blocks.append("\n".join(current_block))
+            current_block = []
+
+    for raw_line in step1_content.splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("#"):
+            heading = _normalize_heading_text(stripped).lower()
+            if "validated competitors" in heading:
+                _flush_current_block()
+                in_validated_section = True
+                continue
+            if in_validated_section:
+                _flush_current_block()
+                break
+        if not in_validated_section:
+            continue
+        if re.match(r"^\s*\d+\)\s+", raw_line):
+            _flush_current_block()
+        if current_block or re.match(r"^\s*\d+\)\s+", raw_line):
+            current_block.append(raw_line)
+
+    _flush_current_block()
+    return blocks
+
+
+def _extract_competitor_url_from_validated_block(block: str) -> str | None:
+    for url in _extract_urls(block):
+        if _is_probable_competitor_url(url):
+            return url
+
+    domain_reference = _extract_domain_reference(block)
+    if domain_reference:
+        return f"https://{domain_reference}/"
+
+    for url in _extract_urls(block):
+        derived = _derive_competitor_url_from_reference(url)
+        if derived:
+            return derived
+
+    return None
+
+
+def _extract_competitor_urls(step1_content: str) -> list[str]:
+    discovered: list[str] = []
+    seen: set[str] = set()
+    in_competitor_section = False
+
+    def _append(url: str | None) -> None:
+        if not url or url in seen:
+            return
+        seen.add(url)
+        discovered.append(url)
+
+    for block in _extract_validated_competitor_blocks(step1_content):
+        _append(_extract_competitor_url_from_validated_block(block))
+    if discovered:
+        return discovered
+
+    for raw_line in step1_content.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        normalized_heading = _normalize_heading_text(stripped)
+        if stripped.startswith("#"):
+            in_competitor_section = "competitor" in normalized_heading.lower()
+        if "competitor" in normalized_heading.lower() or in_competitor_section:
+            _append(_extract_first_probable_competitor_url(raw_line))
+
+    if discovered:
+        return discovered
+
+    for url in _extract_urls(step1_content):
+        if _is_probable_competitor_url(url):
+            _append(url)
+    return discovered
+
+
+def _extract_competitor_count(step1_content: str, competitor_urls: list[str]) -> int | None:
+    explicit_patterns = (
+        r"(?im)validated\s+competitor[s]?\s*[:=]\s*(\d+)",
+        r"(?im)validated\s+competitor[s]?\s*\((\d+)\)",
+        r"(?im)\b(\d+)\s+validated\s+competitor[s]?\b",
+    )
+    for pattern in explicit_patterns:
+        explicit = re.search(pattern, step1_content)
+        if explicit:
+            return int(explicit.group(1))
 
     if competitor_urls:
         return len(competitor_urls)
@@ -480,6 +831,10 @@ def translate_stage1(
         step_key="06",
         remediation="rerun precanon stage and ensure step 06 is persisted.",
     )
+    step4_content = _extract_optional_step_content(
+        precanon_research=precanon_research,
+        step_key="04",
+    )
 
     category_niche = _extract_structured_category_niche(precanon_research)
     if not category_niche:
@@ -491,31 +846,70 @@ def translate_stage1(
             "step 01 output to include 'Category / Niche'."
         )
 
-    primary_icps = _extract_primary_icps(step6_content)
+    segment_profiles = _extract_segment_profiles(step6_content)
+    primary_icps = _extract_primary_icps(step6_content, segment_profiles)
     if len(primary_icps) < 3:
         raise StrategyV2MissingContextError(
             "Stage 1 requires at least 3 primary ICP segment lines from step 06. "
             "Remediation: update foundational step 06 output with 3+ explicit segments."
         )
 
-    size_estimate = _extract_primary_segment_size_estimate(step6_content)
-    key_differentiator = _extract_primary_segment_key_differentiator(step6_content)
+    primary_segment_reference_key, primary_segment_reference_name = _extract_segment_reference(step6_content)
+    primary_segment_profile = next(
+        (
+            profile
+            for profile in segment_profiles
+            if primary_segment_reference_key
+            and profile.get("segment_key") == primary_segment_reference_key
+        ),
+        None,
+    )
+    if primary_segment_profile is None and primary_segment_reference_name:
+        primary_segment_profile = next(
+            (
+                profile
+                for profile in segment_profiles
+                if profile.get("name", "").strip().lower() == primary_segment_reference_name.lower()
+            ),
+            None,
+        )
+
+    size_estimate = (
+        str(primary_segment_profile.get("size_estimate") or "").strip()
+        if primary_segment_profile is not None
+        else None
+    ) or _extract_primary_segment_size_estimate(step6_content)
+    key_differentiator = (
+        str(primary_segment_profile.get("key_differentiator") or "").strip()
+        if primary_segment_profile is not None
+        else None
+    ) or _extract_primary_segment_key_differentiator(step6_content)
     if size_estimate is None:
         size_estimate = primary_icps[1]
     if key_differentiator is None:
         key_differentiator = primary_icps[2]
 
-    bottleneck = _extract_bottleneck(step6_content)
+    bottleneck = None
+    for candidate_content in (step4_content, step6_content):
+        if not candidate_content:
+            continue
+        bottleneck = _extract_bottleneck(candidate_content)
+        if bottleneck:
+            break
+    if not bottleneck and primary_segment_profile is not None:
+        structured_bottleneck = str(primary_segment_profile.get("key_differentiator") or "").strip()
+        if structured_bottleneck:
+            bottleneck = structured_bottleneck
     if not isinstance(bottleneck, str) or not bottleneck.strip():
         step6_excerpt = " ".join(step6_content.split())[:240]
         raise StrategyV2MissingContextError(
-            "Stage 1 requires a non-empty bottleneck in step 06 output. "
-            "Remediation: include a 'Bottleneck:' line, an equivalent challenge/constraint label, "
-            "or the explicit 'The PRIMARY SEGMENT is ...' statement in foundational step 06. "
+            "Stage 1 requires a non-empty bottleneck in step 04 or step 06 output. "
+            "Remediation: include a 'Bottleneck:' line or an equivalent challenge/constraint label "
+            "in foundational step 04 or step 06. "
             f"Observed step 06 excerpt: {step6_excerpt!r}"
         )
 
-    discovered_competitor_urls = _extract_urls(step1_content)
+    discovered_competitor_urls = _extract_competitor_urls(step1_content)
     merged_competitor_urls: list[str] = []
     seen_urls: set[str] = set()
     for url in [*list(stage0.competitor_urls), *discovered_competitor_urls]:
@@ -532,8 +926,12 @@ def translate_stage1(
             "Remediation: update foundational step 01 to include validated competitor count >= 3."
         )
 
+    primary_segment_name = (
+        str(primary_segment_profile.get("name") or "").strip() if primary_segment_profile is not None else ""
+    ) or primary_icps[0]
+
     primary_segment = {
-        "name": primary_icps[0],
+        "name": primary_segment_name,
         "size_estimate": size_estimate,
         "key_differentiator": key_differentiator,
     }
