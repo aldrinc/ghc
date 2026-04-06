@@ -2,7 +2,12 @@ import { Render } from "@measured/puck";
 import type { Data } from "@measured/puck";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { PublicFunnelMeta, PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
+import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
+import type {
+  ImportedHtmlInstrumentationManifest,
+  PublicFunnelMeta,
+  PublicFunnelPage as PublicFunnelPageType,
+} from "@/types/funnels";
 import type { PublicFunnelCommerce } from "@/types/commerce";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
@@ -35,6 +40,11 @@ type ResolvedPageMetadata = {
   description: string;
   lang: string;
   brandName: string | null;
+};
+
+type StandaloneImportedHtmlPayload = {
+  htmlDocument: string;
+  instrumentationManifest: ImportedHtmlInstrumentationManifest | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -205,6 +215,27 @@ function resolvePageMetadata(page: PublicFunnelPageType | null): ResolvedPageMet
   };
 }
 
+function resolveStandaloneImportedHtmlPayload(
+  page: PublicFunnelPageType | null,
+): StandaloneImportedHtmlPayload | null {
+  if (!page || !isRecord(page.puckData)) return null;
+  const content = Array.isArray(page.puckData.content) ? page.puckData.content : null;
+  if (!content || content.length !== 1) return null;
+  const block = content[0];
+  if (!isRecord(block) || block.type !== "ImportedHtmlDocument") return null;
+  const props = isRecord(block.props) ? block.props : null;
+  if (!props) return null;
+  const htmlDocument = typeof props.htmlDocument === "string" ? props.htmlDocument.trim() : "";
+  if (!htmlDocument) return null;
+  const manifest = isRecord(props.instrumentationManifest)
+    ? (props.instrumentationManifest as ImportedHtmlInstrumentationManifest)
+    : null;
+  return {
+    htmlDocument,
+    instrumentationManifest: manifest,
+  };
+}
+
 function getOrCreateId(storage: Storage, key: string) {
   const existing = storage.getItem(key);
   if (existing) return existing;
@@ -289,6 +320,22 @@ export function PublicFunnelPage() {
     if (!page) return null;
     return normalizePuckData(page.puckData, { designSystemTokens: page.designSystemTokens ?? null });
   }, [page]);
+  const standaloneImportedHtmlPayload = useMemo(
+    () => (bundleMode ? resolveStandaloneImportedHtmlPayload(page) : null),
+    [bundleMode, page],
+  );
+  const standalonePagePathById = useMemo(() => {
+    if (!bundleMode || !page || !productSlug) return {};
+    return Object.fromEntries(
+      Object.entries(page.pageMap).map(([pageId, slug]) => [
+        pageId,
+        buildStandalonePublicPagePath({
+          productSlug,
+          slug,
+        }),
+      ]),
+    );
+  }, [bundleMode, page, productSlug]);
 
   useEffect(() => {
     ensureNoIndex();
@@ -498,6 +545,40 @@ export function PublicFunnelPage() {
 
   if (!page) {
     return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
+  }
+
+  if (standaloneImportedHtmlPayload) {
+    if (commerceError) {
+      return (
+        <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
+          Imported HTML page is unavailable. {commerceError}
+        </div>
+      );
+    }
+    if (!commerce?.product) {
+      return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
+    }
+    if (!standaloneImportedHtmlPayload.instrumentationManifest) {
+      return (
+        <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
+          Imported HTML page is missing a valid instrumentation manifest.
+        </div>
+      );
+    }
+    return (
+      <StandaloneImportedHtmlPage
+        page={page}
+        productSlug={productSlug}
+        funnelSlug={funnelSlug}
+        visitorId={visitorId}
+        sessionId={sessionId}
+        htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
+        instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
+        variants={commerce.product.variants}
+        pagePathById={standalonePagePathById}
+        pageStageById={page.pageStageMap}
+      />
+    );
   }
 
   return (

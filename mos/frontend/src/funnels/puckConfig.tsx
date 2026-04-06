@@ -472,6 +472,31 @@ function getUtmParams(): Record<string, string> {
   return utm;
 }
 
+function normalizeImportedHtmlSelection(
+  selection: Record<string, unknown> | null | undefined,
+): Record<string, string> | null {
+  if (!selection || typeof selection !== "object" || Array.isArray(selection)) {
+    return null;
+  }
+  const entries = Object.entries(selection)
+    .map(([key, value]) => {
+      if (typeof key !== "string" || typeof value !== "string") {
+        return null;
+      }
+      const normalizedKey = key.trim();
+      const normalizedValue = value.trim();
+      if (!normalizedKey || !normalizedValue) {
+        return null;
+      }
+      return [normalizedKey, normalizedValue] as const;
+    })
+    .filter((entry): entry is readonly [string, string] => Boolean(entry));
+  if (!entries.length) {
+    return null;
+  }
+  return Object.fromEntries(entries);
+}
+
 function importedHtmlTrackingEventFromType(
   eventType: ImportedHtmlRuntimeNavigateMessage["trackEventType"] | ImportedHtmlRuntimeTrackMessage["trackEventType"],
   props?: Record<string, unknown>,
@@ -550,6 +575,10 @@ function ImportedHtmlDocumentBlock({
       (message.variantId ? variants.find((variant) => variant.id === message.variantId) : undefined) ||
       (message.selection ? variants.find((variant) => matchesVariantOptionValues(variant, message.selection || undefined)) : undefined);
     const resolvedVariantId = selectedVariant?.id || message.variantId || null;
+    const resolvedSelection =
+      message.selection ||
+      normalizeImportedHtmlSelection(selectedVariant?.option_values ?? null) ||
+      {};
 
     const checkoutProps = {
       bindingId: message.bindingId,
@@ -593,7 +622,7 @@ function ImportedHtmlDocumentBlock({
         body: JSON.stringify({
           funnelSlug: runtime.funnelSlug,
           variantId: resolvedVariantId || undefined,
-          selection: message.selection || {},
+          selection: resolvedSelection,
           quantity: 1,
           successUrl: checkoutReturnUrl.toString(),
           cancelUrl: checkoutCancelUrl.toString(),
