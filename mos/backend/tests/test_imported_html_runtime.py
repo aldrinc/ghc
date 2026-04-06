@@ -65,6 +65,56 @@ def test_validate_imported_html_document_manifest_accepts_sales_checkout_binding
     assert normalized["bindings"][0]["checkout"]["variantResolver"]["variantId"] == "variant-1"
 
 
+def test_validate_imported_html_document_manifest_accepts_checkout_binding_matching_multiple_ctas():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <a class="buy-cta" href="#">Try Ember Today</a>
+        <a class="buy-cta" href="#">Try Ember Today</a>
+      </body>
+    </html>
+    """
+    variant = ProductVariant(
+        product_id="product-1",
+        title="Default",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    variant.id = "variant-1"
+    manifest = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "sales",
+        "bindings": [
+            {
+                "id": "all-buy-ctas",
+                "type": "checkout",
+                "selector": "a.buy-cta",
+                "event": "click",
+                "trackEventType": "sales_to_checkout_click",
+                "checkout": {
+                    "mode": "public_checkout",
+                    "variantResolver": {"type": "fixed", "variantId": "variant-1"},
+                },
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="sales",
+        current_page_id="page-sales",
+        available_target_page_ids={"page-sales"},
+        checkout_ready_variants=[variant],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["bindings"][0]["selector"] == "a.buy-cta"
+
+
 def test_validate_imported_html_document_manifest_rejects_unsupported_selector():
     html_document = """
     <!doctype html>

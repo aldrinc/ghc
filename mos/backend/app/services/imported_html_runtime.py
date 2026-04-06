@@ -68,7 +68,8 @@ def imported_html_selector_hint() -> str:
     return (
         "Supported selector syntax: a single simple CSS selector only. "
         "Allowed pieces are tag, #id, .class, [attr], [attr='value'], [attr=\"value\"], and optional :checked. "
-        "Do not use commas, descendant combinators, child combinators, sibling combinators, :nth-*, :has(), or text-based selectors."
+        "Do not use commas, descendant combinators, child combinators, sibling combinators, :nth-*, :has(), or text-based selectors. "
+        "Binding selectors may intentionally match multiple identical CTA elements when they should all share the same behavior."
     )
 
 
@@ -319,10 +320,11 @@ def validate_imported_html_document_manifest(
                 f"instrumentationManifest contains duplicate binding id '{binding.id}'."
             )
         seen_ids.add(binding.id)
-        _validate_selector_uniqueness(
+        _validate_selector_match_count(
             html_root=root,
             selector=binding.selector,
             context_label=f"binding '{binding.id}'",
+            min_matches=1,
         )
 
         if binding.type == "internal_navigation":
@@ -427,10 +429,12 @@ def _validate_checkout_binding(
                     f"Checkout binding '{binding.id}' contains duplicate option selector name '{option_selector.name}'."
                 )
             seen_option_names.add(lowered_name)
-            _validate_selector_uniqueness(
+            _validate_selector_match_count(
                 html_root=html_root,
                 selector=option_selector.selector,
                 context_label=f"binding '{binding.id}' option '{option_selector.name}'",
+                min_matches=1,
+                max_matches=1,
             )
         if checkout_ready_variants:
             selector_names = {option.name.strip() for option in resolver.optionSelectors}
@@ -481,17 +485,24 @@ def _validate_https_url(url: str, *, binding_id: str, variant_id: str) -> None:
         )
 
 
-def _validate_selector_uniqueness(
+def _validate_selector_match_count(
     *,
     html_root: _HtmlNode,
     selector: str,
     context_label: str,
+    min_matches: int = 1,
+    max_matches: int | None = None,
 ) -> None:
     parsed = _parse_restricted_selector(selector)
     matches = [node for node in _iter_html_nodes(html_root) if _node_matches_selector(node, parsed)]
-    if len(matches) != 1:
+    if len(matches) < min_matches:
         raise ImportedHtmlRuntimeValidationError(
-            f"{context_label} selector '{selector}' must match exactly one element in the imported HTML. "
+            f"{context_label} selector '{selector}' must match at least {min_matches} element(s) in the imported HTML. "
+            f"Matched {len(matches)}."
+        )
+    if max_matches is not None and len(matches) > max_matches:
+        raise ImportedHtmlRuntimeValidationError(
+            f"{context_label} selector '{selector}' must match no more than {max_matches} element(s) in the imported HTML. "
             f"Matched {len(matches)}."
         )
 

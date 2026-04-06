@@ -85,108 +85,107 @@ function injectImportedHtmlRuntimeScript(
       const selector = typeof binding.selector === "string" ? binding.selector : "";
       if (!selector) continue;
       const matches = Array.from(document.querySelectorAll(selector));
-      if (matches.length !== 1) {
+      if (matches.length < 1) {
         reportError(
           "Binding '" +
             String(binding.id || "unknown") +
             "' selector '" +
             selector +
-            "' matched " +
-            String(matches.length) +
-            " elements at runtime.",
+            "' matched no elements at runtime.",
         );
         continue;
       }
-      const element = matches[0];
-      if (!(element instanceof HTMLElement)) {
-        reportError("Binding '" + String(binding.id || "unknown") + "' did not resolve to an HTMLElement.");
-        continue;
-      }
-      if (element.dataset.mosImportedHtmlBound === "true") {
-        continue;
-      }
-      element.dataset.mosImportedHtmlBound = "true";
-      element.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const buttonText = normalizedText(element.textContent || "");
-        if (binding.type === "internal_navigation") {
-          post("navigate", {
-            bindingId: binding.id,
-            targetPageId: binding.targetPageId,
-            trackEventType: binding.trackEventType,
-            buttonText,
-          });
-          return;
+      for (const element of matches) {
+        if (!(element instanceof HTMLElement)) {
+          reportError("Binding '" + String(binding.id || "unknown") + "' did not resolve to an HTMLElement.");
+          continue;
         }
-        if (binding.type === "track_only") {
-          post("track", {
-            bindingId: binding.id,
-            trackEventType: binding.trackEventType,
-            buttonText,
-          });
-          return;
+        if (element.dataset.mosImportedHtmlBound === "true") {
+          continue;
         }
-        if (binding.type !== "checkout" || !binding.checkout || typeof binding.checkout !== "object") {
-          reportError("Binding '" + String(binding.id || "unknown") + "' has unsupported type.");
-          return;
-        }
-        const checkout = binding.checkout;
-        let variantId = null;
-        let selection = null;
-        const resolver = checkout.variantResolver;
-        if (!resolver || typeof resolver !== "object" || typeof resolver.type !== "string") {
-          reportError("Checkout binding '" + String(binding.id || "unknown") + "' is missing variantResolver.");
-          return;
-        }
-        if (resolver.type === "fixed") {
-          variantId = typeof resolver.variantId === "string" ? resolver.variantId : null;
-        } else if (resolver.type === "option_values") {
-          selection = {};
-          const optionSelectors = Array.isArray(resolver.optionSelectors) ? resolver.optionSelectors : [];
-          for (const option of optionSelectors) {
-            const optionMatches = Array.from(document.querySelectorAll(option.selector || ""));
-            if (optionMatches.length !== 1) {
-              reportError(
-                "Checkout binding '" +
-                  String(binding.id || "unknown") +
-                  "' option selector '" +
-                  String(option.selector || "") +
-                  "' matched " +
-                  String(optionMatches.length) +
-                  " elements.",
-              );
-              return;
-            }
-            const optionNode = optionMatches[0];
-            const optionName = normalizedText(option.name || "");
-            const optionValue = readNodeValue(optionNode, option.source === "text" ? "text" : "value");
-            if (!optionName || !optionValue) {
-              reportError(
-                "Checkout binding '" +
-                  String(binding.id || "unknown") +
-                  "' could not resolve a non-empty option value for '" +
-                  String(option.name || "") +
-                  "'.",
-              );
-              return;
-            }
-            selection[optionName] = optionValue;
+        element.dataset.mosImportedHtmlBound = "true";
+        element.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const buttonText = normalizedText(element.textContent || "");
+          if (binding.type === "internal_navigation") {
+            post("navigate", {
+              bindingId: binding.id,
+              targetPageId: binding.targetPageId,
+              trackEventType: binding.trackEventType,
+              buttonText,
+            });
+            return;
           }
-        } else {
-          reportError("Checkout binding '" + String(binding.id || "unknown") + "' uses an unsupported resolver.");
-          return;
-        }
-        post("checkout", {
-          bindingId: binding.id,
-          trackEventType: binding.trackEventType,
-          checkoutMode: checkout.mode,
-          buttonText,
-          variantId,
-          selection,
-          externalUrlsByVariant: Array.isArray(checkout.externalUrlsByVariant) ? checkout.externalUrlsByVariant : null,
+          if (binding.type === "track_only") {
+            post("track", {
+              bindingId: binding.id,
+              trackEventType: binding.trackEventType,
+              buttonText,
+            });
+            return;
+          }
+          if (binding.type !== "checkout" || !binding.checkout || typeof binding.checkout !== "object") {
+            reportError("Binding '" + String(binding.id || "unknown") + "' has unsupported type.");
+            return;
+          }
+          const checkout = binding.checkout;
+          let variantId = null;
+          let selection = null;
+          const resolver = checkout.variantResolver;
+          if (!resolver || typeof resolver !== "object" || typeof resolver.type !== "string") {
+            reportError("Checkout binding '" + String(binding.id || "unknown") + "' is missing variantResolver.");
+            return;
+          }
+          if (resolver.type === "fixed") {
+            variantId = typeof resolver.variantId === "string" ? resolver.variantId : null;
+          } else if (resolver.type === "option_values") {
+            selection = {};
+            const optionSelectors = Array.isArray(resolver.optionSelectors) ? resolver.optionSelectors : [];
+            for (const option of optionSelectors) {
+              const optionMatches = Array.from(document.querySelectorAll(option.selector || ""));
+              if (optionMatches.length !== 1) {
+                reportError(
+                  "Checkout binding '" +
+                    String(binding.id || "unknown") +
+                    "' option selector '" +
+                    String(option.selector || "") +
+                    "' matched " +
+                    String(optionMatches.length) +
+                    " elements.",
+                );
+                return;
+              }
+              const optionNode = optionMatches[0];
+              const optionName = normalizedText(option.name || "");
+              const optionValue = readNodeValue(optionNode, option.source === "text" ? "text" : "value");
+              if (!optionName || !optionValue) {
+                reportError(
+                  "Checkout binding '" +
+                    String(binding.id || "unknown") +
+                    "' could not resolve a non-empty option value for '" +
+                    String(option.name || "") +
+                    "'.",
+                );
+                return;
+              }
+              selection[optionName] = optionValue;
+            }
+          } else {
+            reportError("Checkout binding '" + String(binding.id || "unknown") + "' uses an unsupported resolver.");
+            return;
+          }
+          post("checkout", {
+            bindingId: binding.id,
+            trackEventType: binding.trackEventType,
+            checkoutMode: checkout.mode,
+            buttonText,
+            variantId,
+            selection,
+            externalUrlsByVariant: Array.isArray(checkout.externalUrlsByVariant) ? checkout.externalUrlsByVariant : null,
+          });
         });
-      });
+      }
     }
   };
 
