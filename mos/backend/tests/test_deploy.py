@@ -2,11 +2,21 @@ import json
 import os
 from pathlib import Path
 from uuid import UUID
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 
-from app.db.models import Client, OrgDeployDomain
+from app.db.models import (
+    Client,
+    Funnel,
+    FunnelPage,
+    FunnelPageVersion,
+    FunnelPublication,
+    FunnelPublicationPage,
+    OrgDeployDomain,
+    Product,
+)
 from app.services import deploy as deploy_service
 
 
@@ -268,6 +278,92 @@ def test_get_workload_domains_reports_legacy_org_scoped_domains(
     body = resp.json()
     assert body["workspace_server_names"] == []
     assert body["workspace_scope_error"]
+
+
+def test_runtime_artifact_payload_preserves_published_page_slug(db_session, auth_context, monkeypatch):
+    org_id = UUID(auth_context.org_id)
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+    page_id = uuid4()
+    version_id = uuid4()
+    publication_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Test Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Ember Gummies",
+        )
+    )
+    db_session.flush()
+
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name="EMBER Funnel",
+        route_slug="ember-brain-clarity-protocol-imported-template-3",
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={"root": {"props": {"title": "Sales Page"}}, "content": []},
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = publication_id
+    db_session.commit()
+
+    monkeypatch.setattr(deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"})
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(funnel_id),
+        updated_from_publication_id=str(publication_id),
+    )
+
+    funnel_payload = payload["products"][product_slug]["funnels"]["ember-brain-clarity-protocol-imported-template-3"]
+    assert funnel_payload["meta"]["entrySlug"] == "sales-page"
+    assert funnel_payload["meta"]["pages"] == [{"pageId": str(page_id), "slug": "sales-page"}]
+    assert "sales-page" in funnel_payload["pages"]
+    assert "sales" not in funnel_payload["pages"]
 
 
 def test_build_bunny_pull_zone_name_uses_workspace_id():

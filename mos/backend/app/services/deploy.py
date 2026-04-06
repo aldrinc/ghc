@@ -1037,6 +1037,20 @@ def build_client_funnel_runtime_artifact_payload(
     }
     mos_meta_tracking_metadata_key = "mosMetaTracking"
 
+    def _artifact_page_slug(*, publication_slug: Any, template_id: str) -> str:
+        normalized_publication_slug = str(publication_slug or "").strip().lower()
+        if normalized_publication_slug:
+            if normalized_publication_slug == "pre-sales":
+                return "presales"
+            return normalized_publication_slug
+
+        artifact_slug = template_to_artifact.get(template_id)
+        if artifact_slug:
+            return artifact_slug
+        raise DeployError(
+            f"Unsupported template '{template_id or 'unknown'}' for deploy artifact page slug."
+        )
+
     def _resolve_public_meta_tracking_for_funnel(client_funnel: Funnel) -> dict[str, str] | None:
         profile = PaidAdsQaRepository(session).get_platform_profile(
             org_id=str(client_funnel.org_id),
@@ -1152,11 +1166,10 @@ def build_client_funnel_runtime_artifact_payload(
                 raise DeployError(f"Publication page '{item.page_id}' has no version.")
             page = session.scalars(select(FunnelPage).where(FunnelPage.id == item.page_id)).first()
             template_id = (page.template_id if page else None) or ""
-            artifact_slug = template_to_artifact.get(template_id)
-            if not artifact_slug:
-                raise DeployError(
-                    f"Page '{item.page_id}' in funnel '{client_funnel.id}' has unsupported template '{template_id or 'unknown'}'."
-                )
+            artifact_slug = _artifact_page_slug(
+                publication_slug=getattr(item, "slug_at_publish", None),
+                template_id=template_id,
+            )
             if artifact_slug in seen_artifacts:
                 raise DeployError(
                     f"Funnel '{client_funnel.id}' has multiple pages mapped to artifact '{artifact_slug}'."
