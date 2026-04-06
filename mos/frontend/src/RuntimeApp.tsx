@@ -8,7 +8,7 @@ export default function RuntimeApp() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<PublicFunnelRootRedirectPage />} />
-        <Route path="/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
+        <Route path="/:productSlug/:slug" element={<PublicFunnelPage />} />
         <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
         <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
         <Route path="/f/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />

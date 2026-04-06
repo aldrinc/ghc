@@ -4,6 +4,7 @@ type DeployRuntimeConfig = {
   bundleMode?: boolean;
   defaultProductSlug?: string;
   defaultFunnelSlug?: string;
+  defaultEntrySlug?: string;
 };
 
 const SHORT_ID_LENGTH = 8;
@@ -67,6 +68,40 @@ export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: 
   return { productSlug, funnelSlug };
 }
 
+export function getStandaloneDefaultFunnelSlug(): string | null {
+  return getStandaloneDefaultRoute()?.funnelSlug ?? null;
+}
+
+export function getStandaloneDefaultPageRoute(): { productSlug: string; funnelSlug: string; slug: string } | null {
+  const defaultRoute = getStandaloneDefaultRoute();
+  const config = getDeployRuntimeConfig();
+  const slug = normalizeRouteToken(config.defaultEntrySlug);
+  if (!defaultRoute || !slug) {
+    return null;
+  }
+  return {
+    ...defaultRoute,
+    slug,
+  };
+}
+
+export function buildStandalonePublicPagePath(
+  {
+    productSlug,
+    slug,
+  }: {
+    productSlug: string;
+    slug: string;
+  },
+): string {
+  const normalizedProductSlug = normalizeRouteToken(productSlug);
+  const normalizedSlug = normalizeRouteToken(slug);
+  if (!normalizedProductSlug || !normalizedSlug) {
+    throw new Error("productSlug and slug are required to build a standalone public page path.");
+  }
+  return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedSlug)}`;
+}
+
 export function buildPublicFunnelPath(
   {
     productSlug,
@@ -91,7 +126,6 @@ export function buildPublicFunnelPath(
   const normalizedSlug = normalizeRouteToken(slug);
   const normalizedSitePath = sitePath ? sitePath.replace(/^\//, "") : "";
   const nestedSlugPath = typeof slug === "string" && slug.includes("/") ? slug.replace(/^\//, "") : "";
-  
   if (bundleMode) {
     if (!normalizedSlug && !normalizedSitePath && !nestedSlugPath) {
       return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}`;
@@ -117,10 +151,6 @@ export function buildPublicFunnelPath(
   return `/f/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }
 
-/**
- * Parse a nested site path into its components.
- * Supports paths like: us/store, us/collections/summer, us/products/face-oil
- */
 export function parseSitePath(sitePath: string): {
   countryCode: string | null;
   pageType: string;
@@ -128,32 +158,28 @@ export function parseSitePath(sitePath: string): {
   nestedPath: string[];
 } {
   const parts = sitePath.replace(/^\//, "").split("/").filter(Boolean);
-  
+
   if (parts.length === 0) {
     return { countryCode: null, pageType: "home", handle: null, nestedPath: [] };
   }
-  
-  // First part could be a country code (2 chars) or a page type
+
   const firstPart = parts[0];
   const isCountryCode = /^[a-z]{2}$/i.test(firstPart);
-  
+
   const countryCode = isCountryCode ? firstPart.toLowerCase() : null;
   const pathParts = isCountryCode ? parts.slice(1) : parts;
-  
+
   if (pathParts.length === 0) {
     return { countryCode, pageType: "home", handle: null, nestedPath: [] };
   }
-  
+
   const pageType = pathParts[0];
   const handle = pathParts[1] || null;
   const nestedPath = pathParts.slice(2);
-  
+
   return { countryCode, pageType, handle, nestedPath };
 }
 
-/**
- * Build a site path from components.
- */
 export function buildSitePath(options: {
   countryCode?: string | null;
   pageType?: string;
@@ -161,22 +187,22 @@ export function buildSitePath(options: {
   nestedPath?: string[];
 }): string {
   const parts: string[] = [];
-  
+
   if (options.countryCode) {
     parts.push(options.countryCode.toLowerCase());
   }
-  
+
   if (options.pageType && options.pageType !== "home") {
     parts.push(options.pageType);
   }
-  
+
   if (options.handle) {
     parts.push(options.handle);
   }
-  
+
   if (options.nestedPath?.length) {
     parts.push(...options.nestedPath);
   }
-  
+
   return parts.join("/");
 }

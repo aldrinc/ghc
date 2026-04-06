@@ -427,7 +427,8 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     )
     assert runtime_inject_cmd
     assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
-    assert '"defaultFunnelSlug":"f85405a4"' in runtime_inject_cmd
+    assert '"defaultFunnelSlug":"example-funnel"' in runtime_inject_cmd
+    assert '"defaultEntrySlug":"presales"' in runtime_inject_cmd
     assert "raw = raw.replace" in runtime_inject_cmd
     assert '<script type="module"' in runtime_inject_cmd
     assert '"entryImagePreloadMap"' in runtime_inject_cmd

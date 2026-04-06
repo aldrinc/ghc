@@ -854,7 +854,7 @@ WantedBy=multi-user.target
 
     def _resolve_funnel_artifact_default_route(
         self, *, source: FunnelArtifactSourceSpec
-    ) -> Optional[tuple[str, str]]:
+    ) -> Optional[tuple[str, str, str]]:
         artifact = source.artifact or {}
         products = artifact.get("products")
         if not isinstance(products, dict):
@@ -879,15 +879,14 @@ WantedBy=multi-user.target
 
                 funnel_meta = funnel_payload.get("meta")
                 if not isinstance(funnel_meta, dict):
-                    return product_slug, funnel_slug
+                    return None
 
-                funnel_tokens = self._resolve_funnel_path_tokens(
-                    product_slug=product_slug,
-                    funnel_slug=funnel_slug,
-                    funnel_meta=funnel_meta,
-                )
-                resolved_funnel_token = funnel_tokens[-1] if funnel_tokens else funnel_slug
-                return product_slug, resolved_funnel_token
+                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
+                entry_slug = self._canonical_funnel_artifact_page_slug(canonical_funnel_meta.get("entrySlug"))
+                if not entry_slug:
+                    return None
+
+                return product_slug, funnel_slug, entry_slug
 
         return None
 
@@ -895,9 +894,10 @@ WantedBy=multi-user.target
         runtime_config: Dict[str, object] = {"bundleMode": True}
         default_route = self._resolve_funnel_artifact_default_route(source=source)
         if default_route:
-            product_slug, funnel_slug = default_route
+            product_slug, funnel_slug, entry_slug = default_route
             runtime_config["defaultProductSlug"] = product_slug
             runtime_config["defaultFunnelSlug"] = funnel_slug
+            runtime_config["defaultEntrySlug"] = entry_slug
 
         entry_image_preload_map = self._build_entry_image_preload_map(source=source)
         if entry_image_preload_map:

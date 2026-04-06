@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
-import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import {
+  buildPublicFunnelPath,
+  buildStandalonePublicPagePath,
+  isStandaloneBundleMode,
+  resolvePublicApiBaseUrl,
+} from "@/funnels/runtimeRouting";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 
@@ -42,16 +47,14 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
-        const entryPath = meta.medusaRuntimeConfig?.defaultCountryCode
-          ? buildPublicFunnelPath({
+        const entryPath = bundleMode
+          ? buildStandalonePublicPagePath({
               productSlug,
-              funnelSlug,
-              sitePath: meta.medusaRuntimeConfig.defaultCountryCode,
-              bundleMode,
+              slug: meta.entrySlug,
             })
           : buildPublicFunnelPath({
               productSlug,
-              funnelSlug,
+              funnelSlug: meta.funnelSlug || funnelSlug,
               slug: meta.entrySlug,
               bundleMode,
             });
