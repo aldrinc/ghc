@@ -4877,13 +4877,25 @@ def _html_rewrite_output_schema() -> dict[str, Any]:
         "additionalProperties": False,
         "properties": {
             "assistantMessage": {"type": "string"},
-            "htmlDocument": {
-                "type": "string",
-                "description": "Rewritten full HTML document with the exact same DOM structure and attributes.",
+            "textReplacements": {
+                "type": "array",
+                "description": (
+                    "Subset of editable text nodes that should change. "
+                    "Each nodeId must come from the provided editable text node list."
+                ),
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "nodeId": {"type": "string"},
+                        "text": {"type": "string"},
+                    },
+                    "required": ["nodeId", "text"],
+                },
             },
             "instrumentationManifest": imported_html_instrumentation_schema(),
         },
-        "required": ["assistantMessage", "htmlDocument", "instrumentationManifest"],
+        "required": ["assistantMessage", "textReplacements", "instrumentationManifest"],
     }
 
 
@@ -5088,7 +5100,16 @@ def _sanitize_component_tree(items: Any, allowed_types: set[str]) -> list[dict[s
     return cleaned
 
 
-def _validate_imported_html_document_components(puck_data: dict[str, Any]) -> None:
+def _validate_imported_html_document_components(
+    puck_data: dict[str, Any],
+    *,
+    current_page_stage: str = "custom",
+    current_page_id: str | None = None,
+    next_page_id: str | None = None,
+    available_target_page_ids: set[str] | None = None,
+    checkout_ready_variants: list[ProductVariant] | None = None,
+    require_stage_bindings: bool = False,
+) -> None:
     for obj in walk_json(puck_data):
         if not isinstance(obj, dict):
             continue
@@ -5102,15 +5123,20 @@ def _validate_imported_html_document_components(puck_data: dict[str, Any]) -> No
             raise ValueError("ImportedHtmlDocument.props.htmlDocument must be a non-empty string.")
         instrumentation_manifest = props.get("instrumentationManifest")
         try:
+            resolved_page_stage = current_page_stage
+            if resolved_page_stage == "custom" and isinstance(instrumentation_manifest, dict):
+                manifest_stage = instrumentation_manifest.get("pageStage")
+                if isinstance(manifest_stage, str) and manifest_stage.strip():
+                    resolved_page_stage = manifest_stage.strip()
             validate_imported_html_document_manifest(
                 html_document=html_document,
                 instrumentation_manifest=instrumentation_manifest,
-                current_page_stage=(
-                    instrumentation_manifest.get("pageStage")
-                    if isinstance(instrumentation_manifest, dict)
-                    else "custom"
-                ),
-                require_stage_bindings=False,
+                current_page_stage=resolved_page_stage,
+                current_page_id=current_page_id,
+                next_page_id=next_page_id,
+                available_target_page_ids=available_target_page_ids,
+                checkout_ready_variants=checkout_ready_variants,
+                require_stage_bindings=require_stage_bindings,
             )
         except ImportedHtmlRuntimeValidationError as exc:
             raise ValueError(str(exc)) from exc

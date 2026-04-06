@@ -2,8 +2,10 @@ from app.services.html_funnel_reference import (
     HtmlReferenceError,
     HtmlStructureMismatchError,
     MAX_TEXT_PREVIEW_CHARS,
+    apply_html_text_replacements,
     assert_html_text_only_rewrite,
     build_html_reference_prompt_context,
+    extract_editable_html_text_nodes,
     summarize_html_reference,
 )
 
@@ -114,3 +116,45 @@ def test_assert_html_text_only_rewrite_rejects_attribute_or_structure_changes() 
         assert "Only visible text content may change" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected HtmlStructureMismatchError for attribute changes.")
+
+
+def test_extract_editable_html_text_nodes_skips_head_and_preserves_body_order() -> None:
+    html = (
+        "<!doctype html><html><head><title>Should stay put</title><style>.x{color:red;}</style></head>"
+        "<body><section class='hero'><h1>Original title</h1><p>Original body.</p></section>"
+        "<button id='buy-now'>Start my protocol</button></body></html>"
+    )
+
+    nodes = extract_editable_html_text_nodes(html_document=html)
+
+    assert [node.nodeId for node in nodes] == ["text-1", "text-2", "text-3"]
+    assert [node.originalText for node in nodes] == [
+        "Original title",
+        "Original body.",
+        "Start my protocol",
+    ]
+    assert nodes[0].path.endswith("section.hero>h1")
+    assert nodes[2].path.endswith("button#buy-now")
+
+
+def test_apply_html_text_replacements_patches_only_targeted_text_nodes() -> None:
+    original = (
+        "<!doctype html><html><body><section class='hero'>"
+        "<h1>Original title</h1><p>Original body.</p></section>"
+        "<button id='buy-now'>Start my protocol</button></body></html>"
+    )
+
+    rewritten = apply_html_text_replacements(
+        original_html=original,
+        replacements=[
+            {"nodeId": "text-1", "text": "Clarity For Body & Mind"},
+            {"nodeId": "text-3", "text": "Start My Protocol"},
+        ],
+    )
+
+    assert "Clarity For Body &amp; Mind" in rewritten
+    assert "Original body." in rewritten
+    assert "Start My Protocol" in rewritten
+    assert "class='hero'" in rewritten
+    assert "id='buy-now'" in rewritten
+    assert_html_text_only_rewrite(original_html=original, rewritten_html=rewritten)

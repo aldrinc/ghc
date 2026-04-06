@@ -11,6 +11,8 @@ from app.agent.funnel_tools import (
     DraftGeneratePageTool,
     DraftPersistVersionArgs,
     DraftPersistVersionTool,
+    DraftValidateArgs,
+    DraftValidateTool,
     _build_html_template_seed_puck_data,
     _build_puck_prompt_seed,
     _coerce_sales_pdp_import_comparison_config,
@@ -244,10 +246,10 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
         "<!doctype html><html><body><section class='hero'><h1>Original title</h1>"
         "<p>Original body.</p></section></body></html>"
     )
-    rewritten_html = (
-        "<!doctype html><html><body><section class='hero'><h1>Updated title</h1>"
-        "<p>Updated body.</p></section></body></html>"
-    )
+    text_replacements = [
+        {"nodeId": "text-1", "text": "Updated title"},
+        {"nodeId": "text-2", "text": "Updated body."},
+    ]
     instrumentation_manifest = {
         "schemaVersion": "imported-html-instrumentation-v1",
         "pageStage": "sales",
@@ -279,7 +281,7 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
             return json.dumps(
                 {
                     "assistantMessage": "Ember page preview.",
-                    "htmlDocument": rewritten_html,
+                    "textReplacements": text_replacements,
                     "instrumentationManifest": instrumentation_manifest,
                 }
             )
@@ -338,13 +340,124 @@ def test_draft_generate_page_imported_html_mode_rewrites_exact_html_document(db_
 
     saved_component = result.ui_details["puckData"]["content"][0]
     assert saved_component["type"] == "ImportedHtmlDocument"
-    assert saved_component["props"]["htmlDocument"] == rewritten_html
+    assert saved_component["props"]["htmlDocument"] == (
+        "<!doctype html><html><body><section class='hero'><h1>Updated title</h1>"
+        "<p>Updated body.</p></section></body></html>"
+    )
     assert saved_component["props"]["instrumentationManifest"] == instrumentation_manifest
-    assert "Only replace human-facing copy text inside existing text nodes" in captured["prompt"]
-    assert "Preserve the exact tag order, nesting, attributes, classes, ids" in captured["prompt"]
+    assert "textReplacements requirements" in captured["prompt"]
+    assert "The server will apply your text replacements to the original HTML exactly." in captured["prompt"]
+    assert "Editable text nodes that may be rewritten" in captured["prompt"]
+    assert '"nodeId": "text-1"' in captured["prompt"]
+    assert '"originalText": "Original title"' in captured["prompt"]
     assert "instrumentationManifest requirements" in captured["prompt"]
-    assert "Uploaded HTML document to rewrite in place" in captured["prompt"]
+    assert "Uploaded HTML document to preserve exactly while patching copy into the listed text nodes" in captured[
+        "prompt"
+    ]
     assert reference_html in captured["prompt"]
+
+
+def test_draft_validate_imported_html_uses_checkout_variant_context(db_session):
+    client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    product = Product(org_id=TEST_ORG_ID, client_id=client.id, title="Ember")
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    funnel = Funnel(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        name="Imported HTML Funnel",
+        route_slug="imported-html-validate-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales Page",
+        slug="sales",
+        template_id="sales-pdp",
+    )
+    db_session.add(page)
+    db_session.commit()
+    db_session.refresh(page)
+
+    variant = ProductVariant(
+        product_id=product.id,
+        title="Default",
+        price=4900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
+
+    tool = DraftValidateTool()
+    ctx = ToolContext(
+        session=db_session,
+        org_id=str(TEST_ORG_ID),
+        user_id="test-user",
+        run_id="test-run",
+        tool_call_id="tool-call-1",
+    )
+    result = tool.run(
+        ctx=ctx,
+        args=DraftValidateArgs(
+            orgId=str(TEST_ORG_ID),
+            funnelId=str(funnel.id),
+            pageId=str(page.id),
+            puckData={
+                "root": {"props": {"title": "Imported HTML"}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "id": "imported-html-document",
+                            "title": "Imported HTML",
+                            "htmlDocument": "<!doctype html><html><body><button id='buy-now'>Buy</button></body></html>",
+                            "instrumentationManifest": {
+                                "schemaVersion": "imported-html-instrumentation-v1",
+                                "pageStage": "sales",
+                                "bindings": [
+                                    {
+                                        "id": "primary-buy",
+                                        "type": "checkout",
+                                        "selector": "#buy-now",
+                                        "event": "click",
+                                        "trackEventType": "sales_to_checkout_click",
+                                        "checkout": {
+                                            "mode": "public_checkout",
+                                            "variantResolver": {
+                                                "type": "fixed",
+                                                "variantId": str(variant.id),
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+            allowedTypes=["ImportedHtmlDocument"],
+            requiredTypes=["ImportedHtmlDocument"],
+            templateKind="sales-pdp",
+            pageIdSet=[str(page.id)],
+        ),
+    )
+
+    assert result.ui_details["ok"] is True
+    assert result.ui_details["errors"] == []
 
 
 def test_draft_apply_overrides_preserves_imported_html_freeform_structure(db_session, monkeypatch):

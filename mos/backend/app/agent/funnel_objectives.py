@@ -319,6 +319,8 @@ def run_generate_page_draft_stream(
             raw_args={
                 "orgId": org_id,
                 "puckData": puck_data,
+                "funnelId": funnel_id,
+                "pageId": page_id,
                 "allowedTypes": funnel_ctx.get("allowedTypes") or [],
                 "requiredTypes": funnel_ctx.get("requiredTypes") or [],
                 "templateKind": funnel_ctx.get("templateKind"),

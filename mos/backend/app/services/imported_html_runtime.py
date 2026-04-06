@@ -237,7 +237,41 @@ class ImportedHtmlRuntimeValidationError(ValueError):
 
 
 def imported_html_instrumentation_schema() -> dict[str, Any]:
-    return ImportedHtmlInstrumentationManifest.model_json_schema()
+    raw_schema = ImportedHtmlInstrumentationManifest.model_json_schema()
+    defs = raw_schema.get("$defs") if isinstance(raw_schema.get("$defs"), dict) else {}
+
+    def _inline(node: Any) -> Any:
+        if isinstance(node, list):
+            return [_inline(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/$defs/"):
+            ref_key = ref.split("/", 2)[-1]
+            target = defs.get(ref_key)
+            if not isinstance(target, dict):
+                raise ImportedHtmlRuntimeValidationError(
+                    f"instrumentationManifest schema references unknown definition '{ref_key}'."
+                )
+            merged = _inline(target)
+            extras = {key: value for key, value in node.items() if key != "$ref"}
+            if not extras:
+                return merged
+            if not isinstance(merged, dict):
+                return merged
+            return {
+                **merged,
+                **{key: _inline(value) for key, value in extras.items()},
+            }
+
+        return {
+            key: _inline(value)
+            for key, value in node.items()
+            if key != "$defs"
+        }
+
+    return _inline(raw_schema)
 
 
 def coerce_imported_html_instrumentation_manifest(raw: Any) -> dict[str, Any]:

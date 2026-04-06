@@ -7,6 +7,7 @@ from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.db.models import ProductVariant
 from app.services.imported_html_runtime import (
     ImportedHtmlRuntimeValidationError,
+    imported_html_instrumentation_schema,
     resolve_funnel_page_stage,
     validate_imported_html_document_manifest,
 )
@@ -109,6 +110,22 @@ def test_resolve_funnel_page_stage_prefers_template_id():
     assert resolve_funnel_page_stage(template_id="pre-sales-listicle") == "pre_sales"
 
 
+def test_imported_html_instrumentation_schema_is_embeddable():
+    schema = imported_html_instrumentation_schema()
+
+    def _walk(node):
+        if isinstance(node, dict):
+            assert "$defs" not in node
+            assert "$ref" not in node
+            for value in node.values():
+                _walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    _walk(schema)
+
+
 def test_publish_funnel_rejects_imported_html_without_manifest(db_session):
     client = Client(org_id=TEST_ORG_ID, name="Test Client", industry="Wellness")
     db_session.add(client)
@@ -153,6 +170,8 @@ def test_publish_funnel_rejects_imported_html_without_manifest(db_session):
         external_price_id="gid://shopify/ProductVariant/123456789",
     )
     db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
     db_session.add(
         FunnelPageVersion(
             id=uuid4(),
@@ -231,6 +250,8 @@ def test_deploy_artifact_includes_tracking_and_stage_map_for_imported_html(db_se
         external_price_id="gid://shopify/ProductVariant/123456789",
     )
     db_session.add(variant)
+    db_session.commit()
+    db_session.refresh(variant)
     db_session.add(
         FunnelPageVersion(
             id=uuid4(),

@@ -28,8 +28,10 @@ from app.services.funnels import extract_internal_links, publish_funnel
 from app.services.html_funnel_reference import (
     HtmlReferenceError,
     HtmlStructureMismatchError,
+    apply_html_text_replacements,
     assert_html_text_only_rewrite,
     build_html_reference_prompt_context,
+    extract_editable_html_text_nodes,
     summarize_html_reference,
 )
 from app.services.imported_html_runtime import (
@@ -106,13 +108,25 @@ def _build_imported_html_document_puck_data(
     }
 
 
-def _coerce_html_document(raw: Any) -> str:
-    if not isinstance(raw, str):
-        raise RuntimeError("Model response is missing htmlDocument.")
-    document = raw.strip()
-    if not document:
-        raise RuntimeError("Model response returned an empty htmlDocument.")
-    return document
+def _coerce_text_replacements(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        raise RuntimeError("Model response is missing textReplacements.")
+    cleaned: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            raise RuntimeError("Each text replacement must be an object.")
+        node_id = str(item.get("nodeId") or "").strip()
+        if not node_id:
+            raise RuntimeError("Each text replacement must include a nodeId.")
+        if node_id in seen_ids:
+            raise RuntimeError(f"Model response repeated text replacement nodeId '{node_id}'.")
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise RuntimeError(f"Text replacement '{node_id}' must include a string text value.")
+        cleaned.append({"nodeId": node_id, "text": text})
+        seen_ids.add(node_id)
+    return cleaned
 
 
 def _resolve_base_puck_data(
@@ -1990,7 +2004,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             checkout_ready_variants = [
                 variant
                 for variant in ctx.session.scalars(checkout_variants_query).all()
-                if funnel_ai._normalize_variant_provider(variant.provider)
+                if str(variant.provider or "").strip().lower()
                 and str(variant.external_price_id or "").strip()
             ]
             imported_runtime_context = build_imported_html_generation_context(
@@ -2000,25 +2014,37 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 page_targets=page_targets,
                 checkout_ready_variants=checkout_ready_variants,
             )
+            editable_text_nodes = extract_editable_html_text_nodes(html_document=reference_html)
+            if not editable_text_nodes:
+                raise RuntimeError("Uploaded HTML document did not contain any editable visible text nodes.")
+            editable_text_nodes_context = [
+                {
+                    "nodeId": node.nodeId,
+                    "path": node.path,
+                    "originalText": node.originalText,
+                    "charCount": node.charCount,
+                }
+                for node in editable_text_nodes
+            ]
 
             system_content = (
                 "You are updating an uploaded HTML template for a funnel page.\n\n"
                 "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
                 "Return exactly ONE JSON object with this shape:\n"
-                '{ "assistantMessage": string, "htmlDocument": string, "instrumentationManifest": object }\n\n'
+                '{ "assistantMessage": string, "textReplacements": [{ "nodeId": string, "text": string }], "instrumentationManifest": object }\n\n'
                 "assistantMessage requirements:\n"
                 "- Plain text only.\n"
                 f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.\n"
                 "- Summarize the rewritten page briefly and include a medical safety disclaimer.\n\n"
-                "htmlDocument requirements:\n"
-                "- Return the FULL rewritten HTML document.\n"
-                "- Preserve the exact tag order, nesting, attributes, classes, ids, data attributes, inline styles, script blocks, style blocks, and link destinations from the uploaded HTML.\n"
-                "- Do NOT add, remove, rename, reorder, wrap, unwrap, or move elements.\n"
-                "- Do NOT change src, href, class, id, style, role, aria-*, data-*, or any non-text attribute.\n"
-                "- Only replace human-facing copy text inside existing text nodes.\n"
-                "- Keep rewritten text roughly similar in length so the layout stays visually identical.\n"
-                "- Do NOT rewrite script contents, style contents, or comments.\n"
-                "- Do NOT convert the page into Puck primitives or component JSON.\n\n"
+                "textReplacements requirements:\n"
+                "- Return an array of objects with nodeId and text.\n"
+                "- Use ONLY nodeIds from the editable text node list below.\n"
+                "- Omit nodes that should remain unchanged.\n"
+                "- Only replace human-facing copy text inside those existing text nodes.\n"
+                "- Keep replacement text roughly similar in length so the layout stays visually identical.\n"
+                "- Do NOT return HTML, CSS, JavaScript, markdown, selectors, or attribute edits inside text.\n"
+                "- Do NOT attempt to change colors, layout, classes, ids, hrefs, src values, or any non-text attribute.\n"
+                "- The server will apply your text replacements to the original HTML exactly.\n\n"
                 "instrumentationManifest requirements:\n"
                 f"- schemaVersion MUST be '{imported_runtime_context['schemaVersion']}'.\n"
                 f"- pageStage MUST be '{current_page_stage}'.\n"
@@ -2042,11 +2068,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 f"{attachment_guidance}"
                 "Imported HTML runtime context:\n"
                 f"{json.dumps(imported_runtime_context, ensure_ascii=False)}\n\n"
+                "Editable text nodes that may be rewritten:\n"
+                f"{json.dumps(editable_text_nodes_context, ensure_ascii=False)}\n\n"
                 "instrumentationManifest JSON schema:\n"
                 f"{json.dumps(imported_html_instrumentation_schema(), ensure_ascii=False)}\n\n"
                 "HTML summary for orientation only:\n"
                 f"{json.dumps(args.htmlReferencePromptContext or {}, ensure_ascii=False)}\n\n"
-                "Uploaded HTML document to rewrite in place:\n"
+                "Uploaded HTML document to preserve exactly while patching copy into the listed text nodes:\n"
                 f"{reference_html}"
             )
 
@@ -2165,8 +2193,15 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 raise RuntimeError("Model returned no parsable JSON response")
 
             assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage"))
-            rewritten_html = _coerce_html_document(obj.get("htmlDocument"))
+            text_replacements = _coerce_text_replacements(obj.get("textReplacements"))
             instrumentation_manifest = coerce_imported_html_instrumentation_manifest(obj.get("instrumentationManifest"))
+            try:
+                rewritten_html = apply_html_text_replacements(
+                    original_html=reference_html,
+                    replacements=text_replacements,
+                )
+            except HtmlReferenceError as exc:
+                raise RuntimeError(str(exc)) from exc
             try:
                 assert_html_text_only_rewrite(
                     original_html=reference_html,
@@ -3693,6 +3728,8 @@ class DraftValidateArgs(BaseModel):
 
     orgId: str
     puckData: dict[str, Any]
+    funnelId: Optional[str] = None
+    pageId: Optional[str] = None
     allowedTypes: list[str] = Field(default_factory=list)
     requiredTypes: list[str] = Field(default_factory=list)
     templateKind: Optional[str] = None
@@ -3722,8 +3759,51 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
                 funnel_ai._validate_sales_pdp_component_configs(args.puckData)
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
+
+        current_page_stage = "custom"
+        current_page_id: str | None = None
+        next_page_id: str | None = None
+        checkout_ready_variants: list[ProductVariant] = []
+        page_ids = set(args.pageIdSet or [])
+        if args.funnelId and args.pageId:
+            page = ctx.session.scalars(
+                select(FunnelPage).where(
+                    FunnelPage.funnel_id == args.funnelId,
+                    FunnelPage.id == args.pageId,
+                )
+            ).first()
+            if page:
+                current_page_id = str(page.id)
+                next_page_id = str(page.next_page_id) if page.next_page_id else None
+                current_page_stage = resolve_funnel_page_stage(
+                    slug=page.slug,
+                    template_id=page.template_id,
+                    page_name=page.name,
+                )
+            funnel = ctx.session.scalars(
+                select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+            ).first()
+            if funnel and funnel.product_id:
+                checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+                if funnel.selected_offer_id:
+                    checkout_variants_query = checkout_variants_query.where(
+                        ProductVariant.offer_id == funnel.selected_offer_id
+                    )
+                checkout_ready_variants = [
+                    variant
+                    for variant in ctx.session.scalars(checkout_variants_query).all()
+                    if str(variant.external_price_id or "").strip() and str(variant.provider or "").strip()
+                ]
         try:
-            funnel_ai._validate_imported_html_document_components(args.puckData)
+            funnel_ai._validate_imported_html_document_components(
+                args.puckData,
+                current_page_stage=current_page_stage,
+                current_page_id=current_page_id,
+                next_page_id=next_page_id,
+                available_target_page_ids=page_ids or None,
+                checkout_ready_variants=checkout_ready_variants,
+                require_stage_bindings=current_page_stage in {"pre_sales", "sales"},
+            )
         except Exception as exc:  # noqa: BLE001
             errors.append(str(exc))
 
@@ -3750,8 +3830,7 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
                 )
 
         # Internal links must resolve to valid page ids.
-        if args.pageIdSet:
-            page_ids = set(args.pageIdSet)
+        if page_ids:
             for link in extract_internal_links(args.puckData):
                 if link.to_page_id not in page_ids:
                     errors.append(f"Invalid internal link targetPageId: {link.to_page_id}")
