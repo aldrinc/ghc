@@ -286,12 +286,21 @@ def _extract_category_niche(step1_content: str) -> str | None:
         r"^\s*primary\s+niche\s*:\s*(.+)$",
         r"^\s*niche\s*:\s*(.+)$",
     )
-    for raw_line in step1_content.splitlines():
+    lines = step1_content.splitlines()
+    for index, raw_line in enumerate(lines):
         normalized_line = _strip_markdown_formatting(raw_line)
         for pattern in patterns:
             match = re.match(pattern, normalized_line, flags=re.IGNORECASE)
             if match and match.group(1).strip():
                 return _strip_inline_markdown_citations(_strip_markdown_formatting(match.group(1)))
+        if re.match(r"(?i)^\s*primary\s+niche(?:\s*\([^)]*\))?\s*:\s*$", normalized_line):
+            for candidate_line in lines[index + 1 :]:
+                candidate = _strip_inline_markdown_citations(_strip_markdown_formatting(candidate_line))
+                if not candidate:
+                    continue
+                if candidate.startswith("#") or re.match(r"(?i)^(?:adjacent\s+niches|phase\s+\d+)", candidate):
+                    break
+                return candidate
     return None
 
 
@@ -544,6 +553,7 @@ def _extract_primary_segment_key_differentiator(step6_content: str) -> str | Non
 
 def _extract_bottleneck(step6_content: str) -> str | None:
     lines = step6_content.splitlines()
+    normalized_content = "\n".join(_strip_markdown_formatting(line) for line in lines)
     for index, raw_line in enumerate(lines):
         normalized = _strip_markdown_formatting(_normalize_heading_text(raw_line))
         normalized = re.sub(r"^\s*[-*]\s*", "", normalized).strip()
@@ -567,6 +577,7 @@ def _extract_bottleneck(step6_content: str) -> str | None:
 
     patterns = (
         r"(?im)^\s*(?:[-*]\s*)?(?:#\d+\s*)?unresolved\s+pain(?:\s*/\s*unmet\s+need)?\s*[:=\-]\s*(.+)$",
+        r"(?im)^\s*(?:[-*]\s*)?(?:#\d+\s*)?biggest\s+unresolved\s+need\s*[:=\-]\s*(.+)$",
         r"(?im)^\s*(?:#\d+\s*)?(?:primary|main|core|key|critical)?\s*bottleneck(?:\s+to\s+solve)?\s*[:=\-]\s*(.+)$",
         r"(?im)^\s*(?:primary|main|core|key|critical)?\s*bottleneck\s+segment(?:\s+identification)?\s*[:=\-]\s*(.+)$",
         r"(?im)\bbottleneck\s+segment\s*[:=\-]\s*(.+?)(?:[.\n]|$)",
@@ -576,7 +587,7 @@ def _extract_bottleneck(step6_content: str) -> str | None:
         r"(?im)^\s*(?:#\d+\s*)?(?:challenge|obstacle|constraint|friction(?:\s+point)?)\s*[:=\-]\s*(.+)$",
     )
     for pattern in patterns:
-        match = re.search(pattern, step6_content)
+        match = re.search(pattern, normalized_content)
         if match and match.group(1).strip():
             return _strip_markdown_formatting(match.group(1))
     distress_keywords = re.compile(
@@ -715,7 +726,7 @@ def _extract_candidate_competitor_urls(step1_content: str) -> dict[str, str]:
         stripped = raw_line.strip()
         if stripped.startswith("#"):
             heading = _normalize_heading_text(stripped).lower()
-            if "discover competitors" in heading:
+            if "discover competitors" in heading or "candidate competitor set" in heading:
                 in_candidate_section = True
                 continue
             if in_candidate_section and ("validate" in heading or heading.startswith("phase 3")):
@@ -731,7 +742,14 @@ def _extract_candidate_competitor_urls(step1_content: str) -> dict[str, str]:
         candidate_url = _normalize_probable_competitor_url_reference(cells[1])
         row_url = _normalize_probable_competitor_url_reference(raw_line)
         if row_url and (
-            candidate_url is None or urlparse(candidate_url).path in ("", "/") and urlparse(row_url).path not in ("", "/")
+            candidate_url is None
+            or (
+                candidate_url is not None
+                and urlparse(candidate_url).netloc.lower().removeprefix("www.")
+                == urlparse(row_url).netloc.lower().removeprefix("www.")
+                and urlparse(candidate_url).path in ("", "/")
+                and urlparse(row_url).path not in ("", "/")
+            )
         ):
             candidate_url = row_url
         if not candidate_name or not candidate_url or not _is_probable_competitor_url(candidate_url):
@@ -833,13 +851,36 @@ def _extract_validated_competitor_blocks(step1_content: str) -> list[str]:
         stripped = raw_line.strip()
         if stripped.startswith("#"):
             heading = _normalize_heading_text(stripped).lower()
-            if "validated competitors" in heading or "validated set" in heading or "validate" in heading:
+            if (
+                "validated competitors" in heading
+                or "validated competitor set" in heading
+                or "validated set" in heading
+                or ("validate" in heading and "competitor" in heading)
+                or ("validate" in heading and "battle-tested" in heading)
+            ):
                 _flush_current_block()
                 in_validated_section = True
                 continue
             if in_validated_section:
-                _flush_current_block()
-                break
+                if (
+                    "validation rule" in heading
+                    or "validated competitors" in heading
+                    or "validated competitor set" in heading
+                    or "validated set" in heading
+                ):
+                    continue
+                if (
+                    re.match(r"^phase\s+[4-9]\b", heading)
+                    or "competitive assessment" in heading
+                    or "positioning gap" in heading
+                    or "competitor funnel" in heading
+                    or "cross-competitor" in heading
+                    or "product lifecycle" in heading
+                    or "market maturity" in heading
+                ):
+                    _flush_current_block()
+                    break
+                continue
         if not in_validated_section:
             continue
         cells = _parse_markdown_table_cells(raw_line)
@@ -851,6 +892,11 @@ def _extract_validated_competitor_blocks(step1_content: str) -> list[str]:
             if lower_first in {"competitor", "candidate"} or lower_second == "included?":
                 continue
             if lower_second.startswith("yes"):
+                _flush_current_block()
+                blocks.append(raw_line)
+            elif lower_second.startswith("no"):
+                continue
+            elif len(cells) >= 2:
                 _flush_current_block()
                 blocks.append(raw_line)
             continue
@@ -928,6 +974,8 @@ def _extract_competitor_count(step1_content: str, competitor_urls: list[str]) ->
     explicit_patterns = (
         r"(?im)validated\s+competitor[s]?\s*[:=]\s*(\d+)",
         r"(?im)validated\s+competitor[s]?\s*\((\d+)\)",
+        r"(?im)validated\s+competitor\s+set\s*[:=]\s*(\d+)",
+        r"(?im)validated\s+competitor\s+set\s*\((\d+)\)",
         r"(?im)validated\s+set\s*\((\d+)\)",
         r"(?im)\b(\d+)\s+validated\s+competitor[s]?\b",
     )
