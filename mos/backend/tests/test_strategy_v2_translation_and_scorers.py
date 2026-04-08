@@ -991,6 +991,111 @@ def test_translate_stage1_handles_april_2026_live_foundational_shape() -> None:
     assert any("creatine" in keyword for keyword in stage1.product_category_keywords)
 
 
+def test_translate_stage1_handles_validated_competitor_set_tables_with_multiline_niche_and_bold_bottleneck() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "## Phase 1: Understand & Formalize the Idea\n"
+                        "**Primary niche (filter for later phases):**\n"
+                        "**Perimenopause brain-fog supplement protocols, specifically creatine-forward gummies/supplements for women 42–58.**\n"
+                        "\n"
+                        "### Candidate competitor set (unfiltered)\n"
+                        "| Candidate | URL | Type | What they do / who they serve |\n"
+                        "|---|---|---:|---|\n"
+                        "| Goli | goli.com | Adjacent | Large gummy supplement brand. ([de.semrush.com](https://de.semrush.com/website/goli.com/overview/?utm_source=openai)) |\n"
+                        "| Happy Mammoth | store.happymammoth.com | Adjacent | Women's hormone support brand. ([brandsearch.co](https://brandsearch.co/brands/store.happymammoth.com?utm_source=openai)) |\n"
+                        "| Perelel | perelelhealth.com | Adjacent | Women's supplement packs. ([milled.com](https://milled.com/perelel/introducing-mens-multi-support-pack-wV_BzPwQuroAjC8E?utm_source=openai)) |\n"
+                        "\n"
+                        "## Phase 3: Validate “Battle-Tested” Competitors (filter to non-trivial traction)\n"
+                        "### Validation rule applied\n"
+                        "Only include brands with meaningful traffic or clear market proof.\n"
+                        "\n"
+                        "### Validated competitor set (3)\n"
+                        "| Competitor | Why it passes “battle-tested” bar (evidence) |\n"
+                        "|---|---|\n"
+                        "| **Goli (goli.com)** | Semrush shows strong traffic. ([de.semrush.com](https://de.semrush.com/website/goli.com/overview/?utm_source=openai)) |\n"
+                        "| **Happy Mammoth (store.happymammoth.com / happymammoth.com)** | BrandSearch shows strong traffic and revenue. ([brandsearch.co](https://brandsearch.co/brands/store.happymammoth.com?utm_source=openai)) |\n"
+                        "| **Perelel (perelelhealth.com)** | Semrush competitors page shows meaningful traffic. ([semrush.com](https://www.semrush.com/website/perelelhealth.com/competitors/?utm_source=openai)) |\n"
+                        "\n"
+                        "### Product lifecycle stage: Growth → early maturity\n"
+                    ),
+                    "bounded_summary": "Validated competitor set (3).",
+                    "foundational_step_key": "01",
+                }
+            ),
+            "04": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "# Bottleneck Identification (single biggest unresolved need)\n"
+                        "**Biggest unresolved need:** A **peri-specific, creatine-first brain fog protocol** that feels *safe* and *works*, **in a gummy form people actually trust**.\n"
+                    ),
+                    "bounded_summary": "Biggest unresolved need captured.",
+                    "foundational_step_key": "04",
+                }
+            ),
+            "06": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "## Phase 1: Segment Discovery\n"
+                        "### Step 3 — Segment names & bounds (3)\n"
+                        "1) Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "2) Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "3) Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "\n"
+                        "## Segment 1 — Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "- Segment Name: Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "- Estimated Prevalence: ~30% of Ember's TAM\n"
+                        "- Key Differentiator: Their primary pain is status/competence exposure (not just discomfort).\n"
+                        "\n"
+                        "## Segment 2 — Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "- Segment Name: Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "- Estimated Prevalence: ~25% of Ember's TAM\n"
+                        "- Key Differentiator: They share and iterate on protocols before buying.\n"
+                        "\n"
+                        "## Segment 3 — Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "- Segment Name: Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "- Estimated Prevalence: ~20% of Ember's TAM\n"
+                        "- Key Differentiator: They want a non-hormonal protocol they can trust.\n"
+                        "\n"
+                        "**The PRIMARY SEGMENT is: _Boardroom Blankers (High-Performing Knowledge Workers)_.**\n"
+                    ),
+                    "bounded_summary": "Primary segment is Boardroom Blankers.",
+                    "foundational_step_key": "06",
+                }
+            ),
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche == (
+        "Perimenopause brain-fog supplement protocols, specifically creatine-forward gummies/supplements for women 42–58."
+    )
+    assert stage1.market_maturity_stage == "Growth"
+    assert stage1.competitor_count_validated == 3
+    assert stage1.competitor_urls == [
+        "https://goli.com/",
+        "https://store.happymammoth.com/",
+        "https://perelelhealth.com/",
+    ]
+    assert stage1.bottleneck == (
+        "A peri-specific, creatine-first brain fog protocol that feels safe and works, in a gummy form people actually trust."
+    )
+    assert stage1.primary_segment.name == "Boardroom Blankers (High-Performing Knowledge Workers)"
+
+
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:
     analysis = extract_competitor_analysis(_precanon_research_fixture())
     assert "compliance_landscape" in analysis
