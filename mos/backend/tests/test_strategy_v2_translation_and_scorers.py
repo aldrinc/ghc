@@ -797,6 +797,103 @@ def test_translate_stage1_unwraps_wrapped_foundational_payloads_and_keeps_valida
     assert stage1.primary_segment.key_differentiator == "Primary pain is public competence loss"
 
 
+def test_translate_stage1_handles_live_primary_niche_validation_tables_and_profile_blocks() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "## Phase 1 — Understand & Formalize the Idea (Evidence-only)\n"
+                "### 6) Market definition (keep visible)\n"
+                '**Primary niche:** "Hormone-free DTC menopause/perimenopause supplements positioned for brain fog / focus / cognitive clarity."\n'
+                "\n"
+                "## Phase 2 — Discover Competitors (Direct + Adjacent; candidates collected)\n"
+                "| Candidate | URL | Type | What they do (1 line) |\n"
+                "|---|---|---|---|\n"
+                "| O Positiv MENO | opositiv.com/products/meno-menopause-gummy-vitamins-s2 | Direct | Hormone-free menopause gummy. ([opositiv.com](https://opositiv.com/products/meno-menopause-gummy-vitamins-s2?utm_source=openai)) |\n"
+                "| Happy Mammoth Hormone Harmony | happymammoths.us/products/hormone-harmony | Direct | Menopause hormone support. ([happymammoths.us](https://happymammoths.us/products/hormone-harmony?utm_source=openai)) |\n"
+                "| HUM Fan Club | nordstrom.com listing | Direct | Retail listing with substantial review volume. ([nordstrom.com](https://www.nordstrom.com/s/fan-club-multi-symptom-relief-for-perimenopause-menopause-supplement/6971955?utm_source=openai)) |\n"
+                "| Brainzyme Focus | brainzyme.com/products/brainzyme-focus-brain-fog-menopause | Adjacent | Menopause brain fog support. ([brainzyme.com](https://www.brainzyme.com/products/brainzyme-focus-brain-fog-menopause?utm_source=openai)) |\n"
+                "\n"
+                "## Phase 3 — Validate “Battle-Tested” (ONLY those with non-trivial traction signals)\n"
+                "| Competitor | Included? | Why it passes bar (1–2 bullets; evidence) |\n"
+                "|---|---:|---|\n"
+                "| O Positiv | Yes | Large traffic estimate present. |\n"
+                "| Happy Mammoth | Yes | Product page shows thousands of reviews. |\n"
+                "| HUM Fan Club | Yes | Nordstrom listing shows meaningful review volume. |\n"
+                "| Brainzyme | No | Useful adjacent angle but weaker traction in this run. |\n"
+                "\n"
+                "## Phase 8 — Market Maturity Assessment (evidence-based)\n"
+                "### Product lifecycle stage: **Maturity**\n"
+            ),
+            "04": (
+                "## Bottleneck Identification\n"
+                "### #1 biggest unresolved pain / unmet need / broken expectation\n"
+                "A trustworthy, menopause-relevant brain fog solution that feels safe, believable, and easy to stick with.\n"
+            ),
+            "06": (
+                "## Phase 1: Segment Discovery\n"
+                "### Step 3 — Segment names & bounds (3)\n"
+                "1) **Word-Work Panic Performers** — high-performing, word-based careers; embarrassment triggers action.\n"
+                "2) **Hormone-Cautious Protocol Experimenters** — try sleep/exercise/supplements before committing hard.\n"
+                "3) **Format-Driven, Side-Effect-Sensitive Convenience Seekers** — GI tolerance and adherence determine conversion.\n"
+                "\n"
+                "## Phase 2: Segment Profiles\n"
+                "# 1) Word-Work Panic Performers\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Word-Work Panic Performers\n"
+                "- **Estimated Prevalence (Fermi):** **~25%** of peri/meno women 42–58.\n"
+                "- **Key Differentiator:** Their #1 pain is *public performance failure* (meetings/emails/conversations), not general wellness.\n"
+                "\n"
+                "# 2) Hormone-Cautious Protocol Experimenters\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Hormone-Cautious Protocol Experimenters\n"
+                "- **Estimated Prevalence:** **~30%** across the live VOC set.\n"
+                "- **Key Differentiator:** They buy *a protocol*, not a pill.\n"
+                "\n"
+                "# 3) Format-Driven, Side-Effect-Sensitive Convenience Seekers\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Format-Driven, Side-Effect-Sensitive Convenience Seekers\n"
+                "- **Estimated Prevalence:** **~15%** with strong tolerability signals.\n"
+                "- **Key Differentiator:** Conversion hinges on *tolerability + dosing practicality*, not motivation.\n"
+                "\n"
+                "## Phase 3: Bottleneck Segment Identification (computed)\n"
+                "**PRIMARY SEGMENT = Word-Work Panic Performers.**\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche == (
+        "Hormone-free DTC menopause/perimenopause supplements positioned for brain fog / focus / cognitive clarity."
+    )
+    assert stage1.market_maturity_stage == "Maturity"
+    assert stage1.competitor_count_validated == 3
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/products/meno-menopause-gummy-vitamins-s2",
+        "https://happymammoths.us/products/hormone-harmony",
+        "https://www.nordstrom.com/s/fan-club-multi-symptom-relief-for-perimenopause-menopause-supplement/6971955",
+    ]
+    assert stage1.primary_icps == [
+        "Word-Work Panic Performers",
+        "Hormone-Cautious Protocol Experimenters",
+        "Format-Driven, Side-Effect-Sensitive Convenience Seekers",
+    ]
+    assert stage1.primary_segment.name == "Word-Work Panic Performers"
+    assert stage1.primary_segment.size_estimate == "~25% of peri/meno women 42–58."
+    assert stage1.primary_segment.key_differentiator == (
+        "Their #1 pain is public performance failure (meetings/emails/conversations), not general wellness."
+    )
+    assert stage1.bottleneck == (
+        "A trustworthy, menopause-relevant brain fog solution that feels safe, believable, and easy to stick with."
+    )
+
+
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:
     analysis = extract_competitor_analysis(_precanon_research_fixture())
     assert "compliance_landscape" in analysis
