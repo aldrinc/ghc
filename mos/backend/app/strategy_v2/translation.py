@@ -81,11 +81,20 @@ _REFERENCE_DOMAIN_TOKENS = {
     "accessnewswire",
     "accesswire",
     "bankingpressreleases",
+    "bbbprograms",
+    "beautyindependent",
     "businesswire",
+    "cbinsights",
+    "crunchbase",
+    "ecomscout",
+    "fyicombinator",
     "globenewswire",
     "hienergyrocket",
     "modernretail",
+    "morningstar",
+    "pswordpress-production",
     "prnewswire",
+    "semrush",
     "similarweb",
     "trustpilot",
     "truthinadvertising",
@@ -169,7 +178,7 @@ def _extract_step_content(
         raise StrategyV2MissingContextError(
             f"Missing precanon step content '{step_key}'. Remediation: {remediation}"
         )
-    return step_content
+    return _unwrap_embedded_step_payload(step_content)
 
 
 def _extract_optional_step_content(
@@ -183,12 +192,28 @@ def _extract_optional_step_content(
     step_content = step_contents_raw.get(step_key)
     if not isinstance(step_content, str) or not step_content.strip():
         return None
-    return step_content
+    return _unwrap_embedded_step_payload(step_content)
+
+
+def _unwrap_embedded_step_payload(step_content: str) -> str:
+    cleaned = step_content.strip()
+    if not cleaned.startswith("{"):
+        return cleaned
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return cleaned
+    if not isinstance(parsed, Mapping):
+        return cleaned
+    content = parsed.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    return cleaned
 
 
 def _strip_markdown_formatting(value: str) -> str:
     cleaned = value.replace("**", "").replace("__", "").replace("`", "").strip()
-    return re.sub(r"\s+", " ", cleaned).strip().strip("\"'")
+    return re.sub(r"\s+", " ", cleaned).strip().strip("\"'“”‘’")
 
 
 def _normalize_heading_text(value: str) -> str:
@@ -276,8 +301,9 @@ def _extract_structured_category_niche(precanon_research: Mapping[str, object]) 
 
 def _extract_market_maturity(step1_content: str) -> str | None:
     patterns = (
-        r"(?im)^\s*market\s+maturity(?:\s+stage)?\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
-        r"(?im)^\s*lifecycle\s+stage\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
+        r"(?im)^\s*(?:#+\s*)?market\s+maturity(?:\s+stage)?\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
+        r"(?im)^\s*(?:#+\s*)?lifecycle\s+stage\s*[:=]\s*(Introduction|Growth|Maturity|Decline)\s*$",
+        r"(?im)^\s*(?:#+\s*)?product\s+lifecycle\s+stage\s*[:=]\s*\**(Introduction|Growth|Maturity|Decline)\b",
     )
     for pattern in patterns:
         match = re.search(pattern, step1_content)
@@ -432,6 +458,8 @@ def _extract_primary_icps(step6_content: str, segment_profiles: list[dict[str, s
 
     for profile in segment_profiles:
         _append(profile.get("name", ""))
+    if len(ordered) >= 3:
+        return ordered
     for item in _extract_primary_icps_from_list_items(step6_content):
         _append(item)
     return ordered
@@ -463,6 +491,7 @@ def _extract_primary_segment_key_differentiator(step6_content: str) -> str | Non
 
 def _extract_bottleneck(step6_content: str) -> str | None:
     patterns = (
+        r"(?im)^\s*(?:[-*]\s*)?(?:#\d+\s*)?unresolved\s+pain(?:\s*/\s*unmet\s+need)?\s*[:=\-]\s*(.+)$",
         r"(?im)^\s*(?:#\d+\s*)?(?:primary|main|core|key|critical)?\s*bottleneck(?:\s+to\s+solve)?\s*[:=\-]\s*(.+)$",
         r"(?im)^\s*(?:primary|main|core|key|critical)?\s*bottleneck\s+segment(?:\s+identification)?\s*[:=\-]\s*(.+)$",
         r"(?im)\bbottleneck\s+segment\s*[:=\-]\s*(.+?)(?:[.\n]|$)",
@@ -478,6 +507,9 @@ def _extract_bottleneck(step6_content: str) -> str | None:
     distress_keywords = re.compile(
         r"(?i)\b(?:threat|humiliation|embarrassment|stigma|shame|failure|failures|fear|brain\s+blanks?|word[-\s]+finding)\b"
     )
+    generic_labels = re.compile(
+        r"(?i)^(?:failures?\s+people\s+report|victories?\s*,?\s*failures?\s*,?\s*complaints?\s*(?:&|and)?\s*frustrations?)$"
+    )
     for raw_line in step6_content.splitlines():
         if not re.match(r"^\s*(?:[-*]|\d+[.)])\s+", raw_line):
             continue
@@ -486,7 +518,9 @@ def _extract_bottleneck(step6_content: str) -> str | None:
         if not candidate:
             continue
         label = candidate.split(":", 1)[0].strip()
-        if label and distress_keywords.search(label):
+        if not label or generic_labels.match(label):
+            continue
+        if distress_keywords.search(label):
             return _strip_markdown_formatting(label)
     return None
 
@@ -555,6 +589,62 @@ def _extract_domain_reference(text: str) -> str | None:
     return None
 
 
+def _normalize_competitor_label(value: str) -> str:
+    without_parentheticals = re.sub(r"\([^)]*\)", " ", _strip_markdown_formatting(value))
+    alnum_only = re.sub(r"[^A-Za-z0-9]+", " ", without_parentheticals)
+    return re.sub(r"\s+", " ", alnum_only).strip().lower()
+
+
+def _extract_candidate_competitor_urls(step1_content: str) -> dict[str, str]:
+    discovered: dict[str, str] = {}
+    for raw_line in step1_content.splitlines():
+        match = re.match(r"^\|\s*(.+?)\s*\|\s*`(https?://[^`]+)`\s*\|", raw_line.strip())
+        if not match:
+            continue
+        candidate_name = _normalize_competitor_label(match.group(1))
+        candidate_url = match.group(2).strip()
+        if not candidate_name or not _is_probable_competitor_url(candidate_url):
+            continue
+        discovered.setdefault(candidate_name, candidate_url)
+    return discovered
+
+
+def _extract_validated_competitor_name(block: str) -> str | None:
+    for raw_line in block.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        without_index = re.sub(r"^\s*\d+[.)]\s*", "", stripped)
+        without_domain_hint = re.sub(r"\s*\(`[^`]+`\)\s*$", "", without_index)
+        return _strip_markdown_formatting(without_index if not without_domain_hint else without_domain_hint)
+    return None
+
+
+def _lookup_candidate_competitor_url(
+    *,
+    block: str,
+    candidate_urls: Mapping[str, str],
+) -> str | None:
+    candidate_name = _extract_validated_competitor_name(block)
+    if not candidate_name:
+        return None
+    normalized_name = _normalize_competitor_label(candidate_name)
+    if not normalized_name:
+        return None
+    exact = candidate_urls.get(normalized_name)
+    if exact:
+        return exact
+    partial_matches = [
+        (candidate_key, candidate_url)
+        for candidate_key, candidate_url in candidate_urls.items()
+        if candidate_key in normalized_name or normalized_name in candidate_key
+    ]
+    if not partial_matches:
+        return None
+    partial_matches.sort(key=lambda item: len(item[0]), reverse=True)
+    return partial_matches[0][1]
+
+
 def _derive_competitor_url_from_reference(url: str) -> str | None:
     parsed = urlparse(url)
     host = parsed.netloc.lower().removeprefix("www.")
@@ -597,7 +687,7 @@ def _extract_validated_competitor_blocks(step1_content: str) -> list[str]:
         stripped = raw_line.strip()
         if stripped.startswith("#"):
             heading = _normalize_heading_text(stripped).lower()
-            if "validated competitors" in heading:
+            if "validated competitors" in heading or "validated set" in heading:
                 _flush_current_block()
                 in_validated_section = True
                 continue
@@ -615,7 +705,15 @@ def _extract_validated_competitor_blocks(step1_content: str) -> list[str]:
     return blocks
 
 
-def _extract_competitor_url_from_validated_block(block: str) -> str | None:
+def _extract_competitor_url_from_validated_block(
+    block: str,
+    *,
+    candidate_urls: Mapping[str, str],
+) -> str | None:
+    candidate_url = _lookup_candidate_competitor_url(block=block, candidate_urls=candidate_urls)
+    if candidate_url:
+        return candidate_url
+
     for url in _extract_urls(block):
         if _is_probable_competitor_url(url):
             return url
@@ -636,6 +734,7 @@ def _extract_competitor_urls(step1_content: str) -> list[str]:
     discovered: list[str] = []
     seen: set[str] = set()
     in_competitor_section = False
+    candidate_urls = _extract_candidate_competitor_urls(step1_content)
 
     def _append(url: str | None) -> None:
         if not url or url in seen:
@@ -644,7 +743,7 @@ def _extract_competitor_urls(step1_content: str) -> list[str]:
         discovered.append(url)
 
     for block in _extract_validated_competitor_blocks(step1_content):
-        _append(_extract_competitor_url_from_validated_block(block))
+        _append(_extract_competitor_url_from_validated_block(block, candidate_urls=candidate_urls))
     if discovered:
         return discovered
 
@@ -671,6 +770,7 @@ def _extract_competitor_count(step1_content: str, competitor_urls: list[str]) ->
     explicit_patterns = (
         r"(?im)validated\s+competitor[s]?\s*[:=]\s*(\d+)",
         r"(?im)validated\s+competitor[s]?\s*\((\d+)\)",
+        r"(?im)validated\s+set\s*\((\d+)\)",
         r"(?im)\b(\d+)\s+validated\s+competitor[s]?\b",
     )
     for pattern in explicit_patterns:

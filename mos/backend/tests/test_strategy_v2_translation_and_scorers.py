@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from types import SimpleNamespace
 import pytest
@@ -639,6 +640,161 @@ def test_translate_stage1_derives_competitor_domains_from_validated_reference_bl
         "https://happymammoth.com/",
         "https://hellobonafide.com/",
     ]
+
+
+def test_translate_stage1_unwraps_wrapped_foundational_payloads_and_keeps_validated_competitors_clean() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    step01 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## Phase 2: Discover Competitors (Direct + Adjacent)\n"
+                "| Candidate | URL | Type | Notes |\n"
+                "|---|---:|---|---|\n"
+                "| O Positiv | `https://opositivcare.com/` | Direct | Menopause supplement brand |\n"
+                "| Bonafide | `https://hellobonafide.com/` | Direct | Women's health nutraceuticals |\n"
+                "| Happy Mammoth | `https://happymammoths.us/products/hormone-harmony` | Direct | Hormone Harmony product |\n"
+                "| Estroven | `https://estroven.com/` | Direct | Menopause relief brand |\n"
+                "| Perelel | `https://perelelhealth.com/` | Adjacent | Perimenopause pack |\n"
+                "| MenoLabs | `https://menolabs.com/` | Direct | Tracker app plus supplements |\n"
+                "| Amberen | `https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply` | Direct | Menopause relief product |\n"
+                "| MaryRuth Organics | `https://www.maryruthorganics.com/products/organic-menopause-gummies` | Adjacent | Dedicated menopause gummies |\n"
+                "| Life Extension | `https://www.lifeextension.com/` | Adjacent | Large supplement incumbent |\n"
+                "\n"
+                "## Phase 3: Validate Battle-Tested Competitors\n"
+                "### Validated set (9)\n"
+                "1) **Life Extension** (`lifeextension.com`)\n"
+                "- Traffic: ~1.04M visits. ([semrush.com](https://www.semrush.com/website/lifeextension.com/overview/?source=trending-websites&utm_source=openai))\n"
+                "- Content authority: monthly magazine. ([lifeextension.com](https://www.lifeextension.com/about/media-press-pass?utm_source=openai))\n"
+                "2) **Happy Mammoth**\n"
+                "- Traffic: 1,535,938 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/happy-mammoth?utm_source=openai))\n"
+                "3) **MaryRuth Organics**\n"
+                "- Traffic: 2,284,920 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/maryruth-organics?utm_source=openai))\n"
+                "- Market presence: Target distribution. ([maryruthorganics.com](https://www.maryruthorganics.com/blogs/press-and-news/maryruth-s-products-for-infants-now-available-in-almost-2-000-target-stores?utm_source=openai))\n"
+                "4) **Estroven**\n"
+                "- Longevity: first produced in 1997. ([en.wikipedia.org](https://en.wikipedia.org/wiki/Amerifit_Brands?utm_source=openai))\n"
+                "5) **O Positiv**\n"
+                "- Traffic: 994,892 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/flo-vitamins?utm_source=openai))\n"
+                "- Market penetration: verified reviews on the homepage. ([opositivcare.com](https://opositivcare.com/?utm_source=openai))\n"
+                "6) **Bonafide Health**\n"
+                "- Traffic: 211.33K visits. ([semrush.com](https://www.semrush.com/website/hellobonafide.com/overview/))\n"
+                "- Retail expansion: 1,800+ Target stores. ([crunchbase.com](https://www.crunchbase.com/organization/jds-therapeutics-llc-the-parent-company-of-bonafide-and-nutrition-21?utm_source=openai))\n"
+                "7) **Perelel**\n"
+                "- Funding: $27M round. ([beautyindependent.com](https://www.beautyindependent.com/prelude-growth-leads-27m-round-perelel-womens-wellness-heats-up/?utm_source=openai))\n"
+                "8) **MenoLabs**\n"
+                "- Company maturity: acquired by Amyris. ([crunchbase.com](https://www.crunchbase.com/organization/menolabs/company_financials?utm_source=openai))\n"
+                "9) **Amberen (Biogix / Alliance Pharma acquisition mentioned in market report)**\n"
+                "- Market transaction: Alliance Pharma acquired Biogix. ([pswordpress-production.s3.amazonaws.com](https://pswordpress-production.s3.amazonaws.com/2023/11/Menopause_The-600-Billion-Opportunity-in-Femtech_PreScouter-2023.pdf?utm_source=openai))\n"
+                "- Brand site indicates it is active. ([amberen.com](https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply?utm_source=openai))\n"
+                "\n"
+                "## Phase 8: Market Maturity Assessment\n"
+                "### Product lifecycle stage: **Maturity (with ongoing innovation/line extensions)**\n"
+            ),
+            "bounded_summary": "Validated competitors (battle-tested with non-trivial traction evidence): 9.",
+            "foundational_step_key": "01",
+        }
+    )
+    step04 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## D) Victories, Failures, Complaints & Frustrations\n"
+                "- Failures people report: nothing changed, side effects, or they quit early.\n"
+                "\n"
+                "## Bottleneck Identification\n"
+                '- #1 unresolved pain/unmet need: "I need my brain back" (focus + word recall + mental energy) in a way that is reliable, non-hormone-required, and does not add new problems.\n'
+            ),
+            "bounded_summary": "#1 bottleneck: a trustworthy, repeatable, hormone-optional cognitive solution.",
+            "foundational_step_key": "04",
+        }
+    )
+    step06 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## Phase 1 - Segment Discovery\n"
+                "### Step 3: Segment names & bounds (3-5)\n"
+                "1) Workplace Edge Protectors - protect professional competence and verbal fluency.\n"
+                "2) ADHD-Peri System Crashers - peri turns ADHD from manageable to unmanageable.\n"
+                "3) Evidence-Hawk Supplement Skeptics - demand dosing and proof.\n"
+                "4) Format Friction Strugglers - adherence is the top problem.\n"
+                "5) Side-Effect Sentinels - high sensitivity to bloat, palpitations, and hair loss fears.\n"
+                "\n"
+                "## Segment 1: Workplace Edge Protectors\n"
+                "- Segment Name: Workplace Edge Protectors\n"
+                "- Estimated Prevalence: 25% of the live VOC set\n"
+                "- Key Differentiator: Primary pain is public competence loss\n"
+                "\n"
+                "## Segment 2: ADHD-Peri System Crashers\n"
+                "- Segment Name: ADHD-Peri System Crashers\n"
+                "- Estimated Prevalence: Secondary but intense segment\n"
+                "- Key Differentiator: Their coping systems suddenly stop working\n"
+                "\n"
+                "## Segment 3: Evidence-Hawk Supplement Skeptics\n"
+                "- Segment Name: Evidence-Hawk Supplement Skeptics\n"
+                "- Estimated Prevalence: Large skeptical cluster\n"
+                "- Key Differentiator: They demand proof before trusting claims\n"
+                "\n"
+                "## Segment 4: Format Friction Strugglers\n"
+                "- Segment Name: Format Friction Strugglers\n"
+                "- Estimated Prevalence: Medium-sized adherence-driven cluster\n"
+                "- Key Differentiator: They want a format they will actually take\n"
+                "\n"
+                "## Segment 5: Side-Effect Sentinels\n"
+                "- Segment Name: Side-Effect Sentinels\n"
+                "- Estimated Prevalence: Smaller but high-anxiety cluster\n"
+                "- Key Differentiator: Safety and tolerability beat outcomes-first copy\n"
+                "\n"
+                'The PRIMARY SEGMENT is "Workplace Edge Protectors."\n'
+            ),
+            "bounded_summary": "Bounded summary: 5 distinct buyer segments identified. PRIMARY SEGMENT: Workplace Edge Protectors.",
+            "foundational_step_key": "06",
+        }
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": step01,
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": step04,
+            "06": step06,
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.competitor_count_validated == 9
+    assert stage1.competitor_urls == [
+        "https://www.lifeextension.com/",
+        "https://happymammoths.us/products/hormone-harmony",
+        "https://www.maryruthorganics.com/products/organic-menopause-gummies",
+        "https://estroven.com/",
+        "https://opositivcare.com/",
+        "https://hellobonafide.com/",
+        "https://perelelhealth.com/",
+        "https://menolabs.com/",
+        "https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply",
+    ]
+    assert stage1.market_maturity_stage == "Maturity"
+    assert "I need my brain back" in stage1.bottleneck
+    assert stage1.primary_icps == [
+        "Workplace Edge Protectors",
+        "ADHD-Peri System Crashers",
+        "Evidence-Hawk Supplement Skeptics",
+        "Format Friction Strugglers",
+        "Side-Effect Sentinels",
+    ]
+    assert stage1.primary_segment.name == "Workplace Edge Protectors"
+    assert stage1.primary_segment.size_estimate == "25% of the live VOC set"
+    assert stage1.primary_segment.key_differentiator == "Primary pain is public competence loss"
 
 
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:
