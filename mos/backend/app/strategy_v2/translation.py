@@ -90,6 +90,7 @@ _REFERENCE_DOMAIN_TOKENS = {
     "fyicombinator",
     "globenewswire",
     "hienergyrocket",
+    "hypestat",
     "modernretail",
     "morningstar",
     "pswordpress-production",
@@ -216,6 +217,11 @@ def _strip_markdown_formatting(value: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip().strip("\"'“”‘’")
 
 
+def _strip_inline_markdown_citations(value: str) -> str:
+    cleaned = re.sub(r"\s*\(\[[^\]]+\]\([^)]+\)\)\s*$", "", value).strip()
+    return cleaned.strip("\"'“”‘’")
+
+
 def _normalize_heading_text(value: str) -> str:
     without_heading = re.sub(r"^\s*#+\s*", "", value)
     return _strip_markdown_formatting(without_heading)
@@ -285,7 +291,7 @@ def _extract_category_niche(step1_content: str) -> str | None:
         for pattern in patterns:
             match = re.match(pattern, normalized_line, flags=re.IGNORECASE)
             if match and match.group(1).strip():
-                return _strip_markdown_formatting(match.group(1))
+                return _strip_inline_markdown_citations(_strip_markdown_formatting(match.group(1)))
     return None
 
 
@@ -300,6 +306,29 @@ def _extract_structured_category_niche(precanon_research: Mapping[str, object]) 
         if isinstance(nested, str) and nested.strip():
             return nested.strip()
     return None
+
+
+def _select_category_niche(
+    *,
+    structured_category_niche: str | None,
+    extracted_category_niche: str | None,
+) -> str | None:
+    structured = (structured_category_niche or "").strip()
+    extracted = (extracted_category_niche or "").strip()
+    if not structured:
+        return extracted or None
+    if not extracted:
+        return structured
+    structured_tokens = {token.lower() for token in re.findall(r"[A-Za-z0-9]+", structured)}
+    extracted_tokens = {token.lower() for token in re.findall(r"[A-Za-z0-9]+", extracted)}
+    specificity_tokens = {"brain", "fog", "creatine", "menopause", "perimenopause", "gummies", "capsules"}
+    extracted_specificity = len(extracted_tokens & specificity_tokens)
+    structured_specificity = len(structured_tokens & specificity_tokens)
+    if extracted_specificity > structured_specificity:
+        return extracted
+    if len(extracted) >= len(structured) + 15:
+        return extracted
+    return structured
 
 
 def _extract_market_maturity(step1_content: str) -> str | None:
@@ -355,16 +384,26 @@ def _extract_segment_reference(
         segment_key_match = re.search(r"(?i)\bsegment\s+([A-Z0-9]+)\b", segment_label)
         segment_key = segment_key_match.group(1).upper() if segment_key_match else None
         segment_name = label_match.group(2).strip() if label_match.lastindex and label_match.lastindex >= 2 and label_match.group(2) else None
-        return segment_key, _strip_markdown_formatting(segment_name or "")
+        return segment_key, _clean_segment_name(segment_name or "")
 
     name_match = re.search(
         r"(?im)\b(?:the\s+)?primary\s+segment\s+(?:is|[:=\-])\s*(.+?)(?:[.\n]|$)",
         normalized_content,
     )
     if name_match and name_match.group(1).strip():
-        return None, _strip_markdown_formatting(name_match.group(1))
+        return None, _clean_segment_name(name_match.group(1))
 
     return None, None
+
+
+def _clean_segment_name(value: str) -> str:
+    stripped = _strip_markdown_formatting(value)
+    stripped = re.sub(r"\s*\((?:primary|primary\s+candidate)\)\s*$", "", stripped, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", stripped).strip()
+
+
+def _normalize_segment_name_for_match(value: str) -> str:
+    return _normalize_competitor_label(_clean_segment_name(value))
 
 
 def _parse_segment_start(line: str) -> tuple[str, str | None] | None:
@@ -375,10 +414,10 @@ def _parse_segment_start(line: str) -> tuple[str, str | None] | None:
         return None
     numbered_heading = re.match(r"(?i)^(\d+)[.)]\s+(.+)$", normalized)
     if is_heading and numbered_heading:
-        return numbered_heading.group(1).upper(), _strip_markdown_formatting(numbered_heading.group(2))
+        return numbered_heading.group(1).upper(), _clean_segment_name(numbered_heading.group(2))
     with_name = re.match(r"(?i)^segment\s+([A-Z0-9]+)\s*[:=\-\u2013\u2014]\s*(.+)$", normalized)
     if with_name:
-        return with_name.group(1).upper(), _strip_markdown_formatting(with_name.group(2))
+        return with_name.group(1).upper(), _clean_segment_name(with_name.group(2))
     without_name = re.match(r"(?i)^segment\s+([A-Z0-9]+)\b$", normalized)
     if without_name:
         return without_name.group(1).upper(), None
@@ -423,7 +462,7 @@ def _extract_segment_profiles(step6_content: str) -> list[dict[str, str]]:
         profiles.append(
             {
                 "segment_key": current_segment_key,
-                "name": segment_name,
+                "name": _clean_segment_name(segment_name),
                 "size_estimate": _extract_labeled_block_value(
                     current_segment_lines,
                     (
@@ -461,7 +500,7 @@ def _extract_primary_icps(step6_content: str, segment_profiles: list[dict[str, s
     seen: set[str] = set()
 
     def _append(value: str) -> None:
-        cleaned = _strip_markdown_formatting(value)
+        cleaned = _clean_segment_name(value)
         if not cleaned:
             return
         normalized = cleaned.lower()
@@ -508,9 +547,9 @@ def _extract_bottleneck(step6_content: str) -> str | None:
     for index, raw_line in enumerate(lines):
         normalized = _strip_markdown_formatting(_normalize_heading_text(raw_line))
         normalized = re.sub(r"^\s*[-*]\s*", "", normalized).strip()
-        normalized = re.sub(r"^\s*#\d+\s*", "", normalized).strip()
+        normalized = re.sub(r"^\s*(?:#\s*)?\d+\s*", "", normalized).strip()
         if not re.match(
-            r"(?i)^(?:biggest\s+)?unresolved\s+pain(?:\s*/\s*unmet\s+need(?:\s*/\s*broken\s+expectation)?)?$",
+            r"(?i)^(?:biggest\s+)?unresolved\s+pain(?:\s*/\s*unmet\s+need(?:\s*/\s*broken\s+expectation)?)?\s*:?\s*$",
             normalized,
         ):
             continue
@@ -661,6 +700,9 @@ def _normalize_probable_competitor_url_reference(value: str) -> str | None:
     normalized = parsed._replace(scheme="https", query="", fragment="")
     path = normalized.path or "/"
     rebuilt = f"https://{normalized.netloc}{path}"
+    derived = _derive_competitor_url_from_reference(rebuilt)
+    if derived and _is_probable_competitor_url(derived):
+        return derived
     if not _is_probable_competitor_url(rebuilt):
         return None
     return rebuilt
@@ -745,6 +787,18 @@ def _derive_competitor_url_from_reference(url: str) -> str | None:
         return None
     if "similarweb" in host:
         match = re.search(r"(?i)(?:^|/)website/([^/]+)", path)
+        if match:
+            domain = _extract_domain_reference(match.group(1))
+            if domain:
+                return f"https://{domain}/"
+    if "semrush" in host:
+        match = re.search(r"(?i)(?:^|/)website/([^/]+)", path)
+        if match:
+            domain = _extract_domain_reference(match.group(1))
+            if domain:
+                return f"https://{domain}/"
+    if "hypestat" in host:
+        match = re.search(r"(?i)(?:^|/)info/([^/]+)", path)
         if match:
             domain = _extract_domain_reference(match.group(1))
             if domain:
@@ -1058,8 +1112,10 @@ def translate_stage1(
     )
 
     category_niche = _extract_structured_category_niche(precanon_research)
-    if not category_niche:
-        category_niche = _extract_category_niche(step1_content)
+    category_niche = _select_category_niche(
+        structured_category_niche=category_niche,
+        extracted_category_niche=_extract_category_niche(step1_content),
+    )
     if not category_niche:
         raise StrategyV2MissingContextError(
             "Unable to extract 'category_niche' from precanon step 01 content. "
@@ -1090,7 +1146,22 @@ def translate_stage1(
             (
                 profile
                 for profile in segment_profiles
-                if profile.get("name", "").strip().lower() == primary_segment_reference_name.lower()
+                if _normalize_segment_name_for_match(profile.get("name", ""))
+                == _normalize_segment_name_for_match(primary_segment_reference_name)
+            ),
+            None,
+        )
+    if primary_segment_profile is None and primary_segment_reference_name:
+        reference_name = _normalize_segment_name_for_match(primary_segment_reference_name)
+        primary_segment_profile = next(
+            (
+                profile
+                for profile in segment_profiles
+                if reference_name
+                and (
+                    reference_name in _normalize_segment_name_for_match(profile.get("name", ""))
+                    or _normalize_segment_name_for_match(profile.get("name", "")) in reference_name
+                )
             ),
             None,
         )
