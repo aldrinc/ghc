@@ -894,6 +894,103 @@ def test_translate_stage1_handles_live_primary_niche_validation_tables_and_profi
     )
 
 
+def test_translate_stage1_handles_april_2026_live_foundational_shape() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": (
+                "### 6) Market definition (keep visible)\n"
+                '**Primary niche:** "DTC menopause/perimenopause supplements (often gummies/capsules) '
+                'claiming multi-symptom relief, with a sub-pocket of creatine-driven \'brain+strength\' products."\n'
+                "\n"
+                "## Phase 2 — Discover Competitors (Direct + Adjacent)\n"
+                "| Candidate | URL | Type | What it is |\n"
+                "|---|---:|---|---|\n"
+                "| O Positiv | `https://opositiv.com/` | Direct | Menopause supplement brand |\n"
+                "| Alloy | `https://es.semrush.com/website/myalloy.com/overview/` | Adjacent | Menopause care service |\n"
+                "| Midi Health | `https://hypestat.com/info/joinmidi.com` | Adjacent | Menopause specialist clinic |\n"
+                "| Equelle | `https://hypestat.com/info/equelle.com` | Direct | Menopause supplement site |\n"
+                "| Brainzyme | `https://hypestat.com/info/brainzyme.com` | Adjacent | Menopause brain fog support |\n"
+                "\n"
+                "## Phase 3 — Validate Battle-Tested Competitors\n"
+                "### Validated competitors (5)\n"
+                "1) **O Positiv** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/opositiv.com))\n"
+                "2) **Alloy** — traction evidence. "
+                "([semrush.com](https://www.semrush.com/website/myalloy.com/overview/))\n"
+                "3) **Midi Health** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/joinmidi.com))\n"
+                "4) **Equelle** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/equelle.com))\n"
+                "5) **Brainzyme** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/brainzyme.com))\n"
+                "\n"
+                "## Phase 8 — Market Maturity Assessment\n"
+                "### Product lifecycle stage: Growth → early maturity\n"
+            ),
+            "04": (
+                "3) Bottleneck Identification (most important)\n"
+                "#1 unresolved pain / unmet need / broken expectation:\n"
+                "“I need my brain back, but I don’t have time to experiment—and I don’t trust convenient "
+                "formats (gummies) to be real, stable, and correctly dosed.”\n"
+                "\n"
+                "- Quality failures: “MOLD!!” + “not consistent.”\n"
+            ),
+            "06": (
+                "## Phase 1: Segment Discovery\n"
+                "### Step 3 — Segments named & bounded (5)\n"
+                "1) **Boardroom Word-Loss Achiever** — work-performance failures drive urgency.\n"
+                "2) **Caregiver Slow-Fade + Dementia-Fear** — reassurance and a plan.\n"
+                "3) **Proof-First Anti-Scam Analyst** — only buys when proof is explicit.\n"
+                "4) **Side-Effect Sensitive Scale-Watcher (PRIMARY CANDIDATE)** — wants cognitive upside "
+                "but quits fast when bloat, GI, palpitations, or hair fears show up.\n"
+                "5) **Supplement-Overwhelmed Convenience Seeker** — wants an easy, consistent routine.\n"
+                "\n"
+                "## Phase 2: Segment Profiles\n"
+                "# Segment 1 — Boardroom Word-Loss Achiever\n"
+                "## A) Segment Identity\n"
+                "**Segment Name:** Boardroom Word-Loss Achiever\n"
+                "**Estimated Prevalence:** ~25% of TAM\n"
+                "**Key Differentiator:** Her purchase urgency is driven by public work slips.\n"
+                "\n"
+                "# Segment 4 — Side-Effect Sensitive Scale-Watcher (PRIMARY)\n"
+                "## A) Segment Identity\n"
+                "**Segment Name:** Side-Effect Sensitive Scale-Watcher\n"
+                "**Estimated Prevalence:** ~20% of TAM (Fermi): bloat/scale is HIGH SIGNAL and side effects recur.\n"
+                "**Key Differentiator:** Her decision is dominated by tolerability and perceived body-risk.\n"
+                "\n"
+                "## Phase 3: Cross-Segment Analysis\n"
+                "**The PRIMARY SEGMENT is: Side-Effect Sensitive Scale-Watcher.**\n"
+            ),
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche.startswith("DTC menopause/perimenopause supplements")
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/",
+        "https://myalloy.com/",
+        "https://joinmidi.com/",
+        "https://equelle.com/",
+        "https://brainzyme.com/",
+    ]
+    assert stage1.competitor_count_validated == 5
+    assert stage1.bottleneck.startswith("I need my brain back")
+    assert stage1.primary_segment.name == "Side-Effect Sensitive Scale-Watcher"
+    assert stage1.primary_segment.size_estimate.startswith("~20%")
+    assert stage1.primary_segment.key_differentiator.startswith(
+        "Her decision is dominated by tolerability and perceived body-risk"
+    )
+    assert any("creatine" in keyword for keyword in stage1.product_category_keywords)
+
+
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:
     analysis = extract_competitor_analysis(_precanon_research_fixture())
     assert "compliance_landscape" in analysis
