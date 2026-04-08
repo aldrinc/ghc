@@ -23,6 +23,7 @@ from app.db.models import (
     SitePage,
     SitePageVersion,
     Client,
+    SitePublication,
 )
 from app.db.repositories.sites_runtime import SitesRuntimeRepository
 from app.schemas.sites import (
@@ -75,6 +76,16 @@ from app.services.medusa_store_runtime import (
 )
 
 router = APIRouter(prefix="/sites", tags=["sites"])
+
+
+def _resolve_site_publication_state(session: Session, site: Site) -> tuple[str | None, str | None]:
+    publication_id = str(site.active_site_publication_id) if site.active_site_publication_id else None
+    if not publication_id:
+        return None, None
+    publication = session.scalars(
+        select(SitePublication).where(SitePublication.id == site.active_site_publication_id)
+    ).first()
+    return publication_id, publication.created_at.isoformat() if publication and publication.created_at else None
 
 
 def _resolve_medusa_runtime_stripe_account_id(
@@ -563,8 +574,10 @@ def list_sites(
     sites_repo = SitesRuntimeRepository(session)
     sites = sites_repo.list_sites(org_id=str(UUID(auth.org_id)), client_id=str(UUID(clientId)))
 
-    return [
-        {
+    items: list[dict[str, Any]] = []
+    for s in sites:
+        active_site_publication_id, last_published_at = _resolve_site_publication_state(session, s)
+        items.append({
             "id": str(s.id),
             "clientId": str(s.client_id),
             "name": s.name,
@@ -581,11 +594,12 @@ def list_sites(
             "routeSlug": s.route_slug,
             "primaryDomain": s.primary_domain,
             "templateId": str(s.site_template_id) if s.site_template_id else None,
+            "activeSitePublicationId": active_site_publication_id,
+            "lastPublishedAt": last_published_at,
             "createdAt": s.created_at.isoformat(),
             "updatedAt": s.updated_at.isoformat(),
-        }
-        for s in sites
-    ]
+        })
+    return items
 
 
 @router.get("/{site_id}", response_model=SiteDetail)
@@ -655,6 +669,8 @@ def get_site(
             )
         )
 
+    active_site_publication_id, last_published_at = _resolve_site_publication_state(session, site)
+
     return SiteDetail(
         id=str(site.id),
         clientId=str(site.client_id),
@@ -672,6 +688,8 @@ def get_site(
         routeSlug=site.route_slug,
         primaryDomain=site.primary_domain,
         templateId=str(site.site_template_id) if site.site_template_id else None,
+        activeSitePublicationId=active_site_publication_id,
+        lastPublishedAt=last_published_at,
         entryPageId=str(site.entry_page_id) if site.entry_page_id else None,
         pages=page_summaries,
         createdAt=site.created_at.isoformat(),

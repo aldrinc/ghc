@@ -22,6 +22,20 @@ export type CampaignSkillsCreativeContextMaterializeResponse = {
   staleArtifactId?: string | null;
   checkedAt: string;
 };
+
+export type CampaignCreativeContextAngleSummary = {
+  angleId: string;
+  angleName: string;
+  description?: string | null;
+  evidence: string[];
+};
+
+export type CampaignCreativeContextAnglesResponse = {
+  campaignId: string;
+  provider: "strategy_v2" | "manual" | "skills";
+  selectedAngleId?: string | null;
+  angles: CampaignCreativeContextAngleSummary[];
+};
 export const CAMPAIGN_SWIPE_COLLECTION_QUERY_KEY = (campaignId: string) =>
   ["campaigns", campaignId, "swipe-collection"] as const;
 
@@ -37,6 +51,15 @@ export function useCampaign(campaignId?: string) {
     queryKey: ["campaigns", campaignId],
     queryFn: () => get(`/campaigns/${campaignId}`),
     enabled: Boolean(campaignId),
+  });
+}
+
+export function useCampaignsForProduct(clientId?: string | null, productId?: string | null) {
+  const { get } = useApiClient();
+  return useQuery<Campaign[]>({
+    queryKey: ["campaigns", "by-product", clientId, productId],
+    queryFn: () => get(`/campaigns?client_id=${clientId}&product_id=${productId}`),
+    enabled: Boolean(clientId && productId),
   });
 }
 
@@ -87,6 +110,15 @@ export function useMaterializeCampaignCreativeContext(campaignId?: string) {
     onError: (err: ApiError | Error) => {
       toast.error(getMutationErrorMessage(err, "Failed to materialize campaign creative context"));
     },
+  });
+}
+
+export function useCampaignCreativeContextAngles(campaignId?: string | null) {
+  const { get } = useApiClient();
+  return useQuery<CampaignCreativeContextAnglesResponse>({
+    queryKey: ["campaigns", campaignId, "creative-context-angles"],
+    queryFn: () => get(`/campaigns/${campaignId}/creative-context/angles`),
+    enabled: Boolean(campaignId),
   });
 }
 

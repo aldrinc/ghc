@@ -1,12 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Globe, Edit, ExternalLink, Loader2, ArrowLeft, LayoutGrid, Settings, Funnel, FileText, Package, Palette, Plus, Trash2, Check, AlertCircle, LayoutTemplate } from "lucide-react";
 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  useCampaignCreativeContextAngles,
+  useCampaignsForProduct,
+} from "@/api/campaigns";
 import { useClient } from "@/api/clients";
 import { useProducts } from "@/api/products";
 import { useSite, useUpdateSite, type SiteThemeBindingMode } from "@/api/sites";
 import { useSiteFunnels, useCreateSiteFunnel, useDeleteSiteFunnel } from "@/api/siteFunnels";
+import {
+  useCreateSiteFunnelTemplateImport,
+  useSiteFunnelTemplateImports,
+} from "@/api/siteFunnelTemplateImports";
 import { useCreateSiteProductBinding, useDeleteSiteProductBinding, useSiteProductBindings } from "@/api/siteProductBindings";
 import { useCreateSiteTemplateFromSite } from "@/api/siteTemplates";
 import { useDesignSystems } from "@/api/designSystems";
@@ -56,6 +64,42 @@ function getThemeBindingDescription(mode: SiteThemeBindingMode | null | undefine
     case "design_system": return "Uses a specific design system for this site";
     default: return "Theme source not configured";
   }
+}
+
+function formatPageIntent(intent: string | null | undefined): string {
+  if (intent === "pre_sales") return "Pre-sales";
+  if (intent === "sales") return "Sales";
+  return "Not set";
+}
+
+function parseTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getImportedTemplateFunnelStatus(
+  funnel: {
+    templateImportId: string | null;
+    latestPreparedVersionId: string | null;
+    preparedAt: string | null;
+  },
+  site: {
+    activeSitePublicationId?: string | null;
+    lastPublishedAt?: string | null;
+  } | null | undefined,
+): { tone: "warning" | "accent" | "success"; label: string } | null {
+  if (!funnel.templateImportId) return null;
+  if (!funnel.latestPreparedVersionId) {
+    return { tone: "warning", label: "Needs preparation" };
+  }
+
+  const preparedAt = parseTimestamp(funnel.preparedAt);
+  const lastPublishedAt = parseTimestamp(site?.lastPublishedAt);
+  if (!site?.activeSitePublicationId || !lastPublishedAt || (preparedAt && preparedAt > lastPublishedAt)) {
+    return { tone: "accent", label: "Ready to publish" };
+  }
+  return { tone: "success", label: "Published" };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -134,6 +178,11 @@ export function SiteDetailPage() {
   const { data: products = [], isLoading: productsLoading } = useProducts(workspace?.id);
   const { data: funnels = [], isLoading: funnelsLoading, error: funnelsError } = useSiteFunnels(siteId || null);
   const {
+    data: templateImports = [],
+    isLoading: templateImportsLoading,
+    error: templateImportsError,
+  } = useSiteFunnelTemplateImports(siteId || null);
+  const {
     data: productBindings = [],
     isLoading: bindingsLoading,
     error: bindingsError,
@@ -144,6 +193,7 @@ export function SiteDetailPage() {
   } = useSitePreviewDefaults(siteId || null, site?.siteFamily || null, site?.commerceProvider || null);
   const { data: designSystems = [] } = useDesignSystems(workspace?.id);
   const createFunnel = useCreateSiteFunnel(siteId || null);
+  const createTemplateImport = useCreateSiteFunnelTemplateImport(siteId || null);
   const deleteFunnel = useDeleteSiteFunnel(siteId || null);
   const createBinding = useCreateSiteProductBinding(siteId || null);
   const deleteBinding = useDeleteSiteProductBinding(siteId || null);
@@ -157,8 +207,13 @@ export function SiteDetailPage() {
   const [showCreateFunnelForm, setShowCreateFunnelForm] = useState(false);
   const [newFunnelName, setNewFunnelName] = useState("");
   const [newFunnelDescription, setNewFunnelDescription] = useState("");
+  const [newFunnelSourceMode, setNewFunnelSourceMode] = useState<"site_pages" | "imported_html">("site_pages");
   const [newFunnelEntryPageId, setNewFunnelEntryPageId] = useState("");
   const [newFunnelProductId, setNewFunnelProductId] = useState("");
+  const [newFunnelTemplateImportId, setNewFunnelTemplateImportId] = useState("");
+  const [newFunnelPageIntent, setNewFunnelPageIntent] = useState<"" | "sales" | "pre_sales">("");
+  const [newFunnelCampaignId, setNewFunnelCampaignId] = useState("");
+  const [newFunnelSelectedAngleId, setNewFunnelSelectedAngleId] = useState("");
   const [showCreateBindingForm, setShowCreateBindingForm] = useState(false);
   const [selectedBindingProductId, setSelectedBindingProductId] = useState("");
   const [selectedBindingPageId, setSelectedBindingPageId] = useState("");
@@ -169,6 +224,21 @@ export function SiteDetailPage() {
   const [showCreateTemplateDialog, setShowCreateTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
+  const [showCreateTemplateImportDialog, setShowCreateTemplateImportDialog] = useState(false);
+  const [newTemplateImportLabel, setNewTemplateImportLabel] = useState("");
+  const [newTemplateImportHtml, setNewTemplateImportHtml] = useState("");
+
+  const effectiveCampaignProductId = newFunnelProductId || site?.productId || null;
+  const {
+    data: campaignsForProduct = [],
+    isLoading: campaignsLoading,
+    error: campaignsError,
+  } = useCampaignsForProduct(workspace?.id ?? null, effectiveCampaignProductId);
+  const {
+    data: campaignAngles,
+    isLoading: campaignAnglesLoading,
+    error: campaignAnglesError,
+  } = useCampaignCreativeContextAngles(newFunnelCampaignId || null);
 
   // Theme tab state
   const [themeBindingMode, setThemeBindingMode] = useState<SiteThemeBindingMode>("standalone");
@@ -252,10 +322,37 @@ export function SiteDetailPage() {
     { label: "Select a page", value: "" },
     ...sortedPages.map((p) => ({ label: `${p.name} (/${p.slug})`, value: p.id })),
   ], [sortedPages]);
+  const templateImportOptions = useMemo(() => [
+    { label: templateImportsLoading ? "Loading imports..." : "Select an imported HTML template", value: "" },
+    ...templateImports.map((item) => ({
+      label: `${item.sourceLabel} (${item.htmlLength.toLocaleString()} chars)`,
+      value: item.id,
+    })),
+  ], [templateImports, templateImportsLoading]);
   const funnelOptions = useMemo(() => [
     { label: "Site-wide binding", value: "" },
     ...funnels.map((f) => ({ label: f.name, value: f.id })),
   ], [funnels]);
+  const funnelSourceOptions = useMemo(() => [
+    { label: "Site pages", value: "site_pages" },
+    { label: "Imported HTML template", value: "imported_html" },
+  ], []);
+  const pageIntentOptions = useMemo(() => [
+    { label: "Select page intent", value: "" },
+    { label: "Sales page", value: "sales" },
+    { label: "Pre-sales page", value: "pre_sales" },
+  ], []);
+  const campaignOptions = useMemo(() => [
+    { label: campaignsLoading ? "Loading campaigns..." : "Select a campaign", value: "" },
+    ...campaignsForProduct.map((campaign) => ({ label: campaign.name, value: campaign.id })),
+  ], [campaignsForProduct, campaignsLoading]);
+  const angleOptions = useMemo(() => [
+    { label: newFunnelCampaignId ? (campaignAnglesLoading ? "Loading angles..." : "Select an angle") : "Select a campaign first", value: "" },
+    ...((campaignAngles?.angles ?? []).map((angle) => ({
+      label: angle.angleName,
+      value: angle.angleId,
+    }))),
+  ], [campaignAngles?.angles, campaignAnglesLoading, newFunnelCampaignId]);
   const designSystemOptions = useMemo(() => [
     { label: "Select a design system", value: "" },
     ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
@@ -285,9 +382,20 @@ export function SiteDetailPage() {
 
   const openCreateFunnelForm = () => {
     setNewFunnelName(""); setNewFunnelDescription("");
+    setNewFunnelSourceMode("site_pages");
     setNewFunnelEntryPageId(site?.entryPageId || "");
     setNewFunnelProductId(site?.productId || "");
+    setNewFunnelTemplateImportId("");
+    setNewFunnelPageIntent("");
+    setNewFunnelCampaignId("");
+    setNewFunnelSelectedAngleId("");
     setShowCreateFunnelForm(true);
+  };
+
+  const openCreateTemplateImportDialog = () => {
+    setNewTemplateImportLabel("");
+    setNewTemplateImportHtml("");
+    setShowCreateTemplateImportDialog(true);
   };
 
   const openCreateBindingForm = () => {
@@ -353,8 +461,13 @@ export function SiteDetailPage() {
       await createFunnel.mutateAsync({
         name: newFunnelName.trim(),
         description: newFunnelDescription.trim() || undefined,
-        entryPageId: newFunnelEntryPageId || undefined,
+        funnelType: newFunnelSourceMode === "imported_html" ? "html_template" : "checkout",
+        entryPageId: newFunnelSourceMode === "site_pages" ? (newFunnelEntryPageId || undefined) : undefined,
         productId: newFunnelProductId || undefined,
+        templateImportId: newFunnelSourceMode === "imported_html" ? (newFunnelTemplateImportId || undefined) : undefined,
+        pageIntent: newFunnelSourceMode === "imported_html" ? (newFunnelPageIntent || undefined) : undefined,
+        campaignId: newFunnelSourceMode === "imported_html" ? (newFunnelCampaignId || undefined) : undefined,
+        selectedAngleId: newFunnelSourceMode === "imported_html" ? (newFunnelSelectedAngleId || undefined) : undefined,
       });
       setShowCreateFunnelForm(false);
       toast.success("Funnel created");
@@ -362,6 +475,53 @@ export function SiteDetailPage() {
       toast.error(getErrorMessage(err, "Failed to create funnel"));
     }
   };
+
+  const handleTemplateImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const html = await file.text();
+      setNewTemplateImportHtml(html);
+      if (!newTemplateImportLabel.trim()) {
+        const normalized = file.name.replace(/\.[^.]+$/, "").trim();
+        setNewTemplateImportLabel(normalized || file.name);
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to read HTML file"));
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleCreateTemplateImport = async () => {
+    if (!newTemplateImportLabel.trim() || !newTemplateImportHtml.trim()) return;
+    try {
+      await createTemplateImport.mutateAsync({
+        sourceLabel: newTemplateImportLabel.trim(),
+        htmlDocument: newTemplateImportHtml,
+      });
+      setShowCreateTemplateImportDialog(false);
+      toast.success("Template import saved");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to import HTML template"));
+    }
+  };
+
+  useEffect(() => {
+    if (newFunnelSourceMode !== "imported_html") return;
+    setNewFunnelCampaignId("");
+    setNewFunnelSelectedAngleId("");
+  }, [effectiveCampaignProductId, newFunnelSourceMode]);
+
+  useEffect(() => {
+    setNewFunnelSelectedAngleId("");
+  }, [newFunnelCampaignId]);
+
+  useEffect(() => {
+    if (!campaignAngles?.selectedAngleId) return;
+    if (newFunnelSelectedAngleId) return;
+    setNewFunnelSelectedAngleId(campaignAngles.selectedAngleId);
+  }, [campaignAngles?.selectedAngleId, newFunnelSelectedAngleId]);
 
   const handleDeleteFunnel = async (funnelId: string) => {
     setDeletingFunnelId(funnelId);
@@ -612,6 +772,89 @@ export function SiteDetailPage() {
         <TabsContent value="funnels" className="space-y-4">
           <div className="ds-section-card">
             <div className="ds-section-card__header">
+              <div>
+                <div className="text-sm font-semibold text-content">Site Funnel Publishing</div>
+                <div className="text-xs text-content-muted">
+                  Imported HTML funnels publish through the site publication flow using the latest prepared versions.
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Route slug</div>
+                <div className="mt-1 text-sm font-semibold text-content">
+                  {site.routeSlug ? `/${site.routeSlug}` : "Not set"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Active publication</div>
+                <div className="mt-1 text-sm font-semibold text-content">
+                  {site.activeSitePublicationId ? `${site.activeSitePublicationId.slice(0, 8)}...` : "Not published"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">Last published</div>
+                <div className="mt-1 text-sm font-semibold text-content">
+                  {site.lastPublishedAt ? formatDateTime(site.lastPublishedAt) : "Never"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="ds-section-card">
+            <div className="ds-section-card__header">
+              <div>
+                <div className="text-sm font-semibold text-content">Template Imports</div>
+                <div className="text-xs text-content-muted">
+                  Import preserved HTML templates here, then create site funnels from them.
+                </div>
+              </div>
+              <Button size="sm" onClick={openCreateTemplateImportDialog}>
+                <Plus className="mr-1 h-4 w-4" />
+                Import HTML
+              </Button>
+            </div>
+
+            {templateImportsLoading ? (
+              <div className="space-y-2"><RowSkeleton /><RowSkeleton /></div>
+            ) : templateImportsError ? (
+              <Callout variant="danger" size="sm">
+                {getErrorMessage(templateImportsError, "Failed to load template imports.")}
+              </Callout>
+            ) : templateImports.length === 0 ? (
+              <EmptyState
+                title="No HTML templates yet"
+                description="Import an HTML template here to use it as the source for a sales or pre-sales site funnel."
+              />
+            ) : (
+              <div className="space-y-2">
+                {templateImports.map((templateImport) => (
+                  <div
+                    key={templateImport.id}
+                    className={cn("rounded-xl border px-4 py-3 transition-colors", "border-border bg-surface-2 hover:border-accent/40")}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-content">{templateImport.sourceLabel}</span>
+                          <Badge tone="neutral" className="text-xs">HTML</Badge>
+                        </div>
+                        <div className="mt-1 text-xs text-content-muted">
+                          {templateImport.htmlLength.toLocaleString()} characters &bull; {templateImport.htmlSha256.slice(0, 12)}
+                        </div>
+                      </div>
+                      <div className="text-xs text-content-muted">
+                        {formatDateTime(templateImport.updatedAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="ds-section-card">
+            <div className="ds-section-card__header">
               <div><div className="text-sm font-semibold text-content">Funnels</div><div className="text-xs text-content-muted">Marketing funnels attached to this site.</div></div>
               <Button size="sm" onClick={openCreateFunnelForm}><Plus className="mr-1 h-4 w-4" />New Funnel</Button>
             </div>
@@ -624,15 +867,30 @@ export function SiteDetailPage() {
               <EmptyState title="No funnels yet" description="Create a funnel to define a marketing path through your site pages." />
             ) : (
               <div className="space-y-2">
-                {funnels.map((funnel) => (
+                {funnels.map((funnel) => {
+                  const importedStatus = getImportedTemplateFunnelStatus(funnel, site);
+                  return (
                   <div key={funnel.id} className={cn("rounded-xl border px-4 py-3 transition-colors", "border-border bg-surface-2 hover:border-accent/40")}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-content">{funnel.name}</span>
                           <Badge tone={formatFunnelStatus(funnel.status)} className="text-xs">{funnel.status}</Badge>
+                          {funnel.templateImportId ? <Badge tone="accent" className="text-xs">HTML template</Badge> : null}
+                          {funnel.pageIntent ? <Badge tone="neutral" className="text-xs">{formatPageIntent(funnel.pageIntent)}</Badge> : null}
+                          {importedStatus ? <Badge tone={importedStatus.tone} className="text-xs">{importedStatus.label}</Badge> : null}
                         </div>
-                        <div className="mt-1 text-xs text-content-muted">{funnel.description || "No description"}</div>
+                        <div className="mt-1 text-xs text-content-muted">
+                          {funnel.description || "No description"}
+                          {funnel.templateImportLabel ? ` • Template: ${funnel.templateImportLabel}` : ""}
+                        </div>
+                        {funnel.templateImportId ? (
+                          <div className="mt-2 text-xs text-content-muted">
+                            {funnel.latestPreparedVersionId
+                              ? `Prepared version ${funnel.latestPreparedVersionId.slice(0, 8)}...`
+                              : "Prepare this imported HTML funnel before it can be published."}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="sm" variant="outline" onClick={() => navigate(`/workspaces/sites/${site.id}/funnels/${funnel.id}`)}><Edit className="mr-1 h-3 w-3" />Manage</Button>
@@ -642,7 +900,7 @@ export function SiteDetailPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
           </div>
@@ -661,16 +919,152 @@ export function SiteDetailPage() {
                 <FormField label="Description" helper="Optional.">
                   <Input placeholder="A brief description of this funnel" value={newFunnelDescription} onChange={(e) => setNewFunnelDescription(e.target.value)} />
                 </FormField>
-                <FormField label="Entry Page">
-                  <Select options={pageOptions} value={newFunnelEntryPageId} onValueChange={setNewFunnelEntryPageId} />
+                <FormField label="Funnel Source" required>
+                  <Select
+                    options={funnelSourceOptions}
+                    value={newFunnelSourceMode}
+                    onValueChange={(value) => setNewFunnelSourceMode(value as "site_pages" | "imported_html")}
+                  />
                 </FormField>
+                {newFunnelSourceMode === "site_pages" ? (
+                  <FormField label="Entry Page">
+                    <Select options={pageOptions} value={newFunnelEntryPageId} onValueChange={setNewFunnelEntryPageId} />
+                  </FormField>
+                ) : (
+                  <>
+                    {campaignsError ? (
+                      <Callout variant="danger" size="sm">
+                        {getErrorMessage(campaignsError, "Failed to load campaigns for the selected product.")}
+                      </Callout>
+                    ) : null}
+                    <FormField label="Template Import" required>
+                      <Select
+                        options={templateImportOptions}
+                        value={newFunnelTemplateImportId}
+                        onValueChange={setNewFunnelTemplateImportId}
+                      />
+                    </FormField>
+                    <FormField label="Page Intent" required helper="This drives whether later copy generation should behave like a sales page or a pre-sales page.">
+                      <Select
+                        options={pageIntentOptions}
+                        value={newFunnelPageIntent}
+                        onValueChange={(value) => setNewFunnelPageIntent(value as "" | "sales" | "pre_sales")}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Campaign"
+                      required
+                      helper={
+                        effectiveCampaignProductId
+                          ? "Choose the campaign whose strategy context should drive copy preparation."
+                          : "Select a product first so campaigns can be loaded."
+                      }
+                    >
+                      <Select
+                        options={campaignOptions}
+                        value={newFunnelCampaignId}
+                        onValueChange={setNewFunnelCampaignId}
+                        disabled={!effectiveCampaignProductId}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Selected Angle"
+                      required
+                      helper="The imported HTML funnel will be prepared against this specific campaign angle."
+                    >
+                      <Select
+                        options={angleOptions}
+                        value={newFunnelSelectedAngleId}
+                        onValueChange={setNewFunnelSelectedAngleId}
+                        disabled={!newFunnelCampaignId}
+                      />
+                    </FormField>
+                    {campaignAnglesError ? (
+                      <Callout variant="danger" size="sm">
+                        {getErrorMessage(campaignAnglesError, "Failed to load campaign angles. Materialize creative context before creating this funnel.")}
+                      </Callout>
+                    ) : null}
+                  </>
+                )}
                 <FormField label="Product" helper="Optional.">
                   <Select options={productOptions} value={newFunnelProductId} onValueChange={setNewFunnelProductId} />
                 </FormField>
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setShowCreateFunnelForm(false)} disabled={createFunnel.isPending}>Cancel</Button>
-                  <Button onClick={handleCreateFunnel} disabled={!newFunnelName.trim() || createFunnel.isPending}>
+                  <Button
+                    onClick={handleCreateFunnel}
+                    disabled={
+                      !newFunnelName.trim()
+                      || createFunnel.isPending
+                      || (newFunnelSourceMode === "imported_html"
+                        && (
+                          !newFunnelTemplateImportId
+                          || !newFunnelPageIntent
+                          || !newFunnelProductId
+                          || !newFunnelCampaignId
+                          || !newFunnelSelectedAngleId
+                        ))
+                    }
+                  >
                     {createFunnel.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</> : <><Plus className="mr-2 h-4 w-4" />Create Funnel</>}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </DialogRoot>
+
+          <DialogRoot
+            open={showCreateTemplateImportDialog}
+            onOpenChange={(open) => { if (!open) setShowCreateTemplateImportDialog(false); }}
+          >
+            <DialogContent>
+              <div className="space-y-1">
+                <DialogTitle>Import HTML Template</DialogTitle>
+                <DialogDescription>
+                  Save preserved HTML here so it can be used as the source template for a site funnel.
+                </DialogDescription>
+              </div>
+              <div className="mt-4 space-y-4">
+                <FormField label="Template Label" required>
+                  <Input
+                    placeholder="e.g., Ember Hero Landing Template"
+                    value={newTemplateImportLabel}
+                    onChange={(e) => setNewTemplateImportLabel(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="HTML File" helper="Optional. Upload an .html file to populate the document field automatically.">
+                  <input
+                    type="file"
+                    accept=".html,text/html"
+                    onChange={handleTemplateImportFileChange}
+                    className="block w-full text-sm text-content file:mr-3 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:font-medium"
+                  />
+                </FormField>
+                <FormField label="HTML Document" required helper="The preserved HTML that will be used as the funnel template source.">
+                  <textarea
+                    className="min-h-[240px] w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content"
+                    placeholder="Paste your HTML here..."
+                    value={newTemplateImportHtml}
+                    onChange={(e) => setNewTemplateImportHtml(e.target.value)}
+                  />
+                </FormField>
+                <div className="flex items-center justify-between gap-2 text-xs text-content-muted">
+                  <span>{newTemplateImportHtml.length.toLocaleString()} characters</span>
+                  <span>Max 500,000 characters</span>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateTemplateImportDialog(false)}
+                    disabled={createTemplateImport.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateTemplateImport}
+                    disabled={!newTemplateImportLabel.trim() || !newTemplateImportHtml.trim() || createTemplateImport.isPending}
+                  >
+                    {createTemplateImport.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing...</> : <><Plus className="mr-2 h-4 w-4" />Import Template</>}
                   </Button>
                 </div>
               </div>

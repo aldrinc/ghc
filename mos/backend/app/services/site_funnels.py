@@ -14,13 +14,22 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Site, SiteFunnel, SiteFunnelStep, SitePage
+from app.db.models import Campaign, Site, SiteFunnel, SiteFunnelStep, SiteFunnelTemplateImport, SitePage
 
 
 class SiteFunnelError(Exception):
     """Error during site funnel operations."""
 
     pass
+
+
+_VALID_PAGE_INTENTS = {"sales", "pre_sales"}
+
+
+def _clear_prepared_state(funnel: SiteFunnel) -> None:
+    funnel.latest_prepared_version_id = None
+    funnel.preparation_readiness = {}
+    funnel.prepared_at = None
 
 
 def list_funnels(session: Session, site_id: str) -> list[SiteFunnel]:
@@ -63,6 +72,10 @@ def create_funnel(
     entry_page_id: str | None = None,
     product_id: str | None = None,
     selected_offer_id: str | None = None,
+    template_import_id: str | None = None,
+    page_intent: str | None = None,
+    campaign_id: str | None = None,
+    selected_angle_id: str | None = None,
     tracking_config: dict[str, Any] | None = None,
     steps: list[dict[str, Any]] | None = None,
 ) -> SiteFunnel:
@@ -97,6 +110,42 @@ def create_funnel(
                 if not page:
                     raise SiteFunnelError(f"Page not found for step: {page_id}")
 
+    normalized_selected_angle_id = selected_angle_id.strip() if selected_angle_id else None
+
+    template_import = None
+    if template_import_id:
+        template_import = session.scalars(
+            select(SiteFunnelTemplateImport).where(
+                SiteFunnelTemplateImport.id == template_import_id,
+                SiteFunnelTemplateImport.site_id == site_id,
+            )
+        ).first()
+        if not template_import:
+            raise SiteFunnelError(f"Template import not found: {template_import_id}")
+        if not page_intent:
+            raise SiteFunnelError("pageIntent is required when templateImportId is provided.")
+
+    if page_intent and page_intent not in _VALID_PAGE_INTENTS:
+        raise SiteFunnelError("pageIntent must be one of: sales, pre_sales.")
+    if page_intent and not template_import_id:
+        raise SiteFunnelError("pageIntent requires templateImportId.")
+    if template_import_id and not campaign_id:
+        raise SiteFunnelError("campaignId is required when templateImportId is provided.")
+    if template_import_id and not normalized_selected_angle_id:
+        raise SiteFunnelError("selectedAngleId is required when templateImportId is provided.")
+    if normalized_selected_angle_id and not campaign_id:
+        raise SiteFunnelError("selectedAngleId requires campaignId.")
+
+    if campaign_id:
+        campaign = session.scalars(
+            select(Campaign).where(
+                Campaign.id == campaign_id,
+                Campaign.client_id == site.client_id,
+            )
+        ).first()
+        if not campaign:
+            raise SiteFunnelError(f"Campaign not found: {campaign_id}")
+
     now = datetime.now(timezone.utc)
     funnel = SiteFunnel(
         id=str(uuid4()),
@@ -107,6 +156,11 @@ def create_funnel(
         entry_page_id=entry_page_id,
         product_id=product_id,
         selected_offer_id=selected_offer_id,
+        template_import_id=template_import_id,
+        page_intent=page_intent,
+        campaign_id=campaign_id,
+        selected_angle_id=normalized_selected_angle_id,
+        preparation_readiness={},
         tracking_config=tracking_config,
         status="draft",
         created_at=now,
@@ -149,6 +203,10 @@ def update_funnel(
     entry_page_id: str | None = None,
     product_id: str | None = None,
     selected_offer_id: str | None = None,
+    template_import_id: str | None = None,
+    page_intent: str | None = None,
+    campaign_id: str | None = None,
+    selected_angle_id: str | None = None,
     tracking_config: dict[str, Any] | None = None,
 ) -> SiteFunnel:
     """Update a funnel."""
@@ -172,6 +230,70 @@ def update_funnel(
         if not page:
             raise SiteFunnelError(f"Page not found: {entry_page_id}")
 
+    effective_template_import_id = template_import_id if template_import_id is not None else (
+        str(funnel.template_import_id) if funnel.template_import_id else None
+    )
+    effective_page_intent = page_intent if page_intent is not None else funnel.page_intent
+    effective_campaign_id = campaign_id if campaign_id is not None else (
+        str(funnel.campaign_id) if funnel.campaign_id else None
+    )
+    normalized_selected_angle_id = selected_angle_id.strip() if selected_angle_id else None
+
+    if effective_template_import_id:
+        template_import = session.scalars(
+            select(SiteFunnelTemplateImport).where(
+                SiteFunnelTemplateImport.id == effective_template_import_id,
+                SiteFunnelTemplateImport.site_id == site_id,
+            )
+        ).first()
+        if not template_import:
+            raise SiteFunnelError(f"Template import not found: {effective_template_import_id}")
+
+    if effective_page_intent and effective_page_intent not in _VALID_PAGE_INTENTS:
+        raise SiteFunnelError("pageIntent must be one of: sales, pre_sales.")
+    if effective_page_intent and not effective_template_import_id:
+        raise SiteFunnelError("pageIntent requires templateImportId.")
+    if effective_template_import_id and not effective_page_intent:
+        raise SiteFunnelError("pageIntent is required when templateImportId is provided.")
+    if effective_template_import_id and not effective_campaign_id:
+        raise SiteFunnelError("campaignId is required when templateImportId is provided.")
+    effective_selected_angle_id = (
+        normalized_selected_angle_id
+        if selected_angle_id is not None
+        else (str(funnel.selected_angle_id).strip() if funnel.selected_angle_id else None)
+    )
+    if effective_template_import_id and not effective_selected_angle_id:
+        raise SiteFunnelError("selectedAngleId is required when templateImportId is provided.")
+    if effective_selected_angle_id and not effective_campaign_id:
+        raise SiteFunnelError("selectedAngleId requires campaignId.")
+
+    if effective_campaign_id:
+        site = session.scalars(select(Site).where(Site.id == site_id)).first()
+        if not site:
+            raise SiteFunnelError(f"Site not found: {site_id}")
+        campaign = session.scalars(
+            select(Campaign).where(
+                Campaign.id == effective_campaign_id,
+                Campaign.client_id == site.client_id,
+            )
+        ).first()
+        if not campaign:
+            raise SiteFunnelError(f"Campaign not found: {effective_campaign_id}")
+
+    reset_prepared_state = False
+    if product_id is not None and str(product_id or "") != str(funnel.product_id or ""):
+        reset_prepared_state = True
+    if selected_offer_id is not None and str(selected_offer_id or "") != str(funnel.selected_offer_id or ""):
+        reset_prepared_state = True
+    if template_import_id is not None and str(template_import_id or "") != str(funnel.template_import_id or ""):
+        reset_prepared_state = True
+    if page_intent is not None and str(page_intent or "") != str(funnel.page_intent or ""):
+        reset_prepared_state = True
+    if campaign_id is not None and str(campaign_id or "") != str(funnel.campaign_id or ""):
+        reset_prepared_state = True
+    if selected_angle_id is not None and str(normalized_selected_angle_id or "") != str(funnel.selected_angle_id or ""):
+        reset_prepared_state = True
+
     # Update fields
     if name is not None:
         funnel.name = name
@@ -187,8 +309,18 @@ def update_funnel(
         funnel.product_id = product_id
     if selected_offer_id is not None:
         funnel.selected_offer_id = selected_offer_id
+    if template_import_id is not None:
+        funnel.template_import_id = template_import_id
+    if page_intent is not None:
+        funnel.page_intent = page_intent
+    if campaign_id is not None:
+        funnel.campaign_id = campaign_id
+    if selected_angle_id is not None:
+        funnel.selected_angle_id = normalized_selected_angle_id
     if tracking_config is not None:
         funnel.tracking_config = tracking_config
+    if reset_prepared_state:
+        _clear_prepared_state(funnel)
 
     funnel.updated_at = datetime.now(timezone.utc)
     session.add(funnel)

@@ -224,3 +224,21 @@ class CampaignCreativeContextReadinessResponse(BaseModel):
     refreshed: bool = False
     staleArtifactId: str | None = None
     missingArtifacts: list[str] = Field(default_factory=list)
+
+
+class CampaignCreativeContextAngleSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    angleId: str
+    angleName: str
+    description: str | None = None
+    evidence: list[str] = Field(default_factory=list)
+
+
+class CampaignCreativeContextAnglesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    campaignId: str
+    provider: CampaignCreativeContextProviderEnum
+    selectedAngleId: str | None = None
+    angles: list[CampaignCreativeContextAngleSummary] = Field(default_factory=list)

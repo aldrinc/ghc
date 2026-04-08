@@ -14,9 +14,20 @@ export interface SiteFunnel {
   name: string;
   description: string | null;
   status: "draft" | "active" | "paused" | "archived";
+  funnelType: string;
   entryPageId: string | null;
   productId: string | null;
   selectedOfferId: string | null;
+  templateImportId: string | null;
+  templateImportLabel: string | null;
+  pageIntent: "sales" | "pre_sales" | null;
+  campaignId: string | null;
+  selectedAngleId: string | null;
+  preparedPageId: string | null;
+  preparedPageSlug: string | null;
+  latestPreparedVersionId: string | null;
+  preparationReadiness: Record<string, unknown>;
+  preparedAt: string | null;
   trackingConfig: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -46,18 +57,28 @@ export interface CreateSiteFunnelRequest {
   siteId: string;
   name: string;
   description?: string;
+  funnelType?: string;
   entryPageId?: string;
   productId?: string;
   selectedOfferId?: string;
+  templateImportId?: string;
+  pageIntent?: "sales" | "pre_sales";
+  campaignId?: string;
+  selectedAngleId?: string;
 }
 
 export interface UpdateSiteFunnelRequest {
   name?: string;
   description?: string | null;
   status?: "draft" | "active" | "paused" | "archived";
+  funnelType?: string | null;
   entryPageId?: string | null;
   productId?: string | null;
   selectedOfferId?: string | null;
+  templateImportId?: string | null;
+  pageIntent?: "sales" | "pre_sales" | null;
+  campaignId?: string | null;
+  selectedAngleId?: string | null;
   trackingConfig?: Record<string, unknown> | null;
 }
 
@@ -67,6 +88,10 @@ export interface CreateSiteFunnelStepRequest {
   stepRole?: string;
   ctaLabel?: string;
   transitionRule?: Record<string, unknown>;
+}
+
+export interface PrepareSiteFunnelRequest {
+  sourceLabel?: string;
 }
 
 // Get all funnels for a site
@@ -156,6 +181,27 @@ export function useDeleteSiteFunnel(siteId: string | null | undefined) {
     },
     onError: (err: ApiError | Error) => {
       toast.error(getMutationErrorMessage(err, "Failed to delete site funnel"));
+    },
+  });
+}
+
+export function usePrepareSiteFunnel(siteId: string | null | undefined, funnelId: string | null | undefined) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: (request: PrepareSiteFunnelRequest = {}) =>
+      post<SiteFunnelDetail>(`/sites/${siteId}/funnels/${funnelId}/prepare?clientId=${workspace!.id}`, request),
+    onSuccess: () => {
+      toast.success("Template prepared");
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels"] });
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId, "funnels", funnelId] });
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId] });
+      queryClient.invalidateQueries({ queryKey: ["sites", "funnels", "workspace", workspace?.id] });
+    },
+    onError: (err: ApiError | Error) => {
+      toast.error(getMutationErrorMessage(err, "Failed to prepare site funnel template"));
     },
   });
 }

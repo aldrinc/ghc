@@ -52,6 +52,8 @@ interface SiteSummary {
   routeSlug?: string | null;
   primaryDomain?: string | null;
   templateId?: string | null;
+  activeSitePublicationId?: string | null;
+  lastPublishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,10 +94,12 @@ export interface SiteDetail {
   productId?: string | null;
   designSystemId?: string | null;
   themeBindingMode: SiteThemeBindingMode;
-  entryPageId: string | null;
   routeSlug?: string | null;
   primaryDomain?: string | null;
   templateId?: string | null;
+  activeSitePublicationId?: string | null;
+  lastPublishedAt?: string | null;
+  entryPageId: string | null;
   pages: SitePage[];
   createdAt: string;
   updatedAt: string;
@@ -156,6 +160,18 @@ interface UpdateSitePageRequest {
 interface CreateSitePageVersionRequest {
   puckData: Data;
   status?: "draft" | "approved";
+}
+
+export interface SitePublishResponse {
+  publicationId: string;
+  artifactId: string;
+  artifactVersion: number;
+  siteId: string;
+  routeSlug: string;
+  pageCount: number;
+  funnelCount: number;
+  productBindingCount: number;
+  publishedAt: string;
 }
 
 export interface SiteMedusaConfigResponse {
@@ -310,6 +326,22 @@ export function useCreateSitePageVersion(siteId: string | null | undefined, page
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sites", siteId, "pages", pageId] });
       queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id ?? null, siteId] });
+    },
+  });
+}
+
+export function usePublishSite(siteId: string | null | undefined) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  const { workspace } = useWorkspace();
+
+  return useMutation({
+    mutationFn: () =>
+      post<SitePublishResponse>(`/sites/${siteId}/publish?clientId=${workspace!.id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id] });
+      queryClient.invalidateQueries({ queryKey: ["sites", workspace?.id, siteId] });
+      queryClient.invalidateQueries({ queryKey: ["sites", siteId] });
     },
   });
 }
