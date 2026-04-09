@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Download, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -17,6 +17,7 @@ import { useAssets } from "@/api/assets";
 import { useClientShopifyStatus } from "@/api/clients";
 import { useProduct } from "@/api/products";
 import {
+  useDownloadWorkflowResearchZip,
   useStopWorkflow,
   useStrategyV2LaunchAdditionalAngle,
   useStrategyV2LaunchAdditionalUms,
@@ -32,6 +33,12 @@ import type { Asset, ResearchArtifactRef, StrategyV2LaunchRecord, StrategyV2Stat
 const EMPTY_RESEARCH_ARTIFACTS: ResearchArtifactRef[] = [];
 const EMPTY_ARTIFACT_LIST: any[] = [];
 const EMPTY_LAUNCH_RECORDS: StrategyV2LaunchRecord[] = [];
+const STRATEGY_V2_FOUNDATIONAL_STEP_KEYS = [
+  "v2-02.foundation.01",
+  "v2-02.foundation.03",
+  "v2-02.foundation.04",
+  "v2-02.foundation.06",
+] as const;
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -124,6 +131,7 @@ export function WorkflowDetailPage() {
   const launchAngleCampaign = useStrategyV2LaunchAngleCampaign(workflowId);
   const launchAdditionalUms = useStrategyV2LaunchAdditionalUms(workflowId);
   const launchAdditionalAngle = useStrategyV2LaunchAdditionalAngle(workflowId);
+  const downloadWorkflowResearchZip = useDownloadWorkflowResearchZip(workflowId);
   const { product, products, selectProduct } = useProductContext();
 
   const run = data?.run;
@@ -142,6 +150,10 @@ export function WorkflowDetailPage() {
     [data?.research_artifacts],
   );
   const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
+  const foundationalStepKeySet = useMemo(
+    () => new Set(researchArtifacts.map((artifact) => artifact.step_key)),
+    [researchArtifacts],
+  );
   const canonStory = (data?.client_canon?.data?.brand as any)?.story as string | undefined;
   const isOnboarding = run?.kind === "client_onboarding";
   const isCampaignPlanning = run?.kind === "campaign_planning" || run?.kind === "campaign_intent";
@@ -193,6 +205,10 @@ export function WorkflowDetailPage() {
   const hasStrategyV2Copy = useMemo(
     () => Object.keys(strategyV2CopyCanonical).length > 0,
     [strategyV2CopyCanonical],
+  );
+  const hasCompleteFoundationalResearchZip = useMemo(
+    () => STRATEGY_V2_FOUNDATIONAL_STEP_KEYS.every((stepKey) => foundationalStepKeySet.has(stepKey)),
+    [foundationalStepKeySet],
   );
   const strategyV2LaunchReady =
     isStrategyV2 &&
@@ -250,6 +266,30 @@ export function WorkflowDetailPage() {
                   ? "Primary product image is missing its public asset id and cannot be used for launch."
                   : null;
   const resolvedRunProductTitle = runProduct?.title || runProductDetail?.title || null;
+
+  const renderFoundationalZipButton = () => {
+    if (!isStrategyV2) return null;
+    return (
+      <Button
+        variant="secondary"
+        size="xs"
+        onClick={() => void downloadWorkflowResearchZip.mutateAsync("foundational")}
+        disabled={!workflowId || !hasCompleteFoundationalResearchZip || downloadWorkflowResearchZip.isPending}
+        title={
+          hasCompleteFoundationalResearchZip
+            ? "Download the four foundational strategy docs as a ZIP."
+            : "Available after all four foundational docs finish persisting."
+        }
+      >
+        {downloadWorkflowResearchZip.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4" />
+        )}
+        {downloadWorkflowResearchZip.isPending ? "Preparing ZIP..." : "Download foundational ZIP"}
+      </Button>
+    );
+  };
 
   const strategyV2StateSummaries =
     (strategyV2State?.scored_candidate_summaries || {}) as Record<string, unknown>;
@@ -885,6 +925,7 @@ export function WorkflowDetailPage() {
                             <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
                             <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
                           </div>
+                          {renderFoundationalZipButton()}
                         </div>
                         <div className="overflow-x-auto">
                           <Table variant="ghost">
@@ -1220,6 +1261,7 @@ export function WorkflowDetailPage() {
                       <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
                       <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
                     </div>
+                    {renderFoundationalZipButton()}
                   </div>
                   <div className="overflow-x-auto">
                     <Table variant="ghost">

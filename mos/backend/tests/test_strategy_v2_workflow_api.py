@@ -1,9 +1,11 @@
+import io
 from contextlib import contextmanager
 import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
+import zipfile
 
 import pytest
 
@@ -1935,6 +1937,84 @@ def test_workflow_research_artifact_endpoint_supports_artifact_scheme(
     payload = response.json()
     assert payload["step_key"] == "v2-01"
     assert payload["content"] == {"payload": {"hello": "world"}}
+
+
+def test_workflow_research_download_endpoint_returns_foundational_zip(
+    api_client,
+    db_session,
+    auth_context,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="FoundationalZip",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-foundational-zip-workflow",
+        temporal_run_id="strategy-v2-foundational-zip-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    foundational_payloads = {
+        "v2-02.foundation.01": "## Step 01\n\nAtheneum competitor research.\n",
+        "v2-02.foundation.03": "## Step 03\n\nAtheneum deep research prompt.\n",
+        "v2-02.foundation.04": "## Step 04\n\nAtheneum deep research corpus.\n",
+        "v2-02.foundation.06": "## Step 06\n\nAtheneum avatar brief.\n",
+    }
+    for step_key, markdown in foundational_payloads.items():
+        artifact = Artifact(
+            org_id=org_uuid,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            campaign_id=None,
+            type=ArtifactTypeEnum.strategy_v2_step_payload,
+            data={
+                "title": f"{step_key} artifact",
+                "payload": {"content": markdown},
+            },
+        )
+        db_session.add(artifact)
+        db_session.commit()
+        db_session.refresh(artifact)
+        research = ResearchArtifact(
+            org_id=org_uuid,
+            workflow_run_id=workflow_run.id,
+            step_key=step_key,
+            title=f"{step_key} raw output",
+            doc_id=str(artifact.id),
+            doc_url=f"artifact://{artifact.id}",
+            prompt_sha256=None,
+            summary=f"Summary for {step_key}",
+        )
+        db_session.add(research)
+        db_session.commit()
+
+    response = api_client.get(f"/workflows/{workflow_run.id}/research/download?scope=foundational")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert "foundational_docs" in response.headers["content-disposition"]
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        names = sorted(archive.namelist())
+        assert names == [
+            "v2-02_foundation_01.content.md",
+            "v2-02_foundation_03.content.md",
+            "v2-02_foundation_04.content.md",
+            "v2-02_foundation_06.content.md",
+        ]
+        assert archive.read("v2-02_foundation_01.content.md").decode("utf-8") == foundational_payloads["v2-02.foundation.01"]
+        assert archive.read("v2-02_foundation_06.content.md").decode("utf-8") == foundational_payloads["v2-02.foundation.06"]
 
 
 def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_context):

@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import type {
@@ -8,7 +9,11 @@ import type {
   WorkflowRun,
 } from "@/types/common";
 import type { AssetBriefType } from "@/lib/assetBriefTypes";
+import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { toast } from "@/components/ui/toast";
+
+const defaultBaseUrl = resolveRequiredApiBaseUrl();
+const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 type WorkflowFilters = {
   clientId?: string;
@@ -19,6 +24,42 @@ type WorkflowFilters = {
 type WorkflowQueryOptions = {
   enabled?: boolean;
 };
+
+function parseFilenameFromContentDisposition(contentDisposition: string | null): string | null {
+  if (!contentDisposition) return null;
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const quotedMatch = contentDisposition.match(/filename=\"([^\"]+)\"/i);
+  if (quotedMatch?.[1]) return quotedMatch[1];
+  const bareMatch = contentDisposition.match(/filename=([^;]+)/i);
+  return bareMatch?.[1]?.trim() || null;
+}
+
+function isZipContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  return contentType.toLowerCase().includes("application/zip");
+}
+
+async function parseDownloadError(resp: Response): Promise<Error> {
+  try {
+    const raw = await resp.clone().json();
+    const detail = (raw as { detail?: unknown })?.detail;
+    if (typeof detail === "string" && detail.trim()) return new Error(detail);
+    const message = (raw as { message?: unknown })?.message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  } catch {
+    // Fall through to text parsing.
+  }
+  const text = (await resp.text()).trim();
+  if (text) return new Error(text);
+  return new Error(resp.statusText || "Failed to download workflow research ZIP");
+}
 
 export function useWorkflows(filters?: WorkflowFilters, options?: WorkflowQueryOptions) {
   const { get } = useApiClient();
@@ -69,6 +110,63 @@ export function useWorkflowResearchArtifact(
     queryKey: ["workflows", workflowId, "research", stepKey],
     queryFn: () => get(`/workflows/${workflowId}/research/${stepKey}`),
     enabled,
+  });
+}
+
+export type WorkflowResearchDownloadScope = "all" | "foundational";
+
+export function useDownloadWorkflowResearchZip(workflowId?: string) {
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (scope: WorkflowResearchDownloadScope = "all") => {
+      if (!workflowId) throw new Error("Workflow ID is required.");
+      const token = await getToken({ template: clerkTokenTemplate });
+      const headers = new Headers();
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      const response = await fetch(
+        `${defaultBaseUrl}/workflows/${workflowId}/research/download?scope=${encodeURIComponent(scope)}`,
+        {
+          method: "GET",
+          headers,
+        },
+      );
+      if (!response.ok) {
+        throw await parseDownloadError(response);
+      }
+      const responseContentType = response.headers.get("Content-Type");
+      if (!isZipContentType(responseContentType)) {
+        const preview = (await response.text()).trim().slice(0, 240);
+        const contentTypeLabel = responseContentType?.trim() || "unknown content type";
+        throw new Error(
+          preview
+            ? `Expected a ZIP download but received ${contentTypeLabel}. Response preview: ${preview}`
+            : `Expected a ZIP download but received ${contentTypeLabel}.`,
+        );
+      }
+      const blob = await response.blob();
+      const fileNameFromHeader = parseFilenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+      );
+      const filename = fileNameFromHeader || `workflow-research-${workflowId}.zip`;
+      return { blob, filename };
+    },
+    onSuccess: ({ blob, filename }) => {
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(downloadUrl);
+      toast.success(`Downloaded ${filename}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to download workflow research ZIP";
+      toast.error(message);
+    },
   });
 }
 

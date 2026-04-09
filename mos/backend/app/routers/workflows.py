@@ -1,12 +1,16 @@
+import io
 import json
 from datetime import datetime, timezone
 import hashlib
 import os
+import re
 from typing import Any
 from uuid import UUID, uuid4
+import zipfile
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -64,6 +68,18 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 _HITL_POLICY_MODE_ENV = "STRATEGY_V2_HITL_POLICY_MODE"
 _HITL_POLICY_PRODUCTION_STRICT = "production_strict"
 _HITL_POLICY_INTERNAL_VALIDATION = "internal_validation"
+_WORKFLOW_RESEARCH_DOWNLOAD_ALL = "all"
+_WORKFLOW_RESEARCH_DOWNLOAD_FOUNDATIONAL = "foundational"
+_WORKFLOW_RESEARCH_DOWNLOAD_SCOPES = {
+    _WORKFLOW_RESEARCH_DOWNLOAD_ALL,
+    _WORKFLOW_RESEARCH_DOWNLOAD_FOUNDATIONAL,
+}
+_STRATEGY_V2_FOUNDATIONAL_STEP_KEYS = (
+    "v2-02.foundation.01",
+    "v2-02.foundation.03",
+    "v2-02.foundation.04",
+    "v2-02.foundation.06",
+)
 
 
 def _workflow_execution_status_member(*names: str):
@@ -199,6 +215,202 @@ def _normalize_angle_gate_candidates(rows: Any) -> list[dict[str, Any]]:
             continue
         normalized.append(dict(angle))
     return normalized
+
+
+def _sanitize_research_filename(value: str, *, default: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "")).strip("._")
+    return cleaned or default
+
+
+def _resolve_workflow_run_or_404(
+    *,
+    session: Session,
+    org_id: str,
+    workflow_run_id_or_temporal_id: str,
+) -> WorkflowRun:
+    repo = WorkflowsRepository(session)
+    run = _resolve_workflow_run(
+        repo=repo,
+        org_id=org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id_or_temporal_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return run
+
+
+def _resolve_research_markdown_content(value: Any) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return value if text else None
+    if not isinstance(value, dict):
+        return None
+
+    direct_content = value.get("content")
+    if isinstance(direct_content, str) and direct_content.strip():
+        return direct_content
+
+    direct_markdown = value.get("markdown")
+    if isinstance(direct_markdown, str) and direct_markdown.strip():
+        return direct_markdown
+
+    payload = value.get("payload")
+    if isinstance(payload, dict):
+        payload_content = payload.get("content")
+        if isinstance(payload_content, str) and payload_content.strip():
+            return payload_content
+        payload_markdown = payload.get("markdown")
+        if isinstance(payload_markdown, str) and payload_markdown.strip():
+            return payload_markdown
+
+    return None
+
+
+def _load_workflow_research_record(
+    *,
+    session: Session,
+    auth: AuthContext,
+    workflow_run_id: str,
+    step_key: str,
+):
+    run = _resolve_workflow_run_or_404(
+        session=session,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    research_repo = ResearchArtifactsRepository(session)
+    record = research_repo.get_for_step(org_id=auth.org_id, workflow_run_id=str(run.id), step_key=step_key)
+    if not record:
+        raise HTTPException(status_code=404, detail="Research artifact not found for this step")
+    return run, record
+
+
+def _load_workflow_research_records(
+    *,
+    session: Session,
+    auth: AuthContext,
+    workflow_run_id: str,
+    scope: str,
+):
+    normalized_scope = str(scope or _WORKFLOW_RESEARCH_DOWNLOAD_ALL).strip().lower()
+    if normalized_scope not in _WORKFLOW_RESEARCH_DOWNLOAD_SCOPES:
+        supported = ", ".join(sorted(_WORKFLOW_RESEARCH_DOWNLOAD_SCOPES))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported research download scope '{scope}'. Expected one of: {supported}.",
+        )
+
+    run = _resolve_workflow_run_or_404(
+        session=session,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    research_repo = ResearchArtifactsRepository(session)
+    records = list(
+        research_repo.list_for_workflow_run(
+            org_id=auth.org_id,
+            workflow_run_id=str(run.id),
+        )
+    )
+    if normalized_scope == _WORKFLOW_RESEARCH_DOWNLOAD_FOUNDATIONAL:
+        records = [row for row in records if str(getattr(row, "step_key", "")) in _STRATEGY_V2_FOUNDATIONAL_STEP_KEYS]
+    if not records:
+        if normalized_scope == _WORKFLOW_RESEARCH_DOWNLOAD_FOUNDATIONAL:
+            detail = "No foundational research artifacts are available for this workflow run."
+        else:
+            detail = "No research artifacts are available for this workflow run."
+        raise HTTPException(status_code=404, detail=detail)
+    return run, records, normalized_scope
+
+
+def _hydrate_research_artifact(
+    *,
+    session: Session,
+    org_id: str,
+    record: Any,
+) -> dict[str, Any]:
+    doc_url = getattr(record, "doc_url", None) or ""
+    doc_id = getattr(record, "doc_id", None) or ""
+    if not doc_id:
+        raise HTTPException(status_code=500, detail="Research artifact is missing a doc_id")
+
+    artifact_data: dict[str, Any] | None = None
+    payload_data: dict[str, Any] | None = None
+    content_value: Any
+    content_markdown: str | None = None
+
+    if isinstance(doc_url, str) and doc_url.startswith("artifact://"):
+        artifact_id = doc_url.split("artifact://", 1)[1].strip() or doc_id
+        artifact = ArtifactsRepository(session).get(org_id=org_id, artifact_id=artifact_id)
+        if not artifact:
+            raise HTTPException(status_code=404, detail="Referenced artifact record was not found.")
+        artifact_data = artifact.data if isinstance(artifact.data, dict) else {"raw": artifact.data}
+        payload = artifact_data.get("payload")
+        if isinstance(payload, dict):
+            payload_data = payload
+        content_value = artifact.data
+        content_markdown = _resolve_research_markdown_content(artifact.data)
+    elif isinstance(doc_url, str) and doc_url.startswith("drive-stub://"):
+        raise HTTPException(
+            status_code=409,
+            detail="Research artifact was persisted with a Drive stub; full content is unavailable.",
+        )
+    else:
+        try:
+            content_markdown = download_drive_text_file(file_id=doc_id)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        content_value = content_markdown
+
+    summary = getattr(record, "summary", None)
+    if not summary and isinstance(payload_data, dict):
+        bounded_summary = payload_data.get("bounded_summary")
+        if isinstance(bounded_summary, str) and bounded_summary.strip():
+            summary = bounded_summary
+
+    return {
+        "step_key": record.step_key,
+        "title": record.title,
+        "doc_url": record.doc_url,
+        "doc_id": record.doc_id,
+        "summary": summary,
+        "content": content_value,
+        "artifact_data": artifact_data,
+        "payload_data": payload_data,
+        "content_markdown": content_markdown,
+    }
+
+
+def _workflow_research_zip_entry_name(step_key: str) -> str:
+    normalized_step_key = str(step_key or "").strip().replace(".", "_")
+    safe_step_key = _sanitize_research_filename(normalized_step_key, default="research")
+    return f"{safe_step_key}.content.md"
+
+
+def _workflow_research_zip_filename(
+    *,
+    session: Session,
+    org_id: str,
+    run: WorkflowRun,
+    scope: str,
+) -> str:
+    parts: list[str] = []
+    if run.client_id:
+        client = ClientsRepository(session).get(org_id=org_id, client_id=str(run.client_id))
+        client_name = getattr(client, "name", None)
+        if isinstance(client_name, str) and client_name.strip():
+            parts.append(_sanitize_research_filename(client_name, default="client"))
+    if run.product_id:
+        product = ProductsRepository(session).get(org_id=org_id, product_id=str(run.product_id))
+        product_name = getattr(product, "name", None)
+        if isinstance(product_name, str) and product_name.strip():
+            parts.append(_sanitize_research_filename(product_name, default="product"))
+    if not parts:
+        parts.append("workflow")
+    suffix = "foundational_docs" if scope == _WORKFLOW_RESEARCH_DOWNLOAD_FOUNDATIONAL else "research_docs"
+    parts.append(suffix)
+    parts.append(str(run.id)[:8])
+    return "_".join(parts) + ".zip"
 
 
 def _strategy_v2_state_from_research_artifacts(
@@ -1109,6 +1321,57 @@ async def get_workflow_run(
         }
     )
 
+@router.get("/{workflow_run_id}/research/download")
+def download_workflow_research_zip(
+    workflow_run_id: str,
+    scope: str = Query(_WORKFLOW_RESEARCH_DOWNLOAD_ALL),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    run, records, normalized_scope = _load_workflow_research_records(
+        session=session,
+        auth=auth,
+        workflow_run_id=workflow_run_id,
+        scope=scope,
+    )
+
+    archive_buffer = io.BytesIO()
+    used_names: set[str] = set()
+    with zipfile.ZipFile(archive_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for record in records:
+            hydrated = _hydrate_research_artifact(
+                session=session,
+                org_id=auth.org_id,
+                record=record,
+            )
+            markdown = hydrated.get("content_markdown")
+            if not isinstance(markdown, str) or not markdown.strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Research artifact '{record.step_key}' does not contain markdown content and "
+                        "cannot be added to the ZIP."
+                    ),
+                )
+            filename = _workflow_research_zip_entry_name(str(record.step_key))
+            if filename in used_names:
+                filename = _workflow_research_zip_entry_name(f"{record.step_key}_{record.doc_id}")
+            used_names.add(filename)
+            archive.writestr(filename, markdown)
+
+    filename = _workflow_research_zip_filename(
+        session=session,
+        org_id=auth.org_id,
+        run=run,
+        scope=normalized_scope,
+    )
+    archive_buffer.seek(0)
+    return StreamingResponse(
+        iter([archive_buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 @router.get("/{workflow_run_id}/research/{step_key}")
 def get_workflow_research_artifact(
@@ -1124,61 +1387,25 @@ def get_workflow_research_artifact(
     Full text is retrieved from the persisted Drive file on-demand so the UI can render the
     complete document even while a workflow is still running (before client canon exists).
     """
-    repo = WorkflowsRepository(session)
-    run = None
-    parsed_run_id = _maybe_uuid(workflow_run_id)
-    if parsed_run_id:
-        run = repo.get(org_id=auth.org_id, workflow_run_id=str(parsed_run_id))
-    if not run:
-        run = repo.get_by_temporal_workflow_id(org_id=auth.org_id, temporal_workflow_id=workflow_run_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Workflow run not found")
-
-    research_repo = ResearchArtifactsRepository(session)
-    record = research_repo.get_for_step(org_id=auth.org_id, workflow_run_id=str(run.id), step_key=step_key)
-    if not record:
-        raise HTTPException(status_code=404, detail="Research artifact not found for this step")
-
-    doc_url = getattr(record, "doc_url", None) or ""
-    doc_id = getattr(record, "doc_id", None) or ""
-    if not doc_id:
-        raise HTTPException(status_code=500, detail="Research artifact is missing a doc_id")
-
-    if isinstance(doc_url, str) and doc_url.startswith("artifact://"):
-        artifact_id = doc_url.split("artifact://", 1)[1].strip() or doc_id
-        artifact = ArtifactsRepository(session).get(org_id=auth.org_id, artifact_id=artifact_id)
-        if not artifact:
-            raise HTTPException(status_code=404, detail="Referenced artifact record was not found.")
-        return jsonable_encoder(
-            {
-                "step_key": record.step_key,
-                "title": record.title,
-                "doc_url": record.doc_url,
-                "doc_id": record.doc_id,
-                "summary": record.summary,
-                "content": artifact.data,
-            }
-        )
-
-    if isinstance(doc_url, str) and doc_url.startswith("drive-stub://"):
-        raise HTTPException(
-            status_code=409,
-            detail="Research artifact was persisted with a Drive stub; full content is unavailable.",
-        )
-
-    try:
-        content = download_drive_text_file(file_id=doc_id)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
+    _run, record = _load_workflow_research_record(
+        session=session,
+        auth=auth,
+        workflow_run_id=workflow_run_id,
+        step_key=step_key,
+    )
+    hydrated = _hydrate_research_artifact(
+        session=session,
+        org_id=auth.org_id,
+        record=record,
+    )
     return jsonable_encoder(
         {
-            "step_key": record.step_key,
-            "title": record.title,
-            "doc_url": record.doc_url,
-            "doc_id": record.doc_id,
-            "summary": record.summary,
-            "content": content,
+            "step_key": hydrated["step_key"],
+            "title": hydrated["title"],
+            "doc_url": hydrated["doc_url"],
+            "doc_id": hydrated["doc_id"],
+            "summary": hydrated["summary"],
+            "content": hydrated["content"],
         }
     )
 
