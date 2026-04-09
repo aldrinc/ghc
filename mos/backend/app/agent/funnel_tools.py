@@ -27,11 +27,7 @@ from app.services.funnel_templates import get_funnel_template
 from app.services.funnels import extract_internal_links, publish_funnel
 from app.services.html_funnel_reference import (
     HtmlReferenceError,
-    HtmlStructureMismatchError,
-    apply_html_text_replacements,
-    assert_html_text_only_rewrite,
     build_html_reference_prompt_context,
-    extract_editable_html_text_nodes,
     summarize_html_reference,
 )
 from app.services.imported_html_runtime import (
@@ -2014,19 +2010,6 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 page_targets=page_targets,
                 checkout_ready_variants=checkout_ready_variants,
             )
-            editable_text_nodes = extract_editable_html_text_nodes(html_document=reference_html)
-            if not editable_text_nodes:
-                raise RuntimeError("Uploaded HTML document did not contain any editable visible text nodes.")
-            editable_text_nodes_context = [
-                {
-                    "nodeId": node.nodeId,
-                    "path": node.path,
-                    "originalText": node.originalText,
-                    "charCount": node.charCount,
-                }
-                for node in editable_text_nodes
-            ]
-
             system_content = (
                 "You are updating an uploaded HTML template for a funnel page.\n\n"
                 "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
@@ -2035,16 +2018,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "assistantMessage requirements:\n"
                 "- Plain text only.\n"
                 f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.\n"
-                "- Summarize the rewritten page briefly and include a medical safety disclaimer.\n\n"
+                "- Summarize the imported page briefly and include a medical safety disclaimer.\n\n"
                 "textReplacements requirements:\n"
-                "- Return an array of objects with nodeId and text.\n"
-                "- Use ONLY nodeIds from the editable text node list below.\n"
-                "- Omit nodes that should remain unchanged.\n"
-                "- Only replace human-facing copy text inside those existing text nodes.\n"
-                "- Keep replacement text roughly similar in length so the layout stays visually identical.\n"
+                "- Copy rewrites are disabled for exact imported HTML mode.\n"
+                "- Return an empty array.\n"
+                "- Do NOT rewrite, shorten, expand, or otherwise modify any visible copy.\n"
                 "- Do NOT return HTML, CSS, JavaScript, markdown, selectors, or attribute edits inside text.\n"
-                "- Do NOT attempt to change colors, layout, classes, ids, hrefs, src values, or any non-text attribute.\n"
-                "- The server will apply your text replacements to the original HTML exactly.\n\n"
+                "- The server will preserve the uploaded HTML exactly as provided.\n\n"
                 "instrumentationManifest requirements:\n"
                 f"- schemaVersion MUST be '{imported_runtime_context['schemaVersion']}'.\n"
                 f"- pageStage MUST be '{current_page_stage}'.\n"
@@ -2059,10 +2039,10 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Prefer checkout.mode='public_checkout'. Use checkout.mode='external_checkout_url' only when an explicit per-variant external URL map is required.\n"
                 "- If the page has variant/pack selectors, use an option_values resolver with selectors that read the live chosen values from the existing HTML controls.\n"
                 "- If exactly one checkout-ready variant exists and there is no visible variant choice, use a fixed resolver with that variantId.\n\n"
-                "Copy goals:\n"
+                "Page goals:\n"
                 "- Keep the uploaded HTML visually identical.\n"
-                "- Inject accurate product, offer, and strategy copy for this funnel.\n"
-                "- Be specific and persuasive without making unsupported medical claims.\n\n"
+                "- Preserve the existing copy exactly as provided.\n"
+                "- Add only the runtime instrumentation needed for funnel tracking, navigation, and checkout.\n\n"
                 f"{context_guidance}"
                 f"{strategy_prompt_guidance}"
                 f"{copy_pack_guidance}"
@@ -2070,13 +2050,11 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 f"{attachment_guidance}"
                 "Imported HTML runtime context:\n"
                 f"{json.dumps(imported_runtime_context, ensure_ascii=False)}\n\n"
-                "Editable text nodes that may be rewritten:\n"
-                f"{json.dumps(editable_text_nodes_context, ensure_ascii=False)}\n\n"
                 "instrumentationManifest JSON schema:\n"
                 f"{json.dumps(imported_html_instrumentation_schema(), ensure_ascii=False)}\n\n"
                 "HTML summary for orientation only:\n"
                 f"{json.dumps(args.htmlReferencePromptContext or {}, ensure_ascii=False)}\n\n"
-                "Uploaded HTML document to preserve exactly while patching copy into the listed text nodes:\n"
+                "Uploaded HTML document to preserve exactly while adding runtime instrumentation:\n"
                 f"{reference_html}"
             )
 
@@ -2089,7 +2067,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             if args.prompt and args.prompt.strip():
                 conversation.append({"role": "user", "content": args.prompt.strip()})
             if not conversation:
-                conversation.append({"role": "user", "content": "Rewrite the uploaded HTML with the correct funnel copy."})
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": "Generate runtime instrumentation for the uploaded HTML without changing its copy.",
+                    }
+                )
 
             base_prompt_parts = [system_content] + [f"{m['role'].upper()}: {m['content']}" for m in conversation]
             compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
@@ -2196,21 +2179,10 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
 
             assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage"))
             text_replacements = _coerce_text_replacements(obj.get("textReplacements"))
+            if text_replacements:
+                raise RuntimeError("Imported HTML copy rewrites are disabled; textReplacements must be empty.")
             instrumentation_manifest = coerce_imported_html_instrumentation_manifest(obj.get("instrumentationManifest"))
-            try:
-                rewritten_html = apply_html_text_replacements(
-                    original_html=reference_html,
-                    replacements=text_replacements,
-                )
-            except HtmlReferenceError as exc:
-                raise RuntimeError(str(exc)) from exc
-            try:
-                assert_html_text_only_rewrite(
-                    original_html=reference_html,
-                    rewritten_html=rewritten_html,
-                )
-            except HtmlStructureMismatchError as exc:
-                raise RuntimeError(str(exc)) from exc
+            rewritten_html = reference_html
             try:
                 instrumentation_manifest = validate_imported_html_document_manifest(
                     html_document=rewritten_html,
