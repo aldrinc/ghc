@@ -15,7 +15,9 @@ import {
   buildPublicFunnelPath,
   buildStandalonePublicPagePath,
   getStandaloneDefaultFunnelSlug,
+  getStandalonePreloadedFunnelData,
   isStandaloneBundleMode,
+  normalizeRouteToken,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
@@ -302,14 +304,29 @@ export function PublicFunnelPage() {
   const bundleMode = isStandaloneBundleMode();
   const funnelSlug = routeFunnelSlug || (bundleMode ? getStandaloneDefaultFunnelSlug() || undefined : undefined);
   const navigate = useNavigate();
-  const [meta, setMeta] = useState<PublicFunnelMeta | null>(null);
-  const [page, setPage] = useState<PublicFunnelPageType | null>(null);
+  const effectiveSlug = routeSlug || undefined;
+  const preloadedFunnel = useMemo(
+    () =>
+      bundleMode
+        ? getStandalonePreloadedFunnelData({
+            productSlug,
+            funnelSlug,
+          })
+        : null,
+    [bundleMode, funnelSlug, productSlug],
+  );
+  const preloadedPage = useMemo(() => {
+    const normalizedSlug = normalizeRouteToken(effectiveSlug);
+    if (!normalizedSlug) return null;
+    return preloadedFunnel?.pages?.[normalizedSlug] ?? null;
+  }, [effectiveSlug, preloadedFunnel]);
+  const [meta, setMeta] = useState<PublicFunnelMeta | null>(preloadedFunnel?.meta ?? null);
+  const [page, setPage] = useState<PublicFunnelPageType | null>(preloadedPage);
   const [error, setError] = useState<string | null>(null);
-  const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
+  const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(preloadedFunnel?.commerce ?? null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
   const handledCheckoutReturnRef = useRef<string | null>(null);
-  const effectiveSlug = routeSlug || undefined;
 
   const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
   const sessionId = useMemo(
@@ -343,6 +360,10 @@ export function PublicFunnelPage() {
 
   useEffect(() => {
     if (!productSlug || !funnelSlug) return;
+    if (preloadedFunnel?.meta) {
+      setMeta(preloadedFunnel.meta);
+      return;
+    }
     fetch(`${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/meta`)
       .then(async (resp) => {
         if (!resp.ok) return null;
@@ -350,10 +371,15 @@ export function PublicFunnelPage() {
       })
       .then((m) => setMeta(m))
       .catch(() => setMeta(null));
-  }, [funnelSlug, productSlug]);
+  }, [funnelSlug, preloadedFunnel?.meta, productSlug]);
 
   useEffect(() => {
     if (!productSlug || !funnelSlug) return;
+    if (preloadedFunnel?.commerce) {
+      setCommerce(preloadedFunnel.commerce);
+      setCommerceError(null);
+      return;
+    }
     setCommerce(null);
     setCommerceError(null);
     fetch(`${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/commerce`)
@@ -367,11 +393,15 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setCommerceError(err instanceof Error ? err.message : "Unable to load commerce data");
       });
-  }, [funnelSlug, productSlug]);
+  }, [funnelSlug, preloadedFunnel?.commerce, productSlug]);
 
   useEffect(() => {
     if (!productSlug || !funnelSlug || !effectiveSlug) return;
     setError(null);
+    if (preloadedPage) {
+      setPage(preloadedPage);
+      return;
+    }
     setPage(null);
     fetch(
       `${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/pages/${encodeURIComponent(effectiveSlug)}`,
@@ -405,7 +435,7 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Unable to load funnel page");
       });
-  }, [bundleMode, effectiveSlug, funnelSlug, navigate, productSlug]);
+  }, [bundleMode, effectiveSlug, funnelSlug, navigate, preloadedPage, productSlug]);
 
   const trackEvent = async (event: RuntimeTrackingEvent) => {
     if (!page) return;

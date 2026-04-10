@@ -1,10 +1,21 @@
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
+import type { PublicFunnelCommerce } from "@/types/commerce";
+import type { PublicFunnelMeta, PublicFunnelPage } from "@/types/funnels";
+
+type StandalonePreloadedFunnel = {
+  productSlug?: string;
+  funnelSlug?: string;
+  meta?: PublicFunnelMeta | null;
+  commerce?: PublicFunnelCommerce | null;
+  pages?: Record<string, PublicFunnelPage>;
+};
 
 type DeployRuntimeConfig = {
   bundleMode?: boolean;
   defaultProductSlug?: string;
   defaultFunnelSlug?: string;
   defaultEntrySlug?: string;
+  preloadedFunnel?: StandalonePreloadedFunnel;
 };
 
 const SHORT_ID_LENGTH = 8;
@@ -25,6 +36,10 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
     return {};
   }
   return candidate;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export function normalizeRouteToken(value: string | null | undefined): string {
@@ -70,6 +85,54 @@ export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: 
 
 export function getStandaloneDefaultFunnelSlug(): string | null {
   return getStandaloneDefaultRoute()?.funnelSlug ?? null;
+}
+
+export function getStandalonePreloadedFunnelData(
+  options?: {
+    productSlug?: string | null;
+    funnelSlug?: string | null;
+  },
+): StandalonePreloadedFunnel | null {
+  const config = getDeployRuntimeConfig();
+  const candidate = config.preloadedFunnel;
+  if (!isRecord(candidate)) {
+    return null;
+  }
+
+  const productSlug = normalizeRouteToken(String(candidate.productSlug || ""));
+  const funnelSlug = normalizeRouteToken(String(candidate.funnelSlug || ""));
+  if (!productSlug || !funnelSlug) {
+    return null;
+  }
+
+  const requestedProductSlug = normalizeRouteToken(options?.productSlug);
+  if (requestedProductSlug && requestedProductSlug !== productSlug) {
+    return null;
+  }
+  const requestedFunnelSlug = normalizeRouteToken(options?.funnelSlug);
+  if (requestedFunnelSlug && requestedFunnelSlug !== funnelSlug) {
+    return null;
+  }
+
+  const rawPages = candidate.pages;
+  const pages: Record<string, PublicFunnelPage> = {};
+  if (isRecord(rawPages)) {
+    for (const [rawSlug, payload] of Object.entries(rawPages)) {
+      const normalizedSlug = normalizeRouteToken(rawSlug);
+      if (!normalizedSlug || !isRecord(payload)) {
+        continue;
+      }
+      pages[normalizedSlug] = payload as unknown as PublicFunnelPage;
+    }
+  }
+
+  return {
+    productSlug,
+    funnelSlug,
+    meta: isRecord(candidate.meta) ? (candidate.meta as PublicFunnelMeta) : null,
+    commerce: isRecord(candidate.commerce) ? (candidate.commerce as PublicFunnelCommerce) : null,
+    pages,
+  };
 }
 
 export function getStandaloneDefaultPageRoute(): { productSlug: string; funnelSlug: string; slug: string } | null {

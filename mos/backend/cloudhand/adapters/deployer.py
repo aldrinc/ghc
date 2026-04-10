@@ -890,6 +890,70 @@ WantedBy=multi-user.target
 
         return None
 
+    def _build_preloaded_funnel_runtime_payload(
+        self, *, source: FunnelArtifactSourceSpec
+    ) -> Optional[Dict[str, object]]:
+        default_route = self._resolve_funnel_artifact_default_route(source=source)
+        if not default_route:
+            return None
+
+        product_slug, funnel_slug, _entry_slug = default_route
+        artifact = source.artifact or {}
+        products = artifact.get("products")
+        if not isinstance(products, dict):
+            return None
+
+        product_payload = products.get(product_slug)
+        if not isinstance(product_payload, dict):
+            return None
+
+        funnels = product_payload.get("funnels")
+        if not isinstance(funnels, dict):
+            return None
+
+        resolved_funnel_payload: Optional[Dict[str, Any]] = None
+        for raw_funnel_slug, funnel_payload in funnels.items():
+            if self._canonical_funnel_artifact_page_slug(raw_funnel_slug) != funnel_slug:
+                continue
+            if not isinstance(funnel_payload, dict):
+                raise ValueError(
+                    f"Artifact funnel payload for '{product_slug}/{funnel_slug}' must be an object."
+                )
+            resolved_funnel_payload = funnel_payload
+            break
+
+        if resolved_funnel_payload is None:
+            return None
+
+        funnel_meta = resolved_funnel_payload.get("meta")
+        pages = resolved_funnel_payload.get("pages")
+        if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
+            return None
+
+        canonical_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
+        canonical_pages: Dict[str, Dict[str, Any]] = {}
+        for raw_page_slug, page_payload in pages.items():
+            if not isinstance(page_payload, dict):
+                raise ValueError(
+                    f"Artifact page payload for '{product_slug}/{funnel_slug}/{raw_page_slug}' must be an object."
+                )
+            canonical_slug = self._canonical_funnel_artifact_page_slug(str(raw_page_slug or ""))
+            if not canonical_slug:
+                continue
+            canonical_pages[canonical_slug] = self._canonicalize_funnel_artifact_page_payload(
+                page_slug=str(raw_page_slug or ""),
+                page_payload=page_payload,
+            )
+
+        commerce = resolved_funnel_payload.get("commerce")
+        return {
+            "productSlug": product_slug,
+            "funnelSlug": funnel_slug,
+            "meta": canonical_meta,
+            "commerce": commerce if isinstance(commerce, dict) else None,
+            "pages": canonical_pages,
+        }
+
     def _inject_funnel_runtime_config(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
         runtime_config: Dict[str, object] = {"bundleMode": True}
         default_route = self._resolve_funnel_artifact_default_route(source=source)
@@ -902,6 +966,10 @@ WantedBy=multi-user.target
         entry_image_preload_map = self._build_entry_image_preload_map(source=source)
         if entry_image_preload_map:
             runtime_config["entryImagePreloadMap"] = entry_image_preload_map
+
+        preloaded_funnel = self._build_preloaded_funnel_runtime_payload(source=source)
+        if preloaded_funnel:
+            runtime_config["preloadedFunnel"] = preloaded_funnel
 
         config_json = json.dumps(runtime_config, separators=(",", ":"))
         runtime_script = (
