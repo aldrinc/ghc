@@ -417,28 +417,33 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
 
     deployer._configure_funnel_artifact_site(app)
 
-    runtime_inject_cmd = next(
+    runtime_inject_script = next(
         (
-            cmd
-            for cmd in commands
-            if cmd.startswith("python3 -c") and "__MOS_DEPLOY_RUNTIME__" in cmd
+            content
+            for path, content in _uploaded.items()
+            if path.startswith("/tmp/cloudhand-runtime-config-")
+            and path.endswith(".py")
+            and isinstance(content, str)
+            and "__MOS_DEPLOY_RUNTIME__" in content
         ),
         "",
     )
-    assert runtime_inject_cmd
-    assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
-    assert '"defaultFunnelSlug":"example-funnel"' in runtime_inject_cmd
-    assert '"defaultEntrySlug":"presales"' in runtime_inject_cmd
-    assert "raw = raw.replace" in runtime_inject_cmd
-    assert '<script type="module"' in runtime_inject_cmd
-    assert '"entryImagePreloadMap"' in runtime_inject_cmd
+    assert runtime_inject_script
+    assert any(cmd.startswith("python3 /tmp/cloudhand-runtime-config-") for cmd in commands)
+    assert any(cmd.startswith("rm -f /tmp/cloudhand-runtime-config-") for cmd in commands)
+    assert '"defaultProductSlug":"example-product"' in runtime_inject_script
+    assert '"defaultFunnelSlug":"example-funnel"' in runtime_inject_script
+    assert '"defaultEntrySlug":"presales"' in runtime_inject_script
+    assert "raw = raw.replace" in runtime_inject_script
+    assert '<script type="module"' in runtime_inject_script
+    assert '"entryImagePreloadMap"' in runtime_inject_script
     assert (
         '"example-product/example-funnel/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_cmd
+        in runtime_inject_script
     )
     assert (
         '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_cmd
+        in runtime_inject_script
     )
 
 
