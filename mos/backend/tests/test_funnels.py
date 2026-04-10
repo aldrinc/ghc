@@ -1013,6 +1013,8 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://moshq.app/api",
+                "serverNames": ["shop.shopemberco.com"],
+                "https": True,
                 "bunnyPullZone": True,
                 "bunnyPullZoneOriginIp": "46.225.124.104",
             }
@@ -1023,6 +1025,10 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     deploy_request = captured["deploy_request"]
     assert deploy_request["bunny_pull_zone"] is True
     assert deploy_request["bunny_pull_zone_origin_ip"] == "46.225.124.104"
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
+    assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
 
 
 def test_publish_with_deploy_does_not_use_funnel_domain_from_db_when_server_names_omitted(
