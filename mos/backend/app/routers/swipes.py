@@ -53,12 +53,13 @@ from app.services.media_storage import (
 )
 from app.services.funnels import create_funnel_upload_asset
 from app.services.meta_review import clean_optional_text, load_campaign_asset_brief_map
+from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdInput, SwipeImageAdWorkflow
 from app.temporal.workflows.swipe_taxonomy import SwipeTaxonomyInput, SwipeTaxonomyWorkflow
 
 router = APIRouter(prefix="/swipes", tags=["swipes"])
-_TEMPLATE_IMAGES_DIR = Path(__file__).resolve().parents[4] / "template-images"
+_TEMPLATE_IMAGES_DIR = TEMPLATE_IMAGE_ASSETS_DIR
 _IMAGE_REQUIREMENT_FORMATS = {"image", "image_ad", "image-ad"}
 _SWIPE_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 
