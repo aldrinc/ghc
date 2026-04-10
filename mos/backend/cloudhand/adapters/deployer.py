@@ -34,6 +34,17 @@ _ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpH
 _ENV_ASSIGNMENT_PATTERN = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 
 
+def _safe_inline_json(value: Any) -> str:
+    return (
+        json.dumps(value, separators=(",", ":"))
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
 def _normalize_uploaded_env_line(raw_line: str) -> str | None:
     stripped = raw_line.strip()
     if not stripped or stripped.startswith("#"):
@@ -1022,7 +1033,7 @@ WantedBy=multi-user.target
         if preloaded_funnel:
             runtime_config["preloadedFunnel"] = preloaded_funnel
 
-        config_json = json.dumps(runtime_config, separators=(",", ":"))
+        config_json = _safe_inline_json(runtime_config)
         runtime_script = (
             "<script>"
             f"window.__MOS_DEPLOY_RUNTIME__={config_json};"

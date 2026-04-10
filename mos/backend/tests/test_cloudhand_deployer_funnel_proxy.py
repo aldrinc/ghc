@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import base64
 import json
 from pathlib import Path
@@ -197,6 +198,14 @@ def _stub_deployer():
     deployer._path_exists = lambda path: True
     deployer._enable_https = lambda server_names: None
     return deployer, uploaded, commands
+
+
+def _extract_runtime_block(script_text: str) -> str:
+    for line in script_text.splitlines():
+        if not line.startswith("block = "):
+            continue
+        return ast.literal_eval(line[len("block = ") :])
+    raise AssertionError("Runtime injection script did not contain a block assignment.")
 
 
 def test_env_file_upload_normalizes_shell_style_assignments_for_systemd(tmp_path):
@@ -451,34 +460,66 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
 
     deployer._configure_funnel_artifact_site(app)
 
-    runtime_inject_script = next(
-        (
-            content
-            for path, content in _uploaded.items()
-            if path.startswith("/tmp/cloudhand-runtime-config-")
-            and path.endswith(".py")
-            and isinstance(content, str)
-            and "__MOS_DEPLOY_RUNTIME__" in content
-        ),
-        "",
-    )
-    assert runtime_inject_script
+    runtime_script_path = next((path for path in _uploaded if path.startswith("/tmp/cloudhand-runtime-config-")), "")
+    assert runtime_script_path
+    runtime_inject_script = _uploaded[runtime_script_path]
+    assert isinstance(runtime_inject_script, str)
+    runtime_block = _extract_runtime_block(runtime_inject_script)
     assert any(cmd.startswith("python3 /tmp/cloudhand-runtime-config-") for cmd in commands)
     assert any(cmd.startswith("rm -f /tmp/cloudhand-runtime-config-") for cmd in commands)
-    assert '"defaultProductSlug":"example-product"' in runtime_inject_script
-    assert '"defaultFunnelSlug":"example-funnel"' in runtime_inject_script
-    assert '"defaultEntrySlug":"presales"' in runtime_inject_script
+    assert '"defaultProductSlug":"example-product"' in runtime_block
+    assert '"defaultFunnelSlug":"example-funnel"' in runtime_block
+    assert '"defaultEntrySlug":"presales"' in runtime_block
     assert "raw = raw.replace" in runtime_inject_script
     assert '<script type="module"' in runtime_inject_script
-    assert '"entryImagePreloadMap"' in runtime_inject_script
+    assert '"entryImagePreloadMap"' in runtime_block
     assert (
         '"example-product/example-funnel/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_script
+        in runtime_block
     )
     assert (
         '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_script
+        in runtime_block
     )
+
+
+def test_funnel_artifact_site_escapes_html_script_terminators_in_runtime_config():
+    app = _artifact_app()
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["pages"]["presales"] = {
+        "funnelId": "funnel-1",
+        "publicationId": "pub-1",
+        "pageId": "page-1",
+        "slug": "presales",
+        "puckData": {
+            "root": {"props": {"title": "Pre-Sales"}},
+            "content": [
+                {
+                    "type": "ImportedHtmlDocument",
+                    "props": {
+                        "id": "imported-html-document",
+                        "title": "Pre-Sales",
+                        "sourceLabel": "pre-sales.html",
+                        "htmlDocument": '<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"></script></head><body><h1>Advertorial</h1></body></html>',
+                    },
+                }
+            ],
+            "zones": {},
+        },
+        "pageMap": {"page-1": "presales"},
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_script_path = next((path for path in uploaded if path.startswith("/tmp/cloudhand-runtime-config-")), "")
+    assert runtime_script_path
+    runtime_inject_script = uploaded[runtime_script_path]
+    assert isinstance(runtime_inject_script, str)
+    runtime_block = _extract_runtime_block(runtime_inject_script)
+    assert "\\u003c/script\\u003e" in runtime_block
+    assert "</script></head><body><h1>Advertorial</h1>" not in runtime_block
 
 
 def test_funnel_artifact_site_errors_when_preload_asset_public_id_is_invalid_uuid():
