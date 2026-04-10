@@ -39,7 +39,9 @@ class _FakeHttpError(RuntimeError):
 def test_ensure_uploaded_to_gemini_file_search_polls_document_state_from_upload_operation_name(
     monkeypatch,
 ) -> None:
-    expected_document_name = "fileSearchStores/store-1/documents/doc-1"
+    expected_document_name = (
+        "fileSearchStores/store-1/documents/swipestage1bundlebrandfound-dited6yxxxw3"
+    )
     poll_paths: list[str] = []
     _FakeRepo.ready_calls = []
     _FakeRepo.failed_calls = []
@@ -59,13 +61,15 @@ def test_ensure_uploaded_to_gemini_file_search_polls_document_state_from_upload_
             if self.document_poll_count == 2:
                 return SimpleNamespace(
                     body=(
-                        '{"name":"fileSearchStores/store-1/documents/doc-1",'
+                        '{"name":"fileSearchStores/store-1/documents/'
+                        'swipestage1bundlebrandfound-dited6yxxxw3",'
                         '"state":"STATE_PENDING","sizeBytes":"0"}'
                     )
                 )
             return SimpleNamespace(
                 body=(
-                    '{"name":"fileSearchStores/store-1/documents/doc-1",'
+                    '{"name":"fileSearchStores/store-1/documents/'
+                    'swipestage1bundlebrandfound-dited6yxxxw3",'
                     '"state":"STATE_ACTIVE","sizeBytes":"27156"}'
                 )
             )
@@ -85,7 +89,7 @@ def test_ensure_uploaded_to_gemini_file_search_polls_document_state_from_upload_
             assert getattr(file, "name", "") == "context.txt"
             assert config is not None
             return SimpleNamespace(
-                name="fileSearchStores/store-1/upload/operations/doc-1",
+                name="fileSearchStores/store-1/upload/operations/swipestage1bundlebrandfound-dited6yxxxw3",
                 response=None,
             )
 
@@ -145,4 +149,3 @@ def test_ensure_uploaded_to_gemini_file_search_polls_document_state_from_upload_
     assert len(_FakeRepo.ready_calls) == 1
     assert _FakeRepo.ready_calls[0]["gemini_document_name"] == expected_document_name
     assert _FakeRepo.ready_calls[0]["size_bytes"] == 27156
-

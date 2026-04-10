@@ -126,31 +126,12 @@ def _build_store_display_name(*, doc_key: str, sha256: str) -> str:
     return f"{prefix}-{normalized_key}-{sha256[:12]}"
 
 
-def _poll_operation(client, operation, *, timeout_seconds: float):
-    started_at = time.time()
-    latest = operation
-    while not bool(getattr(latest, "done", False)):
-        if (time.time() - started_at) > timeout_seconds:
-            name = str(getattr(latest, "name", "") or "")
-            raise RuntimeError(
-                f"Timed out waiting for Gemini File Search operation to complete (operation={name})."
-            )
-        time.sleep(_POLL_INTERVAL_SECONDS)
-        latest = client.operations.get(latest)
-    error = getattr(latest, "error", None)
-    if error:
-        raise RuntimeError(f"Gemini File Search operation failed: {error}")
-    return latest
-
-
 def _extract_document_name_from_upload_operation_name(operation_name: str) -> str | None:
     cleaned = (operation_name or "").strip()
     match = re.match(r"^(fileSearchStores/[^/]+)/upload/operations/([^/]+)$", cleaned)
     if not match:
         return None
     return f"{match.group(1)}/documents/{match.group(2)}"
-
-
 def _file_search_get_json(client, *, resource_name: str) -> dict[str, Any]:
     api_client = getattr(client, "_api_client", None)
     if api_client is None:
@@ -197,7 +178,10 @@ def _poll_document_active(client, *, document_name: str, timeout_seconds: float)
         if state_value == "STATE_ACTIVE":
             return doc
         if state_value == "STATE_FAILED":
-            raise RuntimeError(f"Gemini File Search document indexing failed for {document_name}.")
+            raise RuntimeError(
+                "Gemini File Search document indexing failed for "
+                f"{document_name}. mime_type={doc.get('mimeType')!r} size_bytes={doc.get('sizeBytes')!r}"
+            )
         if (time.time() - started_at) > timeout_seconds:
             raise RuntimeError(
                 f"Timed out waiting for Gemini File Search document to become active (document={document_name})."
