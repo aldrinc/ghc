@@ -199,6 +199,40 @@ def _stub_deployer():
     return deployer, uploaded, commands
 
 
+def test_env_file_upload_normalizes_shell_style_assignments_for_systemd(tmp_path):
+    env_file = tmp_path / ".env.example"
+    env_file.write_text(
+        "\n".join(
+            [
+                "# API keys",
+                'GOOGLE_API_KEY="AIzaSyAXBYbLxxHGZIpS4sR69VQ5AQY7qJcf8k8"             # Optional, for Google Gemini models.',
+                "GEMINI_API_KEY=AIzaSyAXBYbLxxHGZIpS4sR69VQ5AQY7qJcf8k8",
+                'OPENAI_API_KEY="sk-test" # Optional, for OpenAI models.',
+                "EMPTY_VALUE=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    app = _git_app(name="env-normalizer")
+    app.service_config.environment_file_upload = str(env_file)
+    app.service_config.environment_file = "/etc/cloudhand/env/env-normalizer.env"
+    app.service_config.environment = {"LLM_DEFAULT_MODEL": "claude-opus-4-6"}
+
+    deployer, uploaded, _commands = _stub_deployer()
+    directives = deployer._env_file_directives(app, "/opt/apps/env-normalizer")
+
+    assert directives == "EnvironmentFile=/etc/cloudhand/env/env-normalizer.env"
+    assert uploaded["/etc/cloudhand/env/env-normalizer.env"] == (
+        "GOOGLE_API_KEY=AIzaSyAXBYbLxxHGZIpS4sR69VQ5AQY7qJcf8k8\n"
+        "GEMINI_API_KEY=AIzaSyAXBYbLxxHGZIpS4sR69VQ5AQY7qJcf8k8\n"
+        "OPENAI_API_KEY=sk-test\n"
+        "EMPTY_VALUE=\n"
+        "LLM_DEFAULT_MODEL=claude-opus-4-6\n"
+    )
+
+
 def test_funnel_proxy_redirects_slug_paths_on_same_host_and_port():
     app = _funnel_app(ports=[24123], server_names=[], https=False)
     deployer, uploaded, commands = _stub_deployer()
