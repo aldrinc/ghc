@@ -1019,7 +1019,12 @@ WantedBy=multi-user.target
             "    raw = block + raw\n"
             "index_path.write_text(raw, encoding='utf-8')\n"
         )
-        self.run(f"python3 -c {shlex.quote(script)}")
+        remote_script_path = f"/tmp/cloudhand-runtime-config-{int(time.time() * 1000)}.py"
+        self.upload_file(script, remote_script_path)
+        try:
+            self.run(f"python3 {shlex.quote(remote_script_path)}")
+        finally:
+            self.run(f"rm -f {shlex.quote(remote_script_path)}")
 
     def _write_funnel_artifact_payload(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
         artifact = source.artifact or {}
