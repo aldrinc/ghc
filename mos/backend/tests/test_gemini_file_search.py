@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import pytest
+
 from app.services import gemini_file_search as gemini_service
 
 
@@ -34,6 +36,49 @@ class _FakeHttpError(RuntimeError):
     def __init__(self, status_code: int, message: str) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+def test_require_client_rejects_conflicting_google_api_key_env(monkeypatch) -> None:
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+    monkeypatch.setattr(
+        gemini_service,
+        "genai",
+        SimpleNamespace(Client=lambda **kwargs: SimpleNamespace(kwargs=kwargs)),
+    )
+    monkeypatch.setattr(gemini_service, "genai_types", SimpleNamespace())
+
+    with pytest.raises(gemini_service.GeminiFileSearchConfigError, match="conflicting API key env vars"):
+        gemini_service._require_client()
+
+
+def test_poll_document_active_includes_embedding_probe_diagnostic(monkeypatch) -> None:
+    class _FailedApiClient:
+        def request(self, method: str, path: str, _request_dict, _http_options):
+            assert method == "get"
+            assert path == "fileSearchStores/store-1/documents/doc-1"
+            return SimpleNamespace(
+                body=(
+                    '{"name":"fileSearchStores/store-1/documents/doc-1",'
+                    '"state":"STATE_FAILED","mimeType":"text/markdown","sizeBytes":"25090"}'
+                )
+            )
+
+    fake_client = SimpleNamespace(_api_client=_FailedApiClient())
+    monkeypatch.setattr(
+        gemini_service,
+        "_probe_embedding_access_diagnostic",
+        lambda: "Embedding access probe failed: HTTP 403 | PERMISSION_DENIED | "
+        "Your project has been denied access. Please contact support.",
+    )
+
+    with pytest.raises(RuntimeError, match="Your project has been denied access"):
+        gemini_service._poll_document_active(
+            fake_client,
+            document_name="fileSearchStores/store-1/documents/doc-1",
+            timeout_seconds=30.0,
+        )
 
 
 def test_ensure_uploaded_to_gemini_file_search_polls_document_state_from_upload_operation_name(
