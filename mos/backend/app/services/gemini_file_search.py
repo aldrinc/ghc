@@ -44,6 +44,7 @@ _GEMINI_DEVELOPER_API_BASE = os.getenv(
     "GEMINI_DEVELOPER_API_BASE",
     "https://generativelanguage.googleapis.com/v1beta",
 ).rstrip("/")
+_INLINE_ENV_COMMENT_RE = re.compile(r"\s+#")
 
 
 def _parse_bool(value: str | None, *, default: bool = False) -> bool:
@@ -65,9 +66,26 @@ class GeminiFileSearchConfigError(RuntimeError):
     pass
 
 
+def _normalize_api_key_env_value(value: str | None) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        return ""
+    if normalized[0] in {'"', "'"}:
+        quote = normalized[0]
+        closing_index = normalized.find(quote, 1)
+        if closing_index > 0:
+            normalized = normalized[1:closing_index].strip()
+        else:
+            normalized = normalized[1:].strip()
+    inline_comment_match = _INLINE_ENV_COMMENT_RE.search(normalized)
+    if inline_comment_match is not None:
+        normalized = normalized[: inline_comment_match.start()].rstrip()
+    return normalized
+
+
 def _conflicting_google_api_key_message(*, gemini_api_key: str, google_api_key: str) -> str | None:
-    normalized_gemini = (gemini_api_key or "").strip()
-    normalized_google = (google_api_key or "").strip()
+    normalized_gemini = _normalize_api_key_env_value(gemini_api_key)
+    normalized_google = _normalize_api_key_env_value(google_api_key)
     if not normalized_gemini or not normalized_google or normalized_gemini == normalized_google:
         return None
     return (
@@ -138,7 +156,7 @@ def _require_client():
             "google-genai dependency is unavailable for Gemini File Search. "
             f"Original error: {detail}"
         )
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = _normalize_api_key_env_value(os.getenv("GEMINI_API_KEY"))
     if not api_key:
         raise GeminiFileSearchConfigError("GEMINI_API_KEY not configured for Gemini File Search.")
     conflicting_keys = _conflicting_google_api_key_message(
@@ -235,7 +253,7 @@ def _embedding_probe_url() -> str:
 
 
 def _probe_embedding_access_diagnostic() -> str | None:
-    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    api_key = _normalize_api_key_env_value(os.getenv("GEMINI_API_KEY"))
     if not api_key:
         return None
 

@@ -38,7 +38,23 @@ class _FakeHttpError(RuntimeError):
         self.status_code = status_code
 
 
-def test_require_client_rejects_conflicting_google_api_key_env(monkeypatch) -> None:
+def test_require_client_accepts_google_api_key_with_shell_comment_suffix(monkeypatch) -> None:
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "gemini-key            # Optional, for Google Gemini models.")
+    monkeypatch.setattr(
+        gemini_service,
+        "genai",
+        SimpleNamespace(Client=lambda **kwargs: SimpleNamespace(kwargs=kwargs)),
+    )
+    monkeypatch.setattr(gemini_service, "genai_types", SimpleNamespace())
+
+    client = gemini_service._require_client()
+
+    assert client.kwargs["api_key"] == "gemini-key"
+
+
+def test_require_client_rejects_true_conflicting_google_api_key_env(monkeypatch) -> None:
     monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
     monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
