@@ -46,6 +46,7 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
+from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
@@ -1523,9 +1524,7 @@ _PRE_SALES_WALL_TEMPLATE_FILES: dict[tuple[int, int], tuple[str, str, str]] = {
     (2, 0): ("instagram_post_20250916_152108_via_10015_io.webp", "9:16", "instagram_selfie_car"),
     (2, 1): ("instagram_post_20250916_152858_via_10015_io.webp", "9:16", "instagram_selfie_home"),
 }
-_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = (
-    Path(__file__).resolve().parents[4] / "template-image-workspace" / "assets"
-)
+_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = TEMPLATE_IMAGE_ASSETS_DIR
 
 
 def _resolve_pre_sales_swipe_assignment(render_label: str) -> _PreSalesSwipeTemplateAssignment:

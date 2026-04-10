@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import mimetypes
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -22,11 +21,12 @@ from app.schemas.swipe_image_ads import (
 )
 from app.services.funnels import create_funnel_upload_asset
 from app.services.meta_review import clean_optional_text, load_campaign_asset_brief_map
+from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdInput, SwipeImageAdWorkflow
 
 router = APIRouter(prefix="/swipes", tags=["swipes"])
-_TEMPLATE_IMAGES_DIR = Path(__file__).resolve().parents[4] / "template-images"
+_TEMPLATE_IMAGES_DIR = TEMPLATE_IMAGE_ASSETS_DIR
 _IMAGE_REQUIREMENT_FORMATS = {"image", "image_ad", "image-ad"}
 
 
