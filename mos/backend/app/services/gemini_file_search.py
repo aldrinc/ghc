@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import logging
 import os
 import re
@@ -142,12 +143,57 @@ def _poll_operation(client, operation, *, timeout_seconds: float):
     return latest
 
 
-def _poll_document_active(client, *, document_name: str, timeout_seconds: float):
+def _extract_document_name_from_upload_operation_name(operation_name: str) -> str | None:
+    cleaned = (operation_name or "").strip()
+    match = re.match(r"^(fileSearchStores/[^/]+)/upload/operations/([^/]+)$", cleaned)
+    if not match:
+        return None
+    return f"{match.group(1)}/documents/{match.group(2)}"
+
+
+def _file_search_get_json(client, *, resource_name: str) -> dict[str, Any]:
+    api_client = getattr(client, "_api_client", None)
+    if api_client is None:
+        raise RuntimeError(
+            "Gemini File Search client does not expose a raw API client for resource polling."
+        )
+    response = api_client.request("get", resource_name, {}, None)
+    body = getattr(response, "body", None)
+    if isinstance(body, bytes):
+        payload = body.decode("utf-8", errors="replace")
+    elif isinstance(body, str):
+        payload = body
+    else:
+        payload = str(body or "")
+    if not payload.strip():
+        return {}
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Gemini File Search returned a non-JSON payload while polling a resource. "
+            f"resource_name={resource_name!r}"
+        ) from exc
+
+
+def _poll_document_active(client, *, document_name: str, timeout_seconds: float) -> dict[str, Any]:
     started_at = time.time()
     while True:
-        doc = client.file_search_stores.documents.get(name=document_name)
-        state = getattr(doc, "state", None)
-        state_value = str(getattr(state, "value", state or ""))
+        try:
+            doc = _file_search_get_json(client, resource_name=document_name)
+        except Exception as exc:  # noqa: BLE001
+            status_code = _extract_error_status_code(exc)
+            message = str(exc).lower()
+            if status_code == 404 or "not found" in message or "may not exist" in message:
+                if (time.time() - started_at) > timeout_seconds:
+                    raise RuntimeError(
+                        "Timed out waiting for Gemini File Search document to become active "
+                        f"(document={document_name})."
+                    ) from exc
+                time.sleep(_POLL_INTERVAL_SECONDS)
+                continue
+            raise
+        state_value = str(doc.get("state") or "")
         if state_value == "STATE_ACTIVE":
             return doc
         if state_value == "STATE_FAILED":
@@ -172,7 +218,7 @@ def _extract_error_status_code(exc: Exception) -> int | None:
 
 def _is_accessible_existing_document(client, *, document_name: str) -> bool:
     try:
-        client.file_search_stores.documents.get(name=document_name)
+        _file_search_get_json(client, resource_name=document_name)
         return True
     except Exception as exc:  # noqa: BLE001
         status_code = _extract_error_status_code(exc)
@@ -283,20 +329,20 @@ def ensure_uploaded_to_gemini_file_search(
                     ],
                 ),
             )
-            completed = _poll_operation(client, operation, timeout_seconds=_POLL_TIMEOUT_SECONDS)
-            response = getattr(completed, "response", None)
+            response = getattr(operation, "response", None)
             uploaded_file_name = str(getattr(response, "file_name", "") or "").strip() or None
             document_name = str(getattr(response, "document_name", "") or "").strip() or None
             if not document_name:
-                raise RuntimeError(
-                    "Gemini File Search upload operation completed without a document_name."
-                )
+                operation_name = str(getattr(operation, "name", "") or "").strip()
+                document_name = _extract_document_name_from_upload_operation_name(operation_name)
+            if not document_name:
+                raise RuntimeError("Gemini File Search upload returned no resolvable document name.")
             document = _poll_document_active(
                 client,
                 document_name=document_name,
                 timeout_seconds=_POLL_TIMEOUT_SECONDS,
             )
-            size_bytes = _safe_int(getattr(document, "size_bytes", None))
+            size_bytes = _safe_int(document.get("sizeBytes"))
             if generation is not None:
                 generation.update(
                     output=document_name,

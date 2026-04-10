@@ -1198,6 +1198,45 @@ def _json_payload_bytes(payload: Dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str).encode("utf-8")
 
 
+def _decode_swipe_stage1_doc_text(*, doc_key: str, content_bytes: bytes) -> str:
+    try:
+        return content_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise RuntimeError(
+            "Swipe stage-1 Gemini bundle source document is not valid UTF-8 text. "
+            f"doc_key={doc_key!r}"
+        ) from exc
+
+
+def _render_swipe_stage1_bundle_markdown(
+    *,
+    bundle_title: str,
+    entries: list[Dict[str, Any]],
+) -> bytes:
+    lines: list[str] = [
+        f"# {bundle_title}",
+        "",
+        "Use this retrieval bundle as external context for swipe stage-1 prompt generation.",
+        "",
+    ]
+    for idx, entry in enumerate(entries):
+        if idx:
+            lines.extend(["---", ""])
+        lines.extend(
+            [
+                f"## {entry['doc_title']}",
+                f"Doc Key: {entry['doc_key']}",
+                f"Source Kind: {entry['source_kind']}",
+                f"MIME Type: {entry['mime_type']}",
+                f"SHA256: {entry['content_sha256']}",
+                "",
+                entry["content_text"].strip() or "(empty document)",
+                "",
+            ]
+        )
+    return "\n".join(lines).strip().encode("utf-8")
+
+
 def _extract_store_name_from_document_name(document_name: str) -> str:
     cleaned = (document_name or "").strip()
     match = re.match(r"^(fileSearchStores/[^/]+)/documents/[^/]+$", cleaned)
@@ -1738,22 +1777,23 @@ def _resolve_swipe_stage1_gemini_file_search_context(
                     "source_kind": str(doc["source_kind"]),
                     "mime_type": str(doc["mime_type"]),
                     "content_sha256": hashlib.sha256(doc["content_bytes"]).hexdigest(),
-                    "content_text": doc["content_bytes"].decode("utf-8"),
+                    "content_text": _decode_swipe_stage1_doc_text(
+                        doc_key=key,
+                        content_bytes=doc["content_bytes"],
+                    ),
                 }
             )
-        payload = {
-            "bundle_key": bundle_key,
-            "bundle_title": bundle_title,
-            "documents": entries,
-        }
         bundle_docs.append(
             {
                 "doc_key": bundle_key,
                 "doc_title": bundle_title,
                 "source_kind": "swipe_stage1_bundle",
-                "filename": f"{bundle_key}.json",
-                "mime_type": "text/plain",
-                "content_bytes": _json_payload_bytes(payload),
+                "filename": f"{bundle_key}.md",
+                "mime_type": "text/markdown",
+                "content_bytes": _render_swipe_stage1_bundle_markdown(
+                    bundle_title=bundle_title,
+                    entries=entries,
+                ),
             }
         )
 

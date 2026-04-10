@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -200,6 +201,22 @@ def _fake_swipe_stage1_rag_docs() -> list[dict[str, object]]:
         }
         for doc_key in doc_keys
     ]
+
+
+def _fake_swipe_stage1_rag_docs_with_json_content() -> list[dict[str, object]]:
+    docs = _fake_swipe_stage1_rag_docs()
+    for doc in docs:
+        doc_key = str(doc["doc_key"])
+        doc["content_bytes"] = json.dumps(
+            {
+                "docKey": doc_key,
+                "headline": f"{doc_key} headline",
+                "quoted": '"quoted value"',
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        ).encode("utf-8")
+    return docs
 
 
 def _fake_file_search_context(**_kwargs):
@@ -532,6 +549,55 @@ def test_build_swipe_stage1_destination_context_uses_strategy_artifact_names():
     assert "Swipe Stage1 Strategy V2 Copy" in destination_context
     assert "Swipe Stage1 Strategy V2 Copy Context" in destination_context
     assert "sales page content as the post-click continuity anchor" in destination_context
+
+
+def test_resolve_gemini_store_names_uploads_markdown_bundles(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client, suffix="markdown-bundle"
+    )
+    workspace_id = client_id
+    uploaded: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        swipe_activity,
+        "_load_required_swipe_stage1_rag_docs",
+        lambda **_kwargs: _fake_swipe_stage1_rag_docs_with_json_content(),
+    )
+
+    def _fake_seed(**kwargs):
+        uploaded.append(kwargs)
+        return f"fileSearchStores/foundation-store/documents/{kwargs['doc_key']}"
+
+    monkeypatch.setattr(swipe_activity, "ensure_uploaded_to_gemini_file_search", _fake_seed)
+
+    swipe_activity._resolve_swipe_stage1_gemini_file_search_context(
+        session=db_session,
+        org_id=auth_context.org_id,
+        idea_workspace_id=workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        funnel_id=None,
+        asset_brief_artifact_id="brief-1",
+    )
+
+    brand_foundation = next(
+        row for row in uploaded if row["doc_key"] == "swipe_stage1_bundle_brand_foundation"
+    )
+    bundle_text = brand_foundation["content_bytes"].decode("utf-8")
+
+    assert brand_foundation["mime_type"] == "text/markdown"
+    assert brand_foundation["filename"] == "swipe_stage1_bundle_brand_foundation.md"
+    assert "# Swipe Stage1 Bundle: Brand Foundation" in bundle_text
+    assert "## Swipe Stage1 Client Canon" in bundle_text
+    assert '"docKey": "swipe_stage1_client_canon"' in bundle_text
+    assert '\\"docKey\\"' not in bundle_text
 
 
 def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
