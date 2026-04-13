@@ -209,6 +209,75 @@ def test_collect_testimonial_targets_supports_import_v1_sales_review_wall_review
     assert len(contexts) == 0
 
 
+def test_collect_testimonial_targets_supports_imported_html_sales_review_wall_slides():
+    puck_data = {
+        "content": [
+            {
+                "type": "ImportedHtmlDocument",
+                "props": {
+                    "htmlDocument": """
+                        <div id="rp-carousel"></div>
+                        <script>
+                        (function(){
+                          var slides = [
+                            { src: '/public/assets/old-1', caption: 'One' },
+                            { src: '/public/assets/old-2', caption: 'Two' },
+                            { src: '/public/assets/old-3', caption: 'Three' }
+                          ];
+                        })();
+                        </script>
+                    """,
+                },
+            }
+        ]
+    }
+
+    groups, contexts = funnel_testimonials._collect_testimonial_targets(
+        puck_data=puck_data,
+        template_kind="sales-pdp",
+    )
+
+    assert len(groups) == 3
+    assert groups[0].label == "sales_pdp.imported_html.reviewWall.reviews[0]"
+    assert groups[0].renders[0].template == "social_comment"
+    assert groups[1].renders[0].template == "review_card"
+    assert len(contexts) == 1
+
+
+def test_apply_generated_asset_to_imported_html_target_rewrites_all_matching_sources():
+    props = {
+        "htmlDocument": """
+            <img src="/public/assets/old-1">
+            <div id="rp-carousel"></div>
+            <script>
+            var slides = [{ src: '/public/assets/old-1', caption: 'One' }];
+            </script>
+        """
+    }
+    context = funnel_testimonials._ImportedHtmlContext(props=props)
+    render = funnel_testimonials._TestimonialRenderTarget(
+        image={"src": "/public/assets/old-1", "testimonialTemplate": "social_comment"},
+        label="sales_pdp.imported_html.reviewWall.reviews[0]",
+        template="social_comment",
+        context=context,
+    )
+
+    funnel_testimonials._apply_generated_asset_to_render_target(
+        render,
+        asset_public_id="new-public-id",
+        default_alt="Review from Dana",
+    )
+
+    assert context.dirty is True
+    context.apply()
+
+    assert "/public/assets/new-public-id" in props["htmlDocument"]
+    assert "/public/assets/old-1" not in props["htmlDocument"]
+    assert render.image["assetPublicId"] == "new-public-id"
+    assert render.image["src"] == "/public/assets/new-public-id"
+    assert render.image["alt"] == "Review from Dana"
+
+
 def test_collect_sales_pdp_carousel_slots_truncates_to_expected_count():
     puck_data = {
         "content": [
