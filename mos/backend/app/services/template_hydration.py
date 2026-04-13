@@ -393,6 +393,7 @@ def materialize_template_assets(
         name=template.name,
         description=template.description,
         preview_image=template.preview_image,
+        category=template.category,
         puck_data=deepcopy(puck_data),
         asset_base_path=template.asset_base_path,
         asset_prefix=template.asset_prefix,
