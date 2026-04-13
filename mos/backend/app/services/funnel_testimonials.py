@@ -1897,25 +1897,46 @@ def _collect_sales_pdp_targets(
     groups: list[_TestimonialGroup] = []
     review_wall = config.get("reviewWall")
     if isinstance(review_wall, dict):
-        tiles = review_wall.get("tiles")
-        if not isinstance(tiles, list) or not tiles:
-            raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be a non-empty list.")
-        for idx, tile in enumerate(tiles):
-            if not isinstance(tile, dict):
-                raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be objects.")
-            image = tile.get("image")
-            if not isinstance(image, dict):
-                raise TestimonialGenerationError(
-                    f"Sales PDP reviewWall.tiles[{idx}].image must be an object."
+        reviews = review_wall.get("reviews")
+        if isinstance(reviews, list):
+            for idx, review in enumerate(reviews):
+                if not isinstance(review, dict):
+                    raise TestimonialGenerationError("Sales PDP reviewWall.reviews must be objects.")
+                image = review.get("image")
+                if image is None:
+                    continue
+                if not isinstance(image, dict):
+                    raise TestimonialGenerationError(
+                        f"Sales PDP reviewWall.reviews[{idx}].image must be an object when provided."
+                    )
+                label = f"sales_pdp.reviewWall.reviews[{idx}]"
+                render = _TestimonialRenderTarget(
+                    image=image,
+                    label=label,
+                    template=_resolve_testimonial_template(image),
+                    context=context,
                 )
-            label = f"sales_pdp.reviewWall.tiles[{idx}]"
-            render = _TestimonialRenderTarget(
-                image=image,
-                label=label,
-                template=_resolve_testimonial_template(image),
-                context=context,
-            )
-            groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
+                groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
+        else:
+            tiles = review_wall.get("tiles")
+            if not isinstance(tiles, list) or not tiles:
+                raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be a non-empty list.")
+            for idx, tile in enumerate(tiles):
+                if not isinstance(tile, dict):
+                    raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be objects.")
+                image = tile.get("image")
+                if not isinstance(image, dict):
+                    raise TestimonialGenerationError(
+                        f"Sales PDP reviewWall.tiles[{idx}].image must be an object."
+                    )
+                label = f"sales_pdp.reviewWall.tiles[{idx}]"
+                render = _TestimonialRenderTarget(
+                    image=image,
+                    label=label,
+                    template=_resolve_testimonial_template(image),
+                    context=context,
+                )
+                groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
 
     review_slider = config.get("reviewSlider")
     if isinstance(review_slider, dict):
@@ -2207,16 +2228,25 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
         review_wall = config.get("reviewWall") if "reviewWall" in config else config
         if not isinstance(review_wall, dict):
             return
-        tiles = review_wall.get("tiles")
-        if not isinstance(tiles, list):
-            return
         images: list[dict[str, Any]] = []
-        for tile in tiles:
-            if not isinstance(tile, dict):
-                continue
-            image = tile.get("image")
-            if isinstance(image, dict):
-                images.append(image)
+        reviews = review_wall.get("reviews")
+        if isinstance(reviews, list):
+            for review in reviews:
+                if not isinstance(review, dict):
+                    continue
+                image = review.get("image")
+                if isinstance(image, dict):
+                    images.append(image)
+        else:
+            tiles = review_wall.get("tiles")
+            if not isinstance(tiles, list):
+                return
+            for tile in tiles:
+                if not isinstance(tile, dict):
+                    continue
+                image = tile.get("image")
+                if isinstance(image, dict):
+                    images.append(image)
         assign_templates(images)
 
     for obj in walk_json(puck_data):
@@ -2262,7 +2292,9 @@ def _collect_sales_pdp_review_wall_images(groups: list[_TestimonialGroup]) -> li
     images: list[dict[str, Any]] = []
     for group in groups:
         for render in group.renders:
-            if render.label.startswith("sales_pdp.reviewWall.tiles"):
+            if render.label.startswith("sales_pdp.reviewWall.tiles") or render.label.startswith(
+                "sales_pdp.reviewWall.reviews"
+            ):
                 images.append(render.image)
     return images
 
@@ -4756,11 +4788,6 @@ def generate_funnel_page_testimonials(
         template_kind = "pre-sales-listicle"
     else:
         raise TestimonialGenerationError(f"Template {resolved_template_id} is not supported for testimonials.")
-
-    if template_kind == "sales-pdp" and funnel_ai.uses_sales_pdp_import_schema(base_puck):
-        raise TestimonialGenerationError(
-            "Sales PDP import-v1 pages are not supported by testimonials.generate_and_apply."
-        )
 
     _prepare_testimonial_slot_templates(base_puck, template_kind)
 

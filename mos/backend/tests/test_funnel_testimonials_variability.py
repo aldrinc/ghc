@@ -171,6 +171,44 @@ def test_collect_testimonial_targets_includes_hidden_sales_review_wall_for_guara
     assert len(contexts) == 0
 
 
+def test_collect_testimonial_targets_supports_import_v1_sales_review_wall_reviews_shape():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpReviewWall",
+                "props": {
+                    "config": {
+                        "headline": "What women are saying",
+                        "reviews": [
+                            {
+                                "body": "This brought my focus back.",
+                                "author": "Tanya",
+                                "image": {
+                                    "alt": "Swipe-style testimonial card",
+                                },
+                            },
+                            {
+                                "body": "Still good without an image slot.",
+                                "author": "Maria",
+                            },
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+
+    groups, contexts = funnel_testimonials._collect_testimonial_targets(
+        puck_data=puck_data,
+        template_kind="sales-pdp",
+    )
+
+    assert len(groups) == 1
+    assert groups[0].label == "sales_pdp.reviewWall.reviews[0]"
+    assert groups[0].renders[0].label == "sales_pdp.reviewWall.reviews[0]"
+    assert len(contexts) == 0
+
+
 def test_collect_sales_pdp_carousel_slots_truncates_to_expected_count():
     puck_data = {
         "content": [
@@ -1250,6 +1288,36 @@ def test_prepare_testimonial_slot_templates_sales_pdp_keeps_wall_mix_behavior():
     tiles = puck_data["content"][0]["props"]["config"]["tiles"]
     assert tiles[0]["image"]["testimonialTemplate"] == "social_comment"
     assert tiles[1]["image"]["testimonialTemplate"] == "review_card"
+
+
+def test_prepare_testimonial_slot_templates_sales_pdp_assigns_mix_for_import_v1_reviews():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpReviewWall",
+                "props": {
+                    "config": {
+                        "headline": "What women are saying",
+                        "reviews": [
+                            {"body": "A", "image": {"alt": "Review 1"}},
+                            {"body": "B", "image": {"alt": "Review 2"}},
+                            {"body": "C", "image": {"alt": "Review 3"}},
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+
+    funnel_testimonials._prepare_testimonial_slot_templates(
+        puck_data,
+        template_kind="sales-pdp",
+    )
+
+    reviews = puck_data["content"][0]["props"]["config"]["reviews"]
+    assert reviews[0]["image"]["testimonialTemplate"] == "social_comment"
+    assert reviews[1]["image"]["testimonialTemplate"] == "review_card"
+    assert reviews[2]["image"]["testimonialTemplate"] == "social_comment"
 
 
 def test_resolve_pre_sales_swipe_assignment_maps_all_supported_slot_families():
