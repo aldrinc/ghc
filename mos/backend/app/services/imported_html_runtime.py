@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import ProductVariant
 from app.services.campaign_destinations import normalize_destination_type
+from app.services.funnel_template_categories import resolve_funnel_template_public_stage
 from app.services.paid_ads_qa import clean_optional_text
 
 
@@ -30,11 +31,9 @@ def resolve_funnel_page_stage(
     template_id: str | None = None,
     page_name: str | None = None,
 ) -> ImportedHtmlPageStage:
-    normalized_template_id = clean_optional_text(template_id)
-    if normalized_template_id in {"pre-sales-listicle", "pre_sales_listicle"}:
-        return "pre_sales"
-    if normalized_template_id in {"sales-pdp", "sales_pdp"}:
-        return "sales"
+    template_stage = resolve_funnel_template_public_stage(template_id)
+    if template_stage:
+        return template_stage
 
     normalized = normalize_destination_type(slug)
     if normalized == "pre-sales":

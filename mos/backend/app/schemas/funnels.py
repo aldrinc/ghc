@@ -228,6 +228,7 @@ class FunnelTemplateSummary(BaseModel):
     name: str
     description: Optional[str] = None
     previewImage: Optional[str] = None
+    category: Optional[str] = None
 
 
 class FunnelTemplateDetail(FunnelTemplateSummary):

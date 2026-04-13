@@ -34,6 +34,16 @@ export function resolvePublicFunnelStage(slug: string | null | undefined): Publi
   if (!cleanedSlug) {
     return "custom";
   }
+  if (
+    cleanedSlug.startsWith("presales-") ||
+    cleanedSlug.startsWith("pre-sales-") ||
+    cleanedSlug.startsWith("pre_sales_")
+  ) {
+    return "pre_sales";
+  }
+  if (cleanedSlug.startsWith("sales-") || cleanedSlug.startsWith("sales_")) {
+    return "sales";
+  }
   return FUNNEL_STAGE_ALIASES[cleanedSlug] ?? "custom";
 }
 

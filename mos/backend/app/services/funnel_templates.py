@@ -10,6 +10,12 @@ from typing import Any, Optional
 import httpx
 
 from app.services.funnels import create_funnel_upload_asset
+from app.services.funnel_template_categories import (
+    infer_template_category_from_id,
+    normalize_template_category,
+    resolve_funnel_template_artifact_slug as _resolve_template_artifact_slug,
+    resolve_funnel_template_public_stage as _resolve_template_public_stage,
+)
 from app.db.repositories.assets import AssetsRepository
 from sqlalchemy.orm import Session
 
@@ -20,10 +26,10 @@ class FunnelTemplate:
     name: str
     description: Optional[str]
     preview_image: Optional[str]
+    category: Optional[str]
     puck_data: dict[str, Any]
     asset_base_path: Optional[str]
     asset_prefix: Optional[str]
-
 
 def _template_dir() -> Path:
     # backend/app/services -> backend/app
@@ -45,12 +51,14 @@ def _load_template(path: Path) -> FunnelTemplate:
     if isinstance(asset_base_path, str) and asset_base_path and not Path(asset_base_path).is_absolute():
         repo_root = _template_dir().parents[3]
         asset_base_path = str(repo_root / asset_base_path)
+    category = normalize_template_category(data.get("category"))
 
     return FunnelTemplate(
         template_id=template_id,
         name=name,
         description=data.get("description"),
         preview_image=data.get("previewImage"),
+        category=category or infer_template_category_from_id(template_id),
         puck_data=puck_data,
         asset_base_path=asset_base_path if isinstance(asset_base_path, str) else None,
         asset_prefix=data.get("assetPrefix"),
@@ -74,6 +82,24 @@ def list_funnel_templates() -> list[FunnelTemplate]:
 
 def get_funnel_template(template_id: str) -> Optional[FunnelTemplate]:
     return _load_templates().get(template_id)
+
+
+def resolve_funnel_template_category(template_id: str | None) -> str | None:
+    cleaned = str(template_id or "").strip()
+    if not cleaned:
+        return None
+    template = get_funnel_template(cleaned)
+    if template and template.category:
+        return template.category
+    return infer_template_category_from_id(cleaned)
+
+
+def resolve_funnel_template_public_stage(template_id: str | None) -> str | None:
+    return _resolve_template_public_stage(template_id)
+
+
+def resolve_funnel_template_artifact_slug(template_id: str | None) -> str | None:
+    return _resolve_template_artifact_slug(template_id)
 
 
 def _is_data_uri(value: str) -> bool:

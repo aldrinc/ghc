@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-export type SelectOption = { label: string; value: string; disabled?: boolean };
+export type SelectOption = { label: string; value: string; disabled?: boolean; group?: string };
 
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
   options: SelectOption[];
@@ -12,6 +12,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   { className, options, value, onValueChange, onChange, ...props },
   ref
 ) {
+  const groupedOptions = options.reduce<
+    Array<{ group: string | null; options: SelectOption[] }>
+  >((groups, option) => {
+    const group = typeof option.group === "string" && option.group.trim() ? option.group : null;
+    const existing = groups.find((entry) => entry.group === group);
+    if (existing) {
+      existing.options.push(option);
+      return groups;
+    }
+    groups.push({ group, options: [option] });
+    return groups;
+  }, []);
+
   return (
     <select
       ref={ref}
@@ -28,11 +41,24 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       )}
       {...props}
     >
-      {options.map((option) => (
-        <option key={option.value} value={option.value} disabled={option.disabled}>
-          {option.label}
-        </option>
-      ))}
+      {groupedOptions.map((entry) => {
+        if (!entry.group) {
+          return entry.options.map((option) => (
+            <option key={option.value} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          ));
+        }
+        return (
+          <optgroup key={entry.group} label={entry.group}>
+            {entry.options.map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
     </select>
   );
 });

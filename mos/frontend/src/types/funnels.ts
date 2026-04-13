@@ -226,6 +226,7 @@ export type FunnelTemplateSummary = {
   name: string;
   description?: string | null;
   previewImage?: string | null;
+  category?: string | null;
 };
 
 export type FunnelTemplateDetail = FunnelTemplateSummary & {

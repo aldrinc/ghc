@@ -217,6 +217,7 @@ def list_templates() -> list[FunnelTemplateSummary]:
             name=tmpl.name,
             description=tmpl.description,
             previewImage=tmpl.preview_image,
+            category=tmpl.category,
         )
         for tmpl in list_funnel_templates()
     ]
@@ -232,6 +233,7 @@ def get_template(template_id: str) -> FunnelTemplateDetail:
         name=tmpl.name,
         description=tmpl.description,
         previewImage=tmpl.preview_image,
+        category=tmpl.category,
         puckData=tmpl.puck_data,
     )
 

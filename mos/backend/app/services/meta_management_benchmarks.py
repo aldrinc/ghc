@@ -13,6 +13,7 @@ from app.db.enums import CampaignDeliveryModeEnum, FunnelEventTypeEnum
 from app.db.models import Campaign, Funnel, FunnelEvent, FunnelPage, MetaPublishRun, ProductVariant
 from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
+from app.services.funnel_template_categories import resolve_funnel_template_category
 
 _LAST_N_DAYS_PRESET = re.compile(r"^last_(\d+)d$")
 _BENCHMARKS_METADATA_KEY = "metaManagementBenchmarks"
@@ -300,10 +301,13 @@ def _resolve_campaign_funnel_context(
             select(FunnelPage).where(FunnelPage.funnel_id == funnel.id)
         ).all()
     )
-    sales_page = next((page for page in pages if str(page.template_id or "").strip() == "sales-pdp"), None)
+    sales_page = next((page for page in pages if resolve_funnel_template_category(page.template_id) == "sales"), None)
     if sales_page is None:
-        raise MetaManagementBenchmarkError("Benchmark evaluation requires a published sales-pdp page.")
-    presell_page = next((page for page in pages if str(page.template_id or "").strip() == "pre-sales-listicle"), None)
+        raise MetaManagementBenchmarkError("Benchmark evaluation requires a published sales page.")
+    presell_page = next(
+        (page for page in pages if resolve_funnel_template_category(page.template_id) == "presales"),
+        None,
+    )
 
     price_cents, price_resolution_error = _resolve_price_cents(session, funnel)
     return _ResolvedBenchmarkContext(

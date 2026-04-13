@@ -1026,6 +1026,7 @@ def build_client_funnel_runtime_artifact_payload(
     from app.db.repositories.funnels import FunnelPublicRepository
     from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
     from app.services.design_systems import resolve_design_system_tokens
+    from app.services.funnel_template_categories import resolve_funnel_template_artifact_slug
     from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
     from app.services.public_routing import require_product_route_slug
 
@@ -1038,6 +1039,10 @@ def build_client_funnel_runtime_artifact_payload(
     mos_meta_tracking_metadata_key = "mosMetaTracking"
 
     def _artifact_page_slug(*, publication_slug: Any, template_id: str) -> str:
+        artifact_slug = resolve_funnel_template_artifact_slug(template_id)
+        if artifact_slug == "presales":
+            return artifact_slug
+
         normalized_publication_slug = str(publication_slug or "").strip().lower()
         if normalized_publication_slug:
             if normalized_publication_slug == "pre-sales":
