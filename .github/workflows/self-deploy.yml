@@ -77,9 +77,70 @@ jobs:
           retry_delay="${SELF_DEPLOY_RETRY_DELAY_SECONDS}"
 
           response_file=""
+          validator_file="$(mktemp)"
+          cat >"${validator_file}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          response_path = Path(sys.argv[1])
+          payload_text = response_path.read_text(encoding="utf-8").strip()
+          if not payload_text:
+              raise SystemExit("Self Deploy API returned an empty response.")
+
+          try:
+              payload = json.loads(payload_text)
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"Self Deploy API returned non-JSON output: {exc}") from exc
+
+          failure_patterns = (
+              "command failed:",
+              "apply failed with exit code",
+              "operation failed:",
+              "error: killed",
+          )
+
+          def walk(node, path="$"):
+              if isinstance(node, dict):
+                  for key in ("returncode", "exit_code", "exitCode"):
+                      value = node.get(key)
+                      if isinstance(value, int) and value != 0:
+                          raise SystemExit(f"Self Deploy reported non-zero {path}.{key}={value}")
+
+                  for key in ("status", "conclusion"):
+                      value = node.get(key)
+                      if isinstance(value, str) and value.lower() in {"failed", "failure", "error"}:
+                          raise SystemExit(f"Self Deploy reported {path}.{key}={value!r}")
+
+                  for key in ("logs", "stderr", "error", "detail", "message"):
+                      value = node.get(key)
+                      if not isinstance(value, str):
+                          continue
+                      lowered = value.lower()
+                      for pattern in failure_patterns:
+                          if pattern in lowered:
+                              raise SystemExit(
+                                  f"Self Deploy response contains failure signal {pattern!r} at {path}.{key}"
+                              )
+
+                  for key, value in node.items():
+                      walk(value, f"{path}.{key}")
+                  return
+
+              if isinstance(node, list):
+                  for index, item in enumerate(node):
+                      walk(item, f"{path}[{index}]")
+
+          walk(payload)
+          print(json.dumps(payload, indent=2))
+          PY
+
           cleanup() {
             if [ -n "${response_file}" ] && [ -f "${response_file}" ]; then
               rm -f "${response_file}"
+            fi
+            if [ -f "${validator_file}" ]; then
+              rm -f "${validator_file}"
             fi
           }
           trap cleanup EXIT
@@ -121,63 +182,7 @@ jobs:
               continue
             fi
 
-            if python - "${response_file}" <<'PY'
-            import json
-            import sys
-            from pathlib import Path
-
-            response_path = Path(sys.argv[1])
-            payload_text = response_path.read_text(encoding="utf-8").strip()
-            if not payload_text:
-                raise SystemExit("Self Deploy API returned an empty response.")
-
-            try:
-                payload = json.loads(payload_text)
-            except json.JSONDecodeError as exc:
-                raise SystemExit(f"Self Deploy API returned non-JSON output: {exc}") from exc
-
-            failure_patterns = (
-                "command failed:",
-                "apply failed with exit code",
-                "operation failed:",
-                "error: killed",
-            )
-
-            def walk(node, path="$"):
-                if isinstance(node, dict):
-                    for key in ("returncode", "exit_code", "exitCode"):
-                        value = node.get(key)
-                        if isinstance(value, int) and value != 0:
-                            raise SystemExit(f"Self Deploy reported non-zero {path}.{key}={value}")
-
-                    for key in ("status", "conclusion"):
-                        value = node.get(key)
-                        if isinstance(value, str) and value.lower() in {"failed", "failure", "error"}:
-                            raise SystemExit(f"Self Deploy reported {path}.{key}={value!r}")
-
-                    for key in ("logs", "stderr", "error", "detail", "message"):
-                        value = node.get(key)
-                        if not isinstance(value, str):
-                            continue
-                        lowered = value.lower()
-                        for pattern in failure_patterns:
-                            if pattern in lowered:
-                                raise SystemExit(
-                                    f"Self Deploy response contains failure signal {pattern!r} at {path}.{key}"
-                                )
-
-                    for key, value in node.items():
-                        walk(value, f"{path}.{key}")
-                    return
-
-                if isinstance(node, list):
-                    for index, item in enumerate(node):
-                        walk(item, f"{path}[{index}]")
-
-            walk(payload)
-            print(json.dumps(payload, indent=2))
-            PY
-            then
+            if python "${validator_file}" "${response_file}"; then
               rm -f "${response_file}"
               response_file=""
               break
