@@ -11,7 +11,7 @@ import {
   type ImportedHtmlRuntimeTrackMessage,
 } from "@/funnels/importedHtmlRuntime";
 
-const DEFAULT_MIN_HEIGHT = 900;
+const DEFAULT_INITIAL_HEIGHT = 900;
 const MAX_FRAME_HEIGHT = 20000;
 
 type ImportedHtmlRuntimeActions = {
@@ -244,7 +244,7 @@ export function ImportedHtmlDocument({
   instrumentationManifest?: ImportedHtmlInstrumentationManifest | Record<string, unknown> | null;
   runtimeActions?: ImportedHtmlRuntimeActions | null;
 }) {
-  const [height, setHeight] = useState(DEFAULT_MIN_HEIGHT);
+  const [height, setHeight] = useState(DEFAULT_INITIAL_HEIGHT);
   const frameId = id || "imported-html-document";
   const manifest = useMemo(
     () => normalizeImportedHtmlManifest(instrumentationManifest ?? null),
@@ -262,6 +262,10 @@ export function ImportedHtmlDocument({
   }, [frameId, htmlDocument, manifest, runtimeActions?.manifest]);
 
   useEffect(() => {
+    setHeight(DEFAULT_INITIAL_HEIGHT);
+  }, [frameId, srcDoc]);
+
+  useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const payload = event.data;
       if (!isImportedHtmlRuntimeMessage(payload)) return;
@@ -269,7 +273,7 @@ export function ImportedHtmlDocument({
       if (payload.type === IMPORTED_HTML_HEIGHT_MESSAGE) {
         const nextHeight = Number(payload.height);
         if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
-        setHeight(Math.max(DEFAULT_MIN_HEIGHT, Math.min(MAX_FRAME_HEIGHT, Math.ceil(nextHeight))));
+        setHeight(Math.min(MAX_FRAME_HEIGHT, Math.ceil(nextHeight)));
         return;
       }
       if (payload.type === "navigate" && runtimeActions) {
