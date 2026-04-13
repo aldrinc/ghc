@@ -350,6 +350,61 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return selection;
   };
 
+  const findSmallestElementContainingText = (text) => {
+    const target = cleanText(text);
+    if (!target || !document.body) return null;
+
+    let match = null;
+    let matchLength = Number.POSITIVE_INFINITY;
+    const elements = Array.from(document.body.querySelectorAll("*"));
+    for (const element of elements) {
+      const content = normalizeText(element.textContent || "");
+      if (!content || !content.includes(target)) continue;
+      if (content.length < matchLength) {
+        match = element;
+        matchLength = content.length;
+      }
+    }
+    return match;
+  };
+
+  const applyMobileSpacingFixes = () => {
+    if (window.innerWidth >= 768 || !document.body) return;
+
+    const loadMoreComments = findSmallestElementContainingText("Load more comments...");
+    const healthDisclaimer = findSmallestElementContainingText("HEALTH DISCLAIMER:");
+    if (loadMoreComments && healthDisclaimer) {
+      healthDisclaimer.style.marginTop = "1rem";
+      healthDisclaimer.style.paddingBottom = "1rem";
+      healthDisclaimer.style.color = "rgba(45, 41, 38, 0.4)";
+      healthDisclaimer.style.opacity = "1";
+
+      const copyright = findSmallestElementContainingText("All Rights Reserved.");
+      if (copyright) {
+        copyright.style.marginBottom = "1.25rem";
+        copyright.style.color = "rgba(45, 41, 38, 0.35)";
+        copyright.style.opacity = "1";
+      }
+    }
+
+    const footer = document.querySelector("footer");
+    const newsletterHeading = findSmallestElementContainingText("Join 14,000+ Women");
+    const footerFinePrint = findSmallestElementContainingText("These statements have not been evaluated");
+    if (footer && newsletterHeading && footerFinePrint) {
+      footer.style.paddingTop = "2.5rem";
+      footer.style.paddingBottom = "2rem";
+
+      const newsletterBlock = newsletterHeading.parentElement;
+      if (newsletterBlock) {
+        newsletterBlock.style.marginBottom = "2.5rem";
+      }
+
+      footerFinePrint.style.marginTop = "1.5rem";
+      footerFinePrint.style.color = "#6b7280";
+      footerFinePrint.style.opacity = "1";
+    }
+  };
+
   const bindManifest = () => {
     if (!config.manifest || !Array.isArray(config.manifest.bindings)) return;
 
@@ -508,14 +563,29 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
+  const applyMobileSpacingFixesSafely = () => {
+    try {
+      applyMobileSpacingFixes();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to apply mobile spacing fixes.", error);
+    }
+  };
+
   bindManifestSafely();
+  applyMobileSpacingFixesSafely();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
+    document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
+  window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);
+  window.setTimeout(applyMobileSpacingFixesSafely, 0);
+  window.setTimeout(applyMobileSpacingFixesSafely, 250);
+  window.setTimeout(applyMobileSpacingFixesSafely, 1000);
+  window.addEventListener("resize", applyMobileSpacingFixesSafely);
 })();
 </script>`;
 }
