@@ -69,4 +69,20 @@ describe("ImportedHtmlDocument", () => {
 
     expect(iframe).toHaveStyle({ height: "900px" });
   });
+
+  it("injects the mobile trailing-space compaction runtime", () => {
+    render(
+      <ImportedHtmlDocument
+        title="Imported Ember Page"
+        htmlDocument="<html><body><main>hello</main></body></html>"
+      />,
+    );
+
+    const iframe = screen.getByTitle("Imported Ember Page");
+    const srcDoc = iframe.getAttribute("srcdoc") || "";
+
+    expect(srcDoc).toContain("compactMobileTrailingSpacing");
+    expect(srcDoc).toContain("restoreCompactedSpacing");
+    expect(srcDoc).toContain("window.innerWidth > MOBILE_MAX_WIDTH");
+  });
 });

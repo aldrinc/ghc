@@ -48,6 +48,118 @@ function injectImportedHtmlRuntimeScript(
       .replace(/\\s+/g, " ")
       .trim();
 
+  const MOBILE_MAX_WIDTH = 768;
+  const TARGET_TRAILING_GAP = 24;
+  const MAX_GAP_ADJUSTMENT = 96;
+  const SPACING_PROPERTIES = ["marginTop", "marginBottom", "paddingTop", "paddingBottom"];
+
+  const toPixels = (value) => {
+    const parsed = Number.parseFloat(String(value || "0"));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const dataKeyForProperty = (property) => "mosImportedHtmlOriginal" + property[0].toUpperCase() + property.slice(1);
+
+  const isVisibleElement = (node) => {
+    if (!(node instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
+  const topFor = (node) => node.getBoundingClientRect().top + window.scrollY;
+  const bottomFor = (node) => node.getBoundingClientRect().bottom + window.scrollY;
+
+  const restoreCompactedSpacing = () => {
+    const touchedNodes = document.querySelectorAll("[data-mos-imported-html-spacing='true']");
+    for (const node of touchedNodes) {
+      if (!(node instanceof HTMLElement)) continue;
+      let restoredAny = false;
+      for (const property of SPACING_PROPERTIES) {
+        const dataKey = dataKeyForProperty(property);
+        const originalValue = node.dataset[dataKey];
+        if (typeof originalValue !== "string") continue;
+        node.style[property] = originalValue;
+        delete node.dataset[dataKey];
+        restoredAny = true;
+      }
+      if (restoredAny) {
+        delete node.dataset.mosImportedHtmlSpacing;
+      }
+    }
+  };
+
+  const reduceSpacingProperty = (node, property, reduction) => {
+    if (!(node instanceof HTMLElement)) return false;
+    const current = toPixels(window.getComputedStyle(node)[property]);
+    if (current <= 0) return false;
+    const applied = Math.min(current, reduction, MAX_GAP_ADJUSTMENT);
+    if (applied <= 0) return false;
+    const dataKey = dataKeyForProperty(property);
+    if (typeof node.dataset[dataKey] !== "string") {
+      node.dataset[dataKey] = node.style[property] || "";
+    }
+    node.dataset.mosImportedHtmlSpacing = "true";
+    node.style[property] = String(Math.max(0, current - applied)) + "px";
+    return true;
+  };
+
+  const tightenGapBetween = (previousNode, nextNode, gap) => {
+    const reduction = Math.min(MAX_GAP_ADJUSTMENT, gap - TARGET_TRAILING_GAP);
+    if (reduction <= 0) return;
+    if (reduceSpacingProperty(previousNode, "marginBottom", reduction)) return;
+    if (reduceSpacingProperty(nextNode, "marginTop", reduction)) return;
+    if (reduceSpacingProperty(previousNode, "paddingBottom", reduction)) return;
+    reduceSpacingProperty(nextNode, "paddingTop", reduction);
+  };
+
+  const compactMobileTrailingSpacing = () => {
+    if (!document.body) return;
+    restoreCompactedSpacing();
+    if (window.innerWidth > MOBILE_MAX_WIDTH) return;
+
+    const topLevelChildren = Array.from(document.body.children).filter(isVisibleElement);
+    const topLevelFlowChildren = topLevelChildren.filter(
+      (node) => window.getComputedStyle(node).position !== "fixed",
+    );
+    const lastFlowNode = topLevelFlowChildren[topLevelFlowChildren.length - 1];
+    if (!(lastFlowNode instanceof HTMLElement)) return;
+
+    const previousFlowNode = topLevelFlowChildren[topLevelFlowChildren.length - 2] || null;
+    if (previousFlowNode instanceof HTMLElement) {
+      const gapBeforeSection = topFor(lastFlowNode) - bottomFor(previousFlowNode);
+      if (gapBeforeSection > TARGET_TRAILING_GAP) {
+        tightenGapBetween(previousFlowNode, lastFlowNode, gapBeforeSection);
+      }
+    }
+
+    const descendants = Array.from(lastFlowNode.querySelectorAll("*")).filter(
+      (node) => isVisibleElement(node) && window.getComputedStyle(node).position !== "fixed",
+    );
+    descendants.sort((left, right) => topFor(left) - topFor(right));
+    if (descendants.length < 1) return;
+
+    const firstDescendant = descendants[0];
+    const gapInsideTop = topFor(firstDescendant) - topFor(lastFlowNode);
+    if (gapInsideTop > TARGET_TRAILING_GAP) {
+      const reduction = Math.min(MAX_GAP_ADJUSTMENT, gapInsideTop - TARGET_TRAILING_GAP);
+      if (!reduceSpacingProperty(lastFlowNode, "paddingTop", reduction)) {
+        reduceSpacingProperty(firstDescendant, "marginTop", reduction);
+      }
+    }
+
+    const tailDescendants = descendants.slice(-8);
+    for (let index = 1; index < tailDescendants.length; index += 1) {
+      const previousNode = tailDescendants[index - 1];
+      const nextNode = tailDescendants[index];
+      const gap = topFor(nextNode) - bottomFor(previousNode);
+      if (gap > TARGET_TRAILING_GAP) {
+        tightenGapBetween(previousNode, nextNode, gap);
+      }
+    }
+  };
+
   const measure = () => {
     const body = document.body;
     const doc = document.documentElement;
@@ -191,17 +303,24 @@ function injectImportedHtmlRuntimeScript(
 
   window.addEventListener("load", () => {
     bindManifest();
+    compactMobileTrailingSpacing();
     measure();
     setTimeout(measure, 50);
     setTimeout(measure, 250);
     setTimeout(measure, 1000);
     if (typeof ResizeObserver === "function") {
-      const observer = new ResizeObserver(measure);
+      const observer = new ResizeObserver(() => {
+        compactMobileTrailingSpacing();
+        measure();
+      });
       if (document.documentElement) observer.observe(document.documentElement);
       if (document.body) observer.observe(document.body);
     }
     if (typeof MutationObserver === "function" && document.body) {
-      const observer = new MutationObserver(measure);
+      const observer = new MutationObserver(() => {
+        compactMobileTrailingSpacing();
+        measure();
+      });
       observer.observe(document.body, {
         attributes: true,
         childList: true,
@@ -211,7 +330,10 @@ function injectImportedHtmlRuntimeScript(
     }
   });
 
-  window.addEventListener("resize", measure);
+  window.addEventListener("resize", () => {
+    compactMobileTrailingSpacing();
+    measure();
+  });
   window.addEventListener("error", (event) => {
     reportError(event.error && event.error.message ? event.error.message : event.message || "Imported HTML runtime error.");
   });
