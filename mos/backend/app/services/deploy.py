@@ -2093,23 +2093,18 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
                 raise DeployError(
                     f"Workload '{workload.get('name')}' source_ref must be an object for source_type='funnel_artifact'."
                 )
-            artifact = source_ref.get("artifact")
-            if (
-                isinstance(artifact, dict)
-                and isinstance(artifact.get("products"), dict)
-                and bool(artifact.get("products"))
-            ):
-                continue
             artifact_id = str(source_ref.get("artifact_id") or "").strip()
             if not artifact_id:
-                # Some existing plans may carry placeholder inline artifacts with empty products and
-                # no DB artifact reference yet. Leave those unchanged here.
+                # Some existing plans may carry placeholder inline artifacts with no DB artifact
+                # reference yet. Leave those unchanged here.
                 continue
-            source_ref["artifact"] = _load_funnel_runtime_artifact_payload_for_apply(
+            artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
                 artifact_id=artifact_id
             )
-            workload["source_ref"] = source_ref
-            has_changes = True
+            if source_ref.get("artifact") != artifact_payload:
+                source_ref["artifact"] = artifact_payload
+                workload["source_ref"] = source_ref
+                has_changes = True
 
     if not has_changes:
         return plan_file

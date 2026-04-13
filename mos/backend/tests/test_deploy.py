@@ -1504,6 +1504,80 @@ def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_pa
     assert "sample-product" in source_ref["artifact"]["products"]
 
 
+def test_materialize_funnel_artifacts_for_apply_replaces_stale_inline_artifact_when_artifact_id_present(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+
+    def _fake_load(*, artifact_id: str):
+        assert artifact_id == "artifact-123"
+        return {
+            "meta": {"artifactId": artifact_id, "publicationId": "pub-new"},
+            "products": {
+                "sample-product": {
+                    "meta": {"productSlug": "sample-product"},
+                    "funnels": {
+                        "new-funnel": {
+                            "meta": {"publicationId": "pub-new"},
+                        }
+                    },
+                }
+            },
+        }
+
+    monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+                                        "artifact_id": "artifact-123",
+                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "runtime_dist_path": "mos/frontend/dist",
+                                        "artifact": {
+                                            "meta": {"artifactId": "artifact-old", "publicationId": "pub-old"},
+                                            "products": {
+                                                "sample-product": {
+                                                    "meta": {"productSlug": "sample-product"},
+                                                    "funnels": {
+                                                        "old-funnel": {
+                                                            "meta": {"publicationId": "pub-old"},
+                                                        }
+                                                    },
+                                                }
+                                            },
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
+    assert source_ref["artifact"]["meta"]["artifactId"] == "artifact-123"
+    assert source_ref["artifact"]["meta"]["publicationId"] == "pub-new"
+    assert "new-funnel" in source_ref["artifact"]["products"]["sample-product"]["funnels"]
+    assert "old-funnel" not in source_ref["artifact"]["products"]["sample-product"]["funnels"]
+
+
 def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_publication_source_ref(
     tmp_path, monkeypatch
 ):
