@@ -13,7 +13,6 @@ import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckCon
 import { normalizePuckData } from "@/funnels/puckData";
 import {
   buildPublicFunnelPath,
-  buildStandalonePublicPagePath,
   getStandaloneDefaultFunnelSlug,
   getStandalonePreloadedFunnelData,
   isStandaloneBundleMode,
@@ -342,17 +341,19 @@ export function PublicFunnelPage() {
     [bundleMode, page],
   );
   const standalonePagePathById = useMemo(() => {
-    if (!bundleMode || !page || !productSlug) return {};
+    if (!bundleMode || !page || !productSlug || !funnelSlug) return {};
     return Object.fromEntries(
       Object.entries(page.pageMap).map(([pageId, slug]) => [
         pageId,
-        buildStandalonePublicPagePath({
+        buildPublicFunnelPath({
           productSlug,
+          funnelSlug,
           slug,
+          bundleMode,
         }),
       ]),
     );
-  }, [bundleMode, page, productSlug]);
+  }, [bundleMode, funnelSlug, page, productSlug]);
 
   useEffect(() => {
     ensureNoIndex();
@@ -414,18 +415,14 @@ export function PublicFunnelPage() {
       })
       .then((data) => {
         if (data.redirectToSlug) {
+          const redirectPath = buildPublicFunnelPath({
+            productSlug,
+            funnelSlug,
+            slug: data.redirectToSlug,
+            bundleMode,
+          });
           navigate(
-            bundleMode
-              ? buildStandalonePublicPagePath({
-                  productSlug,
-                  slug: data.redirectToSlug,
-                })
-              : buildPublicFunnelPath({
-                  productSlug,
-                  funnelSlug,
-                  slug: data.redirectToSlug,
-                  bundleMode,
-                }),
+            `${redirectPath}${window.location.search}${window.location.hash}`,
             { replace: true },
           );
           return;
