@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   buildPublicFunnelPath,
-  getStandaloneDefaultRoute,
+  getStandaloneDefaultPageRoute,
   isStandaloneBundleMode,
 } from "@/funnels/runtimeRouting";
 
@@ -30,9 +30,9 @@ export function PublicFunnelRootRedirectPage() {
   }, []);
 
   useEffect(() => {
-    const defaultRoute = getStandaloneDefaultRoute();
+    const defaultRoute = getStandaloneDefaultPageRoute();
     if (!defaultRoute) {
-      setError("This deployment has no published funnel routes configured.");
+      setError("This deployment has no published standalone entry page configured.");
       return;
     }
 
@@ -40,6 +40,7 @@ export function PublicFunnelRootRedirectPage() {
       buildPublicFunnelPath({
         productSlug: defaultRoute.productSlug,
         funnelSlug: defaultRoute.funnelSlug,
+        slug: defaultRoute.slug,
         bundleMode,
       }),
       { replace: true },
@@ -52,4 +53,3 @@ export function PublicFunnelRootRedirectPage() {
     </div>
   );
 }
-

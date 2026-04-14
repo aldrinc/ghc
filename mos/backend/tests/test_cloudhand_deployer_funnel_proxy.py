@@ -413,32 +413,36 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     funnel_payload["meta"]["funnelId"] = uuid_funnel_id
     funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
 
-    deployer, _uploaded, commands = _stub_deployer()
+    deployer, uploaded, commands = _stub_deployer()
 
     deployer._configure_funnel_artifact_site(app)
 
-    runtime_inject_cmd = next(
+    runtime_script_path = next(
         (
-            cmd
+            cmd.split(" ", 1)[1]
             for cmd in commands
-            if cmd.startswith("python3 -c") and "__MOS_DEPLOY_RUNTIME__" in cmd
+            if cmd.startswith("python3 /tmp/cloudhand-runtime-config-")
         ),
         "",
     )
-    assert runtime_inject_cmd
-    assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
-    assert '"defaultFunnelSlug":"f85405a4"' in runtime_inject_cmd
-    assert "raw = raw.replace" in runtime_inject_cmd
-    assert '<script type="module"' in runtime_inject_cmd
-    assert '"entryImagePreloadMap"' in runtime_inject_cmd
+    assert runtime_script_path
+    runtime_script = uploaded[runtime_script_path]
+    assert isinstance(runtime_script, str)
+    assert '"defaultProductSlug":"example-product"' in runtime_script
+    assert '"defaultFunnelSlug":"f85405a4"' in runtime_script
+    assert '"defaultEntrySlug":"presales"' in runtime_script
+    assert "raw = raw.replace" in runtime_script
+    assert '<script type="module"' in runtime_script
+    assert '"entryImagePreloadMap"' in runtime_script
     assert (
         '"example-product/example-funnel/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_cmd
+        in runtime_script
     )
     assert (
         '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
-        in runtime_inject_cmd
+        in runtime_script
     )
+    assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"f85405a4"' in runtime_script
 
 
 def test_funnel_artifact_site_errors_when_preload_asset_public_id_is_invalid_uuid():

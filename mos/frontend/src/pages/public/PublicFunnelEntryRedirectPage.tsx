@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
-import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import {
+  buildPublicFunnelPath,
+  isStandaloneBundleMode,
+  resolvePublicApiBaseUrl,
+} from "@/funnels/runtimeRouting";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 
