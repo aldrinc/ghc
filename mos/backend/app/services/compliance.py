@@ -53,7 +53,12 @@ _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY = {
 _THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY = {
     "contact_support": (
         "# Contact and Support\n\n"
-        "This page is theme-managed and should use the storefront contact-form template.\n"
+        "## Contact Channels\n"
+        "- Email: {{support_email}}\n\n"
+        "## Support Hours\n"
+        "{{support_hours_text}}\n\n"
+        "## Business Address\n"
+        "{{company_address_text}}\n"
     )
 }
 
@@ -811,7 +816,6 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "placeholders": [
             "support_email",
-            "support_phone",
             "support_hours_text",
             "company_address_text",
         ],
@@ -819,7 +823,7 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "# Contact and Support\n\n"
             "## Contact Channels\n"
             "- Email: {{support_email}}\n"
-            "- Phone: {{support_phone}}\n\n"
+            "Phone support, if offered, can be listed on the storefront contact template.\n\n"
             "## Support Hours\n"
             "{{support_hours_text}}\n\n"
             "## Business Address\n"
@@ -846,7 +850,6 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "operating_entity_name",
             "business_license_identifier",
             "support_email",
-            "support_phone",
         ],
         "templateMarkdown": (
             "# Company Information\n\n"
@@ -862,7 +865,7 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "{{business_license_identifier}}\n\n"
             "## Support Contact\n"
             "Email: {{support_email}}  \n"
-            "Phone: {{support_phone}}\n"
+            "{{support_phone_line}}\n"
         ),
     },
     "subscription_terms_and_cancellation": {
@@ -1134,6 +1137,18 @@ def render_policy_template_markdown(
 ) -> str:
     template = get_policy_template(page_key=page_key)
     template_markdown = template["templateMarkdown"]
+    raw_support_phone = placeholder_values.get("support_phone")
+    support_phone = (
+        raw_support_phone.strip()
+        if isinstance(raw_support_phone, str) and raw_support_phone.strip()
+        else None
+    )
+    if page_key == "company_information":
+        support_phone_line = f"Phone: {support_phone}" if support_phone else ""
+        template_markdown = template_markdown.replace(
+            "{{support_phone_line}}",
+            support_phone_line,
+        )
     expected_placeholders = template["placeholders"]
 
     missing_placeholders: list[str] = []
@@ -1175,16 +1190,15 @@ def resolve_theme_contact_page_values(
     *,
     placeholder_values: dict[str, str],
 ) -> dict[str, str]:
-    mapping = {
+    required_mapping = {
         "supportEmail": "support_email",
-        "supportPhone": "support_phone",
         "supportHours": "support_hours_text",
         "businessAddress": "company_address_text",
     }
     missing_placeholders: list[str] = []
     resolved_values: dict[str, str] = {}
 
-    for response_key, placeholder_key in mapping.items():
+    for response_key, placeholder_key in required_mapping.items():
         raw_value = placeholder_values.get(placeholder_key)
         if raw_value is None or not raw_value.strip():
             raw_value = _DEFAULT_POLICY_PLACEHOLDER_VALUES.get(placeholder_key)
@@ -1192,6 +1206,10 @@ def resolve_theme_contact_page_values(
             missing_placeholders.append(placeholder_key)
             continue
         resolved_values[response_key] = raw_value.strip()
+
+    raw_support_phone = placeholder_values.get("support_phone")
+    if isinstance(raw_support_phone, str) and raw_support_phone.strip():
+        resolved_values["supportPhone"] = raw_support_phone.strip()
 
     if missing_placeholders:
         missing = ", ".join(sorted(missing_placeholders))
@@ -1211,15 +1229,19 @@ def render_theme_contact_page_body_html(
         placeholder_values=placeholder_values
     )
     escaped_email = escape(contact_values["supportEmail"])
-    escaped_phone = escape(contact_values["supportPhone"])
     escaped_hours = escape(contact_values["supportHours"]).replace("\n", "<br/>")
     escaped_address = escape(contact_values["businessAddress"]).replace("\n", "<br/>")
+    support_phone = contact_values.get("supportPhone")
+    phone_html = ""
+    if support_phone:
+        phone_html = f"<p><strong>Phone:</strong> {escape(support_phone)}</p>\n"
 
     return (
         "<h1>Contact and Support</h1>\n"
         "<p>Use the contact form on this page to reach our support team.</p>\n"
         f"<p><strong>Email:</strong> <a href=\"mailto:{escaped_email}\">{escaped_email}</a></p>\n"
-        f"<p><strong>Phone:</strong> {escaped_phone}<br/>{escaped_hours}</p>\n"
+        f"{phone_html}"
+        f"<p><strong>Support hours:</strong> {escaped_hours}</p>\n"
         f"<p><strong>Business address:</strong><br/>{escaped_address}</p>"
     )
 

@@ -4896,11 +4896,6 @@ def generate_funnel_page_testimonials(
     else:
         raise TestimonialGenerationError(f"Template {resolved_template_id} is not supported for testimonials.")
 
-    if template_kind == "sales-pdp" and funnel_ai.uses_sales_pdp_import_schema(base_puck):
-        raise TestimonialGenerationError(
-            "Sales PDP import-v1 pages are not supported by testimonials.generate_and_apply."
-        )
-
     _prepare_testimonial_slot_templates(base_puck, template_kind)
 
     groups, contexts = _collect_testimonial_targets(base_puck, template_kind)

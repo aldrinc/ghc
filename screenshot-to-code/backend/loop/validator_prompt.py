@@ -159,11 +159,16 @@ Validation goals:
 - Judge visual fidelity against the reference.
 - Judge behavior fidelity using the requirements spec.
 - Score visual fidelity, behavior fidelity, animation fidelity, and editability separately.
-- Judge whether `hard_constraints` and `section_requirements` are being satisfied.
+- Judge whether `hard_constraints`, `critical_layout_invariants`, `section_requirements`, and each section's `layout_invariants` are being satisfied.
+- Judge whether `wrapper_requirements` are satisfied. When a required shared wrapper, shell, or grouped surface is missing, count that as a real structure failure even if the child sections exist.
+- Use each section's `layout`, `must_include`, and `styling` as part of the blueprint contract, not as optional prose. If those fields describe distinctive chrome composition, framing, grouped CTA/copy clusters, shells, or menu structures and the candidate simplifies them away, count that as a real fidelity miss.
 - Return a `section_results` entry for every item in `section_requirements`, preserving the same top-to-bottom order. Use exactly one status per section: `present`, `partial`, or `missing`.
 - Treat section coverage as a gating requirement: if any required section is `missing` or `partial`, keep the verdict at REVISE and make the first patch instructions restore coverage before polishing already-good sections.
 - Use each `section_results.quality_score` to judge the quality of that specific section only after deciding whether the section is fully present.
 - When the current HTML contains exact `data-section-id="<section_id>"` markers that match `section_requirements.section_id`, treat those markers as authoritative evidence that the section root exists in the implementation. Do not mark that section as `missing`.
+- When the current HTML contains exact `data-wrapper-id="<wrapper_id>"` markers that match `wrapper_requirements.wrapper_id`, treat those markers as authoritative evidence that the shared wrapper root exists. If a required wrapper marker is absent, do not treat the related structure as fully implemented.
+- If the candidate includes the right section roots but breaks the blueprint's shared wrappers, background shells, split panels, or other explicit `critical_layout_invariants` / `layout_invariants`, report that as a `structure` issue rather than silently treating the page as structurally correct.
+- If the candidate preserves the section roots but simplifies section-defining chrome or framing called out in `layout`, `must_include`, or `styling` into a generic bar/card/block, report that as a `structure` or `layout` issue rather than giving credit for superficial section presence.
 - If the reference clearly contains a major section or later-page scene that is not represented in `section_requirements`, report that as a `structure` issue and say the supervisor blueprint is incomplete rather than silently accepting the smaller checklist.
 - Judge whether the current code remains easy to modify for theme, styling, imagery, and copy.
 - When `prior_validation` is present, first verify whether the previously reported issues and patch instructions are now resolved, partially resolved, or still broken.
@@ -176,6 +181,7 @@ Validation goals:
 - The `current_html` block may be truncated. Prefer concrete targets drawn from `current_html_landmarks` whenever possible. If the HTML lacks a clean selector, anchor the fix to the nearest stable nearby text snippet from the current HTML.
 - Avoid abstract guidance like “improve spacing” or “fix the layout”. Instead say exactly which element, which classes/styles/content need to change, and what they should become.
 - Compare against the actual current HTML and avoid vague “rebuild” guidance unless a localized fix is truly impossible.
+- When prescribing decorative glow, blur, orb, or overlay fixes, keep the effect visibly inside the section shell. Do not suggest negative z-index placement or hidden-behind-parent layering unless the settled render already proves that the effect remains visible. Prefer a visible absolute layer plus a higher-z content wrapper.
 - Do not ignore new regressions just because they were not present in `prior_validation`.
 - Be conservative with scores. If there are still obvious visual mismatches, missing sections, wrong styling, wrong imagery, wrong copy, missing interactions, or noticeably incorrect motion, do not score the run in the high 0.90s.
 - Do not return PASS when any required section is `missing` or `partial`, even if the sections that do exist look strong.
@@ -185,6 +191,9 @@ Validation goals:
 - When live browser inspection context is present, use the extracted design system and browser renders as high-confidence evidence for typography, colors, spacing, component styling, and page-level layout containers.
 - When a required design-system preflight is present, treat it as mandatory review criteria for typography, colors, spacing, layout, visible components, and motion intent.
 - When live browser inspection context is present, do not return PASS if the candidate substitutes different font-family names, omits centralized theme tokens, or fails to apply the extracted design system in code.
+- When custom or non-system fonts are required by the live design system, do not return PASS if the candidate merely names those fonts but does not include a working font-loading mechanism such as `@font-face`, imported font CSS, or explicit font asset URLs.
+- When live browser inspection exposes concrete image URLs, SVG references, or CSS background-image assets for visible sections, treat placeholder media or unrelated substitute imagery as a real imagery fidelity miss. Do not return PASS if those extracted site assets were required by the blueprint and the candidate omits them.
+- Treat measured typography mismatches as real visual issues whenever typography drives fidelity. Wrong size, line-height, weight, letter-spacing, max-width, or surrounding spacing on section-defining text like hero H1s, header/nav text, buttons, promo bars, and footer/newsletter headings should keep the verdict at REVISE until they are very close.
 - For video input, be strict about animation fidelity. Missing or materially different motion, timing, easing, sequencing, sticky behavior, scroll choreography, hover transitions, or reveal order must keep the verdict at REVISE.
 - For video input, use the provided timeline checkpoint renders to judge coverage across the full reference sequence. If the candidate only matches the opening portion of the video but misses later states, scenes, transitions, or scroll-driven moments, keep the verdict at REVISE.
 - Do not treat a strong first impression as sufficient if the reference video contains additional content or states beyond what the candidate timeline renders successfully represent.

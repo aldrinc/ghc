@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import re
@@ -9,6 +10,8 @@ from pydantic import BaseModel, ValidationError
 
 
 DEFAULT_VIDEO_FPS = 10
+DEFAULT_GEMINI_STRUCTURED_TIMEOUT_SECONDS = 120
+DEFAULT_GEMINI_STRUCTURED_MAX_ATTEMPTS = 3
 
 StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
 GeminiPart = types.Part | dict[str, str]
@@ -220,6 +223,60 @@ def _is_malformed_json_error(exc: Exception) -> bool:
     return isinstance(exc, ValueError)
 
 
+def _is_retryable_gemini_error(exc: Exception) -> bool:
+    if isinstance(exc, TimeoutError | asyncio.TimeoutError):
+        return True
+
+    haystack = str(exc).lower()
+    retryable_markers = (
+        "429",
+        "500",
+        "502",
+        "503",
+        "504",
+        "unavailable",
+        "resource_exhausted",
+        "deadline_exceeded",
+        "connection reset",
+        "connection aborted",
+        "temporarily unavailable",
+    )
+    return any(marker in haystack for marker in retryable_markers)
+
+
+async def _generate_content_with_timeout_and_retries(
+    *,
+    client: genai.Client,
+    model_name: str,
+    contents: Sequence[types.Content],
+    config: types.GenerateContentConfig,
+    timeout_seconds: int = DEFAULT_GEMINI_STRUCTURED_TIMEOUT_SECONDS,
+    max_attempts: int = DEFAULT_GEMINI_STRUCTURED_MAX_ATTEMPTS,
+) -> Any:
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:
+            last_error = exc
+            if not _is_retryable_gemini_error(exc) or attempt >= max_attempts:
+                break
+            await asyncio.sleep(min(2**attempt, 8))
+
+    assert last_error is not None
+    raise RuntimeError(
+        "Gemini structured generation failed after "
+        f"{max_attempts} attempts: {last_error}"
+    ) from last_error
+
+
 async def generate_structured_output(
     *,
     api_key: str,
@@ -232,8 +289,9 @@ async def generate_structured_output(
     max_output_tokens: int = 8192,
 ) -> StructuredModel:
     client = genai.Client(api_key=api_key)
-    response = await client.aio.models.generate_content(
-        model=model_name,
+    response = await _generate_content_with_timeout_and_retries(
+        client=client,
+        model_name=model_name,
         contents=[
             types.Content(
                 role="user",
@@ -261,8 +319,9 @@ async def generate_structured_output(
         if not isinstance(invalid_response_text, str) or not invalid_response_text.strip():
             raise
 
-        repair_response = await client.aio.models.generate_content(
-            model=model_name,
+        repair_response = await _generate_content_with_timeout_and_retries(
+            client=client,
+            model_name=model_name,
             contents=[
                 types.Content(
                     role="user",
@@ -292,8 +351,9 @@ async def generate_structured_output(
             if not _is_malformed_json_error(repair_exc):
                 raise
 
-            retry_response = await client.aio.models.generate_content(
-                model=model_name,
+            retry_response = await _generate_content_with_timeout_and_retries(
+                client=client,
+                model_name=model_name,
                 contents=[
                     types.Content(
                         role="user",

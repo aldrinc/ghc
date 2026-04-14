@@ -9,6 +9,7 @@ from loop.contracts import (
     SectionValidationResult,
     ValidationIssue,
     ValidationReport,
+    WrapperRequirement,
 )
 from loop.gemini import (
     GeminiPart,
@@ -212,8 +213,12 @@ def _candidate_media_parts(
         iteration=iteration,
         prior_validation=prior_validation,
     )
+    allow_full_page = include_pagewide and iteration <= 1
     if reference_bundle.input_mode == "image":
-        if render_artifact.full_page_screenshot_data_url and (include_pagewide or not is_delta):
+        if (
+            render_artifact.full_page_screenshot_data_url
+            and allow_full_page
+        ):
             parts.append(
                 (
                     "Rendered candidate full-page screenshot:",
@@ -230,7 +235,7 @@ def _candidate_media_parts(
         if (
             include_settled
             and render_artifact.settled_full_page_screenshot_data_url
-            and (include_pagewide or not is_delta)
+            and allow_full_page
         ):
             parts.append(
                 (
@@ -248,9 +253,8 @@ def _candidate_media_parts(
             )
         )
     if (
-        not render_artifact.timeline_frames
-        and render_artifact.full_page_screenshot_data_url
-        and (include_pagewide or not is_delta)
+        render_artifact.full_page_screenshot_data_url
+        and allow_full_page
     ):
         parts.append(
             (
@@ -260,9 +264,8 @@ def _candidate_media_parts(
         )
     if (
         include_settled
-        and not render_artifact.timeline_frames
         and render_artifact.settled_full_page_screenshot_data_url
-        and (include_pagewide or not is_delta)
+        and allow_full_page
     ):
         parts.append(
             (
@@ -336,9 +339,245 @@ def _extract_live_font_names(reference_bundle: ReferenceBundle) -> list[str]:
     return font_names
 
 
+_GENERIC_OR_BUILTIN_FONT_NAMES = {
+    "arial",
+    "courier",
+    "courier new",
+    "emoji",
+    "fantasy",
+    "garamond",
+    "geneva",
+    "georgia",
+    "helvetica",
+    "helvetica neue",
+    "math",
+    "menlo",
+    "monaco",
+    "monospace",
+    "palatino",
+    "sans-serif",
+    "serif",
+    "system-ui",
+    "tahoma",
+    "times",
+    "times new roman",
+    "trebuchet ms",
+    "ui-monospace",
+    "ui-rounded",
+    "ui-sans-serif",
+    "ui-serif",
+    "verdana",
+}
+
+
+def _requires_explicit_font_loading(font_name: str) -> bool:
+    normalized = font_name.strip().strip('"').strip("'").lower()
+    return bool(normalized) and normalized not in _GENERIC_OR_BUILTIN_FONT_NAMES
+
+
+def _has_font_face_declaration(current_html: str, font_name: str) -> bool:
+    pattern = re.compile(
+        rf"@font-face\s*\{{[^}}]*font-family\s*:\s*(['\"]?){re.escape(font_name)}\1",
+        re.IGNORECASE | re.DOTALL,
+    )
+    return pattern.search(current_html) is not None
+
+
+def _has_general_font_loading_evidence(current_html: str) -> bool:
+    lowered = current_html.lower()
+    evidence_markers = (
+        "@font-face",
+        ".woff2",
+        ".woff",
+        ".ttf",
+        ".otf",
+        "fonts.googleapis.com",
+        "fonts.gstatic.com",
+        "use.typekit.net",
+        "fonts.adobe.com",
+        "fontsource",
+        "next/font",
+        "fontface(",
+        'as="font"',
+        "as='font'",
+    )
+    return any(marker in lowered for marker in evidence_markers)
+
+
+def _has_font_loading_evidence_for_font(current_html: str, font_name: str) -> bool:
+    if not _requires_explicit_font_loading(font_name):
+        return True
+    if _has_font_face_declaration(current_html, font_name):
+        return True
+    return _has_general_font_loading_evidence(current_html)
+
+
 def _normalize_section_id(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
     return normalized.strip("-")
+
+
+_GENERIC_SECTION_ID_TOKENS = {
+    "global",
+    "section",
+    "area",
+    "widget",
+    "state",
+    "site",
+}
+
+
+def _split_identifier_words(value: str) -> str:
+    with_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", value.strip())
+    with_boundaries = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1-\2", with_boundaries)
+    return with_boundaries
+
+
+def _identifier_variants(*values: str) -> set[str]:
+    variants: set[str] = set()
+    for value in values:
+        if not value:
+            continue
+        candidates = {value.strip(), _split_identifier_words(value)}
+        for candidate in candidates:
+            normalized = _normalize_section_id(candidate)
+            if not normalized:
+                continue
+            variants.add(normalized)
+            collapsed = normalized.replace("-", "")
+            if collapsed:
+                variants.add(collapsed)
+
+            tokens = [token for token in normalized.split("-") if token]
+            trimmed_tokens = [
+                token for token in tokens if token not in _GENERIC_SECTION_ID_TOKENS
+            ]
+            if trimmed_tokens and trimmed_tokens != tokens:
+                trimmed = "-".join(trimmed_tokens)
+                variants.add(trimmed)
+                variants.add("".join(trimmed_tokens))
+    return variants
+
+
+def _section_id_tokens(value: str) -> tuple[str, ...]:
+    normalized = _normalize_section_id(value)
+    if not normalized:
+        return ()
+    return tuple(token for token in normalized.split("-") if token)
+
+
+def _is_section_id_alias(required_section_id: str, candidate_section_id: str) -> bool:
+    required_tokens = set(_section_id_tokens(required_section_id))
+    candidate_tokens = set(_section_id_tokens(candidate_section_id))
+    if (
+        len(required_tokens) < 2
+        or len(candidate_tokens) < len(required_tokens)
+        or required_tokens == candidate_tokens
+    ):
+        return False
+    return required_tokens.issubset(candidate_tokens)
+
+
+def _resolve_required_section_id(
+    candidate_section_id: str,
+    *,
+    candidate_name: str = "",
+    required_sections: list[tuple[int, SectionRequirement]],
+) -> str | None:
+    candidate_variants = _identifier_variants(candidate_section_id, candidate_name)
+    if not candidate_variants:
+        return None
+
+    best_match: str | None = None
+    best_score: tuple[int, int, int] | None = None
+    for _, section in required_sections:
+        required_variants = _identifier_variants(section.section_id, section.name)
+        shared_variants = required_variants & candidate_variants
+        score: tuple[int, int, int] | None = None
+        if shared_variants:
+            score = (2, max(len(variant) for variant in shared_variants), 0)
+        else:
+            for required_variant in required_variants:
+                required_tokens = _section_id_tokens(required_variant)
+                if not required_tokens:
+                    continue
+                for candidate_variant in candidate_variants:
+                    if not _is_section_id_alias(required_variant, candidate_variant):
+                        continue
+                    candidate_tokens = _section_id_tokens(candidate_variant)
+                    alias_score = (
+                        1,
+                        len(required_tokens),
+                        -abs(len(candidate_tokens) - len(required_tokens)),
+                    )
+                    if score is None or alias_score > score:
+                        score = alias_score
+        if score is None:
+            continue
+        if best_score is None or score > best_score:
+            best_match = section.section_id
+            best_score = score
+    return best_match
+
+
+def _match_declared_section_ids(
+    declared_section_ids: set[str],
+    required_sections: list[tuple[int, SectionRequirement]],
+) -> dict[str, str]:
+    matches: dict[str, str] = {}
+    remaining_candidates = set(declared_section_ids)
+
+    for _, section in required_sections:
+        if section.section_id in remaining_candidates:
+            matches[section.section_id] = section.section_id
+            remaining_candidates.remove(section.section_id)
+
+    remaining_sections = [
+        (index, section)
+        for index, section in required_sections
+        if section.section_id not in matches
+    ]
+    remaining_sections.sort(
+        key=lambda item: len(_section_id_tokens(item[1].section_id)),
+        reverse=True,
+    )
+
+    for _, section in remaining_sections:
+        best_candidate: str | None = None
+        best_score: tuple[int, int, int] | None = None
+        required_variants = _identifier_variants(section.section_id, section.name)
+        for candidate in remaining_candidates:
+            candidate_variants = _identifier_variants(candidate)
+            shared_variants = required_variants & candidate_variants
+            score: tuple[int, int, int] | None = None
+            if shared_variants:
+                score = (2, max(len(variant) for variant in shared_variants), 0)
+            else:
+                for required_variant in required_variants:
+                    required_tokens = _section_id_tokens(required_variant)
+                    if not required_tokens:
+                        continue
+                    for candidate_variant in candidate_variants:
+                        if not _is_section_id_alias(required_variant, candidate_variant):
+                            continue
+                        candidate_tokens = _section_id_tokens(candidate_variant)
+                        alias_score = (
+                            1,
+                            len(required_tokens),
+                            -abs(len(candidate_tokens) - len(required_tokens)),
+                        )
+                        if score is None or alias_score > score:
+                            score = alias_score
+            if score is None:
+                continue
+            if best_score is None or score > best_score:
+                best_candidate = candidate
+                best_score = score
+        if best_candidate is not None:
+            matches[section.section_id] = best_candidate
+            remaining_candidates.remove(best_candidate)
+
+    return matches
 
 
 def _extract_declared_section_ids(current_html: str) -> set[str]:
@@ -350,6 +589,25 @@ def _extract_declared_section_ids(current_html: str) -> set[str]:
         r"data-section-id\s*=\s*'([^']+)'",
         r'data-section-id\s*=\s*\{\s*"([^"]+)"\s*\}',
         r"data-section-id\s*=\s*\{\s*'([^']+)'\s*\}",
+    )
+    declared_ids: set[str] = set()
+    for pattern in patterns:
+        for match in re.findall(pattern, current_html, flags=re.IGNORECASE):
+            normalized = _normalize_section_id(match)
+            if normalized:
+                declared_ids.add(normalized)
+    return declared_ids
+
+
+def _extract_declared_wrapper_ids(current_html: str) -> set[str]:
+    if not current_html:
+        return set()
+
+    patterns = (
+        r'data-wrapper-id\s*=\s*"([^"]+)"',
+        r"data-wrapper-id\s*=\s*'([^']+)'",
+        r'data-wrapper-id\s*=\s*\{\s*"([^"]+)"\s*\}',
+        r"data-wrapper-id\s*=\s*\{\s*'([^']+)'\s*\}",
     )
     declared_ids: set[str] = set()
     for pattern in patterns:
@@ -388,6 +646,87 @@ def _is_section_coverage_instruction(instruction: str) -> bool:
     return normalized.startswith("insert the missing `") or normalized.startswith(
         "finish the partially implemented `"
     )
+
+
+def _required_wrappers(
+    requirements: RequirementsSpec,
+) -> list[WrapperRequirement]:
+    return [
+        wrapper
+        for wrapper in requirements.wrapper_requirements
+        if wrapper.name.strip() and wrapper.wrapper_id.strip()
+    ]
+
+
+def _wrapper_participant_names(
+    wrapper: WrapperRequirement,
+    requirements: RequirementsSpec,
+) -> list[str]:
+    section_lookup = {
+        section.section_id: section.name
+        for _, section in _required_sections(requirements)
+    }
+    return [
+        section_lookup[section_id]
+        for section_id in wrapper.participant_section_ids
+        if section_id in section_lookup
+    ]
+
+
+def _wrapper_scope_summary(wrapper: WrapperRequirement) -> str:
+    scope_bits: list[str] = []
+    if wrapper.layout_invariants:
+        scope_bits.append(
+            "shared shell rules: " + ", ".join(wrapper.layout_invariants[:2])
+        )
+    if wrapper.must_include:
+        scope_bits.append(
+            "required wrapper details: " + ", ".join(wrapper.must_include[:2])
+        )
+    if wrapper.styling:
+        scope_bits.append("wrapper styling: " + ", ".join(wrapper.styling[:2]))
+    if not scope_bits:
+        return "the matching `wrapper_requirements` entry"
+    return "; ".join(scope_bits)
+
+
+def _missing_wrapper_fix_instruction(
+    wrapper: WrapperRequirement,
+    *,
+    requirements: RequirementsSpec,
+) -> str:
+    participant_names = _wrapper_participant_names(wrapper, requirements)
+    participant_text = (
+        ", ".join(f"`{name}`" for name in participant_names)
+        if participant_names
+        else "the affected child sections"
+    )
+    return (
+        f"Add the shared `{wrapper.name}` wrapper with `data-wrapper-id=\"{wrapper.wrapper_id}\"` around {participant_text}. "
+        f"Keep each section's existing `data-section-id` root inside that wrapper and implement {_wrapper_scope_summary(wrapper)}."
+    )
+
+
+def _is_wrapper_requirement_issue(issue: ValidationIssue) -> bool:
+    if issue.category != "structure":
+        return False
+
+    haystack = " ".join(
+        [issue.title, issue.observed, issue.expected, issue.fix_instructions]
+    ).lower()
+    wrapper_markers = (
+        "required shared wrapper",
+        "required wrapper",
+        "data-wrapper-id",
+        "shared wrapper is missing",
+        "shared shell wrapper",
+    )
+    return any(marker in haystack for marker in wrapper_markers)
+
+
+def _is_wrapper_requirement_instruction(instruction: str) -> bool:
+    normalized = instruction.strip().lower()
+    return normalized.startswith("add the shared `") and "data-wrapper-id" in normalized
 
 
 def _apply_score_floor(current: float, floor: float) -> float:
@@ -497,6 +836,10 @@ def _enforce_section_coverage(
         return report
 
     declared_section_ids = _extract_declared_section_ids(current_html)
+    declared_matches = _match_declared_section_ids(
+        declared_section_ids,
+        required_sections,
+    )
     required_lookup = {
         section.section_id: (index, section)
         for index, section in required_sections
@@ -504,38 +847,68 @@ def _enforce_section_coverage(
     matched_results: dict[str, SectionValidationResult] = {}
     extra_results: list[SectionValidationResult] = []
     recovered_section_ids: set[str] = set()
+    reconciled_section_ids: set[str] = set()
     for result in report.section_results:
-        section_id = result.section_id
-        if section_id in required_lookup and section_id not in matched_results:
-            canonical_section = required_lookup[section_id][1]
+        matched_section_id = _resolve_required_section_id(
+            result.section_id,
+            candidate_name=result.name,
+            required_sections=required_sections,
+        )
+        if matched_section_id is not None:
+            canonical_section = required_lookup[matched_section_id][1]
             adjusted_quality_score = result.quality_score
             if result.status == "missing":
                 adjusted_quality_score = 0.0
             elif result.status == "partial":
                 adjusted_quality_score = min(adjusted_quality_score, 0.79)
 
-            if result.status == "missing" and section_id in declared_section_ids:
-                recovered_section_ids.add(section_id)
-                matched_results[section_id] = result.model_copy(
+            normalized_result = result.model_copy(
+                update={
+                    "name": canonical_section.name,
+                    "section_id": canonical_section.section_id,
+                    "quality_score": adjusted_quality_score,
+                }
+            )
+            if (
+                result.status == "present"
+                and canonical_section.section_id != _normalize_section_id(result.section_id)
+            ):
+                reconciled_section_ids.add(matched_section_id)
+            if (
+                result.status == "missing"
+                and canonical_section.section_id in declared_matches
+            ):
+                recovered_section_ids.add(canonical_section.section_id)
+                normalized_result = normalized_result.model_copy(
                     update={
-                        "name": canonical_section.name,
                         "section_id": canonical_section.section_id,
                         "status": "present",
                         "quality_score": max(result.quality_score, 0.8),
                         "summary": (
-                            "Exact `data-section-id` markup in the current HTML confirms this required section root already exists, so missing-section coverage was overridden deterministically."
+                            "A deterministic `data-section-id` match in the current HTML confirms this required section root already exists, so missing-section coverage was overridden."
                         ),
                         "fix_instructions": "",
                     }
                 )
-            else:
-                matched_results[section_id] = result.model_copy(
-                    update={
-                        "name": canonical_section.name,
-                        "section_id": canonical_section.section_id,
-                        "quality_score": adjusted_quality_score,
-                    }
+            existing = matched_results.get(matched_section_id)
+            if (
+                existing is None
+                or (
+                    {"missing": 0, "partial": 1, "present": 2}[normalized_result.status],
+                    normalized_result.quality_score,
                 )
+                > (
+                    {"missing": 0, "partial": 1, "present": 2}[existing.status],
+                    existing.quality_score,
+                )
+            ):
+                if (
+                    existing is not None
+                    and normalized_result.status == "present"
+                    and existing.status != "present"
+                ):
+                    reconciled_section_ids.add(matched_section_id)
+                matched_results[matched_section_id] = normalized_result
             continue
         extra_results.append(result)
 
@@ -545,7 +918,7 @@ def _enforce_section_coverage(
     for index, section in required_sections:
         result = matched_results.get(section.section_id)
         if result is None:
-            if section.section_id in declared_section_ids:
+            if section.section_id in declared_matches:
                 recovered_section_ids.add(section.section_id)
                 result = SectionValidationResult(
                     name=section.name,
@@ -553,7 +926,7 @@ def _enforce_section_coverage(
                     status="present",
                     quality_score=0.8,
                     summary=(
-                        "Exact `data-section-id` markup in the current HTML confirms this required section root already exists, so coverage was recovered deterministically."
+                        "A deterministic `data-section-id` match in the current HTML confirms this required section root already exists, so coverage was recovered."
                     ),
                 )
             else:
@@ -611,10 +984,21 @@ def _enforce_section_coverage(
         for section_id in sorted(recovered_section_ids)
         if section_id in required_lookup
     ]
+    reconciled_section_names = [
+        required_lookup[section_id][1].name
+        for section_id in sorted(reconciled_section_ids - recovered_section_ids)
+        if section_id in required_lookup
+    ]
     if recovered_section_names:
         summary_additions.append(
-            "Deterministic DOM coverage checks confirmed these required section roots already exist via exact `data-section-id` markers: "
+            "Deterministic DOM coverage checks confirmed these required section roots already exist via `data-section-id` matching: "
             + ", ".join(recovered_section_names)
+            + "."
+        )
+    if reconciled_section_names:
+        summary_additions.append(
+            "Section coverage was reconciled across equivalent section IDs or names for: "
+            + ", ".join(reconciled_section_names)
             + "."
         )
 
@@ -705,7 +1089,7 @@ def _enforce_section_coverage(
     has_noncoverage_critical = any(issue.severity == "critical" for issue in issues)
     has_noncoverage_major = any(issue.severity == "major" for issue in issues)
     should_restore_false_positive_cap = (
-        bool(recovered_section_ids)
+        bool(recovered_section_ids or reconciled_section_ids)
         and not missing_sections
         and not partial_sections
         and low_score_pattern
@@ -720,7 +1104,7 @@ def _enforce_section_coverage(
         if reference_bundle.input_mode == "video":
             animation_score = _apply_score_floor(animation_score, 0.86)
         summary_additions.append(
-            "The prior low section-coverage score cap was removed because the missing-section finding was contradicted by exact DOM markers, so remaining scoring reflects only the non-coverage issues still visible."
+            "The prior low section-coverage score cap was removed because the missing-section finding was contradicted by deterministic DOM marker matching, so remaining scoring reflects only the non-coverage issues still visible."
         )
         if not issues:
             verdict = "pass"
@@ -748,9 +1132,158 @@ def _enforce_section_coverage(
     )
 
 
+def _enforce_wrapper_requirements(
+    report: ValidationReport,
+    *,
+    requirements: RequirementsSpec,
+    current_html: str = "",
+) -> ValidationReport:
+    required_wrappers = _required_wrappers(requirements)
+    if not required_wrappers:
+        return report
+
+    declared_wrapper_ids = _extract_declared_wrapper_ids(current_html)
+    missing_wrappers = [
+        wrapper
+        for wrapper in required_wrappers
+        if wrapper.wrapper_id not in declared_wrapper_ids
+    ]
+    if not missing_wrappers:
+        return report
+
+    issues = [
+        issue for issue in report.issues if not _is_wrapper_requirement_issue(issue)
+    ]
+    patch_instructions = [
+        instruction
+        for instruction in report.patch_instructions
+        if not _is_wrapper_requirement_instruction(instruction)
+    ]
+
+    affected_section_ids = {
+        section_id
+        for wrapper in missing_wrappers
+        for section_id in wrapper.participant_section_ids
+    }
+    updated_results: list[SectionValidationResult] = []
+    for result in report.section_results:
+        if result.section_id in affected_section_ids and result.status == "present":
+            updated_results.append(
+                result.model_copy(
+                    update={
+                        "status": "partial",
+                        "quality_score": min(result.quality_score, 0.79),
+                        "summary": (
+                            (result.summary.strip() + " ")
+                            if result.summary.strip()
+                            else ""
+                        )
+                        + "The required shared wrapper/container is still missing from the implementation, so this section is structurally incomplete.",
+                        "fix_instructions": result.fix_instructions
+                        or "Restore the required shared wrapper/container before polishing this section further.",
+                    }
+                )
+            )
+            continue
+        updated_results.append(result)
+
+    for wrapper in missing_wrappers:
+        participant_names = _wrapper_participant_names(wrapper, requirements)
+        participant_summary = (
+            ", ".join(participant_names)
+            if participant_names
+            else ", ".join(wrapper.participant_section_ids)
+            or "the affected sections"
+        )
+        issues.append(
+            ValidationIssue(
+                severity="major",
+                category="structure",
+                title=f"Required shared wrapper is missing: {wrapper.name}",
+                observed=(
+                    f"The implementation does not contain the required shared wrapper `{wrapper.wrapper_id}` for {participant_summary}."
+                ),
+                expected=(
+                    "Sections that share one shell, card, or grouped surface should remain inside one explicit wrapper container rather than being rebuilt as disconnected sibling blocks."
+                ),
+                fix_instructions=_missing_wrapper_fix_instruction(
+                    wrapper,
+                    requirements=requirements,
+                ),
+            )
+        )
+
+    summary_addition = (
+        "Shared wrapper requirements are not fully implemented yet, so structurally related sections still need a real common container before deeper polish."
+    )
+    return report.model_copy(
+        update={
+            "verdict": "revise",
+            "overall_score": _apply_score_cap(report.overall_score, 0.78),
+            "visual_fidelity_score": _apply_score_cap(
+                report.visual_fidelity_score, 0.82
+            ),
+            "behavior_fidelity_score": _apply_score_cap(
+                report.behavior_fidelity_score, 0.82
+            ),
+            "animation_fidelity_score": report.animation_fidelity_score,
+            "editability_score": _apply_score_cap(report.editability_score, 0.8),
+            "summary": " ".join(
+                part for part in [report.summary.strip(), summary_addition] if part
+            ),
+            "section_results": updated_results,
+            "issues": issues,
+            "patch_instructions": _prepend_unique_instructions(
+                patch_instructions,
+                [
+                    _missing_wrapper_fix_instruction(
+                        wrapper,
+                        requirements=requirements,
+                    )
+                    for wrapper in missing_wrappers
+                ],
+            ),
+        }
+    )
+
+
 def _has_css_custom_property_declaration(current_html: str, token_name: str) -> bool:
     pattern = re.compile(rf"{re.escape(token_name)}\s*:")
     return pattern.search(current_html) is not None
+
+
+def _extract_urls_from_text(value: str) -> list[str]:
+    return re.findall(r"https?://[^\s;,)]+", value)
+
+
+def _required_live_asset_urls(
+    reference_bundle: ReferenceBundle,
+    requirements: RequirementsSpec,
+) -> list[str]:
+    if reference_bundle.live_reference is None:
+        return []
+
+    blueprint_values = [
+        *requirements.asset_requirements,
+        *(
+            asset
+            for section in requirements.section_requirements
+            for asset in section.assets
+        ),
+    ]
+    blueprint_blob = " ".join(value for value in blueprint_values if value.strip())
+    if not blueprint_blob:
+        return []
+
+    seen: set[str] = set()
+    urls: list[str] = []
+    for entry in reference_bundle.live_reference.design_system.asset_inventory:
+        for url in _extract_urls_from_text(entry):
+            if url in seen or url not in blueprint_blob:
+                continue
+            seen.add(url)
+            urls.append(url)
+    return urls
 
 
 def _enforce_design_system_usage(
@@ -880,6 +1413,103 @@ def _enforce_design_system_usage(
         visual_cap = min(visual_cap, 0.6)
         editability_cap = min(editability_cap, 0.7)
 
+    fonts_missing_loading = [
+        font_name
+        for font_name in live_font_names[:4]
+        if font_name in current_html
+        and not _has_font_loading_evidence_for_font(current_html, font_name)
+    ]
+    if fonts_missing_loading:
+        issues.append(
+            ValidationIssue(
+                severity="critical",
+                category="styling",
+                title="Exact custom fonts are referenced but not loaded",
+                observed=(
+                    "The current HTML references extracted custom font-family names such as "
+                    + ", ".join(fonts_missing_loading)
+                    + " but does not include working font-loading evidence, so the page would still render fallback fonts."
+                ),
+                expected=(
+                    "Custom fonts from the live reference should be both named in the typography tokens and loaded via a real font-loading mechanism such as @font-face, hosted font CSS, or explicit font asset URLs."
+                ),
+                fix_instructions=(
+                    "Add a working font-loading mechanism for the referenced custom fonts in the centralized theme or stylesheet layer, then keep the exact extracted font-family names applied to the same body and heading rules."
+                ),
+            )
+        )
+        patch_instructions.append(
+            "Add real font-loading for the extracted custom fonts already referenced in the theme (for example via @font-face, imported hosted font CSS, or explicit .woff/.woff2 URLs) so the page does not fall back to substitute faces."
+        )
+        verdict = "revise"
+        overall_cap = min(overall_cap, 0.62)
+        visual_cap = min(visual_cap, 0.68)
+        editability_cap = min(editability_cap, 0.74)
+
+    required_live_asset_urls = _required_live_asset_urls(reference_bundle, requirements)
+    tracked_live_asset_urls = required_live_asset_urls[:6]
+    matched_live_asset_urls = [
+        url for url in tracked_live_asset_urls if url in current_html
+    ]
+    if tracked_live_asset_urls and not matched_live_asset_urls:
+        issues.append(
+            ValidationIssue(
+                severity="critical",
+                category="imagery",
+                title="Required live-site assets are not used",
+                observed=(
+                    "The blueprint requires exact live-site media assets, but none of "
+                    "the required extracted asset URLs appear in the current HTML."
+                ),
+                expected=(
+                    "The implementation should reuse the exact site image, SVG, or "
+                    "background asset URLs recorded in the blueprint for the matching sections."
+                ),
+                fix_instructions=(
+                    "Replace placeholder or substitute media in the affected sections "
+                    "with the exact asset URLs already listed in `asset_requirements` "
+                    "and the relevant section `assets` entries."
+                ),
+            )
+        )
+        patch_instructions.append(
+            "Restore the exact live-site asset URLs from `asset_requirements` and section `assets` into the matching `img`, SVG/image, or CSS `background-image` rules instead of placeholder or substitute media."
+        )
+        verdict = "revise"
+        overall_cap = min(overall_cap, 0.58)
+        visual_cap = min(visual_cap, 0.62)
+        editability_cap = min(editability_cap, 0.76)
+    elif (
+        len(tracked_live_asset_urls) >= 2
+        and len(matched_live_asset_urls) < min(2, len(tracked_live_asset_urls))
+    ):
+        issues.append(
+            ValidationIssue(
+                severity="major",
+                category="imagery",
+                title="Live-site asset coverage is incomplete",
+                observed=(
+                    "Only part of the required live-site asset set appears in the current HTML, "
+                    "so some visible sections are still likely using incorrect imagery."
+                ),
+                expected=(
+                    "The implementation should preserve the same site asset set called "
+                    "out by the blueprint for visible media-bearing sections."
+                ),
+                fix_instructions=(
+                    "Audit the affected media-bearing sections and restore the missing "
+                    "asset URLs from the blueprint's `asset_requirements` and section `assets`."
+                ),
+            )
+        )
+        patch_instructions.append(
+            "Restore the remaining missing live-site asset URLs from the blueprint so all visible media-bearing sections use the required site assets."
+        )
+        verdict = "revise"
+        overall_cap = min(overall_cap, 0.74)
+        visual_cap = min(visual_cap, 0.78)
+        editability_cap = min(editability_cap, 0.82)
+
     if issues == report.issues:
         return report
 
@@ -901,6 +1531,40 @@ def _enforce_design_system_usage(
             "patch_instructions": patch_instructions,
         }
     )
+
+
+def _normalize_visibility_sensitive_patch_instructions(
+    report: ValidationReport,
+) -> ValidationReport:
+    updated_instructions: list[str] = []
+    changed = False
+
+    for instruction in report.patch_instructions:
+        lowered = instruction.lower()
+        updated = instruction
+        if (
+            "-z-10" in instruction
+            and any(
+                token in lowered
+                for token in ("ambient glow", "glow", "blurred", "ellipse", "orb")
+            )
+        ):
+            updated = instruction.replace(
+                "with `absolute inset-0 overflow-hidden pointer-events-none -z-10`",
+                "with `absolute inset-0 overflow-hidden pointer-events-none` and keep the text/content wrapper on `relative z-10` so the glow remains visible inside the section shell",
+            )
+            if updated == instruction:
+                updated = (
+                    instruction
+                    + " Keep the glow on a visible absolute layer inside the section shell and move the text/content wrapper onto `relative z-10`; do not hide the effect behind the section with `-z-10`."
+                )
+            changed = True
+        updated_instructions.append(updated)
+
+    if not changed:
+        return report
+
+    return report.model_copy(update={"patch_instructions": updated_instructions})
 
 
 def _tighten_validation_report(
@@ -1108,12 +1772,18 @@ class LoopValidator:
             reference_bundle=reference_bundle,
             current_html=current_html,
         )
-        tightened = _tighten_validation_report(
+        wrapper_enforced = _enforce_wrapper_requirements(
             coverage_enforced,
+            requirements=requirements,
+            current_html=current_html,
+        )
+        tightened = _tighten_validation_report(
+            wrapper_enforced,
             reference_bundle=reference_bundle,
         )
+        normalized = _normalize_visibility_sensitive_patch_instructions(tightened)
         return _enforce_design_system_usage(
-            tightened,
+            normalized,
             reference_bundle=reference_bundle,
             requirements=requirements,
             current_html=current_html,

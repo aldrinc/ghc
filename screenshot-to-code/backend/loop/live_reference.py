@@ -92,8 +92,14 @@ class LiveReferenceExtractor:
 
         design_system = LiveReferenceDesignSystem.model_validate(design_system_payload)
         normalized_url = payload.get("url") if isinstance(payload.get("url"), str) else url
+        full_dom_html = (
+            payload.get("fullDomHtml")
+            if isinstance(payload.get("fullDomHtml"), str)
+            else ""
+        )
         return LiveReferenceContext(
             url=normalized_url,
+            full_dom_html=full_dom_html,
             design_system=design_system,
             renders=renders,
         )
