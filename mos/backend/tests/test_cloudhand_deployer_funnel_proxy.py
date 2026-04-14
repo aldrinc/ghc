@@ -342,10 +342,14 @@ def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     assert "listen 24123;" in conf
     assert "server_name _;" in conf
     assert "return 302 /f/" not in conf
+    assert 'location ^~ /api/public/assets/ {' in conf
+    assert 'try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;' in conf
+    assert 'add_header Cache-Control "public, max-age=31536000, immutable";' in conf
+    assert 'location ^~ /public/assets/ {' in conf
+    assert 'try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;' in conf
     assert "location ^~ /api/ {" in conf
     assert "proxy_pass https://moshq.app/api/;" in conf
-    assert "location ^~ /public/assets/ {" in conf
-    assert "proxy_pass https://moshq.app/api/public/assets/;" in conf
+    assert "proxy_pass https://moshq.app/api/public/assets/;" not in conf
     assert "Checkout is unavailable in standalone artifact mode." not in conf
     assert "try_files $uri.json =404;" not in conf
     assert "try_files $uri /index.html;" in conf

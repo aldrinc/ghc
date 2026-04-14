@@ -265,6 +265,27 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return Object.fromEntries(entries);
   };
 
+  const serializeVariant = (variant) => {
+    if (!isRecord(variant)) return null;
+    const id = cleanText(variant.id);
+    if (!id) return null;
+    const provider = cleanText(typeof variant.provider === "string" ? variant.provider.toLowerCase() : null);
+    const currency = cleanText(variant.currency);
+    const optionValues = normalizeSelection(variant.optionValues || variant.option_values || null);
+    return {
+      id,
+      provider,
+      price: typeof variant.price === "number" ? variant.price : null,
+      currency,
+      optionValues,
+    };
+  };
+
+  let cachedVariants = Array.isArray(config.variants)
+    ? config.variants.map(serializeVariant).filter(Boolean)
+    : [];
+  let cachedCommercePromise = null;
+
   const selectionsMatch = (left, right) => {
     const normalizedLeft = normalizeSelection(left);
     const normalizedRight = normalizeSelection(right);
@@ -281,14 +302,66 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return match ? cleanText(match.url) : null;
   };
 
-  const resolveVariantForCheckout = (checkout, selectionFromDom) => {
+  const parseResponseError = async (response) => {
+    try {
+      const payload = await response.clone().json();
+      const detail = cleanText(payload && payload.detail);
+      if (detail) return detail;
+      const message = cleanText(payload && payload.message);
+      if (message) return message;
+    } catch (_) {
+      // ignore and fall back to plain text
+    }
+    try {
+      const text = cleanText(await response.text());
+      if (text) return text;
+    } catch (_) {
+      // ignore and fall back to status text
+    }
+    return cleanText(response.statusText) || "Request failed.";
+  };
+
+  const loadCommerceVariants = async () => {
+    if (cachedVariants.length) {
+      return cachedVariants;
+    }
+    if (cachedCommercePromise) {
+      return cachedCommercePromise;
+    }
+    cachedCommercePromise = fetch(
+      config.apiBaseUrl +
+        "/public/funnels/" +
+        encodeURIComponent(config.productSlug) +
+        "/" +
+        encodeURIComponent(config.funnelSlug) +
+        "/commerce",
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await parseResponseError(response));
+        }
+        const payload = await response.json();
+        const product = payload && payload.product;
+        const variants = Array.isArray(product && product.variants)
+          ? product.variants.map(serializeVariant).filter(Boolean)
+          : [];
+        cachedVariants = variants;
+        return cachedVariants;
+      })
+      .finally(() => {
+        cachedCommercePromise = null;
+      });
+    return cachedCommercePromise;
+  };
+
+  const resolveVariantForCheckout = (checkout, selectionFromDom, variants) => {
     const resolver = checkout && checkout.variantResolver;
     if (!resolver || typeof resolver.type !== "string") {
       throw new Error("Checkout binding is missing a variantResolver.");
     }
     if (resolver.type === "fixed") {
       const variantId = cleanText(resolver.variantId);
-      const variant = config.variants.find((candidate) => candidate.id === variantId) || null;
+      const variant = variants.find((candidate) => candidate.id === variantId) || null;
       return {
         variantId,
         variant,
@@ -298,7 +371,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (resolver.type === "option_values") {
       return {
         variantId: null,
-        variant: config.variants.find((candidate) => selectionsMatch(candidate.optionValues, selectionFromDom)) || null,
+        variant: variants.find((candidate) => selectionsMatch(candidate.optionValues, selectionFromDom)) || null,
         selection: selectionFromDom,
       };
     }
@@ -470,7 +543,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
             }
 
             const selectionFromDom = readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown");
-            const { variantId, variant, selection } = resolveVariantForCheckout(binding.checkout, selectionFromDom);
+            const checkoutVariants =
+              selectionFromDom && !cachedVariants.length ? await loadCommerceVariants() : cachedVariants;
+            const { variantId, variant, selection } = resolveVariantForCheckout(
+              binding.checkout,
+              selectionFromDom,
+              checkoutVariants,
+            );
             const resolvedVariantId = cleanText(variant && variant.id ? variant.id : variantId);
             const resolvedSelection = normalizeSelection(selection) || {};
 

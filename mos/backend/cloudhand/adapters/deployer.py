@@ -1354,18 +1354,18 @@ WantedBy=multi-user.target
     proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
     proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
 
-    location ^~ /api/ {{
-        proxy_pass {upstream_api_base_root}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+    location ^~ /api/public/assets/ {{
+        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
     }}
 
     location ^~ /public/assets/ {{
-        proxy_pass {upstream_api_base_root}/public/assets/;
+        try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }}
+
+    location ^~ /api/ {{
+        proxy_pass {upstream_api_base_root}/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
