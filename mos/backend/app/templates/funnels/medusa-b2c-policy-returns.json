@@ -1,0 +1,25 @@
+{
+  "id": "medusa-b2c-policy-returns",
+  "name": "Medusa B2C Refund Policy",
+  "description": "Refund policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Refund Policy",
+        "description": "Refund eligibility, return windows, and how support handles exceptions."
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CPolicyPage",
+        "props": {
+          "pageKey": "returns_refunds_policy",
+          "pageTitle": "Refund Policy",
+          "description": "Refund eligibility, return windows, and how support handles exceptions."
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

@@ -31,6 +31,67 @@ _NGINX_APP_CLIENT_MAX_BODY_SIZE = "250m"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 _ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpHero", "SalesPdpTemplate"}
+_ENV_ASSIGNMENT_PATTERN = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+
+
+def _safe_inline_json(value: Any) -> str:
+    return (
+        json.dumps(value, separators=(",", ":"))
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+
+
+def _normalize_uploaded_env_line(raw_line: str) -> str | None:
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+
+    match = _ENV_ASSIGNMENT_PATTERN.match(stripped)
+    if match is None:
+        raise ValueError("expected KEY=value syntax")
+
+    key, raw_value = match.groups()
+    value = raw_value.strip()
+    if not value or value.startswith("#"):
+        return f"{key}="
+
+    if value[0] in {'"', "'"}:
+        quote = value[0]
+        closing_index = 1
+        while closing_index < len(value):
+            if value[closing_index] == quote and value[closing_index - 1] != "\\":
+                break
+            closing_index += 1
+        if closing_index >= len(value):
+            raise ValueError(f"{key} has an unterminated quoted value")
+        suffix = value[closing_index + 1 :].strip()
+        if suffix and not suffix.startswith("#"):
+            raise ValueError(f"{key} has unsupported trailing content after the quoted value")
+        value = value[1:closing_index]
+        return f"{key}={value}"
+
+    inline_comment_match = re.search(r"\s+#", value)
+    if inline_comment_match is not None:
+        value = value[: inline_comment_match.start()].rstrip()
+    return f"{key}={value}"
+
+
+def _normalize_uploaded_env_content(*, content: str, source_label: str) -> str:
+    normalized_lines: List[str] = []
+    for line_number, raw_line in enumerate(content.splitlines(), start=1):
+        try:
+            normalized = _normalize_uploaded_env_line(raw_line)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid environment file entry in {source_label}:{line_number}: {exc}"
+            ) from exc
+        if normalized is not None:
+            normalized_lines.append(normalized)
+    return "\n".join(normalized_lines) + ("\n" if normalized_lines else "")
 
 
 class ServerDeployer:
@@ -197,9 +258,10 @@ class ServerDeployer:
             local_path = self._resolve_local_path(app.service_config.environment_file_upload)
             if not local_path.exists():
                 raise FileNotFoundError(f"Environment file not found at {local_path}")
-            content = local_path.read_text(encoding="utf-8")
-            if not content.endswith("\n"):
-                content += "\n"
+            content = _normalize_uploaded_env_content(
+                content=local_path.read_text(encoding="utf-8"),
+                source_label=str(local_path),
+            )
 
             extra_lines = self._env_lines_from_map(app.service_config.environment)
             if extra_lines:
@@ -934,7 +996,11 @@ WantedBy=multi-user.target
                 funnel_slug=str(raw_funnel_slug or ""),
                 funnel_meta=funnel_meta,
             )
-            normalized_tokens = {str(token or "").strip().lower() for token in funnel_tokens if str(token or "").strip()}
+            normalized_tokens = {
+                str(token or "").strip().lower()
+                for token in funnel_tokens
+                if str(token or "").strip()
+            }
             if funnel_slug not in normalized_tokens:
                 continue
             resolved_funnel_payload = funnel_payload
@@ -992,7 +1058,7 @@ WantedBy=multi-user.target
         if preloaded_funnel:
             runtime_config["preloadedFunnel"] = preloaded_funnel
 
-        config_json = json.dumps(runtime_config, separators=(",", ":"))
+        config_json = _safe_inline_json(runtime_config)
         runtime_script = (
             "<script>"
             f"window.__MOS_DEPLOY_RUNTIME__={config_json};"

@@ -171,3 +171,65 @@ class TestModelSelectionNoKeys:
                 anthropic_api_key=None,
                 gemini_api_key=None,
             )
+
+
+class TestMosImportModelSelection:
+    def setup_method(self):
+        mock_throw_error = AsyncMock()
+        self.model_selector = ModelSelectionStage(mock_throw_error)
+
+    @pytest.mark.asyncio
+    async def test_mos_import_uses_explicit_slots_only(self):
+        models = await self.model_selector.select_models(
+            generation_type="create",
+            input_mode="image",
+            openai_api_key="openai-key",
+            anthropic_api_key="anthropic-key",
+            gemini_api_key="gemini-key",
+            request_source="mos_import",
+            model_slots=[1, 2],
+        )
+
+        assert models == [
+            Llm.GEMINI_3_FLASH_PREVIEW_MINIMAL,
+            Llm.CLAUDE_OPUS_4_6,
+        ]
+
+    @pytest.mark.asyncio
+    async def test_mos_import_rejects_unsupported_slot(self):
+        with pytest.raises(ValueError, match="Unsupported MOS import model slot"):
+            await self.model_selector.select_models(
+                generation_type="create",
+                input_mode="image",
+                openai_api_key=None,
+                anthropic_api_key="anthropic-key",
+                gemini_api_key="gemini-key",
+                request_source="mos_import",
+                model_slots=[3],
+            )
+
+    @pytest.mark.asyncio
+    async def test_mos_import_requires_gemini_key_for_slot_one(self):
+        with pytest.raises(ValueError, match="requires GEMINI_API_KEY"):
+            await self.model_selector.select_models(
+                generation_type="create",
+                input_mode="image",
+                openai_api_key=None,
+                anthropic_api_key="anthropic-key",
+                gemini_api_key=None,
+                request_source="mos_import",
+                model_slots=[1],
+            )
+
+    @pytest.mark.asyncio
+    async def test_mos_import_requires_anthropic_key_for_slot_two(self):
+        with pytest.raises(ValueError, match="requires ANTHROPIC_API_KEY"):
+            await self.model_selector.select_models(
+                generation_type="create",
+                input_mode="image",
+                openai_api_key=None,
+                anthropic_api_key=None,
+                gemini_api_key="gemini-key",
+                request_source="mos_import",
+                model_slots=[2],
+            )

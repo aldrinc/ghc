@@ -1,8 +1,12 @@
 from types import SimpleNamespace
 
+import pytest
+from temporalio.exceptions import ApplicationError
+
 from app.temporal.activities.asset_activities import (
     _DEFAULT_SWIPE_SOURCE_LABELS,
     _DefaultSwipeSource,
+    _ImagePlanItemExecution,
     _build_creative_generation_batch_id,
     _build_creative_generation_plan_items,
     _existing_creative_generation_assets_by_plan_item,
@@ -11,10 +15,13 @@ from app.temporal.activities.asset_activities import (
     _extract_requirement_swipe_requires_product_image,
     _extract_remote_reference_asset_id,
     _extract_swipe_requires_product_image_from_tags,
+    _generate_image_plan_item_asset,
     _normalize_requirement_format,
     _split_requirement_asset_counts,
+    _summarize_ad_copy_pack_destinations,
     _summarize_exception_message,
 )
+from app.schemas.creative_generation import CreativeGenerationPlanItem
 
 
 def test_split_requirement_asset_counts_even_distribution() -> None:
@@ -174,18 +181,20 @@ def test_build_creative_generation_plan_items_expands_all_default_swipes_determi
         batch_id="batch-1",
         brief={},
         requirements=requirements,
-        default_swipes=default_swipes,
+        swipe_sources=default_swipes,
         copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
         campaign_delivery_config=None,
+        source_set_key="swipe_collection:collection-1",
     )
     second = _build_creative_generation_plan_items(
         asset_brief_id="brief-123",
         batch_id="batch-1",
         brief={},
         requirements=requirements,
-        default_swipes=default_swipes,
+        swipe_sources=default_swipes,
         copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
         campaign_delivery_config=None,
+        source_set_key="swipe_collection:collection-1",
     )
 
     assert [item.id for item in first] == [item.id for item in second]
@@ -202,9 +211,10 @@ def test_build_creative_generation_plan_items_errors_when_image_requirement_has_
             batch_id="batch-1",
             brief={},
             requirements=[{"channel": "facebook", "format": "image_ad"}],
-            default_swipes=[],
+            swipe_sources=[],
             copy_pack_ids_by_requirement={},
             campaign_delivery_config=None,
+            source_set_key="swipe_collection:collection-1",
         )
     except ValueError as exc:
         assert "missing_requirement_index=0" in str(exc)
@@ -228,6 +238,33 @@ def test_build_creative_generation_batch_id_is_stable_for_one_execution() -> Non
 
     assert first == second
     assert first != different
+
+
+def test_summarize_ad_copy_pack_destinations_uses_requirement_level_funnel_stage() -> None:
+    destination_type, destination_label = _summarize_ad_copy_pack_destinations(
+        brief={},
+        image_requirements=[
+            (
+                0,
+                {
+                    "channel": "facebook",
+                    "format": "image_ad",
+                    "funnelStage": "mid",
+                },
+            ),
+            (
+                1,
+                {
+                    "channel": "instagram",
+                    "format": "image_ad",
+                    "funnelStage": "middle-of-funnel",
+                },
+            ),
+        ],
+    )
+
+    assert destination_type == "pre-sales"
+    assert destination_label == "Pre-Sales Landing Page"
 
 
 def test_existing_creative_generation_assets_by_plan_item_filters_by_batch_and_brief() -> None:
@@ -313,3 +350,54 @@ def test_summarize_exception_message_compacts_and_truncates() -> None:
     assert summary.startswith("RuntimeError: line one line two")
     assert len(summary) <= 80
     assert summary.endswith("...")
+
+
+def test_generate_image_plan_item_asset_preserves_non_retryable_application_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _raise_quota_error(_params):  # noqa: ANN001
+        raise ApplicationError(
+            "Swipe prompt generation failed with Gemini: quota exceeded",
+            type="GeminiQuotaExceeded",
+            non_retryable=True,
+        )
+
+    monkeypatch.setattr(
+        "app.temporal.activities.swipe_image_ad_activities.generate_swipe_image_ad_activity",
+        _raise_quota_error,
+    )
+
+    execution = _ImagePlanItemExecution(
+        requirement_index=0,
+        copy_pack_id="copy-pack-1",
+        plan_item=CreativeGenerationPlanItem(
+            id="plan-item-1",
+            batchId="batch-1",
+            assetBriefId="brief-1",
+            requirementIndex=0,
+            channel="facebook",
+            format="image",
+            companySwipeId="swipe-1",
+            sourceLabel="10.png",
+            sourceMediaUrl="https://example.com/10.png",
+            copyPackId="copy-pack-1",
+            sourceSetKey="swipe_collection:collection-1",
+        ),
+    )
+
+    with pytest.raises(ApplicationError, match="planned execution item") as exc_info:
+        _generate_image_plan_item_asset(
+            org_id="org-1",
+            client_id="client-1",
+            product_id="product-1",
+            campaign_id="campaign-1",
+            asset_brief_id="brief-1",
+            workflow_run_id="workflow-run-1",
+            creative_generation_batch_id="batch-1",
+            creative_generation_plan_artifact_id="plan-artifact-1",
+            ad_copy_pack_artifact_id="copy-artifact-1",
+            execution=execution,
+        )
+
+    assert exc_info.value.type == "GeminiQuotaExceeded"
+    assert exc_info.value.non_retryable is True

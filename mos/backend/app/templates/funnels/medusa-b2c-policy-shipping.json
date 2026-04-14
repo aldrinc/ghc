@@ -1,0 +1,25 @@
+{
+  "id": "medusa-b2c-policy-shipping",
+  "name": "Medusa B2C Shipping Policy",
+  "description": "Shipping policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Shipping Policy",
+        "description": "Shipping methods, delivery expectations, and support contacts for customer orders."
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CPolicyPage",
+        "props": {
+          "pageKey": "shipping_policy",
+          "pageTitle": "Shipping Policy",
+          "description": "Shipping methods, delivery expectations, and support contacts for customer orders."
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

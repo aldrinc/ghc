@@ -2,6 +2,7 @@ import { Puck } from "@measured/puck";
 import type { Data } from "@measured/puck";
 import { useFunnel, useFunnelPage, useSaveFunnelDraft, useUpdateFunnelPage } from "@/api/funnels";
 import { useProduct } from "@/api/products";
+import { CommerceRuntimeProvider } from "@/components/commerce/CommerceBlocks";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -12,14 +13,32 @@ import { Select } from "@/components/ui/select";
 import { useDesignSystems } from "@/api/designSystems";
 import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
+import { createPuckFieldTypesPlugin } from "@/funnels/puckFieldTypesPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
+import { buildRuntimePageMap, buildRuntimePageStageMap, buildRuntimePageTypeMap } from "@/funnels/runtimePageMaps";
 import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import type { SiteCommerceData } from "@/types/commerce";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
+async function parsePublicError(resp: Response): Promise<string> {
+  let raw: unknown;
+  try {
+    raw = await resp.clone().json();
+  } catch {
+    raw = await resp.text();
+  }
+  const detail = (raw as { detail?: unknown })?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  const message = (raw as { message?: unknown })?.message;
+  if (typeof message === "string" && message.trim()) return message;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  return resp.statusText || "Request failed";
+}
 
 export function FunnelPageEditorPage() {
   const navigate = useNavigate();
@@ -40,6 +59,9 @@ export function FunnelPageEditorPage() {
   const [draftName, setDraftName] = useState("");
   const [draftSlug, setDraftSlug] = useState("");
   const [draftDesignSystemId, setDraftDesignSystemId] = useState("");
+  const [siteCommerce, setSiteCommerce] = useState<SiteCommerceData | null>(null);
+  const [siteCommerceLoading, setSiteCommerceLoading] = useState(false);
+  const [siteCommerceError, setSiteCommerceError] = useState<string | null>(null);
   const initializedPageIdRef = useRef<string | null>(null);
   const backHref = funnelId ? `/research/funnels/${funnelId}` : "/research/funnels";
 
@@ -76,10 +98,14 @@ export function FunnelPageEditorPage() {
   );
 
   const config = useMemo(() => createFunnelPuckConfig(pageOptions), [pageOptionsKey]);
-  const runtimePageMap = useMemo(() => {
-    const entries = funnel?.pages?.map((p) => [p.id, p.slug]) ?? [];
-    return Object.fromEntries(entries);
-  }, [funnel?.pages]);
+  const runtimePages = useMemo(
+    () => (funnel?.pages?.length ? funnel.pages : pageDetail?.page ? [pageDetail.page] : []),
+    [funnel?.pages, pageDetail?.page]
+  );
+  const runtimePageMap = useMemo(() => buildRuntimePageMap(runtimePages), [runtimePages]);
+  const runtimePageStageMap = useMemo(() => buildRuntimePageStageMap(runtimePages), [runtimePages]);
+  const runtimePageTypeMap = useMemo(() => buildRuntimePageTypeMap(runtimePages), [runtimePages]);
+  const isSiteEditor = Object.keys(runtimePageTypeMap).length > 0;
 
   const currentPageLabel = useMemo(() => {
     const page = funnel?.pages?.find((p) => p.id === pageId);
@@ -119,7 +145,11 @@ export function FunnelPageEditorPage() {
     () => createDesignSystemPlugin({ tokens: designSystemTokens }),
     [designSystemTokens]
   );
-  const plugins = useMemo(() => [designSystemPlugin, aiPlugin], [designSystemPlugin, aiPlugin]);
+  const fieldTypesPlugin = useMemo(() => createPuckFieldTypesPlugin(), []);
+  const plugins = useMemo(
+    () => [designSystemPlugin, fieldTypesPlugin, aiPlugin],
+    [designSystemPlugin, fieldTypesPlugin, aiPlugin]
+  );
   const editorViewports = useMemo(
     () => [
       { width: 375, height: "auto", icon: "Smartphone", label: "Small" },
@@ -154,6 +184,48 @@ export function FunnelPageEditorPage() {
       ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
     ];
   }, [designSystems]);
+
+  useEffect(() => {
+    if (!isSiteEditor || !runtimeProductSlug || !runtimeFunnelSlug) {
+      setSiteCommerce(null);
+      setSiteCommerceLoading(false);
+      setSiteCommerceError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const url = `${apiBaseUrl}/public/funnels/${encodeURIComponent(runtimeProductSlug)}/${encodeURIComponent(runtimeFunnelSlug)}/site/commerce`;
+
+    setSiteCommerceLoading(true);
+    setSiteCommerceError(null);
+
+    fetch(url, { signal: controller.signal })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          throw new Error(await parsePublicError(resp));
+        }
+        return (await resp.json()) as SiteCommerceData;
+      })
+      .then((nextSiteCommerce) => {
+        if (!controller.signal.aborted) {
+          setSiteCommerce(nextSiteCommerce);
+        }
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setSiteCommerce(null);
+        setSiteCommerceError(err instanceof Error ? err.message : "Unable to load site commerce preview.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setSiteCommerceLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [apiBaseUrl, isSiteEditor, runtimeFunnelSlug, runtimeProductSlug]);
 
   return (
     <div className="space-y-4">
@@ -285,24 +357,61 @@ export function FunnelPageEditorPage() {
       ) : (
         <>
           <div className="ds-card ds-card--md p-0 overflow-hidden">
+            {siteCommerceLoading ? (
+              <div className="h-0.5 animate-pulse bg-content/80" aria-hidden="true" />
+            ) : null}
+            {siteCommerceError ? (
+              <div className="border-b border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
+                Site commerce preview failed to load. {siteCommerceError}
+              </div>
+            ) : null}
             <FunnelRuntimeProvider
               value={{
                 productSlug: runtimeProductSlug,
                 funnelSlug: runtimeFunnelSlug,
                 pageMap: runtimePageMap,
+                pageStageMap: runtimePageStageMap,
+                pageTypeMap: runtimePageTypeMap,
                 pageId: pageDetail.page.id,
                 nextPageId: pageDetail.page.next_page_id ?? null,
               }}
             >
-              <Puck
-                key={puckKey}
-                config={config}
-                data={data}
-                onChange={setData}
-                ui={editorUi}
-                viewports={editorViewports}
-                plugins={plugins}
-              />
+              {isSiteEditor ? (
+                <CommerceRuntimeProvider
+                  productSlug={runtimeProductSlug}
+                  funnelSlug={runtimeFunnelSlug}
+                  apiBaseUrl={apiBaseUrl}
+                  initialRegions={siteCommerce?.regions || []}
+                  initialProducts={siteCommerce?.products || []}
+                  initialCollections={siteCommerce?.collections || []}
+                  initialCategories={siteCommerce?.categories || []}
+                  initialCurrentProduct={siteCommerce?.currentProduct || null}
+                  initialCurrentCategory={siteCommerce?.currentCategory || null}
+                  siteFamily={siteCommerce?.siteFamily || null}
+                  commerceProvider={siteCommerce?.commerceProvider || null}
+                  storeName={siteCommerce?.storeName || null}
+                >
+                  <Puck
+                    key={puckKey}
+                    config={config}
+                    data={data}
+                    onChange={setData}
+                    ui={editorUi}
+                    viewports={editorViewports}
+                    plugins={plugins}
+                  />
+                </CommerceRuntimeProvider>
+              ) : (
+                <Puck
+                  key={puckKey}
+                  config={config}
+                  data={data}
+                  onChange={setData}
+                  ui={editorUi}
+                  viewports={editorViewports}
+                  plugins={plugins}
+                />
+              )}
             </FunnelRuntimeProvider>
           </div>
         </>

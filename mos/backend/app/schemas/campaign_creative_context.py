@@ -18,6 +18,7 @@ def _clean_required_text(value: str) -> str:
 class CampaignCreativeContextProviderEnum(str, Enum):
     strategy_v2 = "strategy_v2"
     manual = "manual"
+    skills = "skills"
 
 
 class CampaignCreativeContextProviderRequest(BaseModel):
@@ -188,6 +189,22 @@ class CampaignManualCreativeContextUpsertResponse(BaseModel):
     checkedAt: str
 
 
+class CampaignSkillsCreativeContextMaterializeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    campaignId: str
+    provider: Literal["skills"] = "skills"
+    creativeContextArtifactId: str
+    artifactIds: dict[str, str]
+    sourceArtifactIds: dict[str, str | None]
+    strategyBundleId: str
+    strategyBundleType: str
+    uploadedDocKeys: list[str]
+    refreshed: bool
+    staleArtifactId: str | None = None
+    checkedAt: str
+
+
 class CampaignCreativeContextReadinessResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -199,6 +216,11 @@ class CampaignCreativeContextReadinessResponse(BaseModel):
     sourceStrategyV2TemporalWorkflowId: str | None = None
     launchContextArtifactId: str | None = None
     manualCreativeContextArtifactId: str | None = None
+    creativeContextArtifactId: str | None = None
+    materializedCreativeContextArtifactId: str | None = None
+    materializedArtifactIds: dict[str, str] | None = None
+    strategyBundleId: str | None = None
+    strategyBundleType: str | None = None
     refreshed: bool = False
     staleArtifactId: str | None = None
     missingArtifacts: list[str] = Field(default_factory=list)

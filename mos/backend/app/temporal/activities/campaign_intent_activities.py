@@ -23,7 +23,8 @@ from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
-from app.services.funnel_templates import get_funnel_template, apply_template_assets
+from app.services.funnel_template_categories import resolve_funnel_template_category
+from app.services.funnel_templates import apply_template_assets, get_funnel_template
 from app.agent.funnel_objectives import run_generate_page_draft
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
@@ -1443,8 +1444,12 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         if resolved_pages:
-            pre_sales_pages = [page for page in resolved_pages if page.template_id == "pre-sales-listicle"]
-            sales_pages = [page for page in resolved_pages if page.template_id == "sales-pdp"]
+            pre_sales_pages = [
+                page for page in resolved_pages if resolve_funnel_template_category(page.template_id) == "presales"
+            ]
+            sales_pages = [
+                page for page in resolved_pages if resolve_funnel_template_category(page.template_id) == "sales"
+            ]
             if pre_sales_pages:
                 if len(sales_pages) != 1:
                     raise ValueError(

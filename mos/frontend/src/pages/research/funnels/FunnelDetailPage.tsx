@@ -12,6 +12,11 @@ import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
+import {
+  funnelTemplateCategoryLabel,
+  normalizeFunnelTemplateCategory,
+  resolveFunnelTemplateCategory,
+} from "@/lib/funnelTemplateCategories";
 import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -58,8 +63,9 @@ type DeployJobStatusResponse = {
 };
 
 function artifactForTemplate(templateId: string | null | undefined): "presales" | "sales" | null {
-  if (templateId === "pre-sales-listicle") return "presales";
-  if (templateId === "sales-pdp") return "sales";
+  const category = resolveFunnelTemplateCategory(templateId);
+  if (category === "presales") return "presales";
+  if (category === "sales") return "sales";
   return null;
 }
 
@@ -93,6 +99,17 @@ export function FunnelDetailPage() {
   const pageOptions = useMemo(() => {
     return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
   }, [funnel?.pages]);
+
+  const templateOptions = useMemo(() => {
+    const groupedTemplates = (templates || []).map((tpl) => ({
+      label: tpl.name,
+      value: tpl.id,
+      group: funnelTemplateCategoryLabel(
+        normalizeFunnelTemplateCategory(tpl.category) || resolveFunnelTemplateCategory(tpl.id),
+      ) || undefined,
+    }));
+    return [{ label: "Blank page", value: "" }, ...groupedTemplates];
+  }, [templates]);
 
   const statusTone = useMemo(() => {
     return (status: string) => {
@@ -859,13 +876,7 @@ export function FunnelDetailPage() {
               <Select
                 value={templateId}
                 onValueChange={setTemplateId}
-                options={[
-                  { label: "Blank page", value: "" },
-                  ...(templates || []).map((tpl) => ({
-                    label: tpl.name,
-                    value: tpl.id,
-                  })),
-                ]}
+                options={templateOptions}
               />
               {templateId ? (
                 <div className="text-xs text-content-muted">

@@ -99,6 +99,166 @@ export function useWorkflowDetail(workflowId?: string) {
 
 export type WorkflowResearchArtifact = ResearchArtifactRef & { content: unknown };
 
+export function normalizeMarkdownContent(title: string, value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "object") return String(value);
+
+  const asRecord = value as Record<string, unknown>;
+  const directContent = asRecord.content;
+  if (typeof directContent === "string" && directContent.trim()) return directContent;
+
+  const directMarkdown = asRecord.markdown;
+  if (typeof directMarkdown === "string" && directMarkdown.trim()) return directMarkdown;
+
+  const payload = asRecord.payload;
+  if (payload && typeof payload === "object") {
+    const payloadRecord = payload as Record<string, unknown>;
+    const payloadContent = payloadRecord.content;
+    if (typeof payloadContent === "string" && payloadContent.trim()) return payloadContent;
+    const payloadMarkdown = payloadRecord.markdown;
+    if (typeof payloadMarkdown === "string" && payloadMarkdown.trim()) return payloadMarkdown;
+  }
+
+  let body = "";
+  try {
+    body = JSON.stringify(value, null, 2) || "null";
+  } catch {
+    body = String(value);
+  }
+  const heading = title.trim() ? `# ${title.trim()}\n\n` : "";
+  return `${heading}\`\`\`json\n${body}\n\`\`\`\n`;
+}
+
+function sanitizeFilename(name: string): string {
+  return (
+    name
+      .trim()
+      .replace(/[<>:"/\\|?*]+/g, "")
+      .replace(/\s+/g, "-")
+      .toLowerCase()
+      .slice(0, 80) || "document"
+  );
+}
+
+function parseFilenameFromContentDisposition(contentDisposition: string | null): string | null {
+  if (!contentDisposition) return null;
+  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!filenameMatch?.[1]) return null;
+  try {
+    return decodeURIComponent(filenameMatch[1].trim().replace(/^\"|\"$/g, ""));
+  } catch {
+    return filenameMatch[1].trim().replace(/^\"|\"$/g, "");
+  }
+}
+
+function isZipContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const normalized = contentType.toLowerCase();
+  return (
+    normalized.includes("application/zip") ||
+    normalized.includes("application/x-zip-compressed") ||
+    normalized.includes("application/octet-stream")
+  );
+}
+
+async function parseDownloadError(resp: Response): Promise<Error> {
+  try {
+    const raw = await resp.clone().json();
+    const detail = (raw as { detail?: unknown })?.detail;
+    if (typeof detail === "string" && detail.trim()) return new Error(detail);
+    const message = (raw as { message?: unknown })?.message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  } catch {
+    // Fall through to text parsing.
+  }
+  const text = (await resp.text()).trim();
+  if (text) return new Error(text);
+  return new Error(resp.statusText || "Failed to download research archive");
+}
+
+export function useDownloadResearchMarkdown() {
+  const { get } = useApiClient();
+
+  return useMutation({
+    mutationFn: async ({ workflowId, stepKey, title }: { workflowId: string; stepKey: string; title?: string }) => {
+      const artifact = await get<WorkflowResearchArtifact>(`/workflows/${workflowId}/research/${stepKey}`);
+      const content = normalizeMarkdownContent(artifact.title || stepKey, artifact.content);
+      if (!content.trim()) {
+        throw new Error("No content available to download.");
+      }
+      const filename = sanitizeFilename(title || artifact.title || stepKey) + ".md";
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return filename;
+    },
+    onSuccess: (filename: string) => {
+      toast.success(`Downloaded ${filename}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to download document";
+      toast.error(message);
+    },
+  });
+}
+
+export function useDownloadResearchMarkdownArchive() {
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ workflowId }: { workflowId: string }) => {
+      if (!workflowId?.trim()) throw new Error("Workflow ID is required.");
+      const token = await getToken({ template: clerkTokenTemplate });
+      const headers = new Headers();
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      const response = await fetch(`${defaultBaseUrl}/workflows/${workflowId}/research/download-all`, {
+        method: "GET",
+        headers,
+      });
+      if (!response.ok) {
+        throw await parseDownloadError(response);
+      }
+      const responseContentType = response.headers.get("Content-Type");
+      if (!isZipContentType(responseContentType)) {
+        const preview = (await response.text()).trim().slice(0, 240);
+        const contentTypeLabel = responseContentType?.trim() || "unknown content type";
+        throw new Error(
+          preview
+            ? `Expected a ZIP download but received ${contentTypeLabel}. Response preview: ${preview}`
+            : `Expected a ZIP download but received ${contentTypeLabel}.`,
+        );
+      }
+      const blob = await response.blob();
+      const filename =
+        parseFilenameFromContentDisposition(response.headers.get("Content-Disposition")) ||
+        `research-documents-${sanitizeFilename(workflowId)}.zip`;
+      return { blob, filename };
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${filename}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to download research archive";
+      toast.error(message);
+    },
+  });
+}
+
 export function useWorkflowResearchArtifact(
   workflowId?: string,
   stepKey?: string,

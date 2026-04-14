@@ -11,6 +11,11 @@ import type {
   ProductOfferBonus,
   ProductVariant,
 } from "@/types/products";
+import type {
+  StripeProfile,
+  StripeProfileCreatePayload,
+  StripeProfileUpdatePayload,
+} from "@/types/commerce";
 
 type ShopifyCreatedVariant = {
   variantGid: string;
@@ -577,6 +582,184 @@ export function useDeleteVariant(productIdForInvalidation?: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to delete variant";
+      toast.error(message);
+    },
+  });
+}
+
+// =============================================================================
+// Medusa API Hooks
+// =============================================================================
+
+export type MedusaConfig = {
+  id: string | null;
+  baseUrl: string | null;
+  hasAdminApiKey: boolean;
+  hasPublishableKey: boolean;
+  connectionStatus: string;
+  lastConnectionCheckAt: string | null;
+  lastConnectionError: string | null;
+  stripeAccountProfileId: string | null;
+  defaultPaymentProviderId: string | null;
+  allowedPaymentProviderIds: string[];
+  webhookRoutingMode: "direct" | "shared_ingress";
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type MedusaConnectionStatus = {
+  state: "not_configured" | "not_tested" | "connected" | "error";
+  message: string;
+  baseUrl: string | null;
+  lastCheckAt: string | null;
+};
+
+export type MedusaVariantCreatePayload = {
+  title: string;
+  price: number;
+  currency: string;
+  compareAtPrice?: number;
+  inventoryQuantity?: number;
+  inventoryPolicy?: "deny" | "continue";
+  optionValues?: Record<string, string>;
+  sku?: string;
+  barcode?: string;
+};
+
+export type MedusaVariantCreateResponse = {
+  variantId: string;
+  medusaVariantId: string;
+  medusaProductId: string;
+  title: string;
+  priceCents: number;
+  currency: string;
+  compareAtPriceCents: number | null;
+  sku: string | null;
+  barcode: string | null;
+  inventoryQuantity: number | null;
+  inventoryPolicy: string | null;
+  optionValues: Record<string, string> | null;
+};
+
+export function useMedusaConfig(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<MedusaConfig>({
+    queryKey: ["medusa", "config", clientId],
+    queryFn: () => get(`/clients/${clientId}/medusa/config`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateMedusaConfig(clientId: string) {
+  const { put } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      baseUrl: string;
+      adminApiKey?: string;
+      publishableKey?: string;
+      stripeAccountProfileId?: string | null;
+      defaultPaymentProviderId?: string | null;
+      allowedPaymentProviderIds?: string[];
+      webhookRoutingMode?: "direct" | "shared_ingress";
+    }) => put<MedusaConfig>(`/clients/${clientId}/medusa/config`, payload),
+    onSuccess: () => {
+      toast.success("Medusa configuration saved");
+      queryClient.invalidateQueries({ queryKey: ["medusa", "config", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save Medusa configuration";
+      toast.error(message);
+    },
+  });
+}
+
+export function useTestMedusaConnection(clientId: string) {
+  const { get } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => get<MedusaConnectionStatus>(`/clients/${clientId}/medusa/status`),
+    onSuccess: (status) => {
+      if (status.state === "connected") {
+        toast.success("Medusa connection successful");
+      } else {
+        toast.error(status.message);
+      }
+      queryClient.invalidateQueries({ queryKey: ["medusa", "config", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to test Medusa connection";
+      toast.error(message);
+    },
+  });
+}
+
+export function useCreateMedusaVariant(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: MedusaVariantCreatePayload) =>
+      post<MedusaVariantCreateResponse>(`/products/${productId}/medusa/create-variant`, payload),
+    onSuccess: (response) => {
+      toast.success(`Medusa variant "${response.title}" created`);
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Medusa variant";
+      toast.error(message);
+    },
+  });
+}
+
+// =============================================================================
+// Stripe Profile API Hooks
+// =============================================================================
+
+export function useStripeProfiles() {
+  const { get } = useApiClient();
+  return useQuery<StripeProfile[]>({
+    queryKey: ["stripe-profiles"],
+    queryFn: () => get("/clients/org/stripe-profiles"),
+  });
+}
+
+export function useCreateStripeProfile() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: StripeProfileCreatePayload) =>
+      post<StripeProfile>("/clients/org/stripe-profiles", payload),
+    onSuccess: () => {
+      toast.success("Stripe profile created");
+      queryClient.invalidateQueries({ queryKey: ["stripe-profiles"] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Stripe profile";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateStripeProfile(profileId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: StripeProfileUpdatePayload) =>
+      request<StripeProfile>(`/clients/org/stripe-profiles/${profileId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast.success("Stripe profile updated");
+      queryClient.invalidateQueries({ queryKey: ["stripe-profiles"] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update Stripe profile";
       toast.error(message);
     },
   });

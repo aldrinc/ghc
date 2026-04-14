@@ -274,6 +274,7 @@ def run_generate_page_draft_stream(
                     "brandDocuments": docs_ctx.get("documentBlocks") or [],
                     "copyPack": copy_pack,
                     "referenceHtmlMode": resolved_reference_html_mode,
+                    "referenceHtml": normalized_reference_html or None,
                     "htmlReferencePromptContext": html_ctx.get("htmlReferencePromptContext"),
                     "strategyPromptContext": strategy_ctx.get("strategyPromptContext"),
                 },
@@ -300,6 +301,7 @@ def run_generate_page_draft_stream(
                 "puckData": puck_data,
                 "basePuckData": funnel_ctx.get("basePuckData"),
                 "templateKind": funnel_ctx.get("templateKind"),
+                "referenceHtmlMode": resolved_reference_html_mode,
                 "designSystemTokens": tokens_ctx.get("designSystemTokens"),
                 "brandLogoAssetPublicId": tokens_ctx.get("brandLogoAssetPublicId"),
                 "productId": str(product_id),
@@ -317,6 +319,8 @@ def run_generate_page_draft_stream(
             raw_args={
                 "orgId": org_id,
                 "puckData": puck_data,
+                "funnelId": funnel_id,
+                "pageId": page_id,
                 "allowedTypes": funnel_ctx.get("allowedTypes") or [],
                 "requiredTypes": funnel_ctx.get("requiredTypes") or [],
                 "templateKind": funnel_ctx.get("templateKind"),
@@ -408,12 +412,6 @@ def run_generate_page_draft_stream(
             page_id=page_id,
         )
         draft_version_id = persist_res.ui_details["draftVersionId"]
-        uses_import_schema = bool(
-            funnel_ctx.get("templateMode")
-            and funnel_ctx.get("templateKind") == "sales-pdp"
-            and funnel_ai.uses_sales_pdp_import_schema(puck_data)
-        )
-
         # 11) Generate + apply testimonials for template pages (Sales PDP / Pre-sales listicle).
         # Retry this step in-place so a transient testimonials failure does not force
         # draft/image regeneration for the whole page.
@@ -421,7 +419,6 @@ def run_generate_page_draft_stream(
             generate_testimonials
             and funnel_ctx.get("templateMode")
             and funnel_ctx.get("templateKind") in ("sales-pdp", "pre-sales-listicle")
-            and not uses_import_schema
         ):
             testimonials_attempts = DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS
             testimonials_started_at = time.monotonic()
@@ -470,11 +467,6 @@ def run_generate_page_draft_stream(
                 puck_data = testimonials_res.ui_details.get("puckData") or puck_data
                 draft_version_id = testimonials_res.ui_details.get("draftVersionId") or draft_version_id
                 break
-        elif generate_testimonials and uses_import_schema:
-            yield {
-                "type": "status",
-                "message": "Skipping legacy testimonials.generate_and_apply for import-v1 Sales PDP pages.",
-            }
 
         # 12) Generate + apply Sales PDP carousel images from scoped PDP samples.
         # Run this after testimonials so a long carousel run cannot leave sales pages
@@ -484,7 +476,6 @@ def run_generate_page_draft_stream(
             generate_images
             and funnel_ctx.get("templateMode")
             and funnel_ctx.get("templateKind") == "sales-pdp"
-            and not uses_import_schema
         ):
             carousel_res = yield from runtime.invoke_tool_stream(
                 handle=handle,
@@ -510,11 +501,6 @@ def run_generate_page_draft_stream(
             puck_data = carousel_res.ui_details.get("puckData") or puck_data
             draft_version_id = carousel_res.ui_details.get("draftVersionId") or draft_version_id
             generated_carousel_images = carousel_res.ui_details.get("generatedCarouselImages") or []
-        elif generate_images and uses_import_schema:
-            yield {
-                "type": "status",
-                "message": "Skipping legacy Sales PDP carousel enrichment for import-v1 Sales PDP pages.",
-            }
 
         final = {
             "assistantMessage": assistant_message,

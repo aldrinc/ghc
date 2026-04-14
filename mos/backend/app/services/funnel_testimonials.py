@@ -15,7 +15,7 @@ import threading
 import time
 from collections import Counter
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, cast
@@ -46,6 +46,7 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
+from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
@@ -116,13 +117,37 @@ class _ConfigContext:
     parsed: dict[str, Any]
     dirty: bool = False
 
+    def apply(self) -> None:
+        if self.dirty:
+            self.props[self.key] = json.dumps(self.parsed, ensure_ascii=False)
+
+
+@dataclass
+class _ImportedHtmlContext:
+    props: dict[str, Any]
+    replacements: dict[str, str] = field(default_factory=dict)
+    dirty: bool = False
+
+    def apply(self) -> None:
+        if not self.dirty:
+            return
+        html_document = self.props.get("htmlDocument")
+        if not isinstance(html_document, str) or not html_document.strip():
+            raise TestimonialGenerationError(
+                "ImportedHtmlDocument.props.htmlDocument must be a non-empty string."
+            )
+        rewritten = html_document
+        for old_src, new_src in self.replacements.items():
+            rewritten = rewritten.replace(old_src, new_src)
+        self.props["htmlDocument"] = rewritten
+
 
 @dataclass
 class _TestimonialRenderTarget:
     image: dict[str, Any]
     label: str
     template: str
-    context: _ConfigContext | None = None
+    context: _ConfigContext | _ImportedHtmlContext | None = None
 
 
 @dataclass
@@ -130,7 +155,7 @@ class _TestimonialGroup:
     label: str
     renders: list[_TestimonialRenderTarget]
     slide: dict[str, Any] | None = None
-    context: _ConfigContext | None = None
+    context: _ConfigContext | _ImportedHtmlContext | None = None
 
 
 @dataclass
@@ -322,6 +347,82 @@ def _has_sales_pdp_reviews_component(puck_data: dict[str, Any]) -> bool:
         if isinstance(obj, dict) and obj.get("type") == "SalesPdpReviews":
             return True
     return False
+
+
+def _public_asset_path(public_id: str) -> str:
+    return f"/public/assets/{public_id}"
+
+
+def _extract_imported_html_sales_review_wall_sources(html_document: str) -> list[str]:
+    if not isinstance(html_document, str) or not html_document.strip():
+        return []
+    if 'id="rp-carousel"' not in html_document and "id='rp-carousel'" not in html_document:
+        return []
+
+    match = re.search(r"var\s+slides\s*=\s*\[(?P<body>.*?)\]\s*;", html_document, re.DOTALL)
+    if not match:
+        return []
+
+    sources: list[str] = []
+    seen: set[str] = set()
+    for src_match in re.finditer(r"src\s*:\s*(['\"])(?P<src>[^'\"]+)\1", match.group("body")):
+        src = src_match.group("src").strip()
+        if not src or src in seen:
+            continue
+        seen.add(src)
+        sources.append(src)
+    return sources
+
+
+def _collect_imported_html_sales_pdp_targets(
+    props: dict[str, Any],
+) -> tuple[list[_TestimonialGroup], list[_ImportedHtmlContext]]:
+    html_document = props.get("htmlDocument")
+    if not isinstance(html_document, str) or not html_document.strip():
+        return [], []
+
+    sources = _extract_imported_html_sales_review_wall_sources(html_document)
+    if not sources:
+        return [], []
+
+    context = _ImportedHtmlContext(props=props)
+    templates = _wall_template_sequence(len(sources))
+    groups: list[_TestimonialGroup] = []
+    for idx, (src, template) in enumerate(zip(sources, templates)):
+        image = {
+            "alt": f"Sales PDP testimonial card {idx + 1}",
+            "src": src,
+            "testimonialTemplate": template,
+        }
+        label = f"sales_pdp.imported_html.reviewWall.reviews[{idx}]"
+        render = _TestimonialRenderTarget(
+            image=image,
+            label=label,
+            template=template,
+            context=context,
+        )
+        groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
+    return groups, [context]
+
+
+def _apply_generated_asset_to_render_target(
+    render_target: _TestimonialRenderTarget,
+    *,
+    asset_public_id: str,
+    default_alt: str,
+) -> None:
+    old_src = render_target.image.get("src")
+    render_target.image["assetPublicId"] = str(asset_public_id)
+    if "alt" not in render_target.image or not render_target.image.get("alt"):
+        render_target.image["alt"] = default_alt
+    if isinstance(render_target.context, _ImportedHtmlContext):
+        new_src = _public_asset_path(str(asset_public_id))
+        render_target.image["src"] = new_src
+        if isinstance(old_src, str) and old_src.strip():
+            render_target.context.replacements[old_src.strip()] = new_src
+        render_target.context.dirty = True
+    elif render_target.context:
+        render_target.context.dirty = True
 
 
 def _extract_stage3_voc_quotes(stage3: Any, *, limit: int) -> list[str]:
@@ -1523,9 +1624,7 @@ _PRE_SALES_WALL_TEMPLATE_FILES: dict[tuple[int, int], tuple[str, str, str]] = {
     (2, 0): ("instagram_post_20250916_152108_via_10015_io.webp", "9:16", "instagram_selfie_car"),
     (2, 1): ("instagram_post_20250916_152858_via_10015_io.webp", "9:16", "instagram_selfie_home"),
 }
-_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = (
-    Path(__file__).resolve().parents[4] / "template-image-workspace" / "assets"
-)
+_PRE_SALES_TESTIMONIAL_TEMPLATE_DIR = TEMPLATE_IMAGE_ASSETS_DIR
 
 
 def _resolve_pre_sales_swipe_assignment(render_label: str) -> _PreSalesSwipeTemplateAssignment:
@@ -1898,25 +1997,46 @@ def _collect_sales_pdp_targets(
     groups: list[_TestimonialGroup] = []
     review_wall = config.get("reviewWall")
     if isinstance(review_wall, dict):
-        tiles = review_wall.get("tiles")
-        if not isinstance(tiles, list) or not tiles:
-            raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be a non-empty list.")
-        for idx, tile in enumerate(tiles):
-            if not isinstance(tile, dict):
-                raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be objects.")
-            image = tile.get("image")
-            if not isinstance(image, dict):
-                raise TestimonialGenerationError(
-                    f"Sales PDP reviewWall.tiles[{idx}].image must be an object."
+        reviews = review_wall.get("reviews")
+        if isinstance(reviews, list):
+            for idx, review in enumerate(reviews):
+                if not isinstance(review, dict):
+                    raise TestimonialGenerationError("Sales PDP reviewWall.reviews must be objects.")
+                image = review.get("image")
+                if image is None:
+                    continue
+                if not isinstance(image, dict):
+                    raise TestimonialGenerationError(
+                        f"Sales PDP reviewWall.reviews[{idx}].image must be an object when provided."
+                    )
+                label = f"sales_pdp.reviewWall.reviews[{idx}]"
+                render = _TestimonialRenderTarget(
+                    image=image,
+                    label=label,
+                    template=_resolve_testimonial_template(image),
+                    context=context,
                 )
-            label = f"sales_pdp.reviewWall.tiles[{idx}]"
-            render = _TestimonialRenderTarget(
-                image=image,
-                label=label,
-                template=_resolve_testimonial_template(image),
-                context=context,
-            )
-            groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
+                groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
+        else:
+            tiles = review_wall.get("tiles")
+            if not isinstance(tiles, list) or not tiles:
+                raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be a non-empty list.")
+            for idx, tile in enumerate(tiles):
+                if not isinstance(tile, dict):
+                    raise TestimonialGenerationError("Sales PDP reviewWall.tiles must be objects.")
+                image = tile.get("image")
+                if not isinstance(image, dict):
+                    raise TestimonialGenerationError(
+                        f"Sales PDP reviewWall.tiles[{idx}].image must be an object."
+                    )
+                label = f"sales_pdp.reviewWall.tiles[{idx}]"
+                render = _TestimonialRenderTarget(
+                    image=image,
+                    label=label,
+                    template=_resolve_testimonial_template(image),
+                    context=context,
+                )
+                groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
 
     review_slider = config.get("reviewSlider")
     if isinstance(review_slider, dict):
@@ -2062,9 +2182,9 @@ def _collect_pre_sales_targets(
 
 def _collect_testimonial_targets(
     puck_data: dict[str, Any], template_kind: str
-) -> tuple[list[_TestimonialGroup], list[_ConfigContext]]:
+) -> tuple[list[_TestimonialGroup], list[_ConfigContext | _ImportedHtmlContext]]:
     groups: list[_TestimonialGroup] = []
-    contexts: list[_ConfigContext] = []
+    contexts: list[_ConfigContext | _ImportedHtmlContext] = []
     seen_images: set[int] = set()
     for obj in walk_json(puck_data):
         if not isinstance(obj, dict):
@@ -2106,12 +2226,17 @@ def _collect_testimonial_targets(
             elif comp_type == "PreSalesReviewWall":
                 groups.extend(_collect_pre_sales_targets({"reviewsWall": config}, context=ctx))
 
+        if comp_type == "ImportedHtmlDocument" and template_kind == "sales-pdp":
+            imported_groups, imported_contexts = _collect_imported_html_sales_pdp_targets(props)
+            groups.extend(imported_groups)
+            contexts.extend(imported_contexts)
+
     if not groups:
         expected: set[str] = set()
         if template_kind == "sales-pdp":
             if _has_sales_pdp_reviews_component(puck_data):
                 return groups, contexts
-            expected = {"SalesPdpReviewWall", "SalesPdpReviewSlider", "SalesPdpTemplate"}
+            expected = {"ImportedHtmlDocument", "SalesPdpReviewWall", "SalesPdpReviewSlider", "SalesPdpTemplate"}
         elif template_kind == "pre-sales-listicle":
             expected = {"PreSalesReviews", "PreSalesReviewWall", "PreSalesTemplate"}
         counts = {key: 0 for key in expected}
@@ -2208,16 +2333,25 @@ def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: st
         review_wall = config.get("reviewWall") if "reviewWall" in config else config
         if not isinstance(review_wall, dict):
             return
-        tiles = review_wall.get("tiles")
-        if not isinstance(tiles, list):
-            return
         images: list[dict[str, Any]] = []
-        for tile in tiles:
-            if not isinstance(tile, dict):
-                continue
-            image = tile.get("image")
-            if isinstance(image, dict):
-                images.append(image)
+        reviews = review_wall.get("reviews")
+        if isinstance(reviews, list):
+            for review in reviews:
+                if not isinstance(review, dict):
+                    continue
+                image = review.get("image")
+                if isinstance(image, dict):
+                    images.append(image)
+        else:
+            tiles = review_wall.get("tiles")
+            if not isinstance(tiles, list):
+                return
+            for tile in tiles:
+                if not isinstance(tile, dict):
+                    continue
+                image = tile.get("image")
+                if isinstance(image, dict):
+                    images.append(image)
         assign_templates(images)
 
     for obj in walk_json(puck_data):
@@ -2263,7 +2397,11 @@ def _collect_sales_pdp_review_wall_images(groups: list[_TestimonialGroup]) -> li
     images: list[dict[str, Any]] = []
     for group in groups:
         for render in group.renders:
-            if render.label.startswith("sales_pdp.reviewWall.tiles"):
+            if render.label.startswith("sales_pdp.reviewWall.tiles") or render.label.startswith(
+                "sales_pdp.reviewWall.reviews"
+            ) or render.label.startswith(
+                "sales_pdp.imported_html.reviewWall.reviews"
+            ):
                 images.append(render.image)
     return images
 
@@ -4317,7 +4455,7 @@ def generate_sales_pdp_carousel_images(
 
     for ctx in contexts:
         if ctx.dirty:
-            ctx.props[ctx.key] = json.dumps(ctx.parsed, ensure_ascii=False)
+            ctx.apply()
 
     ai_metadata = {
         "kind": "sales_pdp_carousel_generation",
@@ -5204,11 +5342,11 @@ def generate_funnel_page_testimonials(
                                     product_id=str(funnel.product_id) if funnel.product_id else None,
                                     tags=["funnel", "testimonial", "testimonial_media"],
                                 )
-                                render_target.image["assetPublicId"] = str(asset.public_id)
-                                if "alt" not in render_target.image or not render_target.image.get("alt"):
-                                    render_target.image["alt"] = f"Customer scene for {reviewer_name}"
-                                if render_target.context:
-                                    render_target.context.dirty = True
+                                _apply_generated_asset_to_render_target(
+                                    render_target,
+                                    asset_public_id=str(asset.public_id),
+                                    default_alt=f"Customer scene for {reviewer_name}",
+                                )
                                 _heartbeat(
                                     "testimonial_render_completed",
                                     group_index=group_index,
@@ -5391,11 +5529,11 @@ def generate_funnel_page_testimonials(
                                     product_id=str(funnel.product_id) if funnel.product_id else None,
                                     tags=["funnel", "testimonial", "review_card"],
                                 )
-                                render_target.image["assetPublicId"] = str(asset.public_id)
-                                if "alt" not in render_target.image or not render_target.image.get("alt"):
-                                    render_target.image["alt"] = f"Review from {reviewer_name}"
-                                if render_target.context:
-                                    render_target.context.dirty = True
+                                _apply_generated_asset_to_render_target(
+                                    render_target,
+                                    asset_public_id=str(asset.public_id),
+                                    default_alt=f"Review from {reviewer_name}",
+                                )
                                 _heartbeat(
                                     "testimonial_render_completed",
                                     group_index=group_index,
@@ -5733,11 +5871,11 @@ def generate_funnel_page_testimonials(
                                 product_id=str(funnel.product_id) if funnel.product_id else None,
                                 tags=["funnel", "testimonial", "social_comment", selected_social_template],
                             )
-                            render_target.image["assetPublicId"] = str(asset.public_id)
-                            if "alt" not in render_target.image or not render_target.image.get("alt"):
-                                render_target.image["alt"] = f"Social comment from {reviewer_name}"
-                            if render_target.context:
-                                render_target.context.dirty = True
+                            _apply_generated_asset_to_render_target(
+                                render_target,
+                                asset_public_id=str(asset.public_id),
+                                default_alt=f"Social comment from {reviewer_name}",
+                            )
                             _heartbeat(
                                 "testimonial_render_completed",
                                 group_index=group_index,

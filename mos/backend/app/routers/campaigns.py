@@ -18,6 +18,7 @@ from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfig
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.products import ProductsRepository
+from app.db.repositories.swipes import SwipeCollectionsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.asset_brief_types import normalize_required_asset_brief_types
@@ -27,6 +28,7 @@ from app.schemas.campaign_creative_context import (
     CampaignCreativeContextReadinessResponse,
     CampaignManualCreativeContextUpsertRequest,
     CampaignManualCreativeContextUpsertResponse,
+    CampaignSkillsCreativeContextMaterializeResponse,
 )
 from app.schemas.campaign_delivery import (
     CampaignDeliveryResponse,
@@ -37,6 +39,7 @@ from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
 from app.schemas.creative_generation import SwipeAdCopyPack, SwipeCopyInputs
 from app.schemas.creative_production import CreativeProductionRequest
+from app.schemas.gethookd import CampaignSwipeDefaultResponse, CampaignSwipeDefaultUpdateRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
 from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
 from app.services.meta_review import (
@@ -74,6 +77,7 @@ from app.services.campaign_delivery import (
 )
 from app.services.campaign_creative_context import (
     ensure_campaign_creative_context_ready,
+    materialize_skills_campaign_creative_context,
     persist_manual_campaign_creative_context,
     set_campaign_creative_context_provider,
 )
@@ -85,7 +89,10 @@ from app.temporal.workflows.campaign_funnel_generation import (
     CampaignFunnelGenerationInput,
     CampaignFunnelGenerationWorkflow,
 )
-from app.temporal.workflows.creative_production import CreativeProductionInput, CreativeProductionWorkflow
+from app.temporal.workflows.creative_production import (
+    CreativeProductionInput,
+    CreativeProductionWorkflow,
+)
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
@@ -105,10 +112,16 @@ def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
         (("RUNNING", "WORKFLOW_EXECUTION_STATUS_RUNNING"), WorkflowStatusEnum.running),
         (("COMPLETED", "WORKFLOW_EXECUTION_STATUS_COMPLETED"), WorkflowStatusEnum.completed),
         (("FAILED", "WORKFLOW_EXECUTION_STATUS_FAILED"), WorkflowStatusEnum.failed),
-        (("CANCELED", "CANCELLED", "WORKFLOW_EXECUTION_STATUS_CANCELED"), WorkflowStatusEnum.cancelled),
+        (
+            ("CANCELED", "CANCELLED", "WORKFLOW_EXECUTION_STATUS_CANCELED"),
+            WorkflowStatusEnum.cancelled,
+        ),
         (("TERMINATED", "WORKFLOW_EXECUTION_STATUS_TERMINATED"), WorkflowStatusEnum.cancelled),
         (("TIMED_OUT", "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"), WorkflowStatusEnum.failed),
-        (("CONTINUED_AS_NEW", "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"), WorkflowStatusEnum.running),
+        (
+            ("CONTINUED_AS_NEW", "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"),
+            WorkflowStatusEnum.running,
+        ),
     ]
     for names, internal_status in candidates:
         member = _workflow_execution_status_member(*names)
@@ -173,7 +186,9 @@ def _resolve_meta_review_destination_url(
     destination_page: str,
     review_paths: dict[str, str],
 ) -> str | None:
-    return resolve_meta_review_destination_url(destination_page=destination_page, review_paths=review_paths)
+    return resolve_meta_review_destination_url(
+        destination_page=destination_page, review_paths=review_paths
+    )
 
 
 def _campaign_delivery_config_or_404(
@@ -182,7 +197,9 @@ def _campaign_delivery_config_or_404(
     org_id: str,
     campaign_id: str,
 ):
-    config = _campaign_delivery_repo(session).get_by_campaign(org_id=org_id, campaign_id=campaign_id)
+    config = _campaign_delivery_repo(session).get_by_campaign(
+        org_id=org_id, campaign_id=campaign_id
+    )
     if config is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -305,17 +322,27 @@ def _strategy_v2_launch_row_payload(row, *, launch_status: str | None = None) ->
         "id": str(getattr(row, "id")),
         "launch_type": launch_type,
         "launch_key": str(getattr(row, "launch_key", "") or ""),
-        "campaign_id": str(getattr(row, "campaign_id")) if getattr(row, "campaign_id", None) else None,
+        "campaign_id": str(getattr(row, "campaign_id"))
+        if getattr(row, "campaign_id", None)
+        else None,
         "funnel_id": str(getattr(row, "funnel_id")) if getattr(row, "funnel_id", None) else None,
         "angle_id": str(getattr(row, "angle_id", "") or ""),
         "angle_run_id": str(getattr(row, "angle_run_id", "") or ""),
-        "selected_ums_id": str(getattr(row, "selected_ums_id")) if getattr(row, "selected_ums_id", None) else None,
+        "selected_ums_id": str(getattr(row, "selected_ums_id"))
+        if getattr(row, "selected_ums_id", None)
+        else None,
         "selected_variant_id": (
-            str(getattr(row, "selected_variant_id")) if getattr(row, "selected_variant_id", None) else None
+            str(getattr(row, "selected_variant_id"))
+            if getattr(row, "selected_variant_id", None)
+            else None
         ),
-        "launch_index": int(getattr(row, "launch_index")) if getattr(row, "launch_index", None) is not None else None,
+        "launch_index": int(getattr(row, "launch_index"))
+        if getattr(row, "launch_index", None) is not None
+        else None,
         "launch_workflow_run_id": (
-            str(getattr(row, "launch_workflow_run_id")) if getattr(row, "launch_workflow_run_id", None) else None
+            str(getattr(row, "launch_workflow_run_id"))
+            if getattr(row, "launch_workflow_run_id", None)
+            else None
         ),
         "launch_temporal_workflow_id": (
             str(getattr(row, "launch_temporal_workflow_id"))
@@ -323,7 +350,9 @@ def _strategy_v2_launch_row_payload(row, *, launch_status: str | None = None) ->
             else None
         ),
         "launch_status": launch_status,
-        "created_by_user": str(getattr(row, "created_by_user")) if getattr(row, "created_by_user", None) else None,
+        "created_by_user": str(getattr(row, "created_by_user"))
+        if getattr(row, "created_by_user", None)
+        else None,
         "created_at": created_at_iso,
     }
 
@@ -375,6 +404,7 @@ async def _start_campaign_planning(
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
 
+
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
@@ -406,7 +436,9 @@ def list_campaigns(
             detail="client_id and product_id are required together.",
         )
     repo = CampaignsRepository(session)
-    return jsonable_encoder(repo.list(org_id=auth.org_id, client_id=client_id, product_id=product_id))
+    return jsonable_encoder(
+        repo.list(org_id=auth.org_id, client_id=client_id, product_id=product_id)
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -415,7 +447,9 @@ async def create_campaign(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if not payload.channels or not all(isinstance(ch, str) and ch.strip() for ch in payload.channels):
+    if not payload.channels or not all(
+        isinstance(ch, str) and ch.strip() for ch in payload.channels
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="channels must include at least one non-empty value.",
@@ -504,7 +538,9 @@ def get_campaign_delivery(
     session: Session = Depends(get_session),
 ):
     campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
-    config = _campaign_delivery_repo(session).get_by_campaign(org_id=auth.org_id, campaign_id=str(campaign.id))
+    config = _campaign_delivery_repo(session).get_by_campaign(
+        org_id=auth.org_id, campaign_id=str(campaign.id)
+    )
     if config is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -587,7 +623,9 @@ def validate_campaign_delivery(
         )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(mode="json"),
+            detail=CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(
+                mode="json"
+            ),
         ) from exc
 
     config = repo.update(
@@ -603,7 +641,9 @@ def validate_campaign_delivery(
         validation_error=config.validation_error,
         results=results,
     )
-    return CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(mode="json")
+    return CampaignDeliveryValidationResponse.model_validate(response_payload).model_dump(
+        mode="json"
+    )
 
 
 @router.get("/{campaign_id}/launch-context-readiness")
@@ -641,7 +681,9 @@ def update_campaign_creative_context_provider(
             "campaignId": str(campaign.id),
             "provider": payload.provider.value,
             "creativeContextArtifactId": str(artifact.id),
-            "checkedAt": artifact.created_at.isoformat() if artifact.created_at else _utcnow().isoformat(),
+            "checkedAt": artifact.created_at.isoformat()
+            if artifact.created_at
+            else _utcnow().isoformat(),
         }
     ).model_dump(mode="json")
 
@@ -666,7 +708,30 @@ def upsert_campaign_manual_creative_context(
         payload=payload,
         created_by_user=auth.user_id,
     )
-    return CampaignManualCreativeContextUpsertResponse.model_validate(response_payload).model_dump(mode="json")
+    return CampaignManualCreativeContextUpsertResponse.model_validate(response_payload).model_dump(
+        mode="json"
+    )
+
+
+@router.post("/{campaign_id}/creative-context/materialize")
+def materialize_campaign_skills_creative_context(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = _get_campaign_or_404(session=session, org_id=auth.org_id, campaign_id=campaign_id)
+    try:
+        response_payload = materialize_skills_campaign_creative_context(
+            session=session,
+            org_id=auth.org_id,
+            campaign=campaign,
+            created_by_user=auth.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return CampaignSkillsCreativeContextMaterializeResponse.model_validate(response_payload).model_dump(
+        mode="json"
+    )
 
 
 @router.get("/{campaign_id}/strategy-v2-launches")
@@ -691,7 +756,9 @@ def list_campaign_strategy_v2_launches(
         if launch_workflow_run_id in status_by_workflow_run_id:
             continue
         linked_run = workflow_repo.get(org_id=auth.org_id, workflow_run_id=launch_workflow_run_id)
-        status_by_workflow_run_id[launch_workflow_run_id] = linked_run.status.value if linked_run else None
+        status_by_workflow_run_id[launch_workflow_run_id] = (
+            linked_run.status.value if linked_run else None
+        )
 
     payload_rows = []
     for row in rows:
@@ -837,7 +904,9 @@ async def generate_campaign_funnels(
         for funnel in existing_funnels
         if isinstance(funnel.experiment_spec_id, str) and funnel.experiment_spec_id.strip()
     }
-    duplicate_experiment_ids = [exp_id for exp_id in requested_experiment_ids if exp_id in existing_experiment_ids]
+    duplicate_experiment_ids = [
+        exp_id for exp_id in requested_experiment_ids if exp_id in existing_experiment_ids
+    ]
     if duplicate_experiment_ids:
         joined_ids = ", ".join(duplicate_experiment_ids)
         raise HTTPException(
@@ -934,6 +1003,39 @@ async def start_creative_production(
             ) from exc
 
     asset_brief_ids = payload.asset_brief_ids
+    swipe_collections_repo = SwipeCollectionsRepository(session)
+    explicit_swipe_collection_id = payload.swipe_collection_id
+    resolved_collection_id = explicit_swipe_collection_id or (
+        str(campaign.default_swipe_collection_id) if campaign.default_swipe_collection_id else None
+    )
+    if not resolved_collection_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign has no default swipe collection. Set one before starting creative production.",
+        )
+    swipe_collection = swipe_collections_repo.get(
+        org_id=auth.org_id,
+        collection_id=resolved_collection_id,
+    )
+    if swipe_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+        )
+    if explicit_swipe_collection_id is None and swipe_collection.kind in {"default", "gethookd_inbox"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign launch defaults must point at a curated or uploaded swipe collection.",
+        )
+    ready_swipe_asset_ids = swipe_collections_repo.ready_asset_ids(
+        org_id=auth.org_id,
+        collection_id=str(swipe_collection.id),
+    )
+    if not ready_swipe_asset_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Selected swipe collection has no ready swipe assets for creative generation.",
+        )
+
     artifacts_repo = ArtifactsRepository(session)
     brief_artifacts = artifacts_repo.list(
         org_id=auth.org_id,
@@ -960,7 +1062,10 @@ async def start_creative_production(
     if missing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": "Some asset briefs were not found.", "missingAssetBriefIds": missing},
+            detail={
+                "message": "Some asset briefs were not found.",
+                "missingAssetBriefIds": missing,
+            },
         )
 
     temporal = await get_temporal_client()
@@ -989,6 +1094,9 @@ async def start_creative_production(
                 product_id=str(campaign.product_id),
                 campaign_id=str(campaign.id),
                 asset_brief_ids=asset_brief_ids,
+                swipe_collection_id=str(swipe_collection.id),
+                swipe_collection_name=str(swipe_collection.name),
+                swipe_asset_ids=ready_swipe_asset_ids,
                 workflow_run_id=str(run.id),
             ),
             id=temporal_workflow_id,
@@ -1009,7 +1117,13 @@ async def start_creative_production(
         workflow_run_id=str(run.id),
         step="creative_production",
         status="started",
-        payload_in={"campaign_id": str(campaign.id), "asset_brief_ids": asset_brief_ids},
+        payload_in={
+            "campaign_id": str(campaign.id),
+            "asset_brief_ids": asset_brief_ids,
+            "swipe_collection_id": str(swipe_collection.id),
+            "swipe_collection_name": str(swipe_collection.name),
+            "swipe_asset_ids": ready_swipe_asset_ids,
+        },
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
@@ -1094,8 +1208,12 @@ def setup_campaign_meta_review(
                     "delivery": campaign_delivery_snapshot(delivery_config),
                 },
             ) from exc
-    requested_funnel_id = brief_funnel_id({"funnelId": payload.funnelId}) if payload.funnelId else None
-    selected_brief_funnel_ids = collect_brief_funnel_ids(brief_map=brief_map, brief_ids=selected_brief_ids)
+    requested_funnel_id = (
+        brief_funnel_id({"funnelId": payload.funnelId}) if payload.funnelId else None
+    )
+    selected_brief_funnel_ids = collect_brief_funnel_ids(
+        brief_map=brief_map, brief_ids=selected_brief_ids
+    )
     if is_external_delivery:
         if selected_brief_funnel_ids:
             raise HTTPException(
@@ -1128,7 +1246,9 @@ def setup_campaign_meta_review(
                 )
             requested_funnel_id = next(iter(selected_brief_funnel_ids))
         missing_funnel_brief_ids = [
-            brief_id for brief_id in selected_brief_ids if not brief_funnel_id(brief_map.get(brief_id))
+            brief_id
+            for brief_id in selected_brief_ids
+            if not brief_funnel_id(brief_map.get(brief_id))
         ]
         if missing_funnel_brief_ids:
             raise HTTPException(
@@ -1174,7 +1294,9 @@ def setup_campaign_meta_review(
             generation_batch_id=selected_generation_batch_id,
         )
 
-    missing_asset_briefs = [brief_id for brief_id, assets in assets_by_brief_id.items() if not assets]
+    missing_asset_briefs = [
+        brief_id for brief_id, assets in assets_by_brief_id.items() if not assets
+    ]
     if missing_asset_briefs:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1207,7 +1329,9 @@ def setup_campaign_meta_review(
     meta_repo = MetaAdsRepository(session)
     existing_creative_specs = {
         str(record.asset_id): record
-        for record in meta_repo.list_creative_specs(org_id=auth.org_id, campaign_id=str(campaign.id))
+        for record in meta_repo.list_creative_specs(
+            org_id=auth.org_id, campaign_id=str(campaign.id)
+        )
     }
     existing_adset_specs_by_experiment: dict[str, object] = {}
     for record in meta_repo.list_adset_specs(org_id=auth.org_id, campaign_id=str(campaign.id)):
@@ -1215,7 +1339,10 @@ def setup_campaign_meta_review(
         experiment_key = None
         if record.experiment_id:
             experiment_key = str(record.experiment_id)
-        elif isinstance(metadata.get("experimentSpecId"), str) and metadata.get("experimentSpecId").strip():
+        elif (
+            isinstance(metadata.get("experimentSpecId"), str)
+            and metadata.get("experimentSpecId").strip()
+        ):
             experiment_key = metadata.get("experimentSpecId").strip()
         if experiment_key and experiment_key not in existing_adset_specs_by_experiment:
             existing_adset_specs_by_experiment[experiment_key] = record
@@ -1357,10 +1484,13 @@ def setup_campaign_meta_review(
             )
             angle_used = swipe_copy_inputs.angle_used
             destination_page = swipe_copy_inputs.destination_page
-            normalized_destination_page = normalize_meta_review_destination_page(
-                destination_page,
-                review_paths=review_paths,
-            ) or destination_page.strip()
+            normalized_destination_page = (
+                normalize_meta_review_destination_page(
+                    destination_page,
+                    review_paths=review_paths,
+                )
+                or destination_page.strip()
+            )
             destination_type = requirement_destination_type(brief=brief, requirement=requirement)
             generation_batch_id = metadata.get("creativeGenerationBatchId")
             if isinstance(generation_batch_id, str):
@@ -1371,7 +1501,9 @@ def setup_campaign_meta_review(
                 [
                     str(campaign.name).strip(),
                     str(brief.get("variantName") or experiment_id).strip(),
-                    str(requirement.get("funnelStage") or requirement.get("channel") or "creative").strip(),
+                    str(
+                        requirement.get("funnelStage") or requirement.get("channel") or "creative"
+                    ).strip(),
                 ]
             )
             desired_metadata_json = {
@@ -1387,7 +1519,9 @@ def setup_campaign_meta_review(
                 "requirementIndex": requirement_index,
                 "requirement": requirement,
                 "swipeCopyPack": swipe_copy_pack.model_dump(mode="json", by_alias=True),
-                "swipeCopyInputs": jsonable_encoder(swipe_copy_inputs.model_dump(mode="json", by_alias=True)),
+                "swipeCopyInputs": jsonable_encoder(
+                    swipe_copy_inputs.model_dump(mode="json", by_alias=True)
+                ),
                 "swipeCopyModel": metadata.get("swipeCopyModel"),
                 "swipeCopyRequestId": metadata.get("swipeCopyRequestId"),
                 "swipeCopyStopReason": metadata.get("swipeCopyStopReason"),
@@ -1399,7 +1533,9 @@ def setup_campaign_meta_review(
                 "deliveryMode": resolved_delivery_config.delivery_mode.value,
                 "campaignDeliveryConfigId": str(resolved_delivery_config.id),
                 "campaignDelivery": campaign_delivery_snapshot(resolved_delivery_config),
-                "destinationSource": "campaign_delivery_config" if is_external_delivery else "review_path",
+                "destinationSource": "campaign_delivery_config"
+                if is_external_delivery
+                else "review_path",
                 "resolvedDestinationUrl": _resolve_meta_review_destination_url(
                     destination_page=normalized_destination_page,
                     review_paths=review_paths,
@@ -1470,7 +1606,9 @@ def setup_campaign_meta_review(
             },
         )
 
-    for experiment_id in [brief_map[brief_id]["experimentId"].strip() for brief_id in selected_brief_ids]:
+    for experiment_id in [
+        brief_map[brief_id]["experimentId"].strip() for brief_id in selected_brief_ids
+    ]:
         adset_spec = existing_adset_specs_by_experiment.get(experiment_id)
         if adset_spec is None:
             experiment_config = experiment_config_by_id[experiment_id]
@@ -1516,7 +1654,9 @@ def setup_campaign_meta_review(
             )
         )
         if requires_update:
-            updated_creative_spec = meta_repo.update_creative_spec(existing_creative, **desired_creative_spec_fields)
+            updated_creative_spec = meta_repo.update_creative_spec(
+                existing_creative, **desired_creative_spec_fields
+            )
             updated_creative_spec_ids.append(str(updated_creative_spec.id))
             existing_creative_specs[asset_id] = updated_creative_spec
         else:
@@ -1547,7 +1687,9 @@ def update_experiment_specs(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
 
     if not payload.experimentSpecs:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="experimentSpecs cannot be empty.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="experimentSpecs cannot be empty."
+        )
 
     spec_set = ExperimentSpecSet(
         clientId=campaign.client_id,
@@ -1566,3 +1708,69 @@ def update_experiment_specs(
         created_by_user=auth.user_id,
     )
     return jsonable_encoder(artifact)
+
+
+@router.get("/{campaign_id}/swipe-default")
+def get_campaign_swipe_default(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    if not campaign.default_swipe_collection_id:
+        return jsonable_encoder(CampaignSwipeDefaultResponse())
+    collections_repo = SwipeCollectionsRepository(session)
+    collection = collections_repo.get(
+        org_id=auth.org_id,
+        collection_id=str(campaign.default_swipe_collection_id),
+    )
+    if collection is None:
+        return jsonable_encoder(CampaignSwipeDefaultResponse())
+    ready_count = len(
+        collections_repo.ready_asset_ids(
+            org_id=auth.org_id,
+            collection_id=str(campaign.default_swipe_collection_id),
+        )
+    )
+    return jsonable_encoder(
+        CampaignSwipeDefaultResponse.model_validate(
+            {
+                "swipeCollectionId": str(campaign.default_swipe_collection_id),
+                "swipeCollectionName": collection.name,
+                "readySwipeCount": ready_count,
+            }
+        )
+    )
+
+
+@router.put("/{campaign_id}/swipe-default")
+def update_campaign_swipe_default(
+    campaign_id: str,
+    payload: CampaignSwipeDefaultUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    collection_id = payload.swipe_collection_id
+    collections_repo = SwipeCollectionsRepository(session)
+    if collection_id:
+        collection = collections_repo.get(org_id=auth.org_id, collection_id=collection_id)
+        if collection is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Swipe collection not found"
+            )
+        if collection.kind in {"default", "gethookd_inbox"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Campaign launch defaults must point at a curated or uploaded swipe collection.",
+            )
+        campaign.default_swipe_collection_id = collection_id
+    else:
+        campaign.default_swipe_collection_id = None
+    session.commit()
+    return get_campaign_swipe_default(campaign_id=campaign_id, auth=auth, session=session)

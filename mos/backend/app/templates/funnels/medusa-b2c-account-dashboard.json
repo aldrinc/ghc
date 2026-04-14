@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-account-dashboard",
+  "name": "Medusa B2C Account Dashboard",
+  "description": "Customer account overview with login/register.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Account",
+        "description": "Customer account"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CAccountDashboardPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

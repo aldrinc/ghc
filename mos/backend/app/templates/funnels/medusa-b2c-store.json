@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-store",
+  "name": "Medusa B2C Store",
+  "description": "All products store page with full product listing.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "All Products",
+        "description": "Browse all products"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CStorePage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

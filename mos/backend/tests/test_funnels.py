@@ -7,8 +7,20 @@ from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
 from app.db.enums import FunnelDomainStatusEnum
-from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain, FunnelPage, PaidAdsPlatformProfile
+from app.db.models import (
+    AgentRun,
+    AgentToolCall,
+    Client,
+    ClientComplianceProfile,
+    Funnel,
+    FunnelDomain,
+    FunnelPage,
+    PaidAdsPlatformProfile,
+    Site,
+)
 from app.db.repositories.funnels import FunnelsRepository
+from app.services.compliance import RULESET_VERSION as COMPLIANCE_RULESET_VERSION
+from app.services.funnels import extract_internal_links, rewrite_internal_target_ids
 from app.services.paid_ads_qa import RULESET_VERSION
 from app.services import deploy as deploy_service
 
@@ -216,6 +228,149 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert disabled_meta.status_code == 410
 
 
+def test_public_events_noop_for_site_preview(api_client: TestClient, db_session, auth_context):
+    client = Client(
+        org_id=UUID(auth_context.org_id),
+        name="Site Events Client",
+        industry="Retail",
+    )
+    db_session.add(client)
+    db_session.commit()
+    db_session.refresh(client)
+
+    site = Site(
+        org_id=UUID(auth_context.org_id),
+        client_id=client.id,
+        name="Preview Site",
+        route_slug="preview-site-events",
+        site_family="medusa-b2c-starter",
+        commerce_provider="medusa",
+    )
+    db_session.add(site)
+    db_session.commit()
+    db_session.refresh(site)
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "custom_page_view",
+                    "publicationId": str(site.id),
+                    "pageId": str(site.id),
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": "/f/example/preview-site-events/us",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": 0}
+
+
+def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(
+    api_client: TestClient,
+    db_session,
+):
+    client_resp = api_client.post("/clients", json={"name": "Honest Herbalist", "industry": "Retail"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Honest Herbalist Handbook"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
+
+    site_resp = api_client.post(
+        "/sites",
+        json={
+            "clientId": client_id,
+            "family": "medusa-b2c-starter",
+            "name": "Honest Herbalist",
+            "productId": product_id,
+        },
+    )
+    assert site_resp.status_code == 201
+    site_payload = site_resp.json()
+    route_slug = site_payload["routeSlug"]
+
+    meta_resp = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta_resp.status_code == 200
+    meta_payload = meta_resp.json()
+    assert meta_payload["funnelId"] == site_payload["id"]
+    assert meta_payload["funnelSlug"] == route_slug
+    assert meta_payload["publicationId"] == site_payload["id"]
+    assert meta_payload["entrySlug"] == "home"
+    assert {page["slug"] for page in meta_payload["pages"]} >= {
+        "checkout",
+        "privacy-policy",
+        "terms-of-service",
+        "refund-policy",
+        "shipping-policy",
+        "contact-support",
+    }
+
+    checkout_resp = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/checkout")
+    assert checkout_resp.status_code == 200
+    checkout_payload = checkout_resp.json()
+    assert checkout_payload["funnelId"] == site_payload["id"]
+    assert checkout_payload["slug"] == "checkout"
+    assert "checkout" in checkout_payload["pageTypeMap"].values()
+
+    privacy_resp = api_client.get(
+        f"/public/funnels/{product_slug}/{route_slug}/pages/privacy-policy"
+    )
+    assert privacy_resp.status_code == 200
+    privacy_payload = privacy_resp.json()
+    assert privacy_payload["slug"] == "privacy-policy"
+    assert privacy_payload["pageTypeMap"][privacy_payload["pageId"]] == "privacy_policy"
+
+    site_row = db_session.scalars(select(Site).where(Site.id == site_payload["id"])).first()
+    assert site_row is not None
+    db_session.add(
+        ClientComplianceProfile(
+            org_id=site_row.org_id,
+            client_id=site_row.client_id,
+            ruleset_version=COMPLIANCE_RULESET_VERSION,
+            business_models=["ecommerce"],
+            legal_business_name="Honest Herbalist LLC",
+            operating_entity_name="Honest Herbalist LLC",
+            company_address_text="123 Herbal Way, Austin, TX 78701",
+            support_email="support@honest-herbalist.test",
+            support_phone="+1-555-111-2222",
+            support_hours_text="Mon-Fri 9:00-17:00 CT",
+            response_time_commitment="Within 1 business day",
+            metadata_json={
+                "effective_date": "2026-03-26",
+                "privacy_data_collected": "We collect checkout, support, and browsing activity needed to operate the store.",
+                "privacy_data_usage": "We use collected data for fulfillment, support, billing, analytics, and fraud prevention.",
+                "privacy_data_sharing": "We share data with payment, shipping, and analytics providers required to operate the storefront.",
+                "privacy_security_retention": "We apply reasonable safeguards and retain data only as long as needed for legal and operational purposes.",
+                "privacy_user_choices": "Customers can request access, correction, deletion, or marketing opt-out through support.",
+                "privacy_update_notice": "Material updates are posted on this page with a revised effective date.",
+            },
+        )
+    )
+    db_session.commit()
+
+    policy_resp = api_client.get(
+        f"/public/funnels/{product_slug}/{route_slug}/policy-pages/privacy_policy",
+        params={
+            "website_url": f"https://store.test/f/{product_slug}/{route_slug}/us",
+        },
+    )
+    assert policy_resp.status_code == 200
+    policy_payload = policy_resp.json()
+    assert policy_payload["pageKey"] == "privacy_policy"
+    assert "Honest Herbalist" in policy_payload["markdown"]
+    assert "support@honest-herbalist.test" in policy_payload["markdown"]
+
+
 def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_client: TestClient):
     funnel_id, route_slug, product_id, product_slug = _create_publish_ready_funnel(
         api_client,
@@ -231,6 +386,88 @@ def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_clien
     assert meta.status_code == 200
     assert meta.json()["productSlug"] == product_slug
     assert meta.json()["funnelSlug"] == route_slug
+
+
+def test_rewrite_internal_target_ids_updates_starter_specific_page_target_fields() -> None:
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "funnelPage",
+                    "primaryTargetPageId": "__PAGE_CATEGORY__",
+                    "primaryCtaLabel": "Browse catalog",
+                },
+            },
+            {
+                "type": "Button",
+                "props": {
+                    "linkType": "funnelPage",
+                    "targetPageId": "__PAGE_CART__",
+                    "label": "Go to cart",
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    rewritten = rewrite_internal_target_ids(
+        puck_data,
+        {
+            "__PAGE_CATEGORY__": "page-category-real",
+            "__PAGE_CART__": "page-cart-real",
+        },
+    )
+
+    hero_props = rewritten["content"][0]["props"]
+    button_props = rewritten["content"][1]["props"]
+
+    assert hero_props["primaryTargetPageId"] == "page-category-real"
+    assert button_props["targetPageId"] == "page-cart-real"
+
+
+def test_extract_internal_links_includes_starter_specific_page_target_fields() -> None:
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "id": "hero-block",
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "funnelPage",
+                    "primaryTargetPageId": "page-category-real",
+                    "primaryCtaLabel": "Browse catalog",
+                },
+            },
+            {
+                "id": "button-block",
+                "type": "Button",
+                "props": {
+                    "linkType": "funnelPage",
+                    "targetPageId": "page-cart-real",
+                    "label": "Go to cart",
+                },
+            },
+            {
+                "id": "external-hero-block",
+                "type": "StarterHomeHero",
+                "props": {
+                    "primaryLinkType": "external",
+                    "primaryTargetPageId": "should-not-be-extracted",
+                    "primaryCtaLabel": "External",
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    links = extract_internal_links(puck_data)
+
+    assert [(link.to_page_id, link.label, link.meta["targetKey"]) for link in links] == [
+        ("page-category-real", "Browse catalog", "primaryTargetPageId"),
+        ("page-cart-real", "Go to cart", "targetPageId"),
+    ]
 
 
 def test_public_funnel_exposes_only_canonical_presales_slug(api_client: TestClient, db_session):
@@ -776,6 +1013,8 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://moshq.app/api",
+                "serverNames": ["shop.shopemberco.com"],
+                "https": True,
                 "bunnyPullZone": True,
                 "bunnyPullZoneOriginIp": "46.225.124.104",
             }
@@ -786,6 +1025,10 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     deploy_request = captured["deploy_request"]
     assert deploy_request["bunny_pull_zone"] is True
     assert deploy_request["bunny_pull_zone_origin_ip"] == "46.225.124.104"
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
+    assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
 
 
 def test_publish_with_deploy_does_not_use_funnel_domain_from_db_when_server_names_omitted(

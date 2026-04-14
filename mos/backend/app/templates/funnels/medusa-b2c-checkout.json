@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-checkout",
+  "name": "Medusa B2C Checkout",
+  "description": "Checkout flow with shipping, payment, and order confirmation.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Checkout",
+        "description": "Checkout"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CCheckoutPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

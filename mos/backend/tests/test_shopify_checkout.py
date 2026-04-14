@@ -34,7 +34,9 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
     db_session.commit()
     db_session.refresh(client)
 
-    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product", handle="shopify-product")
+    product = Product(
+        org_id=org_id, client_id=client.id, title="Shopify Product", handle="shopify-product"
+    )
     db_session.add(product)
     db_session.commit()
     db_session.refresh(product)
@@ -87,7 +89,9 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
     }
 
 
-def _seed_active_meta_tracking(*, db_session, seeded: dict[str, object], org_id: UUID, pixel_id: str = "1234567890"):
+def _seed_active_meta_tracking(
+    *, db_session, seeded: dict[str, object], org_id: UUID, pixel_id: str = "1234567890"
+):
     client = seeded["client"]
     connection = MetaAdAccountConnection(
         org_id=org_id,
@@ -244,7 +248,9 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert metadata["offer_id"] == str(seeded["offer"].id)
 
 
-def test_public_checkout_persists_checkout_started_event(api_client, db_session, auth_context, monkeypatch):
+def test_public_checkout_persists_checkout_started_event(
+    api_client, db_session, auth_context, monkeypatch
+):
     seeded = _seed_shopify_funnel(
         db_session=db_session,
         org_id=UUID(auth_context.org_id),
@@ -339,7 +345,40 @@ def test_public_checkout_routes_shopify_provider_with_stale_formatting(
     assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
 
 
-def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, db_session, auth_context):
+def test_public_checkout_medusa_provider_errors_cleanly(api_client, db_session, auth_context):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    seeded["variant"].provider = "medusa"
+    seeded["variant"].external_price_id = "medusa_variant_123"
+    db_session.add(seeded["variant"])
+    db_session.commit()
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "variantId": str(seeded["variant"].id),
+            "selection": {},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": None,
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 501
+    assert response.json()["detail"] == "Medusa checkout is not implemented yet."
+
+
+def test_public_funnel_commerce_filters_to_selected_offer_variants(
+    api_client, db_session, auth_context
+):
     seeded = _seed_shopify_funnel(
         db_session=db_session,
         org_id=UUID(auth_context.org_id),
@@ -382,14 +421,18 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
     db_session.commit()
 
     product_slug = str(seeded["product"].id).split("-", 1)[0]
-    response = api_client.get(f"/public/funnels/{product_slug}/{seeded['funnel'].route_slug}/commerce")
+    response = api_client.get(
+        f"/public/funnels/{product_slug}/{seeded['funnel'].route_slug}/commerce"
+    )
     assert response.status_code == 200
     payload = response.json()
     assert payload["product"]["variants_count"] == 1
     assert payload["product"]["variants"][0]["id"] == str(seeded["variant"].id)
 
 
-def test_public_checkout_selection_prefers_checkout_ready_variant(api_client, db_session, auth_context, monkeypatch):
+def test_public_checkout_selection_prefers_checkout_ready_variant(
+    api_client, db_session, auth_context, monkeypatch
+):
     seeded = _seed_shopify_funnel(
         db_session=db_session,
         org_id=UUID(auth_context.org_id),
@@ -444,7 +487,9 @@ def test_public_checkout_selection_prefers_checkout_ready_variant(api_client, db
     assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
 
 
-def test_shopify_orders_webhook_persists_funnel_order(api_client, db_session, auth_context, monkeypatch):
+def test_shopify_orders_webhook_persists_funnel_order(
+    api_client, db_session, auth_context, monkeypatch
+):
     seeded = _seed_shopify_funnel(db_session=db_session, org_id=UUID(auth_context.org_id))
     monkeypatch.setattr(settings, "SHOPIFY_ORDER_WEBHOOK_SECRET", "test_shopify_secret")
 
@@ -555,9 +600,13 @@ def test_shopify_orders_webhook_sends_meta_purchase_when_tracking_is_active(
     assert event["custom_data"]["currency"] == "USD"
     assert event["custom_data"]["value"] == 49.95
     assert event["custom_data"]["content_ids"] == [str(seeded["variant"].id)]
-    assert event["user_data"]["em"] == [hashlib.sha256("buyer@example.com".encode("utf-8")).hexdigest()]
+    assert event["user_data"]["em"] == [
+        hashlib.sha256("buyer@example.com".encode("utf-8")).hexdigest()
+    ]
     assert event["user_data"]["ph"] == [hashlib.sha256("13125550100".encode("utf-8")).hexdigest()]
-    assert event["user_data"]["external_id"] == [hashlib.sha256("session_123".encode("utf-8")).hexdigest()]
+    assert event["user_data"]["external_id"] == [
+        hashlib.sha256("session_123".encode("utf-8")).hexdigest()
+    ]
     assert event["user_data"]["client_ip_address"] == "203.0.113.10"
     assert event["user_data"]["client_user_agent"] == "Mozilla/5.0 Test Browser"
 
@@ -565,7 +614,10 @@ def test_shopify_orders_webhook_sends_meta_purchase_when_tracking_is_active(
         select(FunnelOrder).where(FunnelOrder.funnel_id == seeded["funnel"].id)
     ).all()
     assert len(saved) == 1
-    assert saved[0].checkout_metadata["meta_conversion"]["eventId"] == "shopify:example-shop.myshopify.com:987654321"
+    assert (
+        saved[0].checkout_metadata["meta_conversion"]["eventId"]
+        == "shopify:example-shop.myshopify.com:987654321"
+    )
     assert saved[0].checkout_metadata["meta_conversion"]["pixelId"] == meta_seed["pixel_id"]
 
 

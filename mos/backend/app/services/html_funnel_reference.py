@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html as html_lib
 import hashlib
 import re
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 MAX_HTML_REFERENCE_CHARS = 250_000
-MAX_HTML_PREVIEW_CHARS = 2_000
+MAX_HTML_PREVIEW_CHARS = 4_000
 MAX_TEXT_PREVIEW_CHARS = 1_200
 MAX_SECTION_ORDER_ITEMS = 20
 MAX_HEADINGS = 20
@@ -23,6 +24,19 @@ MAX_VISIBLE_TEXT_CHUNKS = 120
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+_ATTR_VALUE_RE = re.compile(
+    r"""(?ix)
+    \b(?P<name>[A-Za-z_:][A-Za-z0-9_:\.-]*)
+    \s*=\s*
+    (?:
+        "(?P<double>[^"]*)"
+        |
+        '(?P<single>[^']*)'
+        |
+        (?P<bare>[^\s"'=<>`]+)
+    )
+    """
+)
 _CTA_KEYWORDS = (
     "add to cart",
     "buy",
@@ -73,10 +87,39 @@ _GENERIC_SECTION_WORDS = {
     "shell",
     "wrapper",
 }
+_HTML_VOID_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
+_HTML_NON_EDITABLE_TEXT_TAGS = {"head", "script", "style", "noscript", "template", "svg"}
 
 
 class HtmlReferenceError(ValueError):
     pass
+
+
+class HtmlStructureMismatchError(HtmlReferenceError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class HtmlEditableTextNode:
+    nodeId: str
+    path: str
+    originalText: str
+    charCount: int
 
 
 class HtmlReferenceHeading(BaseModel):
@@ -113,6 +156,23 @@ class _CaptureState:
     tag: str
     attrs: dict[str, str]
     parts: list[str]
+
+
+@dataclass(slots=True)
+class _OpenTagContext:
+    tag: str
+    id_value: str | None
+    class_names: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _EditableHtmlTextSpan:
+    nodeId: str
+    path: str
+    originalText: str
+    charCount: int
+    start: int
+    end: int
 
 
 class _HtmlReferenceParser(HTMLParser):
@@ -232,6 +292,283 @@ class _HtmlReferenceParser(HTMLParser):
             self.meta_title = _clip_text(content, max_length=240)
 
 
+class _HtmlStructureSignatureParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tokens: list[tuple[Any, ...]] = []
+        self._raw_text_tag_stack: list[str] = []
+
+    def handle_decl(self, decl: str) -> None:
+        cleaned = decl.strip().lower()
+        if cleaned:
+            self.tokens.append(("decl", cleaned))
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized_tag = tag.lower()
+        self.tokens.append(("start", normalized_tag, _canonicalize_attrs(attrs)))
+        if normalized_tag in {"script", "style"}:
+            self._raw_text_tag_stack.append(normalized_tag)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tokens.append(("startend", tag.lower(), _canonicalize_attrs(attrs)))
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized_tag = tag.lower()
+        self.tokens.append(("end", normalized_tag))
+        if self._raw_text_tag_stack and self._raw_text_tag_stack[-1] == normalized_tag:
+            self._raw_text_tag_stack.pop()
+
+    def handle_data(self, data: str) -> None:
+        if not data:
+            return
+        if self._raw_text_tag_stack:
+            self.tokens.append(("raw_text", self._raw_text_tag_stack[-1], data))
+            return
+        if data.strip():
+            self.tokens.append(("text",))
+
+    def handle_comment(self, data: str) -> None:
+        if data.strip():
+            self.tokens.append(("comment", data))
+
+
+def _canonicalize_attrs(attrs: list[tuple[str, str | None]]) -> tuple[tuple[str, str | None], ...]:
+    canonical: list[tuple[str, str | None]] = []
+    for key, value in attrs:
+        canonical.append((str(key).lower().strip(), None if value is None else value.strip()))
+    return tuple(canonical)
+
+
+def _collapse_visible_html_text(value: str) -> str:
+    return _clip_text(html_lib.unescape(value), max_length=500)
+
+
+def _parse_tag_name(tag_source: str) -> str | None:
+    stripped = tag_source.strip()
+    if not stripped:
+        return None
+    if stripped.startswith("</"):
+        stripped = stripped[2:].lstrip()
+    elif stripped.startswith("<"):
+        stripped = stripped[1:].lstrip()
+    if stripped.startswith(("!", "?")):
+        return None
+    name_chars: list[str] = []
+    for char in stripped:
+        if char.isalnum() or char in {"_", "-", ":"}:
+            name_chars.append(char.lower())
+            continue
+        break
+    if not name_chars:
+        return None
+    return "".join(name_chars)
+
+
+def _extract_attr_value(tag_source: str, attr_name: str) -> str | None:
+    lowered_target = attr_name.lower()
+    for match in _ATTR_VALUE_RE.finditer(tag_source):
+        name = str(match.group("name") or "").lower()
+        if name != lowered_target:
+            continue
+        value = match.group("double")
+        if value is None:
+            value = match.group("single")
+        if value is None:
+            value = match.group("bare")
+        cleaned = str(value or "").strip()
+        return cleaned or None
+    return None
+
+
+def _scan_html_tag_end(html_document: str, start: int) -> int:
+    quote: str | None = None
+    idx = start + 1
+    while idx < len(html_document):
+        char = html_document[idx]
+        if quote:
+            if char == quote:
+                quote = None
+        else:
+            if char in {"'", '"'}:
+                quote = char
+            elif char == ">":
+                return idx + 1
+        idx += 1
+    return len(html_document)
+
+
+def _is_self_closing_tag(tag_source: str, tag_name: str | None) -> bool:
+    if tag_name and tag_name in _HTML_VOID_TAGS:
+        return True
+    return tag_source.rstrip().endswith("/>")
+
+
+def _build_html_path(stack: list[_OpenTagContext]) -> str:
+    if not stack:
+        return "document"
+    parts: list[str] = []
+    for ctx in stack:
+        part = ctx.tag
+        if ctx.id_value:
+            part += f"#{ctx.id_value}"
+        elif ctx.class_names:
+            part += "".join(f".{name}" for name in ctx.class_names[:2])
+        parts.append(part)
+    return ">".join(parts)
+
+
+def _should_skip_editable_text(stack: list[_OpenTagContext]) -> bool:
+    return any(ctx.tag in _HTML_NON_EDITABLE_TEXT_TAGS for ctx in stack)
+
+
+def _extract_editable_html_text_spans(html_document: str) -> list[_EditableHtmlTextSpan]:
+    normalized_html = str(html_document or "")
+    if not normalized_html.strip():
+        raise HtmlReferenceError("HTML reference must be a non-empty string.")
+
+    spans: list[_EditableHtmlTextSpan] = []
+    open_tags: list[_OpenTagContext] = []
+    node_index = 0
+    cursor = 0
+    total_len = len(normalized_html)
+
+    while cursor < total_len:
+        next_tag = normalized_html.find("<", cursor)
+        if next_tag == -1:
+            next_tag = total_len
+
+        if next_tag > cursor:
+            segment = normalized_html[cursor:next_tag]
+            collapsed = _collapse_visible_html_text(segment)
+            if collapsed and not _should_skip_editable_text(open_tags):
+                node_index += 1
+                spans.append(
+                    _EditableHtmlTextSpan(
+                        nodeId=f"text-{node_index}",
+                        path=_build_html_path(open_tags),
+                        originalText=collapsed,
+                        charCount=len(collapsed),
+                        start=cursor,
+                        end=next_tag,
+                    )
+                )
+            cursor = next_tag
+            continue
+
+        if normalized_html.startswith("<!--", cursor):
+            comment_end = normalized_html.find("-->", cursor + 4)
+            cursor = total_len if comment_end < 0 else comment_end + 3
+            continue
+
+        if normalized_html.startswith("<![CDATA[", cursor):
+            cdata_end = normalized_html.find("]]>", cursor + 9)
+            cursor = total_len if cdata_end < 0 else cdata_end + 3
+            continue
+
+        if normalized_html.startswith("<?", cursor):
+            processing_end = normalized_html.find("?>", cursor + 2)
+            cursor = total_len if processing_end < 0 else processing_end + 2
+            continue
+
+        token_end = _scan_html_tag_end(normalized_html, cursor)
+        tag_source = normalized_html[cursor:token_end]
+        tag_name = _parse_tag_name(tag_source)
+        stripped = tag_source.lstrip()
+
+        if tag_name:
+            if stripped.startswith("</"):
+                for idx in range(len(open_tags) - 1, -1, -1):
+                    if open_tags[idx].tag == tag_name:
+                        del open_tags[idx:]
+                        break
+            elif not _is_self_closing_tag(tag_source, tag_name):
+                class_attr = _extract_attr_value(tag_source, "class") or ""
+                open_tags.append(
+                    _OpenTagContext(
+                        tag=tag_name,
+                        id_value=_extract_attr_value(tag_source, "id"),
+                        class_names=tuple(part for part in class_attr.split() if part),
+                    )
+                )
+
+        cursor = token_end
+
+    return spans
+
+
+def extract_editable_html_text_nodes(*, html_document: str) -> list[HtmlEditableTextNode]:
+    return [
+        HtmlEditableTextNode(
+            nodeId=span.nodeId,
+            path=span.path,
+            originalText=span.originalText,
+            charCount=span.charCount,
+        )
+        for span in _extract_editable_html_text_spans(html_document)
+    ]
+
+
+def apply_html_text_replacements(*, original_html: str, replacements: list[dict[str, Any]]) -> str:
+    spans = _extract_editable_html_text_spans(original_html)
+    replacement_map: dict[str, str] = {}
+
+    for raw in replacements:
+        if not isinstance(raw, dict):
+            raise HtmlReferenceError("Each text replacement must be an object.")
+        node_id = str(raw.get("nodeId") or "").strip()
+        if not node_id:
+            raise HtmlReferenceError("Each text replacement must include a nodeId.")
+        if node_id in replacement_map:
+            raise HtmlReferenceError(f"Duplicate text replacement nodeId '{node_id}'.")
+        replacement_text = raw.get("text")
+        if not isinstance(replacement_text, str):
+            raise HtmlReferenceError(f"Text replacement '{node_id}' must include a string text value.")
+        replacement_map[node_id] = replacement_text
+
+    known_ids = {span.nodeId for span in spans}
+    unknown_ids = sorted(node_id for node_id in replacement_map if node_id not in known_ids)
+    if unknown_ids:
+        joined = ", ".join(unknown_ids[:5])
+        raise HtmlReferenceError(f"Text replacements reference unknown node ids: {joined}.")
+
+    rebuilt_parts: list[str] = []
+    cursor = 0
+    for span in spans:
+        rebuilt_parts.append(original_html[cursor:span.start])
+        raw_segment = original_html[span.start:span.end]
+        if span.nodeId not in replacement_map:
+            rebuilt_parts.append(raw_segment)
+        else:
+            match = re.match(r"^(\s*)(.*?)(\s*)$", raw_segment, flags=re.DOTALL)
+            if match:
+                leading_ws, _, trailing_ws = match.groups()
+            else:  # pragma: no cover - defensive fallback
+                leading_ws, trailing_ws = "", ""
+            rebuilt_parts.append(
+                f"{leading_ws}{html_lib.escape(replacement_map[span.nodeId], quote=False)}{trailing_ws}"
+            )
+        cursor = span.end
+    rebuilt_parts.append(original_html[cursor:])
+    return "".join(rebuilt_parts)
+
+
+def _build_html_structure_signature(reference_html: str) -> tuple[tuple[Any, ...], ...]:
+    parser = _HtmlStructureSignatureParser()
+    parser.feed(reference_html)
+    parser.close()
+    return tuple(parser.tokens)
+
+
+def assert_html_text_only_rewrite(*, original_html: str, rewritten_html: str) -> None:
+    original_signature = _build_html_structure_signature(original_html)
+    rewritten_signature = _build_html_structure_signature(rewritten_html)
+    if original_signature != rewritten_signature:
+        raise HtmlStructureMismatchError(
+            "Imported HTML rewrite changed the page structure or attributes. "
+            "Only visible text content may change in exact-template mode."
+        )
+
+
 def summarize_html_reference(*, reference_html: str, label: str | None = None) -> HtmlReferenceSummary:
     normalized_html = str(reference_html or "").strip()
     if not normalized_html:
@@ -312,6 +649,7 @@ def build_html_reference_prompt_context(summary: HtmlReferenceSummary | dict[str
         "formCount": source.formCount,
         "formFieldHints": source.formFieldHints[:8],
         "textPreview": source.textPreview,
+        "htmlPreview": source.htmlPreview,
     }
 
 
@@ -538,7 +876,9 @@ def _build_text_preview(chunks: list[str]) -> str:
         if projected_length > MAX_TEXT_PREVIEW_CHARS:
             remaining = MAX_TEXT_PREVIEW_CHARS - current_length - len(separator)
             if remaining > 12:
-                preview_parts.append(cleaned[:remaining].rstrip() + "...")
+                clipped = _clip_text(cleaned, max_length=remaining)
+                if clipped:
+                    preview_parts.append(separator + clipped if separator else clipped)
             break
         preview_parts.append(separator + cleaned if separator else cleaned)
         current_length = projected_length

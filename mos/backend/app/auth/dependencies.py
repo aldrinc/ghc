@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 import logging
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.clerk import verify_clerk_token
 from app.db.deps import get_session
+from app.db.models import User
 from app.db.repositories.orgs import OrgsRepository
 
 
@@ -17,6 +21,7 @@ logger = logging.getLogger("auth.deps")
 class AuthContext:
     user_id: str
     org_id: str
+    email: Optional[str] = None
 
 
 def get_current_user(
@@ -57,4 +62,9 @@ def get_current_user(
         )
 
     logger.debug("AuthContext built", extra={"sub": user_id, "org_id": str(org.id)})
-    return AuthContext(user_id=user_id, org_id=str(org.id))
+    email = claims.get("email")
+    if not isinstance(email, str) or not email.strip():
+        stmt = select(User.email).where(User.org_id == org.id, User.clerk_user_id == user_id)
+        email = session.execute(stmt).scalar_one_or_none()
+
+    return AuthContext(user_id=user_id, org_id=str(org.id), email=email.strip() if isinstance(email, str) else None)

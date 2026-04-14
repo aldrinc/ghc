@@ -3,6 +3,7 @@
   "name": "Sales PDP (PuppyPad)",
   "description": "Exact visual clone of the PuppyPad PDP sales page.",
   "previewImage": null,
+  "category": "sales",
   "assetBasePath": "templates/sales-template-main/public/assets",
   "assetPrefix": "/assets/",
   "puckData": {

@@ -217,6 +217,7 @@ def list_templates() -> list[FunnelTemplateSummary]:
             name=tmpl.name,
             description=tmpl.description,
             previewImage=tmpl.preview_image,
+            category=tmpl.category,
         )
         for tmpl in list_funnel_templates()
     ]
@@ -232,6 +233,7 @@ def get_template(template_id: str) -> FunnelTemplateDetail:
         name=tmpl.name,
         description=tmpl.description,
         previewImage=tmpl.preview_image,
+        category=tmpl.category,
         puckData=tmpl.puck_data,
     )
 
@@ -881,13 +883,16 @@ async def publish_funnel_route(
             ),
         )
     try:
+        edge_backed_artifact = bool(deploy.bunnyPullZone)
+        workload_server_names = [] if edge_backed_artifact else server_names
+        workload_https = False if edge_backed_artifact else bool(deploy.https)
         workload_patch = deploy_service.build_funnel_artifact_workload_patch(
             workload_name=deploy.workloadName,
             client_id=str(funnel.client_id),
             upstream_base_url=upstream_base_url,
             upstream_api_base_url=upstream_api_base_root,
-            server_names=server_names,
-            https=deploy.https,
+            server_names=workload_server_names,
+            https=workload_https,
             destination_path=deploy.destinationPath,
         )
         https_enabled = bool(deploy.https and server_names)

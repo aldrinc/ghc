@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,10 @@ import {
   META_OPTIMIZATION_GOALS,
   META_BILLING_EVENTS,
   META_CUSTOM_EVENT_TYPES,
+  META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
 } from "@/lib/metaAdsConstants";
+
+type MetaPublishBudgetScope = "campaign" | "adset" | "mixed";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,6 +29,46 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function resolveDraftBudgetScope(
+  forms: Record<string, ReturnType<typeof buildAdSetForm>>,
+  specs: ReturnType<typeof useMetaPublishContext>["includedAdSetSpecs"],
+  pageName?: string | null,
+): MetaPublishBudgetScope {
+  let sawCampaignBudget = false;
+  let sawAdSetBudget = false;
+  specs.forEach((spec) => {
+    const form = forms[spec.id] || buildAdSetForm(spec, { pageName });
+    const hasAdSetBudget = form.dailyBudget.trim() !== "" || form.lifetimeBudget.trim() !== "";
+    if (hasAdSetBudget) {
+      sawAdSetBudget = true;
+    } else {
+      sawCampaignBudget = true;
+    }
+  });
+  if (sawCampaignBudget && sawAdSetBudget) return "mixed";
+  if (sawAdSetBudget) return "adset";
+  return "campaign";
+}
+
+function formatBudgetScopeLabel(scope: MetaPublishBudgetScope): string {
+  if (scope === "campaign") return "Campaign budget (CBO)";
+  if (scope === "adset") return "Ad set budgets (ABO)";
+  return "Mixed budget scopes";
+}
+
+function formatMinorUnitsBudget(value: string | number | null | undefined): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const cleaned = value.trim();
+    if (!/^-?\d+$/.test(cleaned)) return null;
+    const numericValue = Number(cleaned);
+    return Number.isFinite(numericValue) ? `$${(numericValue / 100).toFixed(2)}/day (${numericValue} minor units)` : null;
+  }
+  const numericValue = value;
+  if (!Number.isFinite(numericValue)) return null;
+  return `$${(numericValue / 100).toFixed(2)}/day (${numericValue} minor units)`;
 }
 
 export function MetaPublishConfigPanel() {
@@ -49,6 +93,13 @@ export function MetaPublishConfigPanel() {
     handlePublishToMeta,
   } = useMetaPublishContext();
   const hasValidatedWorkspacePixel = Boolean(config?.pixelId && config?.validationStatus === "valid" && config?.lastValidatedAt);
+  const draftBudgetScope = useMemo(
+    () => resolveDraftBudgetScope(publishAdSetForms, includedAdSetSpecs, config?.pageName),
+    [config?.pageName, includedAdSetSpecs, publishAdSetForms],
+  );
+  const campaignBudgetSummary = publishCampaignForm.campaignDailyBudget.trim()
+    ? formatMinorUnitsBudget(publishCampaignForm.campaignDailyBudget) || "Enter a whole-number budget in minor units."
+    : (formatMinorUnitsBudget(META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS) || "Enter a campaign budget.");
 
   if (selectionLoading) {
     return <div className="px-4 py-3 text-sm text-content-muted">Loading final Meta package…</div>;
@@ -121,6 +172,21 @@ export function MetaPublishConfigPanel() {
               placeholder="Select buying type"
             />
           </Field>
+          <Field label="Budget scope">
+            <div className="flex h-10 items-center rounded-md border border-border bg-surface-2 px-3 text-sm text-content">
+              {formatBudgetScopeLabel(draftBudgetScope)}
+            </div>
+          </Field>
+          <Field label="Campaign daily budget">
+            <Input
+              type="number"
+              min="101"
+              step="1"
+              value={publishCampaignForm.campaignDailyBudget}
+              onChange={(e) => updatePublishCampaignField("campaignDailyBudget", e.target.value)}
+              placeholder={String(META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS)}
+            />
+          </Field>
           <div className="sm:col-span-2 space-y-1">
             <div className="text-xs font-medium text-content-muted">Special ad categories</div>
             <SpecialAdCategoriesCheckboxGroup
@@ -129,10 +195,13 @@ export function MetaPublishConfigPanel() {
             />
           </div>
         </div>
-        <p className="text-xs text-content-muted">
-          Creates the Meta campaign, ad sets, and ads in <span className="font-semibold text-content">PAUSED</span> status. New publish plans default to a{" "}
-          <span className="font-semibold text-content">$100/day campaign-level CBO budget</span>.
-        </p>
+        <Callout variant={draftBudgetScope === "mixed" ? "warning" : "info"} size="sm">
+          {draftBudgetScope === "campaign"
+            ? `This draft will publish as a campaign-budgeted CBO launch. Current campaign daily budget: ${campaignBudgetSummary}.`
+            : draftBudgetScope === "adset"
+              ? "This draft currently uses ad set budgets because at least one linked ad set has its own daily or lifetime budget. The campaign daily budget stays visible here, but Meta will ignore it until all ad set budgets are blank."
+              : "This draft mixes campaign-level and ad-set budgets. Publish validation will block until every linked ad set uses the same budget scope."}
+        </Callout>
       </section>
 
       {/* Divider */}
@@ -215,6 +284,17 @@ export function MetaPublishConfigPanel() {
                   </div>
 
                   <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-medium text-content-muted">Attribution spec JSON</div>
+                      <Textarea
+                        value={form.attributionSpecJson}
+                        onChange={(e) => updatePublishAdSetField(spec.id, "attributionSpecJson", e.target.value)}
+                        placeholder='[{"event_type":"CLICK_THROUGH","window_days":7}]'
+                      />
+                      <div className="text-xs text-content-muted">
+                        Broad/Int default is 7-day click, 1-day view, and 1-day engaged video view. This JSON is stored on the ad set spec and sent during publish.
+                      </div>
+                    </div>
                     <div className="space-y-1.5">
                       <div className="text-xs font-medium text-content-muted">Targeting JSON</div>
                       <CountryTierButtons

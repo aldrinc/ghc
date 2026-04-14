@@ -1,6 +1,7 @@
 export type FunnelStatus = "draft" | "published" | "disabled" | "archived";
 
 import type { DesignSystemTokens } from "@/types/designSystems";
+import type { MedusaRuntimeConfig } from "@/lib/medusa/config";
 
 export type Funnel = {
   id: string;
@@ -68,9 +69,100 @@ export type PublicFunnelMeta = {
   publicationId: string;
   entrySlug: string;
   pages: { pageId: string; slug: string }[];
+  medusaRuntimeConfig?: MedusaRuntimeConfig | null;
 };
 
 export type PublicFunnelStage = "pre_sales" | "sales" | "checkout" | "thank_you" | "custom";
+
+export type ImportedHtmlTrackEventType =
+  | "pre_sales_to_sales_click"
+  | "sales_to_checkout_click"
+  | "custom_page_click";
+
+export type ImportedHtmlOptionSelector = {
+  name: string;
+  selector: string;
+  source: "value" | "text";
+};
+
+export type ImportedHtmlVariantResolver =
+  | {
+      type: "fixed";
+      variantId: string;
+    }
+  | {
+      type: "option_values";
+      optionSelectors: ImportedHtmlOptionSelector[];
+    };
+
+export type ImportedHtmlCheckoutConfig =
+  | {
+      mode: "public_checkout";
+      variantResolver: ImportedHtmlVariantResolver;
+    }
+  | {
+      mode: "external_checkout_url";
+      variantResolver: ImportedHtmlVariantResolver;
+      externalUrlsByVariant: Array<{
+        variantId: string;
+        url: string;
+      }>;
+    };
+
+export type ImportedHtmlInstrumentationBinding =
+  | {
+      id: string;
+      type: "internal_navigation";
+      selector: string;
+      event: "click";
+      targetPageId: string;
+      trackEventType: ImportedHtmlTrackEventType;
+    }
+  | {
+      id: string;
+      type: "checkout";
+      selector: string;
+      event: "click";
+      trackEventType: ImportedHtmlTrackEventType;
+      checkout: ImportedHtmlCheckoutConfig;
+    }
+  | {
+      id: string;
+      type: "track_only";
+      selector: string;
+      event: "click";
+      trackEventType: ImportedHtmlTrackEventType;
+    };
+
+export type ImportedHtmlInstrumentationManifest = {
+  schemaVersion: "imported-html-instrumentation-v1";
+  pageStage: PublicFunnelStage;
+  bindings: ImportedHtmlInstrumentationBinding[];
+};
+
+// Site page types for commerce experiences
+export type SitePageType =
+  | "home"
+  | "store"
+  | "collection"
+  | "category"
+  | "product_detail"
+  | "cart"
+  | "checkout"
+  | "privacy_policy"
+  | "terms_of_service"
+  | "returns_refunds_policy"
+  | "shipping_policy"
+  | "contact_support"
+  | "account_dashboard"
+  | "account_profile"
+  | "account_addresses"
+  | "account_orders"
+  | "account_order_detail"
+  | "order_confirmed"
+  | "order_transfer"
+  | "order_transfer_accept"
+  | "order_transfer_decline";
 
 export type PublicFunnelPage = {
   productSlug: string;
@@ -82,6 +174,7 @@ export type PublicFunnelPage = {
   puckData: unknown;
   pageMap: Record<string, string>;
   pageStageMap: Record<string, PublicFunnelStage>;
+  pageTypeMap?: Record<string, SitePageType>;
   designSystemTokens?: DesignSystemTokens | null;
   metadata?: {
     title: string;
@@ -133,6 +226,7 @@ export type FunnelTemplateSummary = {
   name: string;
   description?: string | null;
   previewImage?: string | null;
+  category?: string | null;
 };
 
 export type FunnelTemplateDetail = FunnelTemplateSummary & {

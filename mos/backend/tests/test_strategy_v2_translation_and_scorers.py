@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from types import SimpleNamespace
 import pytest
@@ -306,7 +307,7 @@ def test_translate_stage1_accepts_primary_challenge_label_for_bottleneck() -> No
     assert stage1.bottleneck == "confidence in dosage decisions"
 
 
-def test_translate_stage1_accepts_primary_segment_statement_for_bottleneck() -> None:
+def test_translate_stage1_uses_primary_segment_statement_to_select_primary_segment_profile() -> None:
     stage0 = translate_stage0(
         product_name="Honest Herbalist Handbook",
         product_description="Digital herbal safety guide.",
@@ -320,17 +321,32 @@ def test_translate_stage1_accepts_primary_segment_statement_for_bottleneck() -> 
                 '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
                 '"competitors":[{"name":"Competitor A"}]}'
             ),
+            "04": "Bottleneck: confidence in dosage decisions\n",
             "06": (
-                "1. Busy home herbal caregivers\n"
-                "2. Families researching non-pharma options\n"
-                "3. Skeptics needing sourcing transparency\n"
-                "The PRIMARY SEGMENT is Busy home herbal caregivers. "
-                "All downstream prompts should optimize for this segment first.\n"
+                "### Segment A\n"
+                "- Segment Name: Busy home herbal caregivers\n"
+                "- Estimated Prevalence: Common among daily supplement buyers\n"
+                "- Key Differentiator: They want simple and repeatable routines\n"
+                "\n"
+                "### Segment B\n"
+                "- Segment Name: Families researching non-pharma options\n"
+                "- Estimated Prevalence: Smaller but highly motivated cohort\n"
+                "- Key Differentiator: They compare ingredient sourcing across brands\n"
+                "\n"
+                "### Segment C\n"
+                "- Segment Name: Skeptics needing sourcing transparency\n"
+                "- Estimated Prevalence: Narrow but high-intent segment\n"
+                "- Key Differentiator: They need proof before trusting claims\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment B: Families researching non-pharma options.\n"
             ),
         },
     }
     stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
-    assert stage1.bottleneck == "Busy home herbal caregivers"
+    assert stage1.primary_segment.name == "Families researching non-pharma options"
+    assert stage1.primary_segment.size_estimate == "Smaller but highly motivated cohort"
+    assert stage1.primary_segment.key_differentiator == "They compare ingredient sourcing across brands"
+    assert stage1.bottleneck == "confidence in dosage decisions"
 
 
 def test_translate_stage1_accepts_bottleneck_segment_label_for_bottleneck() -> None:
@@ -359,7 +375,7 @@ def test_translate_stage1_accepts_bottleneck_segment_label_for_bottleneck() -> N
     assert stage1.bottleneck == "Busy home herbal caregivers"
 
 
-def test_translate_stage1_accepts_inline_primary_segment_label_for_bottleneck() -> None:
+def test_translate_stage1_requires_explicit_bottleneck_when_only_primary_segment_statement_is_present() -> None:
     stage0 = translate_stage0(
         product_name="Honest Herbalist Handbook",
         product_description="Digital herbal safety guide.",
@@ -382,8 +398,702 @@ def test_translate_stage1_accepts_inline_primary_segment_label_for_bottleneck() 
             ),
         },
     }
+    with pytest.raises(StrategyV2MissingContextError, match="requires a non-empty bottleneck"):
+        translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+
+def test_translate_stage1_filters_citation_urls_and_parses_segment_blocks_from_foundational_docs() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "Category / Niche: Supplements for women age 42-58\n"
+                "### Validated competitors (13)\n"
+                "- Ember Wellness https://emberwellness.example/products/brain-clarity "
+                "https://www.similarweb.com/website/emberwellness.example\n"
+                "- MenoLabs https://menolabs.example/products/memory-support "
+                "https://www.trustpilot.com/review/menolabs.example\n"
+                "- Clarity Keeper https://claritykeeper.example/protocol https://reference.example/brain-fog.pdf\n"
+                "- Press mention https://www.prnewswire.com/news-releases/ember-brain-clarity.html\n"
+                "Introduction calls are common during customer onboarding.\n"
+            ),
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": "#1 Bottleneck to Solve: fear of losing credibility at work when brain fog shows up\n",
+            "06": (
+                "### Segment A\n"
+                "- Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "- Estimated Prevalence: Dominant in the live VOC corpus across professional women 42-58\n"
+                "- Key Differentiator: Their urgency spikes when verbal fluency slips threaten visible competence\n"
+                "\n"
+                "### Segment B\n"
+                "- Segment Name: Exhausted Midlife Caregiver\n"
+                "- Estimated Prevalence: Secondary segment with recurring family-management overload\n"
+                "- Key Differentiator: They need a format that fits fragmented routines\n"
+                "\n"
+                "### Segment C\n"
+                "- Segment Name: Prevention-Oriented Optimizer\n"
+                "- Estimated Prevalence: Smaller but premium-leaning early adopter segment\n"
+                "- Key Differentiator: They respond to proactive performance framing and regimen precision\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
     stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
-    assert stage1.bottleneck == "Busy home herbal caregivers"
+
+    assert stage1.competitor_count_validated == 13
+    assert stage1.competitor_urls == [
+        "https://emberwellness.example/products/brain-clarity",
+        "https://menolabs.example/products/memory-support",
+        "https://claritykeeper.example/protocol",
+    ]
+    assert stage1.market_maturity_stage is None
+    assert stage1.primary_icps == [
+        "Credibility-on-the-line Knowledge Worker",
+        "Exhausted Midlife Caregiver",
+        "Prevention-Oriented Optimizer",
+    ]
+    assert stage1.primary_segment.name == "Credibility-on-the-line Knowledge Worker"
+    assert stage1.primary_segment.size_estimate == "Dominant in the live VOC corpus across professional women 42-58"
+    assert (
+        stage1.primary_segment.key_differentiator
+        == "Their urgency spikes when verbal fluency slips threaten visible competence"
+    )
+    assert stage1.bottleneck == "fear of losing credibility at work when brain fog shows up"
+
+
+def test_translate_stage1_uses_primary_segment_key_differentiator_when_bottleneck_label_is_missing() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": "Category / Niche: Supplements for women age 42-58\nValidated competitors (3)\n",
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "06": (
+                "### Step 3: Named & bounded segments (3-5)\n"
+                "1) Credibility-on-the-line Knowledge Worker\n"
+                "2) Hormone-Restricted Relief Seeker\n"
+                "3) Evidence-First Protocol Optimizer\n"
+                "\n"
+                "# Segment A - Credibility-on-the-line Knowledge Worker\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "Estimated Prevalence: Large cluster in the live VOC set\n"
+                "Key Differentiator: Their primary pain is public and professional competence loss\n"
+                "\n"
+                "# Segment B - Hormone-Restricted Relief Seeker\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Hormone-Restricted Relief Seeker\n"
+                "Estimated Prevalence: Secondary but recurring cluster\n"
+                "Key Differentiator: They need clear non-hormonal safety framing\n"
+                "\n"
+                "# Segment C - Evidence-First Protocol Optimizer\n"
+                "## A. Segment Identity\n"
+                "Segment Name: Evidence-First Protocol Optimizer\n"
+                "Estimated Prevalence: Smaller high-information cluster\n"
+                "Key Differentiator: They demand dose transparency and proof before trying anything\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.primary_segment.name == "Credibility-on-the-line Knowledge Worker"
+    assert stage1.bottleneck == "Their primary pain is public and professional competence loss"
+
+
+def test_translate_stage1_extracts_identity_threat_cluster_label_as_bottleneck() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": "Category / Niche: Supplements for women age 42-58\nValidated competitors (3)\n",
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "06": (
+                "1. Career-load women managing visible cognitive pressure\n"
+                "2. Exhausted caregivers juggling home and symptom load\n"
+                "3. Prevention-oriented optimizers seeking regimen precision\n"
+                "\n"
+                "## Phase 1: Segment Discovery\n"
+                "### Step 1: Distinct buyer signals (VOC-grounded clusters)\n"
+                "**Identity-threat clusters**\n"
+                "- Career competence threat / workplace humiliation: "
+                "“brain fog… I miss details constantly”; “50-something female in tech”\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.bottleneck == "Career competence threat / workplace humiliation"
+
+
+def test_translate_stage1_extracts_numbered_distress_cluster_label_as_bottleneck() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": "Category / Niche: Supplements for women age 42-58\nValidated competitors (3)\n",
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "06": (
+                "## Phase 1 — Segment Discovery\n"
+                "### Step 1: Distinct buyer signals (clusters found in VOC)\n"
+                "1) **Work-performance shame + word-finding failures**\n"
+                "- \"I lose the thread mid-sentence in meetings\"\n"
+                "2) Symptom-stack overwhelm during caregiving hours\n"
+                "- \"Everything hits at once by 4pm\"\n"
+                "3) Prevention-minded protocol optimizers\n"
+                "- \"I want to stay sharp before it gets worse\"\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.bottleneck == "Work-performance shame + word-finding failures"
+
+
+def test_translate_stage1_derives_competitor_domains_from_validated_reference_blocks() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "Category / Niche: Supplements for women age 42-58\n"
+                "### Validated competitors (3)\n"
+                "1) **O Positiv** - passes bar\n"
+                "- Similarweb: 2.6M visits. "
+                "([similarweb.com](https://www.similarweb.com/website/opositiv.com/))\n"
+                "2) **Happy Mammoth** - passes bar\n"
+                "- Trustpilot: 12,348 reviews. "
+                "([trustpilot.com](https://www.trustpilot.com/review/happymammoth.com))\n"
+                "3) **Bonafide (hellobonafide.com)** - passes bar\n"
+                "- Retail expansion press release indicates Target distribution. "
+                "([bankingpressreleases.com](https://bankingpressreleases.com/article/846036254-bonafide-health-announces-expansion))\n"
+            ),
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": "Bottleneck: fear of losing credibility when brain fog shows up at work\n",
+            "06": (
+                "# Segment A - Credibility-on-the-line Knowledge Worker\n"
+                "Segment Name: Credibility-on-the-line Knowledge Worker\n"
+                "Estimated Prevalence: Large cluster in the live VOC set\n"
+                "Key Differentiator: Their primary pain is public and professional competence loss\n"
+                "\n"
+                "# Segment B - Hormone-Restricted Relief Seeker\n"
+                "Segment Name: Hormone-Restricted Relief Seeker\n"
+                "Estimated Prevalence: Secondary but recurring cluster\n"
+                "Key Differentiator: They need clear non-hormonal safety framing\n"
+                "\n"
+                "# Segment C - Evidence-First Protocol Optimizer\n"
+                "Segment Name: Evidence-First Protocol Optimizer\n"
+                "Estimated Prevalence: Smaller high-information cluster\n"
+                "Key Differentiator: They demand dose transparency and proof before trying anything\n"
+                "\n"
+                "The PRIMARY SEGMENT is Segment A: Credibility-on-the-line Knowledge Worker.\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/",
+        "https://happymammoth.com/",
+        "https://hellobonafide.com/",
+    ]
+
+
+def test_translate_stage1_unwraps_wrapped_foundational_payloads_and_keeps_validated_competitors_clean() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": False, "price": "$40"},
+    )
+    step01 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## Phase 2: Discover Competitors (Direct + Adjacent)\n"
+                "| Candidate | URL | Type | Notes |\n"
+                "|---|---:|---|---|\n"
+                "| O Positiv | `https://opositivcare.com/` | Direct | Menopause supplement brand |\n"
+                "| Bonafide | `https://hellobonafide.com/` | Direct | Women's health nutraceuticals |\n"
+                "| Happy Mammoth | `https://happymammoths.us/products/hormone-harmony` | Direct | Hormone Harmony product |\n"
+                "| Estroven | `https://estroven.com/` | Direct | Menopause relief brand |\n"
+                "| Perelel | `https://perelelhealth.com/` | Adjacent | Perimenopause pack |\n"
+                "| MenoLabs | `https://menolabs.com/` | Direct | Tracker app plus supplements |\n"
+                "| Amberen | `https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply` | Direct | Menopause relief product |\n"
+                "| MaryRuth Organics | `https://www.maryruthorganics.com/products/organic-menopause-gummies` | Adjacent | Dedicated menopause gummies |\n"
+                "| Life Extension | `https://www.lifeextension.com/` | Adjacent | Large supplement incumbent |\n"
+                "\n"
+                "## Phase 3: Validate Battle-Tested Competitors\n"
+                "### Validated set (9)\n"
+                "1) **Life Extension** (`lifeextension.com`)\n"
+                "- Traffic: ~1.04M visits. ([semrush.com](https://www.semrush.com/website/lifeextension.com/overview/?source=trending-websites&utm_source=openai))\n"
+                "- Content authority: monthly magazine. ([lifeextension.com](https://www.lifeextension.com/about/media-press-pass?utm_source=openai))\n"
+                "2) **Happy Mammoth**\n"
+                "- Traffic: 1,535,938 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/happy-mammoth?utm_source=openai))\n"
+                "3) **MaryRuth Organics**\n"
+                "- Traffic: 2,284,920 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/maryruth-organics?utm_source=openai))\n"
+                "- Market presence: Target distribution. ([maryruthorganics.com](https://www.maryruthorganics.com/blogs/press-and-news/maryruth-s-products-for-infants-now-available-in-almost-2-000-target-stores?utm_source=openai))\n"
+                "4) **Estroven**\n"
+                "- Longevity: first produced in 1997. ([en.wikipedia.org](https://en.wikipedia.org/wiki/Amerifit_Brands?utm_source=openai))\n"
+                "5) **O Positiv**\n"
+                "- Traffic: 994,892 monthly web visits via Crunchbase. ([crunchbase.com](https://www.crunchbase.com/organization/flo-vitamins?utm_source=openai))\n"
+                "- Market penetration: verified reviews on the homepage. ([opositivcare.com](https://opositivcare.com/?utm_source=openai))\n"
+                "6) **Bonafide Health**\n"
+                "- Traffic: 211.33K visits. ([semrush.com](https://www.semrush.com/website/hellobonafide.com/overview/))\n"
+                "- Retail expansion: 1,800+ Target stores. ([crunchbase.com](https://www.crunchbase.com/organization/jds-therapeutics-llc-the-parent-company-of-bonafide-and-nutrition-21?utm_source=openai))\n"
+                "7) **Perelel**\n"
+                "- Funding: $27M round. ([beautyindependent.com](https://www.beautyindependent.com/prelude-growth-leads-27m-round-perelel-womens-wellness-heats-up/?utm_source=openai))\n"
+                "8) **MenoLabs**\n"
+                "- Company maturity: acquired by Amyris. ([crunchbase.com](https://www.crunchbase.com/organization/menolabs/company_financials?utm_source=openai))\n"
+                "9) **Amberen (Biogix / Alliance Pharma acquisition mentioned in market report)**\n"
+                "- Market transaction: Alliance Pharma acquired Biogix. ([pswordpress-production.s3.amazonaws.com](https://pswordpress-production.s3.amazonaws.com/2023/11/Menopause_The-600-Billion-Opportunity-in-Femtech_PreScouter-2023.pdf?utm_source=openai))\n"
+                "- Brand site indicates it is active. ([amberen.com](https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply?utm_source=openai))\n"
+                "\n"
+                "## Phase 8: Market Maturity Assessment\n"
+                "### Product lifecycle stage: **Maturity (with ongoing innovation/line extensions)**\n"
+            ),
+            "bounded_summary": "Validated competitors (battle-tested with non-trivial traction evidence): 9.",
+            "foundational_step_key": "01",
+        }
+    )
+    step04 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## D) Victories, Failures, Complaints & Frustrations\n"
+                "- Failures people report: nothing changed, side effects, or they quit early.\n"
+                "\n"
+                "## Bottleneck Identification\n"
+                '- #1 unresolved pain/unmet need: "I need my brain back" (focus + word recall + mental energy) in a way that is reliable, non-hormone-required, and does not add new problems.\n'
+            ),
+            "bounded_summary": "#1 bottleneck: a trustworthy, repeatable, hormone-optional cognitive solution.",
+            "foundational_step_key": "04",
+        }
+    )
+    step06 = json.dumps(
+        {
+            "source": "precanon_research.step_contents",
+            "content": (
+                "## Phase 1 - Segment Discovery\n"
+                "### Step 3: Segment names & bounds (3-5)\n"
+                "1) Workplace Edge Protectors - protect professional competence and verbal fluency.\n"
+                "2) ADHD-Peri System Crashers - peri turns ADHD from manageable to unmanageable.\n"
+                "3) Evidence-Hawk Supplement Skeptics - demand dosing and proof.\n"
+                "4) Format Friction Strugglers - adherence is the top problem.\n"
+                "5) Side-Effect Sentinels - high sensitivity to bloat, palpitations, and hair loss fears.\n"
+                "\n"
+                "## Segment 1: Workplace Edge Protectors\n"
+                "- Segment Name: Workplace Edge Protectors\n"
+                "- Estimated Prevalence: 25% of the live VOC set\n"
+                "- Key Differentiator: Primary pain is public competence loss\n"
+                "\n"
+                "## Segment 2: ADHD-Peri System Crashers\n"
+                "- Segment Name: ADHD-Peri System Crashers\n"
+                "- Estimated Prevalence: Secondary but intense segment\n"
+                "- Key Differentiator: Their coping systems suddenly stop working\n"
+                "\n"
+                "## Segment 3: Evidence-Hawk Supplement Skeptics\n"
+                "- Segment Name: Evidence-Hawk Supplement Skeptics\n"
+                "- Estimated Prevalence: Large skeptical cluster\n"
+                "- Key Differentiator: They demand proof before trusting claims\n"
+                "\n"
+                "## Segment 4: Format Friction Strugglers\n"
+                "- Segment Name: Format Friction Strugglers\n"
+                "- Estimated Prevalence: Medium-sized adherence-driven cluster\n"
+                "- Key Differentiator: They want a format they will actually take\n"
+                "\n"
+                "## Segment 5: Side-Effect Sentinels\n"
+                "- Segment Name: Side-Effect Sentinels\n"
+                "- Estimated Prevalence: Smaller but high-anxiety cluster\n"
+                "- Key Differentiator: Safety and tolerability beat outcomes-first copy\n"
+                "\n"
+                'The PRIMARY SEGMENT is "Workplace Edge Protectors."\n'
+            ),
+            "bounded_summary": "Bounded summary: 5 distinct buyer segments identified. PRIMARY SEGMENT: Workplace Edge Protectors.",
+            "foundational_step_key": "06",
+        }
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": step01,
+            "02": (
+                '{"compliance_landscape":{"overall":{"red_pct":0.12,"yellow_pct":0.34}},'
+                '"competitors":[{"name":"Competitor A"}]}'
+            ),
+            "04": step04,
+            "06": step06,
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.competitor_count_validated == 9
+    assert stage1.competitor_urls == [
+        "https://www.lifeextension.com/",
+        "https://happymammoths.us/products/hormone-harmony",
+        "https://www.maryruthorganics.com/products/organic-menopause-gummies",
+        "https://estroven.com/",
+        "https://opositivcare.com/",
+        "https://hellobonafide.com/",
+        "https://perelelhealth.com/",
+        "https://menolabs.com/",
+        "https://amberen.com/products/amberen-advanced-menopause-relief-capsules-3-month-supply",
+    ]
+    assert stage1.market_maturity_stage == "Maturity"
+    assert "I need my brain back" in stage1.bottleneck
+    assert stage1.primary_icps == [
+        "Workplace Edge Protectors",
+        "ADHD-Peri System Crashers",
+        "Evidence-Hawk Supplement Skeptics",
+        "Format Friction Strugglers",
+        "Side-Effect Sentinels",
+    ]
+    assert stage1.primary_segment.name == "Workplace Edge Protectors"
+    assert stage1.primary_segment.size_estimate == "25% of the live VOC set"
+    assert stage1.primary_segment.key_differentiator == "Primary pain is public competence loss"
+
+
+def test_translate_stage1_handles_live_primary_niche_validation_tables_and_profile_blocks() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "step_contents": {
+            "01": (
+                "## Phase 1 — Understand & Formalize the Idea (Evidence-only)\n"
+                "### 6) Market definition (keep visible)\n"
+                '**Primary niche:** "Hormone-free DTC menopause/perimenopause supplements positioned for brain fog / focus / cognitive clarity."\n'
+                "\n"
+                "## Phase 2 — Discover Competitors (Direct + Adjacent; candidates collected)\n"
+                "| Candidate | URL | Type | What they do (1 line) |\n"
+                "|---|---|---|---|\n"
+                "| O Positiv MENO | opositiv.com/products/meno-menopause-gummy-vitamins-s2 | Direct | Hormone-free menopause gummy. ([opositiv.com](https://opositiv.com/products/meno-menopause-gummy-vitamins-s2?utm_source=openai)) |\n"
+                "| Happy Mammoth Hormone Harmony | happymammoths.us/products/hormone-harmony | Direct | Menopause hormone support. ([happymammoths.us](https://happymammoths.us/products/hormone-harmony?utm_source=openai)) |\n"
+                "| HUM Fan Club | nordstrom.com listing | Direct | Retail listing with substantial review volume. ([nordstrom.com](https://www.nordstrom.com/s/fan-club-multi-symptom-relief-for-perimenopause-menopause-supplement/6971955?utm_source=openai)) |\n"
+                "| Brainzyme Focus | brainzyme.com/products/brainzyme-focus-brain-fog-menopause | Adjacent | Menopause brain fog support. ([brainzyme.com](https://www.brainzyme.com/products/brainzyme-focus-brain-fog-menopause?utm_source=openai)) |\n"
+                "\n"
+                "## Phase 3 — Validate “Battle-Tested” (ONLY those with non-trivial traction signals)\n"
+                "| Competitor | Included? | Why it passes bar (1–2 bullets; evidence) |\n"
+                "|---|---:|---|\n"
+                "| O Positiv | Yes | Large traffic estimate present. |\n"
+                "| Happy Mammoth | Yes | Product page shows thousands of reviews. |\n"
+                "| HUM Fan Club | Yes | Nordstrom listing shows meaningful review volume. |\n"
+                "| Brainzyme | No | Useful adjacent angle but weaker traction in this run. |\n"
+                "\n"
+                "## Phase 8 — Market Maturity Assessment (evidence-based)\n"
+                "### Product lifecycle stage: **Maturity**\n"
+            ),
+            "04": (
+                "## Bottleneck Identification\n"
+                "### #1 biggest unresolved pain / unmet need / broken expectation\n"
+                "A trustworthy, menopause-relevant brain fog solution that feels safe, believable, and easy to stick with.\n"
+            ),
+            "06": (
+                "## Phase 1: Segment Discovery\n"
+                "### Step 3 — Segment names & bounds (3)\n"
+                "1) **Word-Work Panic Performers** — high-performing, word-based careers; embarrassment triggers action.\n"
+                "2) **Hormone-Cautious Protocol Experimenters** — try sleep/exercise/supplements before committing hard.\n"
+                "3) **Format-Driven, Side-Effect-Sensitive Convenience Seekers** — GI tolerance and adherence determine conversion.\n"
+                "\n"
+                "## Phase 2: Segment Profiles\n"
+                "# 1) Word-Work Panic Performers\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Word-Work Panic Performers\n"
+                "- **Estimated Prevalence (Fermi):** **~25%** of peri/meno women 42–58.\n"
+                "- **Key Differentiator:** Their #1 pain is *public performance failure* (meetings/emails/conversations), not general wellness.\n"
+                "\n"
+                "# 2) Hormone-Cautious Protocol Experimenters\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Hormone-Cautious Protocol Experimenters\n"
+                "- **Estimated Prevalence:** **~30%** across the live VOC set.\n"
+                "- **Key Differentiator:** They buy *a protocol*, not a pill.\n"
+                "\n"
+                "# 3) Format-Driven, Side-Effect-Sensitive Convenience Seekers\n"
+                "### A. Segment Identity\n"
+                "- **Segment Name:** Format-Driven, Side-Effect-Sensitive Convenience Seekers\n"
+                "- **Estimated Prevalence:** **~15%** with strong tolerability signals.\n"
+                "- **Key Differentiator:** Conversion hinges on *tolerability + dosing practicality*, not motivation.\n"
+                "\n"
+                "## Phase 3: Bottleneck Segment Identification (computed)\n"
+                "**PRIMARY SEGMENT = Word-Work Panic Performers.**\n"
+            ),
+        }
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche == (
+        "Hormone-free DTC menopause/perimenopause supplements positioned for brain fog / focus / cognitive clarity."
+    )
+    assert stage1.market_maturity_stage == "Maturity"
+    assert stage1.competitor_count_validated == 3
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/products/meno-menopause-gummy-vitamins-s2",
+        "https://happymammoths.us/products/hormone-harmony",
+        "https://www.nordstrom.com/s/fan-club-multi-symptom-relief-for-perimenopause-menopause-supplement/6971955",
+    ]
+    assert stage1.primary_icps == [
+        "Word-Work Panic Performers",
+        "Hormone-Cautious Protocol Experimenters",
+        "Format-Driven, Side-Effect-Sensitive Convenience Seekers",
+    ]
+    assert stage1.primary_segment.name == "Word-Work Panic Performers"
+    assert stage1.primary_segment.size_estimate == "~25% of peri/meno women 42–58."
+    assert stage1.primary_segment.key_differentiator == (
+        "Their #1 pain is public performance failure (meetings/emails/conversations), not general wellness."
+    )
+    assert stage1.bottleneck == (
+        "A trustworthy, menopause-relevant brain fog solution that feels safe, believable, and easy to stick with."
+    )
+
+
+def test_translate_stage1_handles_april_2026_live_foundational_shape() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": (
+                "### 6) Market definition (keep visible)\n"
+                '**Primary niche:** "DTC menopause/perimenopause supplements (often gummies/capsules) '
+                'claiming multi-symptom relief, with a sub-pocket of creatine-driven \'brain+strength\' products."\n'
+                "\n"
+                "## Phase 2 — Discover Competitors (Direct + Adjacent)\n"
+                "| Candidate | URL | Type | What it is |\n"
+                "|---|---:|---|---|\n"
+                "| O Positiv | `https://opositiv.com/` | Direct | Menopause supplement brand |\n"
+                "| Alloy | `https://es.semrush.com/website/myalloy.com/overview/` | Adjacent | Menopause care service |\n"
+                "| Midi Health | `https://hypestat.com/info/joinmidi.com` | Adjacent | Menopause specialist clinic |\n"
+                "| Equelle | `https://hypestat.com/info/equelle.com` | Direct | Menopause supplement site |\n"
+                "| Brainzyme | `https://hypestat.com/info/brainzyme.com` | Adjacent | Menopause brain fog support |\n"
+                "\n"
+                "## Phase 3 — Validate Battle-Tested Competitors\n"
+                "### Validated competitors (5)\n"
+                "1) **O Positiv** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/opositiv.com))\n"
+                "2) **Alloy** — traction evidence. "
+                "([semrush.com](https://www.semrush.com/website/myalloy.com/overview/))\n"
+                "3) **Midi Health** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/joinmidi.com))\n"
+                "4) **Equelle** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/equelle.com))\n"
+                "5) **Brainzyme** — traction evidence. "
+                "([hypestat.com](https://hypestat.com/info/brainzyme.com))\n"
+                "\n"
+                "## Phase 8 — Market Maturity Assessment\n"
+                "### Product lifecycle stage: Growth → early maturity\n"
+            ),
+            "04": (
+                "3) Bottleneck Identification (most important)\n"
+                "#1 unresolved pain / unmet need / broken expectation:\n"
+                "“I need my brain back, but I don’t have time to experiment—and I don’t trust convenient "
+                "formats (gummies) to be real, stable, and correctly dosed.”\n"
+                "\n"
+                "- Quality failures: “MOLD!!” + “not consistent.”\n"
+            ),
+            "06": (
+                "## Phase 1: Segment Discovery\n"
+                "### Step 3 — Segments named & bounded (5)\n"
+                "1) **Boardroom Word-Loss Achiever** — work-performance failures drive urgency.\n"
+                "2) **Caregiver Slow-Fade + Dementia-Fear** — reassurance and a plan.\n"
+                "3) **Proof-First Anti-Scam Analyst** — only buys when proof is explicit.\n"
+                "4) **Side-Effect Sensitive Scale-Watcher (PRIMARY CANDIDATE)** — wants cognitive upside "
+                "but quits fast when bloat, GI, palpitations, or hair fears show up.\n"
+                "5) **Supplement-Overwhelmed Convenience Seeker** — wants an easy, consistent routine.\n"
+                "\n"
+                "## Phase 2: Segment Profiles\n"
+                "# Segment 1 — Boardroom Word-Loss Achiever\n"
+                "## A) Segment Identity\n"
+                "**Segment Name:** Boardroom Word-Loss Achiever\n"
+                "**Estimated Prevalence:** ~25% of TAM\n"
+                "**Key Differentiator:** Her purchase urgency is driven by public work slips.\n"
+                "\n"
+                "# Segment 4 — Side-Effect Sensitive Scale-Watcher (PRIMARY)\n"
+                "## A) Segment Identity\n"
+                "**Segment Name:** Side-Effect Sensitive Scale-Watcher\n"
+                "**Estimated Prevalence:** ~20% of TAM (Fermi): bloat/scale is HIGH SIGNAL and side effects recur.\n"
+                "**Key Differentiator:** Her decision is dominated by tolerability and perceived body-risk.\n"
+                "\n"
+                "## Phase 3: Cross-Segment Analysis\n"
+                "**The PRIMARY SEGMENT is: Side-Effect Sensitive Scale-Watcher.**\n"
+            ),
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche.startswith("DTC menopause/perimenopause supplements")
+    assert stage1.competitor_urls == [
+        "https://opositiv.com/",
+        "https://myalloy.com/",
+        "https://joinmidi.com/",
+        "https://equelle.com/",
+        "https://brainzyme.com/",
+    ]
+    assert stage1.competitor_count_validated == 5
+    assert stage1.bottleneck.startswith("I need my brain back")
+    assert stage1.primary_segment.name == "Side-Effect Sensitive Scale-Watcher"
+    assert stage1.primary_segment.size_estimate.startswith("~20%")
+    assert stage1.primary_segment.key_differentiator.startswith(
+        "Her decision is dominated by tolerability and perceived body-risk"
+    )
+    assert any("creatine" in keyword for keyword in stage1.product_category_keywords)
+
+
+def test_translate_stage1_handles_validated_competitor_set_tables_with_multiline_niche_and_bold_bottleneck() -> None:
+    stage0 = translate_stage0(
+        product_name="Ember: Brain Clarity Protocol",
+        product_description="Creatine gummies designed for perimenopausal women.",
+        onboarding_payload={},
+        stage0_overrides={"product_customizable": True, "price": "$40"},
+    )
+    precanon_research = {
+        "category_niche": "Supplements for women age 42-58",
+        "step_contents": {
+            "01": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "## Phase 1: Understand & Formalize the Idea\n"
+                        "**Primary niche (filter for later phases):**\n"
+                        "**Perimenopause brain-fog supplement protocols, specifically creatine-forward gummies/supplements for women 42–58.**\n"
+                        "\n"
+                        "### Candidate competitor set (unfiltered)\n"
+                        "| Candidate | URL | Type | What they do / who they serve |\n"
+                        "|---|---|---:|---|\n"
+                        "| Goli | goli.com | Adjacent | Large gummy supplement brand. ([de.semrush.com](https://de.semrush.com/website/goli.com/overview/?utm_source=openai)) |\n"
+                        "| Happy Mammoth | store.happymammoth.com | Adjacent | Women's hormone support brand. ([brandsearch.co](https://brandsearch.co/brands/store.happymammoth.com?utm_source=openai)) |\n"
+                        "| Perelel | perelelhealth.com | Adjacent | Women's supplement packs. ([milled.com](https://milled.com/perelel/introducing-mens-multi-support-pack-wV_BzPwQuroAjC8E?utm_source=openai)) |\n"
+                        "\n"
+                        "## Phase 3: Validate “Battle-Tested” Competitors (filter to non-trivial traction)\n"
+                        "### Validation rule applied\n"
+                        "Only include brands with meaningful traffic or clear market proof.\n"
+                        "\n"
+                        "### Validated competitor set (3)\n"
+                        "| Competitor | Why it passes “battle-tested” bar (evidence) |\n"
+                        "|---|---|\n"
+                        "| **Goli (goli.com)** | Semrush shows strong traffic. ([de.semrush.com](https://de.semrush.com/website/goli.com/overview/?utm_source=openai)) |\n"
+                        "| **Happy Mammoth (store.happymammoth.com / happymammoth.com)** | BrandSearch shows strong traffic and revenue. ([brandsearch.co](https://brandsearch.co/brands/store.happymammoth.com?utm_source=openai)) |\n"
+                        "| **Perelel (perelelhealth.com)** | Semrush competitors page shows meaningful traffic. ([semrush.com](https://www.semrush.com/website/perelelhealth.com/competitors/?utm_source=openai)) |\n"
+                        "\n"
+                        "### Product lifecycle stage: Growth → early maturity\n"
+                    ),
+                    "bounded_summary": "Validated competitor set (3).",
+                    "foundational_step_key": "01",
+                }
+            ),
+            "04": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "# Bottleneck Identification (single biggest unresolved need)\n"
+                        "**Biggest unresolved need:** A **peri-specific, creatine-first brain fog protocol** that feels *safe* and *works*, **in a gummy form people actually trust**.\n"
+                    ),
+                    "bounded_summary": "Biggest unresolved need captured.",
+                    "foundational_step_key": "04",
+                }
+            ),
+            "06": json.dumps(
+                {
+                    "source": "precanon_research.step_contents",
+                    "content": (
+                        "## Phase 1: Segment Discovery\n"
+                        "### Step 3 — Segment names & bounds (3)\n"
+                        "1) Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "2) Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "3) Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "\n"
+                        "## Segment 1 — Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "- Segment Name: Boardroom Blankers (High-Performing Knowledge Workers)\n"
+                        "- Estimated Prevalence: ~30% of Ember's TAM\n"
+                        "- Key Differentiator: Their primary pain is status/competence exposure (not just discomfort).\n"
+                        "\n"
+                        "## Segment 2 — Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "- Segment Name: Care-Betrayed Self-Experimenters (Community-First Protocol Builders)\n"
+                        "- Estimated Prevalence: ~25% of Ember's TAM\n"
+                        "- Key Differentiator: They share and iterate on protocols before buying.\n"
+                        "\n"
+                        "## Segment 3 — Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "- Segment Name: Hormone-Cautious Non-Hormone Seekers (HRT-Avoidant but Protocol-Oriented)\n"
+                        "- Estimated Prevalence: ~20% of Ember's TAM\n"
+                        "- Key Differentiator: They want a non-hormonal protocol they can trust.\n"
+                        "\n"
+                        "**The PRIMARY SEGMENT is: _Boardroom Blankers (High-Performing Knowledge Workers)_.**\n"
+                    ),
+                    "bounded_summary": "Primary segment is Boardroom Blankers.",
+                    "foundational_step_key": "06",
+                }
+            ),
+        },
+    }
+
+    stage1 = translate_stage1(stage0=stage0, precanon_research=precanon_research)
+
+    assert stage1.category_niche == (
+        "Perimenopause brain-fog supplement protocols, specifically creatine-forward gummies/supplements for women 42–58."
+    )
+    assert stage1.market_maturity_stage == "Growth"
+    assert stage1.competitor_count_validated == 3
+    assert stage1.competitor_urls == [
+        "https://goli.com/",
+        "https://store.happymammoth.com/",
+        "https://perelelhealth.com/",
+    ]
+    assert stage1.bottleneck == (
+        "A peri-specific, creatine-first brain fog protocol that feels safe and works, in a gummy form people actually trust."
+    )
+    assert stage1.primary_segment.name == "Boardroom Blankers (High-Performing Knowledge Workers)"
 
 
 def test_extract_competitor_analysis_and_compliance_sensitivity() -> None:

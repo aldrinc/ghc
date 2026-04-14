@@ -34,11 +34,17 @@ from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import CLAUDE_DEFAULT_MODEL, build_document_blocks, call_claude_structured_message
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    imported_html_instrumentation_schema,
+    validate_imported_html_document_manifest,
+)
 from app.services.funnels import default_puck_data
 from app.services.funnels import _walk_json as walk_json  # reuse internal helper
 from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
 from app.services.funnel_templates import get_funnel_template
 from app.services.media_storage import MediaStorage
+from app.services.puck_data_validation import assert_no_legacy_section_props
 from app.services.product_types import canonical_product_type
 
 
@@ -980,6 +986,47 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
             if not isinstance(data, dict):
                 raise ValueError(
                     f"SalesPdpReviews.{source}.data must be a JSON object{id_suffix}. Received {_describe_value(data)}."
+                )
+            if not isinstance(data.get("productId"), str) or not data.get("productId"):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.productId must be a non-empty string{id_suffix}. "
+                    f"Received {_describe_value(data.get('productId'))}."
+                )
+            summary = data.get("summary")
+            if not isinstance(summary, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.summary must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(summary)}."
+                )
+            for key in ("breakdown", "topics", "mediaGallery"):
+                if not isinstance(summary.get(key), list):
+                    raise ValueError(
+                        f"SalesPdpReviews.{source}.data.summary.{key} must be a list{id_suffix}. "
+                        f"Received {_describe_value(summary.get(key))}."
+                    )
+            filters = data.get("filters")
+            if not isinstance(filters, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.filters must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(filters)}."
+                )
+            for key in ("ratings", "countries", "sorts"):
+                if not isinstance(filters.get(key), list):
+                    raise ValueError(
+                        f"SalesPdpReviews.{source}.data.filters.{key} must be a list{id_suffix}. "
+                        f"Received {_describe_value(filters.get(key))}."
+                    )
+            pagination = data.get("pagination")
+            if not isinstance(pagination, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.pagination must be a JSON object{id_suffix}. "
+                    f"Received {_describe_value(pagination)}."
+                )
+            reviews = data.get("reviews")
+            if not isinstance(reviews, list):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data.reviews must be a list{id_suffix}. "
+                    f"Received {_describe_value(reviews)}."
                 )
 
         elif comp_type == "SalesPdpMarquee":
@@ -4448,7 +4495,9 @@ def _sanitize_puck_data(data: Any) -> dict[str, Any]:
         content = []
     if not isinstance(zones, dict):
         zones = {}
-    return {"root": root, "content": content, "zones": zones}
+    sanitized = {"root": root, "content": content, "zones": zones}
+    assert_no_legacy_section_props(sanitized)
+    return sanitized
 
 
 def _ensure_block_ids(puck_data: dict[str, Any]) -> None:
@@ -4822,6 +4871,34 @@ def _puck_output_schema() -> dict[str, Any]:
     }
 
 
+def _html_rewrite_output_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "assistantMessage": {"type": "string"},
+            "textReplacements": {
+                "type": "array",
+                "description": (
+                    "Subset of editable text nodes that should change. "
+                    "Each nodeId must come from the provided editable text node list."
+                ),
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "nodeId": {"type": "string"},
+                        "text": {"type": "string"},
+                    },
+                    "required": ["nodeId", "text"],
+                },
+            },
+            "instrumentationManifest": imported_html_instrumentation_schema(),
+        },
+        "required": ["assistantMessage", "textReplacements", "instrumentationManifest"],
+    }
+
+
 def _puck_response_format() -> dict[str, Any]:
     return {
         "type": "json_schema",
@@ -4829,6 +4906,17 @@ def _puck_response_format() -> dict[str, Any]:
             "name": "PuckDraft",
             "strict": True,
             "schema": _puck_output_schema(),
+        },
+    }
+
+
+def _html_rewrite_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "ImportedHtmlRewrite",
+            "strict": True,
+            "schema": _html_rewrite_output_schema(),
         },
     }
 
@@ -4918,10 +5006,13 @@ def _inject_header_footer_if_missing(
             "Section",
             {
                 "purpose": "header",
-                "layout": "full",
-                "containerWidth": "lg",
+                "bandWidth": "bleed",
+                "contentWidth": "xl",
+                "contentAlign": "center",
+                "surface": "none",
                 "variant": "default",
-                "padding": "sm",
+                "padY": "sm",
+                "padX": "md",
                 "content": [
                     _make_component(
                         "Columns",
@@ -4947,10 +5038,13 @@ def _inject_header_footer_if_missing(
             "Section",
             {
                 "purpose": "footer",
-                "layout": "full",
-                "containerWidth": "lg",
+                "bandWidth": "bleed",
+                "contentWidth": "xl",
+                "contentAlign": "center",
+                "surface": "none",
                 "variant": "muted",
-                "padding": "md",
+                "padY": "md",
+                "padX": "md",
                 "content": footer_items,
             },
         )
@@ -4994,10 +5088,58 @@ def _sanitize_component_tree(items: Any, allowed_types: set[str]) -> list[dict[s
         elif t == "FAQ":
             if not isinstance(props.get("items"), list):
                 props["items"] = []
+        elif t == "ImportedHtmlDocument":
+            if not isinstance(props.get("htmlDocument"), str):
+                props["htmlDocument"] = ""
+            instrumentation_manifest = props.get("instrumentationManifest")
+            if instrumentation_manifest is not None and not isinstance(instrumentation_manifest, dict):
+                props["instrumentationManifest"] = None
 
         cleaned.append(cast(dict[str, Any], raw))
 
     return cleaned
+
+
+def _validate_imported_html_document_components(
+    puck_data: dict[str, Any],
+    *,
+    current_page_stage: str = "custom",
+    current_page_id: str | None = None,
+    next_page_id: str | None = None,
+    available_target_page_ids: set[str] | None = None,
+    checkout_ready_variants: list[ProductVariant] | None = None,
+    require_stage_bindings: bool = False,
+) -> None:
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("type") != "ImportedHtmlDocument":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            raise ValueError("ImportedHtmlDocument is missing props.")
+        html_document = props.get("htmlDocument")
+        if not isinstance(html_document, str) or not html_document.strip():
+            raise ValueError("ImportedHtmlDocument.props.htmlDocument must be a non-empty string.")
+        instrumentation_manifest = props.get("instrumentationManifest")
+        try:
+            resolved_page_stage = current_page_stage
+            if resolved_page_stage == "custom" and isinstance(instrumentation_manifest, dict):
+                manifest_stage = instrumentation_manifest.get("pageStage")
+                if isinstance(manifest_stage, str) and manifest_stage.strip():
+                    resolved_page_stage = manifest_stage.strip()
+            validate_imported_html_document_manifest(
+                html_document=html_document,
+                instrumentation_manifest=instrumentation_manifest,
+                current_page_stage=resolved_page_stage,
+                current_page_id=current_page_id,
+                next_page_id=next_page_id,
+                available_target_page_ids=available_target_page_ids,
+                checkout_ready_variants=checkout_ready_variants,
+                require_stage_bindings=require_stage_bindings,
+            )
+        except ImportedHtmlRuntimeValidationError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 def _resolve_image_asset_key(obj: dict[str, Any]) -> str | None:
@@ -5797,8 +5939,8 @@ def generate_funnel_page_draft(
             "- Be specific and scannable (short paragraphs, bullets)\n"
             "- Use ethical persuasion; avoid fear-mongering\n\n"
             "Layout guidance:\n"
-            "- Default to Section.layout='full' for most sections (full-width background)\n"
-            "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+            "- Default to Section with bandWidth='bleed' and contentWidth='xl' for most sections\n"
+            "- Use contentWidth='2xl' if you need wider content, or contentWidth='none' for full-bleed blocks\n"
             "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
             "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
             f"{context_guidance}"
@@ -5815,13 +5957,14 @@ def generate_funnel_page_draft(
             "- props should include a string id (unique per component)\n\n"
             "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
             "Available primitives (component types) and their props:\n"
-            "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+            "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
             "   - purpose: 'header' | 'section' | 'footer'\n"
-            "   - layout: 'full' | 'contained' | 'card'\n"
-            "     - full = full-width background, content constrained to containerWidth\n"
-            "     - contained = background constrained to containerWidth (no card styling)\n"
-            "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-            "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+            "   - bandWidth: 'bleed' (edge-to-edge, default) | 'page' (max 1440px) | 'narrow' (max 1024px)\n"
+            "   - contentWidth: 'none' (fill band) | 'prose' | 'sm' | 'md' | 'lg' | 'xl' (default) | '2xl' | 'full'\n"
+            "   - contentAlign: 'center' (default) | 'left' | 'right'\n"
+            "   - surface: 'none' (default) | 'subtle' (tinted bg) | 'card' (bordered + raised)\n"
+            "   - padY: 'none' | 'sm' | 'md' (default) | 'lg' | 'xl'\n"
+            "   - padX: 'none' | 'sm' | 'md' (default) | 'lg'\n"
             "   - content is a slot: ComponentData[]\n"
             "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
             "   - left/right are slots: ComponentData[]\n"
@@ -6049,12 +6192,12 @@ def generate_funnel_page_draft(
         requirements: list[str] = []
         if missing_header:
             requirements.append(
-                "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', padY='sm', padX='md'."
             )
             requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
         if missing_footer:
             requirements.append(
-                "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', variant='muted', padY='md', padX='md'."
             )
             requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 
@@ -6592,8 +6735,8 @@ def stream_funnel_page_draft(
                 "- Be specific and scannable (short paragraphs, bullets)\n"
                 "- Use ethical persuasion; avoid fear-mongering\n\n"
                 "Layout guidance:\n"
-                "- Default to Section.layout='full' for most sections (full-width background)\n"
-                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+                "- Default to Section with bandWidth='bleed' and contentWidth='xl' for most sections\n"
+                "- Use contentWidth='2xl' if you need wider content, or contentWidth='none' for full-bleed blocks\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
                 "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
                 f"{product_guidance}"
@@ -6608,13 +6751,14 @@ def stream_funnel_page_draft(
 	                "- props should include a string id (unique per component)\n\n"
 	                "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
 	                "Available primitives (component types) and their props:\n"
-	                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+	                "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, variant?, padY?, padX?, content? }\n"
 	                "   - purpose: 'header' | 'section' | 'footer'\n"
-	                "   - layout: 'full' | 'contained' | 'card'\n"
-	                "     - full = full-width background, content constrained to containerWidth\n"
-	                "     - contained = background constrained to containerWidth (no card styling)\n"
-	                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+	                "   - bandWidth: 'bleed' (edge-to-edge, default) | 'page' (max 1440px) | 'narrow' (max 1024px)\n"
+	                "   - contentWidth: 'none' (fill band) | 'prose' | 'sm' | 'md' | 'lg' | 'xl' (default) | '2xl' | 'full'\n"
+	                "   - contentAlign: 'center' (default) | 'left' | 'right'\n"
+	                "   - surface: 'none' (default) | 'subtle' (tinted bg) | 'card' (bordered + raised)\n"
+	                "   - padY: 'none' | 'sm' | 'md' (default) | 'lg' | 'xl'\n"
+	                "   - padX: 'none' | 'sm' | 'md' (default) | 'lg'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
                 "   - left/right are slots: ComponentData[]\n"
@@ -6820,14 +6964,14 @@ def stream_funnel_page_draft(
             requirements: list[str] = []
             if missing_header:
                 requirements.append(
-                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                    "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='bleed', contentWidth='xl', padY='sm', padX='md'."
                 )
                 requirements.append(
                     "- Header content should include brand + navigation Buttons (link to internal pages when available)."
                 )
             if missing_footer:
                 requirements.append(
-                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                    "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='bleed', contentWidth='xl', variant='muted', padY='md', padX='md'."
                 )
                 requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 

@@ -1,0 +1,25 @@
+{
+  "id": "medusa-b2c-policy-terms",
+  "name": "Medusa B2C Terms of Service",
+  "description": "Terms of service page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Terms of Service",
+        "description": "Storefront terms covering purchase conditions, account use, and site access."
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CPolicyPage",
+        "props": {
+          "pageKey": "terms_of_service",
+          "pageTitle": "Terms of Service",
+          "description": "Storefront terms covering purchase conditions, account use, and site access."
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

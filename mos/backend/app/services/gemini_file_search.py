@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import logging
 import os
 import re
 import time
 from dataclasses import dataclass
 from typing import Any, Optional, Sequence
+
+import httpx
 
 from app.db.base import session_scope
 from app.db.enums import GeminiContextFileStatusEnum
@@ -30,6 +33,18 @@ _INVALID_FILENAME_CHARS = re.compile(r"[\\/:*?\"<>|]+")
 _DEFAULT_CHAT_MODEL = os.getenv("GEMINI_FILE_SEARCH_MODEL", "gemini-2.5-flash")
 _POLL_INTERVAL_SECONDS = float(os.getenv("GEMINI_FILE_SEARCH_POLL_INTERVAL_SECONDS", "2.0"))
 _POLL_TIMEOUT_SECONDS = float(os.getenv("GEMINI_FILE_SEARCH_POLL_TIMEOUT_SECONDS", "300.0"))
+_EMBED_PROBE_TIMEOUT_SECONDS = float(
+    os.getenv("GEMINI_FILE_SEARCH_EMBED_PROBE_TIMEOUT_SECONDS", "15.0")
+)
+_EMBED_PROBE_MODEL = os.getenv(
+    "GEMINI_FILE_SEARCH_EMBED_PROBE_MODEL",
+    "models/gemini-embedding-001",
+)
+_GEMINI_DEVELOPER_API_BASE = os.getenv(
+    "GEMINI_DEVELOPER_API_BASE",
+    "https://generativelanguage.googleapis.com/v1beta",
+).rstrip("/")
+_INLINE_ENV_COMMENT_RE = re.compile(r"\s+#")
 
 
 def _parse_bool(value: str | None, *, default: bool = False) -> bool:
@@ -49,6 +64,36 @@ def is_gemini_file_search_enabled() -> bool:
 
 class GeminiFileSearchConfigError(RuntimeError):
     pass
+
+
+def _normalize_api_key_env_value(value: str | None) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        return ""
+    if normalized[0] in {'"', "'"}:
+        quote = normalized[0]
+        closing_index = normalized.find(quote, 1)
+        if closing_index > 0:
+            normalized = normalized[1:closing_index].strip()
+        else:
+            normalized = normalized[1:].strip()
+    inline_comment_match = _INLINE_ENV_COMMENT_RE.search(normalized)
+    if inline_comment_match is not None:
+        normalized = normalized[: inline_comment_match.start()].rstrip()
+    return normalized
+
+
+def _conflicting_google_api_key_message(*, gemini_api_key: str, google_api_key: str) -> str | None:
+    normalized_gemini = _normalize_api_key_env_value(gemini_api_key)
+    normalized_google = _normalize_api_key_env_value(google_api_key)
+    if not normalized_gemini or not normalized_google or normalized_gemini == normalized_google:
+        return None
+    return (
+        "Gemini File Search found conflicting API key env vars: GEMINI_API_KEY and GOOGLE_API_KEY "
+        "are both set to different values. The Google Gen AI SDK gives GOOGLE_API_KEY precedence "
+        "when both are present, so File Search would use the wrong project/key. Set only GEMINI_API_KEY "
+        "for this integration, or make GOOGLE_API_KEY match it exactly."
+    )
 
 
 @dataclass
@@ -111,10 +156,19 @@ def _require_client():
             "google-genai dependency is unavailable for Gemini File Search. "
             f"Original error: {detail}"
         )
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = _normalize_api_key_env_value(os.getenv("GEMINI_API_KEY"))
     if not api_key:
         raise GeminiFileSearchConfigError("GEMINI_API_KEY not configured for Gemini File Search.")
-    return genai.Client(api_key=api_key)
+    conflicting_keys = _conflicting_google_api_key_message(
+        gemini_api_key=api_key,
+        google_api_key=os.getenv("GOOGLE_API_KEY", ""),
+    )
+    if conflicting_keys:
+        raise GeminiFileSearchConfigError(conflicting_keys)
+    try:
+        return genai.Client(api_key=api_key, vertexai=False)
+    except TypeError:
+        return genai.Client(api_key=api_key)
 
 
 def _build_store_display_name(*, doc_key: str, sha256: str) -> str:
@@ -125,33 +179,163 @@ def _build_store_display_name(*, doc_key: str, sha256: str) -> str:
     return f"{prefix}-{normalized_key}-{sha256[:12]}"
 
 
-def _poll_operation(client, operation, *, timeout_seconds: float):
-    started_at = time.time()
-    latest = operation
-    while not bool(getattr(latest, "done", False)):
-        if (time.time() - started_at) > timeout_seconds:
-            name = str(getattr(latest, "name", "") or "")
-            raise RuntimeError(
-                f"Timed out waiting for Gemini File Search operation to complete (operation={name})."
-            )
-        time.sleep(_POLL_INTERVAL_SECONDS)
-        latest = client.operations.get(latest)
-    error = getattr(latest, "error", None)
-    if error:
-        raise RuntimeError(f"Gemini File Search operation failed: {error}")
-    return latest
+def _extract_document_name_from_upload_operation_name(operation_name: str) -> str | None:
+    cleaned = (operation_name or "").strip()
+    match = re.match(r"^(fileSearchStores/[^/]+)/upload/operations/([^/]+)$", cleaned)
+    if not match:
+        return None
+    return f"{match.group(1)}/documents/{match.group(2)}"
 
 
-def _poll_document_active(client, *, document_name: str, timeout_seconds: float):
+def _file_search_get_json(client, *, resource_name: str) -> dict[str, Any]:
+    api_client = getattr(client, "_api_client", None)
+    if api_client is None:
+        raise RuntimeError(
+            "Gemini File Search client does not expose a raw API client for resource polling."
+        )
+    response = api_client.request("get", resource_name, {}, None)
+    body = getattr(response, "body", None)
+    if isinstance(body, bytes):
+        payload = body.decode("utf-8", errors="replace")
+    elif isinstance(body, str):
+        payload = body
+    else:
+        payload = str(body or "")
+    if not payload.strip():
+        return {}
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Gemini File Search returned a non-JSON payload while polling a resource. "
+            f"resource_name={resource_name!r}"
+        ) from exc
+
+
+def _summarize_google_api_error_payload(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return None
+
+    segments: list[str] = []
+    code = error.get("code")
+    if isinstance(code, int):
+        segments.append(f"HTTP {code}")
+    status = error.get("status")
+    if isinstance(status, str) and status.strip():
+        segments.append(status.strip())
+    message = error.get("message")
+    if isinstance(message, str) and message.strip():
+        segments.append(message.strip())
+
+    reasons: list[str] = []
+    for detail in error.get("details", []):
+        if not isinstance(detail, dict):
+            continue
+        reason = detail.get("reason")
+        if isinstance(reason, str) and reason.strip() and reason.strip() not in reasons:
+            reasons.append(reason.strip())
+    if reasons:
+        segments.append(f"reasons={','.join(reasons)}")
+
+    if not segments:
+        return None
+    return " | ".join(segments)
+
+
+def _embedding_probe_url() -> str:
+    model_name = _EMBED_PROBE_MODEL
+    if model_name.startswith("models/"):
+        model_name = model_name.split("/", 1)[1]
+    return f"{_GEMINI_DEVELOPER_API_BASE}/models/{model_name}:embedContent"
+
+
+def _probe_embedding_access_diagnostic() -> str | None:
+    api_key = _normalize_api_key_env_value(os.getenv("GEMINI_API_KEY"))
+    if not api_key:
+        return None
+
+    conflicting_keys = _conflicting_google_api_key_message(
+        gemini_api_key=api_key,
+        google_api_key=os.getenv("GOOGLE_API_KEY", ""),
+    )
+    if conflicting_keys:
+        return conflicting_keys
+
+    payload = {
+        "model": _EMBED_PROBE_MODEL,
+        "content": {
+            "parts": [
+                {
+                    "text": "Gemini File Search embedding access health check.",
+                }
+            ]
+        },
+    }
+    try:
+        response = httpx.post(
+            _embedding_probe_url(),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+            },
+            json=payload,
+            timeout=_EMBED_PROBE_TIMEOUT_SECONDS,
+        )
+    except httpx.HTTPError as exc:
+        return f"Embedding access probe failed before the API returned a response: {exc}"
+
+    if response.is_success:
+        return None
+
+    try:
+        summary = _summarize_google_api_error_payload(response.json())
+    except Exception:
+        summary = None
+    if summary:
+        return f"Embedding access probe failed: {summary}"
+
+    body = response.text.strip()
+    if body:
+        return f"Embedding access probe failed: HTTP {response.status_code} | {body[:500]}"
+    return f"Embedding access probe failed: HTTP {response.status_code}"
+
+
+def _poll_document_active(client, *, document_name: str, timeout_seconds: float) -> dict[str, Any]:
     started_at = time.time()
     while True:
-        doc = client.file_search_stores.documents.get(name=document_name)
-        state = getattr(doc, "state", None)
-        state_value = str(getattr(state, "value", state or ""))
+        try:
+            doc = _file_search_get_json(client, resource_name=document_name)
+        except Exception as exc:  # noqa: BLE001
+            status_code = _extract_error_status_code(exc)
+            message = str(exc).lower()
+            if status_code == 404 or "not found" in message or "may not exist" in message:
+                if (time.time() - started_at) > timeout_seconds:
+                    raise RuntimeError(
+                        "Timed out waiting for Gemini File Search document to become active "
+                        f"(document={document_name})."
+                    ) from exc
+                time.sleep(_POLL_INTERVAL_SECONDS)
+                continue
+            raise
+        state_value = str(doc.get("state") or "")
         if state_value == "STATE_ACTIVE":
             return doc
         if state_value == "STATE_FAILED":
-            raise RuntimeError(f"Gemini File Search document indexing failed for {document_name}.")
+            diagnostic = _probe_embedding_access_diagnostic()
+            diagnostic_suffix = ""
+            if diagnostic:
+                diagnostic_suffix = (
+                    " File Search indexing depends on Gemini embeddings, and the post-failure "
+                    f"embedding probe reported: {diagnostic}"
+                )
+            raise RuntimeError(
+                "Gemini File Search document indexing failed for "
+                f"{document_name}. mime_type={doc.get('mimeType')!r} size_bytes={doc.get('sizeBytes')!r}."
+                f"{diagnostic_suffix}"
+            )
         if (time.time() - started_at) > timeout_seconds:
             raise RuntimeError(
                 f"Timed out waiting for Gemini File Search document to become active (document={document_name})."
@@ -172,7 +356,7 @@ def _extract_error_status_code(exc: Exception) -> int | None:
 
 def _is_accessible_existing_document(client, *, document_name: str) -> bool:
     try:
-        client.file_search_stores.documents.get(name=document_name)
+        _file_search_get_json(client, resource_name=document_name)
         return True
     except Exception as exc:  # noqa: BLE001
         status_code = _extract_error_status_code(exc)
@@ -283,20 +467,20 @@ def ensure_uploaded_to_gemini_file_search(
                     ],
                 ),
             )
-            completed = _poll_operation(client, operation, timeout_seconds=_POLL_TIMEOUT_SECONDS)
-            response = getattr(completed, "response", None)
+            response = getattr(operation, "response", None)
             uploaded_file_name = str(getattr(response, "file_name", "") or "").strip() or None
             document_name = str(getattr(response, "document_name", "") or "").strip() or None
             if not document_name:
-                raise RuntimeError(
-                    "Gemini File Search upload operation completed without a document_name."
-                )
+                operation_name = str(getattr(operation, "name", "") or "").strip()
+                document_name = _extract_document_name_from_upload_operation_name(operation_name)
+            if not document_name:
+                raise RuntimeError("Gemini File Search upload returned no resolvable document name.")
             document = _poll_document_active(
                 client,
                 document_name=document_name,
                 timeout_seconds=_POLL_TIMEOUT_SECONDS,
             )
-            size_bytes = _safe_int(getattr(document, "size_bytes", None))
+            size_bytes = _safe_int(document.get("sizeBytes"))
             if generation is not None:
                 generation.update(
                     output=document_name,

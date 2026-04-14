@@ -132,6 +132,8 @@ export type MetaPublishPlanValidation = {
   adsetCount: number;
   publishBaseUrl: string;
   publishDomain?: string | null;
+  budgetScope?: "campaign" | "adset" | "mixed";
+  campaignDailyBudget?: number | null;
   blockers: string[];
   items: MetaPublishPlanValidationItem[];
 };
@@ -145,6 +147,7 @@ export type MetaPublishRunRequest = {
   campaignObjective: string;
   buyingType?: string | null;
   specialAdCategories?: string[];
+  campaignDailyBudget?: number | null;
 };
 
 export type MetaPublishRunItem = {

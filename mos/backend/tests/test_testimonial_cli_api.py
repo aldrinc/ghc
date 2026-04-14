@@ -9,6 +9,8 @@ from app.db.enums import ArtifactTypeEnum
 from app.db.models import Artifact, Campaign
 from app.routers import funnels as funnels_router
 from app.routers import swipes as swipes_router
+from app.services import funnel_testimonials
+from app.services.template_image_workspace import TEMPLATE_IMAGE_ASSETS_DIR
 
 
 def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tuple[str, str, str]:
@@ -93,6 +95,11 @@ def test_sales_pdp_examples_endpoint_errors_when_variant_missing(api_client: Tes
 
     assert response.status_code == 400
     assert "Missing: dorm_selfie." in response.json()["detail"]
+
+
+def test_swipe_and_testimonial_template_paths_share_workspace_assets_dir() -> None:
+    assert swipes_router._TEMPLATE_IMAGES_DIR == TEMPLATE_IMAGE_ASSETS_DIR
+    assert funnel_testimonials._PRE_SALES_TESTIMONIAL_TEMPLATE_DIR == TEMPLATE_IMAGE_ASSETS_DIR
 
 
 def test_swipe_template_testimonials_endpoint_starts_one_workflow_per_template(

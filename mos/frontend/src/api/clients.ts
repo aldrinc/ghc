@@ -1,7 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
-import type { Client } from "@/types/common";
+import type {
+  Client,
+  GetHookdCredentials,
+  GetHookdSyncFeed,
+  GetHookdSyncFeedInput,
+  GetHookdSyncFeedUpdateInput,
+  PostizChannel,
+  PostizBrowserLaunchSession,
+  PostizCreatePostInput,
+  PostizCredentials,
+  PostizPostingProfile,
+  PostizPostingProfileInput,
+  PostizPostingProfileUpdateInput,
+  PostizPublication,
+  PostizPublicationListResponse,
+} from "@/types/common";
 import { toast } from "@/components/ui/toast";
 import { resolveRequiredApiBaseUrl } from "@/lib/apiBaseUrl";
 
@@ -1148,6 +1163,349 @@ export function useDeleteClient() {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to delete workspace";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientGetHookdCredentials(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<GetHookdCredentials>({
+    queryKey: ["clients", "gethookd-credentials", clientId],
+    queryFn: () => get(`/clients/${clientId}/gethookd/credentials`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateClientGetHookdCredentials(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { apiToken: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<GetHookdCredentials>(`/clients/${clientId}/gethookd/credentials`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("GetHookd token saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-credentials", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save GetHookd token";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientGetHookdSyncFeeds(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<GetHookdSyncFeed[]>({
+    queryKey: ["clients", "gethookd-sync-feeds", clientId],
+    queryFn: () => get(`/clients/${clientId}/gethookd/sync-feeds`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useCreateClientGetHookdSyncFeed(clientId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: GetHookdSyncFeedInput) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<GetHookdSyncFeed>(`/clients/${clientId}/gethookd/sync-feeds`, payload);
+    },
+    onSuccess: () => {
+      toast.success("Sync feed created");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create sync feed";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateClientGetHookdSyncFeed(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ feedId, payload }: { feedId: string; payload: GetHookdSyncFeedUpdateInput }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<GetHookdSyncFeed>(`/clients/${clientId}/gethookd/sync-feeds/${feedId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Sync feed updated");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update sync feed";
+      toast.error(message);
+    },
+  });
+}
+
+export function useDeleteClientGetHookdSyncFeed(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (feedId: string) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request(`/clients/${clientId}/gethookd/sync-feeds/${feedId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      toast.success("Sync feed deleted");
+      queryClient.invalidateQueries({ queryKey: ["clients", "gethookd-sync-feeds", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to delete sync feed";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientPostizCredentials(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<PostizCredentials>({
+    queryKey: ["clients", "postiz-credentials", clientId],
+    queryFn: () => get(`/clients/${clientId}/postiz/credentials`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useUpdateClientPostizCredentials(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { baseUrl: string; apiKey: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<PostizCredentials>(`/clients/${clientId}/postiz/credentials`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Postiz credentials saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-credentials", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save Postiz credentials";
+      toast.error(message);
+    },
+  });
+}
+
+export function useValidateClientPostizCredentials(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<{ valid: boolean; message: string }>(`/clients/${clientId}/postiz/validate`, {
+        method: "POST",
+      });
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || "Postiz credentials validated");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-credentials", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to validate Postiz credentials";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientPostizChannels(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<PostizChannel[]>({
+    queryKey: ["clients", "postiz-channels", clientId],
+    queryFn: () => get(`/clients/${clientId}/postiz/channels`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useSyncClientPostizChannels(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<{ syncedCount: number; errors: string[] }>(`/clients/${clientId}/postiz/channels/sync`, {
+        method: "POST",
+      });
+    },
+    onSuccess: (data) => {
+      toast.success(`Synced ${data.syncedCount} Postiz channels`);
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-channels", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Postiz channels";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientPostizConnectUrl(clientId: string) {
+  const { request } = useApiClient();
+  return useMutation({
+    mutationFn: (integration: string) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<{ connectUrl: string; integration: string }>(
+        `/clients/${clientId}/postiz/connect-url`,
+        { method: "POST", body: JSON.stringify({ integration }) },
+      );
+    },
+  });
+}
+
+export function usePrepareClientPostizLaunch(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  const { user } = useUser();
+  return useMutation({
+    mutationFn: () => {
+      if (!clientId) throw new Error("Client ID is required.");
+      const email =
+        user?.primaryEmailAddress?.emailAddress ??
+        user?.emailAddresses?.[0]?.emailAddress ??
+        null;
+      return request<PostizBrowserLaunchSession>(`/clients/${clientId}/postiz/launch`, {
+        method: "POST",
+        body: JSON.stringify(email ? { email } : {}),
+        credentials: "include",
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-credentials", clientId] });
+      if (data.autoConfiguredCredentials) {
+        toast.success("Workspace linked to Postiz");
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to open Postiz";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientPostizPostingProfiles(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<PostizPostingProfile[]>({
+    queryKey: ["clients", "postiz-posting-profiles", clientId],
+    queryFn: () => get(`/clients/${clientId}/postiz/posting-profiles`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useCreateClientPostizPostingProfile(clientId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PostizPostingProfileInput) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<PostizPostingProfile>(`/clients/${clientId}/postiz/posting-profiles`, payload);
+    },
+    onSuccess: () => {
+      toast.success("Postiz posting profile saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-posting-profiles", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to save posting profile";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateClientPostizPostingProfile(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ profileId, payload }: { profileId: string; payload: PostizPostingProfileUpdateInput }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<PostizPostingProfile>(`/clients/${clientId}/postiz/posting-profiles/${profileId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Postiz posting profile updated");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-posting-profiles", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update posting profile";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientPostizPosts(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<PostizPublicationListResponse>({
+    queryKey: ["clients", "postiz-posts", clientId],
+    queryFn: () => get(`/clients/${clientId}/postiz/posts`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useCreateClientPostizPost(clientId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PostizCreatePostInput) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<PostizPublication>(`/clients/${clientId}/postiz/posts`, payload);
+    },
+    onSuccess: () => {
+      toast.success("Postiz publication submitted");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-posts", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Postiz publication";
+      toast.error(message);
+    },
+  });
+}
+
+export function useDeleteClientPostizPost(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (postId: string) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request(`/clients/${clientId}/postiz/posts/${postId}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      toast.success("Postiz publication deleted");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-posts", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to delete Postiz publication";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncClientPostizPost(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (postId: string) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<PostizPublication>(`/clients/${clientId}/postiz/posts/${postId}/sync`, { method: "POST" });
+    },
+    onSuccess: () => {
+      toast.success("Postiz publication synced");
+      queryClient.invalidateQueries({ queryKey: ["clients", "postiz-posts", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Postiz publication";
       toast.error(message);
     },
   });

@@ -4,9 +4,10 @@ import { EmptyState } from "@/components/layout/EmptyState";
 import { ErrorState } from "@/components/layout/ErrorState";
 import { InlineWorkspacePicker } from "@/components/layout/InlineWorkspacePicker";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { StrategySkillsWorkflowPanel } from "@/components/strategy/StrategySkillsWorkflowPanel";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Callout } from "@/components/ui/callout";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Callout } from "@/components/ui/callout";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,13 +17,6 @@ import { useClients } from "@/api/clients";
 import { useStopWorkflow, useWorkflows } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-
-type Filters = {
-  status: string;
-  kind: string;
-  client: string;
-  campaign: string;
-};
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -53,9 +47,11 @@ export function WorkflowsPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
   const { product, isLoading: isLoadingProduct } = useProductContext();
-  const workflowsEnabled = Boolean(workspace?.id && product?.id);
+  const workspaceId = workspace?.id;
+  const productId = product?.id;
+  const workflowsEnabled = Boolean(workspaceId && productId);
   const { data: workflows, isLoading, isError, refetch } = useWorkflows(
-    workflowsEnabled ? { clientId: workspace.id, productId: product.id } : undefined,
+    workflowsEnabled && workspaceId && productId ? { clientId: workspaceId, productId } : undefined,
     { enabled: workflowsEnabled },
   );
   const { data: clients } = useClients();
@@ -63,24 +59,16 @@ export function WorkflowsPage() {
   const [stopId, setStopId] = useState<string | null>(null);
   const stopWorkflow = useStopWorkflow();
 
-  const filters: Filters = {
-    status: searchParams.get("status") || "",
-    kind: searchParams.get("kind") || "",
-    client: searchParams.get("client") || "",
-    campaign: searchParams.get("campaign") || "",
-  };
-
-  const setFilter = (key: keyof Filters, value: string) => {
+  const statusFilter = searchParams.get("status") || "";
+  const setStatusFilter = (value: string) => {
     const next = new URLSearchParams(searchParams);
     if (!value) {
-      next.delete(key);
+      next.delete("status");
     } else {
-      next.set(key, value);
+      next.set("status", value);
     }
     setSearchParams(next, { replace: true });
   };
-
-  const clearFilters = () => setSearchParams(new URLSearchParams(), { replace: true });
 
   const clientLookup = useMemo(() => {
     const map: Record<string, string> = {};
@@ -94,32 +82,17 @@ export function WorkflowsPage() {
     () => Array.from(new Set((workflows || []).map((wf) => wf.status))).sort(),
     [workflows]
   );
-  const kindOptions = useMemo(
-    () => Array.from(new Set((workflows || []).map((wf) => wf.kind))).sort(),
-    [workflows]
-  );
-  const clientOptions = useMemo(
-    () => Array.from(new Set((workflows || []).map((wf) => wf.client_id).filter(Boolean))).sort(),
-    [workflows]
-  );
-  const campaignOptions = useMemo(
-    () => Array.from(new Set((workflows || []).map((wf) => wf.campaign_id).filter(Boolean))).sort(),
-    [workflows]
-  );
 
   const filteredWorkflows = useMemo(() => {
     const list = workflows || [];
     return list
       .filter((wf) => {
         if (product?.id && wf.product_id !== product.id) return false;
-        if (filters.status && wf.status !== filters.status) return false;
-        if (filters.kind && wf.kind !== filters.kind) return false;
-        if (filters.client && wf.client_id !== filters.client) return false;
-        if (filters.campaign && wf.campaign_id !== filters.campaign) return false;
+        if (statusFilter && wf.status !== statusFilter) return false;
         return true;
       })
       .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
-  }, [workflows, filters, product?.id]);
+  }, [workflows, statusFilter, product?.id]);
 
   const handleConfirmStop = () => {
     if (!stopId) return;
@@ -129,28 +102,13 @@ export function WorkflowsPage() {
     });
   };
 
-  const renderFilter = (
-    key: keyof Filters,
-    label: string,
-    options: Array<{ value: string; label: string }>
-  ) => (
-    <div className="flex flex-col gap-1 text-xs text-content-muted">
-      <span>{label}</span>
-      <Select
-        value={filters[key]}
-        onChange={(e) => setFilter(key, e.target.value)}
-        options={[{ value: "", label: "All" }, ...options]}
-      />
-    </div>
-  );
-
   if (!workspace) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Workflows" description="Select a workspace to view workflow runs." />
+        <PageHeader title="Strategy" description="Select a workspace to get started." />
         <EmptyState
           title="No workspace selected"
-          description="Choose a workspace to view workflow runs."
+          description="Choose a workspace to view and manage your strategy workflow."
           actions={<InlineWorkspacePicker />}
         />
       </div>
@@ -160,8 +118,8 @@ export function WorkflowsPage() {
   if (isLoadingProduct && !product) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Workflows" description="Loading workflow runs for the active product." />
-        <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading workflows…</div>
+        <PageHeader title="Strategy" description="Loading product strategy..." />
+        <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading...</div>
       </div>
     );
   }
@@ -169,127 +127,101 @@ export function WorkflowsPage() {
   if (!product) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Workflows" description="Select a product to view product-scoped workflow runs." />
+        <PageHeader title="Strategy" description="Select a product to manage its strategy workflow." />
         <EmptyState
           title="No product selected"
-          description="Choose a product from the header to view workflow runs for that product."
+          description="Choose a product from the header to manage its strategy workflow."
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader
-        title="Workflows"
+        title="Strategy"
         description={
           product?.title
-            ? `Monitor workflow runs for ${product.title}.`
-            : "Monitor workflow runs with filters and quick actions."
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={clearFilters} disabled={!searchParams.toString()}>
-              Clear filters
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-              Refresh
-            </Button>
-          </div>
+            ? `Manage the strategy workflow for ${product.title}.`
+            : "Manage your product strategy step by step."
         }
       />
 
-      <div className="ds-card ds-card--md p-0 shadow-none">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <StrategySkillsWorkflowPanel productId={product.id} productTitle={product.title} />
+
+      {/* Workflow Run History - collapsible secondary section */}
+      <details className="ds-card ds-card--md p-0 shadow-none">
+        <summary className="flex cursor-pointer items-center justify-between px-4 py-3">
           <div>
-          <div className="text-sm font-semibold text-content">Workflow runs</div>
-          <div className="text-xs text-content-muted">
-            {filteredWorkflows.length} shown · {workflows?.length || 0} total
+            <div className="text-sm font-semibold text-content">Workflow Run History</div>
+            <div className="text-xs text-content-muted">
+              {filteredWorkflows.length} runs · {workflows?.length || 0} total
+            </div>
           </div>
-          </div>
-        </div>
+        </summary>
 
-        <div className="border-b border-border px-4 py-3">
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            {renderFilter(
-              "status",
-              "Status",
-              statusOptions.map((value) => ({ value, label: value || "Unknown" }))
-            )}
-            {renderFilter(
-              "kind",
-              "Kind",
-              kindOptions.map((value) => ({ value, label: value || "Unknown" }))
-            )}
-            {renderFilter(
-              "client",
-              "Workspace",
-              clientOptions.map((value) => ({ value: value as string, label: clientLookup[value as string] || (value as string) }))
-            )}
-            {renderFilter(
-              "campaign",
-              "Campaign",
-              campaignOptions.map((value) => ({ value: value as string, label: (value as string) || "Unknown" }))
-            )}
+        <div className="border-t border-border">
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+            <div className="flex flex-col gap-1 text-xs text-content-muted">
+              <span>Status</span>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All" },
+                  ...statusOptions.map((value) => ({ value, label: value || "Unknown" })),
+                ]}
+              />
+            </div>
+            {statusFilter ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setStatusFilter("")}
+              >
+                Clear
+              </Button>
+            ) : null}
           </div>
-        </div>
 
-        {isLoading ? (
-          <div className="divide-y divide-border">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="ml-auto h-8 w-20 rounded-md" />
-              </div>
-            ))}
-          </div>
-        ) : isError ? (
-          <div className="p-4">
-            <ErrorState
-              title="Failed to load workflows"
-              message="Could not fetch workflow runs. Check your connection and try again."
-              onRetry={() => refetch()}
-            />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table variant="ghost">
-              <TableHeader>
-                <TableRow>
-                  <TableHeadCell>Kind</TableHeadCell>
-                  <TableHeadCell>Status</TableHeadCell>
-                  <TableHeadCell>Workspace</TableHeadCell>
-                  <TableHeadCell>Campaign</TableHeadCell>
-                  <TableHeadCell>Started</TableHeadCell>
-                  <TableHeadCell>Duration</TableHeadCell>
-                  <TableHeadCell className="text-right">Actions</TableHeadCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWorkflows.map((wf) => {
-                  const clientName = wf.client_id ? clientLookup[wf.client_id] || wf.client_id : "—";
-                  return (
+          {isLoading ? (
+            <div className="divide-y divide-border">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="p-4">
+              <ErrorState
+                title="Failed to load workflows"
+                message="Could not fetch workflow runs."
+                onRetry={() => refetch()}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table variant="ghost">
+                <TableHeader>
+                  <TableRow>
+                    <TableHeadCell>Kind</TableHeadCell>
+                    <TableHeadCell>Status</TableHeadCell>
+                    <TableHeadCell>Started</TableHeadCell>
+                    <TableHeadCell>Duration</TableHeadCell>
+                    <TableHeadCell className="text-right">Actions</TableHeadCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredWorkflows.map((wf) => (
                     <TableRow key={wf.id} hover>
                       <TableCell className="font-semibold text-content">{formatKind(wf.kind)}</TableCell>
                       <TableCell>
                         <StatusBadge status={wf.status} />
-                      </TableCell>
-                      <TableCell>{clientName}</TableCell>
-                      <TableCell>
-                        {wf.campaign_id ? (
-                          <button
-                            type="button"
-                            className="font-mono text-xs text-accent hover:underline"
-                            onClick={() => navigate(`/campaigns/${wf.campaign_id}`)}
-                          >
-                            {wf.campaign_id.slice(0, 8)}…
-                          </button>
-                        ) : "—"}
                       </TableCell>
                       <TableCell className="text-xs text-content-muted">{formatDate(wf.started_at)}</TableCell>
                       <TableCell className="text-xs text-content-muted">{formatElapsed(wf.started_at, wf.finished_at)}</TableCell>
@@ -306,20 +238,20 @@ export function WorkflowsPage() {
                         </Menu>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-                {!filteredWorkflows.length && (
-                  <TableRow>
-                    <TableCell className="px-3 py-4 text-sm text-content-muted" colSpan={7}>
-                      No workflows match the current filters.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
+                  ))}
+                  {!filteredWorkflows.length && (
+                    <TableRow>
+                      <TableCell className="px-3 py-4 text-sm text-content-muted" colSpan={5}>
+                        No workflows match the current filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </details>
 
       <DialogRoot open={Boolean(stopId)} onOpenChange={(open) => !open && setStopId(null)}>
         <DialogContent>
@@ -337,12 +269,12 @@ export function WorkflowsPage() {
               Cancel
             </Button>
             <Button
-              variant="danger"
+              variant="destructive"
               size="sm"
               onClick={handleConfirmStop}
               disabled={!stopId || stopWorkflow.isPending}
             >
-              {stopWorkflow.isPending ? "Stopping…" : "Stop workflow"}
+              {stopWorkflow.isPending ? "Stopping..." : "Stop workflow"}
             </Button>
           </div>
         </DialogContent>

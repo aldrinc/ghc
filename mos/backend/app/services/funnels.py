@@ -36,10 +36,16 @@ from app.db.models import (
     FunnelPublicationLink,
     FunnelPublicationPage,
     Product,
+    ProductVariant,
 )
 from app.services.funnel_metadata import (
     build_public_page_metadata_for_context,
     normalize_public_page_metadata_for_context,
+)
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    resolve_funnel_page_stage,
+    validate_imported_html_document_manifest,
 )
 from app.services.public_routing import require_product_route_slug
 from app.services.media_storage import MediaStorage
@@ -74,29 +80,63 @@ class InternalLink:
     meta: dict[str, Any] | None = None
 
 
+def _iter_target_page_references(container: dict[str, Any]):
+    for key, target in container.items():
+        if not isinstance(key, str) or (key != "targetPageId" and not key.endswith("TargetPageId")):
+            continue
+        if not isinstance(target, str) or not target:
+            continue
+        prefix = "" if key == "targetPageId" else key[: -len("TargetPageId")]
+        link_type_keys = [f"{prefix}LinkType"] if prefix else ["linkType"]
+        if prefix:
+            link_type_keys.append("linkType")
+        link_type = None
+        for link_type_key in link_type_keys:
+            candidate = container.get(link_type_key)
+            if isinstance(candidate, str) and candidate:
+                link_type = candidate
+                break
+        if link_type != "funnelPage":
+            continue
+        label_candidates = ["label"] if not prefix else [f"{prefix}CtaLabel", f"{prefix}Label", "label"]
+        label = None
+        for label_key in label_candidates:
+            candidate = container.get(label_key)
+            if isinstance(candidate, str) and candidate:
+                label = candidate
+                break
+        yield key, target, label
+
+
 def extract_internal_links(puck_data: dict[str, Any]) -> list[InternalLink]:
     links: list[InternalLink] = []
+    seen: set[tuple[str | None, str, str]] = set()
     for obj in _walk_json(puck_data):
         if not isinstance(obj, dict):
             continue
-        if obj.get("type") != "Button":
+        if "type" not in obj and "props" not in obj:
             continue
-        props = obj.get("props") if isinstance(obj.get("props"), dict) else {}
-        if props.get("linkType") != "funnelPage":
-            continue
-        target = props.get("targetPageId")
-        if not isinstance(target, str) or not target:
-            continue
-        label = props.get("label")
-        if not isinstance(label, str):
-            label = None
         meta: dict[str, Any] = {}
         block_id = obj.get("id")
         if not isinstance(block_id, str) or not block_id:
+            props = obj.get("props") if isinstance(obj.get("props"), dict) else {}
             block_id = props.get("id") if isinstance(props.get("id"), str) else None
         if isinstance(block_id, str) and block_id:
             meta["blockId"] = block_id
-        links.append(InternalLink(to_page_id=target, label=label, kind="cta", meta=meta))
+        containers = []
+        props = obj.get("props")
+        if isinstance(props, dict):
+            containers.append(props)
+        containers.append({key: value for key, value in obj.items() if key != "props"})
+        for container in containers:
+            for target_key, target, label in _iter_target_page_references(container):
+                dedupe_key = (block_id if isinstance(block_id, str) and block_id else None, target_key, target)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                link_meta = dict(meta)
+                link_meta["targetKey"] = target_key
+                links.append(InternalLink(to_page_id=target, label=label, kind="cta", meta=link_meta))
     return links
 
 
@@ -105,15 +145,26 @@ def rewrite_internal_target_ids(puck_data: dict[str, Any], id_map: dict[str, str
     for obj in _walk_json(cloned):
         if not isinstance(obj, dict):
             continue
-        if "targetPageId" in obj and isinstance(obj["targetPageId"], str):
-            old = obj["targetPageId"]
-            if old in id_map:
-                obj["targetPageId"] = id_map[old]
+        for key, value in list(obj.items()):
+            if (
+                not isinstance(key, str)
+                or (key != "targetPageId" and not key.endswith("TargetPageId"))
+                or not isinstance(value, str)
+            ):
+                continue
+            if value in id_map:
+                obj[key] = id_map[value]
         props = obj.get("props")
-        if isinstance(props, dict) and "targetPageId" in props and isinstance(props["targetPageId"], str):
-            old = props["targetPageId"]
-            if old in id_map:
-                props["targetPageId"] = id_map[old]
+        if isinstance(props, dict):
+            for key, value in list(props.items()):
+                if (
+                    not isinstance(key, str)
+                    or (key != "targetPageId" and not key.endswith("TargetPageId"))
+                    or not isinstance(value, str)
+                ):
+                    continue
+                if value in id_map:
+                    props[key] = id_map[value]
     return cloned
 
 
@@ -220,6 +271,51 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
                     "Replace with production testimonials or remove testimonials before publishing."
                 )
         version_by_page[str(page.id)] = version
+
+    page_id_set = {str(page.id) for page in pages}
+    checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+    if funnel.selected_offer_id:
+        checkout_variants_query = checkout_variants_query.where(
+            ProductVariant.offer_id == funnel.selected_offer_id
+        )
+    checkout_ready_variants = [
+        variant
+        for variant in session.scalars(checkout_variants_query).all()
+        if str(variant.external_price_id or "").strip() and str(variant.provider or "").strip()
+    ]
+    for page in pages:
+        page_stage = resolve_funnel_page_stage(
+            slug=page.slug,
+            template_id=page.template_id,
+            page_name=page.name,
+        )
+        puck_data = version_by_page[str(page.id)].puck_data
+        for obj in _walk_json(puck_data):
+            if not isinstance(obj, dict) or obj.get("type") != "ImportedHtmlDocument":
+                continue
+            props = obj.get("props")
+            if not isinstance(props, dict):
+                raise ValueError(f"Page '{page.name}' contains an ImportedHtmlDocument without props.")
+            html_document = props.get("htmlDocument")
+            if not isinstance(html_document, str) or not html_document.strip():
+                raise ValueError(
+                    f"Page '{page.name}' contains an ImportedHtmlDocument without htmlDocument."
+                )
+            try:
+                validate_imported_html_document_manifest(
+                    html_document=html_document,
+                    instrumentation_manifest=props.get("instrumentationManifest"),
+                    current_page_stage=page_stage,
+                    current_page_id=str(page.id),
+                    next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                    available_target_page_ids=page_id_set,
+                    checkout_ready_variants=checkout_ready_variants,
+                    require_stage_bindings=page_stage in {"pre_sales", "sales"},
+                )
+            except ImportedHtmlRuntimeValidationError as exc:
+                raise ValueError(
+                    f"Page '{page.name}' imported HTML runtime validation failed. {exc}"
+                ) from exc
 
     publication = FunnelPublication(
         funnel_id=funnel.id,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 from typing import Any
 
@@ -17,6 +18,10 @@ from app.schemas.experiment_spec import ExperimentSpecSet
 from app.services.campaign_launch_context import ensure_campaign_launch_context_artifact
 from app.services.claude_files import ensure_uploaded_to_claude
 from app.services.gemini_file_search import ensure_uploaded_to_gemini_file_search, is_gemini_file_search_enabled
+from app.services.product_strategy_bundles import (
+    ProductStrategyBundlesError,
+    ProductStrategyBundlesService,
+)
 from app.strategy_v2.downstream import load_strategy_v2_outputs
 
 
@@ -26,6 +31,18 @@ _MANUAL_DOC_SPECS: tuple[tuple[str, ArtifactTypeEnum, str], ...] = (
     ("campaign_loaded_copy", ArtifactTypeEnum.campaign_loaded_copy, "Campaign Loaded Copy"),
     ("campaign_loaded_copy_context", ArtifactTypeEnum.campaign_loaded_copy_context, "Campaign Loaded Copy Context"),
     ("campaign_creative_context", ArtifactTypeEnum.campaign_creative_context, "Campaign Creative Context"),
+)
+
+_SKILLS_COMPATIBILITY_REQUIRED_ROLES: tuple[str, ...] = (
+    "signal_report",
+    "angle_library",
+    "angle_selection",
+    "knowledge_base",
+    "cso",
+    "offer_document",
+    "headline_selection",
+    "presell_page",
+    "sales_page",
 )
 
 
@@ -40,6 +57,10 @@ def _artifact_payload(artifact: Any) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         return None
     return payload
+
+
+def _stable_json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
 
 
 def resolve_campaign_creative_context_provider(
@@ -57,6 +78,8 @@ def resolve_campaign_creative_context_provider(
     provider_value = str(payload.get("provider") or "").strip()
     if provider_value == CampaignCreativeContextProviderEnum.manual.value:
         return CampaignCreativeContextProviderEnum.manual
+    if provider_value == CampaignCreativeContextProviderEnum.skills.value:
+        return CampaignCreativeContextProviderEnum.skills
     return CampaignCreativeContextProviderEnum.strategy_v2
 
 
@@ -136,6 +159,571 @@ def _build_manual_downstream_packet(
     }
 
 
+def _load_active_skills_bundle(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+) -> dict[str, Any]:
+    service = ProductStrategyBundlesService(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        created_by_user=None,
+    )
+    return service.get_active_bundle(bundle_type="skills_handoff")
+
+
+def _latest_materialized_skills_creative_context_artifact(
+    *,
+    artifacts_repo: ArtifactsRepository,
+    org_id: str,
+    campaign_id: str,
+) -> Any | None:
+    candidates = artifacts_repo.list(
+        org_id=org_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.campaign_creative_context,
+        limit=50,
+    )
+    for artifact in candidates:
+        payload = _artifact_payload(artifact) or {}
+        if str(payload.get("provider") or "").strip() != CampaignCreativeContextProviderEnum.skills.value:
+            continue
+        if isinstance(payload.get("materializedContext"), dict):
+            return artifact
+    return None
+
+
+def _skills_materialization_signature(
+    *,
+    strategy_bundle_id: str,
+    strategy_bundle_type: str,
+    angles: dict[str, Any],
+    offer: dict[str, Any],
+    copy: dict[str, Any],
+    copy_context: dict[str, Any],
+    source_artifact_ids: dict[str, str | None],
+    angle_names: list[str],
+) -> str:
+    signature_payload = {
+        "strategyBundleId": strategy_bundle_id,
+        "strategyBundleType": strategy_bundle_type,
+        "angles": angles,
+        "offer": offer,
+        "copy": copy,
+        "copyContext": copy_context,
+        "sourceArtifactIds": source_artifact_ids,
+        "angleNames": angle_names,
+    }
+    return hashlib.sha256(_stable_json_dumps(signature_payload).encode("utf-8")).hexdigest()
+
+
+def _materialized_skills_context_payload(artifact: Any | None) -> dict[str, Any] | None:
+    payload = _artifact_payload(artifact)
+    if not isinstance(payload, dict):
+        return None
+    if str(payload.get("provider") or "").strip() != CampaignCreativeContextProviderEnum.skills.value:
+        return None
+    materialized_context = payload.get("materializedContext")
+    if not isinstance(materialized_context, dict):
+        return None
+    return payload
+
+
+def _skills_bundle_items_by_role(bundle_payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    items = bundle_payload.get("items") or []
+    return {
+        str(item.get("role") or "").strip(): item
+        for item in items
+        if isinstance(item, dict) and str(item.get("role") or "").strip()
+    }
+
+
+def _skills_missing_roles(bundle_payload: dict[str, Any]) -> list[str]:
+    roles = _skills_bundle_items_by_role(bundle_payload)
+    return [role for role in _SKILLS_COMPATIBILITY_REQUIRED_ROLES if role not in roles]
+
+
+def _bundle_item_artifact_id(item: dict[str, Any] | None) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    value = str(item.get("artifactId") or "").strip()
+    return value or None
+
+
+def _require_skills_item(role_map: dict[str, dict[str, Any]], *, role: str) -> dict[str, Any]:
+    item = role_map.get(role)
+    if item is None:
+        raise ValueError(
+            "Skills campaign creative context is incomplete. "
+            f"Missing required active bundle role '{role}'."
+        )
+    return item
+
+
+def _require_skills_markdown(item: dict[str, Any], *, role: str) -> str:
+    artifact_data = item.get("artifactData")
+    if not isinstance(artifact_data, dict):
+        raise ValueError(f"Skills bundle role '{role}' is missing artifact data.")
+    if str(artifact_data.get("documentFormat") or "").strip().lower() != "markdown":
+        raise ValueError(f"Skills bundle role '{role}' must be a markdown document.")
+    markdown = str(artifact_data.get("markdown") or "").strip()
+    if not markdown:
+        raise ValueError(f"Skills bundle role '{role}' markdown is empty.")
+    return markdown
+
+
+def _require_skills_json(item: dict[str, Any], *, role: str) -> dict[str, Any]:
+    artifact_data = item.get("artifactData")
+    if not isinstance(artifact_data, dict):
+        raise ValueError(f"Skills bundle role '{role}' is missing artifact data.")
+    if str(artifact_data.get("documentFormat") or "").strip().lower() != "json":
+        raise ValueError(f"Skills bundle role '{role}' must be a JSON document.")
+    payload = artifact_data.get("json")
+    if not isinstance(payload, dict):
+        raise ValueError(f"Skills bundle role '{role}' JSON payload is invalid.")
+    return payload
+
+
+def _derived_markdown_document(*, title: str, source_role: str, content: str) -> str:
+    normalized = content.strip()
+    if not normalized:
+        raise ValueError(
+            "Skills campaign creative context is missing required source content for "
+            f"derived '{title}' from role '{source_role}'."
+        )
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            f"Derived from approved `{source_role}` artifact.",
+            "",
+            normalized,
+        ]
+    ).strip()
+
+
+def _build_derived_awareness_angle_matrix_markdown(
+    *,
+    angle_library: dict[str, Any],
+    angle_selection: dict[str, Any],
+) -> str:
+    selected_angle = angle_selection.get("selectedAngle")
+    if not isinstance(selected_angle, dict):
+        raise ValueError("Skills angle_selection artifact is missing selectedAngle.")
+    selected_angle_name = str(selected_angle.get("angleName") or "").strip()
+    if not selected_angle_name:
+        raise ValueError("Skills angle_selection artifact is missing selectedAngle.angleName.")
+
+    lines = [
+        "# Awareness Angle Matrix",
+        "",
+        "Derived from approved `angle_library` and `angle_selection` artifacts.",
+        "",
+        "## Selected Angle",
+        f"- ID: {str(selected_angle.get('angleId') or '').strip()}",
+        f"- Name: {selected_angle_name}",
+    ]
+    selected_description = str(selected_angle.get("description") or "").strip()
+    if selected_description:
+        lines.append(f"- Description: {selected_description}")
+    selected_evidence = selected_angle.get("evidence")
+    if isinstance(selected_evidence, list):
+        for evidence in selected_evidence:
+            if isinstance(evidence, str) and evidence.strip():
+                lines.append(f"- Evidence: {evidence.strip()}")
+
+    lines.extend(["", "## Angle Library"])
+    angles = angle_library.get("angles")
+    if not isinstance(angles, list) or not angles:
+        raise ValueError("Skills angle_library artifact must contain a non-empty angles list.")
+    for entry in angles:
+        if not isinstance(entry, dict):
+            continue
+        angle_name = str(entry.get("angleName") or "").strip()
+        if not angle_name:
+            continue
+        lines.extend(["", f"### {angle_name}"])
+        description = str(entry.get("description") or "").strip()
+        mechanism = str(entry.get("mechanism") or "").strip()
+        if description:
+            lines.append(f"- Description: {description}")
+        if mechanism:
+            lines.append(f"- Mechanism: {mechanism}")
+        evidence_list = entry.get("evidence")
+        if isinstance(evidence_list, list):
+            for evidence in evidence_list:
+                if isinstance(evidence, str) and evidence.strip():
+                    lines.append(f"- Evidence: {evidence.strip()}")
+    return "\n".join(lines).strip()
+
+
+def _build_skills_compatibility_payload(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+) -> dict[str, Any]:
+    bundle_payload = _load_active_skills_bundle(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+    )
+    missing_roles = _skills_missing_roles(bundle_payload)
+    if missing_roles:
+        raise ValueError(
+            "Skills campaign creative context is incomplete. "
+            "Active bundle is missing required roles: "
+            + ", ".join(missing_roles)
+            + "."
+        )
+
+    roles = _skills_bundle_items_by_role(bundle_payload)
+    angle_library_item = _require_skills_item(roles, role="angle_library")
+    angle_selection_item = _require_skills_item(roles, role="angle_selection")
+    signal_report_item = _require_skills_item(roles, role="signal_report")
+    knowledge_base_item = _require_skills_item(roles, role="knowledge_base")
+    cso_item = _require_skills_item(roles, role="cso")
+    offer_item = _require_skills_item(roles, role="offer_document")
+    headline_selection_item = _require_skills_item(roles, role="headline_selection")
+    presell_item = _require_skills_item(roles, role="presell_page")
+    sales_item = _require_skills_item(roles, role="sales_page")
+
+    angle_library = _require_skills_json(angle_library_item, role="angle_library")
+    angle_selection = _require_skills_json(angle_selection_item, role="angle_selection")
+    offer_payload = _require_skills_json(offer_item, role="offer_document")
+    headline_selection = _require_skills_json(headline_selection_item, role="headline_selection")
+    signal_report_markdown = _require_skills_markdown(signal_report_item, role="signal_report")
+    knowledge_base_markdown = _require_skills_markdown(knowledge_base_item, role="knowledge_base")
+    cso_markdown = _require_skills_markdown(cso_item, role="cso")
+    presell_markdown = _require_skills_markdown(presell_item, role="presell_page")
+    sales_markdown = _require_skills_markdown(sales_item, role="sales_page")
+
+    selected_angle_id = str(angle_selection.get("selectedAngleId") or "").strip()
+    if not selected_angle_id:
+        raise ValueError("Skills angle_selection artifact is missing selectedAngleId.")
+
+    angles = angle_library.get("angles")
+    if not isinstance(angles, list) or not angles:
+        raise ValueError("Skills angle_library artifact must contain a non-empty angles list.")
+
+    selected_headline = headline_selection.get("selectedHeadline")
+    if not isinstance(selected_headline, dict):
+        raise ValueError("Skills headline_selection artifact is missing selectedHeadline.")
+    headline_text = str(selected_headline.get("headline") or "").strip()
+    if not headline_text:
+        raise ValueError("Skills headline_selection artifact is missing selectedHeadline.headline.")
+
+    angles_payload = {
+        "selectedAngleId": selected_angle_id,
+        "angleLibrary": angles,
+    }
+    copy_payload = {
+        "headline": headline_text,
+        "promiseContract": {
+            "loopQuestion": "",
+            "specificPromise": str(offer_payload.get("corePromise") or "").strip(),
+            "deliveryTest": "",
+            "minimumDelivery": "",
+        },
+        "presellMarkdown": presell_markdown,
+        "salesPageMarkdown": sales_markdown,
+        "templatePayloads": None,
+    }
+    copy_context_payload = {
+        "audienceProductMarkdown": _derived_markdown_document(
+            title="Audience + Product",
+            source_role="knowledge_base",
+            content=knowledge_base_markdown,
+        ),
+        "brandVoiceMarkdown": _derived_markdown_document(
+            title="Brand Voice",
+            source_role="cso",
+            content=cso_markdown,
+        ),
+        "complianceMarkdown": _derived_markdown_document(
+            title="Compliance",
+            source_role="cso",
+            content=cso_markdown,
+        ),
+        "mentalModelsMarkdown": _derived_markdown_document(
+            title="Mental Models",
+            source_role="signal_report",
+            content=signal_report_markdown,
+        ),
+        "awarenessAngleMatrixMarkdown": _build_derived_awareness_angle_matrix_markdown(
+            angle_library=angle_library,
+            angle_selection=angle_selection,
+        ),
+    }
+    artifact_ids = {
+        "angles": _bundle_item_artifact_id(angle_library_item),
+        "offer": _bundle_item_artifact_id(offer_item),
+        "copy": _bundle_item_artifact_id(presell_item),
+        "copy_context": _bundle_item_artifact_id(knowledge_base_item),
+        "signal_report": _bundle_item_artifact_id(signal_report_item),
+        "knowledge_base": _bundle_item_artifact_id(knowledge_base_item),
+        "cso": _bundle_item_artifact_id(cso_item),
+        "headline_selection": _bundle_item_artifact_id(headline_selection_item),
+        "presell_page": _bundle_item_artifact_id(presell_item),
+        "sales_page": _bundle_item_artifact_id(sales_item),
+    }
+
+    angle_names: list[str] = []
+    for entry in angles:
+        if not isinstance(entry, dict):
+            continue
+        angle_name = str(entry.get("angleName") or "").strip()
+        if angle_name:
+            angle_names.append(angle_name)
+
+    return {
+        "provider": CampaignCreativeContextProviderEnum.skills,
+        "skills_bundle": bundle_payload,
+        "angles": angles_payload,
+        "offer": offer_payload,
+        "copy": copy_payload,
+        "copy_context": copy_context_payload,
+        "artifact_ids": artifact_ids,
+        "downstream_packet": _build_manual_downstream_packet(
+            angles=angles_payload,
+            offer=offer_payload,
+            copy=copy_payload,
+            copy_context=copy_context_payload,
+            artifact_ids=artifact_ids,
+        ),
+        "angle_names": angle_names,
+    }
+
+
+def materialize_skills_campaign_creative_context(
+    *,
+    session: Session,
+    org_id: str,
+    campaign: Campaign,
+    created_by_user: str | None,
+) -> dict[str, Any]:
+    provider = resolve_campaign_creative_context_provider(
+        session=session,
+        org_id=org_id,
+        campaign_id=str(campaign.id),
+    )
+    if provider != CampaignCreativeContextProviderEnum.skills:
+        raise ValueError(
+            "Campaign creative context materialization requires provider 'skills'."
+        )
+    if not campaign.product_id:
+        raise ValueError(
+            "Campaign creative context provider 'skills' requires the campaign to have a product_id."
+        )
+
+    compatibility_payload = _build_skills_compatibility_payload(
+        session=session,
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id),
+    )
+    skills_bundle = compatibility_payload["skills_bundle"]
+    strategy_bundle_id = str(skills_bundle.get("id") or "").strip()
+    strategy_bundle_type = str(skills_bundle.get("bundleType") or "").strip()
+    if not strategy_bundle_id or not strategy_bundle_type:
+        raise ValueError("Active skills handoff bundle is missing identity metadata.")
+
+    source_artifact_ids = {
+        "angle_library": compatibility_payload["artifact_ids"].get("angles"),
+        "offer_document": compatibility_payload["artifact_ids"].get("offer"),
+        "presell_page": compatibility_payload["artifact_ids"].get("presell_page"),
+        "knowledge_base": compatibility_payload["artifact_ids"].get("knowledge_base"),
+        "signal_report": compatibility_payload["artifact_ids"].get("signal_report"),
+        "cso": compatibility_payload["artifact_ids"].get("cso"),
+        "headline_selection": compatibility_payload["artifact_ids"].get("headline_selection"),
+        "sales_page": compatibility_payload["artifact_ids"].get("sales_page"),
+        "angle_selection": _bundle_item_artifact_id(
+            _skills_bundle_items_by_role(skills_bundle).get("angle_selection")
+        ),
+    }
+    compatibility_signature = _skills_materialization_signature(
+        strategy_bundle_id=strategy_bundle_id,
+        strategy_bundle_type=strategy_bundle_type,
+        angles=compatibility_payload["angles"],
+        offer=compatibility_payload["offer"],
+        copy=compatibility_payload["copy"],
+        copy_context=compatibility_payload["copy_context"],
+        source_artifact_ids=source_artifact_ids,
+        angle_names=compatibility_payload["angle_names"],
+    )
+
+    artifacts_repo = ArtifactsRepository(session)
+    latest_materialized_artifact = _latest_materialized_skills_creative_context_artifact(
+        artifacts_repo=artifacts_repo,
+        org_id=org_id,
+        campaign_id=str(campaign.id),
+    )
+    latest_materialized_payload = _materialized_skills_context_payload(latest_materialized_artifact)
+    if latest_materialized_payload is not None:
+        existing_signature = str(latest_materialized_payload.get("compatibilitySignature") or "").strip()
+        existing_artifact_ids = latest_materialized_payload.get("artifactIds")
+        if existing_signature == compatibility_signature and isinstance(existing_artifact_ids, dict):
+            return {
+                "campaignId": str(campaign.id),
+                "provider": CampaignCreativeContextProviderEnum.skills.value,
+                "creativeContextArtifactId": str(latest_materialized_artifact.id),
+                "artifactIds": {str(key): str(value) for key, value in existing_artifact_ids.items()},
+                "sourceArtifactIds": source_artifact_ids,
+                "strategyBundleId": strategy_bundle_id,
+                "strategyBundleType": strategy_bundle_type,
+                "uploadedDocKeys": [
+                    "campaign_loaded_angles",
+                    "campaign_loaded_offer",
+                    "campaign_loaded_copy",
+                    "campaign_loaded_copy_context",
+                    "campaign_creative_context",
+                ],
+                "refreshed": False,
+                "staleArtifactId": None,
+                "checkedAt": str(latest_materialized_payload.get("checkedAt") or _iso_now()),
+            }
+
+    product_id = str(campaign.product_id)
+    checked_at = _iso_now()
+    angles_payload = compatibility_payload["angles"]
+    offer_payload = compatibility_payload["offer"]
+    copy_payload = compatibility_payload["copy"]
+    copy_context_payload = compatibility_payload["copy_context"]
+
+    angles_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.campaign_loaded_angles,
+        data=angles_payload,
+        created_by_user=created_by_user,
+    )
+    offer_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.campaign_loaded_offer,
+        data=offer_payload,
+        created_by_user=created_by_user,
+    )
+    copy_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.campaign_loaded_copy,
+        data=copy_payload,
+        created_by_user=created_by_user,
+    )
+    copy_context_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.campaign_loaded_copy_context,
+        data=copy_context_payload,
+        created_by_user=created_by_user,
+    )
+
+    aggregate_payload = {
+        "schemaVersion": 1,
+        "provider": CampaignCreativeContextProviderEnum.skills.value,
+        "campaignId": str(campaign.id),
+        "clientId": str(campaign.client_id),
+        "productId": product_id,
+        "checkedAt": checked_at,
+        "compatibilitySignature": compatibility_signature,
+        "strategyBundleId": strategy_bundle_id,
+        "strategyBundleType": strategy_bundle_type,
+        "sourceArtifactIds": source_artifact_ids,
+        "artifactIds": {
+            "campaign_loaded_angles": str(angles_artifact.id),
+            "campaign_loaded_offer": str(offer_artifact.id),
+            "campaign_loaded_copy": str(copy_artifact.id),
+            "campaign_loaded_copy_context": str(copy_context_artifact.id),
+        },
+        "materializedContext": {
+            "angles": angles_payload,
+            "offer": offer_payload,
+            "copy": copy_payload,
+            "copyContext": copy_context_payload,
+        },
+        "downstreamPacket": compatibility_payload["downstream_packet"],
+        "angleNames": compatibility_payload["angle_names"],
+    }
+    creative_context_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.campaign_creative_context,
+        data=aggregate_payload,
+        created_by_user=created_by_user,
+    )
+    aggregate_payload["artifactIds"]["campaign_creative_context"] = str(creative_context_artifact.id)
+
+    uploaded_doc_keys = _persist_workspace_docs(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=product_id,
+        campaign_id=str(campaign.id),
+        docs=[
+            {
+                "doc_key": "campaign_loaded_angles",
+                "doc_title": "Campaign Loaded Angles",
+                "source_kind": ArtifactTypeEnum.campaign_loaded_angles.value,
+                "payload": angles_payload,
+            },
+            {
+                "doc_key": "campaign_loaded_offer",
+                "doc_title": "Campaign Loaded Offer",
+                "source_kind": ArtifactTypeEnum.campaign_loaded_offer.value,
+                "payload": offer_payload,
+            },
+            {
+                "doc_key": "campaign_loaded_copy",
+                "doc_title": "Campaign Loaded Copy",
+                "source_kind": ArtifactTypeEnum.campaign_loaded_copy.value,
+                "payload": copy_payload,
+            },
+            {
+                "doc_key": "campaign_loaded_copy_context",
+                "doc_title": "Campaign Loaded Copy Context",
+                "source_kind": ArtifactTypeEnum.campaign_loaded_copy_context.value,
+                "payload": copy_context_payload,
+            },
+            {
+                "doc_key": "campaign_creative_context",
+                "doc_title": "Campaign Creative Context",
+                "source_kind": ArtifactTypeEnum.campaign_creative_context.value,
+                "payload": aggregate_payload,
+            },
+        ],
+    )
+
+    return {
+        "campaignId": str(campaign.id),
+        "provider": CampaignCreativeContextProviderEnum.skills.value,
+        "creativeContextArtifactId": str(creative_context_artifact.id),
+        "artifactIds": aggregate_payload["artifactIds"],
+        "sourceArtifactIds": source_artifact_ids,
+        "strategyBundleId": strategy_bundle_id,
+        "strategyBundleType": strategy_bundle_type,
+        "uploadedDocKeys": uploaded_doc_keys,
+        "refreshed": True,
+        "staleArtifactId": str(latest_materialized_artifact.id) if latest_materialized_artifact is not None else None,
+        "checkedAt": checked_at,
+    }
+
+
 def load_campaign_creative_context(
     *,
     session: Session,
@@ -171,6 +759,65 @@ def load_campaign_creative_context(
             "downstream_packet": strategy_outputs.get("downstream_packet"),
             "angle_names": angle_names,
             **strategy_outputs,
+        }
+
+    if provider == CampaignCreativeContextProviderEnum.skills:
+        if not product_id:
+            raise ValueError(
+                "Campaign creative context provider 'skills' requires the campaign to have a product_id."
+            )
+        materialized_artifact = _latest_materialized_skills_creative_context_artifact(
+            artifacts_repo=artifacts_repo,
+            org_id=org_id,
+            campaign_id=campaign_id,
+        )
+        materialized_payload = _materialized_skills_context_payload(materialized_artifact)
+        if materialized_payload is None:
+            raise ValueError(
+                "Skills campaign creative context has not been materialized for this campaign. "
+                "Run skills creative-context materialization before downstream execution."
+            )
+        materialized_context = materialized_payload["materializedContext"]
+        artifact_ids = materialized_payload.get("artifactIds")
+        if not isinstance(artifact_ids, dict):
+            raise ValueError("Materialized skills campaign creative context is missing artifactIds.")
+        angle_names = materialized_payload.get("angleNames")
+        if not isinstance(angle_names, list):
+            angle_names = []
+        downstream_packet = materialized_payload.get("downstreamPacket")
+        if not isinstance(downstream_packet, dict):
+            downstream_packet = _build_manual_downstream_packet(
+                angles=materialized_context.get("angles"),
+                offer=materialized_context.get("offer"),
+                copy=materialized_context.get("copy"),
+                copy_context=materialized_context.get("copyContext"),
+                artifact_ids={
+                    "angles": artifact_ids.get("campaign_loaded_angles"),
+                    "offer": artifact_ids.get("campaign_loaded_offer"),
+                    "copy": artifact_ids.get("campaign_loaded_copy"),
+                    "copy_context": artifact_ids.get("campaign_loaded_copy_context"),
+                },
+            )
+        return {
+            "provider": provider,
+            "materialized_context_artifact": materialized_artifact,
+            "skills_bundle": {
+                "id": materialized_payload.get("strategyBundleId"),
+                "bundleType": materialized_payload.get("strategyBundleType"),
+            },
+            "angles": materialized_context.get("angles"),
+            "offer": materialized_context.get("offer"),
+            "copy": materialized_context.get("copy"),
+            "copy_context": materialized_context.get("copyContext"),
+            "artifact_ids": {
+                "angles": artifact_ids.get("campaign_loaded_angles"),
+                "offer": artifact_ids.get("campaign_loaded_offer"),
+                "copy": artifact_ids.get("campaign_loaded_copy"),
+                "copy_context": artifact_ids.get("campaign_loaded_copy_context"),
+                "creative_context": artifact_ids.get("campaign_creative_context"),
+            },
+            "downstream_packet": downstream_packet,
+            "angle_names": [str(value).strip() for value in angle_names if str(value).strip()],
         }
 
     manual_context_artifact = artifacts_repo.get_latest_by_type_for_campaign(
@@ -265,6 +912,9 @@ def ensure_campaign_creative_context_ready(
         )
         readiness["provider"] = provider.value
         readiness["manualCreativeContextArtifactId"] = None
+        readiness["creativeContextArtifactId"] = None
+        readiness["strategyBundleId"] = None
+        readiness["strategyBundleType"] = None
         readiness["missingArtifacts"] = []
         return readiness
 
@@ -274,6 +924,99 @@ def ensure_campaign_creative_context_ready(
         campaign_id=str(campaign.id),
         artifact_type=ArtifactTypeEnum.campaign_creative_context,
     )
+
+    if provider == CampaignCreativeContextProviderEnum.skills:
+        materialized_artifact = _latest_materialized_skills_creative_context_artifact(
+            artifacts_repo=artifacts_repo,
+            org_id=org_id,
+            campaign_id=str(campaign.id),
+        )
+        materialized_payload = _materialized_skills_context_payload(materialized_artifact)
+        if not campaign.product_id:
+            return {
+                "provider": provider.value,
+                "ready": False,
+                "checkedAt": _iso_now(),
+                "reason": "Skills campaign creative context requires the campaign to have a product_id.",
+                "sourceStrategyV2WorkflowRunId": None,
+                "sourceStrategyV2TemporalWorkflowId": None,
+                "launchContextArtifactId": None,
+                "manualCreativeContextArtifactId": None,
+                "creativeContextArtifactId": str(aggregate_artifact.id) if aggregate_artifact is not None else None,
+                "materializedCreativeContextArtifactId": str(materialized_artifact.id)
+                if materialized_artifact is not None
+                else None,
+                "materializedArtifactIds": materialized_payload.get("artifactIds")
+                if materialized_payload is not None and isinstance(materialized_payload.get("artifactIds"), dict)
+                else None,
+                "strategyBundleId": None,
+                "strategyBundleType": None,
+                "refreshed": False,
+                "staleArtifactId": None,
+                "missingArtifacts": ["product_id"],
+            }
+        try:
+            bundle_payload = _load_active_skills_bundle(
+                session=session,
+                org_id=org_id,
+                client_id=str(campaign.client_id),
+                product_id=str(campaign.product_id),
+            )
+        except ProductStrategyBundlesError as exc:
+            return {
+                "provider": provider.value,
+                "ready": False,
+                "checkedAt": _iso_now(),
+                "reason": str(exc),
+                "sourceStrategyV2WorkflowRunId": None,
+                "sourceStrategyV2TemporalWorkflowId": None,
+                "launchContextArtifactId": None,
+                "manualCreativeContextArtifactId": None,
+                "creativeContextArtifactId": str(aggregate_artifact.id) if aggregate_artifact is not None else None,
+                "materializedCreativeContextArtifactId": str(materialized_artifact.id)
+                if materialized_artifact is not None
+                else None,
+                "materializedArtifactIds": materialized_payload.get("artifactIds")
+                if materialized_payload is not None and isinstance(materialized_payload.get("artifactIds"), dict)
+                else None,
+                "strategyBundleId": None,
+                "strategyBundleType": None,
+                "refreshed": False,
+                "staleArtifactId": None,
+                "missingArtifacts": ["skills_handoff"],
+            }
+
+        missing_roles = _skills_missing_roles(bundle_payload)
+        ready = not missing_roles and materialized_payload is not None
+        return {
+            "provider": provider.value,
+            "ready": ready,
+            "checkedAt": _iso_now(),
+            "reason": None
+            if ready
+            else (
+                "Skills campaign creative context is incomplete."
+                if missing_roles
+                else "Skills campaign creative context has not been materialized for this campaign."
+            ),
+            "sourceStrategyV2WorkflowRunId": None,
+            "sourceStrategyV2TemporalWorkflowId": None,
+            "launchContextArtifactId": None,
+            "manualCreativeContextArtifactId": None,
+            "creativeContextArtifactId": str(aggregate_artifact.id) if aggregate_artifact is not None else None,
+            "materializedCreativeContextArtifactId": str(materialized_artifact.id)
+            if materialized_artifact is not None
+            else None,
+            "materializedArtifactIds": materialized_payload.get("artifactIds")
+            if materialized_payload is not None and isinstance(materialized_payload.get("artifactIds"), dict)
+            else None,
+            "strategyBundleId": str(bundle_payload.get("id") or "") or None,
+            "strategyBundleType": str(bundle_payload.get("bundleType") or "") or None,
+            "refreshed": False,
+            "staleArtifactId": None,
+            "missingArtifacts": missing_roles if missing_roles else ([] if materialized_payload is not None else ["materialized_creative_context"]),
+        }
+
     section_artifacts = {
         "campaign_loaded_angles": artifacts_repo.get_latest_by_type_for_campaign(
             org_id=org_id,
@@ -313,6 +1056,11 @@ def ensure_campaign_creative_context_ready(
         "sourceStrategyV2TemporalWorkflowId": None,
         "launchContextArtifactId": None,
         "manualCreativeContextArtifactId": str(aggregate_artifact.id) if aggregate_artifact is not None else None,
+        "creativeContextArtifactId": str(aggregate_artifact.id) if aggregate_artifact is not None else None,
+        "materializedCreativeContextArtifactId": None,
+        "materializedArtifactIds": None,
+        "strategyBundleId": None,
+        "strategyBundleType": None,
         "refreshed": False,
         "staleArtifactId": None,
         "missingArtifacts": missing_artifacts,

@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-account-order-detail",
+  "name": "Medusa B2C Order Detail",
+  "description": "Single order detail view.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Order Detail",
+        "description": "Order details"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2CAccountOrderDetailPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

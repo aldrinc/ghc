@@ -6,9 +6,24 @@ import time
 from types import SimpleNamespace
 
 import pytest
+from temporalio.exceptions import ApplicationError
 
 from app.temporal.activities import asset_activities
 from app.temporal.activities import swipe_image_ad_activities
+
+
+def _activity_params() -> dict[str, object]:
+    return {
+        "org_id": "org-1",
+        "client_id": "client-1",
+        "campaign_id": "campaign-1",
+        "product_id": "product-1",
+        "asset_brief_id": "brief-1",
+        "workflow_run_id": "workflow-run-1",
+        "swipe_collection_id": "collection-1",
+        "swipe_collection_name": "Collection 1",
+        "swipe_asset_ids": ["swipe-1", "swipe-2"],
+    }
 
 
 def _install_image_generation_stubs(
@@ -214,16 +229,7 @@ def test_generate_assets_for_brief_activity_resumes_completed_image_plan_items(
     )
     asset_by_id = installed["asset_by_id"]
 
-    result = asset_activities.generate_assets_for_brief_activity(
-        {
-            "org_id": "org-1",
-            "client_id": "client-1",
-            "campaign_id": "campaign-1",
-            "product_id": "product-1",
-            "asset_brief_id": "brief-1",
-            "workflow_run_id": "workflow-run-1",
-        }
-    )
+    result = asset_activities.generate_assets_for_brief_activity(_activity_params())
 
     assert result["asset_ids"] == ["existing-asset-1", "new-asset-2"]
     assert len(swipe_calls) == 1
@@ -232,6 +238,21 @@ def test_generate_assets_for_brief_activity_resumes_completed_image_plan_items(
     assert swipe_calls[0]["creative_generation_plan_item_id"] == "plan-item-2"
     assert installed["updated_assets"]["new-asset-2"]["ai_metadata"]["creativeGenerationPlanItemId"] == "plan-item-2"
     assert asset_by_id["new-asset-2"].ai_metadata["adCopyPackId"] == "copy-pack-1"
+
+
+def test_generate_assets_for_brief_activity_treats_missing_swipe_collection_id_as_non_retryable(
+) -> None:
+    params = _activity_params()
+    params.pop("swipe_collection_id")
+
+    with pytest.raises(
+        ApplicationError,
+        match="missing required field\\(s\\): swipe_collection_id",
+    ) as exc_info:
+        asset_activities.generate_assets_for_brief_activity(params)
+
+    assert exc_info.value.type == "InvalidActivityInput"
+    assert exc_info.value.non_retryable is True
 
 
 def test_generate_assets_for_brief_activity_preserves_plan_order_with_parallel_swipes(
@@ -303,16 +324,7 @@ def test_generate_assets_for_brief_activity_preserves_plan_order_with_parallel_s
     )
     asset_by_id = installed["asset_by_id"]
 
-    result = asset_activities.generate_assets_for_brief_activity(
-        {
-            "org_id": "org-1",
-            "client_id": "client-1",
-            "campaign_id": "campaign-1",
-            "product_id": "product-1",
-            "asset_brief_id": "brief-1",
-            "workflow_run_id": "workflow-run-1",
-        }
-    )
+    result = asset_activities.generate_assets_for_brief_activity(_activity_params())
 
     assert completion_order == ["plan-item-2", "plan-item-1"]
     assert result["asset_ids"] == ["new-asset-1", "new-asset-2"]
@@ -357,16 +369,7 @@ def test_generate_assets_for_brief_activity_compacts_swipe_generation_failures(
     )
 
     with pytest.raises(RuntimeError) as exc_info:
-        asset_activities.generate_assets_for_brief_activity(
-            {
-                "org_id": "org-1",
-                "client_id": "client-1",
-                "campaign_id": "campaign-1",
-                "product_id": "product-1",
-                "asset_brief_id": "brief-1",
-                "workflow_run_id": "workflow-run-1",
-            }
-        )
+        asset_activities.generate_assets_for_brief_activity(_activity_params())
 
     error_text = str(exc_info.value)
     assert "plan_item_id=plan-item-1" in error_text

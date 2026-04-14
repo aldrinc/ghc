@@ -3,7 +3,8 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.db.enums import ArtifactTypeEnum
-from app.db.models import Artifact, Campaign, Client, Product
+from app.db.models import ActivityLog, Artifact, Campaign, Client, CompanySwipeAsset, Product
+from app.db.repositories.swipes import SwipeCollectionsRepository
 from app.strategy_v2 import launches as strategy_v2_launches
 from tests.helpers.manual_creative_context import manual_creative_context_payload
 from tests.helpers.launch_context import seed_ready_launch_context_for_campaign
@@ -342,12 +343,35 @@ def test_creative_production_accepts_manual_creative_context_without_launch_line
     db_session.add(brief_artifact)
     db_session.commit()
 
+    swipe_asset = CompanySwipeAsset(
+        org_id=TEST_ORG_ID,
+        title="Manual Produce Swipe",
+        analysis_status="ready",
+    )
+    db_session.add(swipe_asset)
+    db_session.commit()
+    db_session.refresh(swipe_asset)
+
+    swipe_collection = SwipeCollectionsRepository(db_session).ensure_default_collection(org_id=str(TEST_ORG_ID))
+
     response = api_client.post(
         f"/campaigns/{campaign_id}/creative/produce",
-        json={"asset_brief_ids": ["brief-manual-produce"]},
+        json={
+            "asset_brief_ids": ["brief-manual-produce"],
+            "swipeCollectionId": str(swipe_collection.id),
+        },
     )
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["workflow_run_id"]
     assert payload["temporal_workflow_id"]
     assert fake_temporal.started
+
+    activity_log = db_session.scalars(
+        select(ActivityLog).where(ActivityLog.workflow_run_id == payload["workflow_run_id"])
+    ).first()
+    assert activity_log is not None
+    assert activity_log.payload_in is not None
+    assert activity_log.payload_in["swipe_collection_id"] == str(swipe_collection.id)
+    assert activity_log.payload_in["swipe_collection_name"] == "Default"
+    assert activity_log.payload_in["swipe_asset_ids"] == [str(swipe_asset.id)]

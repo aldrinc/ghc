@@ -28,6 +28,27 @@ matching_backend_pid() {
   printf '%s\n' "$matches" | sed -n '1p'
 }
 
+resolve_dev_host() {
+  if [ -n "${BACKEND_HOST:-}" ]; then
+    printf '%s\n' "$BACKEND_HOST"
+    return 0
+  fi
+
+  if [ -n "${DEV_BIND_HOST:-}" ]; then
+    printf '%s\n' "$DEV_BIND_HOST"
+    return 0
+  fi
+
+  local wt0_ip
+  wt0_ip="$(ip -4 addr show wt0 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | sed -n '1p')"
+  if [ -n "$wt0_ip" ]; then
+    printf '%s\n' "$wt0_ip"
+    return 0
+  fi
+
+  printf '127.0.0.1\n'
+}
+
 cd "$BACKEND_DIR"
 
 if [ ! -d ".venv" ] && ! command -v python3.11 >/dev/null 2>&1; then
@@ -38,9 +59,11 @@ if ! [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || (( BACKEND_PORT < 1 || BACKEND_PORT > 
   fail "Invalid BACKEND_PORT '$BACKEND_PORT' (expected 1-65535)."
 fi
 
+BIND_HOST="$(resolve_dev_host)"
+
 existing_backend_pid="$(matching_backend_pid "$BACKEND_PORT")"
 if [ -n "$existing_backend_pid" ]; then
-  echo "[backend] Uvicorn already running on http://localhost:${BACKEND_PORT} (pid ${existing_backend_pid})."
+  echo "[backend] Uvicorn already running on http://${BIND_HOST}:${BACKEND_PORT} (pid ${existing_backend_pid})."
   exit 0
 fi
 
@@ -59,6 +82,8 @@ fi
 echo "[backend] Installing/updating dependencies from pyproject.toml..."
 .venv/bin/pip install -e .
 
-echo "[backend] Starting uvicorn on http://0.0.0.0:${BACKEND_PORT}"
+CANONICAL_URL="$(DEV_ACCESS_HOST="$BIND_HOST" "$ROOT/scripts/resolve-dev-access-url.sh" "$BACKEND_PORT")"
+echo "[backend] Canonical access URL: ${CANONICAL_URL}"
+echo "[backend] Starting uvicorn on http://${BIND_HOST}:${BACKEND_PORT}"
 exec .venv/bin/python "$ROOT/scripts/run_with_backend_env.py" \
-  .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --reload
+  .venv/bin/uvicorn app.main:app --host "$BIND_HOST" --port "$BACKEND_PORT" --reload

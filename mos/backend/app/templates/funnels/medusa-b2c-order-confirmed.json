@@ -1,0 +1,21 @@
+{
+  "id": "medusa-b2c-order-confirmed",
+  "name": "Medusa B2C Order Confirmed",
+  "description": "Order confirmation page after successful checkout.",
+  "previewImage": null,
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Order Confirmed",
+        "description": "Thank you for your order"
+      }
+    },
+    "content": [
+      {
+        "type": "MedusaB2COrderConfirmedPage",
+        "props": {}
+      }
+    ],
+    "zones": {}
+  }
+}

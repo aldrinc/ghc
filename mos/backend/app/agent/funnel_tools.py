@@ -30,6 +30,15 @@ from app.services.html_funnel_reference import (
     build_html_reference_prompt_context,
     summarize_html_reference,
 )
+from app.services.imported_html_runtime import (
+    ImportedHtmlRuntimeValidationError,
+    build_imported_html_generation_context,
+    coerce_imported_html_instrumentation_manifest,
+    imported_html_instrumentation_schema,
+    imported_html_selector_hint,
+    resolve_funnel_page_stage,
+    validate_imported_html_document_manifest,
+)
 from app.services.campaign_creative_context import load_campaign_creative_context
 from app.services.funnel_testimonials import (
     generate_funnel_page_testimonials,
@@ -58,6 +67,64 @@ def _resolve_reference_html_mode(reference_html_mode: str | None) -> _ReferenceH
     return "guide"
 
 
+def _build_html_template_seed_puck_data() -> dict[str, Any]:
+    return {
+        "root": {"props": {}},
+        "content": [],
+        "zones": {},
+    }
+
+
+def _build_imported_html_document_puck_data(
+    *,
+    html_document: str,
+    page_name: str,
+    reference_label: str | None = None,
+    instrumentation_manifest: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    title = page_name.strip() or "Imported HTML Page"
+    source_label = (reference_label or "").strip() or None
+    props: dict[str, Any] = {
+        "id": "imported-html-document",
+        "title": title,
+        "sourceLabel": source_label,
+        "htmlDocument": html_document,
+    }
+    if instrumentation_manifest is not None:
+        props["instrumentationManifest"] = instrumentation_manifest
+    return {
+        "root": {"props": {"title": title, "description": f"Imported HTML template for {title}."}},
+        "content": [
+            {
+                "type": "ImportedHtmlDocument",
+                "props": props,
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _coerce_text_replacements(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        raise RuntimeError("Model response is missing textReplacements.")
+    cleaned: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            raise RuntimeError("Each text replacement must be an object.")
+        node_id = str(item.get("nodeId") or "").strip()
+        if not node_id:
+            raise RuntimeError("Each text replacement must include a nodeId.")
+        if node_id in seen_ids:
+            raise RuntimeError(f"Model response repeated text replacement nodeId '{node_id}'.")
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise RuntimeError(f"Text replacement '{node_id}' must include a string text value.")
+        cleaned.append({"nodeId": node_id, "text": text})
+        seen_ids.add(node_id)
+    return cleaned
+
+
 def _resolve_base_puck_data(
     *,
     current_puck_data: dict[str, Any] | None,
@@ -67,9 +134,7 @@ def _resolve_base_puck_data(
 ) -> tuple[dict[str, Any] | None, str]:
     normalized_mode = _resolve_reference_html_mode(reference_html_mode)
     if normalized_mode == "template":
-        if isinstance(template_puck_data, dict):
-            return template_puck_data, "template"
-        return None, "none"
+        return _build_html_template_seed_puck_data(), "htmlTemplateSeed"
     if isinstance(current_puck_data, dict):
         return current_puck_data, "currentPuckData"
     if isinstance(latest_draft_puck_data, dict):
@@ -1281,7 +1346,8 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         template = get_funnel_template(resolved_template_id) if resolved_template_id else None
         if resolved_template_id and not template:
             raise ValueError("Template not found")
-        if _resolve_reference_html_mode(args.referenceHtmlMode) == "template" and template is None:
+        html_template_mode = _resolve_reference_html_mode(args.referenceHtmlMode) == "template"
+        if html_template_mode and template is None:
             raise ValueError("referenceHtmlMode='template' requires a supported page template.")
 
         template_kind = None
@@ -1320,7 +1386,9 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
         )
 
         required_types: list[str] = []
-        if template is not None:
+        if html_template_mode:
+            required_types = ["ImportedHtmlDocument"]
+        elif template is not None and not html_template_mode:
             # Required components should track the active template definition, not the stored page puckData.
             # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
             # upgrades/merges them with the latest template before validation.
@@ -1330,13 +1398,19 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
                     funnel_ai._required_template_component_types(required_source, template_kind=template_kind)
                 )
 
-        allowed_types = sorted(
-            _allowed_component_types(template_kind, template_mode=template is not None)
-        )
+        if html_template_mode:
+            allowed_types = ["ImportedHtmlDocument"]
+        else:
+            allowed_types = sorted(
+                _allowed_component_types(
+                    None if html_template_mode else template_kind,
+                    template_mode=template is not None and not html_template_mode,
+                )
+            )
 
         template_ctx = _TemplateContext(
             template_id=resolved_template_id,
-            template_mode=template is not None,
+            template_mode=template is not None and not html_template_mode,
             template_kind=template_kind,
         )
 
@@ -1348,6 +1422,12 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             "pageId": str(page.id),
             "pageName": page.name,
             "pageSlug": page.slug,
+            "pageStage": resolve_funnel_page_stage(
+                slug=page.slug,
+                template_id=page.template_id,
+                page_name=page.name,
+            ),
+            "nextPageId": str(page.next_page_id) if page.next_page_id else None,
             "pageContext": page_context,
             "pageIdSet": sorted(page_id_set),
             "basePuckData": base_puck,
@@ -1675,6 +1755,7 @@ class DraftGeneratePageArgs(BaseModel):
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
     referenceHtmlMode: _ReferenceHtmlMode = "guide"
+    referenceHtml: Optional[str] = None
     htmlReferencePromptContext: Optional[dict[str, Any]] = None
     strategyPromptContext: Optional[dict[str, Any]] = None
 
@@ -1695,11 +1776,10 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         template_mode = bool(args.templateMode)
         reference_html_mode = _resolve_reference_html_mode(args.referenceHtmlMode)
         html_template_mode = reference_html_mode == "template"
+        exact_html_mode = html_template_mode and not template_mode
         template_component_kind: str | None = None
         if template_mode and isinstance(args.basePuckData, dict):
             template_component_kind = funnel_ai._infer_template_component_kind(template_kind, args.basePuckData)
-        if html_template_mode and not template_mode:
-            raise ValueError("referenceHtmlMode='template' requires template mode.")
         if html_template_mode and not (
             isinstance(args.htmlReferencePromptContext, dict) and args.htmlReferencePromptContext
         ):
@@ -1725,6 +1805,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
                 "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
             )
+            if html_template_mode:
+                structure_guidance += (
+                    "- Use ONLY primitive components in imported HTML template mode; do NOT use SalesPdp* or PreSales* components.\n"
+                    "- Recreate the uploaded HTML section order, hierarchy, CTA placement, proof blocks, and FAQ rhythm as closely as possible with Section/Columns/Heading/Text/Image/Button/FeatureGrid/Testimonials/FAQ.\n"
+                    "- If the HTML shows repeated cards, proof tiles, or comparison rows, compose them with primitives instead of falling back to legacy template scaffolds.\n\n"
+                )
         elif template_component_kind == "sales-pdp":
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
@@ -1815,8 +1901,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "HTML reference guidance:\n"
                 + (
                     "- Treat the structured HTML reference below as the PRIMARY structural and persuasive blueprint for this generation.\n"
-                    "- Match its information hierarchy, CTA cadence, proof sequencing, FAQ flow, and section emphasis as closely as the supported template components allow.\n"
-                    "- Use the active Puck template as the rendering scaffold, not as the content source.\n"
+                    "- Recreate its information hierarchy, CTA cadence, proof sequencing, FAQ flow, and section emphasis as closely as the allowed Puck components allow.\n"
+                    "- The uploaded HTML is the layout/content source for imported-template mode. Do not preserve legacy funnel template copy or section scaffolds.\n"
                     if html_template_mode
                     else "- The structured HTML reference below comes from an existing page and should be treated as layout and conversion evidence.\n"
                 )
@@ -1825,8 +1911,16 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     if html_template_mode
                     else "- Reuse section order, CTA cadence, proof patterns, FAQ structure, and conversion intent when they fit the active funnel objective.\n"
                 )
-                + "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
-                + "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                + (
+                    "- Do NOT paste raw DOM/CSS or unsupported props into puckData. Translate the HTML into supported Puck components while staying visually and structurally close to the uploaded page.\n"
+                    if html_template_mode
+                    else "- Do NOT attempt a literal DOM import. Translate the intent into the active Puck template and supported component system.\n"
+                )
+                + (
+                    "- If the HTML reference conflicts with product context, brand docs, required strategy copy, or copy pack, preserve the HTML structure and adjust the copy just enough to stay accurate and compliant.\n"
+                    if html_template_mode
+                    else "- If the HTML reference conflicts with product context, brand docs, required strategy copy, copy pack, or the active template constraints, keep the supported funnel/template shape and borrow the closest equivalent pattern.\n"
+                )
                 + f"{json.dumps(args.htmlReferencePromptContext, ensure_ascii=False)}\n\n"
             )
 
@@ -1856,6 +1950,277 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             )
 
         attachment_guidance = _build_attachment_guidance(attachment_summaries)
+
+        if exact_html_mode:
+            reference_html = str(args.referenceHtml or "").strip()
+            if not reference_html:
+                raise ValueError("referenceHtmlMode='template' requires referenceHtml for exact HTML generation.")
+            funnel = ctx.session.scalars(
+                select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+            ).first()
+            if not funnel:
+                raise ValueError("Funnel not found")
+            page = ctx.session.scalars(
+                select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+            ).first()
+            if not page:
+                raise ValueError("Page not found")
+
+            current_page_stage = resolve_funnel_page_stage(
+                slug=page.slug,
+                template_id=page.template_id,
+                page_name=page.name,
+            )
+            publication_pages = list(
+                ctx.session.scalars(
+                    select(FunnelPage)
+                    .where(FunnelPage.funnel_id == funnel.id)
+                    .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+                ).all()
+            )
+            page_targets = [
+                {
+                    "id": str(candidate.id),
+                    "name": candidate.name,
+                    "slug": candidate.slug,
+                    "stage": resolve_funnel_page_stage(
+                        slug=candidate.slug,
+                        template_id=candidate.template_id,
+                        page_name=candidate.name,
+                    ),
+                }
+                for candidate in publication_pages
+                if str(candidate.id) != str(page.id)
+            ]
+            checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+            if funnel.selected_offer_id:
+                checkout_variants_query = checkout_variants_query.where(
+                    ProductVariant.offer_id == funnel.selected_offer_id
+                )
+            checkout_ready_variants = [
+                variant
+                for variant in ctx.session.scalars(checkout_variants_query).all()
+                if str(variant.provider or "").strip().lower()
+                and str(variant.external_price_id or "").strip()
+            ]
+            imported_runtime_context = build_imported_html_generation_context(
+                current_page_stage=current_page_stage,
+                current_page_id=str(page.id),
+                next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                page_targets=page_targets,
+                checkout_ready_variants=checkout_ready_variants,
+            )
+            system_content = (
+                "You are updating an uploaded HTML template for a funnel page.\n\n"
+                "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
+                "Return exactly ONE JSON object with this shape:\n"
+                '{ "assistantMessage": string, "textReplacements": [{ "nodeId": string, "text": string }], "instrumentationManifest": object }\n\n'
+                "assistantMessage requirements:\n"
+                "- Plain text only.\n"
+                f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.\n"
+                "- Summarize the imported page briefly and include a medical safety disclaimer.\n\n"
+                "textReplacements requirements:\n"
+                "- Copy rewrites are disabled for exact imported HTML mode.\n"
+                "- Return an empty array.\n"
+                "- Do NOT rewrite, shorten, expand, or otherwise modify any visible copy.\n"
+                "- Do NOT return HTML, CSS, JavaScript, markdown, selectors, or attribute edits inside text.\n"
+                "- The server will preserve the uploaded HTML exactly as provided.\n\n"
+                "instrumentationManifest requirements:\n"
+                f"- schemaVersion MUST be '{imported_runtime_context['schemaVersion']}'.\n"
+                f"- pageStage MUST be '{current_page_stage}'.\n"
+                "- Use the exact manifest JSON schema below.\n"
+                f"- {imported_html_selector_hint()}\n"
+                "- Every binding selector MUST match at least one existing element in the uploaded HTML.\n"
+                "- If multiple visually identical CTA elements should share behavior, you may use one selector that intentionally matches all of them.\n"
+                "- Option selectors inside checkout.variantResolver.type='option_values' MUST still match exactly one existing element each.\n"
+                "- Do NOT invent ids, classes, attributes, hrefs, or target page ids.\n"
+                "- For pre-sales pages, bind the primary CTA to the configured next page with an internal_navigation binding.\n"
+                "- For sales pages, bind the primary buy CTA with a checkout binding.\n"
+                "- Prefer checkout.mode='public_checkout'. Use checkout.mode='external_checkout_url' only when an explicit per-variant external URL map is required.\n"
+                "- If the page has variant/pack selectors, use an option_values resolver with selectors that read the live chosen values from the existing HTML controls.\n"
+                "- If exactly one checkout-ready variant exists and there is no visible variant choice, use a fixed resolver with that variantId.\n\n"
+                "Page goals:\n"
+                "- Keep the uploaded HTML visually identical.\n"
+                "- Preserve the existing copy exactly as provided.\n"
+                "- Add only the runtime instrumentation needed for funnel tracking, navigation, and checkout.\n\n"
+                f"{context_guidance}"
+                f"{strategy_prompt_guidance}"
+                f"{copy_pack_guidance}"
+                f"{args.productContext}"
+                f"{attachment_guidance}"
+                "Imported HTML runtime context:\n"
+                f"{json.dumps(imported_runtime_context, ensure_ascii=False)}\n\n"
+                "instrumentationManifest JSON schema:\n"
+                f"{json.dumps(imported_html_instrumentation_schema(), ensure_ascii=False)}\n\n"
+                "HTML summary for orientation only:\n"
+                f"{json.dumps(args.htmlReferencePromptContext or {}, ensure_ascii=False)}\n\n"
+                "Uploaded HTML document to preserve exactly while adding runtime instrumentation:\n"
+                f"{reference_html}"
+            )
+
+            conversation: list[dict[str, str]] = []
+            for msg in args.messages or []:
+                role = msg.get("role")
+                content = msg.get("content")
+                if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                    conversation.append({"role": cast(Literal["user", "assistant"], role), "content": content.strip()})
+            if args.prompt and args.prompt.strip():
+                conversation.append({"role": "user", "content": args.prompt.strip()})
+            if not conversation:
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": "Generate runtime instrumentation for the uploaded HTML without changing its copy.",
+                    }
+                )
+
+            base_prompt_parts = [system_content] + [f"{m['role'].upper()}: {m['content']}" for m in conversation]
+            compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
+
+            trace_meta = {
+                "runId": ctx.run_id,
+                "toolCallId": ctx.tool_call_id,
+                "toolName": ctx.tool_name,
+                "toolSeq": ctx.tool_seq,
+                "model": model_id,
+                "temperature": args.temperature,
+                "maxTokens": max_tokens,
+                "referenceHtmlMode": reference_html_mode,
+                "templateMode": template_mode,
+                "templateKind": template_kind,
+                "templateComponentKind": template_component_kind,
+                "exactHtmlMode": True,
+            }
+
+            def _trace_prompt(*, phase: str, prompt_text: str) -> str:
+                sha256 = _sha256_text(prompt_text)
+                _persist_agent_artifact(
+                    ctx=ctx,
+                    kind="llm.prompt",
+                    key=f"{ctx.tool_call_id}:{phase}",
+                    data_json={
+                        **trace_meta,
+                        "phase": phase,
+                        "sha256": sha256,
+                        "chars": len(prompt_text),
+                        "preview": _text_preview(prompt_text),
+                        "text": prompt_text,
+                    },
+                )
+                return sha256
+
+            def _trace_output(*, phase: str, output_text: str, duration_ms: int | None) -> str:
+                sha256 = _sha256_text(output_text)
+                payload: dict[str, Any] = {
+                    **trace_meta,
+                    "phase": phase,
+                    "sha256": sha256,
+                    "chars": len(output_text),
+                    "preview": _text_preview(output_text),
+                    "text": output_text,
+                }
+                if duration_ms is not None:
+                    payload["durationMs"] = duration_ms
+                _persist_agent_artifact(
+                    ctx=ctx,
+                    kind="llm.output",
+                    key=f"{ctx.tool_call_id}:{phase}",
+                    data_json=payload,
+                )
+                return sha256
+
+            params = LLMGenerationParams(
+                model=model_id,
+                max_tokens=max_tokens,
+                temperature=args.temperature,
+                use_reasoning=True,
+                use_web_search=False,
+                response_format=funnel_ai._html_rewrite_response_format(),
+            )
+
+            def _claude_structured_html(prompt_text: str) -> tuple[dict[str, Any], str, int]:
+                default_claude_max = 32_000
+                claude_max = args.maxTokens if args.maxTokens is not None else default_claude_max
+                claude_max = min(claude_max, funnel_ai._CLAUDE_MAX_OUTPUT_TOKENS)
+                user_content = [{"type": "text", "text": prompt_text}, *attachment_blocks, *args.brandDocuments]
+                started = time.monotonic()
+                response = call_claude_structured_message(
+                    model=model_id,
+                    system=None,
+                    user_content=user_content,
+                    output_schema=funnel_ai._html_rewrite_output_schema(),
+                    max_tokens=claude_max,
+                    temperature=args.temperature,
+                )
+                duration_ms = int((time.monotonic() - started) * 1000)
+                parsed = response.get("parsed") if isinstance(response, dict) else None
+                if not isinstance(parsed, dict):
+                    raise RuntimeError("Claude structured response returned no parsed JSON.")
+                out_text = json.dumps(parsed, ensure_ascii=False)
+                return parsed, out_text, duration_ms
+
+            obj: dict[str, Any] | None = None
+            out = ""
+            final_model = model_id
+            _trace_prompt(phase="initial", prompt_text=compiled_prompt)
+
+            if is_claude_model:
+                obj, out, duration_ms = _claude_structured_html(compiled_prompt)
+                _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
+            else:
+                started = time.monotonic()
+                out = llm.generate_text(compiled_prompt, params=params)
+                duration_ms = int((time.monotonic() - started) * 1000)
+                _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
+                obj = funnel_ai._extract_json_object(out)
+
+            if obj is None:
+                raise RuntimeError("Model returned no parsable JSON response")
+
+            assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage"))
+            text_replacements = _coerce_text_replacements(obj.get("textReplacements"))
+            if text_replacements:
+                raise RuntimeError("Imported HTML copy rewrites are disabled; textReplacements must be empty.")
+            instrumentation_manifest = coerce_imported_html_instrumentation_manifest(obj.get("instrumentationManifest"))
+            rewritten_html = reference_html
+            try:
+                instrumentation_manifest = validate_imported_html_document_manifest(
+                    html_document=rewritten_html,
+                    instrumentation_manifest=instrumentation_manifest,
+                    current_page_stage=current_page_stage,
+                    current_page_id=str(page.id),
+                    next_page_id=str(page.next_page_id) if page.next_page_id else None,
+                    available_target_page_ids={str(candidate.id) for candidate in publication_pages},
+                    checkout_ready_variants=checkout_ready_variants,
+                    require_stage_bindings=current_page_stage in {"pre_sales", "sales"},
+                )
+            except ImportedHtmlRuntimeValidationError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+            puck_data = _build_imported_html_document_puck_data(
+                html_document=rewritten_html,
+                page_name=args.pageName,
+                reference_label=(args.htmlReferencePromptContext or {}).get("label"),
+                instrumentation_manifest=instrumentation_manifest,
+            )
+            funnel_ai._ensure_block_ids(puck_data)
+
+            ui_details = {
+                "assistantMessage": assistant_message,
+                "puckData": puck_data,
+                "model": final_model,
+                "attachmentSummaries": attachment_summaries,
+            }
+            llm_output = json.dumps(
+                {
+                    "assistantMessage": assistant_message,
+                    "componentCount": len(puck_data.get("content") or []),
+                    "model": final_model,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
 
         template_guidance = (
             f"Template guidance:\n- Template id: {args.templateId}\n"
@@ -1926,7 +2291,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 + "- Checkout requirement: purchase selector ids MUST match productContext.selected_offer.price_points[].option_values using normalized checkout keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
                 + "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
                 + "- SalesPdpFaq.config MUST be: { id?: string, anchorId?: string, title: string, items: [{ question: string, answer: string }] }\n"
-                + "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
+                + "- SalesPdpReviews.config MUST be: { id: string, data: { productId:string, summary:{ averageRating:number, totalReviews:number, breakdown:list, customersSay:string, topics:list, mediaGallery:list }, filters:{ ratings:list, countries:list, sorts:list }, pagination:{ page:number, pageSize:number, totalReviews:number, totalPages:number }, reviews:list } }\n"
                 + "- SalesPdpFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string }, copyright: string }\n"
                 + "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
                 + (
@@ -2002,10 +2367,16 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if not template_mode:
             layout_guidance = (
                 "Layout guidance:\n"
-                "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
-                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
-                "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+                "- Default to Section.bandWidth='full' for most sections (do not place bare Heading/Text directly at the root)\n"
+                "- Use Section.contentWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+                "- Alternate Section.surface between 'default' and 'muted' to create clear visual sections\n"
+                "- Use Section.padY='md' or 'lg' to create strong vertical rhythm and Section.padX='md' for safe gutter spacing\n\n"
             )
+            if html_template_mode:
+                layout_guidance += (
+                    "- Match the uploaded HTML's section pacing and visual rhythm as closely as possible.\n"
+                    "- Keep the page composition grounded in the imported HTML instead of the legacy sales-page scaffold.\n\n"
+                )
         else:
             if html_template_mode:
                 layout_guidance = (
@@ -2028,13 +2399,16 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         else:
             available_components_block = (
                 "Available primitives (component types) and their props:\n"
-                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+                "1) Section: props { id, purpose?, bandWidth?, contentWidth?, contentAlign?, surface?, padY?, padX?, content? }\n"
                 "   - purpose: 'header' | 'section' | 'footer'\n"
-                "   - layout: 'full' | 'contained' | 'card'\n"
-                "     - full = full-width background, content constrained to containerWidth\n"
-                "     - contained = background constrained to containerWidth (no card styling)\n"
-                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+                "   - bandWidth: 'full' | 'contained'\n"
+                "     - full = full-width background band with content constrained to contentWidth\n"
+                "     - contained = inset contained band/card inside the page width\n"
+                "   - contentWidth: 'sm' | 'md' | 'lg' | 'xl' | 'full'\n"
+                "   - contentAlign: 'left' | 'center' | 'right'\n"
+                "   - surface: 'default' | 'muted' | 'primary' | 'dark'\n"
+                "   - padY: 'none' | 'sm' | 'md' | 'lg' | 'xl'\n"
+                "   - padX: 'none' | 'sm' | 'md' | 'lg'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
                 "   - left/right are slots: ComponentData[]\n"
@@ -2109,9 +2483,13 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "Internal funnel pages you can link to (targetPageId should be one of these ids):\n"
             f"{json.dumps(args.pageContext, ensure_ascii=False)}\n\n"
             + (
-                "Template component structure seed (schema only; not content):\n"
-                if html_template_mode
-                else "Current page puckData (may be null):\n"
+                "Imported HTML freeform seed (schema only; not content):\n"
+                if html_template_mode and not template_mode
+                else (
+                    "Template component structure seed (schema only; not content):\n"
+                    if html_template_mode
+                    else "Current page puckData (may be null):\n"
+                )
             )
             + f"{json.dumps(prompt_puck_data, ensure_ascii=False)}"
         )
@@ -2131,7 +2509,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
 
         allowed_types = _allowed_component_types(
-            template_component_kind if template_mode else template_kind,
+            None
+            if html_template_mode and not template_mode
+            else (template_component_kind if template_mode else template_kind),
             template_mode=template_mode,
         )
 
@@ -2343,12 +2723,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             requirements: list[str] = []
             if missing_header:
                 requirements.append(
-                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                    "- Add a header Section as the FIRST item with props.purpose='header', bandWidth='full', contentWidth='lg', surface='default', padY='sm', padX='md'."
                 )
                 requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
             if missing_footer:
                 requirements.append(
-                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                    "- Add a footer Section as the LAST item with props.purpose='footer', bandWidth='full', contentWidth='lg', surface='muted', padY='md', padX='md'."
                 )
                 requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
 
@@ -2443,6 +2823,7 @@ class DraftApplyOverridesArgs(BaseModel):
     puckData: dict[str, Any]
     basePuckData: Optional[dict[str, Any]] = None
     templateKind: Optional[str] = None
+    referenceHtmlMode: _ReferenceHtmlMode = "guide"
     designSystemTokens: Optional[dict[str, Any]] = None
     brandLogoAssetPublicId: Optional[str] = None
     productId: str
@@ -2467,6 +2848,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         ).first()
         if not product:
             raise ValueError("Product not found")
+        html_template_mode = _resolve_reference_html_mode(args.referenceHtmlMode) == "template"
 
         base_puck_for_restore: dict[str, Any] | None = (
             args.basePuckData if isinstance(args.basePuckData, dict) else None
@@ -2486,16 +2868,16 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         restored_testimonial_image_slots = 0
         checkout_purchase_ids_aligned = 0
         dropped_extra_section_summaries: list[dict[str, str]] = []
-        if args.templateKind and base_puck_for_restore is not None:
+        sales_pdp_import_template_mode = (
+            args.templateKind == "sales-pdp"
+            and funnel_ai.uses_sales_pdp_import_schema(args.puckData)
+        )
+        if args.templateKind and base_puck_for_restore is not None and not html_template_mode:
             page_type: str | None = None
             if args.templateKind == "sales-pdp":
                 page_type = "SalesPdpPage"
             elif args.templateKind == "pre-sales-listicle":
                 page_type = "PreSalesPage"
-            sales_pdp_import_template_mode = (
-                args.templateKind == "sales-pdp"
-                and funnel_ai.uses_sales_pdp_import_schema(args.puckData)
-            )
 
             def _restore_pre_sales_review_image_slots(
                 current_component: dict[str, Any], base_component: dict[str, Any]
@@ -3085,7 +3467,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
 
             restored = restore_missing_src(args.puckData, base_puck_for_restore)
 
-        if args.templateKind == "sales-pdp":
+        if args.templateKind == "sales-pdp" and not html_template_mode:
             funnel = ctx.session.scalars(
                 select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
             ).first()
@@ -3268,7 +3650,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                 product_title=product.title,
             )
 
-        if args.templateKind == "pre-sales-listicle":
+        if args.templateKind == "pre-sales-listicle" and not html_template_mode:
             funnel_ai._enforce_pre_sales_floating_cta_config(
                 puck_data=args.puckData,
                 reference_puck_data=(
@@ -3320,6 +3702,8 @@ class DraftValidateArgs(BaseModel):
 
     orgId: str
     puckData: dict[str, Any]
+    funnelId: Optional[str] = None
+    pageId: Optional[str] = None
     allowedTypes: list[str] = Field(default_factory=list)
     requiredTypes: list[str] = Field(default_factory=list)
     templateKind: Optional[str] = None
@@ -3350,6 +3734,53 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
 
+        current_page_stage = "custom"
+        current_page_id: str | None = None
+        next_page_id: str | None = None
+        checkout_ready_variants: list[ProductVariant] = []
+        page_ids = set(args.pageIdSet or [])
+        if args.funnelId and args.pageId:
+            page = ctx.session.scalars(
+                select(FunnelPage).where(
+                    FunnelPage.funnel_id == args.funnelId,
+                    FunnelPage.id == args.pageId,
+                )
+            ).first()
+            if page:
+                current_page_id = str(page.id)
+                next_page_id = str(page.next_page_id) if page.next_page_id else None
+                current_page_stage = resolve_funnel_page_stage(
+                    slug=page.slug,
+                    template_id=page.template_id,
+                    page_name=page.name,
+                )
+            funnel = ctx.session.scalars(
+                select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+            ).first()
+            if funnel and funnel.product_id:
+                checkout_variants_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+                if funnel.selected_offer_id:
+                    checkout_variants_query = checkout_variants_query.where(
+                        ProductVariant.offer_id == funnel.selected_offer_id
+                    )
+                checkout_ready_variants = [
+                    variant
+                    for variant in ctx.session.scalars(checkout_variants_query).all()
+                    if str(variant.external_price_id or "").strip() and str(variant.provider or "").strip()
+                ]
+        try:
+            funnel_ai._validate_imported_html_document_components(
+                args.puckData,
+                current_page_stage=current_page_stage,
+                current_page_id=current_page_id,
+                next_page_id=next_page_id,
+                available_target_page_ids=page_ids or None,
+                checkout_ready_variants=checkout_ready_variants,
+                require_stage_bindings=current_page_stage in {"pre_sales", "sales"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+
         allowed_set = set(args.allowedTypes or [])
         if allowed_set:
             unknown: set[str] = set()
@@ -3373,8 +3804,7 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
                 )
 
         # Internal links must resolve to valid page ids.
-        if args.pageIdSet:
-            page_ids = set(args.pageIdSet)
+        if page_ids:
             for link in extract_internal_links(args.puckData):
                 if link.to_page_id not in page_ids:
                     errors.append(f"Invalid internal link targetPageId: {link.to_page_id}")

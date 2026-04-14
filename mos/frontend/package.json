@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "lint": "echo \"add lint tooling\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "validate:preview": "node scripts/validate-site-preview.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
@@ -20,9 +24,12 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@measured/puck": "^0.20.2",
+    "@medusajs/js-sdk": "^2.13.5",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
+    "@stripe/react-stripe-js": "^6.0.0",
+    "@stripe/stripe-js": "^9.0.0",
     "@tanstack/react-query": "^5.59.1",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.562.0",
@@ -36,6 +43,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -50,5 +58,6 @@
     "vite": "^5.4.8",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
-  }
+  },
+  "packageManager": "yarn@4.4.0+sha512.91d93b445d9284e7ed52931369bc89a663414e5582d00eea45c67ddc459a2582919eece27c412d6ffd1bd0793ff35399381cb229326b961798ce4f4cc60ddfdb"
 }
