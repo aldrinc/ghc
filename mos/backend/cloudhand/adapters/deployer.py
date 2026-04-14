@@ -948,7 +948,16 @@ WantedBy=multi-user.target
                 if not entry_slug:
                     return None
 
-                return product_slug, funnel_slug, entry_slug
+                funnel_id_token = str(canonical_funnel_meta.get("funnelId") or "").strip().lower()
+                if funnel_id_token:
+                    try:
+                        canonical_funnel_slug = str(UUID(funnel_id_token)).split("-", 1)[0]
+                    except ValueError:
+                        canonical_funnel_slug = funnel_slug
+                else:
+                    canonical_funnel_slug = funnel_slug
+
+                return product_slug, canonical_funnel_slug, entry_slug
 
         return None
 
@@ -975,12 +984,25 @@ WantedBy=multi-user.target
 
         resolved_funnel_payload: Optional[Dict[str, Any]] = None
         for raw_funnel_slug, funnel_payload in funnels.items():
-            if self._canonical_funnel_artifact_page_slug(raw_funnel_slug) != funnel_slug:
-                continue
             if not isinstance(funnel_payload, dict):
                 raise ValueError(
                     f"Artifact funnel payload for '{product_slug}/{funnel_slug}' must be an object."
                 )
+            funnel_meta = funnel_payload.get("meta")
+            if not isinstance(funnel_meta, dict):
+                continue
+            funnel_tokens = self._resolve_funnel_path_tokens(
+                product_slug=product_slug,
+                funnel_slug=str(raw_funnel_slug or ""),
+                funnel_meta=funnel_meta,
+            )
+            normalized_tokens = {
+                str(token or "").strip().lower()
+                for token in funnel_tokens
+                if str(token or "").strip()
+            }
+            if funnel_slug not in normalized_tokens:
+                continue
             resolved_funnel_payload = funnel_payload
             break
 
@@ -1011,7 +1033,10 @@ WantedBy=multi-user.target
         return {
             "productSlug": product_slug,
             "funnelSlug": funnel_slug,
-            "meta": canonical_meta,
+            "meta": {
+                **canonical_meta,
+                "funnelSlug": funnel_slug,
+            },
             "commerce": commerce if isinstance(commerce, dict) else None,
             "pages": canonical_pages,
         }

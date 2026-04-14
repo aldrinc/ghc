@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
-  buildStandalonePublicPagePath,
+  buildPublicFunnelPath,
   getStandaloneDefaultPageRoute,
   isStandaloneBundleMode,
 } from "@/funnels/runtimeRouting";
@@ -21,6 +21,7 @@ function ensureNoIndex() {
 }
 
 export function PublicFunnelRootRedirectPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const bundleMode = isStandaloneBundleMode();
@@ -37,13 +38,15 @@ export function PublicFunnelRootRedirectPage() {
     }
 
     navigate(
-      buildStandalonePublicPagePath({
+      `${buildPublicFunnelPath({
         productSlug: defaultRoute.productSlug,
+        funnelSlug: defaultRoute.funnelSlug,
         slug: defaultRoute.slug,
-      }),
+        bundleMode,
+      })}${location.search}${location.hash}`,
       { replace: true },
     );
-  }, [bundleMode, navigate]);
+  }, [bundleMode, location.hash, location.search, navigate]);
 
   return (
     <div className="min-h-screen bg-surface px-6 py-10 text-sm text-content-muted">

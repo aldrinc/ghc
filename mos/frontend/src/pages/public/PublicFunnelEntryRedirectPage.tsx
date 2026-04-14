@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
 import {
   buildPublicFunnelPath,
-  buildStandalonePublicPagePath,
   isStandaloneBundleMode,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
@@ -47,17 +46,12 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
-        const entryPath = bundleMode
-          ? buildStandalonePublicPagePath({
-              productSlug,
-              slug: meta.entrySlug,
-            })
-          : buildPublicFunnelPath({
-              productSlug,
-              funnelSlug: meta.funnelSlug || funnelSlug,
-              slug: meta.entrySlug,
-              bundleMode,
-            });
+        const entryPath = buildPublicFunnelPath({
+          productSlug,
+          funnelSlug,
+          slug: meta.entrySlug,
+          bundleMode,
+        });
         navigate(
           `${entryPath}${location.search}${location.hash}`,
           { replace: true },

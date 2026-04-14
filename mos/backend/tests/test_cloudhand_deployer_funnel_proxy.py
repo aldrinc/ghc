@@ -468,7 +468,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     assert any(cmd.startswith("python3 /tmp/cloudhand-runtime-config-") for cmd in commands)
     assert any(cmd.startswith("rm -f /tmp/cloudhand-runtime-config-") for cmd in commands)
     assert '"defaultProductSlug":"example-product"' in runtime_block
-    assert '"defaultFunnelSlug":"example-funnel"' in runtime_block
+    assert '"defaultFunnelSlug":"f85405a4"' in runtime_block
     assert '"defaultEntrySlug":"presales"' in runtime_block
     assert "raw = raw.replace" in runtime_inject_script
     assert '<script type="module"' in runtime_inject_script
@@ -481,6 +481,7 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
         '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
         in runtime_block
     )
+    assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"f85405a4"' in runtime_block
 
 
 def test_funnel_artifact_site_escapes_html_script_terminators_in_runtime_config():
