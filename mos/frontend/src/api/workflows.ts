@@ -141,42 +141,6 @@ function sanitizeFilename(name: string): string {
   );
 }
 
-function parseFilenameFromContentDisposition(contentDisposition: string | null): string | null {
-  if (!contentDisposition) return null;
-  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
-  if (!filenameMatch?.[1]) return null;
-  try {
-    return decodeURIComponent(filenameMatch[1].trim().replace(/^\"|\"$/g, ""));
-  } catch {
-    return filenameMatch[1].trim().replace(/^\"|\"$/g, "");
-  }
-}
-
-function isZipContentType(contentType: string | null): boolean {
-  if (!contentType) return false;
-  const normalized = contentType.toLowerCase();
-  return (
-    normalized.includes("application/zip") ||
-    normalized.includes("application/x-zip-compressed") ||
-    normalized.includes("application/octet-stream")
-  );
-}
-
-async function parseDownloadError(resp: Response): Promise<Error> {
-  try {
-    const raw = await resp.clone().json();
-    const detail = (raw as { detail?: unknown })?.detail;
-    if (typeof detail === "string" && detail.trim()) return new Error(detail);
-    const message = (raw as { message?: unknown })?.message;
-    if (typeof message === "string" && message.trim()) return new Error(message);
-  } catch {
-    // Fall through to text parsing.
-  }
-  const text = (await resp.text()).trim();
-  if (text) return new Error(text);
-  return new Error(resp.statusText || "Failed to download research archive");
-}
-
 export function useDownloadResearchMarkdown() {
   const { get } = useApiClient();
 
