@@ -2283,12 +2283,16 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, client_id: str) -> str:
-    workspace_component = _normalize_bunny_pull_zone_name_component(
+def _build_bunny_pull_zone_name(*, client_id: str, workload_name: str) -> str:
+    _ = _normalize_bunny_pull_zone_name_component(
         value=client_id,
         label="client_id",
     )
-    return workspace_component
+    workload_component = _normalize_bunny_pull_zone_name_component(
+        value=workload_name,
+        label="workload_name",
+    )
+    return workload_component
 
 
 def _resolve_bunny_pull_zone_client_id(*, client_id: str) -> str:
@@ -2706,8 +2710,8 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, client_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(client_id=client_id)
+def _ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(client_id=client_id, workload_name=workload_name)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     zone: dict[str, Any]
@@ -2874,6 +2878,7 @@ def configure_bunny_pull_zone_for_workload(
     )
     bunny_zone = _ensure_bunny_pull_zone(
         client_id=resolved_client_id,
+        workload_name=workload_name,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2952,6 +2957,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
     )
     bunny_zone = _ensure_bunny_pull_zone(
         client_id=resolved_client_id,
+        workload_name=workload_name,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
