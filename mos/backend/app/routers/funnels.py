@@ -895,6 +895,8 @@ async def publish_funnel_route(
             https=workload_https,
             destination_path=deploy.destinationPath,
         )
+        if edge_backed_artifact:
+            workload_patch["workspace_server_names"] = server_names
         https_enabled = bool(deploy.https and server_names)
         access_urls = _deploy_access_urls(server_names=server_names, https_enabled=https_enabled)
         job = deploy_service.start_funnel_publish_job(

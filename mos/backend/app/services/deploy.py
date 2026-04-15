@@ -2443,6 +2443,27 @@ def _normalize_workload_server_names(*, server_names: list[str]) -> list[str]:
     return out
 
 
+def _resolve_publish_job_workspace_server_names(
+    *,
+    session: Any,
+    org_id: str,
+    workload_client_id: str,
+    workload_patch: dict[str, Any],
+) -> list[str]:
+    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
+
+    raw_workspace_server_names = workload_patch.get("workspace_server_names")
+    if raw_workspace_server_names is not None:
+        if not isinstance(raw_workspace_server_names, list):
+            raise DeployError("Publish deploy workload workspace_server_names must be a list.")
+        return _normalize_workload_server_names(server_names=raw_workspace_server_names)
+
+    return OrgDeployDomainsRepository(session).list_hostnames(
+        org_id=org_id,
+        client_id=workload_client_id,
+    )
+
+
 def _extract_bunny_pull_zone_hostname_values(zone: dict[str, Any]) -> list[str]:
     hostnames = zone.get("Hostnames")
     if hostnames is None:
@@ -3156,7 +3177,6 @@ async def _run_apply_plan_job(job_id: str) -> None:
 
 async def _run_funnel_publish_job(job_id: str) -> None:
     from app.db.base import SessionLocal
-    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
     from app.services.funnels import publish_funnel
 
     job = _read_publish_job(job_id)
@@ -3281,9 +3301,11 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         workload=workload_patch,
                         workload_name=workload_name,
                     )
-                    workspace_server_names = OrgDeployDomainsRepository(session).list_hostnames(
+                    workspace_server_names = _resolve_publish_job_workspace_server_names(
+                        session=session,
                         org_id=org_id,
-                        client_id=workload_client_id,
+                        workload_client_id=workload_client_id,
+                        workload_patch=workload_patch,
                     )
                     bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
                         client_id=workload_client_id,

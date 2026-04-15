@@ -1028,6 +1028,7 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False
+    assert workload_patch["workspace_server_names"] == ["shop.shopemberco.com"]
     assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
 
 

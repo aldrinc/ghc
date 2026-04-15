@@ -533,6 +533,23 @@ def test_build_bunny_pull_zone_name_uses_workload_name():
     assert name == "brand-funnels-workspace-123-funnel-456"
 
 
+def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_domains(
+):
+    result = deploy_service._resolve_publish_job_workspace_server_names(
+        session=None,
+        org_id=str(uuid4()),
+        workload_client_id=str(uuid4()),
+        workload_patch={
+            "workspace_server_names": [
+                "Shop.Example.com",
+                "shop.example.com",
+            ]
+        },
+    )
+
+    assert result == ["shop.example.com"]
+
+
 def test_resolve_bunny_pull_zone_origin_url_uses_requested_origin_ip(monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", None)
     origin_url = deploy_service._resolve_bunny_pull_zone_origin_url(
