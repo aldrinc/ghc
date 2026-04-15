@@ -488,6 +488,46 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"f85405a4"' in runtime_block
 
 
+def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
+    app = _artifact_app()
+    first_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
+    preferred_funnel_id = "18ac0fe1-1e27-4579-ad94-9a1e6c9530fe"
+    product_payload = app.source_ref.artifact["products"]["example-product"]
+    funnels_payload = product_payload["funnels"]
+
+    first_funnel_payload = funnels_payload["example-funnel"]
+    first_funnel_payload["meta"]["funnelId"] = first_funnel_id
+    first_funnel_payload["pages"]["presales"]["funnelId"] = first_funnel_id
+
+    preferred_funnel_payload = json.loads(json.dumps(first_funnel_payload))
+    preferred_funnel_payload["meta"]["funnelSlug"] = "imported-funnel"
+    preferred_funnel_payload["meta"]["funnelId"] = preferred_funnel_id
+    preferred_funnel_payload["meta"]["publicationId"] = "pub-2"
+    preferred_funnel_payload["pages"]["presales"]["funnelId"] = preferred_funnel_id
+    preferred_funnel_payload["pages"]["presales"]["publicationId"] = "pub-2"
+    preferred_funnel_payload["pages"]["presales"]["pageId"] = "page-2"
+    preferred_funnel_payload["pages"]["presales"]["pageMap"] = {"page-2": "presales"}
+    preferred_funnel_payload["meta"]["pages"] = [{"pageId": "page-2", "slug": "presales"}]
+    funnels_payload["imported-funnel"] = preferred_funnel_payload
+
+    app.source_ref.artifact["meta"]["updatedFromFunnelId"] = preferred_funnel_id
+    app.source_ref.artifact["meta"]["updatedFromPublicationId"] = "pub-2"
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_script_path = next((path for path in uploaded if path.startswith("/tmp/cloudhand-runtime-config-")), "")
+    assert runtime_script_path
+    runtime_inject_script = uploaded[runtime_script_path]
+    assert isinstance(runtime_inject_script, str)
+    runtime_block = _extract_runtime_block(runtime_inject_script)
+    assert '"defaultProductSlug":"example-product"' in runtime_block
+    assert '"defaultFunnelSlug":"18ac0fe1"' in runtime_block
+    assert '"defaultEntrySlug":"presales"' in runtime_block
+    assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"18ac0fe1"' in runtime_block
+
+
 def test_funnel_artifact_site_escapes_html_script_terminators_in_runtime_config():
     app = _artifact_app()
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
