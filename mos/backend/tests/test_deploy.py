@@ -52,7 +52,7 @@ def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_patch_workload_endpoint_persists_workspace_deploy_domains(api_client, db_session, monkeypatch):
+def test_patch_workload_endpoint_keeps_workload_scoped_deploy_domains(api_client, db_session, monkeypatch):
     db_session.add(
         Client(
             id=UUID("00000000-0000-0000-0000-000000000123"),
@@ -61,6 +61,7 @@ def test_patch_workload_endpoint_persists_workspace_deploy_domains(api_client, d
         )
     )
     db_session.commit()
+    captured: dict[str, object] = {}
 
     def fake_patch_workload_in_plan(
         *,
@@ -77,6 +78,7 @@ def test_patch_workload_endpoint_persists_workspace_deploy_domains(api_client, d
         _ = instance_name
         _ = create_if_missing
         _ = in_place
+        captured["workload_patch"] = workload_patch
         return {
             "status": "ok",
             "base_plan_path": "/tmp/plan.json",
@@ -111,10 +113,15 @@ def test_patch_workload_endpoint_persists_workspace_deploy_domains(api_client, d
     )
     assert resp.status_code == 200
 
+    workload_patch = captured["workload_patch"]
+    assert workload_patch["workspace_server_names"] == [
+        "offers.example.com",
+        "landing.example.com",
+    ]
     hostnames = db_session.scalars(
         select(OrgDeployDomain.hostname).order_by(OrgDeployDomain.hostname.asc())
     ).all()
-    assert hostnames == ["landing.example.com", "offers.example.com"]
+    assert hostnames == []
 
 
 def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_client, db_session, monkeypatch):
@@ -190,12 +197,12 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
     workload_patch = captured["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False
-    assert "workspace_server_names" not in workload_patch
+    assert workload_patch["workspace_server_names"] == ["shop.example.com"]
     assert captured["cdn_server_names"] == ["shop.example.com"]
     assert captured["client_id"] == str(workspace_id)
 
 
-def test_get_workload_domains_includes_workspace_server_names(
+def test_get_workload_domains_includes_workload_scoped_server_names_from_plan(
     api_client,
     db_session,
     auth_context,
@@ -204,11 +211,6 @@ def test_get_workload_domains_includes_workspace_server_names(
     org_id = UUID(auth_context.org_id)
     client_id = UUID("00000000-0000-0000-0000-000000000123")
     db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
-    db_session.add_all(
-        [
-            OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"),
-        ]
-    )
     db_session.commit()
 
     def fake_get_workload_domains_from_plan(
@@ -224,6 +226,7 @@ def test_get_workload_domains_includes_workspace_server_names(
             "plan_path": "/tmp/plan.json",
             "workload_found": True,
             "server_names": [],
+            "workspace_server_names": ["offers.example.com"],
             "https": False,
         }
 
@@ -248,6 +251,81 @@ def test_get_workload_domains_includes_workspace_server_names(
     assert body["server_names"] == []
 
 
+def test_get_workload_domains_falls_back_to_workspace_repo_when_plan_has_no_scoped_domains(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = UUID("00000000-0000-0000-0000-000000000126")
+    db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
+    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_domains_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: {
+            "plan_path": "/tmp/plan.json",
+            "workload_found": True,
+            "server_names": [],
+            "https": False,
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: str(client_id),
+    )
+
+    resp = api_client.get(
+        f"/deploy/plans/workloads/domains?workload_name=brand-funnels-test&workspace_id={client_id}"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["workspace_server_names"] == ["offers.example.com"]
+    assert body["workspace_scope_error"] is None
+
+
+def test_get_workload_domains_does_not_fall_back_when_plan_clears_scoped_domains(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = UUID("00000000-0000-0000-0000-000000000127")
+    db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
+    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_domains_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: {
+            "plan_path": "/tmp/plan.json",
+            "workload_found": True,
+            "server_names": [],
+            "workspace_server_names": [],
+            "https": False,
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: str(client_id),
+    )
+
+    resp = api_client.get(
+        f"/deploy/plans/workloads/domains?workload_name=brand-funnels-test&workspace_id={client_id}"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["workspace_server_names"] == []
+    assert body["workspace_scope_error"] is None
+
+
 def test_get_workload_domains_reports_legacy_org_scoped_domains(
     api_client,
     db_session,
@@ -258,6 +336,43 @@ def test_get_workload_domains_reports_legacy_org_scoped_domains(
     client_id = UUID("00000000-0000-0000-0000-000000000125")
     db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
     db_session.add(OrgDeployDomain(org_id=org_id, client_id=None, hostname="legacy.example.com"))
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_domains_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: {
+            "plan_path": "/tmp/plan.json",
+            "workload_found": True,
+            "server_names": [],
+            "https": False,
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_workspace_id_from_plan",
+        lambda *, workload_name, plan_path=None, instance_name=None: str(client_id),
+    )
+
+    resp = api_client.get(
+        f"/deploy/plans/workloads/domains?workload_name=brand-funnels-test&workspace_id={client_id}"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["workspace_server_names"] == []
+    assert body["workspace_scope_error"]
+
+
+def test_get_workload_domains_does_not_inherit_workspace_domains_for_missing_workload(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    org_id = UUID(auth_context.org_id)
+    client_id = UUID("00000000-0000-0000-0000-000000000128")
+    db_session.add(Client(id=client_id, org_id=org_id, name="Workspace"))
+    db_session.add(OrgDeployDomain(org_id=org_id, client_id=client_id, hostname="offers.example.com"))
     db_session.commit()
 
     monkeypatch.setattr(
@@ -277,7 +392,51 @@ def test_get_workload_domains_reports_legacy_org_scoped_domains(
     assert resp.status_code == 200
     body = resp.json()
     assert body["workspace_server_names"] == []
-    assert body["workspace_scope_error"]
+    assert body["workspace_scope_error"] is None
+
+
+def test_get_workload_domains_from_plan_reads_workload_scoped_domains(tmp_path, monkeypatch):
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "instance-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-test",
+                                    "workspace_server_names": [
+                                        "Offers.Example.com",
+                                        "offers.example.com",
+                                        "landing.example.com",
+                                    ],
+                                    "service_config": {
+                                        "server_names": [],
+                                        "https": False,
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(deploy_service, "_assert_under_cloudhand", lambda path: path)
+
+    result = deploy_service.get_workload_domains_from_plan(
+        workload_name="brand-funnels-test",
+        plan_path=str(plan_path),
+    )
+
+    assert result["workspace_server_names"] == [
+        "offers.example.com",
+        "landing.example.com",
+    ]
 
 
 def test_runtime_artifact_payload_preserves_published_page_slug(db_session, auth_context, monkeypatch):

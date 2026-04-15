@@ -109,6 +109,9 @@ class ApplicationSpec(BaseModel):
     runtime: RuntimeType
     build_config: BuildSpec
     service_config: ServiceSpec
+    # Persist custom domains at the workload level while keeping the runtime
+    # itself port-based for Bunny-backed deployments.
+    workspace_server_names: List[str] = Field(default_factory=list)
     destination_path: str = "/opt/apps"
 
     @model_validator(mode="after")

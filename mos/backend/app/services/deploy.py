@@ -220,6 +220,7 @@ def get_workload_domains_from_plan(
     found = False
     server_names: list[str] = []
     https: bool | None = None
+    workspace_server_names: list[str] | None = None
 
     for inst in instances:
         if instance_name and inst.get("name") != instance_name:
@@ -235,6 +236,27 @@ def get_workload_domains_from_plan(
             service_config = workload.get("service_config") or {}
             if not isinstance(service_config, dict):
                 break
+
+            if "workspace_server_names" in workload:
+                raw_workspace_server_names = workload.get("workspace_server_names")
+                if raw_workspace_server_names is None:
+                    raw_workspace_server_names = []
+                if not isinstance(raw_workspace_server_names, list):
+                    raise DeployError("Workload workspace_server_names must be a list.")
+
+                cleaned_workspace: list[str] = []
+                seen_workspace: set[str] = set()
+                for raw in raw_workspace_server_names:
+                    if not isinstance(raw, str):
+                        raise DeployError(
+                            "Workload workspace_server_names entries must be strings."
+                        )
+                    hostname = raw.strip().lower()
+                    if not hostname or hostname in seen_workspace:
+                        continue
+                    seen_workspace.add(hostname)
+                    cleaned_workspace.append(hostname)
+                workspace_server_names = cleaned_workspace
 
             raw_server_names = service_config.get("server_names") or []
             if raw_server_names is None:
@@ -266,12 +288,15 @@ def get_workload_domains_from_plan(
         if found:
             break
 
-    return {
+    result = {
         "plan_path": str(base_plan_path),
         "workload_found": found,
         "server_names": server_names,
         "https": https,
     }
+    if workspace_server_names is not None:
+        result["workspace_server_names"] = workspace_server_names
+    return result
 
 
 def save_plan(*, content: str, path: str | None = None) -> dict[str, str]:

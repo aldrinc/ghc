@@ -134,7 +134,8 @@ async def patch_workload(
     try:
         workspace_server_names = _extract_workspace_server_names(workload)
         workload_for_plan = dict(workload)
-        workload_for_plan.pop("workspace_server_names", None)
+        if workspace_server_names is not None:
+            workload_for_plan["workspace_server_names"] = workspace_server_names
         if configure_bunny_pull_zone:
             service_config = workload_for_plan.get("service_config")
             if service_config is None:
@@ -174,14 +175,6 @@ async def patch_workload(
                 instance_name=instance_name,
                 requested_origin_ip=bunny_pull_zone_origin_ip,
                 server_names=(workspace_server_names or []),
-            )
-
-        if workspace_server_names is not None:
-            repo = OrgDeployDomainsRepository(session)
-            repo.replace_hostnames(
-                org_id=auth.org_id,
-                client_id=workspace_id,
-                hostnames=workspace_server_names,
             )
 
         return result
@@ -230,15 +223,22 @@ async def get_workload_domains(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="workspace_id is required when the workload is not yet present in the plan.",
             )
-        repo = OrgDeployDomainsRepository(session)
-        workspace_server_names = repo.list_hostnames(
-            org_id=auth.org_id,
-            client_id=effective_workspace_id,
-            strict=False,
-        )
         workspace_scope_error = None
-        if not workspace_server_names and repo.has_legacy_unscoped_hostnames(org_id=auth.org_id):
-            workspace_scope_error = LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR
+        workspace_server_names_value = result.get("workspace_server_names")
+        if workspace_server_names_value is None:
+            if result.get("workload_found"):
+                repo = OrgDeployDomainsRepository(session)
+                workspace_server_names = repo.list_hostnames(
+                    org_id=auth.org_id,
+                    client_id=effective_workspace_id,
+                    strict=False,
+                )
+                if not workspace_server_names and repo.has_legacy_unscoped_hostnames(org_id=auth.org_id):
+                    workspace_scope_error = LEGACY_DEPLOY_DOMAIN_SCOPE_ERROR
+            else:
+                workspace_server_names = []
+        else:
+            workspace_server_names = _normalize_server_names(workspace_server_names_value)
         return {
             "workload_name": workload_name,
             "workspace_id": effective_workspace_id,

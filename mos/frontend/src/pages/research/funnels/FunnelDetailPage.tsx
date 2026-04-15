@@ -69,6 +69,15 @@ function artifactForTemplate(templateId: string | null | undefined): "presales" 
   return null;
 }
 
+function buildFunnelDeployWorkloadName(
+  funnel: { client_id?: string | null; id?: string | null } | null | undefined,
+): string | undefined {
+  const clientToken = shortUuidRouteToken(funnel?.client_id || "");
+  const funnelToken = shortUuidRouteToken(funnel?.id || "");
+  if (!clientToken || !funnelToken) return undefined;
+  return `brand-funnels-${clientToken}-${funnelToken}`;
+}
+
 export function FunnelDetailPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -157,7 +166,7 @@ export function FunnelDetailPage() {
   const publicBase = funnelRouteSlug && productRouteSlug ? `/f/${productRouteSlug}/${funnelRouteSlug}` : null;
   const publicOrigin = resolveWindowShopHostedOrigin();
   const mosPreviewUrl = publicBase ? resolveShopHostedUrl(publicBase, publicOrigin) : null;
-  const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
+  const deployWorkloadName = buildFunnelDeployWorkloadName(funnel);
   const entryArtifact = useMemo(() => {
     if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
     const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
@@ -373,6 +382,7 @@ export function FunnelDetailPage() {
   const handlePublish = async () => {
     if (!funnelId || !funnel) return;
     if (!funnel.client_id) return;
+    if (!deployWorkloadName) return;
     const payload: {
       deploy: {
         workloadName: string;
@@ -389,7 +399,7 @@ export function FunnelDetailPage() {
       };
     } = {
       deploy: {
-        workloadName: `brand-funnels-${funnel.client_id}`,
+        workloadName: deployWorkloadName,
         createIfMissing: true,
         applyPlan: true,
         bunnyPullZone: true,
