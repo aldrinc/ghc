@@ -2,6 +2,7 @@ from app.services.funnel_templates import (
     list_funnel_templates,
     resolve_funnel_template_artifact_slug,
     resolve_funnel_template_category,
+    resolve_funnel_template_page_type,
     resolve_funnel_template_public_stage,
 )
 
@@ -15,15 +16,24 @@ def test_template_registry_exposes_global_template_variants() -> None:
     assert "presales-happyv-template" in templates
     assert "sales-omni-template" in templates
     assert "sales-happyv-template" in templates
+    assert "compliance-privacy" in templates
+    assert "compliance-terms" in templates
+    assert "compliance-refunds" in templates
 
     assert templates["presales-omni-template"].name == "omni-template"
     assert templates["presales-happyv-template"].name == "happyv-template"
     assert templates["sales-omni-template"].name == "omni-template"
     assert templates["sales-happyv-template"].name == "happyv-template"
+    assert templates["compliance-privacy"].name == "Privacy Policy"
+    assert templates["compliance-terms"].name == "Terms of Service"
+    assert templates["compliance-refunds"].name == "Refund Policy"
     assert templates["presales-omni-template"].category == "presales"
     assert templates["presales-happyv-template"].category == "presales"
     assert templates["sales-omni-template"].category == "sales"
     assert templates["sales-happyv-template"].category == "sales"
+    assert templates["compliance-privacy"].category == "compliance"
+    assert templates["compliance-terms"].category == "compliance"
+    assert templates["compliance-refunds"].category == "compliance"
 
 
 def test_template_category_helpers_support_global_template_variants() -> None:
@@ -33,11 +43,20 @@ def test_template_category_helpers_support_global_template_variants() -> None:
     assert resolve_funnel_template_category("presales-happyv-template") == "presales"
     assert resolve_funnel_template_category("sales-omni-template") == "sales"
     assert resolve_funnel_template_category("sales-happyv-template") == "sales"
+    assert resolve_funnel_template_category("compliance-privacy") == "compliance"
+    assert resolve_funnel_template_category("compliance-terms") == "compliance"
+    assert resolve_funnel_template_category("compliance-refunds") == "compliance"
 
     assert resolve_funnel_template_public_stage("presales-omni-template") == "pre_sales"
     assert resolve_funnel_template_public_stage("sales-pdp") == "sales"
     assert resolve_funnel_template_public_stage("sales-omni-template") == "sales"
+    assert resolve_funnel_template_public_stage("compliance-privacy") is None
 
     assert resolve_funnel_template_artifact_slug("presales-happyv-template") == "presales"
     assert resolve_funnel_template_artifact_slug("sales-pdp") == "sales"
     assert resolve_funnel_template_artifact_slug("sales-happyv-template") == "sales"
+    assert resolve_funnel_template_artifact_slug("compliance-refunds") is None
+
+    assert resolve_funnel_template_page_type("compliance-privacy") == "privacy_policy"
+    assert resolve_funnel_template_page_type("compliance-terms") == "terms_of_service"
+    assert resolve_funnel_template_page_type("compliance-refunds") == "returns_refunds_policy"

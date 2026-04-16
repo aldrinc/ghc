@@ -1,0 +1,25 @@
+{
+  "id": "compliance-privacy",
+  "name": "Privacy Policy",
+  "description": "Funnel privacy policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "category": "compliance",
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Privacy Policy",
+        "description": "How customer information is collected, used, and protected for this funnel."
+      }
+    },
+    "content": [
+      {
+        "type": "FunnelCompliancePage",
+        "props": {
+          "pageKey": "privacy_policy",
+          "pageTitle": "Privacy Policy"
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

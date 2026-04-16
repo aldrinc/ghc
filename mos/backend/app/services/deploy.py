@@ -1052,6 +1052,7 @@ def build_client_funnel_runtime_artifact_payload(
     from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
     from app.services.design_systems import resolve_design_system_tokens
     from app.services.funnel_template_categories import resolve_funnel_template_artifact_slug
+    from app.services.funnel_templates import resolve_funnel_template_page_type
     from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
     from app.services.public_routing import require_product_route_slug
 
@@ -1223,6 +1224,15 @@ def build_client_funnel_runtime_artifact_payload(
             )
             for artifact_slug, page_id, _, page in page_details
         }
+        page_type_map = {
+            page_id: page_type
+            for _, page_id, _, page in page_details
+            for page_type in [
+                (clean_optional_text(page.page_type) if page else None)
+                or resolve_funnel_template_page_type(page.template_id if page else None)
+            ]
+            if page_type
+        }
         tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
         pages_payload: dict[str, dict[str, Any]] = {}
         for artifact_slug, page_id, version, page in page_details:
@@ -1262,6 +1272,7 @@ def build_client_funnel_runtime_artifact_payload(
                 "puckData": materialized_puck_data,
                 "pageMap": page_map,
                 "pageStageMap": page_stage_map,
+                "pageTypeMap": page_type_map,
                 "designSystemTokens": tokens,
                 "metadata": metadata,
                 "tracking": tracking,

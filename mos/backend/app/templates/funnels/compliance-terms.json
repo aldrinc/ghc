@@ -1,0 +1,25 @@
+{
+  "id": "compliance-terms",
+  "name": "Terms of Service",
+  "description": "Funnel terms of service page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "category": "compliance",
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Terms of Service",
+        "description": "Terms and conditions that apply to purchases and use of this funnel."
+      }
+    },
+    "content": [
+      {
+        "type": "FunnelCompliancePage",
+        "props": {
+          "pageKey": "terms_of_service",
+          "pageTitle": "Terms of Service"
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

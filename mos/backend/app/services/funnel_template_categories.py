@@ -6,6 +6,7 @@ _TEMPLATE_CATEGORY_ALIASES = {
     "pre-sales": "presales",
     "pre_sales": "presales",
     "sales": "sales",
+    "compliance": "compliance",
 }
 
 
@@ -24,6 +25,8 @@ def infer_template_category_from_id(template_id: str | None) -> str | None:
         return "presales"
     if cleaned in {"sales-pdp", "sales_pdp"}:
         return "sales"
+    if cleaned.startswith(("compliance-", "compliance_")):
+        return "compliance"
     if cleaned.startswith(("presales-", "pre-sales-", "pre_sales_")):
         return "presales"
     if cleaned.startswith(("sales-", "sales_")):

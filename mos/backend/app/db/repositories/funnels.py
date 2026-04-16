@@ -178,6 +178,7 @@ class FunnelPagesRepository:
         template_id: Optional[str] = None,
         design_system_id: Optional[str] = None,
         next_page_id: Optional[str] = None,
+        page_type: Optional[str] = None,
     ) -> FunnelPage:
         page = FunnelPage(
             funnel_id=funnel_id,
@@ -187,6 +188,7 @@ class FunnelPagesRepository:
             template_id=template_id,
             design_system_id=design_system_id,
             next_page_id=next_page_id,
+            page_type=page_type,
         )
         self.session.add(page)
         self.session.commit()

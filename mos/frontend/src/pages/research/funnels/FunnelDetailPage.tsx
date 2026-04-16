@@ -1,4 +1,15 @@
-import { useFunnel, useUpdateFunnel, useCreateFunnelPage, usePublishFunnel, useDisableFunnel, useEnableFunnel, useDuplicateFunnel, useFunnelTemplates, useUpdateFunnelPage } from "@/api/funnels";
+import {
+  useCreateFunnelPage,
+  useDisableFunnel,
+  useDuplicateFunnel,
+  useEnableFunnel,
+  useFunnel,
+  useFunnelTemplates,
+  usePublishFunnel,
+  useSyncFunnelCompliancePages,
+  useUpdateFunnel,
+  useUpdateFunnelPage,
+} from "@/api/funnels";
 import { useApiClient } from "@/api/client";
 import { useDeployWorkloadDomains } from "@/api/deploy";
 import { useDesignSystems } from "@/api/designSystems";
@@ -79,6 +90,7 @@ export function FunnelDetailPage() {
   const { data: designSystems = [] } = useDesignSystems(funnel?.client_id || workspace?.id);
   const updateFunnel = useUpdateFunnel();
   const createPage = useCreateFunnelPage();
+  const syncCompliancePages = useSyncFunnelCompliancePages();
   const updatePage = useUpdateFunnelPage();
   const publish = usePublishFunnel();
   const disable = useDisableFunnel();
@@ -485,6 +497,14 @@ export function FunnelDetailPage() {
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => setIsPageModalOpen(true)} disabled={!funnelId || !funnel}>
               New page
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => funnelId && syncCompliancePages.mutate({ funnelId })}
+              disabled={!funnelId || !funnel || syncCompliancePages.isPending}
+            >
+              {syncCompliancePages.isPending ? "Syncing…" : "Sync compliance pages"}
             </Button>
             {funnel?.status === "published" ? (
               deployedPageUrl ? (

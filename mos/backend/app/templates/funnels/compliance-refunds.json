@@ -1,0 +1,25 @@
+{
+  "id": "compliance-refunds",
+  "name": "Refund Policy",
+  "description": "Funnel refund policy page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "category": "compliance",
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Refund Policy",
+        "description": "How returns, refunds, and order cancellations are handled for this funnel."
+      }
+    },
+    "content": [
+      {
+        "type": "FunnelCompliancePage",
+        "props": {
+          "pageKey": "returns_refunds_policy",
+          "pageTitle": "Refund Policy"
+        }
+      }
+    ],
+    "zones": {}
+  }
+}

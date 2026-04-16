@@ -1,8 +1,9 @@
-export type FunnelTemplateCategory = "presales" | "sales";
+export type FunnelTemplateCategory = "presales" | "sales" | "compliance";
 
 const TEMPLATE_CATEGORY_LABELS: Record<FunnelTemplateCategory, string> = {
   presales: "Pre-Sales Templates",
   sales: "Sales Templates",
+  compliance: "Compliance Templates",
 };
 
 const TEMPLATE_CATEGORY_ALIASES: Record<string, FunnelTemplateCategory> = {
@@ -10,6 +11,7 @@ const TEMPLATE_CATEGORY_ALIASES: Record<string, FunnelTemplateCategory> = {
   "pre-sales": "presales",
   pre_sales: "presales",
   sales: "sales",
+  compliance: "compliance",
 };
 
 export function normalizeFunnelTemplateCategory(value: string | null | undefined): FunnelTemplateCategory | null {
@@ -36,6 +38,9 @@ export function resolveFunnelTemplateCategory(templateId: string | null | undefi
   }
   if (cleaned.startsWith("sales-") || cleaned.startsWith("sales_")) {
     return "sales";
+  }
+  if (cleaned.startsWith("compliance-") || cleaned.startsWith("compliance_")) {
+    return "compliance";
   }
   return null;
 }
