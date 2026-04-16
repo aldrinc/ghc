@@ -24,7 +24,9 @@ from app.db.enums import (
 )
 from app.db.models import (
     Campaign,
+    ClientComplianceProfile,
     FunnelDomain,
+    FunnelPage,
     FunnelPageSlugRedirect,
     FunnelPageVersion,
     Product,
@@ -60,7 +62,12 @@ from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
 from app.services.html_funnel_reference import HtmlReferenceError
 from app.services.funnel_metadata import normalize_public_page_metadata_for_context
-from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
+from app.services.funnel_templates import (
+    apply_template_assets,
+    get_funnel_template,
+    list_funnel_templates,
+    resolve_funnel_template_page_type,
+)
 from app.services.funnel_testimonials import (
     TestimonialGenerationError,
     TestimonialGenerationNotFoundError,
@@ -93,6 +100,54 @@ _AI_ATTACHMENT_ALLOWED_MIME_TYPES = {
     "image/webp",
     "image/gif",
 }
+
+_FUNNEL_COMPLIANCE_PAGE_SPECS: tuple[dict[str, str], ...] = (
+    {
+        "pageKey": "terms_of_service",
+        "name": "Terms of Service",
+        "slug": "terms-of-service",
+        "templateId": "compliance-terms",
+    },
+    {
+        "pageKey": "privacy_policy",
+        "name": "Privacy Policy",
+        "slug": "privacy-policy",
+        "templateId": "compliance-privacy",
+    },
+    {
+        "pageKey": "returns_refunds_policy",
+        "name": "Refund Policy",
+        "slug": "refund-policy",
+        "templateId": "compliance-refunds",
+    },
+)
+
+
+def _create_initial_page_draft(
+    *,
+    session: Session,
+    org_id: str,
+    funnel: Funnel,
+    page: FunnelPage,
+    puck_data: dict[str, object],
+) -> FunnelPageVersion:
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=puck_data,
+    )
+
+    version = FunnelPageVersion(
+        page_id=page.id,
+        status=FunnelPageVersionStatusEnum.draft,
+        puck_data=puck_data,
+        source=FunnelPageVersionSourceEnum.human,
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(version)
+    return version
 
 
 def _normalize_server_names(values: list[str]) -> list[str]:
@@ -661,30 +716,174 @@ def create_page(
         template_id=template_id,
         design_system_id=design_system_id,
         next_page_id=next_page_id,
+        page_type=resolve_funnel_template_page_type(template_id),
     )
 
     initial_puck_data = template_puck_data or default_puck_data()
-    normalize_public_page_metadata_for_context(
+    version = _create_initial_page_draft(
         session=session,
         org_id=auth.org_id,
         funnel=funnel,
         page=page,
         puck_data=initial_puck_data,
     )
-
-    version = FunnelPageVersion(
-        page_id=page.id,
-        status=FunnelPageVersionStatusEnum.draft,
-        puck_data=initial_puck_data,
-        source=FunnelPageVersionSourceEnum.human,
-        created_at=datetime.now(timezone.utc),
-    )
-    session.add(version)
     session.commit()
     session.refresh(page)
     session.refresh(version)
 
     return {"page": jsonable_encoder(page), "draftVersion": jsonable_encoder(version)}
+
+
+@router.post("/{funnel_id}/compliance-pages/sync", status_code=status.HTTP_201_CREATED)
+def sync_funnel_compliance_pages(
+    funnel_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    funnels_repo = FunnelsRepository(session)
+    funnel = funnels_repo.get(org_id=auth.org_id, funnel_id=funnel_id)
+    if not funnel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+
+    profile = session.scalars(
+        select(ClientComplianceProfile).where(
+            ClientComplianceProfile.org_id == auth.org_id,
+            ClientComplianceProfile.client_id == funnel.client_id,
+        )
+    ).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compliance profile not found for this funnel's workspace.",
+        )
+
+    existing_pages = list(
+        session.scalars(
+            select(FunnelPage)
+            .where(FunnelPage.funnel_id == funnel_id)
+            .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+        ).all()
+    )
+    target_template_ids = {spec["templateId"] for spec in _FUNNEL_COMPLIANCE_PAGE_SPECS}
+
+    existing_by_template_id: dict[str, FunnelPage] = {}
+    existing_by_slug: dict[str, FunnelPage] = {}
+    for page in existing_pages:
+        template_id = str(page.template_id or "").strip()
+        if template_id in target_template_ids:
+            if template_id in existing_by_template_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Multiple compliance pages already use template '{template_id}'.",
+                )
+            existing_by_template_id[template_id] = page
+        slug = str(page.slug or "").strip()
+        if slug:
+            existing_by_slug[slug] = page
+
+    next_ordering = max((int(page.ordering) for page in existing_pages), default=-1) + 1
+    touched_pages: list[FunnelPage] = []
+    created_count = 0
+    updated_count = 0
+
+    for spec in _FUNNEL_COMPLIANCE_PAGE_SPECS:
+        template_id = spec["templateId"]
+        template = get_funnel_template(template_id)
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Compliance funnel template '{template_id}' is not available.",
+            )
+
+        target_slug = spec["slug"]
+        existing_page = existing_by_template_id.get(template_id)
+        conflicting_page = existing_by_slug.get(target_slug)
+        if conflicting_page and existing_page is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Cannot sync compliance pages because slug '{target_slug}' is already used by "
+                    f"page '{conflicting_page.name}'."
+                ),
+            )
+        if conflicting_page and existing_page and str(conflicting_page.id) != str(existing_page.id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Cannot sync compliance page '{spec['name']}' because slug '{target_slug}' is already "
+                    f"used by page '{conflicting_page.name}'."
+                ),
+            )
+
+        page_type = resolve_funnel_template_page_type(template_id)
+        page_created = False
+        page_updated = False
+        if existing_page is None:
+            existing_page = FunnelPage(
+                funnel_id=funnel_id,
+                name=spec["name"],
+                slug=target_slug,
+                ordering=next_ordering,
+                template_id=template_id,
+                design_system_id=funnel.design_system_id,
+                page_type=page_type,
+            )
+            next_ordering += 1
+            session.add(existing_page)
+            session.flush()
+            page_created = True
+            created_count += 1
+        else:
+            if existing_page.name != spec["name"]:
+                existing_page.name = spec["name"]
+                page_updated = True
+            if existing_page.slug != target_slug:
+                existing_page.slug = target_slug
+                page_updated = True
+            if existing_page.template_id != template_id:
+                existing_page.template_id = template_id
+                page_updated = True
+            if existing_page.page_type != page_type:
+                existing_page.page_type = page_type
+                page_updated = True
+            if page_updated:
+                updated_count += 1
+
+        existing_by_template_id[template_id] = existing_page
+        existing_by_slug[target_slug] = existing_page
+
+        has_version = session.scalars(
+            select(FunnelPageVersion.id).where(FunnelPageVersion.page_id == existing_page.id).limit(1)
+        ).first()
+        if not has_version:
+            initial_puck_data = apply_template_assets(
+                session=session,
+                org_id=auth.org_id,
+                client_id=str(funnel.client_id),
+                template=template,
+                design_system_tokens=None,
+            )
+            _create_initial_page_draft(
+                session=session,
+                org_id=auth.org_id,
+                funnel=funnel,
+                page=existing_page,
+                puck_data=initial_puck_data,
+            )
+            if not page_created and not page_updated:
+                updated_count += 1
+
+        touched_pages.append(existing_page)
+
+    session.commit()
+    for page in touched_pages:
+        session.refresh(page)
+
+    return {
+        "pages": [jsonable_encoder(page) for page in touched_pages],
+        "createdCount": created_count,
+        "updatedCount": updated_count,
+    }
 
 
 @router.get("/{funnel_id}/pages/{page_id}")

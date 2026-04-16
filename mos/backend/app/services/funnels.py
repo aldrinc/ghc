@@ -451,6 +451,7 @@ def duplicate_funnel(
             ordering=page.ordering,
             template_id=page.template_id,
             design_system_id=page.design_system_id,
+            page_type=page.page_type,
         )
         session.add(new_page)
         session.flush()

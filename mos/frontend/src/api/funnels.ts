@@ -58,6 +58,12 @@ type PublishFunnelResponse = {
   };
 };
 
+type SyncFunnelCompliancePagesResponse = {
+  pages: FunnelPage[];
+  createdCount: number;
+  updatedCount: number;
+};
+
 const buildFunnelsPath = (filters: FunnelFilters) => {
   const params = new URLSearchParams();
   if (filters.clientId) params.set("clientId", filters.clientId);
@@ -255,6 +261,23 @@ export function useCreateFunnelPage() {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create page";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncFunnelCompliancePages() {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ funnelId }: { funnelId: string }) =>
+      post<SyncFunnelCompliancePagesResponse>(`/funnels/${funnelId}/compliance-pages/sync`),
+    onSuccess: (_data, vars) => {
+      toast.success("Compliance pages synced");
+      queryClient.invalidateQueries({ queryKey: ["funnels", "detail", vars.funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync compliance pages";
       toast.error(message);
     },
   });

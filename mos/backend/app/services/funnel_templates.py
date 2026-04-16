@@ -31,6 +31,45 @@ class FunnelTemplate:
     asset_base_path: Optional[str]
     asset_prefix: Optional[str]
 
+
+_TEMPLATE_TO_PAGE_TYPE: dict[str, str] = {
+    "medusa-b2b-home": "home",
+    "medusa-b2b-category": "category",
+    "medusa-b2b-pdp": "product_detail",
+    "medusa-b2b-cart": "cart",
+    "medusa-b2b-checkout": "checkout",
+    "medusa-b2b-policy-privacy": "privacy_policy",
+    "medusa-b2b-policy-terms": "terms_of_service",
+    "medusa-b2b-policy-returns": "returns_refunds_policy",
+    "medusa-b2b-policy-shipping": "shipping_policy",
+    "medusa-b2b-policy-contact": "contact_support",
+    "medusa-b2c-home": "home",
+    "medusa-b2c-store": "store",
+    "medusa-b2c-collection": "collection",
+    "medusa-b2c-category": "category",
+    "medusa-b2c-product": "product_detail",
+    "medusa-b2c-cart": "cart",
+    "medusa-b2c-checkout": "checkout",
+    "medusa-b2c-policy-privacy": "privacy_policy",
+    "medusa-b2c-policy-terms": "terms_of_service",
+    "medusa-b2c-policy-returns": "returns_refunds_policy",
+    "medusa-b2c-policy-shipping": "shipping_policy",
+    "medusa-b2c-policy-contact": "contact_support",
+    "medusa-b2c-account-dashboard": "account_dashboard",
+    "medusa-b2c-account-profile": "account_profile",
+    "medusa-b2c-account-addresses": "account_addresses",
+    "medusa-b2c-account-orders": "account_orders",
+    "medusa-b2c-account-order-detail": "account_order_detail",
+    "medusa-b2c-order-confirmed": "order_confirmed",
+    "medusa-b2c-order-transfer": "order_transfer",
+    "medusa-b2c-order-transfer-accept": "order_transfer_accept",
+    "medusa-b2c-order-transfer-decline": "order_transfer_decline",
+    "compliance-privacy": "privacy_policy",
+    "compliance-terms": "terms_of_service",
+    "compliance-refunds": "returns_refunds_policy",
+}
+
+
 def _template_dir() -> Path:
     # backend/app/services -> backend/app
     return Path(__file__).resolve().parents[1] / "templates" / "funnels"
@@ -100,6 +139,13 @@ def resolve_funnel_template_public_stage(template_id: str | None) -> str | None:
 
 def resolve_funnel_template_artifact_slug(template_id: str | None) -> str | None:
     return _resolve_template_artifact_slug(template_id)
+
+
+def resolve_funnel_template_page_type(template_id: str | None) -> str | None:
+    cleaned = str(template_id or "").strip()
+    if not cleaned:
+        return None
+    return _TEMPLATE_TO_PAGE_TYPE.get(cleaned)
 
 
 def _is_data_uri(value: str) -> bool:

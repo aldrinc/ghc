@@ -43,7 +43,7 @@ import defaults from "./defaults.json";
 import styles from "./pdpPage.module.css";
 import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
-import { useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
   resolveDesignSystemBrandLogoVariant,
@@ -2542,13 +2542,35 @@ type SalesPdpFooterProps = {
 
 export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
   const designSystemTokens = useDesignSystemTokens()
+  const runtime = useFunnelRuntime()
   const resolvedConfig = parseJson<FooterConfig>(configJson) ?? config ?? salesPdpDefaults.config.footer
   const logoVariant = resolveDesignSystemBrandLogoVariant(resolvedConfig.logoVariant, "onDark")
   const resolvedLogo = useMemo(
     () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo, logoVariant),
     [designSystemTokens, logoVariant, resolvedConfig.logo]
   )
-  const links = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
+  const links = useMemo(() => {
+    const configuredLinks = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
+    if (configuredLinks.length > 0 || !runtime?.pageTypeMap) {
+      return configuredLinks
+    }
+    const complianceLinks = [
+      { label: "Terms", pageType: "terms_of_service" },
+      { label: "Privacy", pageType: "privacy_policy" },
+      { label: "Refunds", pageType: "returns_refunds_policy" },
+    ] as const
+    return complianceLinks.flatMap(({ label, pageType }) => {
+      const targetPageId = Object.entries(runtime.pageTypeMap ?? {}).find(([, value]) => value === pageType)?.[0]
+      if (!targetPageId) {
+        return []
+      }
+      const targetSlug = runtime.pageMap[targetPageId]
+      if (!targetSlug) {
+        return []
+      }
+      return [{ label, href: resolveRuntimePagePath(runtime, targetSlug) }]
+    })
+  }, [resolvedConfig.links, runtime])
   const paymentIcons = Array.isArray(resolvedConfig.paymentIcons) ? resolvedConfig.paymentIcons : []
   return (
     <footer className={`${styles.sectionPeach} ${styles.footer}`}>
@@ -2557,17 +2579,20 @@ export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
         <div className={styles.footerText}>{resolvedConfig.copyright}</div>
         {links.length > 0 ? (
           <nav className={styles.footerLinks} aria-label="Policy links">
-            {links.map((link) => (
-              <a
-                key={`${link.label}-${link.href}`}
-                href={link.href}
-                className={styles.footerLink}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                {link.label}
-              </a>
-            ))}
+            {links.map((link) => {
+              const isExternalLink = /^https?:\/\//i.test(link.href)
+              return (
+                <a
+                  key={`${link.label}-${link.href}`}
+                  href={link.href}
+                  className={styles.footerLink}
+                  target={isExternalLink ? "_blank" : undefined}
+                  rel={isExternalLink ? "noreferrer noopener" : undefined}
+                >
+                  {link.label}
+                </a>
+              )
+            })}
           </nav>
         ) : null}
         {paymentIcons.length > 0 ? (

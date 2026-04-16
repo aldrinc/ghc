@@ -57,6 +57,7 @@ from app.services.compliance import (
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
 from app.services.funnel_metadata import build_public_page_metadata_for_context
+from app.services.funnel_templates import resolve_funnel_template_page_type
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
@@ -184,6 +185,10 @@ def _site_page_type(
     normalized_template_id = clean_optional_text(template_id)
     if not normalized_template_id:
         return None
+
+    resolved_page_type = resolve_funnel_template_page_type(normalized_template_id)
+    if resolved_page_type:
+        return resolved_page_type
 
     # Map template IDs to site page types
     # B2B templates
