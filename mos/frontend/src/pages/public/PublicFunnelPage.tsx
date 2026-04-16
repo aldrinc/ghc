@@ -575,16 +575,6 @@ export function PublicFunnelPage() {
   }
 
   if (standaloneImportedHtmlPayload) {
-    if (commerceError) {
-      return (
-        <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
-          Imported HTML page is unavailable. {commerceError}
-        </div>
-      );
-    }
-    if (!commerce?.product) {
-      return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
-    }
     if (!standaloneImportedHtmlPayload.instrumentationManifest) {
       return (
         <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
@@ -601,7 +591,7 @@ export function PublicFunnelPage() {
         sessionId={sessionId}
         htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
         instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
-        variants={commerce.product.variants}
+        variants={commerce?.product?.variants ?? []}
         pagePathById={standalonePagePathById}
         pageStageById={page.pageStageMap}
       />

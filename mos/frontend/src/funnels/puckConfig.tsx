@@ -26,6 +26,7 @@ import {
 } from "@/components/imported-site/ImportedSourceSectionBlocks";
 import { ImportedRuntimeSection } from "@/components/imported-site/ImportedRuntimeSection";
 import { buildPublicFunnelPath, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { FunnelCompliancePage } from "@/funnels/FunnelCompliancePage";
 import { ImportedHtmlDocument as ImportedHtmlDocumentRenderer } from "@/funnels/ImportedHtmlDocument";
 import {
   matchesVariantOptionValues,
@@ -1378,6 +1379,35 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           config: salesPdpDefaults.config.footer,
         },
         render: withBlockBoundary("SalesPdpFooter", (props: Record<string, unknown>) => <SalesPdpFooter {...props} />),
+      },
+      FunnelCompliancePage: {
+        fields: {
+          pageKey: {
+            type: "select",
+            options: [
+              { label: "Privacy Policy", value: "privacy_policy" },
+              { label: "Terms of Service", value: "terms_of_service" },
+              { label: "Refund Policy", value: "returns_refunds_policy" },
+            ],
+          },
+          pageTitle: { type: "text" },
+        },
+        defaultProps: {
+          pageKey: "privacy_policy",
+          pageTitle: "Privacy Policy",
+        },
+        render: withBlockBoundary("FunnelCompliancePage", (props: Record<string, unknown>) => (
+          <FunnelCompliancePage
+            pageKey={
+              props.pageKey === "privacy_policy" ||
+              props.pageKey === "terms_of_service" ||
+              props.pageKey === "returns_refunds_policy"
+                ? props.pageKey
+                : "privacy_policy"
+            }
+            pageTitle={typeof props.pageTitle === "string" ? props.pageTitle : undefined}
+          />
+        )),
       },
       SalesPdpReviewSlider: {
         fields: {

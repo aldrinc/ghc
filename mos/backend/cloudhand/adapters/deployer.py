@@ -974,11 +974,33 @@ WantedBy=multi-user.target
     def _resolve_funnel_artifact_default_route(
         self, *, source: FunnelArtifactSourceSpec
     ) -> Optional[tuple[str, str, str]]:
+        resolved_target = self._resolve_funnel_artifact_runtime_target(source=source)
+        if not resolved_target:
+            return None
+        return (
+            str(resolved_target["productSlug"]),
+            str(resolved_target["funnelSlug"]),
+            str(resolved_target["entrySlug"]),
+        )
+
+    def _resolve_funnel_artifact_runtime_target(
+        self, *, source: FunnelArtifactSourceSpec
+    ) -> Optional[Dict[str, Any]]:
         artifact = source.artifact or {}
         products = artifact.get("products")
         if not isinstance(products, dict):
             return None
 
+        artifact_meta = artifact.get("meta")
+        preferred_funnel_id = ""
+        preferred_publication_id = ""
+        if isinstance(artifact_meta, dict):
+            preferred_funnel_id = str(artifact_meta.get("updatedFromFunnelId") or "").strip().lower()
+            preferred_publication_id = (
+                str(artifact_meta.get("updatedFromPublicationId") or "").strip().lower()
+            )
+
+        fallback_target: Optional[Dict[str, Any]] = None
         for raw_product_slug, product_payload in products.items():
             product_slug = str(raw_product_slug or "").strip()
             if not product_slug:
@@ -1014,64 +1036,46 @@ WantedBy=multi-user.target
                 else:
                     canonical_funnel_slug = funnel_slug
 
-                return product_slug, canonical_funnel_slug, entry_slug
+                candidate = {
+                    "productSlug": product_slug,
+                    "funnelSlug": canonical_funnel_slug,
+                    "entrySlug": entry_slug,
+                    "funnelMeta": canonical_funnel_meta,
+                    "funnelPayload": funnel_payload,
+                }
+                if fallback_target is None:
+                    fallback_target = candidate
 
-        return None
+                publication_id_token = (
+                    str(canonical_funnel_meta.get("publicationId") or "").strip().lower()
+                )
+                if preferred_funnel_id and funnel_id_token == preferred_funnel_id:
+                    return candidate
+                if (
+                    preferred_publication_id
+                    and publication_id_token
+                    and publication_id_token == preferred_publication_id
+                ):
+                    return candidate
+
+        return fallback_target
 
     def _build_preloaded_funnel_runtime_payload(
         self, *, source: FunnelArtifactSourceSpec
     ) -> Optional[Dict[str, object]]:
-        default_route = self._resolve_funnel_artifact_default_route(source=source)
-        if not default_route:
+        resolved_target = self._resolve_funnel_artifact_runtime_target(source=source)
+        if not resolved_target:
             return None
 
-        product_slug, funnel_slug, _entry_slug = default_route
-        artifact = source.artifact or {}
-        products = artifact.get("products")
-        if not isinstance(products, dict):
-            return None
-
-        product_payload = products.get(product_slug)
-        if not isinstance(product_payload, dict):
-            return None
-
-        funnels = product_payload.get("funnels")
-        if not isinstance(funnels, dict):
-            return None
-
-        resolved_funnel_payload: Optional[Dict[str, Any]] = None
-        for raw_funnel_slug, funnel_payload in funnels.items():
-            if not isinstance(funnel_payload, dict):
-                raise ValueError(
-                    f"Artifact funnel payload for '{product_slug}/{funnel_slug}' must be an object."
-                )
-            funnel_meta = funnel_payload.get("meta")
-            if not isinstance(funnel_meta, dict):
-                continue
-            funnel_tokens = self._resolve_funnel_path_tokens(
-                product_slug=product_slug,
-                funnel_slug=str(raw_funnel_slug or ""),
-                funnel_meta=funnel_meta,
-            )
-            normalized_tokens = {
-                str(token or "").strip().lower()
-                for token in funnel_tokens
-                if str(token or "").strip()
-            }
-            if funnel_slug not in normalized_tokens:
-                continue
-            resolved_funnel_payload = funnel_payload
-            break
-
-        if resolved_funnel_payload is None:
-            return None
-
-        funnel_meta = resolved_funnel_payload.get("meta")
-        pages = resolved_funnel_payload.get("pages")
+        product_slug = str(resolved_target["productSlug"])
+        funnel_slug = str(resolved_target["funnelSlug"])
+        funnel_meta = resolved_target.get("funnelMeta")
+        resolved_funnel_payload = resolved_target.get("funnelPayload")
+        pages = resolved_funnel_payload.get("pages") if isinstance(resolved_funnel_payload, dict) else None
         if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
             return None
 
-        canonical_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
+        canonical_meta = dict(funnel_meta)
         canonical_pages: Dict[str, Dict[str, Any]] = {}
         for raw_page_slug, page_payload in pages.items():
             if not isinstance(page_payload, dict):

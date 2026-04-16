@@ -265,6 +265,39 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return Object.fromEntries(entries);
   };
 
+  const serializeVariant = (variant) => {
+    if (!isRecord(variant)) return null;
+    const id = cleanText(variant.id);
+    if (!id) return null;
+    const provider = cleanText(typeof variant.provider === "string" ? variant.provider.toLowerCase() : null);
+    const currency = cleanText(variant.currency);
+    const optionValues = normalizeSelection(variant.optionValues || variant.option_values || null);
+    return {
+      id,
+      provider,
+      price: typeof variant.price === "number" ? variant.price : null,
+      currency,
+      optionValues,
+    };
+  };
+
+  let cachedVariants = Array.isArray(config.variants)
+    ? config.variants.map(serializeVariant).filter(Boolean)
+    : [];
+  let cachedCommercePromise = null;
+  const preparedCheckoutCache = {};
+  const preparedCheckoutInFlight = {};
+  const checkoutOriginPreconnects = {};
+  const checkoutUrlPrefetches = {};
+  const checkoutBindingElements = {};
+  const checkoutBindingState = {};
+  const PREPARED_CHECKOUT_TTL_MS = 10 * 60 * 1000;
+  const PREPARED_CHECKOUT_RETRY_DELAYS_MS = [0, 250, 500];
+  const CHECKOUT_LOADING_LABEL = "Preparing secure checkout...";
+  const CHECKOUT_ERROR_LABEL = "Secure checkout is unavailable right now.";
+  let warmCheckoutBindingsTimeout = null;
+  let checkoutNavigationInProgress = false;
+
   const selectionsMatch = (left, right) => {
     const normalizedLeft = normalizeSelection(left);
     const normalizedRight = normalizeSelection(right);
@@ -275,20 +308,286 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return leftEntries.every(([key, value]) => normalizedRight[key] === value);
   };
 
+  const buildPreparedCheckoutCacheKey = (variantId, selection) => {
+    const normalizedSelection = normalizeSelection(selection) || {};
+    const selectionEntries = Object.entries(normalizedSelection).sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+    return JSON.stringify({
+      variantId: cleanText(variantId) || "",
+      selection: selectionEntries,
+    });
+  };
+
+  const getPreparedCheckoutRecord = (cacheKey) => {
+    const record = cacheKey ? preparedCheckoutCache[cacheKey] : null;
+    if (!record) return null;
+    if (Date.now() - record.createdAt > PREPARED_CHECKOUT_TTL_MS) {
+      delete preparedCheckoutCache[cacheKey];
+      return null;
+    }
+    return record;
+  };
+
+  const ensureCheckoutOriginPreconnect = (checkoutUrl) => {
+    const href = cleanText(checkoutUrl);
+    if (!href) return;
+    let origin = "";
+    try {
+      origin = new URL(href, window.location.href).origin;
+    } catch (_) {
+      return;
+    }
+    if (!origin || checkoutOriginPreconnects[origin]) return;
+    checkoutOriginPreconnects[origin] = true;
+    const preconnect = document.createElement("link");
+    preconnect.rel = "preconnect";
+    preconnect.href = origin;
+    preconnect.crossOrigin = "anonymous";
+    document.head.appendChild(preconnect);
+    const dnsPrefetch = document.createElement("link");
+    dnsPrefetch.rel = "dns-prefetch";
+    dnsPrefetch.href = origin;
+    document.head.appendChild(dnsPrefetch);
+  };
+
+  const ensureCheckoutUrlPrefetch = (checkoutUrl) => {
+    const href = cleanText(checkoutUrl);
+    if (!href || checkoutUrlPrefetches[href]) return;
+    checkoutUrlPrefetches[href] = true;
+    const prefetch = document.createElement("link");
+    prefetch.rel = "prefetch";
+    prefetch.as = "document";
+    prefetch.href = href;
+    prefetch.crossOrigin = "anonymous";
+    document.head.appendChild(prefetch);
+  };
+
+  const ensureCheckoutStatusNote = (bindingId, element) => {
+    const existingId = cleanText(element.dataset.mosCheckoutStatusNoteId);
+    if (existingId) {
+      const existing = document.getElementById(existingId);
+      if (existing) return existing;
+    }
+    const noteId =
+      "mos-checkout-status-" +
+      String(bindingId || "unknown") +
+      "-" +
+      String((checkoutBindingElements[bindingId] || []).length);
+    const note = document.createElement("span");
+    note.id = noteId;
+    note.style.display = "none";
+    note.style.width = "100%";
+    note.style.marginTop = "0.5rem";
+    note.style.fontSize = "0.75rem";
+    note.style.lineHeight = "1.4";
+    note.style.fontWeight = "600";
+    note.style.letterSpacing = "normal";
+    note.style.textTransform = "none";
+    note.style.textAlign = "center";
+    note.style.opacity = "0.82";
+    note.style.color = "inherit";
+    note.setAttribute("aria-live", "polite");
+    element.insertAdjacentElement("afterend", note);
+    element.dataset.mosCheckoutStatusNoteId = noteId;
+    return note;
+  };
+
+  const setCheckoutElementWaiting = (bindingId, element, waiting, label) => {
+    const note = ensureCheckoutStatusNote(bindingId, element);
+    if (waiting) {
+      if (!("mosCheckoutSavedPointerEvents" in element.dataset)) {
+        element.dataset.mosCheckoutSavedPointerEvents = element.style.pointerEvents || "";
+      }
+      if (!("mosCheckoutSavedOpacity" in element.dataset)) {
+        element.dataset.mosCheckoutSavedOpacity = element.style.opacity || "";
+      }
+      if (!("mosCheckoutSavedCursor" in element.dataset)) {
+        element.dataset.mosCheckoutSavedCursor = element.style.cursor || "";
+      }
+      if (element instanceof HTMLButtonElement && !("mosCheckoutSavedDisabled" in element.dataset)) {
+        element.dataset.mosCheckoutSavedDisabled = element.disabled ? "true" : "false";
+      }
+      element.dataset.mosCheckoutWaiting = "true";
+      element.setAttribute("aria-busy", "true");
+      element.setAttribute("aria-disabled", "true");
+      element.style.pointerEvents = "none";
+      element.style.opacity = "0.72";
+      element.style.cursor = "progress";
+      if (element instanceof HTMLButtonElement) {
+        element.disabled = true;
+      }
+      note.textContent = cleanText(label) || CHECKOUT_LOADING_LABEL;
+      note.style.display = "block";
+      return;
+    }
+
+    delete element.dataset.mosCheckoutWaiting;
+    element.removeAttribute("aria-busy");
+    element.removeAttribute("aria-disabled");
+    element.style.pointerEvents = element.dataset.mosCheckoutSavedPointerEvents || "";
+    element.style.opacity = element.dataset.mosCheckoutSavedOpacity || "";
+    element.style.cursor = element.dataset.mosCheckoutSavedCursor || "";
+    delete element.dataset.mosCheckoutSavedPointerEvents;
+    delete element.dataset.mosCheckoutSavedOpacity;
+    delete element.dataset.mosCheckoutSavedCursor;
+    if (element instanceof HTMLButtonElement) {
+      const wasDisabled = element.dataset.mosCheckoutSavedDisabled === "true";
+      element.disabled = wasDisabled;
+      delete element.dataset.mosCheckoutSavedDisabled;
+    }
+    note.textContent = "";
+    note.style.display = "none";
+  };
+
+  const renderCheckoutBindingState = (bindingId) => {
+    const state = checkoutBindingState[bindingId] || { status: "idle", message: null };
+    const waiting = state.status === "loading";
+    const elements = checkoutBindingElements[bindingId] || [];
+    for (const element of elements) {
+      setCheckoutElementWaiting(bindingId, element, waiting, state.message || CHECKOUT_LOADING_LABEL);
+    }
+  };
+
+  const setCheckoutBindingState = (bindingId, nextState) => {
+    checkoutBindingState[bindingId] = {
+      ...(checkoutBindingState[bindingId] || { status: "idle", cacheKey: null, message: null }),
+      ...nextState,
+    };
+    renderCheckoutBindingState(bindingId);
+  };
+
+  const registerCheckoutElement = (bindingId, element) => {
+    const list = checkoutBindingElements[bindingId] || [];
+    if (!list.includes(element)) {
+      list.push(element);
+      checkoutBindingElements[bindingId] = list;
+    }
+    renderCheckoutBindingState(bindingId);
+  };
+
   const resolveExternalCheckoutUrlForVariant = (items, variantId) => {
     if (!Array.isArray(items) || !variantId) return null;
     const match = items.find((item) => item && item.variantId === variantId && typeof item.url === "string");
     return match ? cleanText(match.url) : null;
   };
 
-  const resolveVariantForCheckout = (checkout, selectionFromDom) => {
+  const parseResponseError = async (response) => {
+    try {
+      const payload = await response.clone().json();
+      const detail = cleanText(payload && payload.detail);
+      if (detail) return detail;
+      const message = cleanText(payload && payload.message);
+      if (message) return message;
+    } catch (_) {
+      // ignore and fall back to plain text
+    }
+    try {
+      const text = cleanText(await response.text());
+      if (text) return text;
+    } catch (_) {
+      // ignore and fall back to status text
+    }
+    return cleanText(response.statusText) || "Request failed.";
+  };
+
+  const delay = (durationMs) =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, durationMs);
+    });
+
+  const loadCommerceVariants = async () => {
+    if (cachedVariants.length) {
+      return cachedVariants;
+    }
+    if (cachedCommercePromise) {
+      return cachedCommercePromise;
+    }
+    cachedCommercePromise = fetch(
+      config.apiBaseUrl +
+        "/public/funnels/" +
+        encodeURIComponent(config.productSlug) +
+        "/" +
+        encodeURIComponent(config.funnelSlug) +
+        "/commerce",
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await parseResponseError(response));
+        }
+        const payload = await response.json();
+        const product = payload && payload.product;
+        const variants = Array.isArray(product && product.variants)
+          ? product.variants.map(serializeVariant).filter(Boolean)
+          : [];
+        cachedVariants = variants;
+        return cachedVariants;
+      })
+      .finally(() => {
+        cachedCommercePromise = null;
+      });
+    return cachedCommercePromise;
+  };
+
+  const resolveCheckoutUrls = () => {
+    const checkoutReturnUrl = new URL(window.location.href);
+    const checkoutCancelUrl = new URL(window.location.href);
+    checkoutReturnUrl.searchParams.set("checkout", "success");
+    checkoutCancelUrl.searchParams.set("checkout", "cancel");
+    return {
+      successUrl: checkoutReturnUrl.toString(),
+      cancelUrl: checkoutCancelUrl.toString(),
+    };
+  };
+
+  const createCheckoutPayload = ({ resolvedVariantId, resolvedSelection }) => {
+    const checkoutUrls = resolveCheckoutUrls();
+    return {
+      funnelSlug: config.funnelSlug,
+      variantId: resolvedVariantId || undefined,
+      selection: resolvedSelection,
+      quantity: 1,
+      successUrl: checkoutUrls.successUrl,
+      cancelUrl: checkoutUrls.cancelUrl,
+      pageId: config.pageId,
+      visitorId: config.visitorId,
+      sessionId: config.sessionId,
+      utm: getUtmParams(),
+    };
+  };
+
+  const requestCheckout = async ({ resolvedVariantId, resolvedSelection }) => {
+    const response = await fetch(config.apiBaseUrl + "/public/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection })),
+    });
+
+    if (!response.ok) {
+      throw new Error((await response.text()) || response.statusText || "Checkout failed.");
+    }
+
+    const data = await response.json();
+    const checkoutUrl = cleanText(data && data.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Checkout URL is missing.");
+    }
+    ensureCheckoutOriginPreconnect(checkoutUrl);
+    ensureCheckoutUrlPrefetch(checkoutUrl);
+    return {
+      checkoutUrl,
+      sessionId: cleanText(data && data.sessionId) || null,
+    };
+  };
+
+  const resolveVariantForCheckout = (checkout, selectionFromDom, variants) => {
     const resolver = checkout && checkout.variantResolver;
     if (!resolver || typeof resolver.type !== "string") {
       throw new Error("Checkout binding is missing a variantResolver.");
     }
     if (resolver.type === "fixed") {
       const variantId = cleanText(resolver.variantId);
-      const variant = config.variants.find((candidate) => candidate.id === variantId) || null;
+      const variant = variants.find((candidate) => candidate.id === variantId) || null;
       return {
         variantId,
         variant,
@@ -298,11 +597,182 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (resolver.type === "option_values") {
       return {
         variantId: null,
-        variant: config.variants.find((candidate) => selectionsMatch(candidate.optionValues, selectionFromDom)) || null,
+        variant: variants.find((candidate) => selectionsMatch(candidate.optionValues, selectionFromDom)) || null,
         selection: selectionFromDom,
       };
     }
     throw new Error("Unsupported checkout resolver type.");
+  };
+
+  const resolveCheckoutBindingState = async (binding) => {
+    const selectionFromDom = readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown");
+    const checkoutVariants =
+      selectionFromDom && !cachedVariants.length ? await loadCommerceVariants() : cachedVariants;
+    const { variantId, variant, selection } = resolveVariantForCheckout(
+      binding.checkout,
+      selectionFromDom,
+      checkoutVariants,
+    );
+    const resolvedVariantId = cleanText(variant && variant.id ? variant.id : variantId);
+    const resolvedSelection = normalizeSelection(selection) || {};
+    return {
+      variant,
+      resolvedVariantId,
+      resolvedSelection,
+      cacheKey: buildPreparedCheckoutCacheKey(resolvedVariantId, resolvedSelection),
+    };
+  };
+
+  const prepareCheckoutInBackground = async ({ variant, resolvedVariantId, resolvedSelection, cacheKey }) => {
+    if (!cacheKey || !variant || variant.provider !== "shopify") {
+      return null;
+    }
+    const cachedRecord = getPreparedCheckoutRecord(cacheKey);
+    if (cachedRecord) {
+      return cachedRecord;
+    }
+    if (preparedCheckoutInFlight[cacheKey]) {
+      return preparedCheckoutInFlight[cacheKey];
+    }
+    const promise = (async () => {
+      let lastError = null;
+      for (const retryDelayMs of PREPARED_CHECKOUT_RETRY_DELAYS_MS) {
+        if (retryDelayMs > 0) {
+          await delay(retryDelayMs);
+        }
+        try {
+          const preparedCheckout = await requestCheckout({ resolvedVariantId, resolvedSelection });
+          const record = {
+            ...preparedCheckout,
+            variantId: resolvedVariantId || "",
+            selection: resolvedSelection,
+            createdAt: Date.now(),
+          };
+          preparedCheckoutCache[cacheKey] = record;
+          return record;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", lastError);
+      return null;
+    })()
+      .finally(() => {
+        delete preparedCheckoutInFlight[cacheKey];
+      });
+    preparedCheckoutInFlight[cacheKey] = promise;
+    return promise;
+  };
+
+  const waitForPreparedCheckout = async (cacheKey) => {
+    if (!cacheKey || !preparedCheckoutInFlight[cacheKey]) {
+      return null;
+    }
+    return preparedCheckoutInFlight[cacheKey];
+  };
+
+  const syncCheckoutBindingWarmState = async (binding) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const checkoutState = await resolveCheckoutBindingState(binding);
+    const isWarmable =
+      Boolean(checkoutState.cacheKey) &&
+      Boolean(checkoutState.variant) &&
+      checkoutState.variant.provider === "shopify";
+
+    if (!isWarmable) {
+      setCheckoutBindingState(bindingId, {
+        status: "idle",
+        cacheKey: checkoutState.cacheKey || null,
+        message: null,
+      });
+      return checkoutState;
+    }
+
+    const preparedCheckout = getPreparedCheckoutRecord(checkoutState.cacheKey);
+    if (preparedCheckout) {
+      setCheckoutBindingState(bindingId, {
+        status: "ready",
+        cacheKey: checkoutState.cacheKey,
+        message: null,
+      });
+      return checkoutState;
+    }
+
+    setCheckoutBindingState(bindingId, {
+      status: "loading",
+      cacheKey: checkoutState.cacheKey,
+      message: CHECKOUT_LOADING_LABEL,
+    });
+
+    void prepareCheckoutInBackground(checkoutState).then(() => {
+      const currentState = checkoutBindingState[bindingId];
+      if (!currentState || currentState.cacheKey !== checkoutState.cacheKey) {
+        return;
+      }
+      if (getPreparedCheckoutRecord(checkoutState.cacheKey)) {
+        setCheckoutBindingState(bindingId, {
+          status: "ready",
+          cacheKey: checkoutState.cacheKey,
+          message: null,
+        });
+        return;
+      }
+      setCheckoutBindingState(bindingId, {
+        status: "error",
+        cacheKey: checkoutState.cacheKey,
+        message: CHECKOUT_ERROR_LABEL,
+      });
+    });
+
+    return checkoutState;
+  };
+
+  const ensurePreparedCheckoutForClick = async ({
+    bindingId,
+    cacheKey,
+    variant,
+    resolvedVariantId,
+    resolvedSelection,
+  }) => {
+    const isWarmableShopifyCheckout = Boolean(cacheKey) && Boolean(variant) && variant.provider === "shopify";
+    if (!isWarmableShopifyCheckout) {
+      return requestCheckout({ resolvedVariantId, resolvedSelection });
+    }
+    let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
+    if (preparedCheckout) {
+      return preparedCheckout;
+    }
+    setCheckoutBindingState(bindingId, {
+      status: "loading",
+      cacheKey,
+      message: CHECKOUT_LOADING_LABEL,
+    });
+    preparedCheckout =
+      (await waitForPreparedCheckout(cacheKey)) ||
+      (await prepareCheckoutInBackground({ variant, resolvedVariantId, resolvedSelection, cacheKey }));
+    if (!preparedCheckout) {
+      setCheckoutBindingState(bindingId, {
+        status: "error",
+        cacheKey,
+        message: CHECKOUT_ERROR_LABEL,
+      });
+      throw new Error("Prepared checkout is unavailable.");
+    }
+    setCheckoutBindingState(bindingId, {
+      status: "ready",
+      cacheKey,
+      message: null,
+    });
+    return preparedCheckout;
+  };
+
+  const isCheckoutBindingTarget = (target) => {
+    if (!(target instanceof Node)) {
+      return false;
+    }
+    return Object.values(checkoutBindingElements).some((elements) =>
+      Array.isArray(elements) && elements.some((element) => element instanceof HTMLElement && element.contains(target)),
+    );
   };
 
   const readNodeValue = (node, source) => {
@@ -432,6 +902,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
         if (element.dataset.mosStandaloneImportedHtmlBound === "true") {
           continue;
         }
+        if (binding.type === "checkout" && binding.checkout) {
+          registerCheckoutElement(String(binding.id || "unknown"), element);
+        }
         element.dataset.mosStandaloneImportedHtmlBound = "true";
         element.addEventListener("click", async (event) => {
           event.preventDefault();
@@ -469,17 +942,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
               throw new Error("Unsupported binding type.");
             }
 
-            const selectionFromDom = readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown");
-            const { variantId, variant, selection } = resolveVariantForCheckout(binding.checkout, selectionFromDom);
-            const resolvedVariantId = cleanText(variant && variant.id ? variant.id : variantId);
-            const resolvedSelection = normalizeSelection(selection) || {};
+            const bindingId = String(binding.id || "unknown");
+            const { variant, resolvedVariantId, resolvedSelection, cacheKey } = await syncCheckoutBindingWarmState(
+              binding,
+            );
 
-            await trackEvent(
+            void trackEvent(
               binding.trackEventType || "sales_to_checkout_click",
               {
                 fromStage: config.pageStage,
                 toStage: "checkout",
-                bindingId: binding.id,
+                bindingId,
                 buttonText: buttonText || undefined,
                 ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
               },
@@ -497,36 +970,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
               return;
             }
 
-            const checkoutReturnUrl = new URL(window.location.href);
-            const checkoutCancelUrl = new URL(window.location.href);
-            checkoutReturnUrl.searchParams.set("checkout", "success");
-            checkoutCancelUrl.searchParams.set("checkout", "cancel");
-
-            const response = await fetch(config.apiBaseUrl + "/public/checkout", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                funnelSlug: config.funnelSlug,
-                variantId: resolvedVariantId || undefined,
-                selection: resolvedSelection,
-                quantity: 1,
-                successUrl: checkoutReturnUrl.toString(),
-                cancelUrl: checkoutCancelUrl.toString(),
-                pageId: config.pageId,
-                visitorId: config.visitorId,
-                sessionId: config.sessionId,
-                utm: getUtmParams(),
-              }),
+            const checkout = await ensurePreparedCheckoutForClick({
+              bindingId,
+              cacheKey,
+              variant,
+              resolvedVariantId,
+              resolvedSelection,
             });
-
-            if (!response.ok) {
-              throw new Error((await response.text()) || response.statusText || "Checkout failed.");
-            }
-
-            const data = await response.json();
-            if (!data || !cleanText(data.checkoutUrl)) {
-              throw new Error("Checkout URL is missing.");
-            }
 
             if (variant && variant.provider === "stripe") {
               const pendingKey = pendingMetaPurchaseStorageKey(config.sessionId, config.funnelSlug);
@@ -543,12 +993,18 @@ function buildStandaloneImportedHtmlRuntimeScript({
               }
             }
 
-            window.location.href = data.checkoutUrl;
+            checkoutNavigationInProgress = true;
+            window.location.href = checkout.checkoutUrl;
           } catch (error) {
             console.error(
               "[StandaloneImportedHtmlPage] Binding '" + String(binding.id || "unknown") + "' failed.",
               error,
             );
+            setCheckoutBindingState(String(binding.id || "unknown"), {
+              status: "error",
+              cacheKey: null,
+              message: CHECKOUT_ERROR_LABEL,
+            });
           }
         });
       }
@@ -571,21 +1027,74 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
+  const warmCheckoutBindings = async () => {
+    if (!config.manifest || !Array.isArray(config.manifest.bindings)) return;
+    await Promise.all(
+      config.manifest.bindings.map(async (binding) => {
+        if (!binding || typeof binding !== "object") return;
+        if (binding.type !== "checkout" || !binding.checkout) return;
+        if (binding.checkout.mode === "external_checkout_url") return;
+        try {
+          await syncCheckoutBindingWarmState(binding);
+        } catch (_) {
+          setCheckoutBindingState(String(binding.id || "unknown"), {
+            status: "error",
+            cacheKey: null,
+            message: CHECKOUT_ERROR_LABEL,
+          });
+        }
+      }),
+    );
+  };
+
+  const warmCheckoutBindingsSafely = () => {
+    try {
+      void warmCheckoutBindings();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlPage] Failed to warm checkout bindings.", error);
+    }
+  };
+
+  const scheduleWarmCheckoutBindings = (delayMs = 75) => {
+    if (warmCheckoutBindingsTimeout !== null) {
+      window.clearTimeout(warmCheckoutBindingsTimeout);
+    }
+    warmCheckoutBindingsTimeout = window.setTimeout(() => {
+      warmCheckoutBindingsTimeout = null;
+      warmCheckoutBindingsSafely();
+    }, delayMs);
+  };
+
   bindManifestSafely();
+  warmCheckoutBindingsSafely();
   applyMobileSpacingFixesSafely();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
+    document.addEventListener("DOMContentLoaded", warmCheckoutBindingsSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
+  window.addEventListener("load", warmCheckoutBindingsSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);
+  window.setTimeout(warmCheckoutBindingsSafely, 0);
+  window.setTimeout(warmCheckoutBindingsSafely, 250);
+  window.setTimeout(warmCheckoutBindingsSafely, 1000);
   window.setTimeout(applyMobileSpacingFixesSafely, 0);
   window.setTimeout(applyMobileSpacingFixesSafely, 250);
   window.setTimeout(applyMobileSpacingFixesSafely, 1000);
   window.addEventListener("resize", applyMobileSpacingFixesSafely);
+  document.addEventListener("click", (event) => {
+    if (checkoutNavigationInProgress || isCheckoutBindingTarget(event.target)) {
+      return;
+    }
+    scheduleWarmCheckoutBindings();
+  }, true);
+  document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
+  document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);
+  window.addEventListener("pageshow", () => scheduleWarmCheckoutBindings(0));
 })();
 </script>`;
 }

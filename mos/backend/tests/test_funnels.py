@@ -88,6 +88,18 @@ def _create_publish_ready_funnel(
     return funnel_id, route_slug, product_id, product_slug
 
 
+def _add_compliance_profile(db_session, auth_context, client_id: str) -> None:
+    db_session.add(
+        ClientComplianceProfile(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            ruleset_version=COMPLIANCE_RULESET_VERSION,
+            business_models=["ecommerce"],
+        )
+    )
+    db_session.commit()
+
+
 def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_session):
     client_resp = api_client.post("/clients", json={"name": "Funnels Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
@@ -369,6 +381,72 @@ def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(
     assert policy_payload["pageKey"] == "privacy_policy"
     assert "Honest Herbalist" in policy_payload["markdown"]
     assert "support@honest-herbalist.test" in policy_payload["markdown"]
+
+
+def test_sync_funnel_compliance_pages_creates_terms_privacy_and_refunds(
+    api_client: TestClient,
+    db_session,
+    auth_context,
+):
+    client_resp = api_client.post("/clients", json={"name": "Funnels Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": "Funnels Product"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
+
+    funnel_resp = api_client.post(
+        "/funnels",
+        json={"clientId": client_id, "productId": product_id, "name": "Test Funnel", "description": "Demo"},
+    )
+    assert funnel_resp.status_code == 201
+    funnel = funnel_resp.json()
+    funnel_id = funnel["id"]
+    route_slug = funnel["route_slug"]
+
+    _add_compliance_profile(db_session, auth_context, client_id)
+
+    sync_resp = api_client.post(f"/funnels/{funnel_id}/compliance-pages/sync")
+    assert sync_resp.status_code == 201
+    sync_payload = sync_resp.json()
+
+    assert sync_payload["createdCount"] == 3
+    assert sync_payload["updatedCount"] == 0
+    assert {(page["slug"], page["page_type"]) for page in sync_payload["pages"]} == {
+        ("privacy-policy", "privacy_policy"),
+        ("refund-policy", "returns_refunds_policy"),
+        ("terms-of-service", "terms_of_service"),
+    }
+
+    sync_again_resp = api_client.post(f"/funnels/{funnel_id}/compliance-pages/sync")
+    assert sync_again_resp.status_code == 201
+    sync_again_payload = sync_again_resp.json()
+    assert sync_again_payload["createdCount"] == 0
+    assert sync_again_payload["updatedCount"] == 0
+
+    privacy_page = next(page for page in sync_payload["pages"] if page["slug"] == "privacy-policy")
+    set_entry_resp = api_client.patch(f"/funnels/{funnel_id}", json={"entryPageId": privacy_page["id"]})
+    assert set_entry_resp.status_code == 200
+
+    publish_resp = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish_resp.status_code == 201
+
+    public_page_resp = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/privacy-policy")
+    assert public_page_resp.status_code == 200
+    public_page_payload = public_page_resp.json()
+
+    assert public_page_payload["slug"] == "privacy-policy"
+    assert public_page_payload["pageTypeMap"][privacy_page["id"]] == "privacy_policy"
+    assert set(public_page_payload["pageTypeMap"].values()) >= {
+        "privacy_policy",
+        "returns_refunds_policy",
+        "terms_of_service",
+    }
 
 
 def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_client: TestClient):
@@ -1028,6 +1106,7 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False
+    assert workload_patch["workspace_server_names"] == ["shop.shopemberco.com"]
     assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
 
 

@@ -7,7 +7,6 @@ import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 
 const standaloneImportedHtmlPageMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
-
 vi.mock("@measured/puck", () => ({
   Render: () => <div data-testid="puck-renderer" />,
 }));

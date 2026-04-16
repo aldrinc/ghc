@@ -55,6 +55,9 @@ _PUBLIC_ASSET_URL_PREFIXES = (
     "/api/public/assets/",
     "api/public/assets/",
 )
+_PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
+    r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/([^\s\"'<>?#/]+)"
+)
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -220,6 +223,7 @@ def get_workload_domains_from_plan(
     found = False
     server_names: list[str] = []
     https: bool | None = None
+    workspace_server_names: list[str] | None = None
 
     for inst in instances:
         if instance_name and inst.get("name") != instance_name:
@@ -235,6 +239,27 @@ def get_workload_domains_from_plan(
             service_config = workload.get("service_config") or {}
             if not isinstance(service_config, dict):
                 break
+
+            if "workspace_server_names" in workload:
+                raw_workspace_server_names = workload.get("workspace_server_names")
+                if raw_workspace_server_names is None:
+                    raw_workspace_server_names = []
+                if not isinstance(raw_workspace_server_names, list):
+                    raise DeployError("Workload workspace_server_names must be a list.")
+
+                cleaned_workspace: list[str] = []
+                seen_workspace: set[str] = set()
+                for raw in raw_workspace_server_names:
+                    if not isinstance(raw, str):
+                        raise DeployError(
+                            "Workload workspace_server_names entries must be strings."
+                        )
+                    hostname = raw.strip().lower()
+                    if not hostname or hostname in seen_workspace:
+                        continue
+                    seen_workspace.add(hostname)
+                    cleaned_workspace.append(hostname)
+                workspace_server_names = cleaned_workspace
 
             raw_server_names = service_config.get("server_names") or []
             if raw_server_names is None:
@@ -266,12 +291,15 @@ def get_workload_domains_from_plan(
         if found:
             break
 
-    return {
+    result = {
         "plan_path": str(base_plan_path),
         "workload_found": found,
         "server_names": server_names,
         "https": https,
     }
+    if workspace_server_names is not None:
+        result["workspace_server_names"] = workspace_server_names
+    return result
 
 
 def save_plan(*, content: str, path: str | None = None) -> dict[str, str]:
@@ -789,6 +817,23 @@ def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
     return None
 
 
+def _extract_public_asset_ids_from_text(raw_value: str) -> set[str]:
+    value = str(raw_value or "").strip()
+    if not value:
+        return set()
+
+    matches = set()
+    for match in _PUBLIC_ASSET_URL_IN_TEXT_RE.finditer(value):
+        token = str(match.group(1) or "").strip()
+        if not token:
+            continue
+        if "." in token:
+            token = token.split(".", 1)[0]
+        if token:
+            matches.add(token)
+    return matches
+
+
 def _extract_embedded_asset_public_ids(
     *,
     puck_data: dict[str, Any],
@@ -818,17 +863,20 @@ def _extract_embedded_asset_public_ids(
         for raw_value in obj.values():
             if not isinstance(raw_value, str):
                 continue
-            public_id_from_url = _extract_public_asset_id_from_url(raw_value)
-            if not public_id_from_url:
-                continue
-            try:
-                normalized_from_url = str(UUID(public_id_from_url))
-            except ValueError as exc:
-                raise DeployError(
-                    f"{context_label} includes invalid public asset URL '{raw_value}'. "
-                    "Expected /public/assets/<uuid>."
-                ) from exc
-            public_ids.add(normalized_from_url)
+            matched_public_ids = _extract_public_asset_ids_from_text(raw_value)
+            if not matched_public_ids:
+                public_id_from_url = _extract_public_asset_id_from_url(raw_value)
+                if public_id_from_url:
+                    matched_public_ids = {public_id_from_url}
+            for public_id_from_url in matched_public_ids:
+                try:
+                    normalized_from_url = str(UUID(public_id_from_url))
+                except ValueError as exc:
+                    raise DeployError(
+                        f"{context_label} includes invalid public asset URL '{raw_value}'. "
+                        "Expected /public/assets/<uuid>."
+                    ) from exc
+                public_ids.add(normalized_from_url)
 
     if isinstance(design_system_tokens, dict):
         brand = design_system_tokens.get("brand")
@@ -1027,6 +1075,7 @@ def build_client_funnel_runtime_artifact_payload(
     from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
     from app.services.design_systems import resolve_design_system_tokens
     from app.services.funnel_template_categories import resolve_funnel_template_artifact_slug
+    from app.services.funnel_templates import resolve_funnel_template_page_type
     from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
     from app.services.public_routing import require_product_route_slug
 
@@ -1198,6 +1247,15 @@ def build_client_funnel_runtime_artifact_payload(
             )
             for artifact_slug, page_id, _, page in page_details
         }
+        page_type_map = {
+            page_id: page_type
+            for _, page_id, _, page in page_details
+            for page_type in [
+                (clean_optional_text(page.page_type) if page else None)
+                or resolve_funnel_template_page_type(page.template_id if page else None)
+            ]
+            if page_type
+        }
         tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
         pages_payload: dict[str, dict[str, Any]] = {}
         for artifact_slug, page_id, version, page in page_details:
@@ -1237,6 +1295,7 @@ def build_client_funnel_runtime_artifact_payload(
                 "puckData": materialized_puck_data,
                 "pageMap": page_map,
                 "pageStageMap": page_stage_map,
+                "pageTypeMap": page_type_map,
                 "designSystemTokens": tokens,
                 "metadata": metadata,
                 "tracking": tracking,
@@ -2258,12 +2317,16 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, client_id: str) -> str:
-    workspace_component = _normalize_bunny_pull_zone_name_component(
+def _build_bunny_pull_zone_name(*, client_id: str, workload_name: str) -> str:
+    _ = _normalize_bunny_pull_zone_name_component(
         value=client_id,
         label="client_id",
     )
-    return workspace_component
+    workload_component = _normalize_bunny_pull_zone_name_component(
+        value=workload_name,
+        label="workload_name",
+    )
+    return workload_component
 
 
 def _resolve_bunny_pull_zone_client_id(*, client_id: str) -> str:
@@ -2412,6 +2475,27 @@ def _normalize_workload_server_names(*, server_names: list[str]) -> list[str]:
         seen.add(hostname)
         out.append(hostname)
     return out
+
+
+def _resolve_publish_job_workspace_server_names(
+    *,
+    session: Any,
+    org_id: str,
+    workload_client_id: str,
+    workload_patch: dict[str, Any],
+) -> list[str]:
+    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
+
+    raw_workspace_server_names = workload_patch.get("workspace_server_names")
+    if raw_workspace_server_names is not None:
+        if not isinstance(raw_workspace_server_names, list):
+            raise DeployError("Publish deploy workload workspace_server_names must be a list.")
+        return _normalize_workload_server_names(server_names=raw_workspace_server_names)
+
+    return OrgDeployDomainsRepository(session).list_hostnames(
+        org_id=org_id,
+        client_id=workload_client_id,
+    )
 
 
 def _extract_bunny_pull_zone_hostname_values(zone: dict[str, Any]) -> list[str]:
@@ -2681,8 +2765,8 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, client_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(client_id=client_id)
+def _ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(client_id=client_id, workload_name=workload_name)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     zone: dict[str, Any]
@@ -2849,6 +2933,7 @@ def configure_bunny_pull_zone_for_workload(
     )
     bunny_zone = _ensure_bunny_pull_zone(
         client_id=resolved_client_id,
+        workload_name=workload_name,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -2927,6 +3012,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
     )
     bunny_zone = _ensure_bunny_pull_zone(
         client_id=resolved_client_id,
+        workload_name=workload_name,
         origin_url=origin_url,
     )
     domain_provisioning = _provision_bunny_custom_domains(
@@ -3125,7 +3211,6 @@ async def _run_apply_plan_job(job_id: str) -> None:
 
 async def _run_funnel_publish_job(job_id: str) -> None:
     from app.db.base import SessionLocal
-    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
     from app.services.funnels import publish_funnel
 
     job = _read_publish_job(job_id)
@@ -3250,9 +3335,11 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         workload=workload_patch,
                         workload_name=workload_name,
                     )
-                    workspace_server_names = OrgDeployDomainsRepository(session).list_hostnames(
+                    workspace_server_names = _resolve_publish_job_workspace_server_names(
+                        session=session,
                         org_id=org_id,
-                        client_id=workload_client_id,
+                        workload_client_id=workload_client_id,
+                        workload_patch=workload_patch,
                     )
                     bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
                         client_id=workload_client_id,
