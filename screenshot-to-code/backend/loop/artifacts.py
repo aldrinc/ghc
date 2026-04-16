@@ -13,6 +13,8 @@ from loop.contracts import (
     RequirementsSpec,
     ValidationReport,
 )
+from loop.project_export import ProjectExportPaths, export_project_artifact
+from prompts.prompt_types import Stack
 
 
 def _utc_timestamp() -> str:
@@ -23,8 +25,12 @@ def _utc_timestamp() -> str:
 class ArtifactPaths:
     current_file_path: str
     current_metadata_path: str
+    current_project_dir: str
+    current_project_app_path: str
     best_file_path: str
     best_metadata_path: str
+    best_project_dir: str
+    best_project_app_path: str
     run_dir: str
 
 
@@ -47,8 +53,12 @@ class ValidatedLoopArtifactStore:
         return ArtifactPaths(
             current_file_path=str(self._current_dir / "index.html"),
             current_metadata_path=str(self._current_dir / "metadata.json"),
+            current_project_dir=str(self._current_dir / "project"),
+            current_project_app_path=str(self._current_dir / "project" / "src" / "App.tsx"),
             best_file_path=str(self._best_dir / "index.html"),
             best_metadata_path=str(self._best_dir / "metadata.json"),
+            best_project_dir=str(self._best_dir / "project"),
+            best_project_app_path=str(self._best_dir / "project" / "src" / "App.tsx"),
             run_dir=str(self._run_dir),
         )
 
@@ -85,11 +95,28 @@ class ValidatedLoopArtifactStore:
         payload = json.loads(reference_path.read_text(encoding="utf-8"))
         return ReferenceBundle.model_validate(payload)
 
-    def persist_iteration_code(self, *, html: str, iteration: int) -> None:
+    def persist_iteration_code(
+        self,
+        *,
+        html: str,
+        iteration: int,
+        stack: Stack,
+    ) -> ProjectExportPaths | None:
         current_file = Path(self.paths.current_file_path)
         current_file.write_text(html, encoding="utf-8")
         iteration_file = self._iterations_dir / f"iteration-{iteration:02d}.html"
         iteration_file.write_text(html, encoding="utf-8")
+        current_project = export_project_artifact(
+            stack=stack,
+            code=html,
+            project_dir=self._current_dir / "project",
+        )
+        export_project_artifact(
+            stack=stack,
+            code=html,
+            project_dir=self._iterations_dir / f"iteration-{iteration:02d}-project",
+        )
+        return current_project
 
     def persist_blueprint_validation_artifact(
         self,
@@ -110,12 +137,23 @@ class ValidatedLoopArtifactStore:
         iteration: int,
         requirements: RequirementsSpec,
         validation_report: ValidationReport,
+        stack: Stack,
         blueprint_validation: BlueprintValidationReport | None = None,
-    ) -> None:
+    ) -> ProjectExportPaths | None:
         best_file = Path(self.paths.best_file_path)
         best_file.write_text(html, encoding="utf-8")
         run_best_file = self._run_best_dir / "index.html"
         run_best_file.write_text(html, encoding="utf-8")
+        best_project = export_project_artifact(
+            stack=stack,
+            code=html,
+            project_dir=self._best_dir / "project",
+        )
+        run_best_project = export_project_artifact(
+            stack=stack,
+            code=html,
+            project_dir=self._run_best_dir / "project",
+        )
 
         if blueprint_validation is not None:
             self.persist_blueprint_validation_artifact(blueprint_validation)
@@ -125,6 +163,12 @@ class ValidatedLoopArtifactStore:
             "iteration": iteration,
             "bestIteration": iteration,
             "bestFilePath": self.paths.best_file_path,
+            "bestProjectDir": best_project.project_dir if best_project else None,
+            "bestProjectAppPath": best_project.app_file_path if best_project else None,
+            "runBestProjectDir": run_best_project.project_dir if run_best_project else None,
+            "runBestProjectAppPath": run_best_project.app_file_path
+            if run_best_project
+            else None,
             "runDir": self.paths.run_dir,
             "stopReason": None,
             "requirements": requirements.model_dump(mode="json"),
@@ -139,6 +183,7 @@ class ValidatedLoopArtifactStore:
         best_metadata.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         run_best_metadata = self._run_best_dir / "metadata.json"
         run_best_metadata.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return best_project
 
     def persist_metadata(
         self,
@@ -148,6 +193,8 @@ class ValidatedLoopArtifactStore:
         requirements: RequirementsSpec | None,
         validation_report: ValidationReport | None,
         blueprint_validation: BlueprintValidationReport | None = None,
+        blueprint_validation_history: list[dict[str, Any]] | None = None,
+        project_export: ProjectExportPaths | None = None,
     ) -> None:
         if blueprint_validation is not None:
             self.persist_blueprint_validation_artifact(blueprint_validation)
@@ -155,6 +202,10 @@ class ValidatedLoopArtifactStore:
         payload: dict[str, Any] = {
             "updatedAt": datetime.now(timezone.utc).isoformat(),
             "currentFilePath": self.paths.current_file_path,
+            "currentProjectDir": project_export.project_dir if project_export else None,
+            "currentProjectAppPath": project_export.app_file_path
+            if project_export
+            else None,
             "runDir": self.paths.run_dir,
             "iteration": iteration,
             "stopReason": stop_reason,
@@ -168,6 +219,7 @@ class ValidatedLoopArtifactStore:
                 if blueprint_validation is not None
                 else None
             ),
+            "blueprintValidationHistory": blueprint_validation_history or [],
             "validation": (
                 validation_report.model_dump(mode="json")
                 if validation_report is not None

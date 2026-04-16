@@ -83,6 +83,14 @@ class MetaAdsRepository:
         self.session.refresh(record)
         return record
 
+    def update_campaign(self, record: MetaCampaign, **fields) -> MetaCampaign:
+        for key, value in fields.items():
+            setattr(record, key, value)
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
     def get_campaign_by_meta_id(
         self, *, org_id: str, ad_account_id: str, meta_campaign_id: str
     ) -> Optional[MetaCampaign]:

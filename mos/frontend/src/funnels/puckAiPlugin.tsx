@@ -26,7 +26,6 @@ type FunnelAiFieldsProps = FunnelAiPluginOptions & {
 const usePuck = createUsePuck();
 
 const AI_ATTACHMENT_MAX = 8;
-const AI_HTML_REFERENCE_MAX_CHARS = 250_000;
 
 type AiAttachment = {
   id: string;
@@ -51,8 +50,6 @@ type StoredAiState = {
   prompt?: string;
   messages?: FunnelAIChatMessage[];
   generateImages?: boolean;
-  referenceHtml?: string;
-  referenceLabel?: string;
 };
 
 function readStoredAiState(key: string | null): StoredAiState | null {
@@ -171,12 +168,9 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
   const [aiStreamText, setAiStreamText] = useState<string | null>(null);
   const [aiRawStreamText, setAiRawStreamText] = useState<string | null>(null);
   const [aiGeneratedImages, setAiGeneratedImages] = useState<Array<Record<string, unknown>>>([]);
-  const [aiHtmlReference, setAiHtmlReference] = useState("");
-  const [aiHtmlReferenceLabel, setAiHtmlReferenceLabel] = useState<string | null>(null);
   const [aiAttachments, setAiAttachments] = useState<AiAttachment[]>([]);
   const aiBottomRef = useRef<HTMLDivElement | null>(null);
   const aiFileInputRef = useRef<HTMLInputElement | null>(null);
-  const aiHtmlFileInputRef = useRef<HTMLInputElement | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
   const aiAttachmentsRef = useRef<AiAttachment[]>([]);
   const rawStreamBufferRef = useRef("");
@@ -202,14 +196,10 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       setAiMessages(Array.isArray(stored.messages) ? stored.messages : []);
       setAiPrompt(typeof stored.prompt === "string" ? stored.prompt : "");
       setAiGenerateImages(typeof stored.generateImages === "boolean" ? stored.generateImages : true);
-      setAiHtmlReference(typeof stored.referenceHtml === "string" ? stored.referenceHtml : "");
-      setAiHtmlReferenceLabel(typeof stored.referenceLabel === "string" ? stored.referenceLabel : null);
     } else {
       setAiMessages([]);
       setAiPrompt("");
       setAiGenerateImages(true);
-      setAiHtmlReference("");
-      setAiHtmlReferenceLabel(null);
     }
     setAiStreamText(null);
     setAiRawStreamText(null);
@@ -230,10 +220,8 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       prompt: aiPrompt,
       messages: aiMessages,
       generateImages: aiGenerateImages,
-      referenceHtml: aiHtmlReference,
-      referenceLabel: aiHtmlReferenceLabel ?? undefined,
     });
-  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages, aiHtmlReference, aiHtmlReferenceLabel]);
+  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages]);
 
   useEffect(() => {
     return () => {
@@ -245,8 +233,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
   const handleClear = () => {
     setAiMessages([]);
     setAiPrompt("");
-    setAiHtmlReference("");
-    setAiHtmlReferenceLabel(null);
     setAiStreamText(null);
     setAiRawStreamText(null);
     setAiIsGenerating(false);
@@ -258,38 +244,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
 
   const aiAttachmentsUploading = aiAttachments.some((item) => item.status === "uploading");
   const aiReadyAttachments = aiAttachments.filter((item) => item.status === "ready" && item.assetId && item.publicId);
-  const aiTrimmedHtmlReference = aiHtmlReference.trim();
-
-  const handleHtmlReferenceSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (file.size > AI_HTML_REFERENCE_MAX_CHARS) {
-      toast.error(`HTML reference files must be ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} characters or smaller.`);
-      return;
-    }
-
-    const readHtml = async () => {
-      try {
-        const text = await file.text();
-        const trimmed = text.trim();
-        if (!trimmed) throw new Error("Selected HTML file is empty.");
-        if (trimmed.length > AI_HTML_REFERENCE_MAX_CHARS) {
-          throw new Error(
-            `HTML reference exceeds the ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} character limit.`
-          );
-        }
-        setAiHtmlReference(trimmed);
-        setAiHtmlReferenceLabel(file.name);
-        toast.success("HTML reference loaded");
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to read HTML reference file";
-        toast.error(message);
-      }
-    };
-
-    void readHtml();
-  };
 
   const handleAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -384,10 +338,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       toast.error("Wait for image uploads to finish.");
       return;
     }
-    if (aiTrimmedHtmlReference.length > AI_HTML_REFERENCE_MAX_CHARS) {
-      toast.error(`HTML reference exceeds the ${AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} character limit.`);
-      return;
-    }
 
     setAiPrompt("");
     setAiMessages((prev) => [...prev, { role: "user", content: prompt }]);
@@ -444,23 +394,21 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       const fallbackNonStream = async (headers: Headers) => {
         const resp = await fetch(`${apiBaseUrl}/funnels/${funnelId}/pages/${pageId}/ai/generate`, {
           method: "POST",
-              headers,
-              body: JSON.stringify({
-                prompt,
-                messages: aiMessages,
-                attachedAssets: aiReadyAttachments.map((item) => ({
+          headers,
+          body: JSON.stringify({
+            prompt,
+            messages: aiMessages,
+            attachedAssets: aiReadyAttachments.map((item) => ({
               assetId: item.assetId,
               publicId: item.publicId,
               filename: item.name,
               contentType: item.contentType,
               width: item.width ?? null,
               height: item.height ?? null,
-                })),
-                referenceHtml: aiTrimmedHtmlReference || undefined,
-                referenceLabel: aiTrimmedHtmlReference ? aiHtmlReferenceLabel ?? "pasted-html" : undefined,
-                currentPuckData: appState.data,
-                templateId,
-                ideaWorkspaceId,
+            })),
+            currentPuckData: appState.data,
+            templateId,
+            ideaWorkspaceId,
             generateImages: aiGenerateImages,
           }),
           signal: controller.signal,
@@ -496,8 +444,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
               width: item.width ?? null,
               height: item.height ?? null,
             })),
-            referenceHtml: aiTrimmedHtmlReference || undefined,
-            referenceLabel: aiTrimmedHtmlReference ? aiHtmlReferenceLabel ?? "pasted-html" : undefined,
             currentPuckData: appState.data,
             templateId,
             ideaWorkspaceId,
@@ -667,61 +613,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
                 "min-h-[140px] w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface placeholder:text-content-muted"
               )}
             />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-content">HTML reference (optional)</div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" type="button" onClick={() => aiHtmlFileInputRef.current?.click()}>
-                  Upload HTML
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  onClick={() => {
-                    setAiHtmlReference("");
-                    setAiHtmlReferenceLabel(null);
-                  }}
-                  disabled={!aiHtmlReference}
-                >
-                  Clear HTML
-                </Button>
-              </div>
-              <input
-                ref={aiHtmlFileInputRef}
-                type="file"
-                accept="text/html,.html,.htm,text/plain"
-                className="hidden"
-                onChange={handleHtmlReferenceSelect}
-              />
-            </div>
-            <div className="text-xs text-content-muted">
-              Paste or upload an existing sales page HTML file. The assistant will use it as structural reference for
-              section order, CTA rhythm, proof, and FAQ patterns instead of treating it as a literal import target.
-            </div>
-            <textarea
-              rows={8}
-              value={aiHtmlReference}
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setAiHtmlReference(nextValue);
-                setAiHtmlReferenceLabel(nextValue.trim() ? "pasted-html" : null);
-              }}
-              placeholder="Paste full HTML here, or upload a .html file."
-              className={cn(
-                "min-h-[180px] w-full resize-y rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface placeholder:text-content-muted"
-              )}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-content-muted">
-              <span>
-                Source: {aiHtmlReferenceLabel || "none"}
-              </span>
-              <span>
-                {aiHtmlReference.length.toLocaleString()} / {AI_HTML_REFERENCE_MAX_CHARS.toLocaleString()} characters
-              </span>
-            </div>
           </div>
 
           <div className="space-y-2">

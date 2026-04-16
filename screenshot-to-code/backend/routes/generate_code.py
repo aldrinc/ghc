@@ -1013,17 +1013,34 @@ class CodeGenerationMiddleware(Middleware):
 
                 await context.send_message("setCode", loop_result.code, 0, None, None)
                 if loop_result.stop_reason == "pass":
+                    completion_payload = {
+                        "artifactPath": loop_result.saved_code_path,
+                        "runDir": loop_result.saved_run_dir,
+                    }
+                    if loop_result.saved_project_dir:
+                        completion_payload["projectDir"] = loop_result.saved_project_dir
+                    if loop_result.saved_project_app_path:
+                        completion_payload["projectAppPath"] = loop_result.saved_project_app_path
                     await context.send_message(
                         "variantComplete",
                         "Validated loop generation complete",
                         0,
-                        {
-                            "artifactPath": loop_result.saved_code_path,
-                            "runDir": loop_result.saved_run_dir,
-                        },
+                        completion_payload,
                         None,
                     )
                 else:
+                    error_payload = {
+                        "stopReason": loop_result.stop_reason,
+                        "iterationsCompleted": len(loop_result.iterations),
+                        "maxIterations": context.extracted_params.max_validation_iterations,
+                        "canContinue": loop_result.stop_reason == "max_iterations",
+                        "artifactPath": loop_result.saved_code_path,
+                        "runDir": loop_result.saved_run_dir,
+                    }
+                    if loop_result.saved_project_dir:
+                        error_payload["projectDir"] = loop_result.saved_project_dir
+                    if loop_result.saved_project_app_path:
+                        error_payload["projectAppPath"] = loop_result.saved_project_app_path
                     await context.send_message(
                         "variantError",
                         (
@@ -1031,14 +1048,7 @@ class CodeGenerationMiddleware(Middleware):
                             f"({loop_result.stop_reason})."
                         ),
                         0,
-                        {
-                            "stopReason": loop_result.stop_reason,
-                            "iterationsCompleted": len(loop_result.iterations),
-                            "maxIterations": context.extracted_params.max_validation_iterations,
-                            "canContinue": loop_result.stop_reason == "max_iterations",
-                            "artifactPath": loop_result.saved_code_path,
-                            "runDir": loop_result.saved_run_dir,
-                        },
+                        error_payload,
                         None,
                     )
                 await next_func()

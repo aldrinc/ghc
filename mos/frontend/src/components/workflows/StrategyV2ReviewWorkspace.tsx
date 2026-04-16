@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Download, Loader2 } from "lucide-react";
+import { useDownloadWorkflowResearchZip } from "@/api/workflows";
 import { useApiClient, type ApiError } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -292,6 +293,7 @@ export function StrategyV2ReviewWorkspace({
 
   const [showAllArtifacts, setShowAllArtifacts] = useState(false);
   const [selectedCompletedGate, setSelectedCompletedGate] = useState<StrategyV2PendingSignal | null>(null);
+  const downloadWorkflowResearchZip = useDownloadWorkflowResearchZip(workflowId);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [fileStateById, setFileStateById] = useState<Record<string, FileRuntimeState>>({});
   const [artifactDataCache, setArtifactDataCache] = useState<Record<string, Record<string, unknown>>>({});
@@ -968,6 +970,28 @@ export function StrategyV2ReviewWorkspace({
   const activeRuntime = resolvedActiveFile ? getFileRuntime(resolvedActiveFile.id) : undefined;
   const availableFoundationalFiles = foundationalReviewFiles.filter((file) => !file.missingReason);
   const missingFoundationalFiles = foundationalReviewFiles.filter((file) => Boolean(file.missingReason));
+  const canDownloadFoundationalZip = Boolean(workflowId) && missingFoundationalFiles.length === 0 && availableFoundationalFiles.length === FOUNDATIONAL_DOC_SPECS.length;
+
+  const renderFoundationalZipButton = () => (
+    <Button
+      variant="secondary"
+      size="xs"
+      onClick={() => void downloadWorkflowResearchZip.mutateAsync("foundational")}
+      disabled={!canDownloadFoundationalZip || downloadWorkflowResearchZip.isPending}
+      title={
+        canDownloadFoundationalZip
+          ? "Download the four foundational strategy docs as a ZIP."
+          : "Available after all four foundational docs finish persisting."
+      }
+    >
+      {downloadWorkflowResearchZip.isPending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
+      {downloadWorkflowResearchZip.isPending ? "Preparing ZIP..." : "Download foundational ZIP"}
+    </Button>
+  );
 
   const pendingGateIndex = pendingSignal ? GATE_SEQUENCE.indexOf(pendingSignal) : -1;
   const completedGateCount =
@@ -1218,12 +1242,15 @@ export function StrategyV2ReviewWorkspace({
             </div>
           ) : !pendingSignal ? (
             <div className="ds-card ds-card--md space-y-3">
-              <div>
-                <div className="text-sm font-semibold text-content">Foundational docs</div>
-                <div className="text-xs text-content-muted">
-                  Stage 1 full files expected by source of truth: competitor research, meta-prompt, deep research, and
-                  avatar brief.
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Foundational docs</div>
+                  <div className="text-xs text-content-muted">
+                    Stage 1 full files expected by source of truth: competitor research, meta-prompt, deep research, and
+                    avatar brief.
+                  </div>
                 </div>
+                {renderFoundationalZipButton()}
               </div>
 
               <div className="grid gap-2 md:grid-cols-2">
@@ -1312,6 +1339,7 @@ export function StrategyV2ReviewWorkspace({
                       {requiredFiles.filter((f) => getFileRuntime(f.id).reviewed).length} of {requiredFiles.length} reviewed
                     </div>
                   </div>
+                  {pendingSignal === "strategy_v2_proceed_research" ? renderFoundationalZipButton() : null}
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">

@@ -53,6 +53,7 @@ from app.services.meta_review import (
 )
 from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_workspace_config
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_BID_AMOUNT_MINOR_UNITS,
     DEFAULT_META_PUBLISH_BILLING_EVENT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
@@ -1620,6 +1621,7 @@ def setup_campaign_meta_review(
                 optimization_goal=DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
                 billing_event=DEFAULT_META_PUBLISH_BILLING_EVENT,
                 targeting=default_meta_publish_targeting(),
+                bid_amount=DEFAULT_META_PUBLISH_ADSET_BID_AMOUNT_MINOR_UNITS,
                 metadata_json={
                     **experiment_config["metadata_json"],
                     "templateId": "default-broad-int-cbo",

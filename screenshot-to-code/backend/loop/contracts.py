@@ -22,6 +22,8 @@ class InteractionCheckpoint(BaseModel):
     name: str
     trigger: str
     expected_result: str
+    action_type: Literal["dismiss_overlay", "scroll", "wait"] | None = None
+    target_description: str = ""
 
 
 class DesignTokenSet(BaseModel):
@@ -43,6 +45,61 @@ class LiveReferenceRender(BaseModel):
     viewport: ViewportSpec = Field(default_factory=ViewportSpec)
 
 
+class LiveReferenceDomEvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: str = ""
+    kind: Literal[
+        "section",
+        "chrome",
+        "footer_band",
+        "form",
+        "repeated_group",
+        "state_variant",
+    ] = "section"
+    label: str = ""
+    selector: str = ""
+    parent_selector: str = ""
+    tag: str = ""
+    role: str = ""
+    heading_text: str = ""
+    text_sample: str = ""
+    top_offset_px: int | None = None
+    height_px: int | None = None
+    position: str = ""
+    background: str = ""
+    border_radius: str = ""
+    max_width: str = ""
+    asset_urls: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    html_excerpt: str = ""
+
+
+class LiveReferenceDomRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    child_evidence_id: str = ""
+    child_selector: str = ""
+    parent_evidence_id: str = ""
+    parent_selector: str = ""
+    relationship: str = ""
+    notes: list[str] = Field(default_factory=list)
+
+
+class LiveReferenceDomEvidenceCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    section_candidates: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    chrome_candidates: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    footer_bands: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    form_candidates: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    repeated_groups: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    state_variants: list[LiveReferenceDomEvidenceItem] = Field(default_factory=list)
+    wrapper_relationships: list[LiveReferenceDomRelationship] = Field(
+        default_factory=list
+    )
+
+
 class LiveReferenceDesignSystem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -54,6 +111,15 @@ class LiveReferenceDesignSystem(BaseModel):
     shadows: list[str] = Field(default_factory=list)
     layout: list[str] = Field(default_factory=list)
     components: list[str] = Field(default_factory=list)
+    asset_inventory: list[str] = Field(default_factory=list)
+    dom_landmarks: list[str] = Field(default_factory=list)
+    section_inventory: list[str] = Field(default_factory=list)
+    chrome_layers: list[str] = Field(default_factory=list)
+    heading_hierarchy: list[str] = Field(default_factory=list)
+    shell_relationships: list[str] = Field(default_factory=list)
+    dom_evidence: LiveReferenceDomEvidenceCatalog = Field(
+        default_factory=LiveReferenceDomEvidenceCatalog
+    )
     raw_observations: list[str] = Field(default_factory=list)
 
 
@@ -61,6 +127,7 @@ class LiveReferenceContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     url: str
+    full_dom_html: str = ""
     design_system: LiveReferenceDesignSystem = Field(
         default_factory=LiveReferenceDesignSystem
     )
@@ -105,6 +172,7 @@ class SectionRequirement(BaseModel):
     section_id: str = ""
     purpose: str = ""
     layout: str = ""
+    layout_invariants: list[str] = Field(default_factory=list)
     must_include: list[str] = Field(default_factory=list)
     styling: list[str] = Field(default_factory=list)
     copy_items: list[str] = Field(default_factory=list)
@@ -118,6 +186,105 @@ class SectionRequirement(BaseModel):
         return self
 
 
+class WrapperRequirement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    wrapper_id: str = ""
+    kind: Literal[
+        "shared_wrapper",
+        "shared_shell",
+        "split_container",
+        "nested_shell",
+        "surface_group",
+        "state_container",
+    ] = "shared_wrapper"
+    participant_section_ids: list[str] = Field(default_factory=list)
+    purpose: str = ""
+    layout_invariants: list[str] = Field(default_factory=list)
+    must_include: list[str] = Field(default_factory=list)
+    styling: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def derive_wrapper_id(self) -> "WrapperRequirement":
+        self.wrapper_id = _normalize_section_id(self.wrapper_id or self.name)
+        self.participant_section_ids = [
+            normalized
+            for section_id in self.participant_section_ids
+            if (normalized := _normalize_section_id(section_id))
+        ]
+        return self
+
+
+class BlueprintOutlineEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    section_id: str = ""
+    kind: Literal[
+        "section",
+        "chrome",
+        "modal",
+        "footer_band",
+        "state_variant",
+    ] = "section"
+    source_evidence_ids: list[str] = Field(default_factory=list)
+    parent_wrapper_id: str = ""
+    notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def derive_section_id(self) -> "BlueprintOutlineEntry":
+        self.section_id = _normalize_section_id(self.section_id or self.name)
+        self.parent_wrapper_id = _normalize_section_id(self.parent_wrapper_id)
+        self.source_evidence_ids = [
+            value.strip() for value in self.source_evidence_ids if value.strip()
+        ]
+        return self
+
+
+class BlueprintWrapperOutline(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    wrapper_id: str = ""
+    kind: Literal[
+        "shared_wrapper",
+        "shared_shell",
+        "split_container",
+        "nested_shell",
+        "surface_group",
+        "state_container",
+    ] = "shared_wrapper"
+    participant_section_ids: list[str] = Field(default_factory=list)
+    source_relationships: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def derive_wrapper_id(self) -> "BlueprintWrapperOutline":
+        self.wrapper_id = _normalize_section_id(self.wrapper_id or self.name)
+        self.participant_section_ids = [
+            normalized
+            for section_id in self.participant_section_ids
+            if (normalized := _normalize_section_id(section_id))
+        ]
+        self.source_relationships = [
+            value.strip() for value in self.source_relationships if value.strip()
+        ]
+        return self
+
+
+class BlueprintOutlineSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page_outline: list[BlueprintOutlineEntry] = Field(default_factory=list)
+    closing_sections: list[str] = Field(default_factory=list)
+    footer_present: bool | None = None
+    footer_description: str = ""
+    coverage_notes: list[str] = Field(default_factory=list)
+    wrapper_outline: list[BlueprintWrapperOutline] = Field(default_factory=list)
+    state_notes: list[str] = Field(default_factory=list)
+
+
 class RequirementsSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -129,10 +296,12 @@ class RequirementsSpec(BaseModel):
     footer_present: bool | None = None
     footer_description: str = ""
     coverage_notes: list[str] = Field(default_factory=list)
+    critical_layout_invariants: list[str] = Field(default_factory=list)
     hard_constraints: list[str] = Field(default_factory=list)
     preserve_requirements: list[str] = Field(default_factory=list)
     design_tokens: DesignTokenSet = Field(default_factory=DesignTokenSet)
     section_requirements: list[SectionRequirement] = Field(default_factory=list)
+    wrapper_requirements: list[WrapperRequirement] = Field(default_factory=list)
     layout_requirements: list[str] = Field(default_factory=list)
     styling_requirements: list[str] = Field(default_factory=list)
     copy_requirements: list[str] = Field(default_factory=list)
@@ -266,6 +435,7 @@ class RenderArtifact(BaseModel):
     settled_viewport_screenshot_data_url: str | None = None
     settled_full_page_screenshot_data_url: str | None = None
     timeline_frames: list["RenderTimelineFrame"] = Field(default_factory=list)
+    automation_events: list[str] = Field(default_factory=list)
     viewport: ViewportSpec = Field(default_factory=ViewportSpec)
 
 
@@ -516,6 +686,8 @@ class LoopRunResult(BaseModel):
     stop_reason: Literal["pass", "max_iterations", "blocked"]
     saved_code_path: str | None = None
     saved_run_dir: str | None = None
+    saved_project_dir: str | None = None
+    saved_project_app_path: str | None = None
     analyzer_model: Llm | None = None
     executor_model: Llm | None = None
     validator_model: Llm | None = None

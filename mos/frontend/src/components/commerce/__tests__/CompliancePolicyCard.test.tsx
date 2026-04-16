@@ -58,7 +58,7 @@ describe("CompliancePolicyCard", () => {
     expect(screen.getByText("Business models")).toBeInTheDocument();
     expect(screen.getByText("Legal business name")).toBeInTheDocument();
     expect(screen.getByText("Support email")).toBeInTheDocument();
-    expect(screen.getByText("Support phone")).toBeInTheDocument();
+    expect(screen.getByText(/Support phone/)).toBeInTheDocument();
     expect(screen.getByText("Support hours")).toBeInTheDocument();
   });
 

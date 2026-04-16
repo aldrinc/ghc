@@ -19,6 +19,12 @@ If a live page summary is provided, use it to strengthen precision, but do not i
 Return a concise, implementation-ready design system that a frontend coding agent can execute directly.
 Be explicit about motion-bearing components and section-level typography whenever they are visible.
 Also capture section sizing consistency whenever it is visible, especially repeated section heights, vertical padding cadence, container widths, media aspect ratios, and any hero or card min-heights that define the rhythm of the page.
+Every structured field in the response schema is a JSON array of strings, not an object. Do not return keyed maps such as `{ "hero_h1": "..." }` for typography, section sizing, components, motion components, brand, or source notes.
+Capture distinct chrome layers and state variants when they are visible, such as announcement bars, promo bands, sticky header states, modal overlays, dropdown shells, mega-menus, newsletter/legal bands, or closing accessibility regions. Record those in layout, components, or source notes instead of flattening them into a generic header/footer description.
+If a shared shell, canvas, card, or wrapper spans multiple neighboring sections, call out that relationship explicitly in layout or source notes so later blueprinting can preserve it.
+If the live reference summary includes DOM landmarks, section inventory, chrome layers, heading hierarchy, or shell relationships, treat those as structural evidence rather than optional notes.
+If the live reference summary includes concrete image URLs, SVG references, or CSS background-image assets in `asset_inventory`, preserve those sources in components or source notes so later blueprinting can require the same site assets instead of placeholders.
+When the DOM or computed styles expose component geometry, capture it explicitly. This includes horizontal-vs-vertical card orientation, left/right media-to-text splits, full-height media panels, full-bleed image coverage, repeated row/card patterns, and gradient or image-backed shells.
 
 For typography, do not stop at a global type scale. Capture section-specific roles and visible values such as:
 - header/nav links
@@ -50,7 +56,7 @@ Do not include speculation or fake assets.
 class DesignSystemPreflightBuilder:
     def __init__(self, gemini_api_key: str):
         self._gemini_api_key = gemini_api_key
-        self._model_name = "gemini-3.1-pro-preview"
+        self._model_name = "gemini-3-flash-preview"
 
     async def build(self, reference_bundle: ReferenceBundle) -> DesignSystemPreflight:
         live_reference_block = ""
@@ -66,10 +72,15 @@ class DesignSystemPreflightBuilder:
                         "Generate the required design-system preflight artifact for this screenshot-to-code task.",
                         "Prioritize styles and components that are actually visible in the supplied media.",
                         "Output implementation-ready sections for philosophy, typography, section-level typography, colors, spacing, radii, layout, section sizing, components, motion, motion-bearing components, and brand.",
+                        "Return each schema field as a JSON array of strings where the schema expects a list; never emit keyed objects for section typography, section sizing, components, motion components, brand, or source notes.",
                         "If browser inspection context exists, use it to improve precision, especially for exact font names and colors.",
+                        "If browser inspection exposes concrete image, SVG, or background asset URLs, preserve those references in components or source notes so the executor can reuse the same site media later.",
                         "Call out moving UI components explicitly, such as marquees, scrolling banners, carousels, sliding review strips, or animated badges.",
                         "For typography, map visible text roles to section-specific font details instead of only giving a global scale.",
                         "For layout consistency, map visible section sizing patterns instead of leaving section heights and paddings vague.",
+                        "If browser inspection exposes section inventory, chrome layers, heading hierarchy, or shell relationships, promote those facts into layout, section sizing, components, or source notes.",
+                        "If browser inspection exposes component geometry such as horizontal-vs-vertical rows, media-to-text splits, full-height media panels, repeated card patterns, or gradient shells, capture those facts explicitly in layout or components.",
+                        "Call out structurally distinct chrome layers, shared shells, and closing regions explicitly in layout/components/source notes instead of flattening them into generic header/footer notes.",
                         (
                             "<live_reference_summary>\n"
                             + live_reference_block
@@ -140,6 +151,15 @@ def _live_reference_payload(live_reference: LiveReferenceContext) -> dict[str, o
         "radii": live_reference.design_system.radii,
         "layout": live_reference.design_system.layout,
         "components": live_reference.design_system.components,
+        "asset_inventory": live_reference.design_system.asset_inventory,
+        "dom_landmarks": live_reference.design_system.dom_landmarks,
+        "section_inventory": live_reference.design_system.section_inventory,
+        "chrome_layers": live_reference.design_system.chrome_layers,
+        "heading_hierarchy": live_reference.design_system.heading_hierarchy,
+        "shell_relationships": live_reference.design_system.shell_relationships,
+        "dom_evidence": live_reference.design_system.dom_evidence.model_dump(
+            mode="json"
+        ),
         "raw_observations": live_reference.design_system.raw_observations,
         "render_labels": [render.label for render in live_reference.renders],
     }

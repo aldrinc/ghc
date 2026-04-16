@@ -11,12 +11,17 @@ from html.parser import HTMLParser
 import re
 from typing import cast
 
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+
 from loop.contracts import (
     BlueprintValidationIssue,
     BlueprintValidationReport,
     DesignSystemPreflight,
     DesignTokenSet,
     InteractionCheckpoint,
+    LiveReferenceDomEvidenceCatalog,
+    LiveReferenceDomEvidenceItem,
+    LiveReferenceDomRelationship,
     LiveReferenceContext,
     ReferenceBundle,
     RequirementsSpec,
@@ -24,6 +29,7 @@ from loop.contracts import (
     SectionValidationResult,
     ValidationIssue,
     ValidationReport,
+    WrapperRequirement,
 )
 
 MAX_REQUIREMENTS_TEXT_CHARS = 500
@@ -34,6 +40,8 @@ MAX_SECTION_LIST_ITEMS = 6
 MAX_ISSUE_COUNT = 8
 MAX_PATCH_INSTRUCTION_COUNT = 10
 MAX_CURRENT_HTML_CHARS = 20_000
+MAX_LIVE_REFERENCE_JSON_CHARS = 60_000
+MAX_OUTLINE_JSON_CHARS = 40_000
 
 
 class _HtmlLandmarkParser(HTMLParser):
@@ -163,12 +171,20 @@ def reference_summary(reference_bundle: ReferenceBundle) -> str:
 
 
 def summarize_live_reference_for_prompt(live_reference: LiveReferenceContext) -> str:
+    full_dom_landmarks = live_reference.design_system.dom_landmarks
+    full_section_inventory = live_reference.design_system.section_inventory
+    full_chrome_layers = live_reference.design_system.chrome_layers
+    full_heading_hierarchy = live_reference.design_system.heading_hierarchy
+    full_shell_relationships = live_reference.design_system.shell_relationships
+    full_asset_inventory = live_reference.design_system.asset_inventory
+
     payload: dict[str, object] = {
         "url": live_reference.url,
         "page_title": _truncate_text(
             live_reference.design_system.page_title,
             160,
         ),
+        "full_dom_html_chars": len(live_reference.full_dom_html.strip()),
         "render_labels": [
             _truncate_text(render.label, 80) for render in live_reference.renders[:6]
         ],
@@ -200,22 +216,284 @@ def summarize_live_reference_for_prompt(live_reference: LiveReferenceContext) ->
             ),
             "layout": _truncate_list(
                 live_reference.design_system.layout,
-                max_items=10,
-                max_chars=220,
+                max_items=12,
+                max_chars=320,
             ),
             "components": _truncate_list(
                 live_reference.design_system.components,
-                max_items=10,
-                max_chars=220,
+                max_items=12,
+                max_chars=320,
+            ),
+            "asset_inventory": _truncate_list(
+                full_asset_inventory,
+                max_items=max(12, len(full_asset_inventory)),
+                max_chars=340,
+            ),
+            "dom_landmarks": _truncate_list(
+                full_dom_landmarks,
+                max_items=max(12, len(full_dom_landmarks)),
+                max_chars=320,
+            ),
+            "section_inventory": _truncate_list(
+                full_section_inventory,
+                max_items=max(12, len(full_section_inventory)),
+                max_chars=340,
+            ),
+            "chrome_layers": _truncate_list(
+                full_chrome_layers,
+                max_items=max(12, len(full_chrome_layers)),
+                max_chars=320,
+            ),
+            "heading_hierarchy": _truncate_list(
+                full_heading_hierarchy,
+                max_items=max(14, len(full_heading_hierarchy)),
+                max_chars=320,
+            ),
+            "shell_relationships": _truncate_list(
+                full_shell_relationships,
+                max_items=max(12, len(full_shell_relationships)),
+                max_chars=320,
+            ),
+            "dom_evidence": _summarize_dom_evidence_for_prompt(
+                live_reference.design_system.dom_evidence
             ),
             "raw_observations": _truncate_list(
                 live_reference.design_system.raw_observations,
-                max_items=10,
-                max_chars=220,
+                max_items=12,
+                max_chars=260,
             ),
         },
     }
-    return truncate_json_context(json.dumps(payload, indent=2), max_chars=8_000)
+    return truncate_json_context(
+        json.dumps(payload, indent=2), max_chars=MAX_LIVE_REFERENCE_JSON_CHARS
+    )
+
+
+def full_live_dom_for_prompt(full_dom_html: str) -> str:
+    normalized = full_dom_html.strip()
+    if not normalized:
+        return "(no full live DOM snapshot available)"
+    return _normalize_full_dom_for_prompt(normalized)
+
+
+def _normalize_full_dom_for_prompt(full_dom_html: str) -> str:
+    soup = BeautifulSoup(full_dom_html, "html.parser")
+    lines: list[str] = []
+
+    removed_counts = {
+        "script": 0,
+        "style": 0,
+        "noscript": 0,
+        "template": 0,
+    }
+    for tag_name in removed_counts:
+        for node in soup.find_all(tag_name):
+            removed_counts[tag_name] += 1
+            node.decompose()
+
+    for comment in soup.find_all(string=lambda value: isinstance(value, Comment)):
+        comment.extract()
+
+    node_count = len(soup.find_all(True))
+    removed_summary = ", ".join(
+        f"{name}={count}" for name, count in removed_counts.items() if count
+    )
+    lines.append(
+        "Normalized full DOM snapshot "
+        f"(element_count={node_count}"
+        + (f", removed={removed_summary}" if removed_summary else "")
+        + ")"
+    )
+
+    root_nodes = [child for child in soup.contents if _should_emit_dom_node(child)]
+    for child in root_nodes:
+        _append_dom_node(child, lines, depth=0)
+
+    return "\n".join(lines)
+
+
+def _should_emit_dom_node(node: object) -> bool:
+    if isinstance(node, Tag):
+        return True
+    if isinstance(node, NavigableString):
+        return bool(_normalize_dom_text(str(node)))
+    return False
+
+
+def _append_dom_node(node: object, lines: list[str], *, depth: int) -> None:
+    indent = "  " * depth
+    if isinstance(node, NavigableString):
+        text = _normalize_dom_text(str(node))
+        if text:
+            lines.append(f'{indent}#text "{_truncate_text(text, 180)}"')
+        return
+
+    if not isinstance(node, Tag):
+        return
+
+    attrs = _format_dom_attrs(node)
+    direct_text = _normalize_dom_direct_text(node)
+    opening = f"<{node.name}"
+    if attrs:
+        opening += f" {attrs}"
+    if direct_text:
+        opening += f' text="{_truncate_text(direct_text, 180)}"'
+    opening += ">"
+    lines.append(f"{indent}{opening}")
+
+    for child in node.children:
+        if _should_emit_dom_node(child):
+            _append_dom_node(child, lines, depth=depth + 1)
+
+
+def _format_dom_attrs(node: Tag) -> str:
+    preferred_order = [
+        "id",
+        "class",
+        "role",
+        "href",
+        "src",
+        "alt",
+        "aria-label",
+        "aria-labelledby",
+        "type",
+        "name",
+        "placeholder",
+        "title",
+        "value",
+        "data-section-id",
+        "data-wrapper-id",
+    ]
+    attrs: list[str] = []
+    seen: set[str] = set()
+
+    def append_attr(name: str, raw_value: object) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        value = _normalize_dom_attr_value(name, raw_value)
+        if value:
+            attrs.append(f'{name}="{value}"')
+
+    for name in preferred_order:
+        if name in node.attrs:
+            append_attr(name, node.attrs.get(name))
+
+    data_attr_names = sorted(
+        name
+        for name in node.attrs.keys()
+        if isinstance(name, str)
+        and name.startswith("data-")
+        and name not in seen
+    )
+    for name in data_attr_names[:6]:
+        append_attr(name, node.attrs.get(name))
+
+    return " ".join(attrs)
+
+
+def _normalize_dom_attr_value(name: str, raw_value: object) -> str:
+    if raw_value is None:
+        return ""
+    if isinstance(raw_value, list):
+        value = " ".join(str(part) for part in raw_value if str(part).strip())
+    else:
+        value = str(raw_value)
+    value = " ".join(value.split())
+    if not value:
+        return ""
+
+    if name == "class":
+        classes = value.split()
+        return _truncate_text(" ".join(classes[:8]), 120)
+
+    if value.startswith("data:"):
+        return "[data-url]"
+    if len(value) > 180:
+        return _truncate_text(value, 180)
+    return value
+
+
+def _normalize_dom_direct_text(node: Tag) -> str:
+    texts: list[str] = []
+    for child in node.children:
+        if isinstance(child, NavigableString):
+            normalized = _normalize_dom_text(str(child))
+            if normalized:
+                texts.append(normalized)
+    return " ".join(texts[:3])
+
+
+def _normalize_dom_text(value: str) -> str:
+    normalized = " ".join(value.split())
+    return normalized
+
+
+def _summarize_dom_evidence_for_prompt(
+    dom_evidence: LiveReferenceDomEvidenceCatalog,
+) -> dict[str, object]:
+    return {
+        "section_candidates": [
+            _compact_dom_evidence_item(item)
+            for item in dom_evidence.section_candidates
+        ],
+        "chrome_candidates": [
+            _compact_dom_evidence_item(item)
+            for item in dom_evidence.chrome_candidates
+        ],
+        "footer_bands": [
+            _compact_dom_evidence_item(item) for item in dom_evidence.footer_bands
+        ],
+        "form_candidates": [
+            _compact_dom_evidence_item(item) for item in dom_evidence.form_candidates
+        ],
+        "repeated_groups": [
+            _compact_dom_evidence_item(item) for item in dom_evidence.repeated_groups
+        ],
+        "state_variants": [
+            _compact_dom_evidence_item(item) for item in dom_evidence.state_variants
+        ],
+        "wrapper_relationships": [
+            _compact_dom_evidence_relationship(item)
+            for item in dom_evidence.wrapper_relationships
+        ],
+    }
+
+
+def _compact_dom_evidence_item(item: LiveReferenceDomEvidenceItem) -> dict[str, object]:
+    return {
+        "evidence_id": _truncate_text(item.evidence_id, 80),
+        "kind": item.kind,
+        "label": _truncate_text(item.label, 180),
+        "selector": _truncate_text(item.selector, 220),
+        "parent_selector": _truncate_text(item.parent_selector, 220),
+        "tag": item.tag,
+        "role": _truncate_text(item.role, 80),
+        "heading_text": _truncate_text(item.heading_text, 180),
+        "text_sample": _truncate_text(item.text_sample, 220),
+        "top_offset_px": item.top_offset_px,
+        "height_px": item.height_px,
+        "position": _truncate_text(item.position, 40),
+        "background": _truncate_text(item.background, 200),
+        "border_radius": _truncate_text(item.border_radius, 80),
+        "max_width": _truncate_text(item.max_width, 80),
+        "asset_urls": _truncate_list(item.asset_urls, max_items=6, max_chars=220),
+        "notes": _truncate_list(item.notes, max_items=6, max_chars=240),
+        "html_excerpt": _truncate_text(item.html_excerpt, 1000),
+    }
+
+
+def _compact_dom_evidence_relationship(
+    item: LiveReferenceDomRelationship,
+) -> dict[str, object]:
+    return {
+        "child_evidence_id": _truncate_text(item.child_evidence_id, 80),
+        "child_selector": _truncate_text(item.child_selector, 220),
+        "parent_evidence_id": _truncate_text(item.parent_evidence_id, 80),
+        "parent_selector": _truncate_text(item.parent_selector, 220),
+        "relationship": _truncate_text(item.relationship, 320),
+        "notes": _truncate_list(item.notes, max_items=4, max_chars=220),
+    }
 
 
 def build_live_design_system_rules(
@@ -249,10 +527,29 @@ def build_live_design_system_rules(
         lines.append(
             "- If fallbacks are needed, append them after the exact extracted names; do not replace the extracted names."
         )
+        lines.append(
+            "- If those fonts are not standard web-safe families, include a working font-loading mechanism such as `@font-face`, imported hosted font CSS, or explicit font asset URLs. Naming the family without loading it is insufficient."
+        )
     if token_names:
         lines.append(
             "- Centralized theme tokens that must be declared in code: "
             + ", ".join(token_names[:12])
+        )
+    if (
+        reference_bundle.live_reference is not None
+        and reference_bundle.live_reference.design_system.asset_inventory
+    ):
+        lines.append(
+            "- Reuse the extracted live-site image, SVG, and background asset URLs directly for the matching sections instead of substituting placeholder blocks, generated imagery, or unrelated stock assets."
+        )
+        lines.append(
+            "- Representative extracted asset references to preserve: "
+            + "; ".join(
+                _truncate_text(value, 160)
+                for value in reference_bundle.live_reference.design_system.asset_inventory[
+                    :4
+                ]
+            )
         )
     if usage_tokens:
         lines.append(
@@ -261,6 +558,9 @@ def build_live_design_system_rules(
         )
     lines.append(
         "- Do not substitute different font families, bypass the theme variables with unrelated hardcoded styling, or omit the extracted tokens from the implementation."
+    )
+    lines.append(
+        "- Treat measured typography and section sizing from the live design system as implementation targets, especially for hero headlines, header/nav text, CTA labels, promo bars, and footer/newsletter content."
     )
     return "\n".join(lines)
 
@@ -351,6 +651,85 @@ def summarize_html_landmarks(value: str, *, max_items: int = 18) -> str:
     return "\n".join(f"- {landmark}" for landmark in parser.landmarks[:max_items])
 
 
+def summarize_executor_file_evidence(value: str) -> str:
+    if not value.strip():
+        return "(no current file evidence available)"
+
+    section_marker_patterns = [
+        r'data-section-id\s*=\s*"([^"]+)"',
+        r"data-section-id\s*=\s*'([^']+)'",
+        r'data-section-id\s*=\s*\{\s*"([^"]+)"\s*\}',
+        r"data-section-id\s*=\s*\{\s*'([^']+)'\s*\}",
+    ]
+    section_markers: list[str] = []
+    seen_markers: set[str] = set()
+    for pattern in section_marker_patterns:
+        for match in re.findall(pattern, value):
+            normalized = match.strip()
+            if not normalized or normalized in seen_markers:
+                continue
+            seen_markers.add(normalized)
+            section_markers.append(normalized)
+
+    wrapper_marker_patterns = [
+        r'data-wrapper-id\s*=\s*"([^"]+)"',
+        r"data-wrapper-id\s*=\s*'([^']+)'",
+        r'data-wrapper-id\s*=\s*\{\s*"([^"]+)"\s*\}',
+        r"data-wrapper-id\s*=\s*\{\s*'([^']+)'\s*\}",
+    ]
+    wrapper_markers: list[str] = []
+    seen_wrappers: set[str] = set()
+    for pattern in wrapper_marker_patterns:
+        for match in re.findall(pattern, value):
+            normalized = match.strip()
+            if not normalized or normalized in seen_wrappers:
+                continue
+            seen_wrappers.add(normalized)
+            wrapper_markers.append(normalized)
+
+    component_patterns = [
+        r"\bfunction\s+([A-Z][A-Za-z0-9_]*)\s*\(",
+        r"\bconst\s+([A-Z][A-Za-z0-9_]*)\s*=\s*(?:async\s*)?\(",
+        r"\bconst\s+([A-Z][A-Za-z0-9_]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>",
+    ]
+    component_names: list[str] = []
+    seen_components: set[str] = set()
+    for pattern in component_patterns:
+        for match in re.findall(pattern, value):
+            normalized = match.strip()
+            if not normalized or normalized in seen_components:
+                continue
+            seen_components.add(normalized)
+            component_names.append(normalized)
+
+    evidence_lines: list[str] = []
+    if section_markers:
+        evidence_lines.append(
+            "Verified section markers present in the current file: "
+            + ", ".join(section_markers[:24])
+        )
+    if wrapper_markers:
+        evidence_lines.append(
+            "Verified wrapper markers present in the current file: "
+            + ", ".join(wrapper_markers[:20])
+        )
+    if component_names:
+        evidence_lines.append(
+            "Verified component/function boundaries present in the current file: "
+            + ", ".join(component_names[:20])
+        )
+
+    landmarks = summarize_html_landmarks(value, max_items=12)
+    if not landmarks.startswith("(no "):
+        evidence_lines.append("Current file landmarks:")
+        evidence_lines.append(landmarks)
+
+    if not evidence_lines:
+        return "(no stable current file evidence extracted)"
+
+    return "\n".join(evidence_lines)
+
+
 def _truncate_list(items: list[str], *, max_items: int, max_chars: int) -> list[str]:
     return [
         _truncate_text(item, max_chars)
@@ -401,6 +780,20 @@ def _extract_live_reference_font_names(live_reference: LiveReferenceContext) -> 
             seen.add(normalized)
             font_names.append(normalized)
     return font_names
+
+
+def _extract_live_reference_asset_urls(
+    live_reference: LiveReferenceContext,
+) -> list[str]:
+    seen: set[str] = set()
+    urls: list[str] = []
+    for entry in live_reference.design_system.asset_inventory:
+        for match in re.findall(r"https?://[^\s;]+", entry):
+            if match in seen:
+                continue
+            seen.add(match)
+            urls.append(match)
+    return urls
 
 
 def _extract_design_system_font_names(
@@ -461,8 +854,14 @@ def _compact_design_tokens(design_tokens: DesignTokenSet) -> DesignTokenSet:
 def _compact_section(section: SectionRequirement) -> SectionRequirement:
     return SectionRequirement(
         name=_truncate_text(section.name, 120),
+        section_id=section.section_id,
         purpose=_truncate_text(section.purpose, 200),
         layout=_truncate_text(section.layout, 260),
+        layout_invariants=_truncate_list(
+            section.layout_invariants,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=220,
+        ),
         must_include=_truncate_list(
             section.must_include,
             max_items=MAX_SECTION_LIST_ITEMS,
@@ -503,6 +902,37 @@ def _compact_interaction_checkpoint(
         name=_truncate_text(checkpoint.name, 120),
         trigger=_truncate_text(checkpoint.trigger, 200),
         expected_result=_truncate_text(checkpoint.expected_result, 260),
+        action_type=checkpoint.action_type,
+        target_description=_truncate_text(checkpoint.target_description, 180),
+    )
+
+
+def _compact_wrapper_requirement(wrapper: WrapperRequirement) -> WrapperRequirement:
+    return WrapperRequirement(
+        name=_truncate_text(wrapper.name, 120),
+        wrapper_id=wrapper.wrapper_id,
+        kind=wrapper.kind,
+        participant_section_ids=_truncate_list(
+            wrapper.participant_section_ids,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=80,
+        ),
+        purpose=_truncate_text(wrapper.purpose, 220),
+        layout_invariants=_truncate_list(
+            wrapper.layout_invariants,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=220,
+        ),
+        must_include=_truncate_list(
+            wrapper.must_include,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=180,
+        ),
+        styling=_truncate_list(
+            wrapper.styling,
+            max_items=MAX_SECTION_LIST_ITEMS,
+            max_chars=180,
+        ),
     )
 
 
@@ -515,7 +945,7 @@ def compact_requirements_for_prompt(requirements: RequirementsSpec) -> Requireme
         viewport=requirements.viewport,
         page_outline=_truncate_list(
             requirements.page_outline,
-            max_items=MAX_REQUIREMENTS_LIST_ITEMS,
+            max_items=10,
             max_chars=140,
         ),
         closing_sections=_truncate_list(
@@ -529,6 +959,11 @@ def compact_requirements_for_prompt(requirements: RequirementsSpec) -> Requireme
             requirements.coverage_notes,
             max_items=6,
             max_chars=220,
+        ),
+        critical_layout_invariants=_truncate_list(
+            requirements.critical_layout_invariants,
+            max_items=MAX_REQUIREMENTS_LIST_ITEMS,
+            max_chars=260,
         ),
         hard_constraints=_truncate_list(
             requirements.hard_constraints,
@@ -544,6 +979,10 @@ def compact_requirements_for_prompt(requirements: RequirementsSpec) -> Requireme
         section_requirements=[
             _compact_section(section)
             for section in requirements.section_requirements[:MAX_SECTION_COUNT]
+        ],
+        wrapper_requirements=[
+            _compact_wrapper_requirement(wrapper)
+            for wrapper in requirements.wrapper_requirements[:MAX_SECTION_COUNT]
         ],
         layout_requirements=_truncate_list(
             requirements.layout_requirements,
@@ -614,11 +1053,15 @@ def compact_validator_requirements_for_prompt(
         "footer_present": compact.footer_present,
         "footer_description": compact.footer_description,
         "coverage_notes": compact.coverage_notes,
+        "critical_layout_invariants": compact.critical_layout_invariants,
         "hard_constraints": compact.hard_constraints,
         "preserve_requirements": compact.preserve_requirements,
         "design_tokens": compact.design_tokens.model_dump(mode="json"),
         "section_requirements": [
             section.model_dump(mode="json") for section in compact.section_requirements
+        ],
+        "wrapper_requirements": [
+            wrapper.model_dump(mode="json") for wrapper in compact.wrapper_requirements
         ],
         "behavior_requirements": compact.behavior_requirements,
         "animation_requirements": compact.animation_requirements,

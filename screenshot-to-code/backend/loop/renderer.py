@@ -76,6 +76,11 @@ class HtmlPreviewRenderer:
                 and isinstance(frame.get("elapsedMs"), int)
                 and isinstance(frame.get("viewportDataUrl"), str)
             ],
+            automation_events=[
+                event
+                for event in payload.get("automationEvents", [])
+                if isinstance(event, str)
+            ],
             viewport=viewport,
         )
 
@@ -95,6 +100,10 @@ class HtmlPreviewRenderer:
             {
                 "label": checkpoint.name,
                 "elapsedMs": VIDEO_TIMELINE_CAPTURE_DELAYS_MS[index],
+                "trigger": checkpoint.trigger,
+                "expectedResult": checkpoint.expected_result,
+                "actionType": checkpoint.action_type,
+                "targetDescription": checkpoint.target_description,
             }
             for index, checkpoint in enumerate(selected_checkpoints)
         ]

@@ -2959,6 +2959,35 @@ class ClientComplianceProfile(Base):
     )
 
 
+class ClientCompliancePolicyOverride(Base):
+    __tablename__ = "client_compliance_policy_overrides"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "client_id",
+            "page_key",
+            name="uq_compliance_policy_overrides_org_client_page",
+        ),
+        sa.Index(
+            "idx_compliance_policy_overrides_org_client", "org_id", "client_id"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    page_key: Mapped[str] = mapped_column(Text, nullable=False)
+    markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class MetaPublishSelection(Base):
     __tablename__ = "meta_publish_selections"
     __table_args__ = (

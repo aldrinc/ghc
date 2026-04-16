@@ -319,13 +319,12 @@ class _HtmlStructureSignatureParser(HTMLParser):
             self._raw_text_tag_stack.pop()
 
     def handle_data(self, data: str) -> None:
-        if not data:
+        if not data or not data.strip():
             return
         if self._raw_text_tag_stack:
             self.tokens.append(("raw_text", self._raw_text_tag_stack[-1], data))
             return
-        if data.strip():
-            self.tokens.append(("text",))
+        self.tokens.append(("text",))
 
     def handle_comment(self, data: str) -> None:
         if data.strip():
@@ -336,6 +335,7 @@ def _canonicalize_attrs(attrs: list[tuple[str, str | None]]) -> tuple[tuple[str,
     canonical: list[tuple[str, str | None]] = []
     for key, value in attrs:
         canonical.append((str(key).lower().strip(), None if value is None else value.strip()))
+    canonical.sort(key=lambda item: item[0])
     return tuple(canonical)
 
 

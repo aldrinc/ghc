@@ -23,6 +23,20 @@ class ResolvedMetaWorkspaceConfig:
     workspace_config: MetaWorkspaceAdConfig
 
 
+def normalize_meta_tracking_ids(
+    *,
+    pixel_id: str | None,
+    data_set_id: str | None,
+) -> tuple[str | None, str | None]:
+    normalized_pixel_id = clean_optional_text(pixel_id)
+    normalized_data_set_id = clean_optional_text(data_set_id)
+    if normalized_pixel_id and not normalized_data_set_id:
+        normalized_data_set_id = normalized_pixel_id
+    elif normalized_data_set_id and not normalized_pixel_id:
+        normalized_pixel_id = normalized_data_set_id
+    return normalized_pixel_id, normalized_data_set_id
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -50,6 +64,10 @@ def merge_meta_profile(
     connection: MetaAdAccountConnection,
     workspace_config: MetaWorkspaceAdConfig,
 ) -> dict[str, Any]:
+    pixel_id, data_set_id = normalize_meta_tracking_ids(
+        pixel_id=workspace_config.pixel_id,
+        data_set_id=workspace_config.data_set_id,
+    )
     metadata = dict(workspace_config.metadata_json) if isinstance(workspace_config.metadata_json, dict) else {}
     connection_metadata = (
         dict(connection.metadata_json) if isinstance(connection.metadata_json, dict) else {}
@@ -75,8 +93,8 @@ def merge_meta_profile(
         "paymentMethodStatus": clean_optional_text(connection_metadata.get("paymentMethodStatus"))
         if isinstance(connection_metadata, dict)
         else None,
-        "pixelId": workspace_config.pixel_id,
-        "dataSetId": workspace_config.data_set_id,
+        "pixelId": pixel_id,
+        "dataSetId": data_set_id,
         "dataSetShopifyPartnerInstalled": connection_metadata.get("dataSetShopifyPartnerInstalled")
         if isinstance(connection_metadata, dict)
         else None,
@@ -170,4 +188,3 @@ def connection_usage_rows(
         .all()
     )
     return [(config, client) for config, client in rows]
-

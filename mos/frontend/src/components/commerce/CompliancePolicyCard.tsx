@@ -209,7 +209,7 @@ export function CompliancePolicyCard({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-content">Support phone</label>
+              <label className="text-xs font-medium text-content">Support phone (optional)</label>
               <Input
                 value={complianceProfileForm.supportPhone}
                 onChange={(event) => handleComplianceProfileFieldChange("supportPhone", event.target.value)}

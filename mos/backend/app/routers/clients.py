@@ -135,6 +135,7 @@ from app.services.compliance import (
     get_policy_page_handle,
     get_policy_template,
     get_profile_url_field_for_page_key,
+    get_workspace_policy_override_markdown,
     markdown_to_shopify_html,
     resolve_theme_contact_page_values,
     render_policy_template_markdown,
@@ -8334,11 +8335,18 @@ def _sync_compliance_policy_pages_for_template_export(
     sync_pages_payload: list[dict[str, str]] = []
     rendered_pages_payload: list[dict[str, str]] = []
     for page_key in page_keys_to_sync:
-        template = get_policy_template(page_key=page_key)
+        override_markdown = get_workspace_policy_override_markdown(
+            session=session,
+            org_id=str(auth.org_id),
+            client_id=str(client_id),
+            page_key=page_key,
+        )
+        template = get_policy_template(page_key=page_key, override_markdown=override_markdown)
         try:
             rendered_markdown = render_policy_template_markdown(
                 page_key=page_key,
                 placeholder_values=placeholders,
+                override_markdown=override_markdown,
             )
             rendered_html = markdown_to_shopify_html(rendered_markdown)
         except ValueError as exc:

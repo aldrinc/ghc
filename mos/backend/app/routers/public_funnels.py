@@ -51,6 +51,7 @@ from app.schemas.commerce import (
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.compliance import (
     get_policy_template,
+    get_workspace_policy_override_markdown,
     list_policy_page_keys,
     render_policy_template_markdown,
 )
@@ -1564,7 +1565,13 @@ def public_funnel_policy_page(
             detail="Compliance profile not found for this site.",
         )
 
-    template = get_policy_template(page_key=page_key)
+    override_markdown = get_workspace_policy_override_markdown(
+        session=session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        page_key=page_key,
+    )
+    template = get_policy_template(page_key=page_key, override_markdown=override_markdown)
     placeholder_values = _public_policy_placeholder_values(
         profile=profile,
         workspace_name=workspace_name,
@@ -1575,6 +1582,7 @@ def public_funnel_policy_page(
         markdown = render_policy_template_markdown(
             page_key=page_key,
             placeholder_values=placeholder_values,
+            override_markdown=override_markdown,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
