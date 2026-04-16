@@ -600,3 +600,112 @@ def test_sync_compliance_policy_pages_for_ecommerce_and_subscription_includes_al
         "shipping_policy",
         "contact_support",
     }
+
+
+# ---------------------------------------------------------------------------
+# Workspace-controlled policy page overrides (0084 migration)
+# ---------------------------------------------------------------------------
+
+
+def test_get_policy_template_falls_back_to_repo_markdown_when_no_override():
+    template = compliance_service.get_policy_template(page_key="privacy_policy")
+    assert "{{brand_name}}" in template["templateMarkdown"]
+
+
+def test_get_policy_template_uses_override_markdown_when_provided():
+    override = "# Workspace Privacy\n\nCustom body for {{brand_name}}."
+    template = compliance_service.get_policy_template(
+        page_key="privacy_policy", override_markdown=override
+    )
+    assert template["templateMarkdown"] == override
+
+
+def test_render_policy_template_markdown_substitutes_placeholders_in_override():
+    override = (
+        "# {{brand_name}} Privacy\n\n"
+        "Effective: {{effective_date}}. Contact: {{support_email}}."
+    )
+    rendered = compliance_service.render_policy_template_markdown(
+        page_key="privacy_policy",
+        placeholder_values={
+            "brand_name": "Ember",
+            "effective_date": "2026-04-16",
+            "support_email": "support@shopemberco.com",
+            "website_url": "https://shopemberco.com",
+            "legal_business_name": "Ember Gummies",
+            "company_address_text": "100 Main St, Wilmington, DE 19801",
+        },
+        override_markdown=override,
+    )
+    assert "Ember" in rendered
+    assert "2026-04-16" in rendered
+    assert "support@shopemberco.com" in rendered
+    assert "{{" not in rendered
+
+
+def test_client_compliance_policy_page_override_crud(api_client):
+    client_id = _create_client(api_client)
+
+    list_resp = api_client.get(f"/clients/{client_id}/compliance/policy-pages")
+    assert list_resp.status_code == 200
+    assert list_resp.json()["overrides"] == []
+
+    get_missing = api_client.get(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy"
+    )
+    assert get_missing.status_code == 404
+
+    get_unknown = api_client.get(
+        f"/clients/{client_id}/compliance/policy-pages/not_a_real_key"
+    )
+    assert get_unknown.status_code == 404
+
+    put_empty = api_client.put(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy",
+        json={"markdown": ""},
+    )
+    assert put_empty.status_code == 422
+
+    markdown_v1 = "# Ember Privacy\n\nBody v1."
+    put_create = api_client.put(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy",
+        json={"markdown": markdown_v1},
+    )
+    assert put_create.status_code == 200
+    created = put_create.json()
+    assert created["pageKey"] == "privacy_policy"
+    assert created["markdown"] == markdown_v1
+
+    get_created = api_client.get(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy"
+    )
+    assert get_created.status_code == 200
+    assert get_created.json()["markdown"] == markdown_v1
+
+    list_after = api_client.get(f"/clients/{client_id}/compliance/policy-pages")
+    assert list_after.status_code == 200
+    keys = [row["pageKey"] for row in list_after.json()["overrides"]]
+    assert keys == ["privacy_policy"]
+
+    markdown_v2 = "# Ember Privacy v2\n\nBody v2."
+    put_update = api_client.put(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy",
+        json={"markdown": markdown_v2},
+    )
+    assert put_update.status_code == 200
+    assert put_update.json()["markdown"] == markdown_v2
+
+    delete_resp = api_client.delete(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy"
+    )
+    assert delete_resp.status_code == 204
+
+    get_after_delete = api_client.get(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy"
+    )
+    assert get_after_delete.status_code == 404
+
+    delete_missing = api_client.delete(
+        f"/clients/{client_id}/compliance/policy-pages/privacy_policy"
+    )
+    assert delete_missing.status_code == 404

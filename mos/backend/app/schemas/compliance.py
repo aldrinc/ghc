@@ -191,3 +191,24 @@ class CompliancePolicyTemplateResponse(BaseModel):
     requiredSections: list[CompliancePolicyTemplateSectionResponse] = Field(default_factory=list)
     placeholders: list[str] = Field(default_factory=list)
     templateMarkdown: str
+
+
+class CompliancePolicyPageOverrideResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pageKey: str
+    markdown: str
+    createdAt: str
+    updatedAt: str
+
+
+class CompliancePolicyPageOverrideUpsertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    markdown: str = Field(..., min_length=1)
+
+
+class CompliancePolicyPageOverrideListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    overrides: list[CompliancePolicyPageOverrideResponse] = Field(default_factory=list)

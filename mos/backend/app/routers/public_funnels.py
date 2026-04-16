@@ -51,12 +51,14 @@ from app.schemas.commerce import (
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.compliance import (
     get_policy_template,
+    get_workspace_policy_override_markdown,
     list_policy_page_keys,
     render_policy_template_markdown,
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
 from app.services.funnel_metadata import build_public_page_metadata_for_context
+from app.services.funnel_templates import resolve_funnel_template_page_type
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services.commerce_provider import create_managed_checkout
 from app.services.media_storage import MediaStorage
@@ -184,6 +186,10 @@ def _site_page_type(
     normalized_template_id = clean_optional_text(template_id)
     if not normalized_template_id:
         return None
+
+    resolved_page_type = resolve_funnel_template_page_type(normalized_template_id)
+    if resolved_page_type:
+        return resolved_page_type
 
     # Map template IDs to site page types
     # B2B templates
@@ -1559,7 +1565,13 @@ def public_funnel_policy_page(
             detail="Compliance profile not found for this site.",
         )
 
-    template = get_policy_template(page_key=page_key)
+    override_markdown = get_workspace_policy_override_markdown(
+        session=session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        page_key=page_key,
+    )
+    template = get_policy_template(page_key=page_key, override_markdown=override_markdown)
     placeholder_values = _public_policy_placeholder_values(
         profile=profile,
         workspace_name=workspace_name,
@@ -1570,6 +1582,7 @@ def public_funnel_policy_page(
         markdown = render_policy_template_markdown(
             page_key=page_key,
             placeholder_values=placeholder_values,
+            override_markdown=override_markdown,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

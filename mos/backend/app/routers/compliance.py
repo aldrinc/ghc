@@ -9,13 +9,23 @@ from app.db.deps import get_session
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import ClientComplianceProfile, ClientUserPreference
+from app.db.models import (
+    ClientCompliancePolicyOverride,
+    ClientComplianceProfile,
+    ClientUserPreference,
+)
+from app.db.repositories.client_compliance_policy_overrides import (
+    ClientCompliancePolicyOverridesRepository,
+)
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.clients import ClientsRepository
 from app.schemas.compliance import (
     ClientComplianceProfileResponse,
     ClientComplianceProfileUpsertRequest,
     ClientComplianceRequirementsResponse,
+    CompliancePolicyPageOverrideListResponse,
+    CompliancePolicyPageOverrideResponse,
+    CompliancePolicyPageOverrideUpsertRequest,
     ComplianceShopifyPolicySyncPageResponse,
     ComplianceShopifyPolicySyncRequest,
     ComplianceShopifyPolicySyncResponse,
@@ -31,6 +41,7 @@ from app.services.compliance import (
     get_profile_url_field_for_page_key,
     get_policy_template,
     get_ruleset,
+    get_workspace_policy_override_markdown,
     list_policy_templates,
     list_policy_page_keys,
     list_rulesets,
@@ -447,6 +458,116 @@ def get_client_compliance_requirements(
     return ClientComplianceRequirementsResponse(**requirements)
 
 
+def _policy_override_to_response(
+    record: ClientCompliancePolicyOverride,
+) -> CompliancePolicyPageOverrideResponse:
+    return CompliancePolicyPageOverrideResponse(
+        pageKey=record.page_key,
+        markdown=record.markdown,
+        createdAt=record.created_at.isoformat(),
+        updatedAt=record.updated_at.isoformat(),
+    )
+
+
+def _assert_known_page_key(page_key: str) -> None:
+    if page_key not in set(list_policy_page_keys()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown policy page key '{page_key}'.",
+        )
+
+
+@router.get(
+    "/clients/{client_id}/compliance/policy-pages",
+    response_model=CompliancePolicyPageOverrideListResponse,
+)
+def list_client_compliance_policy_page_overrides(
+    client_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    repo = ClientCompliancePolicyOverridesRepository(session)
+    records = repo.list_for_client(org_id=auth.org_id, client_id=client_id)
+    return CompliancePolicyPageOverrideListResponse(
+        overrides=[_policy_override_to_response(record) for record in records],
+    )
+
+
+@router.get(
+    "/clients/{client_id}/compliance/policy-pages/{page_key}",
+    response_model=CompliancePolicyPageOverrideResponse,
+)
+def get_client_compliance_policy_page_override(
+    client_id: str,
+    page_key: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    _assert_known_page_key(page_key)
+    repo = ClientCompliancePolicyOverridesRepository(session)
+    record = repo.get(org_id=auth.org_id, client_id=client_id, page_key=page_key)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No workspace override stored for policy page '{page_key}'.",
+        )
+    return _policy_override_to_response(record)
+
+
+@router.put(
+    "/clients/{client_id}/compliance/policy-pages/{page_key}",
+    response_model=CompliancePolicyPageOverrideResponse,
+)
+def upsert_client_compliance_policy_page_override(
+    client_id: str,
+    page_key: str,
+    payload: CompliancePolicyPageOverrideUpsertRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    _assert_known_page_key(page_key)
+
+    markdown = payload.markdown.strip()
+    if not markdown:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="markdown must not be empty.",
+        )
+
+    repo = ClientCompliancePolicyOverridesRepository(session)
+    record = repo.upsert(
+        org_id=auth.org_id,
+        client_id=client_id,
+        page_key=page_key,
+        markdown=markdown,
+    )
+    return _policy_override_to_response(record)
+
+
+@router.delete(
+    "/clients/{client_id}/compliance/policy-pages/{page_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_client_compliance_policy_page_override(
+    client_id: str,
+    page_key: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    _assert_known_page_key(page_key)
+    repo = ClientCompliancePolicyOverridesRepository(session)
+    removed = repo.delete(org_id=auth.org_id, client_id=client_id, page_key=page_key)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No workspace override stored for policy page '{page_key}'.",
+        )
+
+
 @router.post(
     "/clients/{client_id}/compliance/shopify/policy-pages/sync",
     response_model=ComplianceShopifyPolicySyncResponse,
@@ -509,7 +630,13 @@ def sync_client_compliance_policy_pages_to_shopify(
         placeholders["website_url"] = website_url
     sync_pages_payload: list[dict[str, str]] = []
     for page_key in page_keys_to_sync:
-        template = get_policy_template(page_key=page_key)
+        override_markdown = get_workspace_policy_override_markdown(
+            session=session,
+            org_id=str(auth.org_id),
+            client_id=str(client_id),
+            page_key=page_key,
+        )
+        template = get_policy_template(page_key=page_key, override_markdown=override_markdown)
         try:
             if page_key == "contact_support":
                 rendered_html = render_theme_contact_page_body_html(
@@ -519,6 +646,7 @@ def sync_client_compliance_policy_pages_to_shopify(
                 rendered_markdown = render_policy_template_markdown(
                     page_key=page_key,
                     placeholder_values=placeholders,
+                    override_markdown=override_markdown,
                 )
                 rendered_html = markdown_to_shopify_html(rendered_markdown)
         except ValueError as exc:

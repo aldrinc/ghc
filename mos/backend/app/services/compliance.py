@@ -950,7 +950,12 @@ def _resolve_policy_templates_directory() -> Path:
 _POLICY_TEMPLATES_DIRECTORY = _resolve_policy_templates_directory()
 
 
-def _load_policy_template_markdown(*, page_key: str) -> str:
+def _load_policy_template_markdown(
+    *, page_key: str, override_markdown: str | None = None
+) -> str:
+    if override_markdown is not None and override_markdown.strip():
+        return override_markdown
+
     theme_managed_template_markdown = _THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY.get(page_key)
     if theme_managed_template_markdown is not None:
         return theme_managed_template_markdown
@@ -1018,12 +1023,41 @@ def list_policy_templates() -> list[dict[str, Any]]:
     return ordered
 
 
-def get_policy_template(*, page_key: str) -> dict[str, Any]:
+def get_policy_template(
+    *, page_key: str, override_markdown: str | None = None
+) -> dict[str, Any]:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
     template = deepcopy(_POLICY_TEMPLATES[page_key])
-    template["templateMarkdown"] = _load_policy_template_markdown(page_key=page_key)
+    template["templateMarkdown"] = _load_policy_template_markdown(
+        page_key=page_key, override_markdown=override_markdown
+    )
     return template
+
+
+def get_workspace_policy_override_markdown(
+    *,
+    session: Any,
+    org_id: str,
+    client_id: str,
+    page_key: str,
+) -> str | None:
+    """Return workspace-level markdown override for a policy page, or None if absent.
+
+    Imported lazily to avoid circular imports between services and repositories.
+    """
+    from app.db.repositories.client_compliance_policy_overrides import (
+        ClientCompliancePolicyOverridesRepository,
+    )
+
+    if page_key not in _POLICY_TEMPLATES:
+        return None
+    repo = ClientCompliancePolicyOverridesRepository(session)
+    record = repo.get(org_id=str(org_id), client_id=str(client_id), page_key=page_key)
+    if record is None:
+        return None
+    markdown = record.markdown or ""
+    return markdown if markdown.strip() else None
 
 
 def list_policy_page_keys() -> list[str]:
@@ -1134,8 +1168,9 @@ def render_policy_template_markdown(
     *,
     page_key: str,
     placeholder_values: dict[str, str],
+    override_markdown: str | None = None,
 ) -> str:
-    template = get_policy_template(page_key=page_key)
+    template = get_policy_template(page_key=page_key, override_markdown=override_markdown)
     template_markdown = template["templateMarkdown"]
     raw_support_phone = placeholder_values.get("support_phone")
     support_phone = (
