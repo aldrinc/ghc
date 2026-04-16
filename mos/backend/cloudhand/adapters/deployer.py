@@ -1,18 +1,18 @@
 import base64
 import binascii
+import hashlib
 import io
 import json
 import os
+import re
+import shlex
 import subprocess
 import tarfile
 import time
-import shlex
-import hashlib
-import re
 from uuid import UUID
 from pathlib import Path
 import paramiko
-from typing import Any, Dict, List, Optional  # noqa: F401
+from typing import Any, Dict, Iterator, List, Optional  # noqa: F401
 
 from ..models import (
     ApplicationSourceType,
@@ -390,6 +390,48 @@ WantedBy=multi-user.target
                     return candidate
         return None
 
+    def _iter_local_runtime_source_files(self, frontend_dir: Path) -> Iterator[Path]:
+        excluded_dir_names = {
+            ".git",
+            ".yarn",
+            "coverage",
+            "dist",
+            "node_modules",
+            "playwright-report",
+            "test-results",
+        }
+
+        for root, dirnames, filenames in os.walk(frontend_dir):
+            dirnames[:] = [name for name in dirnames if name not in excluded_dir_names]
+            for filename in filenames:
+                if filename == ".DS_Store":
+                    continue
+                yield Path(root) / filename
+
+    def _latest_local_file_mtime(self, files: Iterator[Path]) -> float:
+        latest_mtime = 0.0
+        for path in files:
+            try:
+                if not path.is_file():
+                    continue
+                latest_mtime = max(latest_mtime, path.stat().st_mtime)
+            except FileNotFoundError:
+                continue
+        return latest_mtime
+
+    def _local_runtime_dist_needs_rebuild(self, *, frontend_dir: Path, dist_dir: Path) -> bool:
+        if not dist_dir.is_dir():
+            return True
+
+        latest_dist_mtime = self._latest_local_file_mtime(dist_dir.rglob("*"))
+        if latest_dist_mtime <= 0:
+            return True
+
+        latest_source_mtime = self._latest_local_file_mtime(
+            self._iter_local_runtime_source_files(frontend_dir)
+        )
+        return latest_source_mtime > latest_dist_mtime
+
     def _ensure_local_runtime_dist(self, runtime_dist_path: str) -> Path | None:
         raw_path = Path(runtime_dist_path)
         dist_candidates: List[Path] = []
@@ -410,10 +452,6 @@ WantedBy=multi-user.target
             seen.add(resolved)
             unique_dist_candidates.append(resolved)
 
-        for candidate in unique_dist_candidates:
-            if candidate.is_dir():
-                return candidate
-
         frontend_candidates: List[Path] = []
         for candidate in unique_dist_candidates:
             if candidate.name == "dist" and (candidate.parent / "package.json").is_file():
@@ -425,6 +463,25 @@ WantedBy=multi-user.target
             repo_frontend = (repo_root / "mos" / "frontend").resolve()
             if (repo_frontend / "package.json").is_file() and repo_frontend not in frontend_candidates:
                 frontend_candidates.append(repo_frontend)
+
+        existing_dist = next((candidate for candidate in unique_dist_candidates if candidate.is_dir()), None)
+        if existing_dist is not None:
+            frontend_dir: Path | None = None
+            if existing_dist.name == "dist" and (existing_dist.parent / "package.json").is_file():
+                frontend_dir = existing_dist.parent
+            elif len(frontend_candidates) == 1:
+                frontend_dir = frontend_candidates[0]
+
+            if frontend_dir is None or not self._local_runtime_dist_needs_rebuild(
+                frontend_dir=frontend_dir,
+                dist_dir=existing_dist,
+            ):
+                return existing_dist
+
+            print(f"[{self.ip}] Local runtime dist stale; rebuilding frontend in {frontend_dir}")
+            self._run_local_command(["npm", "ci"], cwd=frontend_dir)
+            self._run_local_command(["npm", "run", "build"], cwd=frontend_dir)
+            return existing_dist
 
         if not frontend_candidates:
             return None

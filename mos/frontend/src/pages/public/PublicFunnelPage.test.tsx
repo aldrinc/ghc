@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 
+const standaloneImportedHtmlPageMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
 vi.mock("@measured/puck", () => ({
   Render: () => <div data-testid="puck-renderer" />,
 }));
@@ -24,7 +25,7 @@ vi.mock("@/components/design-system/DesignSystemProvider", () => ({
 }));
 
 vi.mock("@/funnels/StandaloneImportedHtmlPage", () => ({
-  StandaloneImportedHtmlPage: () => <div data-testid="standalone-imported-html-page" />,
+  StandaloneImportedHtmlPage: (props: unknown) => standaloneImportedHtmlPageMock(props),
 }));
 
 vi.mock("@/funnels/runtimeRouting", () => ({
@@ -152,5 +153,21 @@ describe("PublicFunnelPage", () => {
     });
 
     expect(screen.queryByText("Imported HTML page is unavailable.")).not.toBeInTheDocument();
+  });
+
+  it("builds standalone imported HTML page paths with the funnel slug", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(standaloneImportedHtmlPageMock).toHaveBeenCalled();
+    });
+
+    const props = standaloneImportedHtmlPageMock.mock.calls[0]?.[0] as {
+      pagePathById?: Record<string, string>;
+    };
+    expect(props.pagePathById).toEqual({
+      "page-1": "/example-product/example-funnel/presales",
+      "page-2": "/example-product/example-funnel/sales-page",
+    });
   });
 });

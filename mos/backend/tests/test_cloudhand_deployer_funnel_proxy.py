@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import os
 from pathlib import Path
 import pytest
 
@@ -644,3 +645,37 @@ def test_funnel_artifact_site_reuses_cached_runtime_without_upload(tmp_path):
         cmd.startswith("cp -R /opt/apps/.cloudhand-runtime-cache/runtimehash123/. /opt/apps/landing-artifact/site/")
         for cmd in commands
     )
+
+
+def test_ensure_local_runtime_dist_rebuilds_when_frontend_source_is_newer(tmp_path):
+    frontend_dir = tmp_path / "mos" / "frontend"
+    dist_dir = frontend_dir / "dist"
+    src_dir = frontend_dir / "src"
+    frontend_dir.mkdir(parents=True, exist_ok=True)
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    src_dir.mkdir(parents=True, exist_ok=True)
+
+    package_json = frontend_dir / "package.json"
+    package_json.write_text('{"name":"mos-frontend"}', encoding="utf-8")
+    dist_file = dist_dir / "index.html"
+    dist_file.write_text("<html></html>", encoding="utf-8")
+    source_file = src_dir / "PublicFunnelPage.tsx"
+    source_file.write_text("export const ready = true;\n", encoding="utf-8")
+
+    os.utime(package_json, (100, 100))
+    os.utime(dist_file, (100, 100))
+    os.utime(source_file, (200, 200))
+
+    deployer = object.__new__(ServerDeployer)
+    deployer.ip = "127.0.0.1"
+    deployer.local_root = tmp_path
+    commands: list[tuple[str, Path]] = []
+    deployer._run_local_command = lambda args, *, cwd: commands.append((" ".join(args), cwd))
+
+    resolved = deployer._ensure_local_runtime_dist("mos/frontend/dist")
+
+    assert resolved == dist_dir.resolve()
+    assert commands == [
+        ("npm ci", frontend_dir.resolve()),
+        ("npm run build", frontend_dir.resolve()),
+    ]
