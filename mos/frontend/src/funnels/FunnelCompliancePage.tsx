@@ -4,7 +4,11 @@ import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { resolveRuntimePagePath, useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 
-type FunnelCompliancePageKey = "privacy_policy" | "terms_of_service" | "returns_refunds_policy";
+type FunnelCompliancePageKey =
+  | "privacy_policy"
+  | "terms_of_service"
+  | "returns_refunds_policy"
+  | "contact_support";
 
 type FunnelCompliancePageResponse = {
   pageKey: FunnelCompliancePageKey;
@@ -54,7 +58,7 @@ function resolveWebsiteUrl(runtime: ReturnType<typeof useFunnelRuntime>): string
 
 function resolvePolicySlugPaths(
   runtime: NonNullable<ReturnType<typeof useFunnelRuntime>>,
-): { terms: string; privacy: string; refund: string; shop: string } {
+): { terms: string; privacy: string; refund: string; contact: string; shop: string } {
   const resolve = (slug: string) => resolveRuntimePagePath(runtime, slug);
   const salesPageId = Object.entries(runtime.pageStageMap).find(([, stage]) => stage === "sales")?.[0];
   const salesSlug = salesPageId ? runtime.pageMap[salesPageId] : undefined;
@@ -62,6 +66,7 @@ function resolvePolicySlugPaths(
     terms: resolve("terms-of-service"),
     privacy: resolve("privacy-policy"),
     refund: resolve("refund-policy"),
+    contact: resolve("contact-us"),
     shop: salesSlug ? resolve(salesSlug) : resolve(runtime.entrySlug || ""),
   };
 }
@@ -373,6 +378,7 @@ export function FunnelCompliancePage({
             <nav className="ember-compliance-footer__nav" aria-label="Footer primary">
               {footerLinks ? (
                 <>
+                  <a href={footerLinks.contact} rel="nofollow">CONTACT US</a>
                   <a href={footerLinks.shop} rel="nofollow">SHOP NOW</a>
                 </>
               ) : null}

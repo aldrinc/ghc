@@ -1588,6 +1588,10 @@ def public_funnel_policy_page(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    # Keep CDN cache short so workspace overrides (edited via
+    # PUT /clients/{client_id}/compliance/policy-pages/{page_key}) propagate
+    # to the storefront proxy within a minute rather than Bunny's default TTL.
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
     return {
         "pageKey": page_key,
         "title": template["title"],
