@@ -730,7 +730,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common_auth_args(swipe_generate)
     swipe_generate.add_argument("--campaign-id", required=True)
     swipe_generate.add_argument("--asset-brief-id", required=True)
-    swipe_generate.add_argument("--aspect-ratio", default="1:1")
+    swipe_generate.add_argument("--aspect-ratio", default="4:5")
     swipe_generate.add_argument("--model")
     swipe_generate.add_argument("--render-model-id")
     swipe_generate.add_argument("--max-output-tokens", type=int)

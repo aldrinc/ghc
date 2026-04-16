@@ -167,7 +167,7 @@ What it does:
 
 ### Optional arguments
 
-- `--aspect-ratio`: default `1:1`
+- `--aspect-ratio`: default `4:5` for feed-sized outputs
 - `--model`
 - `--render-model-id`
 - `--max-output-tokens`
@@ -204,7 +204,7 @@ python scripts/testimonial_cli.py swipe-template-testimonials generate \
   --ui-url http://localhost:5173 \
   --campaign-id 11111111-2222-3333-4444-555555555555 \
   --asset-brief-id brief-123 \
-  --aspect-ratio 1:1
+  --aspect-ratio 4:5
 ```
 
 ### Files written

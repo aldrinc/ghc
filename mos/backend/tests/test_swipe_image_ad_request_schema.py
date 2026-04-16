@@ -61,3 +61,14 @@ def test_swipe_template_request_rejects_image_model_for_stage_one() -> None:
         SwipeTemplateTestimonialsGenerateRequest.model_validate(payload)
 
     assert "Use renderModelId for final image rendering models" in str(exc.value)
+
+
+def test_swipe_template_request_defaults_to_feed_aspect_ratio() -> None:
+    payload = {
+        "campaignId": "00000000-0000-0000-0000-000000000033",
+        "assetBriefId": "asset-brief-1",
+    }
+
+    parsed = SwipeTemplateTestimonialsGenerateRequest.model_validate(payload)
+
+    assert parsed.aspect_ratio == "4:5"

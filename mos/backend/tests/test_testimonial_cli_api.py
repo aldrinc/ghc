@@ -185,6 +185,7 @@ def test_swipe_template_testimonials_endpoint_starts_one_workflow_per_template(
         "https://assets.example.com/public/assets/public-1",
         "https://assets.example.com/public/assets/public-2",
     ]
+    assert all(payload.aspect_ratio == "4:5" for payload in started_payloads)
     assert all(payload.count == 1 for payload in started_payloads)
 
 

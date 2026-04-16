@@ -105,7 +105,7 @@ class SwipeTemplateTestimonialsGenerateRequest(BaseModel):
 
     campaign_id: str = Field(..., validation_alias="campaignId", serialization_alias="campaignId")
     asset_brief_id: str = Field(..., validation_alias="assetBriefId", serialization_alias="assetBriefId")
-    aspect_ratio: str = Field("1:1", validation_alias="aspectRatio", serialization_alias="aspectRatio")
+    aspect_ratio: str = Field("4:5", validation_alias="aspectRatio", serialization_alias="aspectRatio")
     model: str | None = Field(None, description="Gemini model name to use for swipe prompt generation.")
     render_model_id: str | None = Field(
         None,
