@@ -69,5 +69,11 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain("loadCommerceVariants");
     expect(injectedDocument).toContain("/public/funnels/");
     expect(injectedDocument).toContain("/commerce");
+    expect(injectedDocument).toContain('void trackEvent(');
+    expect(injectedDocument).toContain("prepareCheckoutInBackground");
+    expect(injectedDocument).toContain("syncCheckoutBindingWarmState");
+    expect(injectedDocument).toContain("Preparing secure checkout...");
+    expect(injectedDocument).toContain("aria-busy");
+    expect(injectedDocument).toContain("waitForPreparedCheckout(cacheKey, 150)");
   });
 });
