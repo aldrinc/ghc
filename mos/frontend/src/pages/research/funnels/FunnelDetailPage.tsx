@@ -10,7 +10,7 @@ import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
+import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 import {
   funnelTemplateCategoryLabel,
@@ -20,6 +20,13 @@ import {
 import { resolveShopHostedUrl, resolveWindowShopHostedOrigin } from "@/lib/shopHostedFunnels";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  buildFunnelDeployWorkloadName,
+  buildStandalonePublicFunnelPath,
+  buildStandalonePublicPagePath,
+  joinPublicUrl,
+  resolvePrimaryDeployedPublicBaseUrl,
+} from "./funnelPublicUrls";
 
 const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
 const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
@@ -61,13 +68,6 @@ type DeployJobStatusResponse = {
   } | null;
   error?: string | null;
 };
-
-function artifactForTemplate(templateId: string | null | undefined): "presales" | "sales" | null {
-  const category = resolveFunnelTemplateCategory(templateId);
-  if (category === "presales") return "presales";
-  if (category === "sales") return "sales";
-  return null;
-}
 
 export function FunnelDetailPage() {
   const navigate = useNavigate();
@@ -154,15 +154,21 @@ export function FunnelDetailPage() {
 
   const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
   const funnelRouteSlug = shortUuidRouteToken(funnel?.id || "");
-  const publicBase = funnelRouteSlug && productRouteSlug ? `/f/${productRouteSlug}/${funnelRouteSlug}` : null;
+  const mosPreviewBasePath =
+    funnelRouteSlug && productRouteSlug
+      ? buildPublicFunnelPath({
+          productSlug: productRouteSlug,
+          funnelSlug: funnelRouteSlug,
+          bundleMode: false,
+        })
+      : null;
+  const publicBasePath = buildStandalonePublicFunnelPath({
+    productSlug: productRouteSlug,
+    funnelSlug: funnelRouteSlug,
+  });
   const publicOrigin = resolveWindowShopHostedOrigin();
-  const mosPreviewUrl = publicBase ? resolveShopHostedUrl(publicBase, publicOrigin) : null;
-  const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
-  const entryArtifact = useMemo(() => {
-    if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
-    const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
-    return artifactForTemplate(entryPage?.template_id);
-  }, [funnel?.entry_page_id, funnel?.pages]);
+  const mosPreviewUrl = mosPreviewBasePath ? resolveShopHostedUrl(mosPreviewBasePath, publicOrigin) : null;
+  const deployWorkloadName = buildFunnelDeployWorkloadName(funnel);
 
   const deployDomains = useDeployWorkloadDomains({
     workloadName: deployWorkloadName,
@@ -189,36 +195,38 @@ export function FunnelDetailPage() {
     return normalizeDeployDomainList(deployDomains.data?.server_names || []);
   }, [deployDomains.data?.workspace_server_names, deployDomains.data?.server_names]);
 
-  const deployedPathSuffix = useMemo(() => {
-    if (!productRouteSlug || !funnelRouteSlug) return null;
-    const segments = [encodeURIComponent(productRouteSlug), encodeURIComponent(funnelRouteSlug)];
-    if (entryArtifact) segments.push(encodeURIComponent(entryArtifact));
-    return `/${segments.join("/")}`;
-  }, [entryArtifact, funnelRouteSlug, productRouteSlug]);
+  const deployedPublicBaseUrl = useMemo(
+    () =>
+      resolvePrimaryDeployedPublicBaseUrl({
+        configuredDeployDomains,
+        accessUrl: deployJob?.accessUrl,
+      }),
+    [configuredDeployDomains, deployJob?.accessUrl],
+  );
+
+  const deployedPageUrlById = useMemo(() => {
+    const result: Record<string, string> = {};
+    if (!deployedPublicBaseUrl) return result;
+    for (const page of funnel?.pages || []) {
+      const path = buildStandalonePublicPagePath({
+        productSlug: productRouteSlug,
+        funnelSlug: funnelRouteSlug,
+        page,
+      });
+      const pageUrl = joinPublicUrl(deployedPublicBaseUrl, path);
+      if (!page.id || !pageUrl) continue;
+      result[page.id] = pageUrl;
+    }
+    return result;
+  }, [deployedPublicBaseUrl, funnel?.pages, funnelRouteSlug, productRouteSlug]);
 
   const deployedPageUrl = useMemo(() => {
-    if (!deployedPathSuffix) return null;
-
-    const accessCandidate =
-      (() => {
-        const host = configuredDeployDomains[0];
-        if (!host) return "";
-        return `https://${host}/`;
-      })() ||
-      (deployJob?.accessUrl || "").trim();
-
-    const baseUrl = accessCandidate || `${window.location.origin}/`;
-    const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}${deployedPathSuffix}`;
-  }, [
-    configuredDeployDomains,
-    deployJob?.accessUrl,
-    deployedPathSuffix,
-  ]);
+    if (!funnel?.entry_page_id) return null;
+    return deployedPageUrlById[funnel.entry_page_id] || null;
+  }, [deployedPageUrlById, funnel?.entry_page_id]);
 
   const deployedDomainUrlForHost = (hostname: string): string | null => {
-    if (!deployedPathSuffix) return null;
-    return `https://${hostname}${deployedPathSuffix}`;
+    return joinPublicUrl(`https://${hostname}`, publicBasePath);
   };
 
   const parseDeployDomains = (raw: string): string[] => {
@@ -373,6 +381,7 @@ export function FunnelDetailPage() {
   const handlePublish = async () => {
     if (!funnelId || !funnel) return;
     if (!funnel.client_id) return;
+    if (!deployWorkloadName) return;
     const payload: {
       deploy: {
         workloadName: string;
@@ -389,7 +398,7 @@ export function FunnelDetailPage() {
       };
     } = {
       deploy: {
-        workloadName: `brand-funnels-${funnel.client_id}`,
+        workloadName: deployWorkloadName,
         createIfMissing: true,
         applyPlan: true,
         bunnyPullZone: true,
@@ -549,10 +558,10 @@ export function FunnelDetailPage() {
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    if (!mosPreviewUrl) return;
-                    navigator.clipboard.writeText(mosPreviewUrl);
+                    if (!deployedPageUrl) return;
+                    navigator.clipboard.writeText(deployedPageUrl);
                   }}
-                  disabled={!mosPreviewUrl}
+                  disabled={!deployedPageUrl}
                 >
                   Copy share link
                 </Button>
@@ -620,7 +629,7 @@ export function FunnelDetailPage() {
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Public link</div>
                 <div className="flex h-10 items-center rounded-md border border-border bg-surface-2 px-3 font-mono text-xs text-content">
-                  <span className="truncate">{publicBase ? publicBase : "—"}</span>
+                  <span className="truncate">{publicBasePath ? publicBasePath : "—"}</span>
                 </div>
               </div>
               <div className="space-y-1">
@@ -788,6 +797,7 @@ export function FunnelDetailPage() {
             <ul className="divide-y divide-border">
               {funnel.pages.map((page) => {
                 const hasDraft = Boolean(page.latestDraftVersionId);
+                const pagePublicUrl = deployedPageUrlById[page.id] || null;
                 const nextPageOptions = [
                   { label: "No next page", value: "" },
                   ...funnel.pages
@@ -831,9 +841,9 @@ export function FunnelDetailPage() {
                             disabled={updatePage.isPending}
                           />
                         </div>
-                        {publicBase ? (
+                        {pagePublicUrl ? (
                           <a
-                            href={resolveShopHostedUrl(`${publicBase}/${page.slug}`, publicOrigin) || `${publicBase}/${page.slug}`}
+                            href={pagePublicUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="text-xs text-content-muted hover:underline"
