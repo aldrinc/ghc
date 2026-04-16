@@ -415,12 +415,13 @@ def test_sync_funnel_compliance_pages_creates_terms_privacy_and_refunds(
     assert sync_resp.status_code == 201
     sync_payload = sync_resp.json()
 
-    assert sync_payload["createdCount"] == 3
+    assert sync_payload["createdCount"] == 4
     assert sync_payload["updatedCount"] == 0
     assert {(page["slug"], page["page_type"]) for page in sync_payload["pages"]} == {
         ("privacy-policy", "privacy_policy"),
         ("refund-policy", "returns_refunds_policy"),
         ("terms-of-service", "terms_of_service"),
+        ("contact-us", "contact_support"),
     }
 
     sync_again_resp = api_client.post(f"/funnels/{funnel_id}/compliance-pages/sync")

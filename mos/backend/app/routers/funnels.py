@@ -120,6 +120,12 @@ _FUNNEL_COMPLIANCE_PAGE_SPECS: tuple[dict[str, str], ...] = (
         "slug": "refund-policy",
         "templateId": "compliance-refunds",
     },
+    {
+        "pageKey": "contact_support",
+        "name": "Contact Us",
+        "slug": "contact-us",
+        "templateId": "compliance-contact",
+    },
 )
 
 

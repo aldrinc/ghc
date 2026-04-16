@@ -67,6 +67,7 @@ _TEMPLATE_TO_PAGE_TYPE: dict[str, str] = {
     "compliance-privacy": "privacy_policy",
     "compliance-terms": "terms_of_service",
     "compliance-refunds": "returns_refunds_policy",
+    "compliance-contact": "contact_support",
 }
 
 

@@ -1,0 +1,25 @@
+{
+  "id": "compliance-contact",
+  "name": "Contact Us",
+  "description": "Funnel contact page rendered from the workspace compliance profile.",
+  "previewImage": null,
+  "category": "compliance",
+  "puckData": {
+    "root": {
+      "props": {
+        "title": "Contact Us",
+        "description": "How to reach support for this funnel."
+      }
+    },
+    "content": [
+      {
+        "type": "FunnelCompliancePage",
+        "props": {
+          "pageKey": "contact_support",
+          "pageTitle": "Contact Us"
+        }
+      }
+    ],
+    "zones": {}
+  }
+}
