@@ -288,11 +288,15 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const preparedCheckoutCache = {};
   const preparedCheckoutInFlight = {};
   const checkoutOriginPreconnects = {};
+  const checkoutUrlPrefetches = {};
   const checkoutBindingElements = {};
   const checkoutBindingState = {};
   const PREPARED_CHECKOUT_TTL_MS = 10 * 60 * 1000;
+  const PREPARED_CHECKOUT_RETRY_DELAYS_MS = [0, 250, 500];
   const CHECKOUT_LOADING_LABEL = "Preparing secure checkout...";
+  const CHECKOUT_ERROR_LABEL = "Secure checkout is unavailable right now.";
   let warmCheckoutBindingsTimeout = null;
+  let checkoutNavigationInProgress = false;
 
   const selectionsMatch = (left, right) => {
     const normalizedLeft = normalizeSelection(left);
@@ -345,6 +349,18 @@ function buildStandaloneImportedHtmlRuntimeScript({
     dnsPrefetch.rel = "dns-prefetch";
     dnsPrefetch.href = origin;
     document.head.appendChild(dnsPrefetch);
+  };
+
+  const ensureCheckoutUrlPrefetch = (checkoutUrl) => {
+    const href = cleanText(checkoutUrl);
+    if (!href || checkoutUrlPrefetches[href]) return;
+    checkoutUrlPrefetches[href] = true;
+    const prefetch = document.createElement("link");
+    prefetch.rel = "prefetch";
+    prefetch.as = "document";
+    prefetch.href = href;
+    prefetch.crossOrigin = "anonymous";
+    document.head.appendChild(prefetch);
   };
 
   const ensureCheckoutStatusNote = (bindingId, element) => {
@@ -475,6 +491,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return cleanText(response.statusText) || "Request failed.";
   };
 
+  const delay = (durationMs) =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, durationMs);
+    });
+
   const loadCommerceVariants = async () => {
     if (cachedVariants.length) {
       return cachedVariants;
@@ -552,6 +573,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       throw new Error("Checkout URL is missing.");
     }
     ensureCheckoutOriginPreconnect(checkoutUrl);
+    ensureCheckoutUrlPrefetch(checkoutUrl);
     return {
       checkoutUrl,
       sessionId: cleanText(data && data.sessionId) || null,
@@ -612,21 +634,29 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (preparedCheckoutInFlight[cacheKey]) {
       return preparedCheckoutInFlight[cacheKey];
     }
-    const promise = requestCheckout({ resolvedVariantId, resolvedSelection })
-      .then((preparedCheckout) => {
-        const record = {
-          ...preparedCheckout,
-          variantId: resolvedVariantId || "",
-          selection: resolvedSelection,
-          createdAt: Date.now(),
-        };
-        preparedCheckoutCache[cacheKey] = record;
-        return record;
-      })
-      .catch((error) => {
-        console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", error);
-        return null;
-      })
+    const promise = (async () => {
+      let lastError = null;
+      for (const retryDelayMs of PREPARED_CHECKOUT_RETRY_DELAYS_MS) {
+        if (retryDelayMs > 0) {
+          await delay(retryDelayMs);
+        }
+        try {
+          const preparedCheckout = await requestCheckout({ resolvedVariantId, resolvedSelection });
+          const record = {
+            ...preparedCheckout,
+            variantId: resolvedVariantId || "",
+            selection: resolvedSelection,
+            createdAt: Date.now(),
+          };
+          preparedCheckoutCache[cacheKey] = record;
+          return record;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", lastError);
+      return null;
+    })()
       .finally(() => {
         delete preparedCheckoutInFlight[cacheKey];
       });
@@ -634,23 +664,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return promise;
   };
 
-  const waitForPreparedCheckout = async (cacheKey, timeoutMs) => {
+  const waitForPreparedCheckout = async (cacheKey) => {
     if (!cacheKey || !preparedCheckoutInFlight[cacheKey]) {
       return null;
     }
-    let timeoutId = null;
-    try {
-      return await Promise.race([
-        preparedCheckoutInFlight[cacheKey],
-        new Promise((resolve) => {
-          timeoutId = window.setTimeout(() => resolve(null), timeoutMs);
-        }),
-      ]);
-    } finally {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    }
+    return preparedCheckoutInFlight[cacheKey];
   };
 
   const syncCheckoutBindingWarmState = async (binding) => {
@@ -700,13 +718,61 @@ function buildStandaloneImportedHtmlRuntimeScript({
         return;
       }
       setCheckoutBindingState(bindingId, {
-        status: "idle",
+        status: "error",
         cacheKey: checkoutState.cacheKey,
-        message: null,
+        message: CHECKOUT_ERROR_LABEL,
       });
     });
 
     return checkoutState;
+  };
+
+  const ensurePreparedCheckoutForClick = async ({
+    bindingId,
+    cacheKey,
+    variant,
+    resolvedVariantId,
+    resolvedSelection,
+  }) => {
+    const isWarmableShopifyCheckout = Boolean(cacheKey) && Boolean(variant) && variant.provider === "shopify";
+    if (!isWarmableShopifyCheckout) {
+      return requestCheckout({ resolvedVariantId, resolvedSelection });
+    }
+    let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
+    if (preparedCheckout) {
+      return preparedCheckout;
+    }
+    setCheckoutBindingState(bindingId, {
+      status: "loading",
+      cacheKey,
+      message: CHECKOUT_LOADING_LABEL,
+    });
+    preparedCheckout =
+      (await waitForPreparedCheckout(cacheKey)) ||
+      (await prepareCheckoutInBackground({ variant, resolvedVariantId, resolvedSelection, cacheKey }));
+    if (!preparedCheckout) {
+      setCheckoutBindingState(bindingId, {
+        status: "error",
+        cacheKey,
+        message: CHECKOUT_ERROR_LABEL,
+      });
+      throw new Error("Prepared checkout is unavailable.");
+    }
+    setCheckoutBindingState(bindingId, {
+      status: "ready",
+      cacheKey,
+      message: null,
+    });
+    return preparedCheckout;
+  };
+
+  const isCheckoutBindingTarget = (target) => {
+    if (!(target instanceof Node)) {
+      return false;
+    }
+    return Object.values(checkoutBindingElements).some((elements) =>
+      Array.isArray(elements) && elements.some((element) => element instanceof HTMLElement && element.contains(target)),
+    );
   };
 
   const readNodeValue = (node, source) => {
@@ -904,27 +970,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
               return;
             }
 
-            const isWarmableShopifyCheckout = Boolean(cacheKey) && Boolean(variant) && variant.provider === "shopify";
-            let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
-            if (!preparedCheckout && isWarmableShopifyCheckout) {
-              setCheckoutBindingState(bindingId, {
-                status: "loading",
-                cacheKey,
-                message: CHECKOUT_LOADING_LABEL,
-              });
-              preparedCheckout =
-                (await waitForPreparedCheckout(cacheKey, 150)) ||
-                (await prepareCheckoutInBackground({ variant, resolvedVariantId, resolvedSelection, cacheKey }));
-            }
-            const checkout =
-              preparedCheckout || (await requestCheckout({ resolvedVariantId, resolvedSelection }));
-            if (cacheKey) {
-              delete preparedCheckoutCache[cacheKey];
-            }
-            setCheckoutBindingState(bindingId, {
-              status: "ready",
+            const checkout = await ensurePreparedCheckoutForClick({
+              bindingId,
               cacheKey,
-              message: null,
+              variant,
+              resolvedVariantId,
+              resolvedSelection,
             });
 
             if (variant && variant.provider === "stripe") {
@@ -942,6 +993,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
               }
             }
 
+            checkoutNavigationInProgress = true;
             window.location.href = checkout.checkoutUrl;
           } catch (error) {
             console.error(
@@ -949,9 +1001,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
               error,
             );
             setCheckoutBindingState(String(binding.id || "unknown"), {
-              status: "idle",
+              status: "error",
               cacheKey: null,
-              message: null,
+              message: CHECKOUT_ERROR_LABEL,
             });
           }
         });
@@ -986,9 +1038,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
           await syncCheckoutBindingWarmState(binding);
         } catch (_) {
           setCheckoutBindingState(String(binding.id || "unknown"), {
-            status: "idle",
+            status: "error",
             cacheKey: null,
-            message: null,
+            message: CHECKOUT_ERROR_LABEL,
           });
         }
       }),
@@ -1034,7 +1086,12 @@ function buildStandaloneImportedHtmlRuntimeScript({
   window.setTimeout(applyMobileSpacingFixesSafely, 250);
   window.setTimeout(applyMobileSpacingFixesSafely, 1000);
   window.addEventListener("resize", applyMobileSpacingFixesSafely);
-  document.addEventListener("click", () => scheduleWarmCheckoutBindings(), true);
+  document.addEventListener("click", (event) => {
+    if (checkoutNavigationInProgress || isCheckoutBindingTarget(event.target)) {
+      return;
+    }
+    scheduleWarmCheckoutBindings();
+  }, true);
   document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
   document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);
   window.addEventListener("pageshow", () => scheduleWarmCheckoutBindings(0));
