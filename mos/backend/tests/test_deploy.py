@@ -1958,6 +1958,40 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
     }
 
 
+def test_extract_embedded_asset_public_ids_collects_urls_inside_imported_html_document():
+    output = deploy_service._extract_embedded_asset_public_ids(
+        puck_data={
+            "root": {"props": {}},
+            "content": [
+                {
+                    "type": "ImportedHtmlDocument",
+                    "props": {
+                        "htmlDocument": """
+<!DOCTYPE html>
+<html>
+  <body>
+    <img src="https://api.moshq.app/public/assets/77777777-7777-7777-7777-777777777777" alt="Hero">
+    <img src="/public/assets/88888888-8888-8888-8888-888888888888" alt="Chart">
+    <img src="/api/public/assets/99999999-9999-9999-9999-999999999999.png" alt="Gallery">
+  </body>
+</html>
+""",
+                    },
+                }
+            ],
+            "zones": {},
+        },
+        design_system_tokens=None,
+        context_label="imported-html-page",
+    )
+
+    assert output == {
+        "77777777-7777-7777-7777-777777777777",
+        "88888888-8888-8888-8888-888888888888",
+        "99999999-9999-9999-9999-999999999999",
+    }
+
+
 def test_extract_embedded_asset_public_ids_errors_on_invalid_uuid():
     with pytest.raises(deploy_service.DeployError, match="invalid assetPublicId"):
         deploy_service._extract_embedded_asset_public_ids(

@@ -55,6 +55,9 @@ _PUBLIC_ASSET_URL_PREFIXES = (
     "/api/public/assets/",
     "api/public/assets/",
 )
+_PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
+    r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/([^\s\"'<>?#/]+)"
+)
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -814,6 +817,23 @@ def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
     return None
 
 
+def _extract_public_asset_ids_from_text(raw_value: str) -> set[str]:
+    value = str(raw_value or "").strip()
+    if not value:
+        return set()
+
+    matches = set()
+    for match in _PUBLIC_ASSET_URL_IN_TEXT_RE.finditer(value):
+        token = str(match.group(1) or "").strip()
+        if not token:
+            continue
+        if "." in token:
+            token = token.split(".", 1)[0]
+        if token:
+            matches.add(token)
+    return matches
+
+
 def _extract_embedded_asset_public_ids(
     *,
     puck_data: dict[str, Any],
@@ -843,17 +863,20 @@ def _extract_embedded_asset_public_ids(
         for raw_value in obj.values():
             if not isinstance(raw_value, str):
                 continue
-            public_id_from_url = _extract_public_asset_id_from_url(raw_value)
-            if not public_id_from_url:
-                continue
-            try:
-                normalized_from_url = str(UUID(public_id_from_url))
-            except ValueError as exc:
-                raise DeployError(
-                    f"{context_label} includes invalid public asset URL '{raw_value}'. "
-                    "Expected /public/assets/<uuid>."
-                ) from exc
-            public_ids.add(normalized_from_url)
+            matched_public_ids = _extract_public_asset_ids_from_text(raw_value)
+            if not matched_public_ids:
+                public_id_from_url = _extract_public_asset_id_from_url(raw_value)
+                if public_id_from_url:
+                    matched_public_ids = {public_id_from_url}
+            for public_id_from_url in matched_public_ids:
+                try:
+                    normalized_from_url = str(UUID(public_id_from_url))
+                except ValueError as exc:
+                    raise DeployError(
+                        f"{context_label} includes invalid public asset URL '{raw_value}'. "
+                        "Expected /public/assets/<uuid>."
+                    ) from exc
+                public_ids.add(normalized_from_url)
 
     if isinstance(design_system_tokens, dict):
         brand = design_system_tokens.get("brand")
