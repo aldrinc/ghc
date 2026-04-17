@@ -317,7 +317,6 @@ export function FunnelCompliancePage({
     throw new Error("FunnelCompliancePage requires a resolvable public funnel URL.");
   }
 
-  const resolvedTitle = policyPage?.title || pageTitle || "Policy Page";
   const currentYear = new Date().getFullYear();
 
   return (
@@ -344,9 +343,6 @@ export function FunnelCompliancePage({
 
       <main className="ember-compliance-main">
         <div className="ember-compliance-container">
-          <p className="ember-compliance-eyebrow">Compliance</p>
-          <h1 className="ember-compliance-title">{resolvedTitle}</h1>
-
           {loading ? (
             <div className="ember-compliance-status">
               Loading {pageTitle || "policy page"}...
