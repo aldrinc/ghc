@@ -56,19 +56,27 @@ describe("resolveExternalCheckoutUrlForVariant", () => {
 });
 
 describe("optimizeImportedHtmlDocument", () => {
-  it("keeps the first image eager and defers the rest", () => {
+  it("keeps the early above-the-fold images eager and defers the rest", () => {
     const optimized = optimizeImportedHtmlDocument(`
       <!DOCTYPE html>
       <html>
         <body>
-          <img src="/hero.jpg" alt="Hero" />
+          <img src="/flag.png" alt="Flag" class="h-4 w-auto" />
+          <img src="/stars.png" alt="Stars" class="h-4 object-contain" />
+          <img src="/hero.jpg" alt="Hero" class="w-full block aspect-[21/9] object-cover" />
+          <img src="/avatar.jpg" alt="Avatar" class="w-10 h-10 rounded-full" />
           <img src="/gallery-1.jpg" alt="Gallery 1" />
           <img src="/gallery-2.jpg" alt="Gallery 2" loading="lazy" />
         </body>
       </html>
     `);
 
-    expect(optimized).toContain('src="/hero.jpg" alt="Hero" loading="eager" decoding="async" fetchpriority="high"');
+    expect(optimized).toContain('src="/flag.png" alt="Flag" class="h-4 w-auto" loading="eager" decoding="async" fetchpriority="high"');
+    expect(optimized).toContain('src="/stars.png" alt="Stars" class="h-4 object-contain" loading="lazy" decoding="async" fetchpriority="low"');
+    expect(optimized).toContain(
+      'src="/hero.jpg" alt="Hero" class="w-full block aspect-[21/9] object-cover" loading="eager" decoding="async" fetchpriority="high"',
+    );
+    expect(optimized).toContain('src="/avatar.jpg" alt="Avatar" class="w-10 h-10 rounded-full" loading="lazy" decoding="async" fetchpriority="low"');
     expect(optimized).toContain('src="/gallery-1.jpg" alt="Gallery 1" loading="lazy" decoding="async" fetchpriority="low"');
     expect(optimized).toContain('src="/gallery-2.jpg" alt="Gallery 2" loading="lazy" decoding="async" fetchpriority="low"');
   });

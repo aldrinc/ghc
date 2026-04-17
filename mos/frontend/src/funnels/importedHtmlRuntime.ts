@@ -104,6 +104,29 @@ export function resolveExternalCheckoutUrlForVariant(
 }
 
 const IMPORTED_HTML_EAGER_IMAGE_LIMIT = 1;
+const IMPORTED_HTML_EAGER_HERO_SCAN_LIMIT = 6;
+
+function isLikelyAboveFoldHeroImage(image: HTMLImageElement, index: number): boolean {
+  if (index >= IMPORTED_HTML_EAGER_HERO_SCAN_LIMIT) {
+    return false;
+  }
+
+  const className = (image.getAttribute("class") || "").trim().toLowerCase();
+  const style = (image.getAttribute("style") || "").trim().toLowerCase();
+  const width = Number.parseInt((image.getAttribute("width") || "").trim(), 10);
+  const height = Number.parseInt((image.getAttribute("height") || "").trim(), 10);
+
+  if (/\bw-full\b|\baspect-\[|\bobject-cover\b/.test(className)) {
+    return true;
+  }
+  if (/(^|;)\s*(width|max-width)\s*:\s*100%/.test(style)) {
+    return true;
+  }
+  if ((Number.isFinite(width) && width >= 320) || (Number.isFinite(height) && height >= 180)) {
+    return true;
+  }
+  return false;
+}
 
 export function optimizeImportedHtmlDocument(htmlDocument: string | null | undefined): string {
   const normalizedHtml = typeof htmlDocument === "string" ? htmlDocument.trim() : "";
@@ -119,10 +142,13 @@ export function optimizeImportedHtmlDocument(htmlDocument: string | null | undef
     const images = Array.from(parsedDocument.querySelectorAll("img"));
     let eagerImagesAssigned = 0;
 
-    for (const image of images) {
+    for (const [index, image] of images.entries()) {
       const existingLoading = (image.getAttribute("loading") || "").trim().toLowerCase();
       const existingFetchPriority = (image.getAttribute("fetchpriority") || "").trim().toLowerCase();
-      const shouldRemainEager = existingLoading === "eager" || eagerImagesAssigned < IMPORTED_HTML_EAGER_IMAGE_LIMIT;
+      const shouldRemainEager =
+        existingLoading === "eager" ||
+        eagerImagesAssigned < IMPORTED_HTML_EAGER_IMAGE_LIMIT ||
+        isLikelyAboveFoldHeroImage(image, index);
 
       if (!existingLoading) {
         image.setAttribute("loading", shouldRemainEager ? "eager" : "lazy");
