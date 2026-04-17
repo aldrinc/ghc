@@ -527,6 +527,41 @@ def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
     assert '"defaultFunnelSlug":"18ac0fe1"' in runtime_block
     assert '"defaultEntrySlug":"presales"' in runtime_block
     assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"18ac0fe1"' in runtime_block
+    assert '"commerce":' not in runtime_block
+
+
+def test_funnel_artifact_site_only_inlines_the_entry_page_in_runtime_config():
+    app = _artifact_app()
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["pages"]["sales-page"] = {
+        "funnelId": "funnel-1",
+        "publicationId": "pub-1",
+        "pageId": "page-2",
+        "slug": "sales-page",
+        "puckData": {
+            "root": {"props": {"title": "Sales"}},
+            "content": [],
+            "zones": {},
+        },
+        "pageMap": {"page-1": "presales", "page-2": "sales-page"},
+    }
+    funnel_payload["meta"]["pages"] = [
+        {"pageId": "page-1", "slug": "presales"},
+        {"pageId": "page-2", "slug": "sales-page"},
+    ]
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_script_path = next((path for path in uploaded if path.startswith("/tmp/cloudhand-runtime-config-")), "")
+    assert runtime_script_path
+    runtime_inject_script = uploaded[runtime_script_path]
+    assert isinstance(runtime_inject_script, str)
+    runtime_block = _extract_runtime_block(runtime_inject_script)
+
+    assert '"pages":{"presales":' in runtime_block
+    assert '"pageId":"page-2","slug":"sales-page","puckData"' not in runtime_block
 
 
 def test_funnel_artifact_site_escapes_html_script_terminators_in_runtime_config():

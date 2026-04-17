@@ -136,9 +136,12 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain("Secure checkout is unavailable right now.");
     expect(injectedDocument).toContain("aria-busy");
     expect(injectedDocument).toContain("waitForPreparedCheckout(cacheKey)");
+    expect(injectedDocument).not.toContain('document.addEventListener("DOMContentLoaded", warmCheckoutBindingsSafely');
+    expect(injectedDocument).not.toContain('window.addEventListener("load", warmCheckoutBindingsSafely');
+    expect(injectedDocument).not.toContain("window.setTimeout(warmCheckoutBindingsSafely");
   });
 
-  it("reuses the prepared checkout on click instead of creating a second checkout", async () => {
+  it("reuses the prepared checkout after checkout intent instead of creating a second checkout", async () => {
     const htmlDocument = `
       <html>
         <body>
@@ -181,17 +184,20 @@ describe("StandaloneImportedHtmlPage", () => {
     dom.window.console.error = vi.fn();
 
     dom.window.eval(runtimeScript);
-    await new Promise((resolve) => setTimeout(resolve, 1100));
-
     const countCheckoutCalls = () =>
       fetchMock.mock.calls.filter(([input]) => String(input).includes("/public/checkout")).length;
 
-    expect(countCheckoutCalls()).toBe(1);
+    expect(countCheckoutCalls()).toBe(0);
 
     const button = dom.window.document.getElementById("main-cta");
     if (!(button instanceof dom.window.HTMLElement)) {
       throw new Error("Checkout button was not bound in the standalone runtime.");
     }
+
+    button.dispatchEvent(new dom.window.Event("touchstart", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(countCheckoutCalls()).toBe(1);
 
     button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -200,5 +206,21 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(dom.window.location.hash).toBe("#prepared-checkout");
 
     dom.window.close();
+  });
+
+  it("optimizes imported HTML image loading before injecting the document", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: `
+        <html>
+          <body>
+            <img src="/hero.jpg" alt="Hero" />
+            <img src="/gallery.jpg" alt="Gallery" />
+          </body>
+        </html>
+      `,
+    });
+
+    expect(injectedDocument).toContain('src="/hero.jpg" alt="Hero" loading="eager" decoding="async" fetchpriority="high"');
+    expect(injectedDocument).toContain('src="/gallery.jpg" alt="Gallery" loading="lazy" decoding="async" fetchpriority="low"');
   });
 });

@@ -5,6 +5,7 @@ import {
   IMPORTED_HTML_RUNTIME_MESSAGE_SOURCE,
   isImportedHtmlRuntimeMessage,
   normalizeImportedHtmlManifest,
+  optimizeImportedHtmlDocument,
   type ImportedHtmlRuntimeCheckoutMessage,
   type ImportedHtmlRuntimeErrorMessage,
   type ImportedHtmlRuntimeNavigateMessage,
@@ -374,7 +375,7 @@ export function ImportedHtmlDocument({
   );
 
   const srcDoc = useMemo(() => {
-    const normalizedHtml = typeof htmlDocument === "string" ? htmlDocument.trim() : "";
+    const normalizedHtml = optimizeImportedHtmlDocument(htmlDocument);
     if (!normalizedHtml) return "";
     return injectImportedHtmlRuntimeScript(
       normalizedHtml,

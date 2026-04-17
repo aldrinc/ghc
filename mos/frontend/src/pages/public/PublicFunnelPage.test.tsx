@@ -7,25 +7,13 @@ import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 
 const standaloneImportedHtmlPageMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
-vi.mock("@measured/puck", () => ({
-  Render: () => <div data-testid="puck-renderer" />,
-}));
-
-vi.mock("@/funnels/puckConfig", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/funnels/puckConfig")>();
-  return {
-    ...actual,
-    createFunnelPuckConfig: () => ({}),
-    FunnelRuntimeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-  };
-});
-
-vi.mock("@/components/design-system/DesignSystemProvider", () => ({
-  DesignSystemProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
 
 vi.mock("@/funnels/StandaloneImportedHtmlPage", () => ({
   StandaloneImportedHtmlPage: (props: unknown) => standaloneImportedHtmlPageMock(props),
+}));
+
+vi.mock("@/pages/public/PublicFunnelPuckRenderer", () => ({
+  default: ({ children }: { children?: ReactNode }) => <div data-testid="puck-renderer">{children}</div>,
 }));
 
 vi.mock("@/funnels/runtimeRouting", () => ({
@@ -153,6 +141,8 @@ describe("PublicFunnelPage", () => {
     });
 
     expect(screen.queryByText("Imported HTML page is unavailable.")).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/pages/presales"));
+    expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/commerce"));
   });
 
   it("builds standalone imported HTML page paths with the funnel slug", async () => {

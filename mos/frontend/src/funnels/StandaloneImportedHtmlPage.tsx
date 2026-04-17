@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { optimizeImportedHtmlDocument } from "@/funnels/importedHtmlRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type {
@@ -462,6 +463,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (!list.includes(element)) {
       list.push(element);
       checkoutBindingElements[bindingId] = list;
+    }
+    if (element.dataset.mosCheckoutWarmBound !== "true") {
+      element.dataset.mosCheckoutWarmBound = "true";
+      element.addEventListener("pointerenter", () => scheduleWarmCheckoutBindings(75), { passive: true });
+      element.addEventListener("touchstart", () => scheduleWarmCheckoutBindings(0), { passive: true });
+      element.addEventListener("mousedown", () => scheduleWarmCheckoutBindings(0), { passive: true });
+      element.addEventListener("focus", () => scheduleWarmCheckoutBindings(0));
     }
     renderCheckoutBindingState(bindingId);
   };
@@ -1066,35 +1074,22 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   bindManifestSafely();
-  warmCheckoutBindingsSafely();
   applyMobileSpacingFixesSafely();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
-    document.addEventListener("DOMContentLoaded", warmCheckoutBindingsSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
-  window.addEventListener("load", warmCheckoutBindingsSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);
-  window.setTimeout(warmCheckoutBindingsSafely, 0);
-  window.setTimeout(warmCheckoutBindingsSafely, 250);
-  window.setTimeout(warmCheckoutBindingsSafely, 1000);
   window.setTimeout(applyMobileSpacingFixesSafely, 0);
   window.setTimeout(applyMobileSpacingFixesSafely, 250);
   window.setTimeout(applyMobileSpacingFixesSafely, 1000);
   window.addEventListener("resize", applyMobileSpacingFixesSafely);
-  document.addEventListener("click", (event) => {
-    if (checkoutNavigationInProgress || isCheckoutBindingTarget(event.target)) {
-      return;
-    }
-    scheduleWarmCheckoutBindings();
-  }, true);
   document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
   document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);
-  window.addEventListener("pageshow", () => scheduleWarmCheckoutBindings(0));
 })();
 </script>`;
 }
@@ -1114,7 +1109,7 @@ function injectStandaloneRuntimeScript(
 
 export function StandaloneImportedHtmlPage(props: StandaloneImportedHtmlPageProps) {
   useEffect(() => {
-    const normalizedHtml = props.htmlDocument.trim();
+    const normalizedHtml = optimizeImportedHtmlDocument(props.htmlDocument);
     if (!normalizedHtml) {
       throw new Error("Standalone imported HTML page is empty.");
     }

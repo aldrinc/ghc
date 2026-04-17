@@ -1089,8 +1089,16 @@ WantedBy=multi-user.target
                 page_slug=str(raw_page_slug or ""),
                 page_payload=page_payload,
             )
-
-        commerce = resolved_funnel_payload.get("commerce")
+        entry_slug = self._canonical_funnel_artifact_page_slug(canonical_meta.get("entrySlug"))
+        if not entry_slug:
+            raise ValueError(
+                f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical entry slug for runtime preload."
+            )
+        entry_page_payload = canonical_pages.get(entry_slug)
+        if not isinstance(entry_page_payload, dict):
+            raise ValueError(
+                f"Artifact funnel '{product_slug}/{funnel_slug}' entrySlug '{entry_slug}' was not found in pages."
+            )
         return {
             "productSlug": product_slug,
             "funnelSlug": funnel_slug,
@@ -1098,8 +1106,8 @@ WantedBy=multi-user.target
                 **canonical_meta,
                 "funnelSlug": funnel_slug,
             },
-            "commerce": commerce if isinstance(commerce, dict) else None,
-            "pages": canonical_pages,
+            # Keep the deploy-time inline runtime lean so mobile webviews only pay for the entry page.
+            "pages": {entry_slug: entry_page_payload},
         }
 
     def _inject_funnel_runtime_config(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
