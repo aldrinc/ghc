@@ -73,6 +73,8 @@ function resolvePolicySlugPaths(
 
 const COMPLIANCE_PAGE_CSS = `
 .ember-compliance-root {
+  /* Mirror the live Ember sales-page tokens so the compliance surface visually
+     matches the rest of the funnel (brand red, cream page bg, Satoshi). */
   --color-brand: #C41423;
   --color-text: #2D2926;
   --color-muted: rgba(45, 41, 38, 0.76);
@@ -80,11 +82,14 @@ const COMPLIANCE_PAGE_CSS = `
   --color-page-bg: #FFFAF4;
   --color-page-bg-secondary: #F7F1E8;
   --color-border: rgba(45, 41, 38, 0.16);
-  --font-heading: 'Bookmania', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Proxima Nova', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  --color-soft: rgba(196, 20, 35, 0.06);
+  --shadow-sm: 0 8px 24px rgba(45, 41, 38, 0.08);
+  --font-heading: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--color-page-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -167,24 +172,37 @@ const COMPLIANCE_PAGE_CSS = `
 .ember-compliance-content :where(h1, h2, h3, h4) {
   font-family: var(--font-heading);
   color: var(--color-text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
-.ember-compliance-content h1 { font-size: 28px; margin: 0 0 20px; line-height: 1.2; }
-.ember-compliance-content h2 {
-  font-size: 20px;
+.ember-compliance-content h1 {
+  font-size: clamp(36px, 5vw, 48px);
   font-weight: 700;
-  margin: 32px 0 14px;
+  margin: 0 0 28px;
+  line-height: 1.15;
+}
+.ember-compliance-content h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 36px 0 14px;
   line-height: 1.25;
   color: var(--color-brand);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
 }
-.ember-compliance-content h3 { font-size: 17px; margin: 24px 0 10px; line-height: 1.3; }
+.ember-compliance-content h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 28px 0 12px;
+  line-height: 1.3;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
 .ember-compliance-content p,
 .ember-compliance-content li {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.65;
   color: var(--color-text);
+  font-weight: 400;
 }
 .ember-compliance-content p { margin: 0 0 14px; }
 .ember-compliance-content ul,
@@ -272,6 +290,19 @@ export function FunnelCompliancePage({
     () => (runtime ? resolvePolicySlugPaths(runtime) : null),
     [runtime],
   );
+
+  // Lazy-load Satoshi from Fontshare so compliance pages match the sales page
+  // typography even when rendered outside the sales page HTML that imports it.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const id = "ember-compliance-fontshare-satoshi";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap";
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     if (!runtime?.productSlug || !runtime.funnelSlug || !websiteUrl) {
