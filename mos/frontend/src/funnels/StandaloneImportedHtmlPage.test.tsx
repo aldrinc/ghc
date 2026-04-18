@@ -6,7 +6,7 @@ import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type { PublicFunnelPage } from "@/types/funnels";
 
-function buildPage(): PublicFunnelPage {
+function buildPage(overrides?: Partial<PublicFunnelPage>): PublicFunnelPage {
   return {
     productSlug: "example-product",
     funnelId: "funnel-1",
@@ -28,6 +28,7 @@ function buildPage(): PublicFunnelPage {
     designSystemTokens: null,
     tracking: null,
     nextPageId: null,
+    ...overrides,
   };
 }
 
@@ -75,6 +76,7 @@ function buildVariants(): PublicCommerceVariant[] {
 async function captureInjectedDocument(options?: {
   htmlDocument?: string;
   variants?: PublicCommerceVariant[];
+  page?: Partial<PublicFunnelPage>;
 }) {
   const documentOpenSpy = vi.spyOn(document, "open").mockImplementation(() => document);
   const documentWriteSpy = vi.spyOn(document, "write").mockImplementation(() => undefined);
@@ -82,7 +84,7 @@ async function captureInjectedDocument(options?: {
 
   render(
     <StandaloneImportedHtmlPage
-      page={buildPage()}
+      page={buildPage(options?.page)}
       productSlug="example-product"
       funnelSlug="example-funnel"
       visitorId="visitor-1"
@@ -226,6 +228,58 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(countPrepareCalls()).toBe(1);
     expect(countConsumeCalls()).toBe(1);
     expect(dom.window.location.hash).toBe("#prepared-checkout");
+
+    dom.window.close();
+  });
+
+  it("restores Meta page view tracking for standalone sales pages", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
+      page: {
+        tracking: {
+          provider: "meta",
+          metaPixelId: "970868055499017",
+        },
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM("<html><body><button id=\"main-cta\">Buy now</button></body></html>", {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const fbqQueue = dom.window.fbq?.queue ?? [];
+    expect(fbqQueue).toEqual(
+      expect.arrayContaining([
+        ["init", "970868055499017"],
+        ["track", "PageView", { page_stage: "sales" }],
+        ["track", "ViewContent", { page_stage: "sales" }],
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/public/events"),
+      expect.objectContaining({ method: "POST" }),
+    );
 
     dom.window.close();
   });
