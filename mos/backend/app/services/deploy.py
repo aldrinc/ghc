@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -124,6 +125,67 @@ def _assert_under_cloudhand(path: Path) -> Path:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _read_positive_timeout_from_env(*, env_name: str, default_seconds: float) -> float | None:
+    raw_value = str(os.getenv(env_name, "")).strip()
+    if not raw_value:
+        return default_seconds
+    try:
+        timeout_seconds = float(raw_value)
+    except ValueError as exc:
+        raise DeployError(f"{env_name} must be a valid number of seconds.") from exc
+    if timeout_seconds <= 0:
+        return None
+    return timeout_seconds
+
+
+def _deploy_apply_timeout_seconds() -> float | None:
+    return _read_positive_timeout_from_env(
+        env_name="DEPLOY_APPLY_TIMEOUT_SECONDS",
+        default_seconds=15 * 60,
+    )
+
+
+async def _collect_subprocess_output(
+    stream: asyncio.StreamReader | None,
+    *,
+    logs: list[str],
+) -> None:
+    if stream is None:
+        return
+    async for raw in stream:
+        logs.append(raw.decode(errors="ignore"))
+
+
+async def _terminate_subprocess(proc: asyncio.subprocess.Process) -> None:
+    if proc.returncode is not None:
+        return
+
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGTERM)
+        else:  # pragma: no cover - windows
+            proc.terminate()
+        await asyncio.wait_for(proc.wait(), timeout=10)
+        return
+    except ProcessLookupError:
+        return
+    except asyncio.TimeoutError:
+        pass
+
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:  # pragma: no cover - windows
+            proc.kill()
+    except ProcessLookupError:
+        return
+
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=5)
+    except asyncio.TimeoutError:  # pragma: no cover - defensive
+        return
 
 
 def _jobs_dir() -> Path:
@@ -2239,14 +2301,28 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        start_new_session=True,
     )
 
     logs: list[str] = []
-    assert proc.stdout
-    async for raw in proc.stdout:
-        logs.append(raw.decode(errors="ignore"))
-
-    rc = await proc.wait()
+    reader_task = asyncio.create_task(_collect_subprocess_output(proc.stdout, logs=logs))
+    timeout_seconds = _deploy_apply_timeout_seconds()
+    try:
+        if timeout_seconds is None:
+            rc = await proc.wait()
+        else:
+            rc = await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
+    except asyncio.TimeoutError as exc:
+        logs.append(
+            f"Error: Cloudhand apply timed out after {int(timeout_seconds)} seconds "
+            f"for plan '{requested_plan_file}'.\n"
+        )
+        await _terminate_subprocess(proc)
+        raise DeployError(
+            f"Cloudhand apply timed out after {int(timeout_seconds)} seconds."
+        ) from exc
+    finally:
+        await reader_task
 
     # Try to read terraform outputs for convenience
     server_ips: dict[str, str] = {}
@@ -2490,7 +2566,9 @@ def _resolve_publish_job_workspace_server_names(
     if raw_workspace_server_names is not None:
         if not isinstance(raw_workspace_server_names, list):
             raise DeployError("Publish deploy workload workspace_server_names must be a list.")
-        return _normalize_workload_server_names(server_names=raw_workspace_server_names)
+        normalized = _normalize_workload_server_names(server_names=raw_workspace_server_names)
+        if normalized:
+            return normalized
 
     return OrgDeployDomainsRepository(session).list_hostnames(
         org_id=org_id,
@@ -3217,6 +3295,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     path = _publish_job_path(job_id)
     job["status"] = "running"
     job["started_at"] = _utc_now_iso()
+    job["phase"] = "publishing_funnel"
     _write_json_atomic(path, job)
 
     org_id = str(job.get("org_id") or "").strip()
@@ -3240,6 +3319,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 session=session, org_id=org_id, user_id=user_id, funnel_id=funnel_id
             )
             result_payload["publicationId"] = str(publication.id)
+            job["result"] = result_payload
+            job["phase"] = "publication_created"
+            _write_json_atomic(path, job)
 
             if deploy_request is not None:
                 if not isinstance(deploy_request, dict):
@@ -3274,6 +3356,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     if isinstance(artifact_version, int):
                         runtime_artifact_payload["version"] = artifact_version
                     result_payload["runtimeArtifact"] = runtime_artifact_payload
+                    job["result"] = result_payload
+                    job["phase"] = "artifact_hydrated"
+                    _write_json_atomic(path, job)
 
                 plan_resolution = ensure_plan_for_funnel_publish_workload(
                     workload_patch=workload_patch,
@@ -3290,6 +3375,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     in_place=bool(deploy_request.get("in_place", False)),
                 )
                 deploy_response: dict[str, Any] = {"patch": patch_result}
+                job["phase"] = "plan_patched"
+                job["result"] = result_payload
+                _write_json_atomic(path, job)
                 if plan_resolution.get("bootstrapped"):
                     deploy_response["bootstrap"] = {
                         "created": True,
@@ -3299,6 +3387,8 @@ async def _run_funnel_publish_job(job_id: str) -> None:
 
                 apply_plan_enabled = bool(deploy_request.get("apply_plan", True))
                 if apply_plan_enabled:
+                    job["phase"] = "applying_plan"
+                    _write_json_atomic(path, job)
                     apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
                     return_code, summary = _summarize_apply_result(apply_result)
                     deploy_response["apply"] = summary
@@ -3328,6 +3418,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     deploy_response["apply"] = summary
 
                 if bool(deploy_request.get("bunny_pull_zone", False)):
+                    job["phase"] = "reconciling_bunny"
+                    job["result"] = result_payload
+                    _write_json_atomic(path, job)
                     workload_name = str(workload_patch.get("name") or "").strip()
                     if not workload_name:
                         raise DeployError("Publish deploy workload patch is missing workload name.")
@@ -3367,6 +3460,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
         job["result"] = result_payload
         job["access_urls"] = access_urls
         job["status"] = "succeeded"
+        job["phase"] = "completed"
         job["error"] = None
     except ValueError as exc:
         job["status"] = "failed"

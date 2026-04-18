@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -548,6 +549,92 @@ def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_doma
     )
 
     assert result == ["shop.example.com"]
+
+
+def test_resolve_publish_job_workspace_server_names_falls_back_to_saved_workspace_domains_when_empty(
+    monkeypatch,
+):
+    class DummyRepo:
+        def __init__(self, session):
+            self.session = session
+
+        def list_hostnames(self, *, org_id: str, client_id: str, strict: bool = True) -> list[str]:
+            _ = self.session
+            _ = strict
+            assert org_id == "org-123"
+            assert client_id == "client-123"
+            return ["shop.shopemberco.com"]
+
+    monkeypatch.setattr(
+        "app.db.repositories.org_deploy_domains.OrgDeployDomainsRepository",
+        DummyRepo,
+    )
+
+    result = deploy_service._resolve_publish_job_workspace_server_names(
+        session=object(),
+        org_id="org-123",
+        workload_client_id="client-123",
+        workload_patch={"workspace_server_names": []},
+    )
+
+    assert result == ["shop.shopemberco.com"]
+
+
+@pytest.mark.asyncio
+async def test_apply_plan_times_out_stuck_cloudhand_process(tmp_path, monkeypatch):
+    cloudhand_dir = tmp_path / "cloudhand"
+    terraform_dir = tmp_path / "terraform"
+    cloudhand_dir.mkdir()
+    terraform_dir.mkdir()
+    plan_path = cloudhand_dir / "plan.json"
+    plan_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setenv("HCLOUD_TOKEN", "test-token")
+    monkeypatch.setenv("DEPLOY_APPLY_TIMEOUT_SECONDS", "0.01")
+    monkeypatch.setattr(deploy_service, "_cloudhand_dir", lambda: cloudhand_dir)
+    monkeypatch.setattr(deploy_service, "_terraform_dir", lambda: terraform_dir)
+    monkeypatch.setattr(deploy_service, "_materialize_funnel_artifacts_for_apply", lambda *, plan_file: plan_file)
+    monkeypatch.setattr(deploy_service, "_resolve_terraform_bin", lambda: "terraform")
+
+    class FakeStdout:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    class FakeProc:
+        def __init__(self):
+            self.stdout = FakeStdout()
+            self.returncode = None
+            self.pid = 4242
+            self._done = asyncio.Event()
+
+        async def wait(self):
+            await self._done.wait()
+            return self.returncode
+
+    fake_proc = FakeProc()
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        _ = args
+        _ = kwargs
+        return fake_proc
+
+    terminated: list[tuple[int, int]] = []
+
+    def fake_killpg(pid: int, sig: int):
+        terminated.append((pid, sig))
+        fake_proc.returncode = -9
+        fake_proc._done.set()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(deploy_service.os, "killpg", fake_killpg)
+
+    with pytest.raises(deploy_service.DeployError, match="timed out"):
+        await deploy_service.apply_plan(plan_path=str(plan_path))
+
+    assert terminated
 
 
 def test_resolve_bunny_pull_zone_origin_url_uses_requested_origin_ip(monkeypatch):
