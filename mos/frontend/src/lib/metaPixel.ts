@@ -14,7 +14,53 @@ declare global {
 
 const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
 const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
 type MetaPixelMethod = "track" | "trackCustom";
+
+declare global {
+  interface Window {
+    __mosMetaPixelLoadScheduled?: boolean;
+  }
+}
+
+function loadMetaPixelScript() {
+  if (typeof document === "undefined" || document.getElementById(META_PIXEL_SCRIPT_ID)) {
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.id = META_PIXEL_SCRIPT_ID;
+  script.async = true;
+  script.src = META_PIXEL_SCRIPT_SRC;
+  document.head.appendChild(script);
+}
+
+function scheduleMetaPixelScriptLoad() {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+  if (document.getElementById(META_PIXEL_SCRIPT_ID) || window.__mosMetaPixelLoadScheduled) {
+    return;
+  }
+
+  window.__mosMetaPixelLoadScheduled = true;
+  const flush = () => {
+    window.__mosMetaPixelLoadScheduled = false;
+    loadMetaPixelScript();
+  };
+
+  const listenerOptions = { capture: true, once: true } as const;
+  window.addEventListener("pointerdown", flush, listenerOptions);
+  window.addEventListener("keydown", flush, listenerOptions);
+  window.addEventListener("touchstart", flush, listenerOptions);
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(flush, { timeout: META_PIXEL_DEFER_TIMEOUT_MS });
+    return;
+  }
+
+  window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
+}
 
 function ensureMetaPixelBootstrap() {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -37,13 +83,7 @@ function ensureMetaPixelBootstrap() {
     window._fbq = fbq;
   }
 
-  if (!document.getElementById(META_PIXEL_SCRIPT_ID)) {
-    const script = document.createElement("script");
-    script.id = META_PIXEL_SCRIPT_ID;
-    script.async = true;
-    script.src = META_PIXEL_SCRIPT_SRC;
-    document.head.appendChild(script);
-  }
+  scheduleMetaPixelScriptLoad();
 
   if (!Array.isArray(window.__mosMetaPixelIds)) {
     window.__mosMetaPixelIds = [];

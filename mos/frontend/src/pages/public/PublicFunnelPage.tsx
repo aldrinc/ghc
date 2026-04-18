@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
 import type {
   ImportedHtmlInstrumentationManifest,
   PublicFunnelMeta,
@@ -25,11 +24,13 @@ import {
 import { pageViewEventForStage, type RuntimeTrackingEvent } from "@/lib/funnelTracking";
 import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
+import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const managedFaviconAttr = "data-mos-managed-favicon";
 const managedMetaAttr = "data-mos-managed-meta";
 const PublicFunnelPuckRenderer = lazy(() => import("./PublicFunnelPuckRenderer"));
+const PublicImportedHtmlRenderer = lazy(() => import("./PublicImportedHtmlRenderer"));
 
 type ResolvedPageMetadata = {
   title: string;
@@ -557,47 +558,41 @@ export function PublicFunnelPage() {
   }, [funnelSlug, page, sessionId]);
 
   if (!productSlug || !funnelSlug) {
-    return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Missing public funnel path.</div>;
+    return <PublicFunnelShellMessage>Missing public funnel path.</PublicFunnelShellMessage>;
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
-        This funnel page is unavailable. {error}
-      </div>
-    );
+    return <PublicFunnelShellMessage>This funnel page is unavailable. {error}</PublicFunnelShellMessage>;
   }
 
   if (!page) {
-    return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
+    return <PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>;
   }
 
   if (standaloneImportedHtmlPayload) {
     if (!standaloneImportedHtmlPayload.instrumentationManifest) {
-      return (
-        <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
-          Imported HTML page is missing a valid instrumentation manifest.
-        </div>
-      );
+      return <PublicFunnelShellMessage>Imported HTML page is missing a valid instrumentation manifest.</PublicFunnelShellMessage>;
     }
     return (
-      <StandaloneImportedHtmlPage
-        page={page}
-        productSlug={productSlug}
-        funnelSlug={funnelSlug}
-        visitorId={visitorId}
-        sessionId={sessionId}
-        htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
-        instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
-        variants={commerce?.product?.variants ?? []}
-        pagePathById={standalonePagePathById}
-        pageStageById={page.pageStageMap}
-      />
+      <Suspense fallback={<PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>}>
+        <PublicImportedHtmlRenderer
+          page={page}
+          productSlug={productSlug}
+          funnelSlug={funnelSlug}
+          visitorId={visitorId}
+          sessionId={sessionId}
+          htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
+          instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
+          variants={commerce?.product?.variants ?? []}
+          pagePathById={standalonePagePathById}
+          pageStageById={page.pageStageMap}
+        />
+      </Suspense>
     );
   }
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>}>
+    <Suspense fallback={<PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>}>
       <PublicFunnelPuckRenderer
         page={page}
         meta={meta}

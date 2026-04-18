@@ -7,6 +7,7 @@ import { normalizePuckData } from "@/funnels/puckData";
 import type { RuntimeTrackingEvent } from "@/lib/funnelTracking";
 import type { PublicFunnelCommerce } from "@/types/commerce";
 import type { PublicFunnelMeta, PublicFunnelPage } from "@/types/funnels";
+import "@/runtime.css";
 
 const runtimeConfig = createFunnelPuckConfig();
 

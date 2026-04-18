@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 
-const standaloneImportedHtmlPageMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
+const importedHtmlRendererMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
 
-vi.mock("@/funnels/StandaloneImportedHtmlPage", () => ({
-  StandaloneImportedHtmlPage: (props: unknown) => standaloneImportedHtmlPageMock(props),
+vi.mock("@/pages/public/PublicImportedHtmlRenderer", () => ({
+  default: (props: unknown) => importedHtmlRendererMock(props),
 }));
 
 vi.mock("@/pages/public/PublicFunnelPuckRenderer", () => ({
@@ -149,10 +149,10 @@ describe("PublicFunnelPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(standaloneImportedHtmlPageMock).toHaveBeenCalled();
+      expect(importedHtmlRendererMock).toHaveBeenCalled();
     });
 
-    const props = standaloneImportedHtmlPageMock.mock.calls[0]?.[0] as {
+    const props = importedHtmlRendererMock.mock.calls[0]?.[0] as {
       pagePathById?: Record<string, string>;
     };
     expect(props.pagePathById).toEqual({
