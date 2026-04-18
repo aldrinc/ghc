@@ -132,6 +132,9 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain('void trackEvent(');
     expect(injectedDocument).toContain("prepareCheckoutInBackground");
     expect(injectedDocument).toContain("syncCheckoutBindingWarmState");
+    expect(injectedDocument).toContain("/public/checkout/prepare");
+    expect(injectedDocument).toContain("consumePreparedCheckout");
+    expect(injectedDocument).toContain("scheduleInitialWarmCheckoutBindings");
     expect(injectedDocument).toContain("Preparing secure checkout...");
     expect(injectedDocument).toContain("Secure checkout is unavailable right now.");
     expect(injectedDocument).toContain("aria-busy");
@@ -157,9 +160,23 @@ describe("StandaloneImportedHtmlPage", () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("/public/checkout")) {
+      if (url.includes("/public/checkout/prepare/") && url.endsWith("/consume")) {
         return new Response(
           JSON.stringify({
+            checkoutUrl: "#prepared-checkout",
+            sessionId: "checkout-session-1",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (url.includes("/public/checkout/prepare")) {
+        return new Response(
+          JSON.stringify({
+            preparedCheckoutId: "prepared-checkout-1",
+            status: "ready",
             checkoutUrl: "#prepared-checkout",
             sessionId: "checkout-session-1",
           }),
@@ -181,22 +198,33 @@ describe("StandaloneImportedHtmlPage", () => {
     dom.window.console.error = vi.fn();
 
     dom.window.eval(runtimeScript);
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const countPrepareCalls = () =>
+      fetchMock.mock.calls.filter(
+        ([input]) =>
+          String(input).includes("/public/checkout/prepare") &&
+          !String(input).endsWith("/consume"),
+      ).length;
+    const countConsumeCalls = () =>
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/consume")).length;
 
-    const countCheckoutCalls = () =>
-      fetchMock.mock.calls.filter(([input]) => String(input).includes("/public/checkout")).length;
-
-    expect(countCheckoutCalls()).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(countPrepareCalls()).toBe(1);
+    expect(countConsumeCalls()).toBe(0);
 
     const button = dom.window.document.getElementById("main-cta");
     if (!(button instanceof dom.window.HTMLElement)) {
       throw new Error("Checkout button was not bound in the standalone runtime.");
     }
 
+    button.dispatchEvent(new dom.window.Event("touchstart", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(countPrepareCalls()).toBe(1);
     button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    expect(countCheckoutCalls()).toBe(1);
+    expect(countPrepareCalls()).toBe(1);
+    expect(countConsumeCalls()).toBe(1);
     expect(dom.window.location.hash).toBe("#prepared-checkout");
 
     dom.window.close();
