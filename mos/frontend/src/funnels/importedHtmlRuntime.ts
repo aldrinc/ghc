@@ -102,3 +102,53 @@ export function resolveExternalCheckoutUrlForVariant(
   const match = externalUrlsByVariant.find((item) => item.variantId === variantId && typeof item.url === "string");
   return match?.url || null;
 }
+
+const IMPORTED_HTML_EAGER_IMAGE_LIMIT = 1;
+
+export function optimizeImportedHtmlDocument(htmlDocument: string | null | undefined): string {
+  const normalizedHtml = typeof htmlDocument === "string" ? htmlDocument.trim() : "";
+  if (!normalizedHtml) {
+    return "";
+  }
+  if (typeof DOMParser !== "function") {
+    return normalizedHtml;
+  }
+
+  try {
+    const parsedDocument = new DOMParser().parseFromString(normalizedHtml, "text/html");
+    const images = Array.from(parsedDocument.querySelectorAll("img"));
+    let eagerImagesAssigned = 0;
+
+    for (const image of images) {
+      const existingLoading = (image.getAttribute("loading") || "").trim().toLowerCase();
+      const existingFetchPriority = (image.getAttribute("fetchpriority") || "").trim().toLowerCase();
+      const shouldRemainEager = existingLoading === "eager" || eagerImagesAssigned < IMPORTED_HTML_EAGER_IMAGE_LIMIT;
+
+      if (!existingLoading) {
+        image.setAttribute("loading", shouldRemainEager ? "eager" : "lazy");
+      }
+      if (!image.getAttribute("decoding")) {
+        image.setAttribute("decoding", "async");
+      }
+      if (!existingFetchPriority) {
+        image.setAttribute("fetchpriority", shouldRemainEager ? "high" : "low");
+      }
+
+      const resolvedLoading = (image.getAttribute("loading") || "").trim().toLowerCase();
+      if (resolvedLoading === "eager") {
+        eagerImagesAssigned += 1;
+      }
+    }
+
+    const serializedDocument = parsedDocument.documentElement?.outerHTML?.trim();
+    if (!serializedDocument) {
+      return normalizedHtml;
+    }
+    if (/^\s*<!doctype/i.test(normalizedHtml)) {
+      return `<!DOCTYPE html>\n${serializedDocument}`;
+    }
+    return serializedDocument;
+  } catch {
+    return normalizedHtml;
+  }
+}

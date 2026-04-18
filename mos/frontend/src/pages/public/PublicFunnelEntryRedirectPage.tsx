@@ -6,6 +6,7 @@ import {
   isStandaloneBundleMode,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
+import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
 
@@ -63,8 +64,8 @@ export function PublicFunnelEntryRedirectPage() {
   }, [bundleMode, funnelSlug, location.hash, location.search, navigate, productSlug]);
 
   return (
-    <div className="min-h-screen bg-surface px-6 py-10 text-sm text-content-muted">
-      {error ? <div className="mx-auto w-full max-w-xl">This funnel is unavailable. {error}</div> : "Loading funnel…"}
-    </div>
+    <PublicFunnelShellMessage constrain={Boolean(error)}>
+      {error ? `This funnel is unavailable. ${error}` : "Loading funnel…"}
+    </PublicFunnelShellMessage>
   );
 }

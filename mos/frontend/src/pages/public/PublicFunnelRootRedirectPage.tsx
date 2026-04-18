@@ -5,6 +5,7 @@ import {
   getStandaloneDefaultPageRoute,
   isStandaloneBundleMode,
 } from "@/funnels/runtimeRouting";
+import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
 
 function ensureNoIndex() {
   const name = "robots";
@@ -48,9 +49,5 @@ export function PublicFunnelRootRedirectPage() {
     );
   }, [bundleMode, location.hash, location.search, navigate]);
 
-  return (
-    <div className="min-h-screen bg-surface px-6 py-10 text-sm text-content-muted">
-      {error ? <div className="mx-auto w-full max-w-xl">{error}</div> : "Loading funnel…"}
-    </div>
-  );
+  return <PublicFunnelShellMessage constrain={Boolean(error)}>{error || "Loading funnel…"}</PublicFunnelShellMessage>;
 }

@@ -1,16 +1,11 @@
-import { Render } from "@measured/puck";
-import type { Data } from "@measured/puck";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
 import type {
   ImportedHtmlInstrumentationManifest,
   PublicFunnelMeta,
   PublicFunnelPage as PublicFunnelPageType,
 } from "@/types/funnels";
 import type { PublicFunnelCommerce } from "@/types/commerce";
-import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
-import { normalizePuckData } from "@/funnels/puckData";
 import {
   buildPublicFunnelPath,
   getStandaloneDefaultFunnelSlug,
@@ -19,7 +14,6 @@ import {
   normalizeRouteToken,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
-import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import {
   buildPurchaseEventParams,
   clearCheckoutQueryParam,
@@ -30,11 +24,13 @@ import {
 import { pageViewEventForStage, type RuntimeTrackingEvent } from "@/lib/funnelTracking";
 import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
+import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
-const runtimeConfig = createFunnelPuckConfig();
 const managedFaviconAttr = "data-mos-managed-favicon";
 const managedMetaAttr = "data-mos-managed-meta";
+const PublicFunnelPuckRenderer = lazy(() => import("./PublicFunnelPuckRenderer"));
+const PublicImportedHtmlRenderer = lazy(() => import("./PublicImportedHtmlRenderer"));
 
 type ResolvedPageMetadata = {
   title: string;
@@ -332,10 +328,6 @@ export function PublicFunnelPage() {
     () => getOrCreateId(sessionStorage, `funnel_session_id:${productSlug || "unknown"}:${funnelSlug || "unknown"}`),
     [funnelSlug, productSlug],
   );
-  const normalizedPuckData = useMemo(() => {
-    if (!page) return null;
-    return normalizePuckData(page.puckData, { designSystemTokens: page.designSystemTokens ?? null });
-  }, [page]);
   const standaloneImportedHtmlPayload = useMemo(
     () => (bundleMode ? resolveStandaloneImportedHtmlPayload(page) : null),
     [bundleMode, page],
@@ -375,9 +367,14 @@ export function PublicFunnelPage() {
   }, [funnelSlug, preloadedFunnel?.meta, productSlug]);
 
   useEffect(() => {
-    if (!productSlug || !funnelSlug) return;
+    if (!productSlug || !funnelSlug || !page) return;
     if (preloadedFunnel?.commerce) {
       setCommerce(preloadedFunnel.commerce);
+      setCommerceError(null);
+      return;
+    }
+    if (bundleMode && standaloneImportedHtmlPayload) {
+      setCommerce(null);
       setCommerceError(null);
       return;
     }
@@ -394,7 +391,7 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setCommerceError(err instanceof Error ? err.message : "Unable to load commerce data");
       });
-  }, [funnelSlug, preloadedFunnel?.commerce, productSlug]);
+  }, [bundleMode, funnelSlug, page, preloadedFunnel?.commerce, productSlug, standaloneImportedHtmlPayload]);
 
   useEffect(() => {
     if (!productSlug || !funnelSlug || !effectiveSlug) return;
@@ -561,69 +558,53 @@ export function PublicFunnelPage() {
   }, [funnelSlug, page, sessionId]);
 
   if (!productSlug || !funnelSlug) {
-    return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Missing public funnel path.</div>;
+    return <PublicFunnelShellMessage>Missing public funnel path.</PublicFunnelShellMessage>;
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
-        This funnel page is unavailable. {error}
-      </div>
-    );
+    return <PublicFunnelShellMessage>This funnel page is unavailable. {error}</PublicFunnelShellMessage>;
   }
 
   if (!page) {
-    return <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">Loading page…</div>;
+    return <PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>;
   }
 
   if (standaloneImportedHtmlPayload) {
     if (!standaloneImportedHtmlPayload.instrumentationManifest) {
-      return (
-        <div className="min-h-screen bg-surface p-6 text-sm text-content-muted">
-          Imported HTML page is missing a valid instrumentation manifest.
-        </div>
-      );
+      return <PublicFunnelShellMessage>Imported HTML page is missing a valid instrumentation manifest.</PublicFunnelShellMessage>;
     }
     return (
-      <StandaloneImportedHtmlPage
-        page={page}
-        productSlug={productSlug}
-        funnelSlug={funnelSlug}
-        visitorId={visitorId}
-        sessionId={sessionId}
-        htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
-        instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
-        variants={commerce?.product?.variants ?? []}
-        pagePathById={standalonePagePathById}
-        pageStageById={page.pageStageMap}
-      />
+      <Suspense fallback={<PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>}>
+        <PublicImportedHtmlRenderer
+          page={page}
+          productSlug={productSlug}
+          funnelSlug={funnelSlug}
+          visitorId={visitorId}
+          sessionId={sessionId}
+          htmlDocument={standaloneImportedHtmlPayload.htmlDocument}
+          instrumentationManifest={standaloneImportedHtmlPayload.instrumentationManifest}
+          variants={commerce?.product?.variants ?? []}
+          pagePathById={standalonePagePathById}
+          pageStageById={page.pageStageMap}
+        />
+      </Suspense>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface">
-      <FunnelRuntimeProvider
-        value={{
-          productSlug,
-          funnelSlug,
-          pageMap: page.pageMap,
-          pageStageMap: page.pageStageMap,
-          bundleMode,
-          entrySlug: meta?.entrySlug ?? null,
-          pageStage: page.stage,
-          trackEvent,
-          commerce,
-          commerceError,
-          pageId: page.pageId,
-          nextPageId: page.nextPageId ?? null,
-          visitorId,
-          sessionId,
-        }}
-      >
-        <DesignSystemProvider tokens={page.designSystemTokens}>
-          <Render config={runtimeConfig} data={(normalizedPuckData ?? page.puckData) as unknown as Data} />
-        </DesignSystemProvider>
-      </FunnelRuntimeProvider>
-    </div>
+    <Suspense fallback={<PublicFunnelShellMessage>Loading page…</PublicFunnelShellMessage>}>
+      <PublicFunnelPuckRenderer
+        page={page}
+        meta={meta}
+        productSlug={productSlug}
+        funnelSlug={funnelSlug}
+        bundleMode={bundleMode}
+        trackEvent={trackEvent}
+        commerce={commerce}
+        commerceError={commerceError}
+        visitorId={visitorId}
+        sessionId={sessionId}
+      />
+    </Suspense>
   );
 }

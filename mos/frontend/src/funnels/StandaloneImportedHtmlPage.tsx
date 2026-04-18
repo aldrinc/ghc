@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { optimizeImportedHtmlDocument } from "@/funnels/importedHtmlRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type {
@@ -104,6 +105,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
 
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
   const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+  const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
 
   const cleanText = (value) => {
     if (typeof value !== "string") return null;
@@ -149,6 +151,37 @@ function buildStandaloneImportedHtmlRuntimeScript({
     );
   };
 
+  const loadMetaPixelScript = () => {
+    if (document.getElementById(META_PIXEL_SCRIPT_ID)) {
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = META_PIXEL_SCRIPT_ID;
+    script.async = true;
+    script.src = META_PIXEL_SCRIPT_SRC;
+    document.head.appendChild(script);
+  };
+
+  const scheduleMetaPixelScriptLoad = () => {
+    if (window.__mosMetaPixelLoadScheduled || document.getElementById(META_PIXEL_SCRIPT_ID)) {
+      return;
+    }
+    window.__mosMetaPixelLoadScheduled = true;
+    const flush = () => {
+      window.__mosMetaPixelLoadScheduled = false;
+      loadMetaPixelScript();
+    };
+    const listenerOptions = { capture: true, once: true };
+    window.addEventListener("pointerdown", flush, listenerOptions);
+    window.addEventListener("keydown", flush, listenerOptions);
+    window.addEventListener("touchstart", flush, listenerOptions);
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(flush, { timeout: META_PIXEL_DEFER_TIMEOUT_MS });
+      return;
+    }
+    window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
+  };
+
   const ensureMetaPixelBootstrap = () => {
     if (!config.tracking || config.tracking.provider !== "meta" || !config.tracking.metaPixelId) {
       return null;
@@ -172,13 +205,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       window._fbq = fbq;
     }
 
-    if (!document.getElementById(META_PIXEL_SCRIPT_ID)) {
-      const script = document.createElement("script");
-      script.id = META_PIXEL_SCRIPT_ID;
-      script.async = true;
-      script.src = META_PIXEL_SCRIPT_SRC;
-      document.head.appendChild(script);
-    }
+    scheduleMetaPixelScriptLoad();
 
     if (!Array.isArray(window.__mosMetaPixelIds)) {
       window.__mosMetaPixelIds = [];
@@ -465,6 +492,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
     if (!list.includes(element)) {
       list.push(element);
       checkoutBindingElements[bindingId] = list;
+    }
+    if (element.dataset.mosCheckoutWarmBound !== "true") {
+      element.dataset.mosCheckoutWarmBound = "true";
+      element.addEventListener("pointerenter", () => scheduleWarmCheckoutBindings(75), { passive: true });
+      element.addEventListener("touchstart", () => scheduleWarmCheckoutBindings(0), { passive: true });
+      element.addEventListener("mousedown", () => scheduleWarmCheckoutBindings(0), { passive: true });
+      element.addEventListener("focus", () => scheduleWarmCheckoutBindings(0));
     }
     renderCheckoutBindingState(bindingId);
   };
@@ -1199,38 +1233,25 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   bindManifestSafely();
-  warmCheckoutBindingsSafely();
   applyMobileSpacingFixesSafely();
   scheduleInitialWarmCheckoutBindings();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
-    document.addEventListener("DOMContentLoaded", warmCheckoutBindingsSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
     document.addEventListener("DOMContentLoaded", scheduleInitialWarmCheckoutBindings, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
-  window.addEventListener("load", warmCheckoutBindingsSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
   window.addEventListener("load", scheduleInitialWarmCheckoutBindings, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);
-  window.setTimeout(warmCheckoutBindingsSafely, 0);
-  window.setTimeout(warmCheckoutBindingsSafely, 250);
-  window.setTimeout(warmCheckoutBindingsSafely, 1000);
   window.setTimeout(applyMobileSpacingFixesSafely, 0);
   window.setTimeout(applyMobileSpacingFixesSafely, 250);
   window.setTimeout(applyMobileSpacingFixesSafely, 1000);
   window.addEventListener("resize", applyMobileSpacingFixesSafely);
-  document.addEventListener("click", (event) => {
-    if (checkoutNavigationInProgress || isCheckoutBindingTarget(event.target)) {
-      return;
-    }
-    scheduleWarmCheckoutBindings();
-  }, true);
   document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
   document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);
-  window.addEventListener("pageshow", () => scheduleWarmCheckoutBindings(0));
 })();
 </script>`;
 }
@@ -1250,7 +1271,7 @@ function injectStandaloneRuntimeScript(
 
 export function StandaloneImportedHtmlPage(props: StandaloneImportedHtmlPageProps) {
   useEffect(() => {
-    const normalizedHtml = props.htmlDocument.trim();
+    const normalizedHtml = optimizeImportedHtmlDocument(props.htmlDocument);
     if (!normalizedHtml) {
       throw new Error("Standalone imported HTML page is empty.");
     }
