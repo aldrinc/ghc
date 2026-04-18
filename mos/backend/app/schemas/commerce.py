@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from datetime import datetime
+from typing import Any, Literal, Optional
 
 from pydantic import AnyUrl, BaseModel
 
@@ -16,6 +17,16 @@ class PublicCheckoutRequest(BaseModel):
     visitorId: Optional[str] = None
     sessionId: Optional[str] = None
     utm: Optional[dict[str, Any]] = None
+
+
+class PublicPreparedCheckoutResponse(BaseModel):
+    preparedCheckoutId: str
+    status: Literal["pending", "ready", "failed", "expired"]
+    checkoutUrl: Optional[str] = None
+    sessionId: Optional[str] = None
+    error: Optional[str] = None
+    expiresAt: datetime
+    pollAfterMs: Optional[int] = None
 
 
 # =============================================================================

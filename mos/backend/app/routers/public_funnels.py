@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response as BinaryResponse
 from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 import stripe
 
@@ -26,6 +28,7 @@ from app.db.models import (
     FunnelEvent,
     FunnelPage,
     FunnelPageVersion,
+    PreparedFunnelCheckout,
     Product,
     ProductVariant,
     Site,
@@ -41,6 +44,7 @@ from app.db.repositories.funnels import (
 from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.commerce import (
     PublicCheckoutRequest,
+    PublicPreparedCheckoutResponse,
     SiteCommerceCartCreateRequest,
     SiteCommerceCartUpdateRequest,
     SiteCommerceLineItemAddRequest,
@@ -97,6 +101,13 @@ from app.services.medusa_store_runtime import (
 
 router = APIRouter(prefix="/public", tags=["public"])
 _MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
+_PREPARED_CHECKOUT_STATUS_PENDING = "pending"
+_PREPARED_CHECKOUT_STATUS_READY = "ready"
+_PREPARED_CHECKOUT_STATUS_FAILED = "failed"
+_PREPARED_CHECKOUT_STATUS_EXPIRED = "expired"
+_PREPARED_CHECKOUT_TTL = timedelta(minutes=10)
+_PREPARED_CHECKOUT_PENDING_STALE_AFTER = timedelta(seconds=30)
+_PREPARED_CHECKOUT_POLL_AFTER_MS = 150
 
 
 def _resolve_public_medusa_stripe_account_id(
@@ -1001,9 +1012,118 @@ def _metadata_value(value: object, key: str) -> str:
     return text
 
 
-def _record_checkout_started_event(
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _prepared_checkout_selection(selection: dict[str, object] | None) -> dict[str, object]:
+    if not isinstance(selection, dict):
+        return {}
+    return json.loads(json.dumps(selection, sort_keys=True, separators=(",", ":")))
+
+
+def _build_prepared_checkout_request_key(
+    *,
+    funnel_id: str,
+    publication_id: str,
+    page_id: str | None,
+    variant_id: str,
+    visitor_id: str | None,
+    session_id: str | None,
+    quantity: int,
+    selection: dict[str, object] | None,
+) -> str:
+    payload = {
+        "funnelId": str(funnel_id),
+        "publicationId": str(publication_id),
+        "pageId": str(page_id or ""),
+        "variantId": str(variant_id),
+        "visitorId": str(visitor_id or ""),
+        "sessionId": str(session_id or ""),
+        "quantity": quantity,
+        "selection": _prepared_checkout_selection(selection),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _prepared_checkout_is_expired(prepared_checkout: PreparedFunnelCheckout) -> bool:
+    return prepared_checkout.expires_at <= _utcnow()
+
+
+def _prepared_checkout_status(
+    *, session: Session, prepared_checkout: PreparedFunnelCheckout
+) -> str:
+    if _prepared_checkout_is_expired(prepared_checkout):
+        if prepared_checkout.status != _PREPARED_CHECKOUT_STATUS_EXPIRED:
+            prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_EXPIRED
+            prepared_checkout.updated_at = _utcnow()
+            session.add(prepared_checkout)
+            session.commit()
+            session.refresh(prepared_checkout)
+        return _PREPARED_CHECKOUT_STATUS_EXPIRED
+    return str(prepared_checkout.status)
+
+
+def _serialize_prepared_checkout(
+    *, session: Session, prepared_checkout: PreparedFunnelCheckout
+) -> PublicPreparedCheckoutResponse:
+    status_value = _prepared_checkout_status(session=session, prepared_checkout=prepared_checkout)
+    return PublicPreparedCheckoutResponse(
+        preparedCheckoutId=str(prepared_checkout.id),
+        status=status_value,  # type: ignore[arg-type]
+        checkoutUrl=prepared_checkout.checkout_url
+        if status_value == _PREPARED_CHECKOUT_STATUS_READY
+        else None,
+        sessionId=prepared_checkout.checkout_session_id
+        if status_value == _PREPARED_CHECKOUT_STATUS_READY
+        else None,
+        error=prepared_checkout.error_detail
+        if status_value == _PREPARED_CHECKOUT_STATUS_FAILED
+        else None,
+        expiresAt=prepared_checkout.expires_at,
+        pollAfterMs=_PREPARED_CHECKOUT_POLL_AFTER_MS
+        if status_value == _PREPARED_CHECKOUT_STATUS_PENDING
+        else None,
+    )
+
+
+async def _persist_checkout_started_event_async(
+    session: Session, payload: dict[str, Any]
+) -> None:
+    session.add(
+        FunnelEvent(
+            occurred_at=_utcnow(),
+            org_id=payload["org_id"],
+            client_id=payload["client_id"],
+            campaign_id=payload.get("campaign_id"),
+            funnel_id=payload["funnel_id"],
+            publication_id=payload["publication_id"],
+            page_id=payload["page_id"],
+            event_type=FunnelEventTypeEnum.checkout_started,
+            visitor_id=payload.get("visitor_id"),
+            session_id=payload.get("session_id"),
+            host=payload.get("host"),
+            path=payload.get("path"),
+            referrer=payload.get("referrer"),
+            utm=dict(payload.get("utm") or {}),
+            props={
+                "provider": payload["provider"],
+                "checkout_session_id": payload["checkout_session_id"],
+                "variant_id": payload["variant_id"],
+                "offer_id": payload.get("offer_id"),
+                "quantity": payload["quantity"],
+            },
+        )
+    )
+    session.commit()
+
+
+def _schedule_checkout_started_event(
     *,
     session: Session,
+    background_tasks: BackgroundTasks,
     request: Request,
     funnel: Funnel,
     page_id: str | None,
@@ -1018,33 +1138,29 @@ def _record_checkout_started_event(
     publication_id = funnel.active_publication_id
     if publication_id is None or not page_id:
         return
-
-    session.add(
-        FunnelEvent(
-            occurred_at=datetime.now(timezone.utc),
-            org_id=funnel.org_id,
-            client_id=funnel.client_id,
-            campaign_id=funnel.campaign_id,
-            funnel_id=funnel.id,
-            publication_id=publication_id,
-            page_id=page_id,
-            event_type=FunnelEventTypeEnum.checkout_started,
-            visitor_id=visitor_id,
-            session_id=session_id,
-            host=request.headers.get("host"),
-            path=request.url.path,
-            referrer=request.headers.get("referer"),
-            utm=dict(utm or {}),
-            props={
-                "provider": provider,
-                "checkout_session_id": checkout_session_id,
-                "variant_id": str(variant.id),
-                "offer_id": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-                "quantity": quantity,
-            },
-        )
+    background_tasks.add_task(
+        _persist_checkout_started_event_async,
+        session,
+        {
+            "org_id": str(funnel.org_id),
+            "client_id": str(funnel.client_id),
+            "campaign_id": str(funnel.campaign_id) if funnel.campaign_id else None,
+            "funnel_id": str(funnel.id),
+            "publication_id": str(publication_id),
+            "page_id": str(page_id),
+            "visitor_id": visitor_id,
+            "session_id": session_id,
+            "host": request.headers.get("host"),
+            "path": request.url.path,
+            "referrer": request.headers.get("referer"),
+            "utm": dict(utm or {}),
+            "provider": provider,
+            "checkout_session_id": checkout_session_id,
+            "variant_id": str(variant.id),
+            "offer_id": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+            "quantity": quantity,
+        },
     )
-    session.commit()
 
 
 def _resolve_public_meta_tracking(*, session: Session, funnel: Funnel) -> dict[str, str] | None:
@@ -1747,12 +1863,9 @@ def public_funnel_commerce(
     }
 
 
-@router.post("/checkout")
-def public_checkout(
-    payload: PublicCheckoutRequest,
-    request: Request,
-    session: Session = Depends(get_session),
-):
+def _resolve_public_checkout_context(
+    *, session: Session, payload: PublicCheckoutRequest
+) -> dict[str, Any]:
     if payload.quantity < 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quantity must be >= 1")
 
@@ -1835,7 +1948,6 @@ def public_checkout(
         if funnel.selected_offer_id
         else None,
         "variant_id": _metadata_value(str(variant.id), "variantId"),
-        # Legacy key kept for older webhooks/reporting paths.
         "price_point_id": _metadata_value(str(variant.id), "pricePointId"),
         "page_id": _metadata_value(payload.pageId, "pageId"),
         "visitor_id": _metadata_value(payload.visitorId, "visitorId"),
@@ -1845,6 +1957,202 @@ def public_checkout(
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
+    return {
+        "funnel": funnel,
+        "variant": variant,
+        "normalized_provider": normalized_provider,
+        "external_price_id": external_price_id,
+        "metadata": metadata,
+        "selection": _prepared_checkout_selection(payload.selection),
+    }
+
+
+def _load_prepared_checkout_or_404(
+    *, session: Session, prepared_checkout_id: str
+) -> PreparedFunnelCheckout:
+    try:
+        prepared_uuid = UUID(str(prepared_checkout_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="preparedCheckoutId must be a valid UUID.",
+        ) from exc
+    prepared_checkout = session.get(PreparedFunnelCheckout, prepared_uuid)
+    if not prepared_checkout:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prepared checkout not found.")
+    return prepared_checkout
+
+
+def _upsert_prepared_checkout(
+    *,
+    session: Session,
+    funnel: Funnel,
+    variant: ProductVariant,
+    provider: str,
+    external_variant_id: str,
+    payload: PublicCheckoutRequest,
+    metadata: dict[str, Any],
+    selection: dict[str, object],
+) -> tuple[PreparedFunnelCheckout, bool]:
+    publication_id = funnel.active_publication_id
+    if publication_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Funnel must be published before preparing checkout.",
+        )
+    request_key = _build_prepared_checkout_request_key(
+        funnel_id=str(funnel.id),
+        publication_id=str(publication_id),
+        page_id=payload.pageId,
+        variant_id=str(variant.id),
+        visitor_id=payload.visitorId,
+        session_id=payload.sessionId,
+        quantity=payload.quantity,
+        selection=selection,
+    )
+    now = _utcnow()
+    should_enqueue_prepare = False
+
+    prepared_checkout = session.scalars(
+        select(PreparedFunnelCheckout).where(PreparedFunnelCheckout.request_key == request_key)
+    ).first()
+    if prepared_checkout is None:
+        prepared_checkout = PreparedFunnelCheckout(
+            org_id=funnel.org_id,
+            client_id=funnel.client_id,
+            funnel_id=funnel.id,
+            publication_id=publication_id,
+            page_id=payload.pageId,
+            variant_id=variant.id,
+            request_key=request_key,
+            provider=provider,
+            external_variant_id=external_variant_id,
+            quantity=payload.quantity,
+            visitor_id=payload.visitorId,
+            session_id=payload.sessionId,
+            selection=selection,
+            utm=dict(payload.utm or {}),
+            checkout_metadata=metadata,
+            status=_PREPARED_CHECKOUT_STATUS_PENDING,
+            expires_at=now + _PREPARED_CHECKOUT_TTL,
+            updated_at=now,
+        )
+        session.add(prepared_checkout)
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            prepared_checkout = session.scalars(
+                select(PreparedFunnelCheckout).where(
+                    PreparedFunnelCheckout.request_key == request_key
+                )
+            ).first()
+            if prepared_checkout is None:
+                raise
+        else:
+            should_enqueue_prepare = True
+            session.refresh(prepared_checkout)
+            return prepared_checkout, should_enqueue_prepare
+
+    if prepared_checkout is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Prepared checkout could not be created.",
+        )
+
+    is_stale_pending = (
+        prepared_checkout.status == _PREPARED_CHECKOUT_STATUS_PENDING
+        and (now - (prepared_checkout.updated_at or prepared_checkout.created_at))
+        > _PREPARED_CHECKOUT_PENDING_STALE_AFTER
+    )
+    should_reset = (
+        _prepared_checkout_is_expired(prepared_checkout)
+        or prepared_checkout.status == _PREPARED_CHECKOUT_STATUS_FAILED
+        or is_stale_pending
+    )
+    if should_reset:
+        prepared_checkout.provider = provider
+        prepared_checkout.external_variant_id = external_variant_id
+        prepared_checkout.quantity = payload.quantity
+        prepared_checkout.visitor_id = payload.visitorId
+        prepared_checkout.session_id = payload.sessionId
+        prepared_checkout.selection = selection
+        prepared_checkout.utm = dict(payload.utm or {})
+        prepared_checkout.checkout_metadata = metadata
+        prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_PENDING
+        prepared_checkout.checkout_url = None
+        prepared_checkout.checkout_session_id = None
+        prepared_checkout.error_detail = None
+        prepared_checkout.last_prepared_at = None
+        prepared_checkout.consumed_at = None
+        prepared_checkout.expires_at = now + _PREPARED_CHECKOUT_TTL
+        prepared_checkout.updated_at = now
+        session.add(prepared_checkout)
+        session.commit()
+        session.refresh(prepared_checkout)
+        should_enqueue_prepare = True
+
+    return prepared_checkout, should_enqueue_prepare
+
+
+async def _prepare_shopify_checkout_async(
+    session: Session, prepared_checkout_id: str
+) -> None:
+    prepared_checkout = _load_prepared_checkout_or_404(
+        session=session, prepared_checkout_id=prepared_checkout_id
+    )
+    status_value = _prepared_checkout_status(
+        session=session, prepared_checkout=prepared_checkout
+    )
+    if status_value != _PREPARED_CHECKOUT_STATUS_PENDING:
+        return
+    try:
+        checkout = create_shopify_checkout(
+            client_id=str(prepared_checkout.client_id),
+            variant_gid=str(prepared_checkout.external_variant_id),
+            quantity=int(prepared_checkout.quantity),
+            metadata=dict(prepared_checkout.checkout_metadata or {}),
+        )
+    except HTTPException as exc:
+        prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
+        prepared_checkout.error_detail = str(exc.detail)
+        prepared_checkout.updated_at = _utcnow()
+        session.add(prepared_checkout)
+        session.commit()
+        return
+    except Exception as exc:  # pragma: no cover - defensive runtime guard
+        prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
+        prepared_checkout.error_detail = str(exc)
+        prepared_checkout.updated_at = _utcnow()
+        session.add(prepared_checkout)
+        session.commit()
+        return
+
+    now = _utcnow()
+    prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_READY
+    prepared_checkout.checkout_url = checkout["checkoutUrl"]
+    prepared_checkout.checkout_session_id = checkout["cartId"]
+    prepared_checkout.error_detail = None
+    prepared_checkout.last_prepared_at = now
+    prepared_checkout.expires_at = now + _PREPARED_CHECKOUT_TTL
+    prepared_checkout.updated_at = now
+    session.add(prepared_checkout)
+    session.commit()
+
+
+@router.post("/checkout")
+def public_checkout(
+    payload: PublicCheckoutRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    context = _resolve_public_checkout_context(session=session, payload=payload)
+    funnel = context["funnel"]
+    variant = context["variant"]
+    normalized_provider = context["normalized_provider"]
+    external_price_id = context["external_price_id"]
+    metadata = context["metadata"]
     if normalized_provider == "stripe":
         if not external_price_id:
             raise HTTPException(
@@ -1874,8 +2182,9 @@ def public_checkout(
             line_items=[{"price": external_price_id, "quantity": payload.quantity}],
             metadata=metadata,
         )
-        _record_checkout_started_event(
+        _schedule_checkout_started_event(
             session=session,
+            background_tasks=background_tasks,
             request=request,
             funnel=funnel,
             page_id=payload.pageId,
@@ -1901,8 +2210,9 @@ def public_checkout(
             quantity=payload.quantity,
             metadata=metadata,
         )
-        _record_checkout_started_event(
+        _schedule_checkout_started_event(
             session=session,
+            background_tasks=background_tasks,
             request=request,
             funnel=funnel,
             page_id=payload.pageId,
@@ -1929,8 +2239,9 @@ def public_checkout(
             quantity=payload.quantity,
             metadata=metadata,
         )
-        _record_checkout_started_event(
+        _schedule_checkout_started_event(
             session=session,
+            background_tasks=background_tasks,
             request=request,
             funnel=funnel,
             page_id=payload.pageId,
@@ -1948,6 +2259,109 @@ def public_checkout(
         status_code=status.HTTP_409_CONFLICT,
         detail="Unsupported checkout provider.",
     )
+
+
+@router.post("/checkout/prepare", response_model=PublicPreparedCheckoutResponse)
+def prepare_public_checkout(
+    payload: PublicCheckoutRequest,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+):
+    context = _resolve_public_checkout_context(session=session, payload=payload)
+    if context["normalized_provider"] != "shopify":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Prepared checkout is only supported for Shopify variants.",
+        )
+    if not context["external_price_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify variant GID is missing for this variant.",
+        )
+
+    prepared_checkout, should_enqueue_prepare = _upsert_prepared_checkout(
+        session=session,
+        funnel=context["funnel"],
+        variant=context["variant"],
+        provider=context["normalized_provider"],
+        external_variant_id=context["external_price_id"],
+        payload=payload,
+        metadata=context["metadata"],
+        selection=context["selection"],
+    )
+    if should_enqueue_prepare:
+        background_tasks.add_task(
+            _prepare_shopify_checkout_async, session, str(prepared_checkout.id)
+        )
+    return _serialize_prepared_checkout(
+        session=session, prepared_checkout=prepared_checkout
+    )
+
+
+@router.get("/checkout/prepare/{prepared_checkout_id}", response_model=PublicPreparedCheckoutResponse)
+def prepared_public_checkout_status(
+    prepared_checkout_id: str,
+    session: Session = Depends(get_session),
+):
+    prepared_checkout = _load_prepared_checkout_or_404(
+        session=session, prepared_checkout_id=prepared_checkout_id
+    )
+    return _serialize_prepared_checkout(session=session, prepared_checkout=prepared_checkout)
+
+
+@router.post("/checkout/prepare/{prepared_checkout_id}/consume")
+def consume_prepared_public_checkout(
+    prepared_checkout_id: str,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    prepared_checkout = _load_prepared_checkout_or_404(
+        session=session, prepared_checkout_id=prepared_checkout_id
+    )
+    status_value = _prepared_checkout_status(
+        session=session, prepared_checkout=prepared_checkout
+    )
+    if status_value != _PREPARED_CHECKOUT_STATUS_READY:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Prepared checkout is not ready.",
+        )
+    if not prepared_checkout.checkout_url or not prepared_checkout.checkout_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Prepared checkout is missing checkout details.",
+        )
+
+    should_track_start = prepared_checkout.consumed_at is None
+    prepared_checkout.consumed_at = _utcnow()
+    prepared_checkout.updated_at = _utcnow()
+    session.add(prepared_checkout)
+    session.commit()
+
+    if should_track_start and prepared_checkout.page_id:
+        funnel = session.get(Funnel, prepared_checkout.funnel_id)
+        variant = session.get(ProductVariant, prepared_checkout.variant_id)
+        if funnel and variant:
+            _schedule_checkout_started_event(
+                session=session,
+                background_tasks=background_tasks,
+                request=request,
+                funnel=funnel,
+                page_id=str(prepared_checkout.page_id),
+                visitor_id=prepared_checkout.visitor_id,
+                session_id=prepared_checkout.session_id,
+                utm=dict(prepared_checkout.utm or {}),
+                provider=prepared_checkout.provider,
+                checkout_session_id=prepared_checkout.checkout_session_id,
+                variant=variant,
+                quantity=int(prepared_checkout.quantity),
+            )
+
+    return {
+        "checkoutUrl": prepared_checkout.checkout_url,
+        "sessionId": prepared_checkout.checkout_session_id,
+    }
 
 
 # =============================================================================
@@ -2973,10 +3387,41 @@ def public_site_checkout_complete(
     }
 
 
+async def _persist_public_events_async(
+    session: Session,
+    *,
+    funnel_context: dict[str, str | None],
+    host: str | None,
+    events: list[dict[str, Any]],
+) -> None:
+    for ev in events:
+        session.add(
+            FunnelEvent(
+                occurred_at=ev["occurred_at"],
+                org_id=funnel_context["org_id"],
+                client_id=funnel_context["client_id"],
+                campaign_id=funnel_context.get("campaign_id"),
+                funnel_id=funnel_context["funnel_id"],
+                publication_id=funnel_context["publication_id"],
+                page_id=ev["page_id"],
+                event_type=ev["event_type"],
+                visitor_id=ev.get("visitor_id"),
+                session_id=ev.get("session_id"),
+                host=host,
+                path=ev.get("path"),
+                referrer=ev.get("referrer"),
+                utm=ev.get("utm") or {},
+                props=ev.get("props") or {},
+            )
+        )
+    session.commit()
+
+
 @router.post("/events")
 def ingest_public_events(
     payload: PublicEventsIngestRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
     if not payload.events:
@@ -3020,38 +3465,44 @@ def ingest_public_events(
             return {"ingested": 0}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
 
-    host = request.headers.get("host")
-    ingested = 0
+    ingested_events: list[dict[str, Any]] = []
     for ev in payload.events:
         occurred_at = ev.occurredAt or datetime.now(timezone.utc)
         try:
             event_type = FunnelEventTypeEnum(ev.eventType)
         except Exception:
             continue
-
-        session.add(
-            FunnelEvent(
-                occurred_at=occurred_at,
-                org_id=funnel.org_id,
-                client_id=funnel.client_id,
-                campaign_id=funnel.campaign_id,
-                funnel_id=funnel.id,
-                publication_id=publication_uuid,
-                page_id=ev.pageId,
-                event_type=event_type,
-                visitor_id=ev.visitorId,
-                session_id=ev.sessionId,
-                host=host,
-                path=ev.path,
-                referrer=ev.referrer,
-                utm=ev.utm,
-                props=ev.props,
-            )
+        ingested_events.append(
+            {
+                "occurred_at": occurred_at,
+                "page_id": ev.pageId,
+                "event_type": event_type,
+                "visitor_id": ev.visitorId,
+                "session_id": ev.sessionId,
+                "path": ev.path,
+                "referrer": ev.referrer,
+                "utm": ev.utm,
+                "props": ev.props,
+            }
         )
-        ingested += 1
 
-    session.commit()
-    return {"ingested": ingested}
+    if not ingested_events:
+        return {"ingested": 0}
+
+    background_tasks.add_task(
+        _persist_public_events_async,
+        session,
+        funnel_context={
+            "org_id": str(funnel.org_id),
+            "client_id": str(funnel.client_id),
+            "campaign_id": str(funnel.campaign_id) if funnel.campaign_id else None,
+            "funnel_id": str(funnel.id),
+            "publication_id": str(publication_uuid),
+        },
+        host=request.headers.get("host"),
+        events=ingested_events,
+    )
+    return {"ingested": len(ingested_events)}
 
 
 @router.get("/assets/{public_id}")

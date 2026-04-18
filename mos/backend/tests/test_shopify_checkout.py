@@ -19,6 +19,7 @@ from app.db.models import (
     MetaAdAccountConnection,
     MetaWorkspaceAdConfig,
     PaidAdsPlatformProfile,
+    PreparedFunnelCheckout,
     Product,
     ProductOffer,
     ProductVariant,
@@ -298,6 +299,98 @@ def test_public_checkout_persists_checkout_started_event(
     assert event.utm == {"source": "test"}
     assert event.props["provider"] == "shopify"
     assert event.props["checkout_session_id"] == "gid://shopify/Cart/example"
+    assert event.props["variant_id"] == str(seeded["variant"].id)
+
+
+def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
+    api_client, db_session, auth_context, monkeypatch
+):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    sales_page = _publish_sales_page(db_session=db_session, funnel=seeded["funnel"])
+
+    observed: list[dict[str, object]] = []
+
+    def fake_create_shopify_checkout(**kwargs):
+        observed.append(kwargs)
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/prepared-token",
+            "cartId": "gid://shopify/Cart/prepared",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    payload = {
+        "funnelSlug": seeded["funnel"].route_slug,
+        "variantId": str(seeded["variant"].id),
+        "selection": {},
+        "quantity": 1,
+        "successUrl": "https://funnel.example/success",
+        "cancelUrl": "https://funnel.example/cancel",
+        "pageId": str(sales_page.id),
+        "visitorId": "visitor_123",
+        "sessionId": "session_123",
+        "utm": {"source": "test"},
+    }
+
+    prepare_response = api_client.post("/public/checkout/prepare", json=payload)
+    assert prepare_response.status_code == 200
+    prepared_payload = prepare_response.json()
+    prepared_id = prepared_payload["preparedCheckoutId"]
+
+    status_response = api_client.get(f"/public/checkout/prepare/{prepared_id}")
+    assert status_response.status_code == 200
+    prepared_status = status_response.json()
+    assert prepared_status["status"] == "ready"
+
+    prepared_record = db_session.get(PreparedFunnelCheckout, UUID(prepared_id))
+    assert prepared_record is not None
+    assert prepared_record.checkout_url == "https://example-shop.myshopify.com/cart/c/prepared-token"
+    assert prepared_record.checkout_session_id == "gid://shopify/Cart/prepared"
+    assert prepared_record.consumed_at is None
+    assert len(observed) == 1
+
+    existing_event = db_session.scalars(
+        select(FunnelEvent).where(
+            FunnelEvent.funnel_id == seeded["funnel"].id,
+            FunnelEvent.event_type == FunnelEventTypeEnum.checkout_started,
+        )
+    ).first()
+    assert existing_event is None
+
+    second_prepare_response = api_client.post("/public/checkout/prepare", json=payload)
+    assert second_prepare_response.status_code == 200
+    assert second_prepare_response.json()["preparedCheckoutId"] == prepared_id
+    assert len(observed) == 1
+
+    consume_response = api_client.post(f"/public/checkout/prepare/{prepared_id}/consume")
+    assert consume_response.status_code == 200
+    assert consume_response.json() == {
+        "checkoutUrl": "https://example-shop.myshopify.com/cart/c/prepared-token",
+        "sessionId": "gid://shopify/Cart/prepared",
+    }
+
+    db_session.expire_all()
+    consumed_record = db_session.get(PreparedFunnelCheckout, UUID(prepared_id))
+    assert consumed_record is not None
+    assert consumed_record.consumed_at is not None
+
+    event = db_session.scalars(
+        select(FunnelEvent).where(
+            FunnelEvent.funnel_id == seeded["funnel"].id,
+            FunnelEvent.event_type == FunnelEventTypeEnum.checkout_started,
+        )
+    ).first()
+    assert event is not None
+    assert event.publication_id == seeded["funnel"].active_publication_id
+    assert event.page_id == sales_page.id
+    assert event.visitor_id == "visitor_123"
+    assert event.session_id == "session_123"
+    assert event.props["provider"] == "shopify"
+    assert event.props["checkout_session_id"] == "gid://shopify/Cart/prepared"
     assert event.props["variant_id"] == str(seeded["variant"].id)
 
 

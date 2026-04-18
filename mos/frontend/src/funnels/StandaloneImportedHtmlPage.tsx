@@ -219,10 +219,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
   };
 
-  const trackEvent = async (eventType, props) => {
+  const trackEvent = (eventType, props) => {
     trackMetaPixelForEvent(eventType, props || {});
     try {
-      await fetch(config.apiBaseUrl + "/public/events", {
+      void fetch(config.apiBaseUrl + "/public/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -246,6 +246,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
           ],
         }),
         keepalive: true,
+      }).catch((error) => {
+        console.error("[StandaloneImportedHtmlPage] Tracking failed.", error);
       });
     } catch (error) {
       console.error("[StandaloneImportedHtmlPage] Tracking failed.", error);
@@ -293,7 +295,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const checkoutBindingElements = {};
   const checkoutBindingState = {};
   const PREPARED_CHECKOUT_TTL_MS = 10 * 60 * 1000;
-  const PREPARED_CHECKOUT_RETRY_DELAYS_MS = [0, 250, 500];
+  const PREPARED_CHECKOUT_POLL_INTERVAL_MS = 150;
+  const PREPARED_CHECKOUT_POLL_TIMEOUT_MS = 10 * 1000;
   const CHECKOUT_LOADING_LABEL = "Preparing secure checkout...";
   const CHECKOUT_ERROR_LABEL = "Secure checkout is unavailable right now.";
   let warmCheckoutBindingsTimeout = null;
@@ -564,6 +567,25 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
+  const normalizePreparedCheckoutResponse = (data) => {
+    if (!isRecord(data)) {
+      throw new Error("Prepared checkout response is invalid.");
+    }
+    const preparedCheckoutId = cleanText(data.preparedCheckoutId);
+    const status = cleanText(data.status);
+    if (!preparedCheckoutId || !status) {
+      throw new Error("Prepared checkout response is incomplete.");
+    }
+    return {
+      preparedCheckoutId,
+      status,
+      checkoutUrl: cleanText(data.checkoutUrl),
+      sessionId: cleanText(data.sessionId),
+      error: cleanText(data.error),
+      pollAfterMs: typeof data.pollAfterMs === "number" ? data.pollAfterMs : PREPARED_CHECKOUT_POLL_INTERVAL_MS,
+    };
+  };
+
   const requestCheckout = async ({ resolvedVariantId, resolvedSelection }) => {
     const response = await fetch(config.apiBaseUrl + "/public/checkout", {
       method: "POST",
@@ -573,6 +595,62 @@ function buildStandaloneImportedHtmlRuntimeScript({
 
     if (!response.ok) {
       throw new Error((await response.text()) || response.statusText || "Checkout failed.");
+    }
+
+    const data = await response.json();
+    const checkoutUrl = cleanText(data && data.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Checkout URL is missing.");
+    }
+    ensureCheckoutOriginPreconnect(checkoutUrl);
+    ensureCheckoutUrlPrefetch(checkoutUrl);
+    return {
+      checkoutUrl,
+      sessionId: cleanText(data && data.sessionId) || null,
+    };
+  };
+
+  const requestPreparedCheckout = async ({ resolvedVariantId, resolvedSelection }) => {
+    const response = await fetch(config.apiBaseUrl + "/public/checkout/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createCheckoutPayload({ resolvedVariantId, resolvedSelection })),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+
+    return normalizePreparedCheckoutResponse(await response.json());
+  };
+
+  const requestPreparedCheckoutStatus = async (preparedCheckoutId) => {
+    const response = await fetch(
+      config.apiBaseUrl + "/public/checkout/prepare/" + encodeURIComponent(preparedCheckoutId),
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+
+    return normalizePreparedCheckoutResponse(await response.json());
+  };
+
+  const consumePreparedCheckout = async (preparedCheckoutId) => {
+    const response = await fetch(
+      config.apiBaseUrl + "/public/checkout/prepare/" + encodeURIComponent(preparedCheckoutId) + "/consume",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
     }
 
     const data = await response.json();
@@ -631,6 +709,50 @@ function buildStandaloneImportedHtmlRuntimeScript({
     };
   };
 
+  const finalizePreparedCheckoutRecord = ({
+    cacheKey,
+    preparedCheckout,
+    resolvedVariantId,
+    resolvedSelection,
+  }) => {
+    const checkoutUrl = cleanText(preparedCheckout && preparedCheckout.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Prepared checkout is missing checkoutUrl.");
+    }
+    const record = {
+      preparedCheckoutId: cleanText(preparedCheckout.preparedCheckoutId) || "",
+      checkoutUrl,
+      sessionId: cleanText(preparedCheckout.sessionId) || null,
+      variantId: resolvedVariantId || "",
+      selection: resolvedSelection,
+      createdAt: Date.now(),
+    };
+    ensureCheckoutOriginPreconnect(record.checkoutUrl);
+    ensureCheckoutUrlPrefetch(record.checkoutUrl);
+    preparedCheckoutCache[cacheKey] = record;
+    return record;
+  };
+
+  const waitForPreparedCheckoutStatus = async (preparedCheckoutId, initialPollAfterMs) => {
+    const deadline = Date.now() + PREPARED_CHECKOUT_POLL_TIMEOUT_MS;
+    let pollAfterMs = initialPollAfterMs || PREPARED_CHECKOUT_POLL_INTERVAL_MS;
+    while (Date.now() < deadline) {
+      await delay(pollAfterMs);
+      const preparedCheckout = await requestPreparedCheckoutStatus(preparedCheckoutId);
+      if (preparedCheckout.status === "ready") {
+        return preparedCheckout;
+      }
+      if (preparedCheckout.status === "failed") {
+        throw new Error(preparedCheckout.error || "Prepared checkout failed.");
+      }
+      if (preparedCheckout.status === "expired") {
+        throw new Error("Prepared checkout expired before it was used.");
+      }
+      pollAfterMs = preparedCheckout.pollAfterMs || PREPARED_CHECKOUT_POLL_INTERVAL_MS;
+    }
+    throw new Error("Prepared checkout timed out.");
+  };
+
   const prepareCheckoutInBackground = async ({ variant, resolvedVariantId, resolvedSelection, cacheKey }) => {
     if (!cacheKey || !variant || variant.provider !== "shopify") {
       return null;
@@ -643,27 +765,27 @@ function buildStandaloneImportedHtmlRuntimeScript({
       return preparedCheckoutInFlight[cacheKey];
     }
     const promise = (async () => {
-      let lastError = null;
-      for (const retryDelayMs of PREPARED_CHECKOUT_RETRY_DELAYS_MS) {
-        if (retryDelayMs > 0) {
-          await delay(retryDelayMs);
+      try {
+        let preparedCheckout = await requestPreparedCheckout({ resolvedVariantId, resolvedSelection });
+        if (preparedCheckout.status === "pending") {
+          preparedCheckout = await waitForPreparedCheckoutStatus(
+            preparedCheckout.preparedCheckoutId,
+            preparedCheckout.pollAfterMs,
+          );
         }
-        try {
-          const preparedCheckout = await requestCheckout({ resolvedVariantId, resolvedSelection });
-          const record = {
-            ...preparedCheckout,
-            variantId: resolvedVariantId || "",
-            selection: resolvedSelection,
-            createdAt: Date.now(),
-          };
-          preparedCheckoutCache[cacheKey] = record;
-          return record;
-        } catch (error) {
-          lastError = error;
+        if (preparedCheckout.status !== "ready") {
+          throw new Error(preparedCheckout.error || "Prepared checkout is unavailable.");
         }
+        return finalizePreparedCheckoutRecord({
+          cacheKey,
+          preparedCheckout,
+          resolvedVariantId,
+          resolvedSelection,
+        });
+      } catch (error) {
+        console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", error);
+        return null;
       }
-      console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", lastError);
-      return null;
     })()
       .finally(() => {
         delete preparedCheckoutInFlight[cacheKey];
@@ -748,7 +870,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
     let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
     if (preparedCheckout) {
-      return preparedCheckout;
+      return consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
     }
     setCheckoutBindingState(bindingId, {
       status: "loading",
@@ -766,12 +888,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
       });
       throw new Error("Prepared checkout is unavailable.");
     }
+    const consumedCheckout = await consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
+    preparedCheckoutCache[cacheKey] = {
+      ...preparedCheckout,
+      ...consumedCheckout,
+    };
     setCheckoutBindingState(bindingId, {
       status: "ready",
       cacheKey,
       message: null,
     });
-    return preparedCheckout;
+    return consumedCheckout;
   };
 
   const isCheckoutBindingTarget = (target) => {
@@ -926,7 +1053,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
               if (!targetPath) {
                 throw new Error("Target page path is missing for binding '" + String(binding.id || "unknown") + "'.");
               }
-              await trackEvent(binding.trackEventType || "custom_page_click", {
+              trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
                 targetPageId: binding.targetPageId,
@@ -937,7 +1064,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
             }
 
             if (binding.type === "track_only") {
-              await trackEvent(binding.trackEventType || "custom_page_click", {
+              trackEvent(binding.trackEventType || "custom_page_click", {
                 fromStage: config.pageStage,
                 pageId: config.pageId,
                 buttonText: buttonText || undefined,
@@ -1073,14 +1200,23 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }, delayMs);
   };
 
+  const scheduleInitialWarmCheckoutBindings = () => {
+    scheduleWarmCheckoutBindings(0);
+    window.setTimeout(() => scheduleWarmCheckoutBindings(0), 250);
+    window.setTimeout(() => scheduleWarmCheckoutBindings(0), 1000);
+  };
+
   bindManifestSafely();
   applyMobileSpacingFixesSafely();
+  scheduleInitialWarmCheckoutBindings();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
+    document.addEventListener("DOMContentLoaded", scheduleInitialWarmCheckoutBindings, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
+  window.addEventListener("load", scheduleInitialWarmCheckoutBindings, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);

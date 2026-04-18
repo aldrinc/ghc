@@ -718,6 +718,63 @@ class FunnelEvent(Base):
     )
 
 
+class PreparedFunnelCheckout(Base):
+    __tablename__ = "prepared_funnel_checkouts"
+    __table_args__ = (
+        sa.Index("idx_prepared_funnel_checkouts_status_expires", "status", "expires_at"),
+        sa.Index("idx_prepared_funnel_checkouts_funnel_session", "funnel_id", "session_id"),
+        UniqueConstraint("request_key", name="uq_prepared_funnel_checkouts_request_key"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    variant_id: Mapped[str] = mapped_column(
+        ForeignKey("product_offer_price_points.id", ondelete="CASCADE"), nullable=False
+    )
+    request_key: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    external_variant_id: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    visitor_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    session_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    selection: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    utm: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    checkout_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    checkout_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    checkout_session_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_prepared_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class FunnelOrder(Base):
     __tablename__ = "funnel_orders"
     __table_args__ = (

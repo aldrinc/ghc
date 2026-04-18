@@ -430,7 +430,7 @@ export function PublicFunnelPage() {
       });
   }, [bundleMode, effectiveSlug, funnelSlug, navigate, preloadedPage, productSlug]);
 
-  const trackEvent = async (event: RuntimeTrackingEvent) => {
+  const trackEvent = (event: RuntimeTrackingEvent) => {
     if (!page) return;
     const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
     const mappedMetaEvents = mapRuntimeEventToMetaPixelEvents(event);
@@ -463,11 +463,13 @@ export function PublicFunnelPage() {
       );
     }
     try {
-      await fetch(`${apiBaseUrl}/public/events`, {
+      void fetch(`${apiBaseUrl}/public/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         keepalive: true,
+      }).catch(() => {
+        // ignore
       });
     } catch {
       // ignore
