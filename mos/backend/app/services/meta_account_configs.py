@@ -59,6 +59,23 @@ def meta_ads_client_for_connection(connection: MetaAdAccountConnection) -> MetaA
     )
 
 
+def resolve_ad_account_id_for_context(
+    *,
+    resolved: ResolvedMetaWorkspaceConfig,
+    explicit_ad_account_id: str | None = None,
+) -> str:
+    context_ad_account_id = clean_optional_text(resolved.connection.ad_account_id)
+    requested_ad_account_id = clean_optional_text(explicit_ad_account_id)
+    if requested_ad_account_id and context_ad_account_id and requested_ad_account_id != context_ad_account_id:
+        raise MetaWorkspaceConfigError(
+            "Requested adAccountId does not match the selected Meta workspace config."
+        )
+    resolved_ad_account_id = requested_ad_account_id or context_ad_account_id
+    if not resolved_ad_account_id:
+        raise MetaWorkspaceConfigError("adAccountId is required.")
+    return resolved_ad_account_id
+
+
 def merge_meta_profile(
     *,
     connection: MetaAdAccountConnection,
@@ -139,6 +156,34 @@ def resolve_workspace_config(
     if connection is None or connection.status == "archived":
         raise MetaWorkspaceConfigError("The selected Meta ad connection no longer exists.")
     return ResolvedMetaWorkspaceConfig(connection=connection, workspace_config=workspace_config)
+
+
+def resolve_workspace_config_for_client_or_config(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str | None = None,
+    config_id: str | None = None,
+) -> ResolvedMetaWorkspaceConfig:
+    resolved_client_id = clean_optional_text(client_id)
+    resolved_config_id = clean_optional_text(config_id)
+    if not resolved_client_id and not resolved_config_id:
+        raise MetaWorkspaceConfigError("clientId or metaConfigId is required.")
+
+    repo = MetaAccountConfigsRepository(session)
+    if resolved_config_id and not resolved_client_id:
+        workspace_config = repo.get_workspace_config_by_id(org_id=org_id, config_id=resolved_config_id)
+        if workspace_config is None:
+            raise MetaWorkspaceConfigError("Meta workspace config not found.")
+        resolved_client_id = str(workspace_config.client_id)
+
+    assert resolved_client_id is not None
+    return resolve_workspace_config(
+        session=session,
+        org_id=org_id,
+        client_id=resolved_client_id,
+        config_id=resolved_config_id,
+    )
 
 
 def update_connection_credentials(

@@ -11,6 +11,7 @@ from app.db.enums import (
     ArtifactTypeEnum,
     AssetSourceEnum,
     AssetStatusEnum,
+    CampaignDeliveryModeEnum,
     FunnelEventTypeEnum,
     FunnelPageVersionStatusEnum,
     FunnelStatusEnum,
@@ -19,6 +20,7 @@ from app.db.models import (
     Artifact,
     Asset,
     Campaign,
+    CampaignDeliveryConfig,
     ClientUserPreference,
     Funnel,
     FunnelEvent,
@@ -35,6 +37,7 @@ from app.db.models import (
     ProductVariant,
 )
 from app.routers import meta_ads as meta_ads_router
+from app.services.meta_media_buying import fetch_ad_level_insights
 from app.services.integration_secrets import encrypt_secret_json
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
@@ -439,6 +442,32 @@ def _seed_management_funnel(
         "presellPage": presell_page,
         "salesPage": sales_page,
     }
+
+
+def _set_campaign_delivery_mode(
+    db_session,
+    *,
+    client_id: str,
+    campaign_id: str,
+    delivery_mode: CampaignDeliveryModeEnum,
+) -> None:
+    row = db_session.scalar(
+        select(CampaignDeliveryConfig).where(
+            CampaignDeliveryConfig.org_id == TEST_ORG_ID,
+            CampaignDeliveryConfig.campaign_id == campaign_id,
+        )
+    )
+    if row is None:
+        row = CampaignDeliveryConfig(
+            org_id=TEST_ORG_ID,
+            client_id=client_id,
+            campaign_id=campaign_id,
+            delivery_mode=delivery_mode,
+        )
+        db_session.add(row)
+    else:
+        row.delivery_mode = delivery_mode
+    db_session.commit()
 
 
 def _seed_management_funnel_events(
@@ -1677,8 +1706,8 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
             return {"id": ad_id, "status": payload["status"]}
 
     monkeypatch.setattr(
-        "app.routers.meta_ads._get_meta_client",
-        lambda **_kwargs: _FakeManagementClient(),
+        "app.services.meta_management_service.meta_ads_client_for_connection",
+        lambda *_args, **_kwargs: _FakeManagementClient(),
     )
     monkeypatch.setattr(
         "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
@@ -1724,6 +1753,27 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
     assert payload["artifacts"]["recommendedActionsArtifactId"]
     assert payload["artifacts"]["approvalDecisionArtifactId"]
+
+
+def test_fetch_ad_level_insights_normalizes_ad_account_id() -> None:
+    captured_paths: list[str] = []
+
+    class _FakeClient:
+        def _request(self, method, path, *, params=None):
+            _ = method
+            _ = params
+            captured_paths.append(path)
+            return {"data": [], "paging": {}}
+
+    rows = fetch_ad_level_insights(
+        client=_FakeClient(),
+        ad_account_id="act_123456",
+        campaign_id="meta_campaign_123",
+        date_preset="last_3d",
+    )
+
+    assert rows == []
+    assert captured_paths == ["act_123456/insights"]
 
 
 def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_client, db_session, monkeypatch) -> None:
@@ -1773,8 +1823,8 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
         pass
 
     monkeypatch.setattr(
-        "app.routers.meta_ads._get_meta_client",
-        lambda **_kwargs: _FakeManagementClient(),
+        "app.services.meta_management_service.meta_ads_client_for_connection",
+        lambda *_args, **_kwargs: _FakeManagementClient(),
     )
     monkeypatch.setattr(
         "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
@@ -1815,6 +1865,8 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
 
     assert response.status_code == 200, response.text
     payload = response.json()
+    assert payload["managementScope"] == "meta_plus_funnel"
+    assert payload["benchmarkStatus"]["available"] is True
     assert payload["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
     assert payload["benchmarkContext"]["atcPriceBandId"] == "core_97_126"
     assert payload["funnelSnapshot"]["presellPageViewSessions"] == 10
@@ -1835,9 +1887,104 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
         select(Artifact).where(Artifact.id == payload["artifacts"]["metricsSnapshotArtifactId"])
     ).first()
     assert metrics_artifact is not None
+    assert metrics_artifact.data["managementScope"] == "meta_plus_funnel"
+    assert metrics_artifact.data["benchmarkStatus"]["available"] is True
     assert metrics_artifact.data["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
     assert metrics_artifact.data["funnelSnapshot"]["checkoutStartedSessions"] == 1
     assert len(metrics_artifact.data["benchmarkEvaluations"]) == 5
+
+
+def test_meta_management_plan_allows_external_url_campaigns_without_funnel_benchmarks(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="management-external-urls",
+        db_session=db_session,
+    )
+    _ = product_id
+    _seed_meta_workspace_config(db_session, client_id=client_id)
+    _set_campaign_delivery_mode(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        delivery_mode=CampaignDeliveryModeEnum.external_urls,
+    )
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    local_meta_campaign = MetaCampaign(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:external-urls",
+        meta_campaign_id="meta_campaign_external_urls_123",
+        name="External URL Campaign",
+        objective="OUTCOME_SALES",
+        status="ACTIVE",
+        metadata_json={},
+    )
+    db_session.add(local_meta_campaign)
+    db_session.commit()
+
+    class _FakeManagementClient:
+        pass
+
+    monkeypatch.setattr(
+        "app.services.meta_management_service.meta_ads_client_for_connection",
+        lambda *_args, **_kwargs: _FakeManagementClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
+        lambda **_kwargs: (
+            {"id": "meta_campaign_external_urls_123", "name": "External URL Campaign", "status": "ACTIVE"},
+            [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_ad_level_insights",
+        lambda **_kwargs: [
+            {
+                "ad_id": "meta_ad_123",
+                "ad_name": "Ad One",
+                "adset_id": "meta_adset_123",
+                "campaign_id": "meta_campaign_external_urls_123",
+                "impressions": "1000",
+                "spend": "65.00",
+                "cpm": "65.00",
+                "inline_link_clicks": "30",
+                "inline_link_click_ctr": "3.0",
+                "cost_per_inline_link_click": "2.17",
+                "actions": [],
+                "action_values": [],
+            }
+        ],
+    )
+
+    response = api_client.post(
+        "/meta/management/plan",
+        json={
+            "metaCampaignId": "meta_campaign_external_urls_123",
+            "clientId": client_id,
+            "benchmarkMode": "best_effort",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["managementScope"] == "meta_only"
+    assert payload["benchmarkStatus"]["available"] is False
+    assert payload["benchmarkStatus"]["reasonCode"] == "unsupported_delivery_mode"
+    assert payload["benchmarkEvaluations"] == []
+    assert payload["artifacts"]["metricsSnapshotArtifactId"]
+
+    metrics_artifact = db_session.scalars(
+        select(Artifact).where(Artifact.id == payload["artifacts"]["metricsSnapshotArtifactId"])
+    ).first()
+    assert metrics_artifact is not None
+    assert metrics_artifact.data["managementScope"] == "meta_only"
+    assert metrics_artifact.data["benchmarkStatus"]["reasonCode"] == "unsupported_delivery_mode"
+    assert metrics_artifact.data["benchmarkContext"] is None
 
 
 def test_meta_management_plan_errors_when_benchmark_profile_is_missing(api_client, db_session, monkeypatch) -> None:
@@ -1869,8 +2016,8 @@ def test_meta_management_plan_errors_when_benchmark_profile_is_missing(api_clien
         pass
 
     monkeypatch.setattr(
-        "app.routers.meta_ads._get_meta_client",
-        lambda **_kwargs: _FakeManagementClient(),
+        "app.services.meta_management_service.meta_ads_client_for_connection",
+        lambda *_args, **_kwargs: _FakeManagementClient(),
     )
     monkeypatch.setattr(
         "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
@@ -1889,7 +2036,7 @@ def test_meta_management_plan_errors_when_benchmark_profile_is_missing(api_clien
         json={
             "metaCampaignId": "meta_campaign_missing_profile_123",
             "clientId": client_id,
-            "evaluateBenchmarks": True,
+            "benchmarkMode": "required",
         },
     )
 

@@ -20,7 +20,9 @@ _BENCHMARKS_METADATA_KEY = "metaManagementBenchmarks"
 
 
 class MetaManagementBenchmarkError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, code: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class MetaOneSidedBenchmark(BaseModel):
@@ -191,10 +193,14 @@ def _resolve_window(date_preset: str) -> tuple[datetime, datetime]:
     if match:
         days = int(match.group(1))
         if days <= 0:
-            raise MetaManagementBenchmarkError(f"Unsupported date preset for benchmark evaluation: {date_preset}")
+            raise MetaManagementBenchmarkError(
+                f"Unsupported date preset for benchmark evaluation: {date_preset}",
+                code="unsupported_date_preset",
+            )
         return now - timedelta(days=days), now
     raise MetaManagementBenchmarkError(
-        "Benchmark evaluation only supports day-based Meta presets like today, yesterday, or last_3d."
+        "Benchmark evaluation only supports day-based Meta presets like today, yesterday, or last_3d.",
+        code="unsupported_date_preset",
     )
 
 
@@ -203,12 +209,16 @@ def parse_meta_management_benchmark_profile(metadata: Mapping[str, Any] | None) 
     raw_profile = metadata_map.get(_BENCHMARKS_METADATA_KEY)
     if not isinstance(raw_profile, dict):
         raise MetaManagementBenchmarkError(
-            "Meta benchmark profile is missing from paid ads profile metadata.metaManagementBenchmarks."
+            "Meta benchmark profile is missing from paid ads profile metadata.metaManagementBenchmarks.",
+            code="benchmark_profile_missing",
         )
     try:
         return MetaManagementBenchmarkProfile.model_validate(raw_profile)
     except Exception as exc:  # pragma: no cover - pydantic error formatting is sufficient
-        raise MetaManagementBenchmarkError(f"Meta benchmark profile is invalid: {exc}") from exc
+        raise MetaManagementBenchmarkError(
+            f"Meta benchmark profile is invalid: {exc}",
+            code="benchmark_profile_invalid",
+        ) from exc
 
 
 def _resolve_price_cents(session: Session, funnel: Funnel) -> tuple[int | None, str | None]:
@@ -247,10 +257,14 @@ def _resolve_campaign_funnel_context(
         campaign_id=str(campaign.id),
     )
     if delivery is None:
-        raise MetaManagementBenchmarkError("Campaign delivery config is required before benchmark evaluation can run.")
+        raise MetaManagementBenchmarkError(
+            "Campaign delivery config is required before benchmark evaluation can run.",
+            code="delivery_config_missing",
+        )
     if delivery.delivery_mode != CampaignDeliveryModeEnum.internal_funnel:
         raise MetaManagementBenchmarkError(
-            "Benchmark evaluation currently supports only internal_funnel delivery. External URL tracking is not implemented."
+            "This campaign uses external URLs, so mOS can only show Meta-native management. First-party funnel benchmarks require internal_funnel delivery.",
+            code="unsupported_delivery_mode",
         )
 
     publish_run = session.scalars(
@@ -281,19 +295,22 @@ def _resolve_campaign_funnel_context(
         funnel = next((candidate for candidate in funnels if str(candidate.id) == funnel_id), None)
         if funnel is None:
             raise MetaManagementBenchmarkError(
-                f"Published funnel {funnel_id} could not be found for campaign {campaign.id}."
+                f"Published funnel {funnel_id} could not be found for campaign {campaign.id}.",
+                code="published_funnel_not_found",
             )
     elif len(funnels) == 1:
         funnel = funnels[0]
     else:
         raise MetaManagementBenchmarkError(
-            "Benchmark evaluation could not determine a single funnel for this campaign. Publish metadata must include funnelId."
+            "Benchmark evaluation could not determine a single funnel for this campaign. Publish metadata must include funnelId.",
+            code="funnel_resolution_ambiguous",
         )
 
     publication_id = str(funnel.active_publication_id or "").strip()
     if not publication_id:
         raise MetaManagementBenchmarkError(
-            "Selected funnel is not published, so first-party funnel benchmarks cannot be evaluated."
+            "Selected funnel is not published, so first-party funnel benchmarks cannot be evaluated.",
+            code="funnel_not_published",
         )
 
     pages = list(
@@ -303,7 +320,10 @@ def _resolve_campaign_funnel_context(
     )
     sales_page = next((page for page in pages if resolve_funnel_template_category(page.template_id) == "sales"), None)
     if sales_page is None:
-        raise MetaManagementBenchmarkError("Benchmark evaluation requires a published sales page.")
+        raise MetaManagementBenchmarkError(
+            "Benchmark evaluation requires a published sales page.",
+            code="sales_page_missing",
+        )
     presell_page = next(
         (page for page in pages if resolve_funnel_template_category(page.template_id) == "presales"),
         None,
@@ -569,6 +589,21 @@ def build_management_benchmark_payload(
     date_preset: str,
     ad_rows: list[Any],
 ) -> tuple[MetaBenchmarkContext, MetaFunnelMetricsSnapshot, list[MetaBenchmarkEvaluation]]:
+    delivery = CampaignDeliveryConfigsRepository(session).get_by_campaign(
+        org_id=org_id,
+        campaign_id=str(campaign.id),
+    )
+    if delivery is None:
+        raise MetaManagementBenchmarkError(
+            "Campaign delivery config is required before benchmark evaluation can run.",
+            code="delivery_config_missing",
+        )
+    if delivery.delivery_mode != CampaignDeliveryModeEnum.internal_funnel:
+        raise MetaManagementBenchmarkError(
+            "This campaign uses external URLs, so mOS can only show Meta-native management. First-party funnel benchmarks require internal_funnel delivery.",
+            code="unsupported_delivery_mode",
+        )
+
     profile_record = PaidAdsQaRepository(session).get_platform_profile(
         org_id=org_id,
         client_id=str(campaign.client_id),
@@ -576,7 +611,8 @@ def build_management_benchmark_payload(
     )
     if profile_record is None:
         raise MetaManagementBenchmarkError(
-            "Meta paid ads profile is required before benchmark evaluation can run."
+            "Meta paid ads profile is required before benchmark evaluation can run.",
+            code="paid_ads_profile_missing",
         )
     profile = parse_meta_management_benchmark_profile(profile_record.metadata_json)
     resolved_context = _resolve_campaign_funnel_context(

@@ -227,6 +227,7 @@ class Settings(BaseSettings):
     GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 1
     GETHOOKD_SYNC_SCHEDULE_ID: str = "gethookd-nightly-sync"
     GETHOOKD_SYNC_SCHEDULE_CRON: str = "0 3 * * *"
+    META_MANAGEMENT_SCHEDULE_CRON: str = "0 */6 * * *"
 
     # Postiz sidecar configuration
     # Default base URL for self-hosted Postiz instances.

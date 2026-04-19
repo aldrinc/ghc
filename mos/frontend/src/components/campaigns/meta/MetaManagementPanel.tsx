@@ -67,6 +67,17 @@ function runLabel(run: MetaPublishRun): string {
   return `${campaignLabel} · ${createdLabel} · ${metaLabel}`;
 }
 
+function runDeliveryMode(run: MetaPublishRun | null): string | null {
+  const metadata = run?.metadata;
+  if (!metadata || typeof metadata !== "object") return null;
+  const campaignDelivery =
+    "campaignDelivery" in metadata && metadata.campaignDelivery && typeof metadata.campaignDelivery === "object"
+      ? metadata.campaignDelivery
+      : null;
+  if (!campaignDelivery || !("deliveryMode" in campaignDelivery)) return null;
+  return typeof campaignDelivery.deliveryMode === "string" ? campaignDelivery.deliveryMode : null;
+}
+
 export function MetaManagementPanel() {
   const { campaign, visiblePublishRuns, publishRunsLoading, publishRunsError } = useMetaPublishContext();
   const { planManagement } = useMetaApi();
@@ -116,7 +127,7 @@ export function MetaManagementPanel() {
         metaConfigId: selectedRun.metaConfigId || undefined,
         datePreset,
         mode: "plan_only",
-        evaluateBenchmarks: true,
+        benchmarkMode: "best_effort",
       });
       setPlan(nextPlan);
     } catch (err) {
@@ -135,13 +146,17 @@ export function MetaManagementPanel() {
     void loadPlan();
   }, [loadPlan, selectedRun?.metaCampaignId]);
 
+  const deliveryMode = runDeliveryMode(selectedRun) || plan?.benchmarkContext?.deliveryMode || null;
+  const benchmarkUnavailableReason = plan?.benchmarkStatus.reason || null;
+  const showBenchmarkCards = Boolean(plan?.benchmarkEvaluations.length);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-surface p-4">
         <div>
-          <div className="text-base font-semibold text-content">Manage live benchmarks</div>
+          <div className="text-base font-semibold text-content">Manage live Meta campaigns</div>
           <div className="mt-1 text-sm text-content-muted">
-            Compare ad CTR and first-party funnel conversion metrics against the Meta management benchmark profile.
+            Review live Meta delivery, rule-triggered actions, and funnel benchmarks when first-party data is available.
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -176,32 +191,40 @@ export function MetaManagementPanel() {
 
       {plan ? (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {plan.benchmarkEvaluations.map((evaluation) => (
-              <div key={evaluation.metricId} className="rounded-xl border border-border bg-surface p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-content-muted">{evaluation.label}</div>
-                    <div className="mt-1 text-2xl font-semibold text-content">{formatPct(evaluation.value)}</div>
-                  </div>
-                  <Badge tone={benchmarkStatusTone(evaluation.status)}>{benchmarkStatusLabel(evaluation.status)}</Badge>
-                </div>
-                <div className="mt-3 space-y-1 text-xs text-content-muted">
-                  {evaluation.minimum != null ? <div>Minimum {formatPct(evaluation.minimum)}</div> : null}
-                  {evaluation.target != null ? <div>Target {formatPct(evaluation.target)}</div> : null}
-                  {evaluation.good != null ? <div>Good {formatPct(evaluation.good)}</div> : null}
-                  {evaluation.denominator != null ? (
+          {showBenchmarkCards ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {plan.benchmarkEvaluations.map((evaluation) => (
+                <div key={evaluation.metricId} className="rounded-xl border border-border bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      Volume {evaluation.numerator ?? 0}/{evaluation.denominator}
+                      <div className="text-xs uppercase tracking-wide text-content-muted">{evaluation.label}</div>
+                      <div className="mt-1 text-2xl font-semibold text-content">{formatPct(evaluation.value)}</div>
                     </div>
+                    <Badge tone={benchmarkStatusTone(evaluation.status)}>{benchmarkStatusLabel(evaluation.status)}</Badge>
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs text-content-muted">
+                    {evaluation.minimum != null ? <div>Minimum {formatPct(evaluation.minimum)}</div> : null}
+                    {evaluation.target != null ? <div>Target {formatPct(evaluation.target)}</div> : null}
+                    {evaluation.good != null ? <div>Good {formatPct(evaluation.good)}</div> : null}
+                    {evaluation.denominator != null ? (
+                      <div>
+                        Volume {evaluation.numerator ?? 0}/{evaluation.denominator}
+                      </div>
+                    ) : null}
+                  </div>
+                  {recommendationForEvaluation(evaluation) ? (
+                    <div className="mt-3 text-sm text-content-muted">{recommendationForEvaluation(evaluation)}</div>
                   ) : null}
                 </div>
-                {recommendationForEvaluation(evaluation) ? (
-                  <div className="mt-3 text-sm text-content-muted">{recommendationForEvaluation(evaluation)}</div>
-                ) : null}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
+
+          {!plan.benchmarkStatus.available ? (
+            <Callout variant="warning" size="sm" title="Funnel benchmarks unavailable">
+              {benchmarkUnavailableReason || "This campaign is being managed with Meta-native metrics only."}
+            </Callout>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[1.4fr,1fr]">
             <div className="rounded-xl border border-border bg-surface p-4">
@@ -256,11 +279,12 @@ export function MetaManagementPanel() {
 
             <div className="space-y-4">
               <div className="rounded-xl border border-border bg-surface p-4">
-                <div className="text-base font-semibold text-content">Funnel context</div>
+                <div className="text-base font-semibold text-content">Management context</div>
                 <div className="mt-3 space-y-2 text-sm text-content-muted">
                   <div>Generated {formatDate(plan.generatedAt)}</div>
                   <div>Window {String(plan.window.datePreset || "—")}</div>
-                  {plan.benchmarkContext?.deliveryMode ? <div>Delivery {plan.benchmarkContext.deliveryMode}</div> : null}
+                  <div>Scope {plan.managementScope === "meta_plus_funnel" ? "Meta + funnel" : "Meta only"}</div>
+                  {deliveryMode ? <div>Delivery {deliveryMode}</div> : null}
                   {plan.benchmarkContext?.priceDollars != null ? (
                     <div>Price ${plan.benchmarkContext.priceDollars.toFixed(2)}</div>
                   ) : null}

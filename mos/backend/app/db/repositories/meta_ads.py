@@ -290,6 +290,19 @@ class MetaAdsRepository:
         )
         return list(self.session.scalars(stmt).all())
 
+    def get_latest_published_run(self, *, org_id: str, campaign_id: str) -> Optional[MetaPublishRun]:
+        stmt = (
+            select(MetaPublishRun)
+            .where(
+                MetaPublishRun.org_id == org_id,
+                MetaPublishRun.campaign_id == campaign_id,
+                MetaPublishRun.status == "published",
+                MetaPublishRun.meta_campaign_id.is_not(None),
+            )
+            .order_by(MetaPublishRun.completed_at.desc().nullslast(), MetaPublishRun.created_at.desc())
+        )
+        return self.session.scalars(stmt).first()
+
     def get_publish_run(self, *, org_id: str, publish_run_id: str) -> Optional[MetaPublishRun]:
         stmt = select(MetaPublishRun).where(
             MetaPublishRun.org_id == org_id,
