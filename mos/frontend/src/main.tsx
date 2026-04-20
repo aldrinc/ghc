@@ -19,30 +19,18 @@ function redirectUnsupportedLocalOrigin() {
   return true;
 }
 
-async function loadBootstrapModule(
-  kind: "admin" | "runtime"
-): Promise<
-  | { bootstrapAdminApp: () => void }
-  | { bootstrapRuntimeApp: () => void }
-> {
-  if (kind === "runtime") {
-    return import("./runtimeBootstrap");
-  }
-  return import("./adminBootstrap");
-}
-
 async function bootstrap() {
   if (redirectUnsupportedLocalOrigin()) {
     return;
   }
   const runtimeMode = Boolean(window.__MOS_DEPLOY_RUNTIME__?.bundleMode);
   if (runtimeMode) {
-    const mod = await loadBootstrapModule("runtime");
-    mod.bootstrapRuntimeApp();
+    const { bootstrapRuntimeApp } = await import("./runtimeBootstrap");
+    bootstrapRuntimeApp();
     return;
   }
-  const mod = await loadBootstrapModule("admin");
-  mod.bootstrapAdminApp();
+  const { bootstrapAdminApp } = await import("./adminBootstrap");
+  bootstrapAdminApp();
 }
 
 void bootstrap();

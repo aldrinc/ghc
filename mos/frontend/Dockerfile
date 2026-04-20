@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Build-time overrides for Vite envs; pass --build-arg to set.
 ARG VITE_API_BASE_URL=http://localhost:8008
-ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_placeholder
+ARG VITE_CLERK_PUBLISHABLE_KEY
 ARG VITE_CLERK_JWT_TEMPLATE=backend
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
@@ -15,6 +15,14 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+RUN if [ -z "$VITE_CLERK_PUBLISHABLE_KEY" ]; then \
+      echo "VITE_CLERK_PUBLISHABLE_KEY build arg is required." >&2; \
+      exit 1; \
+    fi && \
+    if [ "$VITE_CLERK_PUBLISHABLE_KEY" = "pk_test_placeholder" ]; then \
+      echo "VITE_CLERK_PUBLISHABLE_KEY build arg cannot use the placeholder value." >&2; \
+      exit 1; \
+    fi
 RUN npm run build
 
 FROM nginx:alpine

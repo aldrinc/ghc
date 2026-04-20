@@ -85,4 +85,26 @@ describe("ImportedHtmlDocument", () => {
     expect(srcDoc).toContain("restoreCompactedSpacing");
     expect(srcDoc).toContain("window.innerWidth > MOBILE_MAX_WIDTH");
   });
+
+  it("optimizes imported HTML image loading inside the iframe document", () => {
+    render(
+      <ImportedHtmlDocument
+        title="Imported Ember Page"
+        htmlDocument={`
+          <html>
+            <body>
+              <img src="/hero.jpg" alt="Hero" />
+              <img src="/gallery.jpg" alt="Gallery" />
+            </body>
+          </html>
+        `}
+      />,
+    );
+
+    const iframe = screen.getByTitle("Imported Ember Page");
+    const srcDoc = iframe.getAttribute("srcdoc") || "";
+
+    expect(srcDoc).toContain('src="/hero.jpg" alt="Hero" loading="eager" decoding="async" fetchpriority="high"');
+    expect(srcDoc).toContain('src="/gallery.jpg" alt="Gallery" loading="lazy" decoding="async" fetchpriority="low"');
+  });
 });

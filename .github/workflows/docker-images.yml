@@ -142,7 +142,7 @@ jobs:
       packages: write
     env:
       VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'http://localhost:8000' }}
-      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
       VITE_CLERK_JWT_TEMPLATE: ${{ vars.VITE_CLERK_JWT_TEMPLATE || 'backend' }}
     steps:
       - name: Checkout
@@ -158,6 +158,18 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate frontend image env
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_CLERK_PUBLISHABLE_KEY:-}" ]; then
+            echo "VITE_CLERK_PUBLISHABLE_KEY repository variable is required for the frontend image build." >&2
+            exit 1
+          fi
+          if [ "${VITE_CLERK_PUBLISHABLE_KEY}" = "pk_test_placeholder" ]; then
+            echo "VITE_CLERK_PUBLISHABLE_KEY cannot use the placeholder value for the frontend image build." >&2
+            exit 1
+          fi
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
@@ -225,3 +237,91 @@ jobs:
             IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml up -d
             IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml exec -T backend alembic upgrade head
             IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml restart backend worker
+
+            if ! command -v nginx >/dev/null 2>&1; then
+              echo "nginx is required on the target host to serve moshq.app." >&2
+              exit 1
+            fi
+
+            export APP_DOMAIN="${DEPLOY_APP_DOMAIN:-moshq.app}"
+            export APP_EXTRA_SERVER_NAMES="${DEPLOY_APP_EXTRA_SERVER_NAMES:-}"
+            export TLS_CERT_PATH="${DEPLOY_APP_TLS_CERT_PATH:-/etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem}"
+            export TLS_KEY_PATH="${DEPLOY_APP_TLS_KEY_PATH:-/etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem}"
+            export FRONTEND_UPSTREAM="${DEPLOY_APP_FRONTEND_UPSTREAM:-http://127.0.0.1:8080}"
+            export BACKEND_UPSTREAM="${DEPLOY_APP_BACKEND_UPSTREAM:-http://127.0.0.1:8008}"
+            TEMPLATE_PATH="$DEPLOY_PATH/ops/moshq-app/app/nginx.conf"
+            TARGET_PATH="/etc/nginx/sites-available/000-moshq-app"
+
+            if [ ! -f "$TEMPLATE_PATH" ]; then
+              echo "Expected nginx template at $TEMPLATE_PATH." >&2
+              exit 1
+            fi
+
+            mkdir -p /var/www/certbot /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+            python3 - "$TEMPLATE_PATH" "$TARGET_PATH" <<'PY'
+            import os
+            import sys
+            from pathlib import Path
+
+            template_path = Path(sys.argv[1])
+            target_path = Path(sys.argv[2])
+            rendered = template_path.read_text(encoding="utf-8")
+            replacements = {
+                "__DOMAIN_NAME__": os.environ["APP_DOMAIN"],
+                "__EXTRA_SERVER_NAMES__": os.environ["APP_EXTRA_SERVER_NAMES"],
+                "__SSL_CERTIFICATE__": os.environ["TLS_CERT_PATH"],
+                "__SSL_CERTIFICATE_KEY__": os.environ["TLS_KEY_PATH"],
+                "__FRONTEND_UPSTREAM__": os.environ["FRONTEND_UPSTREAM"],
+                "__BACKEND_UPSTREAM__": os.environ["BACKEND_UPSTREAM"],
+            }
+            for placeholder, value in replacements.items():
+                rendered = rendered.replace(placeholder, value)
+            target_path.write_text(rendered, encoding="utf-8")
+            PY
+
+            python3 - <<'PY'
+            import os
+            from pathlib import Path
+
+            target_names = {os.environ["APP_DOMAIN"]}
+            target_names.update(
+                value.strip()
+                for value in os.environ["APP_EXTRA_SERVER_NAMES"].split()
+                if value.strip()
+            )
+
+            sites_enabled = Path("/etc/nginx/sites-enabled")
+            keep_name = "000-moshq-app"
+            for candidate in sites_enabled.iterdir():
+                if candidate.name in {keep_name, "default"}:
+                    continue
+                try:
+                    text = candidate.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+
+                configured_names: set[str] = set()
+                for raw_line in text.splitlines():
+                    stripped = raw_line.split("#", 1)[0].strip()
+                    if not stripped.startswith("server_name "):
+                        continue
+                    directive = stripped[len("server_name ") :].rstrip(";")
+                    configured_names.update(token.strip() for token in directive.split() if token.strip())
+
+                if configured_names & target_names:
+                    candidate.unlink()
+            PY
+
+            ln -sf "$TARGET_PATH" /etc/nginx/sites-enabled/000-moshq-app
+            rm -f /etc/nginx/sites-enabled/default
+            nginx -t
+            systemctl reload nginx
+
+      - name: Verify SPA Deep Links
+        run: |
+          python3 scripts/check_spa_routes.py \
+            --base-url https://moshq.app \
+            --route / \
+            --route /sign-in \
+            --route /workspaces/overview

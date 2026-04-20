@@ -141,9 +141,12 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(injectedDocument).toContain("Secure checkout is unavailable right now.");
     expect(injectedDocument).toContain("aria-busy");
     expect(injectedDocument).toContain("waitForPreparedCheckout(cacheKey)");
+    expect(injectedDocument).not.toContain('document.addEventListener("DOMContentLoaded", warmCheckoutBindingsSafely');
+    expect(injectedDocument).not.toContain('window.addEventListener("load", warmCheckoutBindingsSafely');
+    expect(injectedDocument).not.toContain("window.setTimeout(warmCheckoutBindingsSafely");
   });
 
-  it("reuses the prepared checkout on click instead of creating a second checkout", async () => {
+  it("reuses the prepared checkout after checkout intent instead of creating a second checkout", async () => {
     const htmlDocument = `
       <html>
         <body>
@@ -230,6 +233,22 @@ describe("StandaloneImportedHtmlPage", () => {
     expect(dom.window.location.hash).toBe("#prepared-checkout");
 
     dom.window.close();
+  });
+
+  it("optimizes imported HTML image loading before injecting the document", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: `
+        <html>
+          <body>
+            <img src="/hero.jpg" alt="Hero" />
+            <img src="/gallery.jpg" alt="Gallery" />
+          </body>
+        </html>
+      `,
+    });
+
+    expect(injectedDocument).toContain('src="/hero.jpg" alt="Hero" loading="eager" decoding="async" fetchpriority="high"');
+    expect(injectedDocument).toContain('src="/gallery.jpg" alt="Gallery" loading="lazy" decoding="async" fetchpriority="low"');
   });
 
   it("restores Meta page view tracking for standalone sales pages", async () => {

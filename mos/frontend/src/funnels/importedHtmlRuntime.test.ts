@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   matchesVariantOptionValues,
+  optimizeImportedHtmlDocument,
   resolveExternalCheckoutUrlForVariant,
 } from "@/funnels/importedHtmlRuntime";
 
@@ -51,5 +52,24 @@ describe("resolveExternalCheckoutUrlForVariant", () => {
 
   it("returns null when no mapping exists", () => {
     expect(resolveExternalCheckoutUrlForVariant([], "variant-1")).toBeNull();
+  });
+});
+
+describe("optimizeImportedHtmlDocument", () => {
+  it("keeps the first image eager and defers the rest", () => {
+    const optimized = optimizeImportedHtmlDocument(`
+      <!DOCTYPE html>
+      <html>
+        <body>
+          <img src="/hero.jpg" alt="Hero" />
+          <img src="/gallery-1.jpg" alt="Gallery 1" />
+          <img src="/gallery-2.jpg" alt="Gallery 2" loading="lazy" />
+        </body>
+      </html>
+    `);
+
+    expect(optimized).toContain('src="/hero.jpg" alt="Hero" loading="eager" decoding="async" fetchpriority="high"');
+    expect(optimized).toContain('src="/gallery-1.jpg" alt="Gallery 1" loading="lazy" decoding="async" fetchpriority="low"');
+    expect(optimized).toContain('src="/gallery-2.jpg" alt="Gallery 2" loading="lazy" decoding="async" fetchpriority="low"');
   });
 });

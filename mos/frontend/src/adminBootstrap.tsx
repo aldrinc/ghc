@@ -9,13 +9,23 @@ import App from "./App";
 import "./index.css";
 import "@measured/puck/puck.css";
 
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder";
+function getClerkPublishableKey() {
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
+  if (!clerkKey) {
+    throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required to bootstrap the admin app.");
+  }
+  if (clerkKey === "pk_test_placeholder") {
+    throw new Error("VITE_CLERK_PUBLISHABLE_KEY is set to the placeholder value.");
+  }
+  return clerkKey;
+}
 
 export function bootstrapAdminApp() {
   const root = document.getElementById("root");
   if (!root) {
     throw new Error("Root element #root was not found.");
   }
+  const clerkKey = getClerkPublishableKey();
 
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
