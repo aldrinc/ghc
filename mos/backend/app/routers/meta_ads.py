@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Optional
 from typing import Literal
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlsplit, urlunsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -1201,6 +1201,43 @@ def _resolve_publish_destination_url(*, destination_url: str | None, publish_bas
     return None
 
 
+def _apply_tracking_url_parameters(
+    *,
+    destination_url: str,
+    tracking_url_parameters: str | None,
+) -> str:
+    cleaned_destination_url = _clean_optional_text(destination_url)
+    if not cleaned_destination_url:
+        return destination_url
+
+    cleaned_tracking_url_parameters = _clean_optional_text(tracking_url_parameters)
+    if not cleaned_tracking_url_parameters:
+        return cleaned_destination_url
+
+    destination_parts = urlsplit(cleaned_destination_url)
+    tracking_pairs = parse_qsl(cleaned_tracking_url_parameters.lstrip("?"), keep_blank_values=True)
+    if not tracking_pairs:
+        return cleaned_destination_url
+
+    tracking_keys = {key for key, _value in tracking_pairs}
+    destination_pairs = [
+        (key, value)
+        for key, value in parse_qsl(destination_parts.query, keep_blank_values=True)
+        if key not in tracking_keys
+    ]
+    destination_pairs.extend(tracking_pairs)
+    merged_query = urlencode(destination_pairs, doseq=True)
+    return urlunsplit(
+        (
+            destination_parts.scheme,
+            destination_parts.netloc,
+            destination_parts.path,
+            merged_query,
+            destination_parts.fragment,
+        )
+    )
+
+
 def _publish_run_item_response(record: MetaPublishRunItem) -> MetaPublishRunItemResponse:
     return MetaPublishRunItemResponse(
         id=str(record.id),
@@ -1875,10 +1912,14 @@ def _create_meta_creative_internal(
         normalized_cta_type = _normalize_meta_call_to_action_type(payload.callToActionType)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    tracked_link_url = _apply_tracking_url_parameters(
+        destination_url=payload.linkUrl,
+        tracking_url_parameters=resolved.workspace_config.tracking_url_parameters,
+    )
 
     if upload.meta_image_hash:
         link_data: dict[str, Any] = {
-            "link": payload.linkUrl,
+            "link": tracked_link_url,
             "image_hash": upload.meta_image_hash,
         }
         if payload.message:
@@ -1890,7 +1931,7 @@ def _create_meta_creative_internal(
         if normalized_cta_type:
             link_data["call_to_action"] = {
                 "type": normalized_cta_type,
-                "value": {"link": payload.linkUrl},
+                "value": {"link": tracked_link_url},
             }
         object_story_spec: dict[str, Any] = {
             "page_id": page_id,
@@ -1899,7 +1940,7 @@ def _create_meta_creative_internal(
     elif upload.meta_video_id:
         video_data: dict[str, Any] = {
             "video_id": upload.meta_video_id,
-            "link": payload.linkUrl,
+            "link": tracked_link_url,
         }
         if payload.message:
             video_data["message"] = payload.message
@@ -1910,7 +1951,7 @@ def _create_meta_creative_internal(
         if normalized_cta_type:
             video_data["call_to_action"] = {
                 "type": normalized_cta_type,
-                "value": {"link": payload.linkUrl},
+                "value": {"link": tracked_link_url},
             }
         object_story_spec = {
             "page_id": page_id,

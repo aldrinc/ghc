@@ -4,6 +4,7 @@ import io
 from collections import Counter
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from PIL import Image
@@ -320,6 +321,8 @@ def _upsert_meta_profile(
     client_id: str,
     metadata: dict[str, object] | None = None,
     page_name: str | None = "Test Page",
+    tracking_provider: str | None = "mos",
+    tracking_url_parameters: str | None = "utm_source=meta&utm_medium=paid",
 ) -> None:
     response = api_client.put(
         f"/clients/{client_id}/paid-ads-qa/platforms/meta/profile",
@@ -331,6 +334,8 @@ def _upsert_meta_profile(
             "pixelId": "pixel_123",
             "verifiedDomain": "shop.thehonestherbalist.com",
             "verifiedDomainStatus": "verified",
+            "trackingProvider": tracking_provider,
+            "trackingUrlParameters": tracking_url_parameters,
             "metadata": metadata or {},
         },
     )
@@ -965,8 +970,19 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
 
         def create_adcreative(self, **kwargs):
             assert kwargs["payload"]["object_story_spec"]["page_id"] == "page_123"
-            assert kwargs["payload"]["object_story_spec"]["link_data"]["link"] == "https://shop.thehonestherbalist.com/presales"
+            tracked_link = kwargs["payload"]["object_story_spec"]["link_data"]["link"]
+            parsed_link = urlsplit(tracked_link)
+            assert f"{parsed_link.scheme}://{parsed_link.netloc}{parsed_link.path}" == "https://shop.thehonestherbalist.com/presales"
+            assert parse_qs(parsed_link.query) == {
+                "utm_source": ["meta"],
+                "utm_medium": ["paid"],
+            }
             assert kwargs["payload"]["object_story_spec"]["link_data"]["call_to_action"]["type"] == "LEARN_MORE"
+            cta_link = kwargs["payload"]["object_story_spec"]["link_data"]["call_to_action"]["value"]["link"]
+            assert parse_qs(urlsplit(cta_link).query) == {
+                "utm_source": ["meta"],
+                "utm_medium": ["paid"],
+            }
             return {"id": "meta_creative_123"}
 
         def create_ad(self, **kwargs):
@@ -1089,6 +1105,22 @@ def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_se
     assert publish_payload["metadata"]["budgetScope"] == "campaign"
     assert publish_payload["metadata"]["campaignDailyBudget"] == 25000
     assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
+
+
+def test_apply_tracking_url_parameters_overrides_existing_utm_values() -> None:
+    tracked_url = meta_ads_router._apply_tracking_url_parameters(
+        destination_url="https://example.com/presales?foo=bar&utm_source=old#section-1",
+        tracking_url_parameters="utm_source=meta&utm_medium=paid",
+    )
+
+    parsed = urlsplit(tracked_url)
+    assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == "https://example.com/presales"
+    assert parse_qs(parsed.query) == {
+        "foo": ["bar"],
+        "utm_source": ["meta"],
+        "utm_medium": ["paid"],
+    }
+    assert parsed.fragment == "section-1"
 
 
 def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
