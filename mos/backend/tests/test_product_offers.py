@@ -2044,6 +2044,16 @@ def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
     monkeypatch.setattr(products_router, "verify_shopify_product_exists", fake_verify)
     monkeypatch.setattr(
         products_router,
+        "_require_ready_shopify_domain",
+        lambda *, client_id, selected_shop_domain=None: "example.myshopify.com",
+    )
+    monkeypatch.setattr(
+        products_router,
+        "_disable_shopify_inventory_tracking_for_product",
+        lambda **_: None,
+    )
+    monkeypatch.setattr(
+        products_router,
         "sync_workspace_shopify_catalog_collection",
         fake_sync,
     )
@@ -2059,6 +2069,75 @@ def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
     assert observed["verified_product_gid"] == "gid://shopify/Product/901"
     assert observed["sync_client_id"] == client_id
     assert observed["extra_product_gids"] == ["gid://shopify/Product/901"]
+
+
+def test_update_product_disables_tracked_inventory_when_shopify_mapping_is_set(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Shopify Inventory Tracking Disable")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+    observed_updates: list[dict[str, object]] = []
+
+    monkeypatch.setattr(products_router, "verify_shopify_product_exists", lambda **_: None)
+    monkeypatch.setattr(
+        products_router,
+        "_require_ready_shopify_domain",
+        lambda *, client_id, selected_shop_domain=None: "example.myshopify.com",
+    )
+    monkeypatch.setattr(
+        products_router,
+        "get_client_shopify_product",
+        lambda **_: {
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/111",
+                    "inventoryManagement": "shopify",
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/222",
+                    "inventoryManagement": None,
+                },
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        products_router,
+        "update_client_shopify_variant",
+        lambda *, client_id, variant_gid, fields, shop_domain=None: observed_updates.append(
+            {
+                "client_id": client_id,
+                "variant_gid": variant_gid,
+                "fields": fields,
+                "shop_domain": shop_domain,
+            }
+        )
+        or {
+            "shopDomain": shop_domain or "example.myshopify.com",
+            "productGid": "gid://shopify/Product/901",
+            "variantGid": variant_gid,
+        },
+    )
+    monkeypatch.setattr(
+        products_router,
+        "sync_workspace_shopify_catalog_collection",
+        lambda **_: None,
+    )
+
+    response = api_client.patch(
+        f"/products/{product_id}",
+        json={"shopifyProductGid": "gid://shopify/Product/901"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["shopify_product_gid"] == "gid://shopify/Product/901"
+    assert observed_updates == [
+        {
+            "client_id": client_id,
+            "variant_gid": "gid://shopify/ProductVariant/111",
+            "fields": {"inventoryManagement": None},
+            "shop_domain": "example.myshopify.com",
+        }
+    ]
 
 
 def test_update_product_allows_clearing_published_at(api_client):

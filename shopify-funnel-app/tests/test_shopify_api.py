@@ -1819,6 +1819,22 @@ def test_create_product_returns_created_product_and_variants():
     assert result["variants"][0]["priceCents"] == 4999
     assert result["variants"][1]["variantGid"] == "gid://shopify/ProductVariant/200"
     assert len(observed_payloads) == 3
+    update_variants = (((observed_payloads[1].get("variables") or {}).get("variants")) or [])
+    assert update_variants == [
+        {
+            "id": "gid://shopify/ProductVariant/100",
+            "price": "49.99",
+            "inventoryItem": {"tracked": False},
+        }
+    ]
+    created_variants = (((observed_payloads[2].get("variables") or {}).get("variants")) or [])
+    assert created_variants == [
+        {
+            "price": "79.00",
+            "optionValues": [{"optionName": "Title", "name": "Bundle"}],
+            "inventoryItem": {"tracked": False},
+        }
+    ]
     assert observed_catalog_sync == {
         "shop_domain": "example.myshopify.com",
         "access_token": "token",
@@ -2049,9 +2065,11 @@ def test_sync_product_updates_existing_variants_and_writes_source_payload():
             ]
             assert product_input["variants"][0]["id"] == "gid://shopify/ProductVariant/100"
             assert product_input["variants"][0]["price"] == "49.99"
+            assert product_input["variants"][0]["inventoryItem"] == {"tracked": False}
             assert product_input["variants"][1]["optionValues"] == [
                 {"optionName": "Title", "name": "Bundle"}
             ]
+            assert product_input["variants"][1]["inventoryItem"] == {"tracked": False}
             return {
                 "productSet": {
                     "product": {
