@@ -1,20 +1,28 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCampaign,
   useCampaignDelivery,
   useCampaignLaunchContextReadiness,
   useCampaignStrategyV2Launches,
 } from "@/api/campaigns";
+import { type ApiError } from "@/api/client";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useFunnels } from "@/api/funnels";
+import { useMetaApi } from "@/api/meta";
 import { useProduct } from "@/api/products";
 import { useWorkflows, useWorkflowLogs } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  groupPipelineAssetsByBriefId,
+  selectLatestProductionBatchPipelineAssets,
+} from "@/lib/campaignProductionBatch";
 import type { Artifact, AssetBrief, ExperimentSpec, StrategySheet } from "@/types/artifacts";
 import type { Campaign, StrategyV2LaunchRecord, WorkflowRun } from "@/types/common";
 import type { CampaignDeliveryConfig, CampaignLaunchContextReadiness } from "@/types/delivery";
 import type { ProductAsset } from "@/types/products";
+import type { MetaPipelineAsset } from "@/types/meta";
 
 // ---------------------------------------------------------------------------
 // Derived types
@@ -64,9 +72,11 @@ type CampaignContextValue = {
   assetBriefArtifacts: Artifact[];
   briefsLoading: boolean;
   assetBriefs: AssetBrief[];
-  generatedAssetsByBriefId: Map<string, ProductAsset[]>;
+  generatedAssetsByBriefId: Map<string, MetaPipelineAsset[]>;
   generatedAssetTotal: number;
   briefsWithGeneratedAssets: number;
+  generatedAssetsLoading: boolean;
+  latestGeneratedBatchId: string | null;
 
   // Funnels
   funnels: FunnelRecord[];
@@ -105,6 +115,7 @@ export function CampaignProvider({
 }) {
   const { workspace, clients } = useWorkspace();
   const { product, products } = useProductContext();
+  const { listPipelineAssets } = useMetaApi();
 
   // ---- Core campaign data ------------------------------------------------
   const { data: campaign } = useCampaign(campaignId);
@@ -153,6 +164,15 @@ export function CampaignProvider({
   const { data: campaignProductDetail, isLoading: campaignProductLoading } = useProduct(
     campaignProductId || undefined,
   );
+
+  const {
+    data: pipelineAssets = [],
+    isLoading: generatedAssetsLoading,
+  } = useQuery<MetaPipelineAsset[], ApiError>({
+    queryKey: ["meta", "pipeline", "assets", campaignId],
+    queryFn: () => listPipelineAssets({ campaignId }),
+    enabled: Boolean(campaignId),
+  });
 
   // ---- Derived: workspace name -------------------------------------------
   const workspaceName = useMemo(() => {
@@ -207,23 +227,16 @@ export function CampaignProvider({
   }, [assetBriefArtifacts]);
 
   // ---- Derived: generated assets by brief --------------------------------
+  const { batchId: latestGeneratedBatchId, assets: latestGeneratedPipelineAssets } = useMemo(() => {
+    return selectLatestProductionBatchPipelineAssets(
+      pipelineAssets,
+      assetBriefs.map((brief) => brief.id),
+    );
+  }, [assetBriefs, pipelineAssets]);
+
   const generatedAssetsByBriefId = useMemo(() => {
-    const assets = campaignProductDetail?.assets || [];
-    const validBriefIds = new Set(assetBriefs.map((brief) => brief.id));
-    const mapped = new Map<string, ProductAsset[]>();
-    assets.forEach((asset) => {
-      const metadata = asset.ai_metadata || {};
-      const briefId = typeof metadata.assetBriefId === "string" ? metadata.assetBriefId : null;
-      if (!briefId || !validBriefIds.has(briefId)) return;
-      const group = mapped.get(briefId);
-      if (group) {
-        group.push(asset);
-      } else {
-        mapped.set(briefId, [asset]);
-      }
-    });
-    return mapped;
-  }, [campaignProductDetail?.assets, assetBriefs]);
+    return groupPipelineAssetsByBriefId(latestGeneratedPipelineAssets);
+  }, [latestGeneratedPipelineAssets]);
 
   const generatedAssetTotal = useMemo(
     () =>
@@ -282,6 +295,8 @@ export function CampaignProvider({
       generatedAssetsByBriefId,
       generatedAssetTotal,
       briefsWithGeneratedAssets,
+      generatedAssetsLoading,
+      latestGeneratedBatchId,
       funnels: funnels as FunnelRecord[],
       funnelsLoading,
       campaignLaunches,
@@ -317,6 +332,8 @@ export function CampaignProvider({
     generatedAssetsByBriefId,
     generatedAssetTotal,
     briefsWithGeneratedAssets,
+    generatedAssetsLoading,
+    latestGeneratedBatchId,
     funnels,
     funnelsLoading,
     campaignLaunches,

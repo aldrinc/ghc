@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -18,14 +18,18 @@ import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaign, useCampaignStrategyV2Launches, useUpdateExperimentSpecs } from "@/api/campaigns";
 import { useDeleteFunnel, useFunnels } from "@/api/funnels";
-import { useProduct } from "@/api/products";
+import { useMetaApi } from "@/api/meta";
 import { useWorkflowLogs, useWorkflows, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import {
+  groupPipelineAssetsByBriefId,
+  selectLatestProductionBatchPipelineAssets,
+} from "@/lib/campaignProductionBatch";
 import { cn } from "@/lib/utils";
 import type { Artifact, AssetBrief, ExperimentSpec, StrategySheet } from "@/types/artifacts";
 import type { StrategyV2LaunchRecord } from "@/types/common";
-import type { ProductAsset } from "@/types/products";
+import type { MetaPipelineAsset } from "@/types/meta";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -51,7 +55,9 @@ function formatBytes(value?: number | null): string | null {
   return `${size.toFixed(size < 10 && idx > 0 ? 1 : 0)} ${units[idx]}`;
 }
 
-function assetLabel(asset: ProductAsset): string {
+type GeneratedCampaignAsset = MetaPipelineAsset["asset"];
+
+function assetLabel(asset: GeneratedCampaignAsset): string {
   const filename = asset.ai_metadata?.filename;
   if (typeof filename === "string" && filename.trim()) return filename;
   if (asset.content_type) return asset.content_type;
@@ -63,7 +69,7 @@ function GeneratedAssetCarousel({
   selectedAssetId,
   onSelect,
 }: {
-  assets: ProductAsset[];
+  assets: GeneratedCampaignAsset[];
   selectedAssetId: string;
   onSelect: (assetId: string) => void;
 }) {
@@ -145,7 +151,7 @@ function GeneratedAssetCarousel({
         )}
       >
         {assets.map((asset) => {
-          const thumbUrl = asset.download_url || undefined;
+          const thumbUrl = asset.public_url || undefined;
           const thumbIsImage = asset.asset_kind === "image";
           const thumbSelected = selectedAssetId === asset.id;
           return (
@@ -166,7 +172,7 @@ function GeneratedAssetCarousel({
               {thumbIsImage && thumbUrl ? (
                 <img
                   src={thumbUrl}
-                  alt={asset.alt || assetLabel(asset)}
+                  alt={assetLabel(asset)}
                   className="h-full w-full object-cover"
                   loading="lazy"
                 />
@@ -232,6 +238,7 @@ export function CampaignDetailPage() {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const { post } = useApiClient();
+  const { listPipelineAssets } = useMetaApi();
   const queryClient = useQueryClient();
   const { workspace, clients } = useWorkspace();
   const { product, products, selectProduct } = useProductContext();
@@ -317,8 +324,14 @@ export function CampaignDetailPage() {
     if (workspace?.id === campaign.client_id) return workspace.name;
     return clients.find((client) => client.id === campaign.client_id)?.name ?? null;
   }, [campaign?.client_id, workspace?.id, workspace?.name, clients]);
-  const campaignProductId = campaign?.product_id || product?.id;
-  const { data: campaignProductDetail, isLoading: campaignProductLoading } = useProduct(campaignProductId || undefined);
+  const {
+    data: pipelineAssets = [],
+    isLoading: generatedAssetsLoading,
+  } = useQuery<MetaPipelineAsset[], ApiError>({
+    queryKey: ["meta", "pipeline", "assets", campaignId],
+    queryFn: () => listPipelineAssets({ campaignId }),
+    enabled: Boolean(campaignId),
+  });
 
   const campaignProduct = useMemo(
     () => products.find((item) => item.id === campaign?.product_id),
@@ -446,23 +459,17 @@ export function CampaignDetailPage() {
     });
     return Array.from(map.values());
   }, [assetBriefArtifacts]);
+  const latestGeneratedPipelineAssets = useMemo(
+    () =>
+      selectLatestProductionBatchPipelineAssets(
+        pipelineAssets,
+        assetBriefs.map((brief) => brief.id),
+      ).assets,
+    [assetBriefs, pipelineAssets]
+  );
   const generatedAssetsByBriefId = useMemo(() => {
-    const assets = campaignProductDetail?.assets || [];
-    const validBriefIds = new Set(assetBriefs.map((brief) => brief.id));
-    const mapped = new Map<string, ProductAsset[]>();
-    assets.forEach((asset) => {
-      const metadata = asset.ai_metadata || {};
-      const briefId = typeof metadata.assetBriefId === "string" ? metadata.assetBriefId : null;
-      if (!briefId || !validBriefIds.has(briefId)) return;
-      const group = mapped.get(briefId);
-      if (group) {
-        group.push(asset);
-      } else {
-        mapped.set(briefId, [asset]);
-      }
-    });
-    return mapped;
-  }, [campaignProductDetail?.assets, assetBriefs]);
+    return groupPipelineAssetsByBriefId(latestGeneratedPipelineAssets);
+  }, [latestGeneratedPipelineAssets]);
   const generatedAssetTotal = useMemo(
     () =>
       Array.from(generatedAssetsByBriefId.values()).reduce((sum, assets) => {
@@ -1615,7 +1622,7 @@ export function CampaignDetailPage() {
                   <div className="mt-2 text-sm text-content-muted">
                     Generating assets triggers creative production for the selected briefs.
                   </div>
-                  {campaignProductLoading ? (
+                  {generatedAssetsLoading ? (
                     <div className="mt-1 text-sm text-content-muted">Loading generated assets…</div>
                   ) : null}
                   {creativeProductionError ? (
@@ -1636,10 +1643,10 @@ export function CampaignDetailPage() {
                     const selectedPreviewAssetId = selectedPreviewAssetByBrief[brief.id];
                     const featuredAsset =
                       generatedAssets.find((asset) => asset.id === selectedPreviewAssetId) || generatedAssets[0];
-                    const featuredAssetUrl = featuredAsset?.download_url || undefined;
+                    const featuredAssetUrl = featuredAsset?.public_url || undefined;
                     const featuredIsImage = featuredAsset?.asset_kind === "image";
                     const featuredIsVideo = featuredAsset?.asset_kind === "video";
-                    const featuredSize = featuredAsset ? formatBytes(featuredAsset.size_bytes) : null;
+                    const featuredSize = null;
                     return (
                       <div key={brief.id} className="px-4 py-3 text-base">
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
@@ -1691,7 +1698,7 @@ export function CampaignDetailPage() {
                                   {featuredIsImage && featuredAssetUrl ? (
                                     <img
                                       src={featuredAssetUrl}
-                                      alt={featuredAsset.alt || assetLabel(featuredAsset)}
+                                      alt={assetLabel(featuredAsset)}
                                       className="h-[420px] w-full object-contain"
                                       loading="lazy"
                                     />
