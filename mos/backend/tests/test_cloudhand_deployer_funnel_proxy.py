@@ -15,6 +15,7 @@ from PIL import Image
 import cloudhand.adapters.deployer as deployer_module
 from cloudhand.adapters.deployer import (
     ServerDeployer,
+    _build_standalone_render_optimization_css,
     _html_tag_has_aspect_ratio_class,
     _html_tag_has_explicit_box_size_classes,
     _normalize_remote_standalone_fetch_url,
@@ -1007,6 +1008,8 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
     assert 'data-mos-local-fontshare="true"' in entry_html
     assert 'data-mos-local-google-fonts="true"' in entry_html
     assert 'data-mos-local-font-awesome="true"' in entry_html
+    assert 'const resolveSameDocumentHashTarget = (element) => {' in entry_html
+    assert 'binding.type === "checkout" ? resolveSameDocumentHashTarget(element) : null' in entry_html
     assert fontshare_400_route in entry_html
     assert fontshare_700_route in entry_html
     assert google_inter_400_route in entry_html
@@ -1022,6 +1025,39 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
     assert f"/opt/apps/landing-artifact/site{google_inter_400_route}" in uploaded
     assert f"/opt/apps/landing-artifact/site{google_inter_700_route}" in uploaded
     assert f"/opt/apps/landing-artifact/site{fontawesome_solid_route}" in uploaded
+
+
+def test_localized_google_fonts_stylesheet_requests_modern_browser_variant(monkeypatch):
+    deployer, _uploaded, _commands = _stub_deployer()
+    captured_user_agents: list[str | None] = []
+
+    def fake_fetch_remote_binary_asset(*, url: str, user_agent: str | None = None, **_kwargs):
+        captured_user_agents.append(user_agent)
+        if url == "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap":
+            return (
+                "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;"
+                "src:url('https://fonts.gstatic.com/s/inter/v18/inter-400.woff2') format('woff2');}"
+            ).encode("utf-8"), "text/css"
+        if url == "https://fonts.gstatic.com/s/inter/v18/inter-400.woff2":
+            return b"google-inter-400", "font/woff2"
+        raise AssertionError(f"Unexpected fetch for {url}")
+
+    monkeypatch.setattr(deployer, "_fetch_remote_standalone_binary_asset", fake_fetch_remote_binary_asset)
+
+    stylesheet, _preloads = deployer._build_localized_fontshare_stylesheet(
+        site_dir="/opt/apps/example/site",
+        source_url="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap",
+        context_label="Standalone test",
+        mirrored_asset_url_cache={},
+        mirrored_target_paths=set(),
+        standalone_served_assets={},
+        standalone_image_sources={},
+    )
+
+    assert "inter-400.woff2" not in stylesheet
+    assert "format('woff2')" in stylesheet
+    assert captured_user_agents
+    assert captured_user_agents[0] == deployer_module._STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER
 
 
 def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_after_custom_styles(
@@ -1419,47 +1455,6 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
     assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
 
 
-def test_funnel_artifact_site_skips_compression_candidates_after_image_optimization_budget_expires(
-    monkeypatch,
-):
-    html_document = """<!DOCTYPE html>
-<html>
-  <body>
-    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
-    <a id="main-cta" href="#shop">Start my protocol</a>
-  </body>
-</html>
-"""
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
-    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
-    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
-        "contentType": "image/jpeg",
-        "sizeBytes": len(noisy_jpeg),
-        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
-    }
-    deployer, uploaded, _commands = _stub_deployer()
-    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
-    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
-    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
-    monkeypatch.setattr(
-        deployer_module,
-        "_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS",
-        -1.0,
-    )
-    monkeypatch.setattr(
-        deployer,
-        "_validate_standalone_imported_html_visual_parity",
-        lambda **_: (_ for _ in ()).throw(AssertionError("parity validation should not run")),
-    )
-
-    deployer._configure_funnel_artifact_site(app)
-
-    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
-    entry_html = uploaded[entry_route_path]
-    assert "/_standalone-assets/compressed/" not in entry_html
-    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
-
-
 def test_presales_compression_candidates_include_lossy_webp_for_large_images():
     deployer, _uploaded, _commands = _stub_deployer()
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1376, height=768)
@@ -1603,46 +1598,6 @@ def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites
     assert "sizes=" not in entry_html
 
 
-def test_funnel_artifact_site_skips_responsive_candidates_after_image_optimization_budget_expires(
-    monkeypatch,
-):
-    html_document = """<!DOCTYPE html>
-<html>
-  <body>
-    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
-    <a id="main-cta" href="#shop">Start my protocol</a>
-  </body>
-</html>
-"""
-    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
-    deployer, uploaded, _commands = _stub_deployer()
-    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
-    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
-    monkeypatch.setattr(
-        deployer_module,
-        "_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS",
-        -1.0,
-    )
-    monkeypatch.setattr(
-        deployer,
-        "_measure_standalone_imported_html_image_layouts",
-        lambda **_: {0: {"desktop": 400, "mobile": 200}},
-    )
-    monkeypatch.setattr(
-        deployer,
-        "_validate_standalone_imported_html_visual_parity",
-        lambda **_: (_ for _ in ()).throw(AssertionError("parity validation should not run")),
-    )
-
-    deployer._configure_funnel_artifact_site(app)
-
-    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
-    entry_html = uploaded[entry_route_path]
-    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
-    assert "srcset=" not in entry_html
-    assert "sizes=" not in entry_html
-
-
 def test_funnel_artifact_site_minifies_final_html_and_uses_longer_meta_pixel_delay(monkeypatch):
     html_document = """<!DOCTYPE html>
 <html>
@@ -1670,7 +1625,48 @@ def test_funnel_artifact_site_minifies_final_html_and_uses_longer_meta_pixel_del
     entry_html = uploaded[entry_route_path]
     assert "<!-- remove me -->" not in entry_html
     assert ">      <" not in entry_html
-    assert "const META_PIXEL_DEFER_TIMEOUT_MS = 15000;" in entry_html
+    assert "const META_PIXEL_DEFER_TIMEOUT_MS = 60000;" in entry_html
+
+
+def test_build_standalone_render_optimization_css_targets_sales_and_presales():
+    sales_css = _build_standalone_render_optimization_css(page_stage="sales")
+    presales_css = _build_standalone_render_optimization_css(page_stage="pre_sales")
+
+    assert "body>section:nth-of-type(n+3)" in sales_css
+    assert "body>footer" in sales_css
+    assert "content-visibility:auto" in sales_css
+
+    assert "body>div:nth-of-type(n+3):not(.fixed)" in presales_css
+    assert ".article-body>*:nth-child(n+13)" in presales_css
+    assert ".article-body>figure:nth-child(n+13)" in presales_css
+    assert "content-visibility:auto" in presales_css
+
+
+def test_funnel_artifact_site_injects_render_optimization_styles(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <section>Hero</section>
+    <section>Proof</section>
+    <section>FAQ</section>
+    <footer>Footer</footer>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_html = uploaded["/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"]
+    assert 'data-mos-render-optimization="true"' in entry_html
+    assert "body>section:nth-of-type(n+3)" in entry_html
 
 
 def test_funnel_artifact_site_uses_canonical_domain_for_default_route_when_workspace_server_names_present():

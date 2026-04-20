@@ -225,6 +225,7 @@ describe("StandaloneImportedHtmlPage", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(countPrepareCalls()).toBe(1);
+
     button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
     await new Promise((resolve) => setTimeout(resolve, 200));
 

@@ -124,6 +124,11 @@ _BINARY_ASSET_CONTENT_TYPE_EXTENSION_MAP = {
     "font/woff2": ".woff2",
 }
 _FONT_ASSET_URL_SUFFIXES = (".eot", ".otf", ".ttf", ".woff", ".woff2")
+_STANDALONE_FETCH_USER_AGENT_DEFAULT = "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)"
+_STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+)
 _FONTAWESOME_FAMILY_SPECS = {
     "fa-solid": {"font_family": "Font Awesome 6 Free", "font_weight": "900", "font_style": "normal"},
     "fa-regular": {"font_family": "Font Awesome 6 Free", "font_weight": "400", "font_style": "normal"},
@@ -148,13 +153,11 @@ _STANDALONE_PARITY_MAX_HEIGHT_DELTA_PX = 8
 _STANDALONE_COMPRESSED_IMAGE_MIN_BYTES = 64 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_BYTES = 4 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_RATIO = 0.03
-_STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 128 * 1024
+_STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 16 * 1024
 _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 16
 _STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 16
 _STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 48
-_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS = 90.0
-_STANDALONE_PRESALES_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS = 120.0
-_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 15000
+_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 60000
 _STANDALONE_PRESALES_MIN_PSNR_DB = 33.0
 _STANDALONE_PRESALES_MIN_RESPONSIVE_PSNR_DB = 31.0
 _STANDALONE_MIN_RESPONSIVE_SOURCE_WIDTH_DELTA = 64
@@ -469,6 +472,47 @@ def _optimize_standalone_imported_html_document(html_document: str) -> str:
     return re.sub(r"<img\b[^>]*>", _replace_image, html_document, flags=re.IGNORECASE)
 
 
+def _build_standalone_render_optimization_css(*, page_stage: str | None) -> str:
+    normalized_stage = str(page_stage or "").strip().lower().replace("-", "_")
+    if normalized_stage == "sales":
+        return (
+            "@supports (content-visibility:auto){"
+            "body>section:nth-of-type(n+3),body>footer{"
+            "content-visibility:auto;"
+            "contain-intrinsic-size:auto 960px;"
+            "}}"
+        )
+    if normalized_stage in {"pre_sales", "presales"}:
+        return (
+            "@supports (content-visibility:auto){"
+            "body>div:nth-of-type(n+3):not(.fixed){"
+            "content-visibility:auto;"
+            "contain-intrinsic-size:auto 720px;"
+            "}"
+            ".article-body>*:nth-child(n+13){"
+            "content-visibility:auto;"
+            "}"
+            ".article-body>p:nth-child(n+13),"
+            ".article-body>ul:nth-child(n+13),"
+            ".article-body>ol:nth-child(n+13),"
+            ".article-body>blockquote:nth-child(n+13){"
+            "contain-intrinsic-size:auto 112px;"
+            "}"
+            ".article-body>h2:nth-child(n+13),"
+            ".article-body>h3:nth-child(n+13){"
+            "contain-intrinsic-size:auto 64px;"
+            "}"
+            ".article-body>figure:nth-child(n+13){"
+            "contain-intrinsic-size:auto 420px;"
+            "}"
+            ".article-body>div:nth-child(n+13){"
+            "contain-intrinsic-size:auto 180px;"
+            "}"
+            "}"
+        )
+    return ""
+
+
 def _minify_standalone_imported_html_document(html_document: str) -> str:
     normalized = str(html_document or "").strip()
     if not normalized:
@@ -496,12 +540,6 @@ def _has_meaningful_compression_savings(*, original_bytes: int, candidate_bytes:
 def _is_presales_stage(page_stage: str | None) -> bool:
     normalized = str(page_stage or "").strip().lower().replace("-", "_")
     return normalized in {"pre_sales", "presales"}
-
-
-def _standalone_image_optimization_budget_seconds(*, page_stage: str | None) -> float:
-    if _is_presales_stage(page_stage):
-        return _STANDALONE_PRESALES_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS
-    return _STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS
 
 
 def _normalize_remote_standalone_fetch_url(raw_url: str) -> str:
@@ -1266,12 +1304,13 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         url: str,
         context_label: str,
         accept: str = "*/*",
+        user_agent: str | None = None,
     ) -> tuple[bytes, str]:
         fetch_url = _normalize_remote_standalone_fetch_url(url)
         request = Request(
             fetch_url,
             headers={
-                "User-Agent": "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)",
+                "User-Agent": str(user_agent or "").strip() or _STANDALONE_FETCH_USER_AGENT_DEFAULT,
                 "Accept": accept,
             },
         )
@@ -1349,10 +1388,18 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
     ) -> tuple[str, list[tuple[str, str]]]:
+        parsed_source_url = urlsplit(source_url)
+        source_host = parsed_source_url.netloc.strip().lower()
+        preferred_user_agent = (
+            _STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER
+            if source_host in _GOOGLE_FONTS_STYLESHEET_HOSTS
+            else None
+        )
         payload, _content_type = self._fetch_remote_standalone_binary_asset(
             url=source_url,
             context_label=context_label,
             accept="text/css,*/*;q=0.1",
+            user_agent=preferred_user_agent,
         )
         stylesheet_text = _decode_stylesheet_payload(
             payload=payload,
@@ -2365,7 +2412,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         uploaded_target_paths: set[str],
         context_label: str,
         page_stage: str | None = None,
-        optimization_deadline: float | None = None,
     ) -> str:
         if not standalone_image_sources or _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES <= 0:
             return html_document
@@ -2405,8 +2451,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         rewritten_document = html_document
 
         for route_plan in route_plans:
-            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
-                break
             image_indices = tuple(int(index) for index in route_plan["indices"])
             current_route = ""
             for image_index in image_indices:
@@ -2435,8 +2479,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
             accepted = False
             for payload, content_type, label in compression_candidates:
-                if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
-                    break
                 try:
                     quality_ok = self._is_standalone_image_candidate_quality_acceptable(
                         image_source=image_source,
@@ -2528,7 +2570,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         uploaded_target_paths: set[str],
         context_label: str,
         page_stage: str | None = None,
-        optimization_deadline: float | None = None,
     ) -> str:
         if (
             not standalone_image_sources
@@ -2786,8 +2827,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         route_plans.sort(key=lambda plan: int(plan["benefit_score"]), reverse=True)
         route_plans = route_plans[:_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES]
         for route_plan in route_plans:
-            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
-                break
             route_path = str(route_plan["route"])
             image_source = standalone_image_sources.get(route_path)
             if image_source is None:
@@ -2838,8 +2877,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         image_plans = image_plans[:_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES]
         for image_plan in image_plans:
-            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
-                break
             image_index = int(image_plan["image_index"])
             current_tag = _find_nth_img_tag(rewritten_document, image_index)
             if current_tag is None:
@@ -4761,6 +4798,15 @@ WantedBy=multi-user.target
     nextUrl.search = currentUrl.search;
     return nextUrl.toString();
   };
+  const resolveSameDocumentHashTarget = (element) => {
+    if (!(element instanceof HTMLAnchorElement)) return null;
+    const rawHref = cleanText(element.getAttribute("href"));
+    if (!rawHref || !rawHref.startsWith("#") || rawHref === "#") return null;
+    const targetId = cleanText(rawHref.slice(1));
+    if (!targetId) return null;
+    const target = document.getElementById(targetId);
+    return target instanceof HTMLElement ? target : null;
+  };
   const hasPaidEntryAttribution = () => {
     const params = new URLSearchParams(window.location.search);
     const clickIdKeys = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
@@ -4841,26 +4887,30 @@ WantedBy=multi-user.target
       return;
     }
     window.__mosMetaPixelLoadScheduled = true;
+    let timeoutId = null;
     const flush = () => {
+      if (!window.__mosMetaPixelLoadScheduled) {
+        return;
+      }
       window.__mosMetaPixelLoadScheduled = false;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       loadMetaPixelScript();
     };
     const listenerOptions = { capture: true, once: true };
     window.addEventListener("pointerdown", flush, listenerOptions);
     window.addEventListener("keydown", flush, listenerOptions);
     window.addEventListener("touchstart", flush, listenerOptions);
-    const queueIdleLoad = () => {
-      if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(flush, { timeout: META_PIXEL_DEFER_TIMEOUT_MS });
-        return;
+    window.addEventListener("scroll", flush, { capture: true, once: true, passive: true });
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
       }
-      window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
-    };
-    if (document.readyState === "complete") {
-      queueIdleLoad();
-      return;
-    }
-    window.addEventListener("load", queueIdleLoad, { once: true });
+    }, { once: true });
+    window.addEventListener("pagehide", flush, { once: true });
+    timeoutId = window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
   };
   const ensureMetaPixelBootstrap = () => {
     if (!config.tracking || config.tracking.provider !== "meta" || !config.tracking.metaPixelId) {
@@ -5457,6 +5507,19 @@ WantedBy=multi-user.target
           if (binding.type === "internal_navigation" && modifiedClick) {
             return;
           }
+          const sameDocumentHashTarget =
+            binding.type === "checkout" ? resolveSameDocumentHashTarget(element) : null;
+          if (sameDocumentHashTarget) {
+            trackEvent("custom_page_click", {
+              fromStage: config.pageStage,
+              toStage: config.pageStage,
+              pageId: config.pageId,
+              buttonText: normalizeText(element.textContent || "") || undefined,
+              bindingId: binding.id,
+              targetHash: cleanText(element.getAttribute("href")) || undefined,
+            });
+            return;
+          }
           event.preventDefault();
           event.stopPropagation();
           const buttonText = normalizeText(element.textContent || "");
@@ -5690,9 +5753,6 @@ WantedBy=multi-user.target
             origin_hints = _origin_hint_markup_for_html_document(html_document)
             if origin_hints:
                 html_document = _inject_head_html_block(html_document=html_document, block=origin_hints)
-        image_optimization_deadline = (
-            time.monotonic() + _standalone_image_optimization_budget_seconds(page_stage=page_stage)
-        )
         html_document = self._rewrite_standalone_imported_html_compressed_images(
             site_dir=site_dir,
             html_document=html_document,
@@ -5701,7 +5761,6 @@ WantedBy=multi-user.target
             uploaded_target_paths=mirrored_target_paths,
             context_label=context_label,
             page_stage=page_stage,
-            optimization_deadline=image_optimization_deadline,
         )
         html_document = self._rewrite_standalone_imported_html_responsive_images(
             site_dir=site_dir,
@@ -5711,9 +5770,14 @@ WantedBy=multi-user.target
             uploaded_target_paths=mirrored_target_paths,
             context_label=context_label,
             page_stage=page_stage,
-            optimization_deadline=image_optimization_deadline,
         )
         html_document = _optimize_standalone_imported_html_document(html_document)
+        render_optimization_css = _build_standalone_render_optimization_css(page_stage=page_stage)
+        if render_optimization_css:
+            html_document = _inject_head_html_block(
+                html_document=html_document,
+                block=f'<style data-mos-render-optimization="true">{render_optimization_css}</style>',
+            )
         preload_image_spec = _resolve_imported_html_preload_image_spec(html_document)
         if preload_image_spec:
             preload_href = escape(str(preload_image_spec.get("href") or ""), quote=True)

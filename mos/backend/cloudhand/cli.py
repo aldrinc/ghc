@@ -206,7 +206,7 @@ def plan(ctx: click.Context, description: str) -> None:
     "--workload-name",
     "workload_names",
     multiple=True,
-    help="Scope apply/deploy to one or more workload names.",
+    help="Limit workload deployment/materialization to the named workload. Repeat for multiple workloads.",
 )
 @click.pass_context
 def apply(

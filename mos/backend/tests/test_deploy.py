@@ -2089,6 +2089,11 @@ def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_pa
         }
 
     monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service,
+        "_artifact_payload_supports_standalone_imported_html",
+        lambda *, artifact_payload: True,
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2149,6 +2154,11 @@ def test_materialize_funnel_artifacts_for_apply_replaces_stale_inline_artifact_w
         }
 
     monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service,
+        "_artifact_payload_supports_standalone_imported_html",
+        lambda *, artifact_payload: True,
+    )
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2387,6 +2397,103 @@ def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode
     source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
     assert source_ref["artifact_render_mode"] == "standalone_imported_html"
     assert "runtime_dist_path" not in source_ref
+
+
+def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_from_artifact_payload(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+
+    def _fake_load(*, artifact_id: str):
+        assert artifact_id == "artifact-123"
+        return {
+            "meta": {"artifactId": artifact_id},
+            "products": {
+                "sample-product": {
+                    "meta": {"productSlug": "sample-product"},
+                    "funnels": {
+                        "sample-funnel": {
+                            "meta": {
+                                "routeSlug": "sample-funnel",
+                                "entrySlug": "presales",
+                                "publicationId": "publication-123",
+                                "pages": [
+                                    {"pageId": "page-1", "slug": "presales"},
+                                ],
+                            },
+                            "pages": {
+                                "presales": {
+                                    "puckData": {
+                                        "content": [
+                                            {
+                                                "type": "ImportedHtmlDocument",
+                                                "props": {
+                                                    "htmlDocument": "<html><body>Presales</body></html>",
+                                                    "instrumentationManifest": {
+                                                        "pageView": {
+                                                            "eventName": "pre_sales_page_view",
+                                                        },
+                                                        "bindings": [],
+                                                    },
+                                                },
+                                            }
+                                        ]
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+
+    monkeypatch.setattr(deploy_service, "_load_funnel_runtime_artifact_payload_for_apply", _fake_load)
+    monkeypatch.setattr(
+        deploy_service,
+        "_artifact_payload_supports_standalone_imported_html",
+        lambda *, artifact_payload: True,
+    )
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "standalone-artifact-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-1",
+                                        "artifact_id": "artifact-123",
+                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "runtime_dist_path": "mos/frontend/dist",
+                                        "artifact": {
+                                            "meta": {"clientId": "client-1"},
+                                            "products": {},
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
+    assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in source_ref
+    assert source_ref["artifact"]["meta"]["artifactId"] == "artifact-123"
 
 
 def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():

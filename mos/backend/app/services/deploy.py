@@ -2402,6 +2402,27 @@ def _materialize_funnel_artifacts_for_apply(
             artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
                 artifact_id=artifact_id
             )
+            raw_render_mode = str(source_ref.get("artifact_render_mode") or "").strip().lower()
+            if not raw_render_mode:
+                inferred_render_mode = (
+                    _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+                    if _artifact_payload_supports_standalone_imported_html(
+                        artifact_payload=artifact_payload
+                    )
+                    else _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+                )
+                source_ref["artifact_render_mode"] = inferred_render_mode
+                raw_render_mode = inferred_render_mode
+                has_changes = True
+
+            if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+                if "runtime_dist_path" in source_ref:
+                    source_ref.pop("runtime_dist_path", None)
+                    has_changes = True
+            elif not str(source_ref.get("runtime_dist_path") or "").strip():
+                source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+                has_changes = True
+
             if source_ref.get("artifact") != artifact_payload:
                 source_ref["artifact"] = artifact_payload
                 workload["source_ref"] = source_ref

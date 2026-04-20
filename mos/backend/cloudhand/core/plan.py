@@ -20,10 +20,15 @@ def build_plan_prompt(
 You must generate a valid JSON plan adhering to the DesiredStateSpec.
 
 For 'workloads' (Applications), analyze the request or assume standard practices:
-1. If Node.js (package.json): Set runtime='nodejs'. build_config.install_command='npm install'. service_config.command='npm start'.
-2. If Python (requirements.txt): Set runtime='python'. build_config.install_command='pip install -r requirements.txt'. service_config.command='gunicorn app:app'.
-3. If Docker (Dockerfile): Set runtime='docker'.
-4. Detect ports (e.g. 3000, 8000, 8080) and set service_config.ports=[...].
+1. If Node.js serves a static SPA/frontend (for example Vite/React with a dist build): Set runtime='nodejs'. build_config.install_command='npm ci'. build_config.build_command='npm run build'. Set service_config.static_root to the built output directory (for example 'dist' or 'mos/frontend/dist'), set service_config.spa_fallback=true for SPAs, and omit service_config.command so nginx serves the built files directly.
+2. If Node.js is a server app: Set runtime='nodejs'. build_config.install_command='npm ci'. service_config.command='npm start'.
+3. If Python (requirements.txt): Set runtime='python'. build_config.install_command='pip install -r requirements.txt'. service_config.command='gunicorn app:app'.
+4. If Docker (Dockerfile): Set runtime='docker'.
+5. Detect ports (e.g. 3000, 8000, 8080) and set service_config.ports=[...].
+
+Public SPA rule:
+- Never use Python's built-in static file server (`python -m http.server` or `SimpleHTTPServer`) for a public SPA.
+- Prefer nginx serving the built output directly via service_config.static_root with service_config.spa_fallback=true.
 
 Hard constraints for deployment requests:
 - If the description indicates the user wants to deploy or run an application and current_spec.instances is empty, you MUST create at least:
@@ -35,7 +40,7 @@ Hard constraints for deployment requests:
 DesiredStateSpec schema for provider "{provider}":
 - networks[]: {{"name": str, "cidr": str}}
 - instances[]: {{"name": str, "size": str, "network": str, "region"?: str, "labels"?: {{}},"workloads"?: [ApplicationSpec]}}
-- ApplicationSpec (git source): {{"name": str, "source_type": "git", "repo_url": str, "branch"?: str, "runtime": str, "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command": str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
+- ApplicationSpec (git source): {{"name": str, "source_type": "git", "repo_url": str, "branch"?: str, "runtime": str, "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command"?: str, "static_root"?: str, "spa_fallback"?: bool, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
 - ApplicationSpec (DB-backed funnel proxy source): {{"name": str, "source_type": "funnel_publication", "source_ref": {{"public_id": str, "upstream_base_url": str, "upstream_api_base_url": str}}, "runtime": "static", "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command"?: str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
 - ApplicationSpec (DB-backed standalone funnel artifact source): {{"name": str, "source_type": "funnel_artifact", "source_ref": {{"client_id": str, "artifact_id"?: str, "artifact_version"?: int, "upstream_api_base_root": str, "runtime_dist_path": str, "artifact": {{"meta": {{}}, "products": {{}}}}}}, "runtime": "static", "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command"?: str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
 - firewalls[]: {{"name": str, "rules": [{{"direction": str, "protocol": str, "port"?: str, "cidr"?: str}}], "targets": [{{"type": str, "selector": str}}]}}

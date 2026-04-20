@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from .adapters.vault import _openbao_client
 
+_SHARED_KEYS_DIR = Path("/var/lib/cloudhand/keys")
+
 
 def read_secret(path: str) -> Optional[Dict[str, Any]]:
     """
@@ -46,6 +48,30 @@ def get_provider_token(provider: str, default: Optional[str] = None) -> Optional
     return get_secret_value(path, "token", default=default)
 
 
+def _project_key_paths(keys_dir: Path, project_id: str) -> tuple[Path, Path]:
+    return keys_dir / f"{project_id}_id_rsa", keys_dir / f"{project_id}_id_rsa.pub"
+
+
+def _resolve_local_keys_dir(project_id: str) -> Path:
+    configured_dir = (os.getenv("CLOUDHAND_KEYS_DIR") or "").strip()
+    if configured_dir:
+        return Path(configured_dir).expanduser()
+
+    shared_dir = _SHARED_KEYS_DIR
+    home_dir = Path.home() / ".cloudhand" / "keys"
+
+    for candidate in (shared_dir, home_dir):
+        priv_path, pub_path = _project_key_paths(candidate, project_id)
+        if priv_path.exists() and pub_path.exists():
+            return candidate
+
+    for candidate in (shared_dir, home_dir):
+        if candidate.exists() and os.access(candidate, os.W_OK):
+            return candidate
+
+    return home_dir
+
+
 def get_or_create_project_ssh_key(project_id: str) -> Tuple[str, str]:
     """
     Returns (private_key, public_key) for the given project, backed by OpenBao.
@@ -61,11 +87,10 @@ def get_or_create_project_ssh_key(project_id: str) -> Tuple[str, str]:
         # Fallback: store project SSH keys locally on disk (no OpenBao required).
         # This makes the control-plane usable out-of-the-box, while still supporting
         # OpenBao when OPENBAO_TOKEN/OPENBAO_ADDR are set.
-        keys_dir = Path(os.getenv("CLOUDHAND_KEYS_DIR", str(Path.home() / ".cloudhand" / "keys")))
+        keys_dir = _resolve_local_keys_dir(project_id)
         keys_dir.mkdir(parents=True, exist_ok=True)
 
-        priv_path = keys_dir / f"{project_id}_id_rsa"
-        pub_path = keys_dir / f"{project_id}_id_rsa.pub"
+        priv_path, pub_path = _project_key_paths(keys_dir, project_id)
 
         if priv_path.exists() and pub_path.exists():
             return priv_path.read_text(encoding="utf-8"), pub_path.read_text(encoding="utf-8")
