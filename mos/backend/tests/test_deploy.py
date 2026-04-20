@@ -19,6 +19,7 @@ from app.db.models import (
     Product,
 )
 from app.services import deploy as deploy_service
+from tests.conftest import TEST_ORG_ID
 
 
 def test_deploy_apply_proxies_to_service(api_client, monkeypatch):
@@ -604,6 +605,116 @@ def test_build_bunny_pull_zone_name_uses_workload_name():
         workload_name="brand-funnels-workspace-123-funnel-456",
     )
     assert name == "brand-funnels-workspace-123-funnel-456"
+
+
+def test_build_client_funnel_runtime_artifact_payload_prefers_explicit_publication_override(
+    db_session, monkeypatch
+):
+    org_id = TEST_ORG_ID
+    client_id = uuid4()
+    product_id = uuid4()
+    funnel_id = uuid4()
+    page_id = uuid4()
+    version_id = uuid4()
+    old_publication_id = uuid4()
+    new_publication_id = uuid4()
+    product_slug = str(product_id).split("-")[0]
+
+    db_session.add(Client(id=client_id, org_id=org_id, name="Test Client"))
+    db_session.add(
+        Product(
+            id=product_id,
+            org_id=org_id,
+            client_id=client_id,
+            title="Ember Gummies",
+        )
+    )
+    db_session.flush()
+
+    funnel = Funnel(
+        id=funnel_id,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        name="EMBER Funnel",
+        route_slug="ember-brain-clarity-protocol-imported-template-3",
+    )
+    db_session.add(funnel)
+    db_session.add(
+        FunnelPage(
+            id=page_id,
+            funnel_id=funnel_id,
+            name="Sales Page",
+            slug="sales-page",
+            template_id="sales-pdp",
+        )
+    )
+    db_session.add(
+        FunnelPageVersion(
+            id=version_id,
+            page_id=page_id,
+            puck_data={"root": {"props": {"title": "Sales Page"}}, "content": []},
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=old_publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=old_publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="old-sales-page",
+            title_at_publish="Old Sales Page",
+        )
+    )
+    db_session.add(
+        FunnelPublication(
+            id=new_publication_id,
+            funnel_id=funnel_id,
+            entry_page_id=page_id,
+            created_by="codex",
+        )
+    )
+    db_session.add(
+        FunnelPublicationPage(
+            publication_id=new_publication_id,
+            page_id=page_id,
+            page_version_id=version_id,
+            slug_at_publish="sales-page",
+            title_at_publish="Sales Page",
+        )
+    )
+    db_session.flush()
+
+    funnel.entry_page_id = page_id
+    funnel.active_publication_id = old_publication_id
+    db_session.commit()
+
+    monkeypatch.setattr(
+        deploy_service, "build_public_page_metadata_for_context", lambda **_: {"title": "Sales Page"}
+    )
+
+    payload = deploy_service.build_client_funnel_runtime_artifact_payload(
+        session=db_session,
+        org_id=str(org_id),
+        client_id=str(client_id),
+        updated_from_funnel_id=str(funnel_id),
+        updated_from_publication_id=str(new_publication_id),
+        publication_id_overrides={str(funnel_id): str(new_publication_id)},
+    )
+
+    funnel_payload = payload["products"][product_slug]["funnels"]["ember-brain-clarity-protocol-imported-template-3"]
+    sales_page = funnel_payload["pages"]["sales-page"]
+
+    assert funnel_payload["meta"]["publicationId"] == str(new_publication_id)
+    assert funnel_payload["meta"]["entrySlug"] == "sales-page"
+    assert sales_page["publicationId"] == str(new_publication_id)
 
 
 def test_resolve_publish_job_workspace_server_names_prefers_workload_scoped_domains(
@@ -1559,6 +1670,165 @@ def test_patch_workload_in_plan_assigns_and_preserves_org_scoped_port(tmp_path, 
     assert stable_port == first_port
 
 
+def test_build_funnel_publication_workload_patch_supports_standalone_imported_html():
+    patch = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="standalone-funnel",
+        client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=["shop.example.com"],
+        https=True,
+        destination_path="/opt/apps",
+        artifact_render_mode="standalone_imported_html",
+    )
+
+    source_ref = patch["source_ref"]
+    assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in source_ref
+
+
+def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatible_artifact(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
+    workload_patch = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="auto-standalone-funnel",
+        client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=[],
+        https=False,
+        destination_path="/opt/apps",
+        artifact_render_mode="runtime_bundle",
+    )
+
+    artifact_payload = {
+        "meta": {"clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"},
+        "products": {
+            "070d6cf7": {
+                "meta": {"productId": "product-1"},
+                "funnels": {
+                    "sales-funnel": {
+                        "meta": {
+                            "productSlug": "070d6cf7",
+                            "funnelSlug": "sales-funnel",
+                            "funnelId": "18ac0fe1-1e27-4579-ad94-9a1e6c9530fe",
+                            "publicationId": "pub-1",
+                            "entrySlug": "sales-page",
+                            "pages": [{"pageId": "page-1", "slug": "sales-page"}],
+                        },
+                        "pages": {
+                            "sales-page": {
+                                "puckData": {
+                                    "root": {"props": {}},
+                                    "content": [
+                                        {
+                                            "type": "ImportedHtmlDocument",
+                                            "props": {
+                                                "htmlDocument": "<html><body>ok</body></html>",
+                                                    "instrumentationManifest": {
+                                                    "schemaVersion": "imported-html-instrumentation-v1",
+                                                    "pageStage": "sales",
+                                                    "bindings": [],
+                                                },
+                                            },
+                                        }
+                                    ],
+                                    "zones": {},
+                                }
+                            },
+                            "privacy-policy": {
+                                "puckData": {
+                                    "root": {"props": {}},
+                                    "content": [
+                                        {
+                                            "type": "FunnelCompliancePage",
+                                            "props": {
+                                                "pageKey": "privacy_policy",
+                                                "pageTitle": "Privacy Policy",
+                                            },
+                                        }
+                                    ],
+                                    "zones": {},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+
+    patched = deploy_service._apply_publish_job_artifact_render_mode(
+        workload_patch=workload_patch,
+        artifact_payload=artifact_payload,
+        requested_render_mode=None,
+        render_mode_was_explicit=False,
+    )
+
+    source_ref = patched["source_ref"]
+    assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in source_ref
+
+
+def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompatible_artifact(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH", "mos/frontend/dist")
+    workload_patch = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="fallback-runtime-funnel",
+        client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=[],
+        https=False,
+        destination_path="/opt/apps",
+        artifact_render_mode="runtime_bundle",
+    )
+
+    artifact_payload = {
+        "meta": {"clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"},
+        "products": {
+            "070d6cf7": {
+                "meta": {"productId": "product-1"},
+                "funnels": {
+                    "sales-funnel": {
+                        "meta": {
+                            "productSlug": "070d6cf7",
+                            "funnelSlug": "sales-funnel",
+                            "funnelId": "18ac0fe1-1e27-4579-ad94-9a1e6c9530fe",
+                            "publicationId": "pub-1",
+                            "entrySlug": "sales-page",
+                            "pages": [{"pageId": "page-1", "slug": "sales-page"}],
+                        },
+                        "pages": {
+                            "sales-page": {
+                                "puckData": {
+                                    "root": {"props": {}},
+                                    "content": [
+                                        {
+                                            "type": "Text",
+                                            "props": {"text": "Published"},
+                                        }
+                                    ],
+                                    "zones": {},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+
+    patched = deploy_service._apply_publish_job_artifact_render_mode(
+        workload_patch=workload_patch,
+        artifact_payload=artifact_payload,
+        requested_render_mode=None,
+        render_mode_was_explicit=False,
+    )
+
+    source_ref = patched["source_ref"]
+    assert source_ref["artifact_render_mode"] == "runtime_bundle"
+    assert source_ref["runtime_dist_path"] == "mos/frontend/dist"
+
+
 def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     plan_path = tmp_path / "plan-test.json"
@@ -2072,6 +2342,51 @@ def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_
     assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
     assert source_ref["upstream_base_url"] == "https://moshq.app"
     assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
+
+
+def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode_without_runtime_path(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "standalone-artifact-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "client_id": "client-1",
+                                        "artifact_render_mode": "standalone_imported_html",
+                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "artifact": {
+                                            "meta": {"clientId": "client-1"},
+                                            "products": {},
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
+    assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in source_ref
 
 
 def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():

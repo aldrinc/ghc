@@ -48,6 +48,7 @@ class FunnelPublishDeployRequest(BaseModel):
     destinationPath: str = "/opt/apps"
     upstreamBaseUrl: Optional[str] = None
     upstreamApiBaseUrl: Optional[str] = None
+    renderMode: Optional[Literal["runtime_bundle", "standalone_imported_html"]] = None
 
 
 class FunnelPublishRequest(BaseModel):

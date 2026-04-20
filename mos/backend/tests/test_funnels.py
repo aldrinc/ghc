@@ -1042,6 +1042,7 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert workload_patch["source_type"] == "funnel_artifact"
     assert workload_patch["source_ref"]["client_id"] == client_id
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://moshq.app/api"
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "runtime_bundle"
     assert workload_patch["source_ref"]["runtime_dist_path"] == "mos/frontend/dist"
     assert workload_patch["source_ref"]["artifact"]["meta"]["clientId"] == client_id
     assert workload_patch["source_ref"]["artifact"]["products"] == {}
@@ -1053,7 +1054,59 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert deploy_request["apply_plan"] is True
     assert deploy_request["bunny_pull_zone"] is False
     assert deploy_request["bunny_pull_zone_origin_ip"] is None
+    assert deploy_request["artifact_render_mode_explicit"] is False
+    assert deploy_request["artifact_render_mode_requested"] is None
     assert captured["access_urls"] == ["https://landing.example.com/"]
+
+
+def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: TestClient, monkeypatch):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Explicit Standalone Deploy Funnel",
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_start_funnel_publish_job(
+        *,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
+    ):
+        _ = org_id, user_id, funnel_id, access_urls
+        captured["deploy_request"] = deploy_request
+        return {
+            "id": "publish-job-standalone",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": [],
+            "result": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "renderMode": "standalone_imported_html",
+            }
+        },
+    )
+    assert resp.status_code == 201
+
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in workload_patch["source_ref"]
+    assert deploy_request["artifact_render_mode_explicit"] is True
+    assert deploy_request["artifact_render_mode_requested"] == "standalone_imported_html"
 
 
 def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestClient, monkeypatch):

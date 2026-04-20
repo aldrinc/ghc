@@ -1103,6 +1103,8 @@ async def publish_funnel_route(
             ),
         )
     try:
+        render_mode_explicit = "renderMode" in deploy.model_fields_set
+        requested_render_mode = deploy.renderMode if render_mode_explicit else None
         workload_server_names = [] if edge_backed_artifact else server_names
         workload_https = False if edge_backed_artifact else bool(deploy.https)
         workload_patch = deploy_service.build_funnel_artifact_workload_patch(
@@ -1113,6 +1115,9 @@ async def publish_funnel_route(
             server_names=workload_server_names,
             https=workload_https,
             destination_path=deploy.destinationPath,
+            artifact_render_mode=(
+                requested_render_mode or deploy_service._FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+            ),
         )
         if edge_backed_artifact:
             workload_patch["workspace_server_names"] = server_names
@@ -1132,6 +1137,8 @@ async def publish_funnel_route(
                 "bunny_pull_zone": deploy.bunnyPullZone,
                 "bunny_pull_zone_origin_ip": deploy.bunnyPullZoneOriginIp,
                 "access_urls": access_urls,
+                "artifact_render_mode_explicit": render_mode_explicit,
+                "artifact_render_mode_requested": requested_render_mode,
             },
             access_urls=access_urls,
         )

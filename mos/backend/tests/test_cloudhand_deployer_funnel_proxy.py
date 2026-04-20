@@ -2,13 +2,49 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
+import io
 import json
 import os
+import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 import pytest
+from PIL import Image
 
-from cloudhand.adapters.deployer import ServerDeployer
+import cloudhand.adapters.deployer as deployer_module
+from cloudhand.adapters.deployer import (
+    ServerDeployer,
+    _html_tag_has_aspect_ratio_class,
+    _html_tag_has_explicit_box_size_classes,
+    _normalize_remote_standalone_fetch_url,
+    _parse_fontawesome_icon_codepoints,
+)
 from cloudhand.models import ApplicationSpec
+
+
+def _make_png_bytes(*, width: int, height: int, color: tuple[int, int, int, int]) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGBA", (width, height), color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _make_jpeg_bytes(*, width: int, height: int, color: tuple[int, int, int]) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), color).save(buffer, format="JPEG", quality=95)
+    return buffer.getvalue()
+
+
+def _make_noisy_jpeg_bytes(*, width: int, height: int) -> bytes:
+    buffer = io.BytesIO()
+    noise = Image.effect_noise((width, height), 96).convert("RGB")
+    noise.save(buffer, format="JPEG", quality=100, subsampling=0)
+    return buffer.getvalue()
+
+
+_PRIMARY_ASSET_BYTES = _make_png_bytes(width=1600, height=1000, color=(201, 20, 35, 255))
+_SECONDARY_ASSET_BYTES = _make_png_bytes(width=1200, height=800, color=(24, 24, 24, 255))
+_TERTIARY_ASSET_BYTES = _make_png_bytes(width=900, height=600, color=(245, 241, 232, 255))
 
 
 def _funnel_app(
@@ -44,7 +80,15 @@ def _funnel_app(
     return ApplicationSpec.model_validate(payload)
 
 
-def _git_app(name: str = "legacy-app") -> ApplicationSpec:
+def _git_app(
+    name: str = "legacy-app",
+    *,
+    command: str | None = "npm run start",
+    static_root: str | None = None,
+    spa_fallback: bool = False,
+    ports: list[int] | None = None,
+    server_names: list[str] | None = None,
+) -> ApplicationSpec:
     payload = {
         "name": name,
         "source_type": "git",
@@ -57,10 +101,12 @@ def _git_app(name: str = "legacy-app") -> ApplicationSpec:
             "system_packages": [],
         },
         "service_config": {
-            "command": "npm run start",
+            "command": command,
+            "static_root": static_root,
+            "spa_fallback": spa_fallback,
             "environment": {},
-            "ports": [3000],
-            "server_names": ["example.com"],
+            "ports": ports or [3000],
+            "server_names": server_names or ["example.com"],
             "https": False,
         },
         "destination_path": "/opt/apps",
@@ -73,91 +119,182 @@ def _artifact_app(
     name: str = "landing-artifact",
     ports: list[int] | None = None,
     server_names: list[str] | None = None,
+    workspace_server_names: list[str] | None = None,
+    render_mode: str = "runtime_bundle",
+    html_document: str | None = None,
 ) -> ApplicationSpec:
-    payload = {
-        "name": name,
-        "source_type": "funnel_artifact",
-        "source_ref": {
-            "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
-            "upstream_api_base_root": "https://moshq.app/api",
-            "runtime_dist_path": "mos/frontend/dist",
-            "artifact": {
-                "meta": {
-                    "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
-                },
-                "assets": {
-                    "totalBytes": 11,
-                    "items": {
-                        "11111111-1111-1111-1111-111111111111": {
-                            "contentType": "image/png",
-                            "sizeBytes": 11,
-                            "bytesBase64": base64.b64encode(b"hello-asset").decode("ascii"),
-                        }
-                    },
-                },
-                "products": {
-                    "example-product": {
-                        "meta": {
-                            "productId": "product-1",
-                            "productSlug": "example-product",
-                        },
-                        "funnels": {
-                            "example-funnel": {
-                                "meta": {
-                                    "funnelSlug": "example-funnel",
-                                    "funnelId": "funnel-1",
-                                    "publicationId": "pub-1",
-                                    "entrySlug": "presales",
-                                    "pages": [{"pageId": "page-1", "slug": "presales"}],
-                                },
-                                "pages": {
-                                    "presales": {
-                                        "funnelId": "funnel-1",
-                                        "publicationId": "pub-1",
-                                        "pageId": "page-1",
-                                        "slug": "presales",
-                                        "puckData": {
-                                            "root": {"props": {}},
-                                            "content": [
-                                                {
-                                                    "type": "PreSalesPage",
-                                                    "props": {
-                                                        "id": "root-page",
-                                                        "anchorId": "top",
-                                                        "content": [
-                                                            {
-                                                                "type": "PreSalesHero",
-                                                                "props": {
-                                                                    "id": "hero-1",
-                                                                    "config": {
-                                                                        "hero": {
-                                                                            "title": "Hero title",
-                                                                            "subtitle": "Hero subtitle",
-                                                                            "media": {
-                                                                                "type": "image",
-                                                                                "alt": "Hero image",
-                                                                                "assetPublicId": "11111111-1111-1111-1111-111111111111",
-                                                                            },
-                                                                        },
-                                                                        "badges": [],
-                                                                    },
-                                                                },
-                                                            }
-                                                        ],
-                                                    },
-                                                }
-                                            ],
-                                            "zones": {},
+    commerce_payload = None
+    page_payload = {
+        "funnelId": "funnel-1",
+        "publicationId": "pub-1",
+        "pageId": "page-1",
+        "slug": "presales",
+        "puckData": {
+            "root": {"props": {}},
+            "content": [
+                {
+                    "type": "PreSalesPage",
+                    "props": {
+                        "id": "root-page",
+                        "anchorId": "top",
+                        "content": [
+                            {
+                                "type": "PreSalesHero",
+                                "props": {
+                                    "id": "hero-1",
+                                    "config": {
+                                        "hero": {
+                                            "title": "Hero title",
+                                            "subtitle": "Hero subtitle",
+                                            "media": {
+                                                "type": "image",
+                                                "alt": "Hero image",
+                                                "assetPublicId": "11111111-1111-1111-1111-111111111111",
+                                            },
                                         },
-                                        "pageMap": {"page-1": "presales"},
-                                    }
+                                        "badges": [],
+                                    },
                                 },
                             }
-                        }
+                        ],
+                    },
+                }
+            ],
+            "zones": {},
+        },
+        "pageMap": {"page-1": "presales"},
+    }
+    if html_document is not None:
+        page_payload = {
+            "funnelId": "funnel-1",
+            "funnelSlug": "example-funnel",
+            "productSlug": "example-product",
+            "publicationId": "pub-1",
+            "pageId": "page-1",
+            "slug": "presales",
+            "stage": "sales",
+            "pageStageMap": {"page-1": "sales"},
+            "tracking": {
+                "provider": "meta",
+                "mode": "public_funnel_runtime",
+                "metaPixelId": "pixel-123",
+            },
+            "puckData": {
+                "root": {"props": {"title": "Imported HTML"}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "id": "imported-html-document",
+                            "title": "Imported HTML",
+                            "sourceLabel": "sales-page.html",
+                            "htmlDocument": html_document,
+                            "instrumentationManifest": {
+                                "schemaVersion": "imported-html-instrumentation-v1",
+                                "pageStage": "sales",
+                                "bindings": [
+                                    {
+                                        "id": "primary-buy",
+                                        "type": "checkout",
+                                        "selector": "#main-cta",
+                                        "event": "click",
+                                        "trackEventType": "sales_to_checkout_click",
+                                        "checkout": {
+                                            "mode": "public_checkout",
+                                            "variantResolver": {
+                                                "type": "fixed",
+                                                "variantId": "variant-1",
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+            "pageMap": {"page-1": "presales"},
+        }
+        commerce_payload = {
+            "productSlug": "example-product",
+            "funnelSlug": "example-funnel",
+            "funnelId": "funnel-1",
+            "product": {
+                "id": "product-1",
+                "variants": [
+                    {
+                        "id": "variant-1",
+                        "provider": "shopify",
+                        "price": 4900,
+                        "currency": "USD",
+                        "option_values": {},
+                    }
+                ],
+                "variants_count": 1,
+            },
+        }
+
+    source_ref = {
+        "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        "upstream_api_base_root": "https://moshq.app/api",
+        "artifact_render_mode": render_mode,
+        "artifact": {
+            "meta": {
+                "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            },
+            "assets": {
+                "totalBytes": 11,
+                "items": {
+                    "11111111-1111-1111-1111-111111111111": {
+                        "contentType": "image/png",
+                        "sizeBytes": len(_PRIMARY_ASSET_BYTES),
+                        "bytesBase64": base64.b64encode(_PRIMARY_ASSET_BYTES).decode("ascii"),
+                    },
+                    "22222222-2222-2222-2222-222222222222": {
+                        "contentType": "image/png",
+                        "sizeBytes": len(_SECONDARY_ASSET_BYTES),
+                        "bytesBase64": base64.b64encode(_SECONDARY_ASSET_BYTES).decode("ascii"),
+                    },
+                    "33333333-3333-3333-3333-333333333333": {
+                        "contentType": "image/png",
+                        "sizeBytes": len(_TERTIARY_ASSET_BYTES),
+                        "bytesBase64": base64.b64encode(_TERTIARY_ASSET_BYTES).decode("ascii"),
                     }
                 },
             },
+            "products": {
+                "example-product": {
+                    "meta": {
+                        "productId": "product-1",
+                        "productSlug": "example-product",
+                    },
+                    "funnels": {
+                        "example-funnel": {
+                            "meta": {
+                                "funnelSlug": "example-funnel",
+                                "funnelId": "funnel-1",
+                                "publicationId": "pub-1",
+                                "entrySlug": "presales",
+                                "pages": [{"pageId": "page-1", "slug": "presales"}],
+                            },
+                            "pages": {
+                                "presales": page_payload,
+                            },
+                            "commerce": commerce_payload,
+                        }
+                    }
+                }
+            },
         },
+    }
+    if render_mode == "runtime_bundle":
+        source_ref["runtime_dist_path"] = "mos/frontend/dist"
+
+    payload = {
+        "name": name,
+        "source_type": "funnel_artifact",
+        "source_ref": source_ref,
         "runtime": "static",
         "build_config": {
             "install_command": None,
@@ -171,6 +308,7 @@ def _artifact_app(
             "server_names": server_names or [],
             "https": False,
         },
+        "workspace_server_names": workspace_server_names or [],
         "destination_path": "/opt/apps",
     }
     return ApplicationSpec.model_validate(payload)
@@ -198,6 +336,8 @@ def _stub_deployer():
     deployer.run = fake_run
     deployer._path_exists = lambda path: True
     deployer._enable_https = lambda server_names: None
+    deployer._measure_standalone_imported_html_image_layouts = lambda **_: {}
+    deployer._validate_standalone_imported_html_visual_parity = lambda **_: None
     return deployer, uploaded, commands
 
 
@@ -209,47 +349,44 @@ def _extract_runtime_block(script_text: str) -> str:
     raise AssertionError("Runtime injection script did not contain a block assignment.")
 
 
-class _FakeSFTPFile:
-    def __init__(self, *, path: str, mode: str, files: dict[str, str | bytes]):
+class _FakeRemoteFile:
+    def __init__(self, *, sftp, path: str) -> None:
+        self._sftp = sftp
         self._path = path
-        self._mode = mode
-        self._files = files
-        self._buffer: str | bytes = b"" if "b" in mode else ""
-
-    def write(self, content: str | bytes) -> None:
-        self._buffer = content
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        if exc_type is None:
-            self._files[self._path] = self._buffer
         return False
 
+    def write(self, content):
+        self._sftp.files[self._path] = content
 
-class _FakeSFTPClient:
-    def __init__(self, *, existing_dirs: set[str] | None = None, fail_mkdir_for: set[str] | None = None):
-        self.existing_dirs = set(existing_dirs or {"/"})
-        self.fail_mkdir_for = set(fail_mkdir_for or set())
+
+class _FakeSFTP:
+    def __init__(self) -> None:
+        self.directories = {"/", "/opt"}
         self.files: dict[str, str | bytes] = {}
-        self.closed = False
+        self.mkdir_calls: list[str] = []
 
     def stat(self, path: str):
-        if path in self.existing_dirs or path in self.files:
-            return object()
-        raise OSError(f"missing {path}")
+        if path in self.directories or path in self.files:
+            return SimpleNamespace()
+        raise FileNotFoundError(path)
 
-    def mkdir(self, path: str) -> None:
-        if path in self.fail_mkdir_for:
-            raise OSError(f"cannot create {path}")
-        self.existing_dirs.add(path)
+    def mkdir(self, path: str):
+        self.directories.add(path)
+        self.mkdir_calls.append(path)
 
     def file(self, path: str, mode: str):
-        return _FakeSFTPFile(path=path, mode=mode, files=self.files)
+        parent = Path(path).parent.as_posix()
+        if parent not in self.directories:
+            raise FileNotFoundError(path)
+        return _FakeRemoteFile(sftp=self, path=path)
 
-    def close(self) -> None:
-        self.closed = True
+    def close(self):
+        return None
 
 
 class _FakeTransport:
@@ -258,7 +395,7 @@ class _FakeTransport:
 
 
 class _FakeSSHClient:
-    def __init__(self, *, sftp: _FakeSFTPClient):
+    def __init__(self, sftp: _FakeSFTP) -> None:
         self._sftp = sftp
 
     def get_transport(self):
@@ -304,31 +441,34 @@ def test_env_file_upload_normalizes_shell_style_assignments_for_systemd(tmp_path
 
 def test_upload_file_creates_missing_remote_parent_directories():
     deployer = object.__new__(ServerDeployer)
-    deployer.client = _FakeSSHClient(sftp=_FakeSFTPClient(existing_dirs={"/", "/opt"}))
+    sftp = _FakeSFTP()
+    deployer.client = _FakeSSHClient(sftp)
     deployer.connect = lambda: None
 
-    deployer.upload_file("hello", "/opt/apps/landing/site/index.html")
+    deployer.upload_file("hello", "/opt/apps/example/site/contact-us/index.html")
 
-    sftp = deployer.client._sftp
-    assert "/opt/apps" in sftp.existing_dirs
-    assert "/opt/apps/landing" in sftp.existing_dirs
-    assert "/opt/apps/landing/site" in sftp.existing_dirs
-    assert sftp.files["/opt/apps/landing/site/index.html"] == "hello"
-    assert sftp.closed is True
+    assert sftp.files["/opt/apps/example/site/contact-us/index.html"] == "hello"
+    assert "/opt/apps" in sftp.mkdir_calls
+    assert "/opt/apps/example" in sftp.mkdir_calls
+    assert "/opt/apps/example/site" in sftp.mkdir_calls
+    assert "/opt/apps/example/site/contact-us" in sftp.mkdir_calls
 
 
 def test_upload_bytes_wraps_remote_parent_directory_creation_errors():
     deployer = object.__new__(ServerDeployer)
-    deployer.client = _FakeSSHClient(
-        sftp=_FakeSFTPClient(existing_dirs={"/", "/opt"}, fail_mkdir_for={"/opt/apps"})
-    )
+
+    class _BrokenSFTP(_FakeSFTP):
+        def mkdir(self, path: str):
+            if path == "/opt/apps":
+                raise FileNotFoundError(path)
+            super().mkdir(path)
+
+    sftp = _BrokenSFTP()
+    deployer.client = _FakeSSHClient(sftp)
     deployer.connect = lambda: None
 
-    with pytest.raises(
-        ValueError,
-        match=r"Failed to create remote directory '/opt/apps' for '/opt/apps/landing/site/index.html'",
-    ):
-        deployer.upload_bytes(b"hello", "/opt/apps/landing/site/index.html")
+    with pytest.raises(ValueError, match="Failed to create remote directory '/opt/apps'"):
+        deployer.upload_bytes(b"abc", "/opt/apps/example/site/index.html")
 
 
 def test_funnel_proxy_redirects_slug_paths_on_same_host_and_port():
@@ -388,6 +528,59 @@ def test_generic_nginx_config_allows_large_upload_bodies():
     assert "systemctl reload nginx" in commands
 
 
+def test_git_static_site_config_serves_built_spa_with_history_fallback():
+    app = _git_app(
+        name="mos-ui",
+        command=None,
+        static_root="mos/frontend/dist",
+        spa_fallback=True,
+        server_names=["moshq.app"],
+    )
+    deployer, uploaded, commands = _stub_deployer()
+
+    deployer._configure_git_static_site(app, "/opt/apps/mos-ui")
+
+    conf = uploaded["/etc/nginx/sites-available/mos-ui"]
+    assert "listen 80;" in conf
+    assert "server_name moshq.app;" in conf
+    assert "root /opt/apps/mos-ui/mos/frontend/dist;" in conf
+    assert "index index.html;" in conf
+    assert "try_files $uri $uri/ /index.html;" in conf
+    assert "proxy_pass" not in conf
+    assert "nginx -t" in commands
+    assert "systemctl reload nginx" in commands
+
+
+def test_deploy_git_static_site_builds_then_replaces_old_service_with_nginx():
+    app = _git_app(
+        name="mos-ui",
+        command=None,
+        static_root="mos/frontend/dist",
+        spa_fallback=True,
+        server_names=["moshq.app"],
+    )
+    deployer, uploaded, commands = _stub_deployer()
+    removed_paths: list[tuple[str, bool]] = []
+    configure_systemd_calls: list[tuple[str, str]] = []
+
+    deployer._service_unit_exists = lambda service_name: service_name == "mos-ui"
+    deployer._remove_path_if_exists = lambda path, recursive=False: removed_paths.append((path, recursive)) or (
+        path == "/etc/systemd/system/mos-ui.service"
+    )
+    deployer._port_is_listening = lambda port: False
+    deployer._configure_systemd = lambda app_arg, app_dir_arg: configure_systemd_calls.append((app_arg.name, app_dir_arg))
+
+    deployer.deploy(app)
+
+    assert any(cmd == "npm ci" for cmd in commands)
+    assert any(cmd == "npm run build" for cmd in commands)
+    assert any(cmd.startswith("systemctl stop") and "mos-ui.service" in cmd for cmd in commands)
+    assert any(cmd.startswith("systemctl disable") and "mos-ui.service" in cmd for cmd in commands)
+    assert "/etc/nginx/sites-available/mos-ui" in uploaded
+    assert ("/etc/systemd/system/mos-ui.service", False) in removed_paths
+    assert configure_systemd_calls == []
+
+
 def test_remove_workload_cleans_service_nginx_and_app_dir():
     app = _git_app(name="honest-herbalist")
     deployer, _uploaded, commands = _stub_deployer()
@@ -436,6 +629,8 @@ def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     assert 'add_header Cache-Control "public, max-age=31536000, immutable";' in conf
     assert 'location ^~ /public/assets/ {' in conf
     assert 'try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;' in conf
+    assert 'location ^~ /_standalone-assets/ {' in conf
+    assert 'try_files $uri =404;' in conf
     assert "location ^~ /api/ {" in conf
     assert "proxy_pass https://moshq.app/api/;" in conf
     assert "proxy_pass https://moshq.app/api/public/assets/;" not in conf
@@ -448,15 +643,1098 @@ def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     id_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/meta.json"
     id_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/pages/presales.json"
     asset_path = "/opt/apps/landing-artifact/site/api/public/assets/11111111-1111-1111-1111-111111111111.png"
+    public_asset_path = "/opt/apps/landing-artifact/site/public/assets/11111111-1111-1111-1111-111111111111.png"
     assert meta_path in uploaded
     assert page_path in uploaded
     assert id_meta_path in uploaded
     assert id_page_path in uploaded
     assert asset_path in uploaded
-    assert uploaded[asset_path] == b"hello-asset"
+    assert public_asset_path in uploaded
+    assert uploaded[asset_path] == _PRIMARY_ASSET_BYTES
+    assert uploaded[public_asset_path] == _PRIMARY_ASSET_BYTES
 
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
+
+
+def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_bundle():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <main id="app">
+      <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <img src="/public/assets/22222222-2222-2222-2222-222222222222" alt="Gallery 1">
+      <img src="/public/assets/33333333-3333-3333-3333-333333333333" alt="Gallery 2" loading="lazy">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "return 302 /example-product/example-funnel/presales$is_args$args;" in conf
+    assert "try_files $uri $uri/index.html $uri/ =404;" in conf
+    assert "try_files $uri /index.html;" not in conf
+    assert "gzip on;" in conf
+    assert "gzip_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;" in conf
+    assert not any(path.startswith("/tmp/cloudhand-runtime-config-") for path in uploaded)
+    assert not any(cmd.startswith("cp -R ") for cmd in commands)
+    assert not any(cmd.startswith("python3 -c ") for cmd in commands)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    page_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html"
+    alias_entry_route_path = "/opt/apps/landing-artifact/site/example-product/funnel-1/index.html"
+    alias_page_route_path = "/opt/apps/landing-artifact/site/example-product/funnel-1/presales/index.html"
+    asset_path = "/opt/apps/landing-artifact/site/api/public/assets/11111111-1111-1111-1111-111111111111.png"
+    public_asset_path = "/opt/apps/landing-artifact/site/public/assets/11111111-1111-1111-1111-111111111111.png"
+    runtime_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
+
+    entry_html = uploaded[entry_route_path]
+    page_html = uploaded[page_route_path]
+    alias_entry_html = uploaded[alias_entry_route_path]
+    alias_page_html = uploaded[alias_page_route_path]
+
+    assert "<main id=\"app\">" in entry_html
+    assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" in entry_html
+    assert "\"apiBasePath\":\"/api\"" in entry_html
+    assert 'rel="preload" as="image" fetchpriority="high" href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero" loading="eager" decoding="async" fetchpriority="high"' in entry_html
+    assert 'src="/public/assets/22222222-2222-2222-2222-222222222222" alt="Gallery 1" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
+    assert 'src="/public/assets/33333333-3333-3333-3333-333333333333" alt="Gallery 2" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
+    assert "/public/events" in entry_html
+    assert "navigator.sendBeacon" in entry_html
+    assert 'new Blob([payload], { type: "application/json" })' in entry_html
+    assert "pageLifecycleFinalizing = true;" in entry_html
+    assert "/public/checkout" in entry_html
+    assert "/public/checkout/prepare" not in entry_html
+    assert "standalone_html" in entry_html
+    assert "web_vital_recorded" in entry_html
+    assert "metricName" in entry_html
+    assert "document.write" not in entry_html
+    assert "__MOS_DEPLOY_RUNTIME__" not in entry_html
+    assert "funnel_visitor_id" in entry_html
+    assert "pixel-123" in entry_html
+
+    assert page_html == entry_html
+    assert "/example-product/example-funnel/presales/" in entry_html
+    assert alias_entry_html == alias_page_html
+    assert "/example-product/funnel-1/presales/" in alias_entry_html
+    assert uploaded[asset_path] == _PRIMARY_ASSET_BYTES
+    assert uploaded[public_asset_path] == _PRIMARY_ASSET_BYTES
+    assert runtime_page_path not in uploaded
+
+
+def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_params():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <a id="main-cta" href="#shop">Check availability</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    page_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"][
+        "presales"
+    ]
+    page_payload["stage"] = "pre_sales"
+    page_payload["pageMap"] = {"page-1": "presales", "page-2": "sales-page"}
+    page_payload["pageStageMap"] = {"page-1": "pre_sales", "page-2": "sales"}
+    page_payload["puckData"]["content"][0]["props"]["instrumentationManifest"] = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "pre_sales",
+        "bindings": [
+            {
+                "id": "presales-cta",
+                "type": "internal_navigation",
+                "selector": "#main-cta",
+                "event": "click",
+                "targetPageId": "page-2",
+                "trackEventType": "pre_sales_to_sales_click",
+            }
+        ],
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+
+    assert "const buildInternalNavigationUrl = (targetPath) => {" in entry_html
+    assert 'currentUrl.searchParams.delete("checkout");' in entry_html
+    assert "nextUrl.search = currentUrl.search;" in entry_html
+    assert "element.href = buildInternalNavigationUrl(targetPath);" in entry_html
+    assert "window.location.href = buildInternalNavigationUrl(targetPath);" in entry_html
+    assert '"/example-product/example-funnel/sales-page/"' in entry_html
+
+
+def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    artifact = app.source_ref.artifact
+    artifact["meta"]["updatedFromFunnelId"] = "funnel-1"
+    product_payload = artifact["products"]["example-product"]
+    product_payload["funnels"]["other-funnel"] = {
+        "meta": {
+            "funnelSlug": "other-funnel",
+            "funnelId": "funnel-2",
+            "publicationId": "pub-2",
+            "entrySlug": "presales",
+            "pages": [{"pageId": "page-2", "slug": "presales"}],
+        },
+        "pages": {
+            "presales": {
+                "funnelId": "funnel-2",
+                "funnelSlug": "other-funnel",
+                "productSlug": "example-product",
+                "publicationId": "pub-2",
+                "pageId": "page-2",
+                "slug": "presales",
+                "stage": "sales",
+                "pageStageMap": {"page-2": "sales"},
+                "tracking": {
+                    "provider": "meta",
+                    "mode": "public_funnel_runtime",
+                    "metaPixelId": "pixel-456",
+                },
+                "puckData": {
+                    "root": {"props": {"title": "Other Funnel"}},
+                    "content": [
+                        {
+                            "type": "ImportedHtmlDocument",
+                            "props": {
+                                "id": "other-imported-html-document",
+                                "title": "Other Funnel",
+                                "sourceLabel": "other.html",
+                                "htmlDocument": html_document,
+                            },
+                        }
+                    ],
+                    "zones": {},
+                },
+                "pageMap": {"page-2": "presales"},
+            }
+        },
+        "commerce": None,
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html" in uploaded
+    assert "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html" in uploaded
+    assert "/opt/apps/landing-artifact/site/example-product/other-funnel/index.html" not in uploaded
+    assert "/opt/apps/landing-artifact/site/example-product/other-funnel/presales/index.html" not in uploaded
+
+
+def test_funnel_artifact_site_prepares_imported_html_once_per_page_across_route_tokens(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    uuid_funnel_id = "18ac0fe1-1e27-4579-ad94-9a1e6c9530fe"
+    funnel_payload["meta"]["funnelId"] = uuid_funnel_id
+    funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
+
+    deployer, uploaded, _commands = _stub_deployer()
+    prepare_calls: list[str] = []
+
+    def fake_prepare(**kwargs):
+        prepare_calls.append(str(kwargs["page_slug"]))
+        return "<!DOCTYPE html><html><body><a id=\"main-cta\" href=\"#shop\">Prepared</a></body></html>"
+
+    monkeypatch.setattr(
+        deployer,
+        "_prepare_standalone_imported_html_document",
+        fake_prepare,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert prepare_calls == ["presales"]
+    assert "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html" in uploaded
+    assert f"/opt/apps/landing-artifact/site/example-product/{uuid_funnel_id}/index.html" in uploaded
+    assert "/opt/apps/landing-artifact/site/example-product/18ac0fe1/index.html" in uploaded
+
+
+def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                primary: '#C41423'
+              }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="bg-brand-primary text-white">
+      <i class="fa-solid fa-star"></i>
+      <img src="https://shop.example.com/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.example.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(
+        deployer,
+        "_compile_standalone_imported_html_tailwind_css",
+        lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
+    )
+    fontshare_400 = b"fontshare-400"
+    fontshare_700 = b"fontshare-700"
+    fontawesome_solid = b"fontawesome-solid"
+    google_inter_400 = b"google-inter-400"
+    google_inter_700 = b"google-inter-700"
+    fontshare_css = (
+        "@font-face{font-family:'Satoshi';font-style:normal;font-weight:400;font-display:swap;"
+        "src:url('https://cdn.fontshare.com/fonts/satoshi-400.woff2') format('woff2');}"
+        "@font-face{font-family:'Satoshi';font-style:normal;font-weight:700;font-display:swap;"
+        "src:url('https://cdn.fontshare.com/fonts/satoshi-700.woff2') format('woff2');}"
+    ).encode("utf-8")
+    google_fonts_css = (
+        "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;"
+        "src:url('https://fonts.gstatic.com/s/inter/v18/inter-400.woff2') format('woff2');}"
+        "@font-face{font-family:'Inter';font-style:normal;font-weight:700;font-display:swap;"
+        "src:url('https://fonts.gstatic.com/s/inter/v18/inter-700.woff2') format('woff2');}"
+    ).encode("utf-8")
+    fontawesome_css = (
+        '@font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:900;font-display:block;'
+        'src:url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2") format("woff2");}'
+        '.fa-solid,.fas{font-family:"Font Awesome 6 Free";font-weight:900;}'
+        '.fa-star:before{content:"\\\\f005";}'
+    ).encode("utf-8")
+
+    def fake_fetch_remote_binary_asset(*, url: str, **_kwargs):
+        if url == "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap":
+            return fontshare_css, "text/css"
+        if url == "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap":
+            return google_fonts_css, "text/css"
+        if url == "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css":
+            return fontawesome_css, "text/css"
+        if url == "https://cdn.fontshare.com/fonts/satoshi-400.woff2":
+            return fontshare_400, "font/woff2"
+        if url == "https://cdn.fontshare.com/fonts/satoshi-700.woff2":
+            return fontshare_700, "font/woff2"
+        if url == "https://fonts.gstatic.com/s/inter/v18/inter-400.woff2":
+            return google_inter_400, "font/woff2"
+        if url == "https://fonts.gstatic.com/s/inter/v18/inter-700.woff2":
+            return google_inter_700, "font/woff2"
+        if url in {
+            "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2",
+            "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf",
+        }:
+            return fontawesome_solid, "font/woff2"
+        raise AssertionError(f"Unexpected mirrored asset request: {url}")
+
+    monkeypatch.setattr(deployer, "_fetch_remote_standalone_binary_asset", fake_fetch_remote_binary_asset)
+    monkeypatch.setattr(
+        deployer,
+        "_subset_font_awesome_font_payload",
+        lambda *, payload, **_kwargs: (payload, "font/woff2"),
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    fontshare_400_route = (
+        f"/_standalone-assets/fonts/{hashlib.sha256(fontshare_400).hexdigest()[:32]}.woff2"
+    )
+    fontshare_700_route = (
+        f"/_standalone-assets/fonts/{hashlib.sha256(fontshare_700).hexdigest()[:32]}.woff2"
+    )
+    google_inter_400_route = (
+        f"/_standalone-assets/fonts/{hashlib.sha256(google_inter_400).hexdigest()[:32]}.woff2"
+    )
+    google_inter_700_route = (
+        f"/_standalone-assets/fonts/{hashlib.sha256(google_inter_700).hexdigest()[:32]}.woff2"
+    )
+    fontawesome_solid_route = (
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(fontawesome_solid + b':fa-solid').hexdigest()[:32]}.woff2"
+    )
+    assert "https://cdn.tailwindcss.com" not in entry_html
+    assert "tailwind.config" not in entry_html
+    assert 'data-mos-compiled-tailwind="true"' in entry_html
+    assert ".bg-brand-primary{background-color:#C41423}" in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert "https://api.fontshare.com" not in entry_html
+    assert "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" not in entry_html
+    assert "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" not in entry_html
+    assert 'data-mos-local-fontshare="true"' in entry_html
+    assert 'data-mos-local-google-fonts="true"' in entry_html
+    assert 'data-mos-local-font-awesome="true"' in entry_html
+    assert fontshare_400_route in entry_html
+    assert fontshare_700_route in entry_html
+    assert google_inter_400_route in entry_html
+    assert google_inter_700_route in entry_html
+    assert fontawesome_solid_route in entry_html
+    assert 'data-mos-style-preload="true"' not in entry_html
+    assert (
+        f'rel="preload" as="font" href="{fontawesome_solid_route}" type="font/woff2" '
+        'crossorigin="anonymous" data-mos-font-preload="true"'
+    ) in entry_html
+    assert f"/opt/apps/landing-artifact/site{fontshare_400_route}" in uploaded
+    assert f"/opt/apps/landing-artifact/site{fontshare_700_route}" in uploaded
+    assert f"/opt/apps/landing-artifact/site{google_inter_400_route}" in uploaded
+    assert f"/opt/apps/landing-artifact/site{google_inter_700_route}" in uploaded
+    assert f"/opt/apps/landing-artifact/site{fontawesome_solid_route}" in uploaded
+
+
+def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_after_custom_styles(
+    monkeypatch,
+):
+    deployer, _uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(
+        deployer,
+        "_compile_standalone_imported_html_tailwind_css",
+        lambda **_: ".text-\\[32px\\]{font-size:32px}",
+    )
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {}
+        }
+      }
+    </script>
+    <style>
+      .strict-h1 { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1 class="strict-h1 text-[32px]">Headline</h1>
+  </body>
+</html>
+"""
+
+    rewritten = deployer._replace_standalone_imported_html_tailwind_runtime(html_document=html_document)
+
+    assert "https://cdn.tailwindcss.com" not in rewritten
+    assert "tailwind.config" not in rewritten
+    assert rewritten.index(".strict-h1 { font-size: 13px; }") < rewritten.index(
+        'data-mos-compiled-tailwind="true"'
+    )
+    assert rewritten.index('data-mos-compiled-tailwind="true"') < rewritten.lower().rindex("</head>")
+
+
+def test_compile_standalone_imported_html_tailwind_css_uses_external_frontend_root(
+    monkeypatch,
+    tmp_path,
+):
+    deployer, _uploaded, _commands = _stub_deployer()
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    external_frontend_root = tmp_path / "external" / "mos" / "frontend"
+    (external_frontend_root / "node_modules" / "tailwindcss" / "lib").mkdir(parents=True)
+    (external_frontend_root / "node_modules" / "postcss" / "lib").mkdir(parents=True)
+    (external_frontend_root / "node_modules" / "tailwindcss" / "lib" / "index.js").write_text(
+        "export default function tailwindcss() { return () => {}; }",
+        encoding="utf-8",
+    )
+    (external_frontend_root / "node_modules" / "postcss" / "lib" / "postcss.js").write_text(
+        "export default function postcss() { return { process: async () => ({ css: '' }) }; }",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(deployer, "_resolve_local_workspace_root", lambda: workspace_root)
+    monkeypatch.setenv(
+        "MOS_STANDALONE_TAILWIND_FRONTEND_ROOTS",
+        str(external_frontend_root),
+    )
+
+    observed: dict[str, str] = {}
+
+    def fake_subprocess_run(
+        args,
+        *,
+        cwd,
+        capture_output,
+        check,
+        text,
+        timeout,
+    ):
+        observed["cwd"] = cwd
+        observed["postcss"] = args[4]
+        observed["tailwind"] = args[5]
+        output_path = Path(args[3])
+        output_path.write_text(".compiled{display:block}", encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", fake_subprocess_run)
+
+    compiled_css = deployer._compile_standalone_imported_html_tailwind_css(
+        html_document='<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"></script></head></html>'
+    )
+
+    assert compiled_css == ".compiled{display:block}"
+    assert observed["cwd"] == str(external_frontend_root)
+    assert observed["postcss"].endswith("/node_modules/postcss/lib/postcss.js")
+    assert observed["tailwind"].endswith("/node_modules/tailwindcss/lib/index.js")
+
+
+def test_parse_fontawesome_icon_codepoints_handles_minified_content_rules():
+    stylesheet = (
+        '.fa-solid,.fas{font-family:"Font Awesome 6 Free";font-weight:900;}'
+        '.fa-circle-xmark:before,.fa-times-circle:before,.fa-xmark-circle:before{content:"\\f057"}'
+    )
+
+    codepoints = _parse_fontawesome_icon_codepoints(stylesheet)
+
+    assert codepoints["fa-circle-xmark"] == 0xF057
+    assert codepoints["fa-times-circle"] == 0xF057
+    assert codepoints["fa-xmark-circle"] == 0xF057
+
+
+def test_html_tag_has_aspect_ratio_class_detects_tailwind_aspect_tokens():
+    assert _html_tag_has_aspect_ratio_class('<img class="w-full aspect-[16/9] object-cover">') is True
+    assert _html_tag_has_aspect_ratio_class('<img class="aspect-square rounded-full">') is True
+    assert _html_tag_has_aspect_ratio_class('<img class="w-10 h-10 rounded-full">') is False
+
+
+def test_html_tag_has_explicit_box_size_classes_detects_fixed_box_utilities():
+    assert _html_tag_has_explicit_box_size_classes('<img class="w-10 h-10 rounded-full">') is True
+    assert _html_tag_has_explicit_box_size_classes('<img class="w-[45px] h-[45px] rounded-full">') is True
+    assert _html_tag_has_explicit_box_size_classes('<img class="w-full h-auto">') is False
+    assert _html_tag_has_explicit_box_size_classes('<img class="w-[100px] aspect-square">') is False
+
+
+def test_funnel_artifact_site_mirrors_non_canonical_public_asset_urls_locally(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Pre-Sales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                primary: '#C41423'
+              }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="bg-brand-primary text-white">
+      <img src="https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.shopemberco.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(
+        deployer,
+        "_compile_standalone_imported_html_tailwind_css",
+        lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_fetch_remote_standalone_image_asset",
+        lambda **_: (_make_jpeg_bytes(width=1600, height=900, color=(201, 20, 35)), "image/jpeg"),
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    mirrored_payload = _make_jpeg_bytes(width=1600, height=900, color=(201, 20, 35))
+    mirrored_digest = hashlib.sha256(mirrored_payload).hexdigest()[:32]
+    mirrored_path = f"/opt/apps/landing-artifact/site/_standalone-assets/{mirrored_digest}.jpg"
+
+    assert "https://cdn.tailwindcss.com" not in entry_html
+    assert 'data-mos-compiled-tailwind="true"' in entry_html
+    assert f'src="/_standalone-assets/{mirrored_digest}.jpg"' in entry_html
+    assert 'src="https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
+    assert mirrored_path in uploaded
+    assert uploaded[mirrored_path] == mirrored_payload
+
+
+def test_funnel_artifact_site_mirrors_extensionless_absolute_img_urls(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="https://assets.replocdn.com/projects/1d59688c-4fca-4894-8cd3-23dbe64f87b3/c20e5f0a-57f7-4265-be05-b5f356e9b0b7" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.shopemberco.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+    mirrored_payload = _make_png_bytes(width=1200, height=1200, color=(201, 20, 35, 255))
+    monkeypatch.setattr(
+        deployer,
+        "_fetch_remote_standalone_image_asset",
+        lambda **_: (mirrored_payload, "image/png"),
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    mirrored_digest = hashlib.sha256(mirrored_payload).hexdigest()[:32]
+    mirrored_path = f"/opt/apps/landing-artifact/site/_standalone-assets/{mirrored_digest}.png"
+
+    assert (
+        'src="/_standalone-assets/'
+        f'{mirrored_digest}.png" alt="Hero" loading="eager" decoding="async" fetchpriority="high"'
+    ) in entry_html
+    assert mirrored_path in uploaded
+    assert uploaded[mirrored_path] == mirrored_payload
+
+
+def test_funnel_artifact_site_prioritizes_large_hero_image_over_decorative_icons(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Pre-Sales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                primary: '#C41423'
+              }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="bg-brand-primary text-white">
+      <img src="https://img.funnelish.com/badge.png" alt="Ratings" class="h-4 object-contain">
+      <img src="https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero" class="w-full block aspect-[16/10] object-cover">
+      <img src="https://api.moshq.app/public/assets/22222222-2222-2222-2222-222222222222" alt="Reviewer Avatar" class="w-10 h-10 rounded-full">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.shopemberco.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(
+        deployer,
+        "_compile_standalone_imported_html_tailwind_css",
+        lambda **_: ".bg-brand-primary{background-color:#C41423}.text-white{color:#fff}",
+    )
+    mirrored_assets = {
+        "https://img.funnelish.com/badge.png": (_make_png_bytes(width=100, height=100, color=(255, 255, 255, 255)), "image/png"),
+        "https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111": (_make_jpeg_bytes(width=1600, height=1000, color=(201, 20, 35)), "image/jpeg"),
+        "https://api.moshq.app/public/assets/22222222-2222-2222-2222-222222222222": (_make_png_bytes(width=40, height=40, color=(245, 241, 232, 255)), "image/png"),
+    }
+    monkeypatch.setattr(
+        deployer,
+        "_fetch_remote_standalone_image_asset",
+        lambda **kwargs: mirrored_assets[kwargs["url"]],
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    badge_digest = hashlib.sha256(mirrored_assets["https://img.funnelish.com/badge.png"][0]).hexdigest()[:32]
+    hero_digest = hashlib.sha256(mirrored_assets["https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111"][0]).hexdigest()[:32]
+    avatar_digest = hashlib.sha256(mirrored_assets["https://api.moshq.app/public/assets/22222222-2222-2222-2222-222222222222"][0]).hexdigest()[:32]
+
+    assert f'src="/_standalone-assets/{badge_digest}.png" alt="Ratings" class="h-4 object-contain" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
+    assert f'src="/_standalone-assets/{hero_digest}.jpg" alt="Hero" class="w-full block aspect-[16/10] object-cover" loading="eager" decoding="async" fetchpriority="high"' in entry_html
+    assert f'rel="preload" as="image" fetchpriority="high" href="/_standalone-assets/{hero_digest}.jpg"' in entry_html
+    assert f'src="/_standalone-assets/{avatar_digest}.png" alt="Reviewer Avatar" class="w-10 h-10 rounded-full" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
+
+
+def test_funnel_artifact_site_errors_when_mirroring_required_image_asset_fails(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="https://img.funnelish.com/hero.png" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.shopemberco.com"],
+    )
+    deployer, _uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(
+        deployer,
+        "_fetch_remote_standalone_image_asset",
+        lambda **_: (_ for _ in ()).throw(ValueError("mirror failed")),
+    )
+
+    with pytest.raises(ValueError, match="mirror failed"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_standalone_image_source_uses_actual_image_format_for_mismatched_content_type():
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    image_source = deployer._build_standalone_image_source(
+        route_path="/_standalone-assets/example.png",
+        payload=_make_jpeg_bytes(width=1600, height=900, color=(201, 20, 35)),
+        content_type="image/png",
+        context_label="test",
+    )
+
+    assert image_source is not None
+    assert image_source.image_format == "JPEG"
+    assert image_source.content_type == "image/jpeg"
+
+
+def test_funnel_artifact_site_rewrites_tiny_reused_image_routes_when_safe(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Avatar" class="w-10 h-10 rounded-full">
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Avatar duplicate" class="w-10 h-10 rounded-full hidden">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES", 1)
+    monkeypatch.setattr(
+        deployer,
+        "_measure_standalone_imported_html_image_layouts",
+        lambda **_: {0: {"desktop": 45, "mobile": 45}, 1: {"desktop": 0, "mobile": 0}},
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        lambda **_: None,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+
+    assert "tiny-w96.png" in entry_html
+    assert entry_html.count("tiny-w96.png") == 2
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
+
+
+def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_safe(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        lambda **_: None,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert "/_standalone-assets/compressed/" in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
+
+
+def test_presales_compression_candidates_include_lossy_webp_for_large_images():
+    deployer, _uploaded, _commands = _stub_deployer()
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1376, height=768)
+    image_source = deployer._build_standalone_image_source(
+        route_path="/_standalone-assets/noisy.jpg",
+        payload=noisy_jpeg,
+        content_type="image/jpeg",
+        context_label="test",
+    )
+
+    assert image_source is not None
+    candidates = deployer._generate_standalone_image_compression_candidates(
+        image_source=image_source,
+        context_label="test",
+        page_stage="pre_sales",
+    )
+
+    assert any(label.startswith("webp-q") for _payload, _content_type, label in candidates)
+
+
+def test_normalize_remote_standalone_fetch_url_downgrades_legacy_public_asset_host():
+    assert _normalize_remote_standalone_fetch_url(
+        "https://api.moshq.app/public/assets/6c579e05-f25b-4003-9b33-d2c3ac70473b"
+    ) == "http://api.moshq.app/public/assets/6c579e05-f25b-4003-9b33-d2c3ac70473b"
+    assert _normalize_remote_standalone_fetch_url(
+        "https://api.moshq.app/other/path"
+    ) == "https://api.moshq.app/other/path"
+
+
+def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    page_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"]["presales"]
+    page_payload["stage"] = "pre_sales"
+    page_payload["pageStageMap"] = {"page-1": "pre_sales"}
+    imported_block = page_payload["puckData"]["content"][0]
+    imported_block["props"]["instrumentationManifest"]["pageStage"] = "pre_sales"
+
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
+    monkeypatch.setattr(
+        deployer,
+        "_measure_standalone_imported_html_image_layouts",
+        lambda **_: {0: {"desktop": 400, "mobile": 200}},
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        lambda **_: None,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert ".webp" in entry_html
+    assert "srcset=" in entry_html
+
+
+def test_responsive_image_parity_checks_always_compare_against_original_html(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
+    monkeypatch.setattr(
+        deployer,
+        "_measure_standalone_imported_html_image_layouts",
+        lambda **_: {0: {"desktop": 400, "mobile": 200}},
+    )
+    recorded_before_html: list[str] = []
+
+    def record_validate(*, before_html: str, **_kwargs):
+        recorded_before_html.append(before_html)
+
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        record_validate,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert recorded_before_html
+    assert all(before_html == html_document for before_html in recorded_before_html)
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    assert "srcset=" in uploaded[entry_route_path]
+
+
+def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites_are_disabled(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Responsive</title>
+  </head>
+  <body>
+    <main>
+      <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    deployer._measure_standalone_imported_html_image_layouts = lambda **_: {
+        0: {"desktop": 720, "mobile": 390}
+    }
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert "srcset=" not in entry_html
+    assert "sizes=" not in entry_html
+
+
+def test_funnel_artifact_site_minifies_final_html_and_uses_longer_meta_pixel_delay(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <!-- remove me -->
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <main>
+      <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert "<!-- remove me -->" not in entry_html
+    assert ">      <" not in entry_html
+    assert "const META_PIXEL_DEFER_TIMEOUT_MS = 15000;" in entry_html
+
+
+def test_funnel_artifact_site_uses_canonical_domain_for_default_route_when_workspace_server_names_present():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <main id="app">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        workspace_server_names=["shop.example.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "location = / {" in conf
+    assert (
+        "return 302 https://shop.example.com/example-product/example-funnel/presales$is_args$args;"
+        in conf
+    )
+
+
+def test_funnel_artifact_site_standalone_export_errors_on_unsupported_page_blocks():
+    app = _artifact_app(render_mode="standalone_imported_html")
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="unsupported standalone page block type 'PreSalesPage'"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_funnel_artifact_site_standalone_export_errors_when_manifest_is_missing():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    props = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"]["presales"]["puckData"]["content"][0]["props"]
+    props.pop("instrumentationManifest", None)
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="instrumentationManifest is required"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.shopemberco.com"],
+    )
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    imported_page = funnel_payload["pages"]["presales"]
+    imported_page["pageMap"] = {
+        "page-1": "presales",
+        "page-2": "terms-of-service",
+    }
+    imported_page["pageStageMap"] = {
+        "page-1": "pre_sales",
+        "page-2": "custom",
+    }
+    imported_page["designSystemTokens"] = {
+        "brand": {
+            "name": "Ember",
+        }
+    }
+    funnel_payload["meta"]["pages"] = [
+        {"pageId": "page-1", "slug": "presales"},
+        {"pageId": "page-2", "slug": "terms-of-service"},
+    ]
+    funnel_payload["pages"]["terms-of-service"] = {
+        "productSlug": "example-product",
+        "funnelId": "funnel-1",
+        "publicationId": "pub-1",
+        "pageId": "page-2",
+        "slug": "terms-of-service",
+        "stage": "custom",
+        "puckData": {
+            "root": {
+                "props": {
+                    "title": "Terms of Service",
+                    "description": "Terms of service",
+                }
+            },
+            "content": [
+                {
+                    "type": "FunnelCompliancePage",
+                    "props": {
+                        "pageKey": "terms_of_service",
+                        "pageTitle": "Terms of Service",
+                    },
+                }
+            ],
+            "zones": {},
+        },
+        "pageMap": {
+            "page-1": "presales",
+            "page-2": "terms-of-service",
+        },
+        "pageStageMap": {
+            "page-1": "pre_sales",
+            "page-2": "custom",
+        },
+        "designSystemTokens": {
+            "brand": {
+                "name": "Ember",
+            }
+        },
+    }
+
+    deployer, uploaded, _commands = _stub_deployer()
+    deployer._fetch_standalone_compliance_policy_page = lambda **_: {
+        "title": "Terms of Service",
+        "markdown": "# Terms of Service\n\n## Contact Information\nFor help, email **support@example.com**.\n",
+    }
+
+    deployer._configure_funnel_artifact_site(app)
+
+    compliance_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/terms-of-service/index.html"
+    compliance_html = uploaded[compliance_route_path]
+    assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in compliance_html
+    assert "<h1>Terms of Service</h1>" in compliance_html
+    assert "<h2>Contact Information</h2>" in compliance_html
+    assert "<strong>support@example.com</strong>" in compliance_html
+    assert 'href="/example-product/example-funnel/presales/" rel="nofollow">SHOP NOW</a>' in compliance_html
+    assert 'href="/example-product/example-funnel/terms-of-service/" rel="nofollow">Terms</a>' in compliance_html
 
 
 def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing_slug():
