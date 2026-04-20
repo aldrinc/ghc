@@ -63,8 +63,17 @@ function recommendationForEvaluation(evaluation: MetaManagementBenchmarkEvaluati
 function runLabel(run: MetaPublishRun): string {
   const campaignLabel = run.campaignName || "Published campaign";
   const createdLabel = formatDate(run.createdAt);
-  const metaLabel = run.metaCampaignId ? `Meta ${shortId(run.metaCampaignId, 5)}` : "No Meta id";
+  const trackedMetaCampaignId = run.managementMetaCampaignId || run.metaCampaignId;
+  const metaLabel = trackedMetaCampaignId ? `Meta ${shortId(trackedMetaCampaignId, 5)}` : "No Meta id";
   return `${campaignLabel} · ${createdLabel} · ${metaLabel}`;
+}
+
+function runManagementMetaCampaignId(run: MetaPublishRun | null): string | null {
+  if (!run) return null;
+  const overrideId = typeof run.managementMetaCampaignId === "string" ? run.managementMetaCampaignId.trim() : "";
+  if (overrideId) return overrideId;
+  const publishedId = typeof run.metaCampaignId === "string" ? run.metaCampaignId.trim() : "";
+  return publishedId || null;
 }
 
 function runDeliveryMode(run: MetaPublishRun | null): string | null {
@@ -88,7 +97,7 @@ export function MetaManagementPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const runnableRuns = useMemo(
-    () => visiblePublishRuns.filter((run) => typeof run.metaCampaignId === "string" && run.metaCampaignId.trim()),
+    () => visiblePublishRuns.filter((run) => Boolean(runManagementMetaCampaignId(run))),
     [visiblePublishRuns],
   );
 
@@ -114,7 +123,8 @@ export function MetaManagementPanel() {
   );
 
   const loadPlan = useCallback(async () => {
-    if (!selectedRun?.metaCampaignId) {
+    const trackedMetaCampaignId = runManagementMetaCampaignId(selectedRun);
+    if (!trackedMetaCampaignId) {
       setPlan(null);
       return;
     }
@@ -122,7 +132,7 @@ export function MetaManagementPanel() {
     setError(null);
     try {
       const nextPlan = await planManagement({
-        metaCampaignId: selectedRun.metaCampaignId,
+        metaCampaignId: trackedMetaCampaignId,
         clientId: campaign.client_id,
         metaConfigId: selectedRun.metaConfigId || undefined,
         datePreset,
@@ -139,16 +149,24 @@ export function MetaManagementPanel() {
   }, [campaign.client_id, datePreset, planManagement, selectedRun]);
 
   useEffect(() => {
-    if (!selectedRun?.metaCampaignId) {
+    if (!runManagementMetaCampaignId(selectedRun)) {
       setPlan(null);
       return;
     }
     void loadPlan();
-  }, [loadPlan, selectedRun?.metaCampaignId]);
+  }, [loadPlan, selectedRun]);
 
   const deliveryMode = runDeliveryMode(selectedRun) || plan?.benchmarkContext?.deliveryMode || null;
   const benchmarkUnavailableReason = plan?.benchmarkStatus.reason || null;
   const showBenchmarkCards = Boolean(plan?.benchmarkEvaluations.length);
+  const publishedMetaCampaignId =
+    typeof selectedRun?.metaCampaignId === "string" && selectedRun.metaCampaignId.trim()
+      ? selectedRun.metaCampaignId.trim()
+      : null;
+  const trackedMetaCampaignId = runManagementMetaCampaignId(selectedRun);
+  const hasManagementOverride = Boolean(
+    trackedMetaCampaignId && publishedMetaCampaignId && trackedMetaCampaignId !== publishedMetaCampaignId,
+  );
 
   return (
     <div className="space-y-4">
@@ -181,6 +199,12 @@ export function MetaManagementPanel() {
       {!publishRunsLoading && !publishRunsError && !runnableRuns.length ? (
         <Callout variant="warning" size="sm">
           Publish a Meta campaign first. The Manage phase only evaluates live campaigns that have a saved `metaCampaignId`.
+        </Callout>
+      ) : null}
+      {hasManagementOverride ? (
+        <Callout variant="warning" size="sm" title="Managing a rebound Meta target">
+          This run was originally published to Meta {shortId(publishedMetaCampaignId || "", 5)}, but management is
+          currently bound to Meta {shortId(trackedMetaCampaignId || "", 5)}.
         </Callout>
       ) : null}
       {error ? (

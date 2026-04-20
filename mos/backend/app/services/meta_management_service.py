@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db.enums import ArtifactTypeEnum
-from app.db.models import Campaign
+from app.db.models import Campaign, MetaPublishRun
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
@@ -58,6 +58,18 @@ class MetaManagementMonitoringRunResult:
     benchmark_available: bool = False
     benchmark_reason_code: str | None = None
     artifact_ids: dict[str, str] | None = None
+
+
+def resolve_publish_run_management_meta_campaign_id(run: MetaPublishRun) -> str | None:
+    metadata = run.metadata_json if isinstance(run.metadata_json, dict) else {}
+    management = metadata.get("management")
+    if isinstance(management, dict):
+        override = management.get("metaCampaignId")
+        if isinstance(override, str) and override.strip():
+            return override.strip()
+
+    meta_campaign_id = str(run.meta_campaign_id or "").strip()
+    return meta_campaign_id or None
 
 
 def resolve_management_benchmark_mode(
@@ -388,7 +400,7 @@ def run_meta_management_monitoring_snapshot(
             reason="published_meta_campaign_not_found",
         )
 
-    meta_campaign_id = str(publish_run.meta_campaign_id or "").strip()
+    meta_campaign_id = resolve_publish_run_management_meta_campaign_id(publish_run)
     if not meta_campaign_id:
         return MetaManagementMonitoringRunResult(
             status="skipped",

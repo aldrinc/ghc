@@ -182,6 +182,7 @@ export type MetaPublishRun = {
   adAccountId?: string | null;
   pageId?: string | null;
   metaCampaignId?: string | null;
+  managementMetaCampaignId?: string | null;
   errorMessage?: string | null;
   metadata: Record<string, unknown>;
   items: MetaPublishRunItem[];

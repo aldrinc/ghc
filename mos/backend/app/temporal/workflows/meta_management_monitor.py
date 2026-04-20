@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.meta_management_activities import (
@@ -41,5 +42,5 @@ class MetaManagementMonitorWorkflow:
                 date_preset=input.date_preset,
             ),
             start_to_close_timeout=900,
-            retry_policy=workflow.RetryPolicy(maximum_attempts=1),
+            retry_policy=RetryPolicy(maximum_attempts=1),
         )
