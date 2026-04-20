@@ -1419,6 +1419,47 @@ def test_funnel_artifact_site_rewrites_large_images_to_compressed_routes_when_sa
     assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
 
 
+def test_funnel_artifact_site_skips_compression_candidates_after_image_optimization_budget_expires(
+    monkeypatch,
+):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    monkeypatch.setattr(
+        deployer_module,
+        "_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS",
+        -1.0,
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        lambda **_: (_ for _ in ()).throw(AssertionError("parity validation should not run")),
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert "/_standalone-assets/compressed/" not in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+
+
 def test_presales_compression_candidates_include_lossy_webp_for_large_images():
     deployer, _uploaded, _commands = _stub_deployer()
     noisy_jpeg = _make_noisy_jpeg_bytes(width=1376, height=768)
@@ -1552,6 +1593,46 @@ def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites
     deployer._measure_standalone_imported_html_image_layouts = lambda **_: {
         0: {"desktop": 720, "mobile": 390}
     }
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert "srcset=" not in entry_html
+    assert "sizes=" not in entry_html
+
+
+def test_funnel_artifact_site_skips_responsive_candidates_after_image_optimization_budget_expires(
+    monkeypatch,
+):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
+    monkeypatch.setattr(
+        deployer_module,
+        "_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS",
+        -1.0,
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_measure_standalone_imported_html_image_layouts",
+        lambda **_: {0: {"desktop": 400, "mobile": 200}},
+    )
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        lambda **_: (_ for _ in ()).throw(AssertionError("parity validation should not run")),
+    )
 
     deployer._configure_funnel_artifact_site(app)
 

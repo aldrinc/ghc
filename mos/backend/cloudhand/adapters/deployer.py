@@ -152,6 +152,8 @@ _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 128 * 1024
 _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 16
 _STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 16
 _STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 48
+_STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS = 90.0
+_STANDALONE_PRESALES_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS = 120.0
 _STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 15000
 _STANDALONE_PRESALES_MIN_PSNR_DB = 33.0
 _STANDALONE_PRESALES_MIN_RESPONSIVE_PSNR_DB = 31.0
@@ -494,6 +496,12 @@ def _has_meaningful_compression_savings(*, original_bytes: int, candidate_bytes:
 def _is_presales_stage(page_stage: str | None) -> bool:
     normalized = str(page_stage or "").strip().lower().replace("-", "_")
     return normalized in {"pre_sales", "presales"}
+
+
+def _standalone_image_optimization_budget_seconds(*, page_stage: str | None) -> float:
+    if _is_presales_stage(page_stage):
+        return _STANDALONE_PRESALES_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS
+    return _STANDALONE_DEFAULT_IMAGE_OPTIMIZATION_TIME_BUDGET_SECONDS
 
 
 def _normalize_remote_standalone_fetch_url(raw_url: str) -> str:
@@ -2357,6 +2365,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         uploaded_target_paths: set[str],
         context_label: str,
         page_stage: str | None = None,
+        optimization_deadline: float | None = None,
     ) -> str:
         if not standalone_image_sources or _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES <= 0:
             return html_document
@@ -2396,6 +2405,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         rewritten_document = html_document
 
         for route_plan in route_plans:
+            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
+                break
             image_indices = tuple(int(index) for index in route_plan["indices"])
             current_route = ""
             for image_index in image_indices:
@@ -2424,6 +2435,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
             accepted = False
             for payload, content_type, label in compression_candidates:
+                if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
+                    break
                 try:
                     quality_ok = self._is_standalone_image_candidate_quality_acceptable(
                         image_source=image_source,
@@ -2515,6 +2528,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         uploaded_target_paths: set[str],
         context_label: str,
         page_stage: str | None = None,
+        optimization_deadline: float | None = None,
     ) -> str:
         if (
             not standalone_image_sources
@@ -2772,6 +2786,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         route_plans.sort(key=lambda plan: int(plan["benefit_score"]), reverse=True)
         route_plans = route_plans[:_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES]
         for route_plan in route_plans:
+            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
+                break
             route_path = str(route_plan["route"])
             image_source = standalone_image_sources.get(route_path)
             if image_source is None:
@@ -2822,6 +2838,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         image_plans = image_plans[:_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES]
         for image_plan in image_plans:
+            if optimization_deadline is not None and time.monotonic() >= optimization_deadline:
+                break
             image_index = int(image_plan["image_index"])
             current_tag = _find_nth_img_tag(rewritten_document, image_index)
             if current_tag is None:
@@ -5672,6 +5690,9 @@ WantedBy=multi-user.target
             origin_hints = _origin_hint_markup_for_html_document(html_document)
             if origin_hints:
                 html_document = _inject_head_html_block(html_document=html_document, block=origin_hints)
+        image_optimization_deadline = (
+            time.monotonic() + _standalone_image_optimization_budget_seconds(page_stage=page_stage)
+        )
         html_document = self._rewrite_standalone_imported_html_compressed_images(
             site_dir=site_dir,
             html_document=html_document,
@@ -5680,6 +5701,7 @@ WantedBy=multi-user.target
             uploaded_target_paths=mirrored_target_paths,
             context_label=context_label,
             page_stage=page_stage,
+            optimization_deadline=image_optimization_deadline,
         )
         html_document = self._rewrite_standalone_imported_html_responsive_images(
             site_dir=site_dir,
@@ -5689,6 +5711,7 @@ WantedBy=multi-user.target
             uploaded_target_paths=mirrored_target_paths,
             context_label=context_label,
             page_stage=page_stage,
+            optimization_deadline=image_optimization_deadline,
         )
         html_document = _optimize_standalone_imported_html_document(html_document)
         preload_image_spec = _resolve_imported_html_preload_image_spec(html_document)
