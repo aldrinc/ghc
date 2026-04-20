@@ -201,6 +201,14 @@ def _compute_stale_workloads(
     return stale
 
 
+def _normalize_selected_workload_names(*, workload_names: list[str] | None) -> set[str]:
+    return {
+        str(raw_name or "").strip()
+        for raw_name in (workload_names or [])
+        if str(raw_name or "").strip()
+    }
+
+
 def apply_plan(
     root: Path,
     plan_path: Path,
@@ -208,6 +216,7 @@ def apply_plan(
     terraform_bin: str = "terraform",
     project_id: str = "default",
     workspace_id: str = "default",
+    workload_names: list[str] | None = None,
 ) -> int:
     if not plan_path.exists():
         raise FileNotFoundError(f"Plan file not found at {plan_path}")
@@ -219,6 +228,7 @@ def apply_plan(
 
     # Validate and persist new spec
     new_spec = DesiredStateSpec.model_validate(new_spec_data)
+    selected_workload_names = _normalize_selected_workload_names(workload_names=workload_names)
     for inst in new_spec.instances:
         app_models = [
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
@@ -276,10 +286,17 @@ def apply_plan(
 
     for inst in new_spec.instances:
         ip = server_ips.get(inst.name)
-        stale_apps = stale_workloads_by_instance.get(inst.name, [])
+        stale_apps = [
+            app for app in stale_workloads_by_instance.get(inst.name, [])
+            if not selected_workload_names or app.name in selected_workload_names
+        ]
+        target_apps = [
+            app for app in inst.workloads
+            if not selected_workload_names or app.name in selected_workload_names
+        ]
         if not ip:
             continue
-        if not inst.workloads and not stale_apps:
+        if not target_apps and not stale_apps:
             continue
         print(f" Configuring {inst.name} ({ip})...")
         deployer = ServerDeployer(ip, priv_key, local_root=root)
@@ -289,12 +306,12 @@ def apply_plan(
             for stale_app in stale_apps:
                 deployer.remove_workload(stale_app)
 
-        if not inst.workloads:
+        if not target_apps:
             continue
 
         app_models = [
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
-            for app in inst.workloads
+            for app in target_apps
         ]
 
         # Nginx routing modes:
@@ -323,10 +340,13 @@ def apply_plan(
 
     # Handle stale workloads for instances removed from the desired spec but still present in outputs.
     for instance_name, stale_apps in stale_workloads_by_instance.items():
+        stale_apps = [
+            app for app in stale_apps if not selected_workload_names or app.name in selected_workload_names
+        ]
         if instance_name in desired_instance_names:
             continue
         ip = server_ips.get(instance_name)
-        if not ip:
+        if not ip or not stale_apps:
             continue
         print(f" Cleaning removed instance {instance_name} ({ip}) stale workloads: {', '.join(app.name for app in stale_apps)}")
         deployer = ServerDeployer(ip, priv_key, local_root=root)

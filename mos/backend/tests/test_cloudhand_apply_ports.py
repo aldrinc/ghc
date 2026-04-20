@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
+import cloudhand.core.apply as apply_module
 from cloudhand.core.apply import (
     _assign_and_validate_instance_ports,
     _compute_stale_workloads,
+    _normalize_selected_workload_names,
     _validate_instance_server_name_conflicts,
 )
 from cloudhand.models import ApplicationSpec, DesiredStateSpec
@@ -295,3 +299,68 @@ def test_compute_stale_workloads_identifies_removed_workloads_and_instances():
     assert set(stale.keys()) == {"mos-ghc-1", "mos-ghc-2"}
     assert {app.name for app in stale["mos-ghc-1"]} == {"honest-herbalist", "funnel-old"}
     assert {app.name for app in stale["mos-ghc-2"]} == {"legacy-site"}
+
+
+def test_apply_plan_deploys_only_selected_workload(tmp_path, monkeypatch):
+    plan_path = tmp_path / "plan.json"
+    tf_dir = tmp_path / "terraform"
+    ch_dir = tmp_path / "cloudhand"
+    tf_dir.mkdir()
+    ch_dir.mkdir()
+
+    desired_spec_payload = _desired_spec(
+        [
+            _instance_payload(
+                "mos-ghc-1",
+                [
+                    _artifact_app(name="brand-funnels-tenor").model_dump(),
+                    _artifact_app(name="brand-funnels-ember").model_dump(),
+                ],
+            )
+        ]
+    ).model_dump(mode="json")
+    plan_path.write_text(json.dumps({"new_spec": desired_spec_payload}), encoding="utf-8")
+
+    monkeypatch.setattr(apply_module, "cloudhand_dir", lambda root: ch_dir)
+    monkeypatch.setattr(apply_module, "terraform_dir", lambda root: tf_dir)
+    monkeypatch.setattr(apply_module, "get_or_create_project_ssh_key", lambda project_id: ("priv", "pub"))
+    monkeypatch.setattr(apply_module, "get_generator", lambda provider: type("Gen", (), {"generate": lambda *args, **kwargs: None})())
+    monkeypatch.setattr(apply_module.shutil, "which", lambda binary: "/usr/bin/terraform")
+    monkeypatch.setattr(apply_module.subprocess, "run", lambda *args, **kwargs: type("R", (), {"returncode": 0})())
+    monkeypatch.setattr(
+        apply_module.subprocess,
+        "check_output",
+        lambda *args, **kwargs: json.dumps({"server_ips": {"value": {"mos-ghc-1": "127.0.0.1"}}}).encode("utf-8"),
+    )
+
+    deployed: list[str] = []
+
+    class FakeDeployer:
+        def __init__(self, ip, priv_key, local_root):
+            _ = (ip, priv_key, local_root)
+
+        def deploy(self, app, configure_nginx=True):
+            _ = configure_nginx
+            deployed.append(app.name)
+
+        def remove_workload(self, app):
+            deployed.append(f"remove:{app.name}")
+
+        def configure_combined_nginx(self, apps):
+            deployed.append(f"combined:{','.join(app.name for app in apps)}")
+
+    monkeypatch.setattr(apply_module, "ServerDeployer", FakeDeployer)
+
+    rc = apply_module.apply_plan(
+        root=tmp_path,
+        plan_path=plan_path,
+        auto_approve=True,
+        terraform_bin="terraform",
+        project_id="default",
+        workspace_id="default",
+        workload_names=["brand-funnels-tenor"],
+    )
+
+    assert rc == 0
+    assert _normalize_selected_workload_names(workload_names=["brand-funnels-tenor"]) == {"brand-funnels-tenor"}
+    assert deployed == ["brand-funnels-tenor"]

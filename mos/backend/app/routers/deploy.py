@@ -46,6 +46,10 @@ class PlanUpdate(BaseModel):
 
 class ApplyPayload(BaseModel):
     plan_path: Optional[str] = Field(None, description="Optional plan file path (inside DEPLOY_ROOT_DIR)")
+    workload_names: Optional[list[str]] = Field(
+        None,
+        description="Optional workload names to scope artifact materialization and apply/deploy steps.",
+    )
 
 
 class WorkloadDomainsResponse(BaseModel):
@@ -260,7 +264,10 @@ async def apply_plan(
 ):
     _require_internal_proxy(request)
     try:
-        return await deploy_service.apply_plan(plan_path=(payload.plan_path if payload else None))
+        return await deploy_service.apply_plan(
+            plan_path=(payload.plan_path if payload else None),
+            workload_names=(payload.workload_names if payload else None),
+        )
     except deploy_service.DeployError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

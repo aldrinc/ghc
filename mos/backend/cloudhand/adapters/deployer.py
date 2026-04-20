@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -144,17 +145,55 @@ class ServerDeployer:
         if self.client.get_transport() is None or not self.client.get_transport().is_active():
             self.connect()
         sftp = self.client.open_sftp()
-        with sftp.file(remote_path, "w") as f:
-            f.write(content)
-        sftp.close()
+        try:
+            self._ensure_remote_parent_directory(sftp=sftp, remote_path=remote_path)
+            with sftp.file(remote_path, "w") as f:
+                f.write(content)
+        except OSError as exc:
+            raise ValueError(f"Failed to upload remote file '{remote_path}': {exc}") from exc
+        finally:
+            sftp.close()
 
     def upload_bytes(self, content: bytes, remote_path: str):
         if self.client.get_transport() is None or not self.client.get_transport().is_active():
             self.connect()
         sftp = self.client.open_sftp()
-        with sftp.file(remote_path, "wb") as f:
-            f.write(content)
-        sftp.close()
+        try:
+            self._ensure_remote_parent_directory(sftp=sftp, remote_path=remote_path)
+            with sftp.file(remote_path, "wb") as f:
+                f.write(content)
+        except OSError as exc:
+            raise ValueError(f"Failed to upload remote file '{remote_path}': {exc}") from exc
+        finally:
+            sftp.close()
+
+    def _ensure_remote_parent_directory(self, *, sftp: Any, remote_path: str) -> None:
+        parent = posixpath.dirname(remote_path.rstrip("/"))
+        if not parent or parent == "/":
+            return
+
+        missing_parts: list[str] = []
+        current = parent
+        while current and current != "/":
+            try:
+                sftp.stat(current)
+                break
+            except OSError:
+                missing_parts.append(current)
+                current = posixpath.dirname(current.rstrip("/"))
+                if current == parent:
+                    break
+
+        for directory in reversed(missing_parts):
+            try:
+                sftp.mkdir(directory)
+            except OSError:
+                try:
+                    sftp.stat(directory)
+                except OSError as exc:
+                    raise ValueError(
+                        f"Failed to create remote directory '{directory}' for '{remote_path}': {exc}"
+                    ) from exc
 
     def _upload_local_directory(self, *, local_dir: Path, remote_dir: str) -> None:
         if not local_dir.is_dir():

@@ -22,8 +22,9 @@ from app.services import deploy as deploy_service
 
 
 def test_deploy_apply_proxies_to_service(api_client, monkeypatch):
-    async def fake_apply_plan(*, plan_path=None):
+    async def fake_apply_plan(*, plan_path=None, workload_names=None):
         assert plan_path is None
+        assert workload_names is None
         return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
 
     monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
@@ -34,13 +35,84 @@ def test_deploy_apply_proxies_to_service(api_client, monkeypatch):
 
 
 def test_deploy_apply_alias_works(api_client, monkeypatch):
-    async def fake_apply_plan(*, plan_path=None):
+    async def fake_apply_plan(*, plan_path=None, workload_names=None):
         return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
 
     monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
 
     resp = api_client.post("/deploy/apply", json={})
     assert resp.status_code == 200
+
+
+def test_deploy_apply_forwards_workload_names(api_client, monkeypatch):
+    async def fake_apply_plan(*, plan_path=None, workload_names=None):
+        assert plan_path == "/tmp/plan.json"
+        assert workload_names == ["brand-funnels-abc", "brand-funnels-def"]
+        return {"returncode": 0, "plan_path": "/tmp/plan.json", "server_ips": {}, "live_url": None, "logs": ""}
+
+    monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
+
+    resp = api_client.post(
+        "/deploy/plans/apply",
+        json={"plan_path": "/tmp/plan.json", "workload_names": ["brand-funnels-abc", "brand-funnels-def"]},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(tmp_path, monkeypatch):
+    cloudhand_dir = tmp_path / "cloudhand"
+    terraform_dir = tmp_path / "terraform"
+    cloudhand_dir.mkdir()
+    plan_path = cloudhand_dir / "plan.json"
+    plan_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setenv("HCLOUD_TOKEN", "test-token")
+    monkeypatch.setattr(deploy_service, "_cloudhand_dir", lambda: cloudhand_dir)
+    monkeypatch.setattr(deploy_service, "_terraform_dir", lambda: terraform_dir)
+    monkeypatch.setattr(deploy_service, "_resolve_terraform_bin", lambda: "terraform")
+
+    captured: dict[str, object] = {}
+
+    def fake_materialize(*, plan_file, workload_names=None):
+        captured["materialize_plan_file"] = str(plan_file)
+        captured["materialize_workload_names"] = workload_names
+        return plan_file
+
+    class FakeStdout:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    class FakeProc:
+        def __init__(self):
+            self.stdout = FakeStdout()
+            self.returncode = 0
+
+        async def wait(self):
+            return self.returncode
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        captured["subprocess_args"] = list(args)
+        captured["subprocess_kwargs"] = kwargs
+        return FakeProc()
+
+    monkeypatch.setattr(deploy_service, "_materialize_funnel_artifacts_for_apply", fake_materialize)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    result = await deploy_service.apply_plan(
+        plan_path=str(plan_path),
+        workload_names=["brand-funnels-tenor", "brand-funnels-tenor"],
+    )
+
+    assert result["returncode"] == 0
+    assert captured["materialize_workload_names"] == {"brand-funnels-tenor"}
+    subprocess_args = captured["subprocess_args"]
+    assert "--workload-name" in subprocess_args
+    assert subprocess_args.count("--workload-name") == 1
+    assert subprocess_args[-2:] == ["--workload-name", "brand-funnels-tenor"]
 
 
 def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
@@ -593,7 +665,11 @@ async def test_apply_plan_times_out_stuck_cloudhand_process(tmp_path, monkeypatc
     monkeypatch.setenv("DEPLOY_APPLY_TIMEOUT_SECONDS", "0.01")
     monkeypatch.setattr(deploy_service, "_cloudhand_dir", lambda: cloudhand_dir)
     monkeypatch.setattr(deploy_service, "_terraform_dir", lambda: terraform_dir)
-    monkeypatch.setattr(deploy_service, "_materialize_funnel_artifacts_for_apply", lambda *, plan_file: plan_file)
+    monkeypatch.setattr(
+        deploy_service,
+        "_materialize_funnel_artifacts_for_apply",
+        lambda *, plan_file, workload_names=None: plan_file,
+    )
     monkeypatch.setattr(deploy_service, "_resolve_terraform_bin", lambda: "terraform")
 
     class FakeStdout:

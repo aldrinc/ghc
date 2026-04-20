@@ -2182,7 +2182,9 @@ def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any])
     return changed
 
 
-def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
+def _materialize_funnel_artifacts_for_apply(
+    *, plan_file: Path, workload_names: set[str] | None = None
+) -> Path:
     try:
         plan = json.loads(plan_file.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -2204,6 +2206,9 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
             continue
         for workload in workloads:
             if not isinstance(workload, dict):
+                continue
+            workload_name = str(workload.get("name") or "").strip()
+            if workload_names and workload_name not in workload_names:
                 continue
             source_type = str(workload.get("source_type") or "").strip().lower()
             if source_type == "funnel_publication":
@@ -2246,7 +2251,9 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
     return materialized_path
 
 
-async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
+async def apply_plan(
+    *, plan_path: str | None = None, workload_names: list[str] | None = None
+) -> dict[str, Any]:
     """
     Apply a plan using the embedded Cloudhand engine (Terraform + SSH deploy).
 
@@ -2273,7 +2280,18 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         raise DeployError("No plan found.")
 
     requested_plan_file = plan_file
-    plan_file = _materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    normalized_workload_names: list[str] = []
+    selected_workload_names: set[str] = set()
+    for raw_name in workload_names or []:
+        workload_name = str(raw_name or "").strip()
+        if not workload_name or workload_name in selected_workload_names:
+            continue
+        selected_workload_names.add(workload_name)
+        normalized_workload_names.append(workload_name)
+    plan_file = _materialize_funnel_artifacts_for_apply(
+        plan_file=plan_file,
+        workload_names=(selected_workload_names or None),
+    )
 
     # Run Cloudhand apply in a subprocess so we can stream/capture Terraform output.
     env = os.environ.copy()
@@ -2293,6 +2311,8 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         "--terraform-bin",
         terraform_bin,
     ]
+    for workload_name in normalized_workload_names:
+        cmd.extend(["--workload-name", workload_name])
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -3389,7 +3409,15 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 if apply_plan_enabled:
                     job["phase"] = "applying_plan"
                     _write_json_atomic(path, job)
-                    apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
+                    workload_name = str(workload_patch.get("name") or "").strip()
+                    if not workload_name:
+                        raise DeployError(
+                            "Publish deploy workload patch is missing workload name."
+                        )
+                    apply_result = await apply_plan(
+                        plan_path=patch_result["updated_plan_path"],
+                        workload_names=[workload_name],
+                    )
                     return_code, summary = _summarize_apply_result(apply_result)
                     deploy_response["apply"] = summary
                     if return_code != 0:

@@ -209,6 +209,65 @@ def _extract_runtime_block(script_text: str) -> str:
     raise AssertionError("Runtime injection script did not contain a block assignment.")
 
 
+class _FakeSFTPFile:
+    def __init__(self, *, path: str, mode: str, files: dict[str, str | bytes]):
+        self._path = path
+        self._mode = mode
+        self._files = files
+        self._buffer: str | bytes = b"" if "b" in mode else ""
+
+    def write(self, content: str | bytes) -> None:
+        self._buffer = content
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self._files[self._path] = self._buffer
+        return False
+
+
+class _FakeSFTPClient:
+    def __init__(self, *, existing_dirs: set[str] | None = None, fail_mkdir_for: set[str] | None = None):
+        self.existing_dirs = set(existing_dirs or {"/"})
+        self.fail_mkdir_for = set(fail_mkdir_for or set())
+        self.files: dict[str, str | bytes] = {}
+        self.closed = False
+
+    def stat(self, path: str):
+        if path in self.existing_dirs or path in self.files:
+            return object()
+        raise OSError(f"missing {path}")
+
+    def mkdir(self, path: str) -> None:
+        if path in self.fail_mkdir_for:
+            raise OSError(f"cannot create {path}")
+        self.existing_dirs.add(path)
+
+    def file(self, path: str, mode: str):
+        return _FakeSFTPFile(path=path, mode=mode, files=self.files)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeTransport:
+    def is_active(self) -> bool:
+        return True
+
+
+class _FakeSSHClient:
+    def __init__(self, *, sftp: _FakeSFTPClient):
+        self._sftp = sftp
+
+    def get_transport(self):
+        return _FakeTransport()
+
+    def open_sftp(self):
+        return self._sftp
+
+
 def test_env_file_upload_normalizes_shell_style_assignments_for_systemd(tmp_path):
     env_file = tmp_path / ".env.example"
     env_file.write_text(
@@ -241,6 +300,35 @@ def test_env_file_upload_normalizes_shell_style_assignments_for_systemd(tmp_path
         "EMPTY_VALUE=\n"
         "LLM_DEFAULT_MODEL=claude-opus-4-6\n"
     )
+
+
+def test_upload_file_creates_missing_remote_parent_directories():
+    deployer = object.__new__(ServerDeployer)
+    deployer.client = _FakeSSHClient(sftp=_FakeSFTPClient(existing_dirs={"/", "/opt"}))
+    deployer.connect = lambda: None
+
+    deployer.upload_file("hello", "/opt/apps/landing/site/index.html")
+
+    sftp = deployer.client._sftp
+    assert "/opt/apps" in sftp.existing_dirs
+    assert "/opt/apps/landing" in sftp.existing_dirs
+    assert "/opt/apps/landing/site" in sftp.existing_dirs
+    assert sftp.files["/opt/apps/landing/site/index.html"] == "hello"
+    assert sftp.closed is True
+
+
+def test_upload_bytes_wraps_remote_parent_directory_creation_errors():
+    deployer = object.__new__(ServerDeployer)
+    deployer.client = _FakeSSHClient(
+        sftp=_FakeSFTPClient(existing_dirs={"/", "/opt"}, fail_mkdir_for={"/opt/apps"})
+    )
+    deployer.connect = lambda: None
+
+    with pytest.raises(
+        ValueError,
+        match=r"Failed to create remote directory '/opt/apps' for '/opt/apps/landing/site/index.html'",
+    ):
+        deployer.upload_bytes(b"hello", "/opt/apps/landing/site/index.html")
 
 
 def test_funnel_proxy_redirects_slug_paths_on_same_host_and_port():
