@@ -284,6 +284,17 @@ def upsert_cname_record(*, hostname: str, target_hostname: str) -> dict[str, Any
     get_result = _extract_get_hosts_result(root=get_root)
     existing_records = _parse_host_records(get_hosts_result=get_result)
 
+    matching_cname = next(
+        (
+            record
+            for record in existing_records
+            if str(record.get("Name") or "").strip().lower() == host.lower()
+            and str(record.get("Type") or "").strip().upper() == "CNAME"
+            and _normalize_cname_target(str(record.get("Address") or "").strip()) == normalized_target
+        ),
+        None,
+    )
+
     conflicts = [
         record
         for record in existing_records
@@ -291,6 +302,16 @@ def upsert_cname_record(*, hostname: str, target_hostname: str) -> dict[str, Any
         and str(record.get("Type") or "").strip().upper() != "CNAME"
     ]
     if conflicts:
+        if matching_cname is not None:
+            return {
+                "provider": "namecheap",
+                "recordType": "CNAME",
+                "host": host,
+                "domain": apex_domain,
+                "fqdn": apex_domain if host == "@" else f"{host}.{apex_domain}",
+                "target": normalized_target,
+                "status": "existing_conflict_preserved",
+            }
         conflict_types = sorted({str(item.get("Type") or "").upper() for item in conflicts})
         host_label = apex_domain if host == "@" else f"{host}.{apex_domain}"
         raise NamecheapDnsError(
@@ -321,6 +342,7 @@ def upsert_cname_record(*, hostname: str, target_hostname: str) -> dict[str, Any
         "domain": apex_domain,
         "fqdn": apex_domain if host == "@" else f"{host}.{apex_domain}",
         "target": normalized_target,
+        "status": "dns_record_written",
     }
 
 

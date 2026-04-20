@@ -82,6 +82,7 @@ def test_upsert_cname_record_merges_records_and_replaces_existing_cname(monkeypa
         "domain": "example.com",
         "fqdn": "shop.example.com",
         "target": "workspace-123.b-cdn.net",
+        "status": "dns_record_written",
     }
     assert captured["sld"] == "example"
     assert captured["tld"] == "com"
@@ -112,6 +113,40 @@ def test_upsert_cname_record_errors_when_non_cname_conflict_exists(monkeypatch):
             hostname="shop.example.com",
             target_hostname="workspace-123.b-cdn.net",
         )
+
+
+def test_upsert_cname_record_reuses_matching_apex_cname_when_mx_and_txt_exist(monkeypatch):
+    monkeypatch.setattr(
+        namecheap_dns,
+        "_namecheap_request",
+        lambda *, command, params: _build_get_hosts_response(
+            host_entries=[
+                {"Name": "@", "Type": "CNAME", "Address": "brand-funnels-70124684-be65d76e.b-cdn.net"},
+                {"Name": "@", "Type": "MX", "Address": "smtp.google.com."},
+                {"Name": "@", "Type": "TXT", "Address": "facebook-domain-verification=abc123"},
+            ]
+        ),
+    )
+
+    def _unexpected_set_hosts(*, sld: str, tld: str, records: list[dict[str, str]]) -> None:
+        raise AssertionError("setHosts should not run when the apex already points at the correct CNAME")
+
+    monkeypatch.setattr(namecheap_dns, "_set_hosts", _unexpected_set_hosts)
+
+    result = namecheap_dns.upsert_cname_record(
+        hostname="example.com",
+        target_hostname="brand-funnels-70124684-be65d76e.b-cdn.net",
+    )
+
+    assert result == {
+        "provider": "namecheap",
+        "recordType": "CNAME",
+        "host": "@",
+        "domain": "example.com",
+        "fqdn": "example.com",
+        "target": "brand-funnels-70124684-be65d76e.b-cdn.net",
+        "status": "existing_conflict_preserved",
+    }
 
 
 def test_upsert_txt_record_merges_existing_records_and_preserves_other_txt_values(monkeypatch):
