@@ -3248,7 +3248,12 @@ class ShopifyApiClient:
                 "variables": {
                     "productId": product_gid,
                     "variants": [
-                        {"id": initial_variant_id, "price": first_variant["price"]}
+                        {
+                            "id": initial_variant_id,
+                            "price": first_variant["price"],
+                            # mOS treats Shopify as checkout/catalog, not inventory source-of-truth.
+                            "inventoryItem": {"tracked": False},
+                        }
                     ],
                 },
             },
@@ -3301,6 +3306,7 @@ class ShopifyApiClient:
                                 "optionValues": [
                                     {"optionName": "Title", "name": variant["title"]}
                                 ],
+                                "inventoryItem": {"tracked": False},
                             }
                             for variant in cleaned_variants[1:]
                         ],
@@ -4178,19 +4184,21 @@ class ShopifyApiClient:
                     )
                 product_variant_input["inventoryPolicy"] = normalized_inventory_policy
 
-            inventory_item_input: dict[str, Any] = {}
+            # mOS does not manage Shopify inventory counts, so keep tracking disabled.
+            inventory_item_input: dict[str, Any] = {"tracked": False}
             raw_inventory_management = raw_variant.get("inventoryManagement")
             if raw_inventory_management is not None:
                 if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
-                    inventory_item_input["tracked"] = False
-                else:
-                    normalized_inventory_management = raw_inventory_management.strip().lower()
-                    if normalized_inventory_management != "shopify":
-                        raise ShopifyApiError(
-                            message="inventoryManagement must be null or 'shopify'.",
-                            status_code=400,
-                        )
-                    inventory_item_input["tracked"] = True
+                    raise ShopifyApiError(
+                        message="inventoryManagement must be null or 'shopify'.",
+                        status_code=400,
+                    )
+                normalized_inventory_management = raw_inventory_management.strip().lower()
+                if normalized_inventory_management != "shopify":
+                    raise ShopifyApiError(
+                        message="inventoryManagement must be null or 'shopify'.",
+                        status_code=400,
+                    )
 
             raw_requires_shipping = raw_variant.get("requiresShipping")
             if raw_requires_shipping is not None:

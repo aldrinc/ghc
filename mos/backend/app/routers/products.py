@@ -166,6 +166,47 @@ def verify_shopify_product_exists(*, client_id: str, product_gid: str) -> None:
     )
 
 
+def _disable_shopify_inventory_tracking_for_product(
+    *,
+    client_id: str,
+    product_gid: str,
+    shop_domain: str,
+) -> None:
+    shopify_product = get_client_shopify_product(
+        client_id=client_id,
+        product_gid=product_gid,
+        shop_domain=shop_domain,
+    )
+    raw_variants = shopify_product.get("variants")
+    if not isinstance(raw_variants, list):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify product payload is missing a valid variants list.",
+        )
+
+    for raw_variant in raw_variants:
+        if not isinstance(raw_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product payload returned an invalid variant entry.",
+            )
+        variant_gid = raw_variant.get("variantGid")
+        inventory_management = raw_variant.get("inventoryManagement")
+        if not isinstance(variant_gid, str) or not variant_gid.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify product payload returned a variant without variantGid.",
+            )
+        if inventory_management is None:
+            continue
+        update_client_shopify_variant(
+            client_id=client_id,
+            variant_gid=variant_gid.strip(),
+            fields={"inventoryManagement": None},
+            shop_domain=shop_domain,
+        )
+
+
 def sync_workspace_shopify_catalog_collection(
     *,
     session: Session,
@@ -1952,9 +1993,31 @@ def update_product(
             fields["shopify_product_gid"] = None
         else:
             normalized_gid = _normalize_shopify_product_gid(payload.shopifyProductGid)
+            selected_shop_domain_pref = _get_client_user_pref(
+                session=session,
+                org_id=auth.org_id,
+                client_id=str(product.client_id),
+                user_external_id=auth.user_id,
+            )
+            selected_shop_domain = (
+                selected_shop_domain_pref.selected_shop_domain.strip().lower()
+                if selected_shop_domain_pref
+                and isinstance(selected_shop_domain_pref.selected_shop_domain, str)
+                and selected_shop_domain_pref.selected_shop_domain.strip()
+                else None
+            )
+            resolved_shop_domain = _require_ready_shopify_domain(
+                client_id=str(product.client_id),
+                selected_shop_domain=selected_shop_domain,
+            )
             verify_shopify_product_exists(
                 client_id=str(product.client_id),
                 product_gid=normalized_gid,
+            )
+            _disable_shopify_inventory_tracking_for_product(
+                client_id=str(product.client_id),
+                product_gid=normalized_gid,
+                shop_domain=resolved_shop_domain,
             )
             fields["shopify_product_gid"] = normalized_gid
             catalog_sync_extra_product_gids = [normalized_gid]
