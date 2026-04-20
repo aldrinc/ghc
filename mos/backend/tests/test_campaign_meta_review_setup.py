@@ -6,6 +6,7 @@ from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
 from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage, MetaAdSetSpec, MetaCreativeSpec
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
+    DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_TARGETING,
 )
@@ -287,7 +288,7 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     setup_payload = setup_resp.json()
     assert setup_payload["assetCount"] == 1
     assert len(setup_payload["createdCreativeSpecIds"]) == 1
-    assert len(setup_payload["createdAdSetSpecIds"]) == 1
+    assert len(setup_payload["createdAdSetSpecIds"]) == DEFAULT_META_PUBLISH_BUCKET_COUNT
 
     pipeline_resp = api_client.get(
         f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&campaignId={campaign_id}&statuses=draft"
@@ -315,7 +316,7 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["creative_spec"]["metadata_json"]["reviewPaths"]["pre-sales"].endswith("/pre-sales")
     assert row["creative_spec"]["metadata_json"]["reviewPaths"]["sales"].endswith("/sales")
     assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
-    assert row["adset_specs"][0]["metadata_json"]["experimentSpecId"] == "exp-A02-Interaction Triage Workflow"
+    assert len(row["adset_specs"]) == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert row["adset_specs"][0]["optimization_goal"] == "OFFSITE_CONVERSIONS"
     assert row["adset_specs"][0]["billing_event"] == "IMPRESSIONS"
     assert row["adset_specs"][0]["daily_budget"] is None
@@ -323,6 +324,8 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert row["adset_specs"][0]["placements"] is None
     assert row["adset_specs"][0]["targeting"] == DEFAULT_META_PUBLISH_TARGETING
     assert row["adset_specs"][0]["metadata_json"]["templateId"] == "default-broad-int-cbo"
+    assert row["adset_specs"][0]["metadata_json"]["bucketIndex"] == 1
+    assert row["adset_specs"][0]["metadata_json"]["bucketCount"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert row["adset_specs"][0]["metadata_json"]["campaignDailyBudget"] == (
         DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
     )
@@ -332,9 +335,8 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert library_pipeline_resp.status_code == 200
     library_pipeline = library_pipeline_resp.json()
     assert len(library_pipeline) == 1
-    assert library_pipeline[0]["adset_specs"][0]["metadata_json"]["experimentSpecId"] == (
-        "exp-A02-Interaction Triage Workflow"
-    )
+    assert len(library_pipeline[0]["adset_specs"]) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+    assert library_pipeline[0]["adset_specs"][0]["metadata_json"]["bucketIndex"] == 1
 
 
 def test_campaign_meta_review_setup_uses_external_campaign_delivery_urls(

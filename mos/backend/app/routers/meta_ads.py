@@ -108,8 +108,10 @@ from app.services.meta_management_service import (
 )
 from app.services.meta_management_schedule import reconcile_campaign_meta_management_schedule
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     default_meta_publish_attribution_spec,
+    read_default_meta_publish_bucket_index,
 )
 from app.services.paid_ads_qa import (
     MetaProfileRefreshError,
@@ -304,6 +306,71 @@ def _meta_experiment_key(*, experiment_id: Optional[str], metadata_json: Any) ->
         if isinstance(raw, str) and raw.strip():
             return raw.strip()
     return None
+
+
+def _meta_publish_bucket_sort_key(spec: MetaAdSetSpec) -> tuple[int, str]:
+    bucket_index = read_default_meta_publish_bucket_index(spec.metadata_json)
+    return (
+        bucket_index if bucket_index is not None else DEFAULT_META_PUBLISH_BUCKET_COUNT + 1,
+        str(spec.id),
+    )
+
+
+def _campaign_bucket_specs(
+    adset_specs: list[MetaAdSetSpec],
+) -> tuple[list[MetaAdSetSpec], list[str]]:
+    bucket_specs_by_index: dict[int, MetaAdSetSpec] = {}
+    blockers: list[str] = []
+    for spec in adset_specs:
+        bucket_index = read_default_meta_publish_bucket_index(spec.metadata_json)
+        if bucket_index is None:
+            continue
+        if bucket_index in bucket_specs_by_index:
+            blockers.append(
+                "Campaign has duplicate Meta CBO bucket specs. "
+                "Each bucket index 1-5 must exist at most once."
+            )
+            continue
+        bucket_specs_by_index[bucket_index] = spec
+    return (
+        [bucket_specs_by_index[index] for index in sorted(bucket_specs_by_index.keys())],
+        blockers,
+    )
+
+
+def _campaign_bucket_spec_count_blocker_message(count: int) -> str:
+    return (
+        f"Campaign CBO launch requires exactly {DEFAULT_META_PUBLISH_BUCKET_COUNT} "
+        f"campaign-scoped Meta ad set buckets. Found {count}. "
+        "Run Prepare Meta review to generate the default bucket specs."
+    )
+
+
+def _campaign_bucket_budget_scope_blocker_message() -> str:
+    return (
+        "Campaign CBO bucket specs cannot set ad set budgets. "
+        "Leave all bucket daily/lifetime budgets blank so the $100/day campaign budget stays at the campaign level."
+    )
+
+
+def _assign_assets_to_bucket_specs(
+    *,
+    assets: list[Asset],
+    bucket_specs: list[MetaAdSetSpec],
+) -> dict[str, MetaAdSetSpec]:
+    if not bucket_specs:
+        return {}
+    ordered_assets = sorted(
+        assets,
+        key=lambda asset: (
+            asset.created_at.isoformat() if asset.created_at else "",
+            str(asset.id),
+        ),
+    )
+    assignments: dict[str, MetaAdSetSpec] = {}
+    for position, asset in enumerate(ordered_assets):
+        assignments[str(asset.id)] = bucket_specs[position % len(bucket_specs)]
+    return assignments
 
 
 def _asset_generation_key(asset: Asset) -> str:
@@ -1461,14 +1528,19 @@ def _validate_publish_plan(
             MetaAdSetSpec.campaign_id == str(campaign.id),
         )
     ).all()
-    adset_spec_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
-    for spec in adset_specs:
-        experiment_key = _meta_experiment_key(
-            experiment_id=str(spec.experiment_id) if spec.experiment_id else None,
-            metadata_json=spec.metadata_json,
-        )
-        if experiment_key:
-            adset_spec_map[experiment_key].append(spec)
+    campaign_bucket_specs, bucket_spec_blockers = _campaign_bucket_specs(adset_specs)
+    blockers.extend(bucket_spec_blockers)
+    if len(campaign_bucket_specs) != DEFAULT_META_PUBLISH_BUCKET_COUNT:
+        blockers.append(_campaign_bucket_spec_count_blocker_message(len(campaign_bucket_specs)))
+    asset_bucket_assignments = _assign_assets_to_bucket_specs(
+        assets=selected_assets,
+        bucket_specs=(
+            campaign_bucket_specs
+            if len(campaign_bucket_specs) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+            and not bucket_spec_blockers
+            else []
+        ),
+    )
 
     validation_items: list[MetaPublishPlanValidationItemResponse] = []
     resolved_items: list[dict[str, Any]] = []
@@ -1493,23 +1565,16 @@ def _validate_publish_plan(
             except ValueError as exc:
                 item_blockers.append(str(exc))
 
-            experiment_key = (
-                str(asset.experiment_id)
-                if asset.experiment_id
-                else _meta_experiment_key(
-                    experiment_id=str(creative_spec.experiment_id) if creative_spec.experiment_id else None,
-                    metadata_json=creative_spec.metadata_json,
-                )
-            )
-            linked_adset_specs = adset_spec_map.get(experiment_key, []) if experiment_key else []
-            if not linked_adset_specs:
-                item_blockers.append("Final-package asset is missing a linked Meta ad set spec.")
-            elif len(linked_adset_specs) > 1:
+            adset_spec = asset_bucket_assignments.get(asset_id)
+            if (
+                len(campaign_bucket_specs) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+                and not bucket_spec_blockers
+                and adset_spec is None
+            ):
                 item_blockers.append(
-                    "Final-package asset resolves to multiple Meta ad set specs. Publish requires exactly one."
+                    "Final-package asset could not be assigned to a Meta CBO bucket."
                 )
-            else:
-                adset_spec = linked_adset_specs[0]
+            if adset_spec is not None:
                 if not _clean_optional_text(adset_spec.name):
                     item_blockers.append("Linked Meta ad set spec is missing a name.")
                 if not _clean_optional_text(adset_spec.optimization_goal):
@@ -1581,12 +1646,19 @@ def _validate_publish_plan(
                     "asset": asset,
                     "creative_spec": creative_spec,
                     "adset_spec": adset_spec,
+                    "bucket_index": read_default_meta_publish_bucket_index(
+                        adset_spec.metadata_json
+                    ),
                     "resolved_destination_url": resolved_destination_url,
                     "effective_page_id": _clean_optional_text(creative_spec.page_id) or profile_page_id,
                 }
             )
 
-    budget_scope = _publish_budget_scope_for_specs(_unique_publish_adset_specs(resolved_items))
+    budget_scope = _publish_budget_scope_for_specs(
+        campaign_bucket_specs if campaign_bucket_specs else _unique_publish_adset_specs(resolved_items)
+    )
+    if campaign_bucket_specs and budget_scope != "campaign":
+        blockers.append(_campaign_bucket_budget_scope_blocker_message())
     if budget_scope == "mixed":
         blockers.append(_publish_budget_scope_blocker_message())
     campaign_daily_budget = _resolved_publish_campaign_daily_budget(
@@ -1609,7 +1681,11 @@ def _validate_publish_plan(
         generationKey=payload.generationKey,
         ok=not blockers and all(item.status == "ok" for item in validation_items),
         includedCount=len(selected_assets),
-        adsetCount=len({str(item["adset_spec"].id) for item in resolved_items}),
+        adsetCount=(
+            len(campaign_bucket_specs)
+            if campaign_bucket_specs
+            else len({str(item["adset_spec"].id) for item in resolved_items})
+        ),
         publishBaseUrl=publish_base_url,
         publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
         budgetScope=budget_scope,
@@ -3558,11 +3634,26 @@ def create_meta_publish_run(
         )
 
         meta_adset_id_by_spec_id: dict[str, str] = {}
-        unique_adset_specs: dict[str, MetaAdSetSpec] = {}
-        for resolved in resolved_items:
-            unique_adset_specs[str(resolved["adset_spec"].id)] = resolved["adset_spec"]
+        campaign_adset_specs = session.scalars(
+            select(MetaAdSetSpec).where(
+                MetaAdSetSpec.org_id == auth.org_id,
+                MetaAdSetSpec.campaign_id == str(campaign.id),
+            )
+        ).all()
+        bucket_adset_specs, bucket_spec_blockers = _campaign_bucket_specs(campaign_adset_specs)
+        if bucket_spec_blockers:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=" ".join(bucket_spec_blockers),
+            )
+        if len(bucket_adset_specs) != DEFAULT_META_PUBLISH_BUCKET_COUNT:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=_campaign_bucket_spec_count_blocker_message(len(bucket_adset_specs)),
+            )
 
-        for adset_spec_id, adset_spec in unique_adset_specs.items():
+        for adset_spec in bucket_adset_specs:
+            adset_spec_id = str(adset_spec.id)
             created_adset = _create_meta_adset_internal(
                 payload=MetaAdSetCreateRequest(
                     requestId=f"meta-launch-plan:{launch_plan_key}:adset:{adset_spec_id}",
@@ -3861,13 +3952,19 @@ def list_meta_pipeline_assets(
             )
         ).all()
     adset_spec_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
+    campaign_bucket_specs_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
     for spec in adset_specs:
+        campaign_bucket_index = read_default_meta_publish_bucket_index(spec.metadata_json)
+        if campaign_bucket_index is not None and spec.campaign_id:
+            campaign_bucket_specs_map[str(spec.campaign_id)].append(spec)
         experiment_key = _meta_experiment_key(
             experiment_id=str(spec.experiment_id) if spec.experiment_id else None,
             metadata_json=spec.metadata_json,
         )
         if experiment_key:
             adset_spec_map[experiment_key].append(spec)
+    for campaign_spec_list in campaign_bucket_specs_map.values():
+        campaign_spec_list.sort(key=_meta_publish_bucket_sort_key)
 
     campaigns = []
     if campaign_ids:
@@ -3967,7 +4064,11 @@ def list_meta_pipeline_assets(
                 if experiment_id
                 else None,
                 "creative_spec": creative_spec,
-                "adset_specs": adset_spec_map.get(experiment_id, []) if experiment_id else [],
+                "adset_specs": (
+                    campaign_bucket_specs_map.get(campaign_id, [])
+                    if campaign_id and campaign_bucket_specs_map.get(campaign_id)
+                    else adset_spec_map.get(experiment_id, []) if experiment_id else []
+                ),
                 "meta": {
                     "upload": upload_map.get(asset_id),
                     "creatives": creative_list,

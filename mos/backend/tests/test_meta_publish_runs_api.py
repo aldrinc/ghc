@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from collections import Counter
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -44,8 +45,12 @@ from app.services.meta_management_service import run_meta_management_monitoring_
 from app.services.integration_secrets import encrypt_secret_json
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
+    DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_TARGETING,
+    default_meta_publish_bucket_metadata,
+    default_meta_publish_bucket_name,
+    read_default_meta_publish_bucket_index,
 )
 from app.services.paid_ads_qa import RULESET_VERSION
 from tests.helpers.manual_creative_context import manual_creative_context_payload
@@ -209,33 +214,50 @@ def _create_meta_publish_inputs(
         status="draft",
         metadata_json={"experimentSpecId": experiment_key},
     )
-    adset_spec = MetaAdSetSpec(
-        org_id=TEST_ORG_ID,
-        campaign_id=campaign_id,
-        name="Launch Ad Set",
-        status="draft",
-        optimization_goal="OFFSITE_CONVERSIONS",
-        billing_event="IMPRESSIONS",
-        targeting=dict(DEFAULT_META_PUBLISH_TARGETING) if with_targeting else None,
-        placements=None,
-        daily_budget=None,
-        lifetime_budget=None,
-        bid_amount=None,
-        start_time=None,
-        end_time=None,
-        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
-        conversion_domain="shop.thehonestherbalist.com",
-        metadata_json={
-            "experimentSpecId": experiment_key,
-            "attributionSpec": DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC,
-        },
-    )
+    existing_adset_specs = db_session.scalars(
+        select(MetaAdSetSpec).where(
+            MetaAdSetSpec.org_id == TEST_ORG_ID,
+            MetaAdSetSpec.campaign_id == campaign_id,
+        )
+    ).all()
+    adset_specs_by_bucket_index = {
+        bucket_index: spec
+        for spec in existing_adset_specs
+        if (bucket_index := read_default_meta_publish_bucket_index(spec.metadata_json)) is not None
+    }
+    for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1):
+        if bucket_index in adset_specs_by_bucket_index:
+            continue
+        adset_spec = MetaAdSetSpec(
+            org_id=TEST_ORG_ID,
+            campaign_id=campaign_id,
+            name=default_meta_publish_bucket_name(bucket_index),
+            status="draft",
+            optimization_goal="OFFSITE_CONVERSIONS",
+            billing_event="IMPRESSIONS",
+            targeting=dict(DEFAULT_META_PUBLISH_TARGETING) if with_targeting else None,
+            placements=None,
+            daily_budget=None,
+            lifetime_budget=None,
+            bid_amount=None,
+            start_time=None,
+            end_time=None,
+            promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+            conversion_domain="shop.thehonestherbalist.com",
+            metadata_json=default_meta_publish_bucket_metadata(bucket_index),
+        )
+        db_session.add(adset_spec)
+        adset_specs_by_bucket_index[bucket_index] = adset_spec
     db_session.add(creative_spec)
-    db_session.add(adset_spec)
     db_session.commit()
     db_session.refresh(creative_spec)
-    db_session.refresh(adset_spec)
-    return creative_spec, adset_spec
+    adset_specs = [
+        adset_specs_by_bucket_index[bucket_index]
+        for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1)
+    ]
+    for adset_spec in adset_specs:
+        db_session.refresh(adset_spec)
+    return creative_spec, adset_specs[0]
 
 
 def _seed_meta_workspace_config(db_session, *, client_id: str) -> MetaWorkspaceAdConfig:
@@ -810,6 +832,7 @@ def test_validate_meta_publish_plan_scopes_to_requested_funnel(api_client, db_se
     payload = response.json()
     assert payload["ok"] is True
     assert payload["includedCount"] == 1
+    assert payload["adsetCount"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert len(payload["items"]) == 1
     assert payload["items"][0]["assetId"] == str(asset.id)
     assert payload["budgetScope"] == "campaign"
@@ -864,6 +887,7 @@ def test_validate_meta_publish_plan_respects_requested_campaign_daily_budget(api
     assert response.status_code == 200
     payload = response.json()
     assert payload["ok"] is True
+    assert payload["adsetCount"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert payload["budgetScope"] == "campaign"
     assert payload["campaignDailyBudget"] == 25000
 
@@ -905,6 +929,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     _upsert_meta_profile(api_client, client_id=client_id)
 
     content = _jpeg_bytes()
+    adset_counter = {"count": 0}
 
     class _FakeStorage:
         def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
@@ -926,6 +951,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             return {"id": "meta_campaign_123", "status": "PAUSED"}
 
         def create_adset(self, **kwargs):
+            adset_counter["count"] += 1
             assert kwargs["payload"]["status"] == "PAUSED"
             assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
             assert kwargs["payload"]["dsa_payor"] == "Test Page"
@@ -935,7 +961,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             assert "daily_budget" not in kwargs["payload"]
             assert "lifetime_budget" not in kwargs["payload"]
             assert kwargs["payload"]["attribution_spec"] == DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC
-            return {"id": "meta_adset_123", "status": "PAUSED"}
+            return {"id": f"meta_adset_{adset_counter['count']}", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
             assert kwargs["payload"]["object_story_spec"]["page_id"] == "page_123"
@@ -970,8 +996,9 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert len(publish_payload["items"]) == 1
     assert publish_payload["items"][0]["status"] == "published"
     assert publish_payload["items"][0]["metaCreativeId"] == "meta_creative_123"
-    assert publish_payload["items"][0]["metaAdSetId"] == "meta_adset_123"
+    assert publish_payload["items"][0]["metaAdSetId"] == "meta_adset_1"
     assert publish_payload["items"][0]["metaAdId"] == "meta_ad_123"
+    assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
 
     history_response = api_client.get(f"/meta/campaigns/{campaign_id}/publish-runs")
     assert history_response.status_code == 200
@@ -1015,6 +1042,7 @@ def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_se
     _upsert_meta_profile(api_client, client_id=client_id)
 
     content = _jpeg_bytes()
+    adset_counter = {"count": 0}
 
     class _FakeStorage:
         def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
@@ -1032,7 +1060,8 @@ def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_se
             return {"id": "meta_campaign_custom_budget", "status": "PAUSED"}
 
         def create_adset(self, **kwargs):
-            return {"id": "meta_adset_custom_budget", "status": "PAUSED"}
+            adset_counter["count"] += 1
+            return {"id": f"meta_adset_custom_budget_{adset_counter['count']}", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
             return {"id": "meta_creative_custom_budget"}
@@ -1059,6 +1088,115 @@ def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_se
     publish_payload = publish_response.json()
     assert publish_payload["metadata"]["budgetScope"] == "campaign"
     assert publish_payload["metadata"]["campaignDailyBudget"] == 25000
+    assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
+
+
+def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-buckets",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-buckets"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+
+    expected_storage_keys: set[str] = set()
+    for index in range(7):
+        asset = _create_asset(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            batch_id="latest-run",
+            suffix=f"publish-buckets-{index}",
+            asset_brief_id=brief_id,
+        )
+        expected_storage_keys.add(str(asset.storage_key))
+        _create_meta_publish_inputs(
+            db_session,
+            asset=asset,
+            campaign_id=campaign_id,
+            experiment_key=f"exp-publish-buckets-{index}",
+            with_targeting=True,
+        )
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    adset_counter = {"count": 0}
+    creative_counter = {"count": 0}
+    ad_creations: list[str] = []
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key in expected_storage_keys
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            assert kwargs["ad_account_id"] == "act_123456"
+            return {"images": {kwargs["filename"]: {"hash": f"hash_{kwargs['filename']}"}}}
+
+        def create_campaign(self, **kwargs):
+            assert kwargs["payload"]["daily_budget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+            return {"id": "meta_campaign_bucket_distribution", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            adset_counter["count"] += 1
+            return {"id": f"meta_adset_{adset_counter['count']}", "status": "PAUSED"}
+
+        def create_adcreative(self, **kwargs):
+            creative_counter["count"] += 1
+            return {"id": f"meta_creative_{creative_counter['count']}"}
+
+        def create_ad(self, **kwargs):
+            ad_creations.append(kwargs["payload"]["adset_id"])
+            return {"id": f"meta_ad_{len(ad_creations)}", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+            "buyingType": "AUCTION",
+        },
+    )
+
+    assert publish_response.status_code == 200
+    publish_payload = publish_response.json()
+    assert publish_payload["status"] == "published"
+    assert len(publish_payload["items"]) == 7
+    assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
+    assert creative_counter["count"] == 7
+    assert len({item["adsetSpecId"] for item in publish_payload["items"]}) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+
+    meta_adset_counts = Counter(item["metaAdSetId"] for item in publish_payload["items"])
+    assert meta_adset_counts == Counter(
+        {
+            "meta_adset_1": 2,
+            "meta_adset_2": 2,
+            "meta_adset_3": 1,
+            "meta_adset_4": 1,
+            "meta_adset_5": 1,
+        }
+    )
+    assert Counter(ad_creations) == meta_adset_counts
 
 
 def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
@@ -1185,7 +1323,7 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
     assert second_payload["items"][0]["metaAssetUploadId"] == first_upload_id
     assert counters["upload_image"] == 1
     assert counters["create_campaign"] == 2
-    assert counters["create_adset"] == 2
+    assert counters["create_adset"] == 2 * DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert counters["create_adcreative"] == 2
     assert counters["create_ad"] == 2
 
@@ -1496,26 +1634,29 @@ def test_validate_meta_publish_plan_supports_external_delivery_without_funnel(
             "resolvedDestinationUrl": "https://lp.example.com/pre-sale",
         },
     )
-    adset_spec = MetaAdSetSpec(
-        org_id=TEST_ORG_ID,
-        campaign_id=campaign_id,
-        name="External Launch Ad Set",
-        status="draft",
-        optimization_goal="OFFSITE_CONVERSIONS",
-        billing_event="IMPRESSIONS",
-        targeting={"geo_locations": {"countries": ["US"]}},
-        placements={"publisher_platforms": ["facebook"]},
-        daily_budget=5000,
-        lifetime_budget=None,
-        bid_amount=None,
-        start_time=None,
-        end_time=None,
-        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
-        conversion_domain="lp.example.com",
-        metadata_json={"experimentSpecId": "exp-publish-external"},
-    )
+    adset_specs = [
+        MetaAdSetSpec(
+            org_id=TEST_ORG_ID,
+            campaign_id=campaign_id,
+            name=default_meta_publish_bucket_name(bucket_index),
+            status="draft",
+            optimization_goal="OFFSITE_CONVERSIONS",
+            billing_event="IMPRESSIONS",
+            targeting={"geo_locations": {"countries": ["US"]}},
+            placements={"publisher_platforms": ["facebook"]},
+            daily_budget=None,
+            lifetime_budget=None,
+            bid_amount=None,
+            start_time=None,
+            end_time=None,
+            promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+            conversion_domain="lp.example.com",
+            metadata_json=default_meta_publish_bucket_metadata(bucket_index),
+        )
+        for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1)
+    ]
     db_session.add(creative_spec)
-    db_session.add(adset_spec)
+    db_session.add_all(adset_specs)
     db_session.commit()
 
     _upsert_meta_profile(api_client, client_id=client_id)
@@ -1632,26 +1773,29 @@ def test_validate_meta_publish_plan_supports_manual_creative_context_without_lau
             "resolvedDestinationUrl": "https://lp.example.com/manual-pre-sale",
         },
     )
-    adset_spec = MetaAdSetSpec(
-        org_id=TEST_ORG_ID,
-        campaign_id=campaign_id,
-        name="Manual Launch Ad Set",
-        status="draft",
-        optimization_goal="OFFSITE_CONVERSIONS",
-        billing_event="IMPRESSIONS",
-        targeting={"geo_locations": {"countries": ["US"]}},
-        placements={"publisher_platforms": ["facebook"]},
-        daily_budget=5000,
-        lifetime_budget=None,
-        bid_amount=None,
-        start_time=None,
-        end_time=None,
-        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
-        conversion_domain="lp.example.com",
-        metadata_json={"experimentSpecId": "exp-manual-1"},
-    )
+    adset_specs = [
+        MetaAdSetSpec(
+            org_id=TEST_ORG_ID,
+            campaign_id=campaign_id,
+            name=default_meta_publish_bucket_name(bucket_index),
+            status="draft",
+            optimization_goal="OFFSITE_CONVERSIONS",
+            billing_event="IMPRESSIONS",
+            targeting={"geo_locations": {"countries": ["US"]}},
+            placements={"publisher_platforms": ["facebook"]},
+            daily_budget=None,
+            lifetime_budget=None,
+            bid_amount=None,
+            start_time=None,
+            end_time=None,
+            promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+            conversion_domain="lp.example.com",
+            metadata_json=default_meta_publish_bucket_metadata(bucket_index),
+        )
+        for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1)
+    ]
     db_session.add(creative_spec)
-    db_session.add(adset_spec)
+    db_session.add_all(adset_specs)
     db_session.commit()
 
     _upsert_meta_profile(api_client, client_id=client_id)

@@ -55,10 +55,12 @@ from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_ADSET_BID_AMOUNT_MINOR_UNITS,
     DEFAULT_META_PUBLISH_BILLING_EVENT,
-    DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
+    DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
-    default_meta_publish_attribution_spec,
+    default_meta_publish_bucket_metadata,
+    default_meta_publish_bucket_name,
     default_meta_publish_targeting,
+    read_default_meta_publish_bucket_index,
 )
 from app.services.campaign_destinations import (
     CampaignDestinationError,
@@ -129,6 +131,26 @@ def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
         if member is not None:
             mapping[member] = internal_status
     return mapping
+
+
+def _campaign_bucket_specs_by_index(campaign_adset_specs: list[object]) -> dict[int, object]:
+    bucket_specs: dict[int, object] = {}
+    for record in campaign_adset_specs:
+        bucket_index = read_default_meta_publish_bucket_index(
+            getattr(record, "metadata_json", None)
+        )
+        if bucket_index is None:
+            continue
+        if bucket_index in bucket_specs:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Campaign has duplicate Meta CBO bucket specs. "
+                    "Each bucket index 1-5 must exist at most once."
+                ),
+            )
+        bucket_specs[bucket_index] = record
+    return bucket_specs
 
 
 def _select_assets_for_meta_review(
@@ -1334,19 +1356,11 @@ def setup_campaign_meta_review(
             org_id=auth.org_id, campaign_id=str(campaign.id)
         )
     }
-    existing_adset_specs_by_experiment: dict[str, object] = {}
-    for record in meta_repo.list_adset_specs(org_id=auth.org_id, campaign_id=str(campaign.id)):
-        metadata = record.metadata_json if isinstance(record.metadata_json, dict) else {}
-        experiment_key = None
-        if record.experiment_id:
-            experiment_key = str(record.experiment_id)
-        elif (
-            isinstance(metadata.get("experimentSpecId"), str)
-            and metadata.get("experimentSpecId").strip()
-        ):
-            experiment_key = metadata.get("experimentSpecId").strip()
-        if experiment_key and experiment_key not in existing_adset_specs_by_experiment:
-            existing_adset_specs_by_experiment[experiment_key] = record
+    campaign_adset_specs = meta_repo.list_adset_specs(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+    )
+    existing_bucket_specs_by_index = _campaign_bucket_specs_by_index(campaign_adset_specs)
 
     created_creative_spec_ids: list[str] = []
     updated_creative_spec_ids: list[str] = []
@@ -1355,7 +1369,6 @@ def setup_campaign_meta_review(
     reused_adset_spec_ids: list[str] = []
     prepared_creative_specs: list[dict[str, object]] = []
     invalid_assets: list[dict[str, object]] = []
-    experiment_config_by_id: dict[str, dict[str, object]] = {}
 
     for brief_id in selected_brief_ids:
         brief = brief_map[brief_id]
@@ -1366,23 +1379,6 @@ def setup_campaign_meta_review(
                 detail=f"Asset brief '{brief_id}' is missing experimentId.",
             )
         experiment_id = experiment_id.strip()
-        if experiment_id not in experiment_config_by_id:
-            experiment_config_by_id[experiment_id] = {
-                "name": brief.get("variantName") or brief.get("creativeConcept") or experiment_id,
-                "metadata_json": {
-                    "source": "campaign_meta_review_setup",
-                    "experimentSpecId": experiment_id,
-                    "campaignGoalDescription": campaign.goal_description,
-                    "campaignChannels": campaign.channels or [],
-                    "variantId": brief.get("variantId"),
-                    "variantName": brief.get("variantName"),
-                    "assetBriefIds": [
-                        candidate
-                        for candidate in selected_brief_ids
-                        if brief_map[candidate].get("experimentId") == experiment_id
-                    ],
-                },
-            }
 
         requirements = brief.get("requirements") or []
         if not isinstance(requirements, list) or not requirements:
@@ -1607,29 +1603,28 @@ def setup_campaign_meta_review(
             },
         )
 
-    for experiment_id in [
-        brief_map[brief_id]["experimentId"].strip() for brief_id in selected_brief_ids
-    ]:
-        adset_spec = existing_adset_specs_by_experiment.get(experiment_id)
+    for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1):
+        adset_spec = existing_bucket_specs_by_index.get(bucket_index)
         if adset_spec is None:
-            experiment_config = experiment_config_by_id[experiment_id]
             new_adset_spec = meta_repo.create_adset_spec(
                 org_id=auth.org_id,
                 campaign_id=str(campaign.id),
-                name=str(experiment_config["name"]),
+                name=default_meta_publish_bucket_name(bucket_index),
                 status="draft",
                 optimization_goal=DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
                 billing_event=DEFAULT_META_PUBLISH_BILLING_EVENT,
                 targeting=default_meta_publish_targeting(),
                 bid_amount=DEFAULT_META_PUBLISH_ADSET_BID_AMOUNT_MINOR_UNITS,
-                metadata_json={
-                    **experiment_config["metadata_json"],
-                    "templateId": "default-broad-int-cbo",
-                    "campaignDailyBudget": DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
-                    "attributionSpec": default_meta_publish_attribution_spec(),
-                },
+                metadata_json=default_meta_publish_bucket_metadata(
+                    bucket_index,
+                    base_metadata={
+                        "source": "campaign_meta_review_setup",
+                        "campaignGoalDescription": campaign.goal_description,
+                        "campaignChannels": campaign.channels or [],
+                    },
+                ),
             )
-            existing_adset_specs_by_experiment[experiment_id] = new_adset_spec
+            existing_bucket_specs_by_index[bucket_index] = new_adset_spec
             created_adset_spec_ids.append(str(new_adset_spec.id))
         else:
             reused_adset_spec_ids.append(str(adset_spec.id))

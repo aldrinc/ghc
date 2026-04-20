@@ -3,8 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+DEFAULT_META_PUBLISH_TEMPLATE_ID = "default-broad-int-cbo"
 DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS = 10000
 DEFAULT_META_PUBLISH_ADSET_BID_AMOUNT_MINOR_UNITS = 2500
+DEFAULT_META_PUBLISH_BUCKET_COUNT = 5
+DEFAULT_META_PUBLISH_BUCKET_STRATEGY = "deterministic_round_robin"
 DEFAULT_META_PUBLISH_COUNTRIES = ("US", "CA", "GB", "AU")
 DEFAULT_META_PUBLISH_TARGETING: dict[str, Any] = {
     "age_min": 18,
@@ -38,3 +41,54 @@ def default_meta_publish_targeting() -> dict[str, Any]:
 
 def default_meta_publish_attribution_spec() -> list[dict[str, Any]]:
     return deepcopy(DEFAULT_META_PUBLISH_ATTRIBUTION_SPEC)
+
+
+def _coerce_bucket_index(value: Any) -> int | None:
+    if isinstance(value, int):
+        normalized = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        normalized = int(value.strip())
+    else:
+        return None
+    if normalized < 1 or normalized > DEFAULT_META_PUBLISH_BUCKET_COUNT:
+        return None
+    return normalized
+
+
+def read_default_meta_publish_bucket_index(metadata_json: Any) -> int | None:
+    if not isinstance(metadata_json, dict):
+        return None
+    if metadata_json.get("templateId") != DEFAULT_META_PUBLISH_TEMPLATE_ID:
+        return None
+    bucket_count = metadata_json.get("bucketCount")
+    if bucket_count is not None:
+        if isinstance(bucket_count, str) and bucket_count.strip().isdigit():
+            bucket_count = int(bucket_count.strip())
+        if bucket_count != DEFAULT_META_PUBLISH_BUCKET_COUNT:
+            return None
+    return _coerce_bucket_index(metadata_json.get("bucketIndex"))
+
+
+def default_meta_publish_bucket_name(bucket_index: int) -> str:
+    normalized = _coerce_bucket_index(bucket_index)
+    if normalized is None:
+        raise ValueError(f"bucket_index must be between 1 and {DEFAULT_META_PUBLISH_BUCKET_COUNT}.")
+    return f"CBO Bucket {normalized}"
+
+
+def default_meta_publish_bucket_metadata(
+    bucket_index: int,
+    *,
+    base_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized = _coerce_bucket_index(bucket_index)
+    if normalized is None:
+        raise ValueError(f"bucket_index must be between 1 and {DEFAULT_META_PUBLISH_BUCKET_COUNT}.")
+    metadata = deepcopy(base_metadata) if isinstance(base_metadata, dict) else {}
+    metadata["templateId"] = DEFAULT_META_PUBLISH_TEMPLATE_ID
+    metadata["campaignDailyBudget"] = DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+    metadata["bucketIndex"] = normalized
+    metadata["bucketCount"] = DEFAULT_META_PUBLISH_BUCKET_COUNT
+    metadata["bucketStrategy"] = DEFAULT_META_PUBLISH_BUCKET_STRATEGY
+    metadata.setdefault("attributionSpec", default_meta_publish_attribution_spec())
+    return metadata
