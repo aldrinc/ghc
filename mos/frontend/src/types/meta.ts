@@ -182,6 +182,7 @@ export type MetaPublishRun = {
   adAccountId?: string | null;
   pageId?: string | null;
   metaCampaignId?: string | null;
+  managementMetaCampaignId?: string | null;
   errorMessage?: string | null;
   metadata: Record<string, unknown>;
   items: MetaPublishRunItem[];
@@ -324,7 +325,8 @@ export type MetaManagementPlanRequest = {
   mode?: "plan_only" | "apply";
   datePreset?: string;
   includeRaw?: boolean;
-  evaluateBenchmarks?: boolean;
+  benchmarkMode?: "disabled" | "best_effort" | "required";
+  evaluateBenchmarks?: boolean | null;
   cutRules?: {
     minSpend?: number;
     maxCpm?: number;
@@ -446,6 +448,13 @@ export type MetaManagementPlan = {
   actions: MetaManagementPlannedAction[];
   appliedActions: MetaManagementAppliedAction[];
   warnings: string[];
+  managementScope: "meta_only" | "meta_plus_funnel";
+  benchmarkStatus: {
+    requestedMode: "disabled" | "best_effort" | "required";
+    available: boolean;
+    reasonCode?: string | null;
+    reason?: string | null;
+  };
   benchmarkContext?: MetaManagementBenchmarkContext | null;
   funnelSnapshot?: MetaManagementFunnelSnapshot | null;
   benchmarkEvaluations: MetaManagementBenchmarkEvaluation[];

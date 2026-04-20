@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
+from app.services import campaign_delivery
 from app.db.enums import ArtifactTypeEnum
 from app.db.models import ActivityLog, Artifact, Campaign, Client, CompanySwipeAsset, Product
 from app.db.repositories.swipes import SwipeCollectionsRepository
@@ -192,6 +193,43 @@ def test_campaign_delivery_validate_marks_invalid_when_required_markers_missing(
     get_response = api_client.get(f"/campaigns/{campaign_id}/delivery")
     assert get_response.status_code == 200
     assert get_response.json()["validationStatus"] == "invalid"
+
+
+def test_campaign_delivery_fetch_inspects_extended_body_window(monkeypatch) -> None:
+    prefix = "<html>contact support "
+    privacy_offset = 98_181
+    body = prefix + ("x" * (privacy_offset - len(prefix))) + "privacy footer</html>"
+
+    class _FakeResponse:
+        status_code = 200
+        url = "https://example.com/presell"
+        text = body
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def get(self, url: str):
+            assert url == "https://example.com/presell"
+            return _FakeResponse()
+
+    monkeypatch.setattr(campaign_delivery.httpx, "Client", _FakeClient)
+
+    status_code, final_url, body_text = campaign_delivery._fetch_url_validation_result(
+        "https://example.com/presell"
+    )
+
+    assert status_code == 200
+    assert final_url == "https://example.com/presell"
+    assert "privacy" in body_text
+    assert len(body_text) == len(body)
+    assert len(body_text) > 50_000
 
 
 def test_campaign_launch_context_readiness_reports_missing_launch_lineage(api_client) -> None:

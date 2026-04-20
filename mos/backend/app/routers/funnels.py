@@ -35,6 +35,7 @@ from app.db.models import (
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.db.repositories.funnels import FunnelPageVersionsRepository, FunnelPagesRepository, FunnelsRepository
+from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
 from app.schemas.funnels import (
     FunnelCreateRequest,
     FunnelDuplicateRequest,
@@ -174,14 +175,25 @@ def _resolve_deploy_server_names(
     org_id: str,
     funnel_id: str,
     requested_server_names: list[str],
+    client_id: str | None = None,
+    use_workspace_defaults: bool = False,
 ) -> list[str]:
-    # Deploy publish should only use explicitly requested domains.
-    # Do not implicitly inherit funnel domains from DB, which can unintentionally
-    # enable HTTPS + certbot provisioning for port-based deploys.
-    _ = session
-    _ = org_id
+    # Direct deploy publishes should only use explicitly requested domains.
+    # For Bunny-backed funnel artifact publishes, an empty requested list means
+    # "use the workspace-scoped deploy domains" so the edge-backed workload
+    # keeps serving the current brand hostnames instead of silently dropping them.
     _ = funnel_id
-    return _normalize_server_names(requested_server_names)
+    normalized = _normalize_server_names(requested_server_names)
+    if normalized or not use_workspace_defaults:
+        return normalized
+
+    if not client_id:
+        return []
+    return OrgDeployDomainsRepository(session).list_hostnames(
+        org_id=org_id,
+        client_id=client_id,
+        strict=True,
+    )
 
 
 def _deploy_access_urls(*, server_names: list[str], https_enabled: bool) -> list[str]:
@@ -1069,11 +1081,14 @@ async def publish_funnel_route(
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
 
+    edge_backed_artifact = bool(deploy.bunnyPullZone)
     server_names = _resolve_deploy_server_names(
         session=session,
         org_id=auth.org_id,
         funnel_id=funnel_id,
         requested_server_names=deploy.serverNames,
+        client_id=str(funnel.client_id),
+        use_workspace_defaults=edge_backed_artifact,
     )
 
     upstream_base_url = (deploy.upstreamBaseUrl or settings.DEPLOY_PUBLIC_BASE_URL or "").strip()
@@ -1088,7 +1103,6 @@ async def publish_funnel_route(
             ),
         )
     try:
-        edge_backed_artifact = bool(deploy.bunnyPullZone)
         workload_server_names = [] if edge_backed_artifact else server_names
         workload_https = False if edge_backed_artifact else bool(deploy.https)
         workload_patch = deploy_service.build_funnel_artifact_workload_patch(

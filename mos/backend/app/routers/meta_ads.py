@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import mimetypes
@@ -80,6 +81,8 @@ from app.services.meta_account_configs import (
     connection_usage_rows,
     merge_meta_profile,
     meta_ads_client_for_connection,
+    resolve_ad_account_id_for_context,
+    resolve_workspace_config_for_client_or_config,
     resolve_workspace_config,
     update_connection_credentials,
 )
@@ -95,13 +98,15 @@ from app.services.meta_review import (
 from app.services.meta_media_buying import (
     MetaCutRuleConfig,
     MetaEventMappings,
-    MetaInsightsConfig,
-    build_management_plan,
 )
-from app.services.meta_management_benchmarks import (
-    MetaManagementBenchmarkError,
-    build_management_benchmark_payload,
+from app.services.meta_management_service import (
+    MetaManagementExecutionError,
+    execute_meta_management_plan,
+    persist_meta_management_artifacts,
+    resolve_publish_run_management_meta_campaign_id,
+    resolve_management_benchmark_mode,
 )
+from app.services.meta_management_schedule import reconcile_campaign_meta_management_schedule
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     default_meta_publish_attribution_spec,
@@ -177,9 +182,31 @@ class MetaManagementPlanRequest(BaseModel):
     mode: Literal["plan_only", "apply"] = "plan_only"
     datePreset: str = "last_3d"
     includeRaw: bool = False
-    evaluateBenchmarks: bool = False
+    benchmarkMode: Literal["disabled", "best_effort", "required"] | None = None
+    evaluateBenchmarks: bool | None = None
     cutRules: MetaCutRuleConfig | None = None
     eventMappings: _MetaEventMappingsRequest | None = None
+
+
+class MetaManagementTargetBindRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metaCampaignId: str
+    metaConfigId: str | None = None
+    publishRunId: str | None = None
+
+
+class MetaManagementTargetBindResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    campaignId: str
+    publishRunId: str
+    publishedMetaCampaignId: str | None = None
+    managementMetaCampaignId: str
+    metaConfigId: str | None = None
+    adAccountId: str | None = None
+    remoteCampaign: dict[str, Any] = Field(default_factory=dict)
+    updatedAt: str
 
 
 def _resolve_ad_account_id(ad_account_id: Optional[str]) -> str:
@@ -676,14 +703,13 @@ def _resolved_ad_account_id_for_context(
     resolved: ResolvedMetaWorkspaceConfig,
     explicit_ad_account_id: str | None = None,
 ) -> str:
-    context_ad_account_id = _clean_optional_text(resolved.connection.ad_account_id)
-    requested_ad_account_id = _clean_optional_text(explicit_ad_account_id)
-    if requested_ad_account_id and context_ad_account_id and requested_ad_account_id != context_ad_account_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Requested adAccountId does not match the selected Meta workspace config.",
+    try:
+        return resolve_ad_account_id_for_context(
+            resolved=resolved,
+            explicit_ad_account_id=explicit_ad_account_id,
         )
-    return _resolve_ad_account_id(requested_ad_account_id or context_ad_account_id)
+    except MetaWorkspaceConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 def _resolve_meta_workspace_context_for_asset(
@@ -723,28 +749,20 @@ def _resolve_meta_workspace_context_for_client_or_config(
     client_id: str | None = None,
     config_id: str | None = None,
 ) -> ResolvedMetaWorkspaceConfig:
-    resolved_client_id = _clean_optional_text(client_id)
-    resolved_config_id = _clean_optional_text(config_id)
-    if not resolved_client_id and not resolved_config_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="clientId or metaConfigId is required.",
-        )
-    if resolved_config_id and not resolved_client_id:
-        workspace_config = MetaAccountConfigsRepository(session).get_workspace_config_by_id(
+    try:
+        return resolve_workspace_config_for_client_or_config(
+            session=session,
             org_id=auth.org_id,
-            config_id=resolved_config_id,
+            client_id=client_id,
+            config_id=config_id,
         )
-        if workspace_config is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta workspace config not found")
-        resolved_client_id = str(workspace_config.client_id)
-    assert resolved_client_id is not None
-    return _resolve_meta_workspace_context_or_409(
-        session=session,
-        org_id=auth.org_id,
-        client_id=resolved_client_id,
-        config_id=resolved_config_id,
-    )
+    except MetaWorkspaceConfigError as exc:
+        message = str(exc)
+        if message == "clientId or metaConfigId is required.":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message) from exc
+        if message == "Meta workspace config not found.":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message) from exc
 
 
 def _get_meta_client(
@@ -1152,6 +1170,7 @@ def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) 
         adAccountId=run.ad_account_id,
         pageId=run.page_id,
         metaCampaignId=run.meta_campaign_id,
+        managementMetaCampaignId=resolve_publish_run_management_meta_campaign_id(run),
         errorMessage=run.error_message,
         metadata=run.metadata_json if isinstance(run.metadata_json, dict) else {},
         items=[_publish_run_item_response(item) for item in items],
@@ -1290,79 +1309,35 @@ def _persist_launch_plan_artifact(
     return str(artifact.id)
 
 
-def _persist_meta_management_artifacts(
+def _reconcile_meta_management_schedule(
     *,
-    session: Session,
-    auth: AuthContext,
-    campaign: Campaign,
-    plan,
-) -> dict[str, str]:
-    artifacts_repo = ArtifactsRepository(session)
-    metrics_artifact = artifacts_repo.insert(
-        org_id=auth.org_id,
-        client_id=str(campaign.client_id),
-        product_id=str(campaign.product_id) if campaign.product_id else None,
-        campaign_id=str(campaign.id),
-        artifact_type=ArtifactTypeEnum.meta_management_metrics_snapshot,
-        data={
-            "generatedAt": plan.generatedAt,
-            "window": plan.window,
-            "campaign": plan.campaign,
-            "adsets": plan.adsets,
-            "rows": [row.model_dump(mode="json") for row in plan.rows],
-            "observedActionTypes": plan.observedActionTypes,
-            "benchmarkContext": plan.benchmarkContext.model_dump(mode="json") if plan.benchmarkContext else None,
-            "funnelSnapshot": plan.funnelSnapshot.model_dump(mode="json") if plan.funnelSnapshot else None,
-            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
-        },
-        created_by_user=auth.user_id,
-    )
-    recommendations_artifact = artifacts_repo.insert(
-        org_id=auth.org_id,
-        client_id=str(campaign.client_id),
-        product_id=str(campaign.product_id) if campaign.product_id else None,
-        campaign_id=str(campaign.id),
-        artifact_type=ArtifactTypeEnum.meta_management_recommended_actions,
-        data={
-            "generatedAt": plan.generatedAt,
-            "mode": plan.mode,
-            "actions": [action.model_dump(mode="json") for action in plan.actions],
-            "warnings": plan.warnings,
-            "benchmarkEvaluations": [evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations],
-        },
-        created_by_user=auth.user_id,
-    )
-    artifact_ids = {
-        "metricsSnapshotArtifactId": str(metrics_artifact.id),
-        "recommendedActionsArtifactId": str(recommendations_artifact.id),
-    }
-    if plan.mode == "apply":
-        approval_artifact = artifacts_repo.insert(
-            org_id=auth.org_id,
-            client_id=str(campaign.client_id),
-            product_id=str(campaign.product_id) if campaign.product_id else None,
-            campaign_id=str(campaign.id),
-            artifact_type=ArtifactTypeEnum.meta_management_approval_decision,
-            data={
-                "generatedAt": plan.generatedAt,
-                "approved": True,
-                "approvedByUserId": auth.user_id,
-                "approvedActionKinds": [action.kind for action in plan.actions],
-            },
-            created_by_user=auth.user_id,
-        )
-        artifact_ids["approvalDecisionArtifactId"] = str(approval_artifact.id)
-        for applied_action in plan.appliedActions:
-            artifacts_repo.insert(
-                org_id=auth.org_id,
-                client_id=str(campaign.client_id),
-                product_id=str(campaign.product_id) if campaign.product_id else None,
-                campaign_id=str(campaign.id),
-                artifact_type=ArtifactTypeEnum.meta_management_applied_action,
-                data=applied_action.model_dump(mode="json"),
-                created_by_user=auth.user_id,
+    org_id: str,
+    campaign_id: str,
+    enabled: bool,
+) -> dict[str, Any]:
+    reconciled_at = datetime.now(timezone.utc).isoformat()
+    try:
+        schedule_id = asyncio.run(
+            reconcile_campaign_meta_management_schedule(
+                org_id=org_id,
+                campaign_id=campaign_id,
+                enabled=enabled,
             )
-    return artifact_ids
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "error",
+            "scheduleId": None,
+            "error": str(exc),
+            "reconciledAt": reconciled_at,
+        }
+
+    return {
+        "status": "scheduled" if schedule_id else "disabled",
+        "scheduleId": schedule_id,
+        "error": None,
+        "reconciledAt": reconciled_at,
+    }
 
 
 def _validate_publish_plan(
@@ -2843,13 +2818,6 @@ def plan_meta_management(
     This endpoint does not mutate Meta objects; it only returns the computed dashboard
     metrics and the actions that would be taken under the current ruleset.
     """
-    resolved = _resolve_meta_workspace_context_for_client_or_config(
-        session=session,
-        auth=auth,
-        client_id=payload.clientId,
-        config_id=payload.metaConfigId,
-    )
-    ad_account_id = _resolved_ad_account_id_for_context(resolved=resolved)
     cut_rules = payload.cutRules or MetaCutRuleConfig()
     mappings_req = payload.eventMappings or _MetaEventMappingsRequest()
     event_mappings = MetaEventMappings(
@@ -2858,67 +2826,36 @@ def plan_meta_management(
         purchase_action_type=mappings_req.purchaseActionType,
         purchase_value_action_type=mappings_req.purchaseValueActionType,
     )
-    plan = build_management_plan(
-        client=_get_meta_client(resolved=resolved),
-        ad_account_id=ad_account_id,
-        campaign_id=payload.metaCampaignId,
-        mode=payload.mode,
-        insights=MetaInsightsConfig(datePreset=payload.datePreset),
-        cut_rules=cut_rules,
-        event_mappings=event_mappings,
-        include_raw=payload.includeRaw,
-    )
-    repo = MetaAdsRepository(session)
-    local_meta_campaign = repo.get_campaign_by_meta_id(
-        org_id=auth.org_id,
-        ad_account_id=ad_account_id,
-        meta_campaign_id=payload.metaCampaignId,
-    )
-    campaign = None
-    if local_meta_campaign and local_meta_campaign.campaign_id:
-        campaigns_repo = CampaignsRepository(session)
-        campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=str(local_meta_campaign.campaign_id))
-    elif payload.mode == "apply" or payload.evaluateBenchmarks:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "A locally tracked published campaign is required before management artifacts "
-                "or benchmark evaluation can run."
-            ),
+    try:
+        benchmark_mode = resolve_management_benchmark_mode(
+            benchmark_mode=payload.benchmarkMode,
+            evaluate_benchmarks=payload.evaluateBenchmarks,
         )
-
-    if payload.evaluateBenchmarks:
-        if campaign is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Benchmark evaluation requires a locally tracked campaign record.",
-            )
-        try:
-            benchmark_context, funnel_snapshot, benchmark_evaluations = build_management_benchmark_payload(
-                session=session,
-                org_id=auth.org_id,
-                campaign=campaign,
-                meta_campaign_id=payload.metaCampaignId,
-                date_preset=payload.datePreset,
-                ad_rows=plan.rows,
-            )
-        except MetaManagementBenchmarkError as exc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        plan = plan.model_copy(
-            update={
-                "benchmarkContext": benchmark_context,
-                "funnelSnapshot": funnel_snapshot,
-                "benchmarkEvaluations": benchmark_evaluations,
-            }
-        )
-
-    response_payload = jsonable_encoder(plan)
-    if campaign is not None:
-        response_payload["artifacts"] = _persist_meta_management_artifacts(
+        result = execute_meta_management_plan(
             session=session,
-            auth=auth,
-            campaign=campaign,
-            plan=plan,
+            org_id=auth.org_id,
+            user_id=auth.user_id,
+            client_id=payload.clientId,
+            meta_config_id=payload.metaConfigId,
+            meta_campaign_id=payload.metaCampaignId,
+            mode=payload.mode,
+            date_preset=payload.datePreset,
+            include_raw=payload.includeRaw,
+            benchmark_mode=benchmark_mode,
+            cut_rules=cut_rules,
+            event_mappings=event_mappings,
+        )
+    except MetaManagementExecutionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    response_payload = jsonable_encoder(result.plan)
+    if result.campaign is not None:
+        response_payload["artifacts"] = persist_meta_management_artifacts(
+            session=session,
+            org_id=auth.org_id,
+            user_id=auth.user_id,
+            campaign=result.campaign,
+            plan=result.plan,
         )
     return response_payload
 
@@ -3299,6 +3236,184 @@ def list_meta_publish_runs(
     ]
 
 
+@router.post("/campaigns/{campaign_id}/management-target", response_model=MetaManagementTargetBindResponse)
+def bind_meta_management_target(
+    campaign_id: str,
+    payload: MetaManagementTargetBindRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    requested_meta_campaign_id = _clean_optional_text(payload.metaCampaignId)
+    if not requested_meta_campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="metaCampaignId is required.",
+        )
+
+    repo = MetaAdsRepository(session)
+    requested_publish_run_id = _clean_optional_text(payload.publishRunId)
+    if requested_publish_run_id:
+        publish_run = repo.get_publish_run(org_id=auth.org_id, publish_run_id=requested_publish_run_id)
+        if publish_run is None or str(publish_run.campaign_id) != str(campaign.id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publish run not found")
+        if publish_run.status != "published":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Management target binding requires a published Meta run.",
+            )
+    else:
+        publish_run = repo.get_latest_published_run(org_id=auth.org_id, campaign_id=str(campaign.id))
+        if publish_run is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Publish a Meta campaign first before binding a management target.",
+            )
+
+    config_id = _clean_optional_text(payload.metaConfigId)
+    if not config_id and publish_run.meta_workspace_config_id:
+        config_id = str(publish_run.meta_workspace_config_id)
+
+    resolved = _resolve_meta_workspace_context_or_409(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        config_id=config_id,
+    )
+    ad_account_id = resolve_ad_account_id_for_context(resolved=resolved)
+    client = _get_meta_client(resolved=resolved)
+
+    try:
+        remote_campaign = client.get_object(
+            object_id=requested_meta_campaign_id,
+            fields="id,name,status,effective_status,objective,account_id,created_time,updated_time",
+        )
+    except MetaAdsError as exc:
+        _raise_meta_error(exc)
+
+    remote_campaign_id = _clean_optional_text(remote_campaign.get("id")) if isinstance(remote_campaign, dict) else None
+    if remote_campaign_id != requested_meta_campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Meta campaign lookup returned an unexpected id.",
+        )
+    remote_account_id = _clean_optional_text(remote_campaign.get("account_id")) if isinstance(remote_campaign, dict) else None
+    normalized_ad_account_id = ad_account_id.removeprefix("act_")
+    if remote_account_id and remote_account_id not in {ad_account_id, normalized_ad_account_id}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That Meta campaign belongs to a different ad account than the selected Meta workspace config.",
+        )
+
+    existing_campaign = repo.get_campaign_by_meta_id(
+        org_id=auth.org_id,
+        ad_account_id=ad_account_id,
+        meta_campaign_id=requested_meta_campaign_id,
+    )
+    if existing_campaign and existing_campaign.campaign_id and str(existing_campaign.campaign_id) != str(campaign.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That Meta campaign is already linked to a different campaign in mOS.",
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    published_meta_campaign_id = _clean_optional_text(publish_run.meta_campaign_id)
+    binding_metadata = {
+        "source": "management_target_bind",
+        "boundAt": now_iso,
+        "boundByUserId": auth.user_id,
+        "publishedMetaCampaignId": published_meta_campaign_id,
+        "remoteCampaign": remote_campaign if isinstance(remote_campaign, dict) else {},
+    }
+    remote_status = (
+        _clean_optional_text(remote_campaign.get("effective_status"))
+        if isinstance(remote_campaign, dict)
+        else None
+    ) or (
+        _clean_optional_text(remote_campaign.get("status")) if isinstance(remote_campaign, dict) else None
+    )
+
+    if existing_campaign is None:
+        repo.create_campaign(
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            meta_workspace_config_id=str(resolved.workspace_config.id),
+            ad_account_id=ad_account_id,
+            request_id=f"management-target:{publish_run.id}:{requested_meta_campaign_id}",
+            meta_campaign_id=requested_meta_campaign_id,
+            name=_clean_optional_text(remote_campaign.get("name")) if isinstance(remote_campaign, dict) else None,
+            objective=(
+                _clean_optional_text(remote_campaign.get("objective"))
+                if isinstance(remote_campaign, dict)
+                else None
+            ),
+            status=remote_status,
+            metadata_json={"managementTargetBinding": binding_metadata},
+        )
+    else:
+        next_metadata = (
+            dict(existing_campaign.metadata_json)
+            if isinstance(existing_campaign.metadata_json, dict)
+            else {}
+        )
+        next_metadata["managementTargetBinding"] = binding_metadata
+        repo.update_campaign(
+            existing_campaign,
+            campaign_id=str(campaign.id),
+            meta_workspace_config_id=str(resolved.workspace_config.id),
+            name=_clean_optional_text(remote_campaign.get("name")) if isinstance(remote_campaign, dict) else None,
+            objective=(
+                _clean_optional_text(remote_campaign.get("objective"))
+                if isinstance(remote_campaign, dict)
+                else None
+            ),
+            status=remote_status,
+            metadata_json=next_metadata,
+        )
+
+    next_publish_run_metadata = (
+        dict(publish_run.metadata_json) if isinstance(publish_run.metadata_json, dict) else {}
+    )
+    management_metadata = (
+        dict(next_publish_run_metadata.get("management"))
+        if isinstance(next_publish_run_metadata.get("management"), dict)
+        else {}
+    )
+    management_metadata.update(
+        {
+            "metaCampaignId": requested_meta_campaign_id,
+            "publishedMetaCampaignId": published_meta_campaign_id,
+            "boundAt": now_iso,
+            "boundByUserId": auth.user_id,
+            "metaConfigId": str(resolved.workspace_config.id),
+            "adAccountId": ad_account_id,
+            "remoteCampaign": remote_campaign if isinstance(remote_campaign, dict) else {},
+        }
+    )
+    next_publish_run_metadata["management"] = management_metadata
+    updated_run = repo.update_publish_run(
+        publish_run,
+        metadata_json=next_publish_run_metadata,
+        meta_workspace_config_id=str(resolved.workspace_config.id),
+        ad_account_id=ad_account_id,
+    )
+
+    return MetaManagementTargetBindResponse(
+        campaignId=str(campaign.id),
+        publishRunId=str(updated_run.id),
+        publishedMetaCampaignId=published_meta_campaign_id,
+        managementMetaCampaignId=requested_meta_campaign_id,
+        metaConfigId=str(updated_run.meta_workspace_config_id) if updated_run.meta_workspace_config_id else None,
+        adAccountId=updated_run.ad_account_id,
+        remoteCampaign=remote_campaign if isinstance(remote_campaign, dict) else {},
+        updatedAt=updated_run.updated_at.isoformat(),
+    )
+
+
 @router.post("/campaigns/{campaign_id}/publish-runs", response_model=MetaPublishRunResponse)
 def create_meta_publish_run(
     campaign_id: str,
@@ -3571,6 +3686,18 @@ def create_meta_publish_run(
             run,
             status="published",
             completed_at=datetime.now(timezone.utc),
+        )
+        monitoring_status = _reconcile_meta_management_schedule(
+            org_id=auth.org_id,
+            campaign_id=str(campaign.id),
+            enabled=True,
+        )
+        run = repo.update_publish_run(
+            run,
+            metadata_json={
+                **(run.metadata_json if isinstance(run.metadata_json, dict) else {}),
+                "metaManagementMonitoring": monitoring_status,
+            },
         )
     except HTTPException as exc:
         error_message = exc.detail if isinstance(exc.detail, str) else jsonable_encoder(exc.detail)

@@ -82,18 +82,18 @@ class MetaAdsClient:
                 files=files,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
+        except httpx.RequestError as exc:
+            message = f"Meta Graph API request failed: {exc}"
+            raise MetaAdsError(message) from exc
+
+        if response.is_error:
             error_payload: Any = None
             try:
                 error_payload = response.json()
             except Exception:
                 error_payload = {"text": response.text}
             message = f"Meta Graph API error ({response.status_code})."
-            raise MetaAdsError(message, status_code=response.status_code, error_payload=error_payload) from exc
-        except httpx.RequestError as exc:
-            message = f"Meta Graph API request failed: {exc}"
-            raise MetaAdsError(message) from exc
+            raise MetaAdsError(message, status_code=response.status_code, error_payload=error_payload)
 
         try:
             return response.json()

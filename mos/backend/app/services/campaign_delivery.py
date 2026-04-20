@@ -15,6 +15,7 @@ from app.services.paid_ads_qa import _CONTACT_RE, _MAILTO_RE, _PHONE_RE, _PRIVAC
 _HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 _HTTP_HEADERS = {"User-Agent": "MOS-CampaignDeliveryValidation/1.0"}
 _PUBLIC_HOST_BLOCKLIST_SUFFIXES = (".local", ".internal")
+_VALIDATION_BODY_TEXT_LIMIT = 250_000
 
 
 class CampaignDeliveryConfigError(ValueError):
@@ -199,7 +200,7 @@ def campaign_delivery_response_payload(config: CampaignDeliveryConfig) -> dict[s
 def _fetch_url_validation_result(url: str) -> tuple[int, str, str]:
     with httpx.Client(follow_redirects=True, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS) as client:
         response = client.get(url)
-    return response.status_code, str(response.url), response.text[:50000]
+    return response.status_code, str(response.url), response.text[:_VALIDATION_BODY_TEXT_LIMIT]
 
 
 def validate_campaign_delivery_config(config: CampaignDeliveryConfig) -> list[dict[str, Any]]:

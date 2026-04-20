@@ -368,6 +368,7 @@ class MetaPublishRunResponse(BaseModel):
     adAccountId: str | None = None
     pageId: str | None = None
     metaCampaignId: str | None = None
+    managementMetaCampaignId: str | None = None
     errorMessage: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     items: list[MetaPublishRunItemResponse] = Field(default_factory=list)

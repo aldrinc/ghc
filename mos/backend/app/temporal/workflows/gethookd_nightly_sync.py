@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.gethookd_sync_activities import (
@@ -80,7 +81,7 @@ class GetHookdNightlySyncWorkflow:
                     client_id=input.client_id,
                 ),
                 start_to_close_timeout=3600,  # 1 hour timeout
-                retry_policy=workflow.RetryPolicy(
+                retry_policy=RetryPolicy(
                     maximum_attempts=1,  # No retry for the whole workflow
                 ),
             )

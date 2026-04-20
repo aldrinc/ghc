@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.services.meta_ads import MetaAdsClient, MetaAdsError
+from app.services.meta_ads import MetaAdsClient, MetaAdsError, _normalize_ad_account_id
 from app.services.meta_management_benchmarks import (
     MetaBenchmarkContext,
     MetaBenchmarkEvaluation,
@@ -16,7 +16,10 @@ from app.services.meta_management_benchmarks import (
 
 
 class MetaMediaBuyingPlanError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None, error_payload: Any = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_payload = error_payload
 
 
 def _to_int(value: Any, *, field: str) -> int:
@@ -143,6 +146,19 @@ class MetaAppliedAction(BaseModel):
     error: str | None = None
 
 
+MetaManagementBenchmarkMode = Literal["disabled", "best_effort", "required"]
+MetaManagementScope = Literal["meta_only", "meta_plus_funnel"]
+
+
+class MetaManagementBenchmarkStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requestedMode: MetaManagementBenchmarkMode
+    available: bool
+    reasonCode: str | None = None
+    reason: str | None = None
+
+
 class MetaManagementPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -156,6 +172,15 @@ class MetaManagementPlan(BaseModel):
     actions: list[MetaPlannedAction]
     appliedActions: list[MetaAppliedAction] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    managementScope: MetaManagementScope = "meta_only"
+    benchmarkStatus: MetaManagementBenchmarkStatus = Field(
+        default_factory=lambda: MetaManagementBenchmarkStatus(
+            requestedMode="disabled",
+            available=False,
+            reasonCode="disabled_by_request",
+            reason="Benchmark evaluation was not requested.",
+        )
+    )
     benchmarkContext: MetaBenchmarkContext | None = None
     funnelSnapshot: MetaFunnelMetricsSnapshot | None = None
     benchmarkEvaluations: list[MetaBenchmarkEvaluation] = Field(default_factory=list)
@@ -255,10 +280,11 @@ def fetch_ad_level_insights(
     out: list[dict[str, Any]] = []
     after: Optional[str] = None
     seen: set[str] = set()
+    normalized_ad_account_id = _normalize_ad_account_id(ad_account_id)
     while True:
         if after:
             params["after"] = after
-        resp = client._request("GET", f"act_{ad_account_id}/insights", params=params)
+        resp = client._request("GET", f"{normalized_ad_account_id}/insights", params=params)
         data = resp.get("data") if isinstance(resp, dict) else None
         if data:
             out.extend([row for row in data if isinstance(row, dict)])
@@ -405,7 +431,11 @@ def build_management_plan(
             date_preset=insights.datePreset,
         )
     except MetaAdsError as exc:
-        raise MetaMediaBuyingPlanError(str(exc)) from exc
+        raise MetaMediaBuyingPlanError(
+            str(exc),
+            status_code=exc.status_code,
+            error_payload=exc.error_payload,
+        ) from exc
 
     computed_rows: list[MetaAdMetrics] = []
     observed_actions: set[str] = set()

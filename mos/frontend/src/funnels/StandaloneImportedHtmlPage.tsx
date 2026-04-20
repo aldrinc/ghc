@@ -120,6 +120,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
 
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
+  const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
+
   const getUtmParams = () => {
     const params = new URLSearchParams(window.location.search);
     const utm = {};
@@ -217,15 +219,46 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return pixelId;
   };
 
+  const resolveMetaPixelPageStage = (props) => {
+    const pageStage = cleanText(props && props.pageStage);
+    return pageStage || cleanText(config.pageStage);
+  };
+
+  const trackMetaPixel = (method, eventName, params) => {
+    if (typeof window.fbq !== "function") {
+      return;
+    }
+    if (isNonEmptyRecord(params)) {
+      window.fbq(method, eventName, params);
+      return;
+    }
+    window.fbq(method, eventName);
+  };
+
   const trackMetaPixelForEvent = (eventType, props) => {
     const pixelId = ensureMetaPixelBootstrap();
     if (!pixelId || typeof window.fbq !== "function") {
       return;
     }
+    const pageStage = resolveMetaPixelPageStage(props);
+    const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
+    if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
+      trackMetaPixel("track", "PageView", pageViewParams);
+      return;
+    }
+    if (eventType === "sales_page_view") {
+      trackMetaPixel("track", "PageView", pageViewParams);
+      trackMetaPixel("track", "ViewContent", pageViewParams);
+      return;
+    }
+    if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
+      trackMetaPixel("track", "PageView", pageViewParams);
+      return;
+    }
     if (eventType === "sales_to_checkout_click") {
       const variantId = cleanText(props && props.variantId);
       if (variantId) {
-        window.fbq("track", "AddToCart", {
+        trackMetaPixel("track", "AddToCart", {
           content_ids: [variantId],
           content_type: "product",
           num_items: 1,
@@ -234,14 +267,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
       return;
     }
     if (eventType === "pre_sales_to_sales_click") {
-      window.fbq("trackCustom", "PreSalesToSalesClick", {
+      trackMetaPixel("trackCustom", "PreSalesToSalesClick", {
         from_stage: "pre_sales",
         to_stage: "sales",
       });
       return;
     }
     if (eventType === "custom_page_click") {
-      window.fbq("trackCustom", "custom_page_click", props || {});
+      trackMetaPixel("trackCustom", "custom_page_click", props || {});
     }
   };
 
@@ -327,6 +360,41 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const CHECKOUT_ERROR_LABEL = "Secure checkout is unavailable right now.";
   let warmCheckoutBindingsTimeout = null;
   let checkoutNavigationInProgress = false;
+
+  const resolvePageViewEventType = () => {
+    if (config.pageStage === "pre_sales") return "pre_sales_page_view";
+    if (config.pageStage === "sales") return "sales_page_view";
+    if (config.pageStage === "checkout") return "checkout_page_view";
+    if (config.pageStage === "thank_you") return "thank_you_page_view";
+    return "custom_page_view";
+  };
+
+  const trackInitialPageView = () => {
+    const trackedPageViewIds = window.__mosStandaloneImportedHtmlTrackedPageViewIds || [];
+    if (trackedPageViewIds.includes(config.pageId)) {
+      return;
+    }
+    trackedPageViewIds.push(config.pageId);
+    window.__mosStandaloneImportedHtmlTrackedPageViewIds = trackedPageViewIds;
+    trackEvent(resolvePageViewEventType(), {
+      pageStage: config.pageStage,
+    });
+  };
+
+  const scheduleInitialPageView = () => {
+    const run = () => {
+      try {
+        trackInitialPageView();
+      } catch (error) {
+        console.error("[StandaloneImportedHtmlPage] Failed to track initial page view.", error);
+      }
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(run);
+      return;
+    }
+    window.setTimeout(run, 0);
+  };
 
   const selectionsMatch = (left, right) => {
     const normalizedLeft = normalizeSelection(left);
@@ -1235,14 +1303,17 @@ function buildStandaloneImportedHtmlRuntimeScript({
   bindManifestSafely();
   applyMobileSpacingFixesSafely();
   scheduleInitialWarmCheckoutBindings();
+  scheduleInitialPageView();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindManifestSafely, { once: true });
     document.addEventListener("DOMContentLoaded", applyMobileSpacingFixesSafely, { once: true });
     document.addEventListener("DOMContentLoaded", scheduleInitialWarmCheckoutBindings, { once: true });
+    document.addEventListener("DOMContentLoaded", scheduleInitialPageView, { once: true });
   }
   window.addEventListener("load", bindManifestSafely, { once: true });
   window.addEventListener("load", applyMobileSpacingFixesSafely, { once: true });
   window.addEventListener("load", scheduleInitialWarmCheckoutBindings, { once: true });
+  window.addEventListener("load", scheduleInitialPageView, { once: true });
   window.setTimeout(bindManifestSafely, 0);
   window.setTimeout(bindManifestSafely, 250);
   window.setTimeout(bindManifestSafely, 1000);

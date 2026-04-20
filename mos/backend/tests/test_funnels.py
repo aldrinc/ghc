@@ -1111,6 +1111,81 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
 
 
+def test_publish_with_bunny_pull_zone_uses_saved_workspace_domains_when_server_names_empty(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Bunny Saved Domains Funnel",
+    )
+
+    funnel_detail_resp = api_client.get(f"/funnels/{funnel_id}")
+    assert funnel_detail_resp.status_code == 200
+    funnel_detail = funnel_detail_resp.json()
+    client_id = funnel_detail["client_id"]
+    org_id = funnel_detail["org_id"]
+
+    from app.db.models import OrgDeployDomain
+
+    db_session.add(
+        OrgDeployDomain(
+            org_id=UUID(org_id),
+            client_id=UUID(client_id),
+            hostname="shop.shopemberco.com",
+        )
+    )
+    db_session.commit()
+
+    captured: dict[str, object] = {}
+
+    def fake_start_funnel_publish_job(
+        *,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
+    ):
+        _ = user_id
+        captured["org_id"] = org_id
+        captured["funnel_id"] = funnel_id
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
+        return {
+            "id": "publish-job-saved-domains",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "serverNames": [],
+                "bunnyPullZone": True,
+            }
+        },
+    )
+    assert resp.status_code == 201
+
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
+    assert workload_patch["workspace_server_names"] == ["shop.shopemberco.com"]
+    assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
+
+
 def test_publish_with_deploy_does_not_use_funnel_domain_from_db_when_server_names_omitted(
     api_client: TestClient,
     db_session,
