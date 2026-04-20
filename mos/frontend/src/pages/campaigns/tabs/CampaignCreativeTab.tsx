@@ -12,6 +12,7 @@ import type { MetaPipelineAsset } from "@/types/meta";
 import { CreativeReviewGrid } from "@/components/creative/CreativeReviewGrid";
 import { AdDetailPanel } from "@/components/creative/AdDetailPanel";
 import { useCreativeReview } from "@/hooks/useCreativeReview";
+import { selectLatestProductionBatchPipelineAssets } from "@/lib/campaignProductionBatch";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,7 +41,7 @@ export function CampaignCreativeTab() {
     generatedAssetsByBriefId,
     generatedAssetTotal,
     briefsWithGeneratedAssets,
-    campaignProductLoading,
+    generatedAssetsLoading,
   } = useCampaignContext();
 
   // ---- Local state --------------------------------------------------------
@@ -96,12 +97,10 @@ export function CampaignCreativeTab() {
   });
 
   const scopedPipelineAssets = useMemo(() => {
-    const validBriefIds = new Set(assetBriefs.map((brief) => brief.id));
-    if (!validBriefIds.size) return [];
-    return pipelineAssets.filter((item) => {
-      const metadata = (item.asset.ai_metadata || {}) as Record<string, unknown>;
-      return typeof metadata.assetBriefId === "string" && validBriefIds.has(metadata.assetBriefId);
-    });
+    return selectLatestProductionBatchPipelineAssets(
+      pipelineAssets,
+      assetBriefs.map((brief) => brief.id),
+    ).assets;
   }, [assetBriefs, pipelineAssets]);
 
   // ---- Transform into review items ----------------------------------------
@@ -178,7 +177,7 @@ export function CampaignCreativeTab() {
                 ? "Loading…"
                 : `${assetBriefs.length} briefs · ${generatedAssetTotal} generated assets across ${briefsWithGeneratedAssets} briefs`}
             </div>
-            {campaignProductLoading ? (
+            {generatedAssetsLoading ? (
               <div className="mt-1 text-sm text-content-muted">Loading generated assets…</div>
             ) : null}
           </div>
@@ -265,11 +264,11 @@ export function CampaignCreativeTab() {
         <div className="border border-danger/30 bg-danger/5 px-4 py-8 text-center text-sm text-danger">
           Failed to load campaign creative specs: {getErrorMessage(pipelineError)}
         </div>
-      ) : pipelineLoading || campaignProductLoading ? (
+      ) : pipelineLoading || generatedAssetsLoading ? (
         <div className="border border-border bg-transparent px-4 py-8 text-center text-sm text-content-muted">
           Loading campaign creative assets…
         </div>
-      ) : !briefsLoading && !campaignProductLoading ? (
+      ) : !briefsLoading && !generatedAssetsLoading ? (
         <div className="border border-border bg-transparent px-4 py-8 text-center text-sm text-content-muted">
           No generated assets yet. Select briefs above and click "Generate assets" to create ads.
         </div>
