@@ -929,6 +929,42 @@ def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
     assert '"publicationId":"pub-1"' not in entry_html
 
 
+def test_standalone_imported_html_local_relative_image_assets_are_written(monkeypatch, tmp_path):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="public/assets/generated/chart.jpg" alt="Chart">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    asset_root = tmp_path / "public" / "assets" / "generated"
+    asset_root.mkdir(parents=True, exist_ok=True)
+    asset_path = asset_root / "chart.jpg"
+    asset_path.write_bytes(_make_jpeg_bytes(width=1200, height=800, color=(201, 20, 35)))
+
+    monkeypatch.setattr(
+        deployer_module,
+        "_STANDALONE_LOCAL_IMAGE_ASSET_ROOTS",
+        (tmp_path,),
+    )
+
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html"
+    entry_html = uploaded[entry_route_path]
+    expected_digest = hashlib.sha256(asset_path.read_bytes()).hexdigest()[:32]
+    expected_route = f"/_standalone-assets/{expected_digest}.jpg"
+    assert f'src="{expected_route}"' in entry_html
+
+    asset_route_path = f"/opt/apps/landing-artifact/site{expected_route}"
+    assert asset_route_path in uploaded
+    assert isinstance(uploaded[asset_route_path], bytes)
+
+
 def test_funnel_artifact_site_prepares_imported_html_once_per_page_across_route_tokens(monkeypatch):
     html_document = """<!DOCTYPE html>
 <html>
