@@ -14,6 +14,7 @@ from app.db.models import (
     ClientComplianceProfile,
     Funnel,
     FunnelDomain,
+    FunnelEvent,
     FunnelPage,
     PaidAdsPlatformProfile,
     Site,
@@ -280,6 +281,50 @@ def test_public_events_noop_for_site_preview(api_client: TestClient, db_session,
 
     assert response.status_code == 200
     assert response.json() == {"ingested": 0}
+
+
+def test_public_events_accept_valid_inactive_funnel_publication(api_client: TestClient, db_session):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Inactive Publication Events"
+    )
+
+    publish_1 = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish_1.status_code == 201
+    publication_id_1 = publish_1.json()["publicationId"]
+
+    publish_2 = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish_2.status_code == 201
+    publication_id_2 = publish_2.json()["publicationId"]
+    assert publication_id_2 != publication_id_1
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    page_id = meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id_1,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": f"/{product_slug}/{route_slug}/sales-page",
+                    "props": {"source": "test"},
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": 1}
+
+    event = db_session.scalars(select(FunnelEvent).where(FunnelEvent.publication_id == publication_id_1)).first()
+    assert event is not None
+    assert str(event.funnel_id) == funnel_id
+    assert str(event.page_id) == page_id
 
 
 def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(

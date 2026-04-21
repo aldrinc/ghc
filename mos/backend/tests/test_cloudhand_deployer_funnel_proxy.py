@@ -20,6 +20,7 @@ from cloudhand.adapters.deployer import (
     _html_tag_has_explicit_box_size_classes,
     _normalize_remote_standalone_fetch_url,
     _parse_fontawesome_icon_codepoints,
+    _rewrite_standalone_compliance_navigation_links,
 )
 from cloudhand.models import ApplicationSpec
 
@@ -732,6 +733,43 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert runtime_page_path not in uploaded
 
 
+def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 0)
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <main id="app">
+      <img src="https://moshq.app/api/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        workspace_server_names=["shop.example.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+
+    def fail_remote_image_fetch(**kwargs):
+        raise AssertionError(f"unexpected remote image fetch: {kwargs['url']}")
+
+    deployer._fetch_remote_standalone_image_asset = fail_remote_image_fetch
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert "https://moshq.app/api/public/assets/" not in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert 'href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+
+
 def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_params():
     html_document = """<!DOCTYPE html>
 <html>
@@ -775,6 +813,29 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     assert "element.href = buildInternalNavigationUrl(targetPath);" in entry_html
     assert "window.location.href = buildInternalNavigationUrl(targetPath);" in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html
+
+
+def test_rewrite_standalone_compliance_navigation_links_rewrites_relative_policy_links():
+    rewritten = _rewrite_standalone_compliance_navigation_links(
+        html_fragment=(
+            '<footer>'
+            '<a href="contact-us">Contact</a>'
+            '<a href="terms-of-service">Terms</a>'
+            '<a href="privacy-policy">Privacy</a>'
+            '<a href="refund-policy">Refunds</a>'
+            "</footer>"
+        ),
+        shop_path="/example-product/example-funnel/sales-page/",
+        footer_terms="/example-product/example-funnel/terms-of-service/",
+        footer_privacy="/example-product/example-funnel/privacy-policy/",
+        footer_refund="/example-product/example-funnel/refund-policy/",
+        footer_contact="/example-product/example-funnel/contact-us/",
+    )
+
+    assert 'href="/example-product/example-funnel/contact-us/"' in rewritten
+    assert 'href="/example-product/example-funnel/terms-of-service/"' in rewritten
+    assert 'href="/example-product/example-funnel/privacy-policy/"' in rewritten
+    assert 'href="/example-product/example-funnel/refund-policy/"' in rewritten
 
 
 def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
@@ -842,6 +903,30 @@ def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
     assert "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html" in uploaded
     assert "/opt/apps/landing-artifact/site/example-product/other-funnel/index.html" not in uploaded
     assert "/opt/apps/landing-artifact/site/example-product/other-funnel/presales/index.html" not in uploaded
+
+
+def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["meta"]["publicationId"] = "pub-2"
+    funnel_payload["pages"]["presales"]["publicationId"] = "pub-1"
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html"
+    entry_html = uploaded[entry_route_path]
+
+    assert '"publicationId":"pub-2"' in entry_html
+    assert '"publicationId":"pub-1"' not in entry_html
 
 
 def test_funnel_artifact_site_prepares_imported_html_once_per_page_across_route_tokens(monkeypatch):
@@ -948,25 +1033,33 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
         '.fa-star:before{content:"\\\\f005";}'
     ).encode("utf-8")
 
-    def fake_fetch_remote_binary_asset(*, url: str, **_kwargs):
+    def fake_fetch_remote_binary_asset(*, url: str, user_agent: str | None = None, **_kwargs):
         if url == "https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap":
+            assert user_agent is None
             return fontshare_css, "text/css"
         if url == "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap":
+            assert user_agent == deployer_module._STANDALONE_MODERN_BROWSER_USER_AGENT
             return google_fonts_css, "text/css"
         if url == "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css":
+            assert user_agent is None
             return fontawesome_css, "text/css"
         if url == "https://cdn.fontshare.com/fonts/satoshi-400.woff2":
+            assert user_agent is None
             return fontshare_400, "font/woff2"
         if url == "https://cdn.fontshare.com/fonts/satoshi-700.woff2":
+            assert user_agent is None
             return fontshare_700, "font/woff2"
         if url == "https://fonts.gstatic.com/s/inter/v18/inter-400.woff2":
+            assert user_agent is None
             return google_inter_400, "font/woff2"
         if url == "https://fonts.gstatic.com/s/inter/v18/inter-700.woff2":
+            assert user_agent is None
             return google_inter_700, "font/woff2"
         if url in {
             "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2",
             "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf",
         }:
+            assert user_agent is None
             return fontawesome_solid, "font/woff2"
         raise AssertionError(f"Unexpected mirrored asset request: {url}")
 
@@ -976,22 +1069,31 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
         "_subset_font_awesome_font_payload",
         lambda *, payload, **_kwargs: (payload, "font/woff2"),
     )
+    monkeypatch.setattr(
+        deployer,
+        "_subset_text_font_payload",
+        lambda *, payload, **_kwargs: (payload, "font/woff2"),
+    )
 
     deployer._configure_funnel_artifact_site(app)
 
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
     entry_html = uploaded[entry_route_path]
     fontshare_400_route = (
-        f"/_standalone-assets/fonts/{hashlib.sha256(fontshare_400).hexdigest()[:32]}.woff2"
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'fontshare-400:Satoshi:400:normal:').hexdigest()[:32]}.woff2"
     )
     fontshare_700_route = (
-        f"/_standalone-assets/fonts/{hashlib.sha256(fontshare_700).hexdigest()[:32]}.woff2"
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'fontshare-700:Satoshi:700:normal:').hexdigest()[:32]}.woff2"
     )
     google_inter_400_route = (
-        f"/_standalone-assets/fonts/{hashlib.sha256(google_inter_400).hexdigest()[:32]}.woff2"
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'google-inter-400:Inter:400:normal:').hexdigest()[:32]}.woff2"
     )
     google_inter_700_route = (
-        f"/_standalone-assets/fonts/{hashlib.sha256(google_inter_700).hexdigest()[:32]}.woff2"
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'google-inter-700:Inter:700:normal:').hexdigest()[:32]}.woff2"
     )
     fontawesome_solid_route = (
         "/_standalone-assets/fonts/"
@@ -1027,37 +1129,90 @@ def test_funnel_artifact_site_compiles_tailwind_and_normalizes_public_asset_urls
     assert f"/opt/apps/landing-artifact/site{fontawesome_solid_route}" in uploaded
 
 
-def test_localized_google_fonts_stylesheet_requests_modern_browser_variant(monkeypatch):
-    deployer, _uploaded, _commands = _stub_deployer()
-    captured_user_agents: list[str | None] = []
+def test_configure_funnel_artifact_site_subsets_localized_text_fonts_to_used_unicode_ranges(
+    monkeypatch,
+):
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <main>
+      <h1>Hero title</h1>
+      <p>Women over 45 feel better.</p>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        server_names=["shop.example.com"],
+    )
+    deployer, uploaded, _commands = _stub_deployer()
+
+    latin_font_bytes = b"latin-ttf"
+    latin_ext_font_bytes = b"latin-ext-ttf"
+    google_fonts_css = (
+        "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;"
+        "src:url('https://fonts.gstatic.com/s/inter/v18/inter-latin-ext.ttf') format('truetype');"
+        "unicode-range:U+0100-024F;}"
+        "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;"
+        "src:url('https://fonts.gstatic.com/s/inter/v18/inter-latin.ttf') format('truetype');"
+        "unicode-range:U+0000-00FF;}"
+    ).encode("utf-8")
+    subset_calls: list[tuple[str, tuple[int, ...]]] = []
 
     def fake_fetch_remote_binary_asset(*, url: str, user_agent: str | None = None, **_kwargs):
-        captured_user_agents.append(user_agent)
-        if url == "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap":
-            return (
-                "@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;"
-                "src:url('https://fonts.gstatic.com/s/inter/v18/inter-400.woff2') format('woff2');}"
-            ).encode("utf-8"), "text/css"
-        if url == "https://fonts.gstatic.com/s/inter/v18/inter-400.woff2":
-            return b"google-inter-400", "font/woff2"
-        raise AssertionError(f"Unexpected fetch for {url}")
+        if url == "https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap":
+            assert user_agent == deployer_module._STANDALONE_MODERN_BROWSER_USER_AGENT
+            return google_fonts_css, "text/css"
+        if url == "https://fonts.gstatic.com/s/inter/v18/inter-latin.ttf":
+            assert user_agent is None
+            return latin_font_bytes, "font/ttf"
+        if url == "https://fonts.gstatic.com/s/inter/v18/inter-latin-ext.ttf":
+            assert user_agent is None
+            return latin_ext_font_bytes, "font/ttf"
+        raise AssertionError(f"Unexpected mirrored asset request: {url}")
+
+    def fake_subset_text_font_payload(*, payload: bytes, source_url: str, used_codepoints: set[int], **_kwargs):
+        subset_calls.append((source_url, tuple(sorted(used_codepoints))))
+        if source_url.endswith("inter-latin.ttf"):
+            return b"latin-subset-woff2", "font/woff2"
+        if source_url.endswith("inter-latin-ext.ttf"):
+            return b"latin-ext-subset-woff2", "font/woff2"
+        raise AssertionError(f"Unexpected subset source: {source_url}")
 
     monkeypatch.setattr(deployer, "_fetch_remote_standalone_binary_asset", fake_fetch_remote_binary_asset)
+    monkeypatch.setattr(deployer, "_subset_text_font_payload", fake_subset_text_font_payload)
 
-    stylesheet, _preloads = deployer._build_localized_fontshare_stylesheet(
-        site_dir="/opt/apps/example/site",
-        source_url="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap",
-        context_label="Standalone test",
-        mirrored_asset_url_cache={},
-        mirrored_target_paths=set(),
-        standalone_served_assets={},
-        standalone_image_sources={},
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    latin_subset_route = (
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'latin-subset-woff2:Inter:400:normal:U+0000-00FF').hexdigest()[:32]}.woff2"
+    )
+    latin_ext_subset_route = (
+        "/_standalone-assets/fonts/"
+        f"{hashlib.sha256(b'latin-ext-subset-woff2:Inter:400:normal:U+0100-024F').hexdigest()[:32]}.woff2"
     )
 
-    assert "inter-400.woff2" not in stylesheet
-    assert "format('woff2')" in stylesheet
-    assert captured_user_agents
-    assert captured_user_agents[0] == deployer_module._STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER
+    assert 'data-mos-local-google-fonts="true"' in entry_html
+    assert latin_subset_route in entry_html
+    assert latin_ext_subset_route not in entry_html
+    assert "inter-latin.ttf" not in entry_html
+    assert "inter-latin-ext.ttf" not in entry_html
+    assert subset_calls == [
+        (
+            "https://fonts.gstatic.com/s/inter/v18/inter-latin.ttf",
+            tuple(sorted({ord(character) for character in " Hero title Women over 45 feel better."})),
+        )
+    ]
+    assert f"/opt/apps/landing-artifact/site{latin_subset_route}" in uploaded
+    assert uploaded[f"/opt/apps/landing-artifact/site{latin_subset_route}"] == b"latin-subset-woff2"
 
 
 def test_replace_standalone_imported_html_tailwind_runtime_places_compiled_css_after_custom_styles(
@@ -1598,7 +1753,7 @@ def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites
     assert "sizes=" not in entry_html
 
 
-def test_funnel_artifact_site_minifies_final_html_and_uses_longer_meta_pixel_delay(monkeypatch):
+def test_funnel_artifact_site_minifies_final_html_and_loads_meta_pixel_soon_after_page_load(monkeypatch):
     html_document = """<!DOCTYPE html>
 <html>
   <head>
@@ -1625,7 +1780,11 @@ def test_funnel_artifact_site_minifies_final_html_and_uses_longer_meta_pixel_del
     entry_html = uploaded[entry_route_path]
     assert "<!-- remove me -->" not in entry_html
     assert ">      <" not in entry_html
-    assert "const META_PIXEL_DEFER_TIMEOUT_MS = 60000;" in entry_html
+    assert "const META_PIXEL_DEFER_TIMEOUT_MS = 2500;" in entry_html
+    assert 'window.addEventListener("load", flush, { once: true });' in entry_html
+    assert "window.requestIdleCallback(flush, {" in entry_html
+    assert "const resetBusyBoundElements = () => {" in entry_html
+    assert 'window.addEventListener("pageshow", () => {' in entry_html
 
 
 def test_build_standalone_render_optimization_css_targets_sales_and_presales():
@@ -1727,25 +1886,48 @@ def test_funnel_artifact_site_standalone_export_errors_when_manifest_is_missing(
 def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
     html_document = """<!DOCTYPE html>
 <html>
-  <body>
-    <a id="main-cta" href="#shop">Start my protocol</a>
+  <head>
+    <title>Sales Page</title>
+    <style>.brand-header{color:red;}</style>
+  </head>
+  <body class="brand-body">
+    <header class="brand-header">
+      <a id="header-shop-link" href="#shop" rel="nofollow">SHOP</a>
+      <span>BRAND</span>
+    </header>
+    <main>
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+    <footer class="brand-footer">
+      <a href="#" rel="nofollow">Contact</a>
+      <a id="footer-shop-link" href="#shop" rel="nofollow">Shop</a>
+      <a href="#" rel="nofollow">Terms</a>
+      <a href="#" rel="nofollow">Privacy</a>
+      <a href="#" rel="nofollow">Refunds</a>
+    </footer>
   </body>
 </html>
 """
     app = _artifact_app(
         render_mode="standalone_imported_html",
         html_document=html_document,
-        server_names=["shop.shopemberco.com"],
+        workspace_server_names=["shoptenorco.com"],
     )
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     imported_page = funnel_payload["pages"]["presales"]
     imported_page["pageMap"] = {
         "page-1": "presales",
         "page-2": "terms-of-service",
+        "page-3": "privacy-policy",
+        "page-4": "refund-policy",
+        "page-5": "contact-us",
     }
     imported_page["pageStageMap"] = {
         "page-1": "pre_sales",
         "page-2": "custom",
+        "page-3": "custom",
+        "page-4": "custom",
+        "page-5": "custom",
     }
     imported_page["designSystemTokens"] = {
         "brand": {
@@ -1755,6 +1937,9 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
     funnel_payload["meta"]["pages"] = [
         {"pageId": "page-1", "slug": "presales"},
         {"pageId": "page-2", "slug": "terms-of-service"},
+        {"pageId": "page-3", "slug": "privacy-policy"},
+        {"pageId": "page-4", "slug": "refund-policy"},
+        {"pageId": "page-5", "slug": "contact-us"},
     ]
     funnel_payload["pages"]["terms-of-service"] = {
         "productSlug": "example-product",
@@ -1776,6 +1961,7 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
                     "props": {
                         "pageKey": "terms_of_service",
                         "pageTitle": "Terms of Service",
+                        "supportEmail": "support@shoptenorco.com",
                     },
                 }
             ],
@@ -1784,10 +1970,16 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
         "pageMap": {
             "page-1": "presales",
             "page-2": "terms-of-service",
+            "page-3": "privacy-policy",
+            "page-4": "refund-policy",
+            "page-5": "contact-us",
         },
         "pageStageMap": {
             "page-1": "pre_sales",
             "page-2": "custom",
+            "page-3": "custom",
+            "page-4": "custom",
+            "page-5": "custom",
         },
         "designSystemTokens": {
             "brand": {
@@ -1797,21 +1989,34 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
     }
 
     deployer, uploaded, _commands = _stub_deployer()
-    deployer._fetch_standalone_compliance_policy_page = lambda **_: {
+    observed: dict[str, str] = {}
+
+    def _fake_fetch(**kwargs):
+        observed["website_url"] = kwargs["website_url"]
+        return {
         "title": "Terms of Service",
         "markdown": "# Terms of Service\n\n## Contact Information\nFor help, email **support@example.com**.\n",
-    }
+        }
+
+    deployer._fetch_standalone_compliance_policy_page = _fake_fetch
 
     deployer._configure_funnel_artifact_site(app)
 
     compliance_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/terms-of-service/index.html"
     compliance_html = uploaded[compliance_route_path]
+    assert observed["website_url"].startswith("https://shoptenorco.com/example-product/")
+    assert observed["website_url"].endswith("/presales/")
     assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in compliance_html
     assert "<h1>Terms of Service</h1>" in compliance_html
     assert "<h2>Contact Information</h2>" in compliance_html
-    assert "<strong>support@example.com</strong>" in compliance_html
-    assert 'href="/example-product/example-funnel/presales/" rel="nofollow">SHOP NOW</a>' in compliance_html
+    assert "<strong>support@shoptenorco.com</strong>" in compliance_html
+    assert '<body class="brand-body">' in compliance_html
+    assert 'id="header-shop-link" href="/example-product/example-funnel/presales/#shop"' in compliance_html
+    assert 'href="/example-product/example-funnel/contact-us/" rel="nofollow">Contact</a>' in compliance_html
+    assert 'id="footer-shop-link" href="/example-product/example-funnel/presales/#shop"' in compliance_html
     assert 'href="/example-product/example-funnel/terms-of-service/" rel="nofollow">Terms</a>' in compliance_html
+    assert 'href="/example-product/example-funnel/privacy-policy/" rel="nofollow">Privacy</a>' in compliance_html
+    assert 'href="/example-product/example-funnel/refund-policy/" rel="nofollow">Refunds</a>' in compliance_html
 
 
 def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing_slug():

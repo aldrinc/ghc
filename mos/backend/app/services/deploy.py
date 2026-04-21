@@ -1347,6 +1347,17 @@ def build_client_funnel_runtime_artifact_payload(
             if page_type
         }
         tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
+        from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+
+        compliance_profile = ClientComplianceProfilesRepository(session).get(
+            org_id=str(client_funnel.org_id),
+            client_id=str(client_funnel.client_id),
+        )
+        compliance_support_email = (
+            str(compliance_profile.support_email or "").strip()
+            if compliance_profile is not None
+            else ""
+        )
         pages_payload: dict[str, dict[str, Any]] = {}
         for artifact_slug, page_id, version, page in page_details:
             tokens = resolve_design_system_tokens(
@@ -1359,6 +1370,10 @@ def build_client_funnel_runtime_artifact_payload(
             materialized_puck_data = _materialize_design_system_brand_logo_in_puck_data(
                 puck_data=version.puck_data,
                 design_system_tokens=tokens if isinstance(tokens, dict) else None,
+            )
+            _apply_compliance_support_email_to_puck_data(
+                puck_data=materialized_puck_data,
+                support_email=compliance_support_email,
             )
             metadata = build_public_page_metadata_for_context(
                 session=session,
@@ -1524,6 +1539,30 @@ def persist_client_funnel_runtime_artifact(
     }
 
 
+def _apply_compliance_support_email_to_puck_data(
+    *,
+    puck_data: dict[str, Any],
+    support_email: str | None,
+) -> None:
+    normalized_support_email = str(support_email or "").strip()
+    if not normalized_support_email:
+        return
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            if str(node.get("type") or "").strip() == "FunnelCompliancePage":
+                props = node.get("props")
+                if isinstance(props, dict) and not str(props.get("supportEmail") or "").strip():
+                    props["supportEmail"] = normalized_support_email
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(puck_data)
+
+
 def _page_payload_supports_standalone_imported_html(*, page_payload: dict[str, Any]) -> bool:
     puck_data = page_payload.get("puckData")
     if not isinstance(puck_data, dict):
@@ -1670,17 +1709,23 @@ def hydrate_funnel_artifact_workload_patch(
         publication_id=publication_id,
         created_by_user_id=created_by_user_id,
     )
+    from app.db.repositories.artifacts import ArtifactsRepository
+
+    artifact_record = ArtifactsRepository(session).get(org_id=org_id, artifact_id=str(artifact_ref["artifact_id"]))
+    if artifact_record is None:
+        raise DeployError(
+            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+        )
+    artifact_payload = artifact_record.data
+    if not isinstance(artifact_payload, dict):
+        raise DeployError(
+            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' has an invalid payload."
+        )
+
     source_ref["client_id"] = str(artifact_ref["client_id"])
     source_ref["artifact_id"] = str(artifact_ref["artifact_id"])
     source_ref["artifact_version"] = int(artifact_ref["artifact_version"])
-    source_ref["artifact"] = {
-        "meta": {
-            "clientId": str(artifact_ref["client_id"]),
-            "artifactId": str(artifact_ref["artifact_id"]),
-            "artifactVersion": int(artifact_ref["artifact_version"]),
-        },
-        "products": {},
-    }
+    source_ref["artifact"] = copy.deepcopy(artifact_payload)
     workload_patch["source_ref"] = source_ref
     return workload_patch
 

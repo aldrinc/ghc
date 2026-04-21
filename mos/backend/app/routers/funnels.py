@@ -130,6 +130,30 @@ _FUNNEL_COMPLIANCE_PAGE_SPECS: tuple[dict[str, str], ...] = (
 )
 
 
+def _apply_compliance_profile_page_props(
+    *,
+    puck_data: dict[str, object],
+    support_email: str | None,
+) -> None:
+    normalized_support_email = str(support_email or "").strip()
+    if not normalized_support_email:
+        return
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            if str(node.get("type") or "").strip() == "FunnelCompliancePage":
+                props = node.get("props")
+                if isinstance(props, dict) and not str(props.get("supportEmail") or "").strip():
+                    props["supportEmail"] = normalized_support_email
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(puck_data)
+
+
 def _create_initial_page_draft(
     *,
     session: Session,
@@ -880,6 +904,10 @@ def sync_funnel_compliance_pages(
                 client_id=str(funnel.client_id),
                 template=template,
                 design_system_tokens=None,
+            )
+            _apply_compliance_profile_page_props(
+                puck_data=initial_puck_data,
+                support_email=profile.support_email,
             )
             _create_initial_page_draft(
                 session=session,

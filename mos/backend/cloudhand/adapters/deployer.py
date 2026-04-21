@@ -17,7 +17,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from html import escape
+from html import escape, unescape
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -124,11 +124,6 @@ _BINARY_ASSET_CONTENT_TYPE_EXTENSION_MAP = {
     "font/woff2": ".woff2",
 }
 _FONT_ASSET_URL_SUFFIXES = (".eot", ".otf", ".ttf", ".woff", ".woff2")
-_STANDALONE_FETCH_USER_AGENT_DEFAULT = "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)"
-_STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
-)
 _FONTAWESOME_FAMILY_SPECS = {
     "fa-solid": {"font_family": "Font Awesome 6 Free", "font_weight": "900", "font_style": "normal"},
     "fa-regular": {"font_family": "Font Awesome 6 Free", "font_weight": "400", "font_style": "normal"},
@@ -155,9 +150,14 @@ _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_BYTES = 4 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_RATIO = 0.03
 _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 16 * 1024
 _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 16
-_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 16
-_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 48
-_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 60000
+_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 8
+_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 16
+_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 2500
+_STANDALONE_MODERN_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/123.0.0.0 Safari/537.36"
+)
 _STANDALONE_PRESALES_MIN_PSNR_DB = 33.0
 _STANDALONE_PRESALES_MIN_RESPONSIVE_PSNR_DB = 31.0
 _STANDALONE_MIN_RESPONSIVE_SOURCE_WIDTH_DELTA = 64
@@ -841,6 +841,78 @@ def _strip_css_font_face_blocks(stylesheet_text: str) -> str:
     return re.sub(r"@font-face\s*{[^}]*}\s*", "", stylesheet_text, flags=re.IGNORECASE | re.DOTALL)
 
 
+def _extract_html_text_codepoints(html_document: str) -> set[int]:
+    scrubbed_document = re.sub(
+        r"<(script|style|noscript)\b[^>]*>[\s\S]*?</\1>",
+        " ",
+        str(html_document or ""),
+        flags=re.IGNORECASE,
+    )
+    raw_text = unescape(re.sub(r"<[^>]+>", " ", scrubbed_document))
+
+    attribute_values: list[str] = []
+    for attribute_name in ("alt", "aria-label", "placeholder", "title", "value"):
+        for match in re.finditer(
+            rf"\b{re.escape(attribute_name)}\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s/>]+))",
+            scrubbed_document,
+            flags=re.IGNORECASE | re.DOTALL,
+        ):
+            raw_value = next((group for group in match.groups() if group is not None), "")
+            if raw_value:
+                attribute_values.append(unescape(str(raw_value)))
+
+    normalized_text = re.sub(r"\s+", " ", " ".join([raw_text, *attribute_values])).strip()
+    return {ord(character) for character in normalized_text}
+
+
+def _parse_css_unicode_ranges(unicode_range: str | None) -> list[tuple[int, int]]:
+    normalized = str(unicode_range or "").strip()
+    if not normalized:
+        return []
+
+    parsed_ranges: list[tuple[int, int]] = []
+    for raw_token in normalized.split(","):
+        token = str(raw_token or "").strip().upper()
+        if not token:
+            continue
+        if not token.startswith("U+"):
+            raise ValueError(f"Unsupported CSS unicode-range token {token!r}.")
+        token_value = token[2:]
+        if "?" in token_value:
+            start = int(token_value.replace("?", "0"), 16)
+            end = int(token_value.replace("?", "F"), 16)
+        elif "-" in token_value:
+            start_token, end_token = token_value.split("-", 1)
+            start = int(start_token, 16)
+            end = int(end_token, 16)
+        else:
+            start = end = int(token_value, 16)
+        parsed_ranges.append((start, end))
+    return parsed_ranges
+
+
+def _filter_codepoints_for_unicode_range(*, codepoints: set[int], unicode_range: str | None) -> set[int]:
+    parsed_ranges = _parse_css_unicode_ranges(unicode_range)
+    if not parsed_ranges:
+        return set(codepoints)
+    return {
+        codepoint
+        for codepoint in codepoints
+        if any(start <= codepoint <= end for start, end in parsed_ranges)
+    }
+
+
+def _preferred_font_subset_source_url(urls: list[str]) -> str:
+    normalized_urls = [str(url or "").strip() for url in urls if str(url or "").strip()]
+    if not normalized_urls:
+        raise ValueError("Preferred font subset source URL requires at least one candidate.")
+    for suffix in (".ttf", ".otf", ".woff2", ".woff"):
+        for candidate in normalized_urls:
+            if urlsplit(candidate).path.lower().endswith(suffix):
+                return candidate
+    return normalized_urls[0]
+
+
 def _origin_hint_markup_for_html_document(html_document: str) -> str:
     external_origins: list[tuple[str, bool]] = []
     seen_origins: set[str] = set()
@@ -913,6 +985,147 @@ def _inject_head_html_block(*, html_document: str, block: str) -> str:
         lambda match: f"{block}{match.group(0)}",
         html_document,
         count=1,
+        flags=re.IGNORECASE,
+    )
+
+
+def _extract_html_document_head_inner(html_document: str) -> str | None:
+    match = re.search(r"<head\b[^>]*>(?P<inner>[\s\S]*?)</head>", html_document, flags=re.IGNORECASE)
+    if match is None:
+        return None
+    return str(match.group("inner") or "")
+
+
+def _extract_html_document_body_opening_tag(html_document: str) -> str | None:
+    match = re.search(r"<body\b[^>]*>", html_document, flags=re.IGNORECASE)
+    if match is None:
+        return None
+    return match.group(0)
+
+
+def _extract_first_html_tag_block(html_document: str, tag_name: str) -> str | None:
+    match = re.search(
+        rf"<{re.escape(tag_name)}\b[^>]*>[\s\S]*?</{re.escape(tag_name)}>",
+        html_document,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    return match.group(0)
+
+
+def _extract_last_html_tag_block(html_document: str, tag_name: str) -> str | None:
+    matches = list(
+        re.finditer(
+            rf"<{re.escape(tag_name)}\b[^>]*>[\s\S]*?</{re.escape(tag_name)}>",
+            html_document,
+            flags=re.IGNORECASE,
+        )
+    )
+    if not matches:
+        return None
+    return matches[-1].group(0)
+
+
+def _strip_html_tags(raw_html: str) -> str:
+    normalized = re.sub(r"<[^>]+>", " ", str(raw_html or ""))
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def _sanitize_supporting_page_head_html(*, supporting_html_document: str, page_title: str) -> str:
+    head_inner = _extract_html_document_head_inner(supporting_html_document)
+    if head_inner is None:
+        raise ValueError("Supporting imported HTML page must contain a <head> element.")
+
+    sanitized = re.sub(
+        r"<title\b[^>]*>[\s\S]*?</title>",
+        "",
+        head_inner,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(
+        r"<script\b[^>]*>[\s\S]*?</script>",
+        "",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(
+        r"<link\b[^>]*\bdata-mos-standalone-entry-preload=\"true\"[^>]*>",
+        "",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(
+        r"<link\b[^>]*\brel=(?:\"preload\"|'preload')[^>]*\bas=(?:\"image\"|'image')[^>]*>",
+        "",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    return f'<title>{escape(page_title)}</title>{sanitized}'
+
+
+def _rewrite_standalone_compliance_navigation_links(
+    *,
+    html_fragment: str,
+    shop_path: str,
+    footer_terms: str,
+    footer_privacy: str,
+    footer_refund: str,
+    footer_contact: str,
+) -> str:
+    shop_target = f"{shop_path}#shop"
+    label_targets = {
+        "contact": footer_contact,
+        "contact us": footer_contact,
+        "shop": shop_target,
+        "shop now": shop_target,
+        "terms": footer_terms,
+        "privacy": footer_privacy,
+        "refunds": footer_refund,
+    }
+    href_targets = {
+        "contact": footer_contact,
+        "contact-us": footer_contact,
+        "shop": shop_target,
+        "terms": footer_terms,
+        "terms-of-service": footer_terms,
+        "privacy": footer_privacy,
+        "privacy-policy": footer_privacy,
+        "refunds": footer_refund,
+        "refund-policy": footer_refund,
+    }
+
+    def _replace_anchor(match: re.Match[str]) -> str:
+        raw_tag = match.group(0)
+        href_value = str(_read_html_tag_attribute(raw_tag, "href") or "").strip()
+        inner_html = str(match.group("inner") or "")
+        label = _strip_html_tags(inner_html).lower()
+        replacement_href: str | None = None
+        href_path = urlsplit(href_value).path.strip().lower() if href_value else ""
+        href_key = href_path.removeprefix("./").strip("/")
+
+        if href_value in {"#shop", "/#shop"}:
+            replacement_href = shop_target
+        elif href_value in {"#", ""}:
+            replacement_href = label_targets.get(label)
+        elif href_key and not href_value.startswith("/"):
+            replacement_href = href_targets.get(href_key)
+
+        if not replacement_href:
+            return raw_tag
+
+        opening_match = re.match(r"<a\b[^>]*>", raw_tag, flags=re.IGNORECASE)
+        if opening_match is None:
+            return raw_tag
+        opening_tag = _set_html_tag_attribute(opening_match.group(0), "href", replacement_href)
+        return f"{opening_tag}{inner_html}</a>"
+
+    return re.sub(
+        r"<a\b[^>]*>(?P<inner>[\s\S]*?)</a>",
+        _replace_anchor,
+        html_fragment,
         flags=re.IGNORECASE,
     )
 
@@ -1310,7 +1523,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         request = Request(
             fetch_url,
             headers={
-                "User-Agent": str(user_agent or "").strip() or _STANDALONE_FETCH_USER_AGENT_DEFAULT,
+                "User-Agent": str(user_agent or "").strip() or "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)",
                 "Accept": accept,
             },
         )
@@ -1327,6 +1540,10 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             ) from exc
         except URLError as exc:
             raise ValueError(f"{context_label} failed to fetch asset '{url}': {exc.reason}.") from exc
+        except TimeoutError as exc:
+            raise ValueError(f"{context_label} failed to fetch asset '{url}': request timed out.") from exc
+        except OSError as exc:
+            raise ValueError(f"{context_label} failed to fetch asset '{url}': {exc}.") from exc
 
         if not payload:
             raise ValueError(f"{context_label} failed to fetch asset '{url}': response body was empty.")
@@ -1377,29 +1594,72 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             return subset_payload, "font/woff"
         return subset_payload, content_type
 
+    def _subset_text_font_payload(
+        self,
+        *,
+        payload: bytes,
+        content_type: str,
+        used_codepoints: set[int],
+        context_label: str,
+        source_url: str,
+        output_flavor: str | None = "woff2",
+    ) -> tuple[bytes, str]:
+        if not used_codepoints:
+            raise ValueError(f"{context_label} could not determine any used glyphs for '{source_url}'.")
+        try:
+            from fontTools.subset import Options, Subsetter
+            from fontTools.ttLib import TTFont
+        except ImportError as exc:  # pragma: no cover - enforced by package dependency
+            raise ValueError(
+                f"{context_label} requires the 'fonttools' package to subset localized font assets."
+            ) from exc
+
+        try:
+            font = TTFont(io.BytesIO(payload), recalcTimestamp=False)
+            options = Options()
+            options.ignore_missing_glyphs = True
+            subsetter = Subsetter(options=options)
+            subsetter.populate(unicodes=sorted({int(codepoint) for codepoint in used_codepoints}))
+            subsetter.subset(font)
+            output = io.BytesIO()
+            normalized_flavor = str(output_flavor or "").strip().lower() or None
+            font.flavor = normalized_flavor
+            font.save(output)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(
+                f"{context_label} failed to subset localized font '{source_url}': {exc}"
+            ) from exc
+
+        subset_payload = output.getvalue()
+        if not subset_payload:
+            raise ValueError(f"{context_label} generated an empty localized font subset for '{source_url}'.")
+        if normalized_flavor == "woff2":
+            return subset_payload, "font/woff2"
+        if normalized_flavor == "woff":
+            return subset_payload, "font/woff"
+        return subset_payload, content_type
+
     def _build_localized_fontshare_stylesheet(
         self,
         *,
         site_dir: str,
         source_url: str,
+        html_document: str,
         context_label: str,
         mirrored_asset_url_cache: dict[str, str],
         mirrored_target_paths: set[str],
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
     ) -> tuple[str, list[tuple[str, str]]]:
-        parsed_source_url = urlsplit(source_url)
-        source_host = parsed_source_url.netloc.strip().lower()
-        preferred_user_agent = (
-            _STANDALONE_FETCH_USER_AGENT_MODERN_BROWSER
-            if source_host in _GOOGLE_FONTS_STYLESHEET_HOSTS
-            else None
+        source_host = urlsplit(source_url).netloc.strip().lower()
+        stylesheet_user_agent = (
+            _STANDALONE_MODERN_BROWSER_USER_AGENT if source_host in _GOOGLE_FONTS_STYLESHEET_HOSTS else None
         )
         payload, _content_type = self._fetch_remote_standalone_binary_asset(
             url=source_url,
             context_label=context_label,
             accept="text/css,*/*;q=0.1",
-            user_agent=preferred_user_agent,
+            user_agent=stylesheet_user_agent,
         )
         stylesheet_text = _decode_stylesheet_payload(
             payload=payload,
@@ -1410,31 +1670,74 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         if not font_face_blocks:
             return stylesheet_text, []
 
+        used_text_codepoints = _extract_html_text_codepoints(html_document)
+        if not used_text_codepoints:
+            raise ValueError(f"{context_label} could not determine any text glyphs from the imported HTML document.")
+
         localized_font_faces: list[str] = []
+        fetched_font_payloads: dict[str, tuple[bytes, str]] = {}
         for font_face in font_face_blocks:
-            preferred_url = _preferred_font_asset_url(list(font_face["urls"]))
-            absolute_url = urljoin(source_url, preferred_url)
-            mirrored_route, _asset_content_type = self._mirror_remote_standalone_binary_asset(
-                site_dir=site_dir,
-                source_url=absolute_url,
-                route_prefix=_STANDALONE_FONT_ASSET_ROUTE_PREFIX,
-                standalone_served_assets=standalone_served_assets,
-                mirrored_target_paths=mirrored_target_paths,
-                context_label=context_label,
-                mirrored_asset_url_cache=mirrored_asset_url_cache,
-                accept="font/woff2,font/woff,font/ttf,*/*;q=0.1",
+            unicode_range = str(font_face.get("unicode_range") or "").strip()
+            block_codepoints = _filter_codepoints_for_unicode_range(
+                codepoints=used_text_codepoints,
+                unicode_range=unicode_range,
             )
-            if mirrored_route.lower().endswith(".woff2"):
+            if not block_codepoints:
+                continue
+
+            subset_source_url = urljoin(
+                source_url,
+                _preferred_font_subset_source_url(list(font_face["urls"])),
+            )
+            original_font_payload, original_content_type = fetched_font_payloads.get(subset_source_url, (b"", ""))
+            if not original_font_payload:
+                original_font_payload, original_content_type = self._fetch_remote_standalone_binary_asset(
+                    url=subset_source_url,
+                    context_label=context_label,
+                    accept="font/ttf,font/otf,font/woff2,font/woff,*/*;q=0.1",
+                )
+                fetched_font_payloads[subset_source_url] = (original_font_payload, original_content_type)
+
+            subset_payload, subset_content_type = self._subset_text_font_payload(
+                payload=original_font_payload,
+                content_type=original_content_type,
+                used_codepoints=block_codepoints,
+                context_label=context_label,
+                source_url=subset_source_url,
+                output_flavor="woff2",
+            )
+            extension = _resolve_mirrored_binary_extension(
+                content_type=subset_content_type,
+                source_url=subset_source_url,
+            )
+            digest_input = (
+                subset_payload
+                + f":{font_face['family_name']}:{font_face['font_weight']}:{font_face['font_style']}:{unicode_range}".encode(
+                    "utf-8"
+                )
+            )
+            route_path = f"{_STANDALONE_FONT_ASSET_ROUTE_PREFIX}/{hashlib.sha256(digest_input).hexdigest()[:32]}{extension}"
+            self._write_standalone_route_asset(
+                site_dir=site_dir,
+                route_path=route_path,
+                payload=subset_payload,
+                content_type=subset_content_type,
+                uploaded_target_paths=mirrored_target_paths,
+                standalone_served_assets=standalone_served_assets,
+                standalone_image_sources=standalone_image_sources,
+                context_label=context_label,
+            )
+
+            if route_path.lower().endswith(".woff2"):
                 format_label = "woff2"
-            elif mirrored_route.lower().endswith(".woff"):
+            elif route_path.lower().endswith(".woff"):
                 format_label = "woff"
-            elif mirrored_route.lower().endswith(".ttf"):
+            elif route_path.lower().endswith(".ttf"):
                 format_label = "truetype"
-            elif mirrored_route.lower().endswith(".otf"):
+            elif route_path.lower().endswith(".otf"):
                 format_label = "opentype"
             else:
                 format_label = "woff2"
-            unicode_range = str(font_face.get("unicode_range") or "").strip()
             unicode_range_css = f"unicode-range:{unicode_range};" if unicode_range else ""
             localized_font_faces.append(
                 "@font-face{"
@@ -1442,10 +1745,13 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 f"font-style:{font_face['font_style']};"
                 f"font-weight:{font_face['font_weight']};"
                 f"font-display:{font_face['font_display']};"
-                f"src:url('{mirrored_route}') format('{format_label}');"
+                f"src:url('{route_path}') format('{format_label}');"
                 f"{unicode_range_css}"
                 "}"
             )
+
+        if not localized_font_faces:
+            raise ValueError(f"{context_label} could not match any localized font faces to the imported HTML text.")
 
         stylesheet_without_faces = _strip_css_font_face_blocks(stylesheet_text).strip()
         localized_stylesheet = "".join(localized_font_faces)
@@ -1623,6 +1929,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 localized_css, preload_specs = self._build_localized_fontshare_stylesheet(
                     site_dir=site_dir,
                     source_url=href_value,
+                    html_document=rewritten_document,
                     context_label=context_label,
                     mirrored_asset_url_cache=mirrored_asset_url_cache,
                     mirrored_target_paths=mirrored_target_paths,
@@ -1634,6 +1941,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 localized_css, preload_specs = self._build_localized_fontshare_stylesheet(
                     site_dir=site_dir,
                     source_url=href_value,
+                    html_document=rewritten_document,
                     context_label=context_label,
                     mirrored_asset_url_cache=mirrored_asset_url_cache,
                     mirrored_target_paths=mirrored_target_paths,
@@ -4228,8 +4536,10 @@ WantedBy=multi-user.target
         funnel_path_token: str,
         page_slug: str,
         page_payload: Dict[str, Any],
+        funnel_payload: Dict[str, Any],
         source: FunnelArtifactSourceSpec,
-        server_names: list[str],
+        public_server_names: list[str],
+        supporting_imported_html_documents: dict[str, str],
     ) -> str:
         context_label = f"Artifact funnel '{product_slug}/{funnel_slug}/{page_slug}'"
         props = self._extract_standalone_compliance_page_props(
@@ -4283,8 +4593,8 @@ WantedBy=multi-user.target
         )
 
         base_origin = "https://example.invalid"
-        if server_names:
-            primary_server_name = str(server_names[0] or "").strip().lower()
+        if public_server_names:
+            primary_server_name = str(public_server_names[0] or "").strip().lower()
             if primary_server_name:
                 base_origin = f"https://{primary_server_name}"
         website_url = f"{base_origin.rstrip('/')}{shop_path}"
@@ -4311,219 +4621,159 @@ WantedBy=multi-user.target
         brand_tokens = design_system_tokens.get("brand")
         if not isinstance(brand_tokens, dict):
             brand_tokens = {}
-        brand_label = str(brand_tokens.get("name") or "Ember").strip() or "Ember"
-        logo_asset_public_id = _extract_public_asset_public_id_from_url(brand_tokens.get("logoAssetPublicId"))
-        logo_url = f"/public/assets/{logo_asset_public_id}" if logo_asset_public_id else None
+        support_email_override = (
+            str(props.get("supportEmail") or "").strip()
+            or str(brand_tokens.get("supportEmail") or "").strip()
+        )
+        if support_email_override and "@" in support_email_override:
+            rendered_policy_html = re.sub(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+                lambda _match: escape(support_email_override),
+                rendered_policy_html,
+            )
 
         footer_terms = page_path_by_slug.get("terms-of-service", "#")
         footer_privacy = page_path_by_slug.get("privacy-policy", "#")
         footer_refund = page_path_by_slug.get("refund-policy", "#")
         footer_contact = page_path_by_slug.get("contact-us", "#")
-        current_year = datetime.now(timezone.utc).year
+        pages = funnel_payload.get("pages")
+        if not isinstance(pages, dict):
+            raise ValueError(f"{context_label} funnel pages are required for standalone compliance export.")
 
-        logo_markup = (
-            f'<img src="{escape(logo_url)}" alt="{escape(brand_label)}" class="ember-compliance-header__logo" />'
-            if logo_url
-            else f'<div class="ember-compliance-brand-text">{escape(brand_label)}</div>'
+        supporting_page_slug = (
+            "sales-page"
+            if "sales-page" in supporting_imported_html_documents
+            else "presales"
+            if "presales" in supporting_imported_html_documents
+            else ""
         )
-        footer_logo_markup = (
-            f'<img src="{escape(logo_url)}" alt="{escape(brand_label)}" class="ember-compliance-footer__logo" />'
-            if logo_url
-            else f'<div class="ember-compliance-brand-text ember-compliance-brand-text--footer">{escape(brand_label)}</div>'
+        if not supporting_page_slug:
+            for candidate_slug, candidate_payload in pages.items():
+                if not isinstance(candidate_payload, dict):
+                    continue
+                candidate_puck_data = candidate_payload.get("puckData")
+                candidate_content = candidate_puck_data.get("content") if isinstance(candidate_puck_data, dict) else None
+                candidate_block = (
+                    candidate_content[0]
+                    if isinstance(candidate_content, list)
+                    and len(candidate_content) == 1
+                    and isinstance(candidate_content[0], dict)
+                    else None
+                )
+                if str(candidate_block.get("type") or "").strip() == "ImportedHtmlDocument":
+                    supporting_page_slug = str(candidate_slug or "").strip()
+                    break
+
+        supporting_html_document = supporting_imported_html_documents.get(supporting_page_slug)
+        if not supporting_page_slug or not supporting_html_document:
+            raise ValueError(
+                f"{context_label} requires a supporting ImportedHtmlDocument sales or presales page for standalone compliance export."
+            )
+
+        supporting_head_html = _sanitize_supporting_page_head_html(
+            supporting_html_document=supporting_html_document,
+            page_title=page_title,
+        )
+        supporting_body_opening_tag = _extract_html_document_body_opening_tag(supporting_html_document)
+        if supporting_body_opening_tag is None:
+            raise ValueError(f"{context_label} supporting imported HTML page must contain a <body> element.")
+        supporting_header_html = _extract_first_html_tag_block(supporting_html_document, "header")
+        if supporting_header_html is None:
+            raise ValueError(f"{context_label} supporting imported HTML page must contain a <header> element.")
+        supporting_footer_html = _extract_last_html_tag_block(supporting_html_document, "footer")
+        if supporting_footer_html is None:
+            raise ValueError(f"{context_label} supporting imported HTML page must contain a <footer> element.")
+
+        supporting_header_html = _rewrite_standalone_compliance_navigation_links(
+            html_fragment=supporting_header_html,
+            shop_path=shop_path,
+            footer_terms=footer_terms,
+            footer_privacy=footer_privacy,
+            footer_refund=footer_refund,
+            footer_contact=footer_contact,
+        )
+        supporting_footer_html = _rewrite_standalone_compliance_navigation_links(
+            html_fragment=supporting_footer_html,
+            shop_path=shop_path,
+            footer_terms=footer_terms,
+            footer_privacy=footer_privacy,
+            footer_refund=footer_refund,
+            footer_contact=footer_contact,
         )
 
         return f"""<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{escape(page_title)}</title>
-    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet" />
+    {supporting_head_html}
     <style>
-      .ember-compliance-root {{
-        --color-brand: #C41423;
-        --color-text: #2D2926;
-        --color-muted: rgba(45, 41, 38, 0.76);
-        --color-bg: #FFFFFF;
-        --color-page-bg: #FFFAF4;
-        --color-page-bg-secondary: #F7F1E8;
-        --color-border: rgba(45, 41, 38, 0.16);
-        --font-heading: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        --font-sans: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background-color: var(--color-page-bg);
-        color: var(--color-text);
-        font-family: var(--font-sans);
-        -webkit-font-smoothing: antialiased;
+      .mos-standalone-compliance-root {{
         min-height: 100vh;
         display: flex;
         flex-direction: column;
       }}
-      .ember-compliance-header {{
+      .mos-standalone-compliance-main {{
+        flex: 1;
         width: 100%;
-        max-width: 1440px;
+        padding: 48px 16px 72px;
+      }}
+      .mos-standalone-compliance-container {{
+        max-width: 880px;
         margin: 0 auto;
-        padding: 20px 32px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: var(--color-page-bg);
       }}
-      .ember-compliance-header__slot {{ width: 33.333%; display: flex; align-items: center; }}
-      .ember-compliance-header__slot--center {{ justify-content: center; }}
-      .ember-compliance-header__slot--right {{ justify-content: flex-end; }}
-      .ember-compliance-shop-link {{
-        color: var(--color-brand);
-        font-weight: 700;
-        font-size: 20px;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        text-decoration: none;
-      }}
-      .ember-compliance-shop-link:hover {{ text-decoration: underline; }}
-      .ember-compliance-header__logo {{ height: 40px; width: auto; display: block; }}
-      .ember-compliance-brand-text {{
-        color: var(--color-brand);
-        font-weight: 900;
-        font-size: 28px;
-        letter-spacing: -0.03em;
-      }}
-      .ember-compliance-brand-text--footer {{ font-size: 24px; }}
-      .ember-compliance-main {{ flex: 1; width: 100%; padding: 48px 16px 72px; }}
-      .ember-compliance-container {{ max-width: 880px; margin: 0 auto; }}
-      .ember-compliance-card {{
-        background-color: var(--color-bg);
-        border: 1px solid var(--color-border);
+      .mos-standalone-compliance-card {{
+        background-color: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 15, 15, 0.12);
         border-radius: 16px;
         padding: 40px clamp(24px, 4vw, 56px);
-        box-shadow: 0 8px 24px rgba(45, 41, 38, 0.06);
+        box-shadow: 0 8px 24px rgba(15, 15, 15, 0.08);
       }}
-      .ember-compliance-content h1,
-      .ember-compliance-content h2 {{
-        font-family: var(--font-heading);
-        color: var(--color-text);
+      .mos-standalone-compliance-content h1,
+      .mos-standalone-compliance-content h2 {{
+        color: #0F0F0F;
         letter-spacing: -0.02em;
       }}
-      .ember-compliance-content h1 {{
+      .mos-standalone-compliance-content h1 {{
         font-size: clamp(36px, 5vw, 48px);
         font-weight: 700;
         margin: 0 0 28px;
         line-height: 1.15;
       }}
-      .ember-compliance-content h2 {{
+      .mos-standalone-compliance-content h2 {{
         font-size: 22px;
         font-weight: 700;
         margin: 36px 0 14px;
         line-height: 1.25;
-        color: var(--color-brand);
+        color: #E51E25;
         letter-spacing: 0.01em;
         text-transform: uppercase;
       }}
-      .ember-compliance-content p,
-      .ember-compliance-content li {{
+      .mos-standalone-compliance-content p,
+      .mos-standalone-compliance-content li {{
         font-size: 17px;
         line-height: 1.65;
-        color: var(--color-text);
+        color: #191919;
         font-weight: 400;
       }}
-      .ember-compliance-content p {{ margin: 0 0 14px; }}
-      .ember-compliance-content ul {{ margin: 0 0 18px; padding-left: 22px; }}
-      .ember-compliance-content li {{ margin-bottom: 8px; }}
-      .ember-compliance-content strong {{ color: var(--color-text); font-weight: 700; }}
-      .ember-compliance-footer {{
-        background-color: var(--color-page-bg-secondary);
-        border-top: 1px solid var(--color-brand);
-        padding: 56px 0 32px;
-      }}
-      .ember-compliance-footer__inner {{ max-width: 1280px; margin: 0 auto; padding: 0 32px; }}
-      .ember-compliance-footer__primary {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 24px;
-        padding-bottom: 28px;
-        border-bottom: 1px solid rgba(45, 41, 38, 0.2);
-      }}
-      .ember-compliance-footer__logo {{ height: 32px; width: auto; }}
-      .ember-compliance-footer__nav {{
-        display: flex;
-        gap: 32px;
-        font-size: 14px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }}
-      .ember-compliance-footer__nav a,
-      .ember-compliance-footer__policies a {{
-        color: var(--color-brand);
-        text-decoration: none;
-      }}
-      .ember-compliance-footer__nav a:hover,
-      .ember-compliance-footer__policies a:hover {{ text-decoration: underline; }}
-      .ember-compliance-footer__meta {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 16px;
-        margin-top: 24px;
-        font-size: 13px;
-        color: rgba(45, 41, 38, 0.6);
-      }}
-      .ember-compliance-footer__policies {{ display: flex; gap: 16px; }}
-      .ember-compliance-footer__disclaimer {{
-        text-align: center;
-        font-size: 12px;
-        color: rgba(45, 41, 38, 0.45);
-        margin: 28px auto 0;
-        max-width: 720px;
-        line-height: 1.7;
-      }}
+      .mos-standalone-compliance-content p {{ margin: 0 0 14px; }}
+      .mos-standalone-compliance-content ul {{ margin: 0 0 18px; padding-left: 22px; }}
+      .mos-standalone-compliance-content li {{ margin-bottom: 8px; }}
+      .mos-standalone-compliance-content strong {{ color: #0F0F0F; font-weight: 700; }}
       @media (min-width: 768px) {{
-        .ember-compliance-main {{ padding: 64px 32px 96px; }}
-        .ember-compliance-footer__primary {{ flex-direction: row; justify-content: space-between; }}
-        .ember-compliance-footer__meta {{ flex-direction: row; justify-content: space-between; }}
+        .mos-standalone-compliance-main {{ padding: 64px 32px 96px; }}
       }}
     </style>
   </head>
-  <body>
-    <div class="ember-compliance-root">
-      <header class="ember-compliance-header">
-        <div class="ember-compliance-header__slot">
-          <a class="ember-compliance-shop-link" href="{escape(shop_path)}" rel="nofollow">SHOP NOW</a>
-        </div>
-        <div class="ember-compliance-header__slot ember-compliance-header__slot--center">
-          {logo_markup}
-        </div>
-        <div class="ember-compliance-header__slot ember-compliance-header__slot--right"></div>
-      </header>
-      <main class="ember-compliance-main">
-        <div class="ember-compliance-container">
-          <article class="ember-compliance-card ember-compliance-content">
+  {supporting_body_opening_tag}
+    <div class="mos-standalone-compliance-root">
+      {supporting_header_html}
+      <main class="mos-standalone-compliance-main">
+        <div class="mos-standalone-compliance-container">
+          <article class="mos-standalone-compliance-card mos-standalone-compliance-content">
             {rendered_policy_html}
           </article>
         </div>
       </main>
-      <footer class="ember-compliance-footer">
-        <div class="ember-compliance-footer__inner">
-          <div class="ember-compliance-footer__primary">
-            {footer_logo_markup}
-            <nav class="ember-compliance-footer__nav" aria-label="Footer primary">
-              <a href="{escape(footer_contact)}" rel="nofollow">CONTACT US</a>
-              <a href="{escape(shop_path)}" rel="nofollow">SHOP NOW</a>
-            </nav>
-          </div>
-          <div class="ember-compliance-footer__meta">
-            <div>&copy; {current_year} {escape(brand_label)}: Brain Clarity Protocol. All rights reserved.</div>
-            <div class="ember-compliance-footer__policies">
-              <a href="{escape(footer_terms)}" rel="nofollow">Terms</a>
-              <a href="{escape(footer_privacy)}" rel="nofollow">Privacy</a>
-              <a href="{escape(footer_refund)}" rel="nofollow">Refunds</a>
-            </div>
-          </div>
-          <div class="ember-compliance-footer__disclaimer">
-            These statements have not been evaluated by the Food and Drug Administration. This product is not intended to diagnose, treat, cure, or prevent any disease.
-          </div>
-        </div>
-      </footer>
+      {supporting_footer_html}
     </div>
   </body>
 </html>
@@ -4594,12 +4844,13 @@ WantedBy=multi-user.target
         page_payload: Dict[str, Any],
         funnel_payload: Dict[str, Any],
         source: FunnelArtifactSourceSpec,
-        server_names: list[str],
+        public_server_names: list[str],
         mirrored_url_map: dict[str, str],
         mirrored_target_paths: set[str],
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
         prepared_imported_html_document: str | None = None,
+        prepared_imported_html_documents: dict[str, str] | None = None,
     ) -> str:
         puck_data = page_payload.get("puckData")
         content = puck_data.get("content") if isinstance(puck_data, dict) else None
@@ -4615,12 +4866,13 @@ WantedBy=multi-user.target
                 page_slug=page_slug,
                 page_payload=page_payload,
                 funnel_payload=funnel_payload,
-                server_names=server_names,
+                server_names=public_server_names,
                 mirrored_url_map=mirrored_url_map,
                 mirrored_target_paths=mirrored_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,
                 prepared_html_document=prepared_imported_html_document,
+                upstream_api_base_root=str(source.upstream_api_base_root or ""),
             )
         if block_type == "FunnelCompliancePage":
             return self._render_standalone_compliance_page_html(
@@ -4630,8 +4882,10 @@ WantedBy=multi-user.target
                 funnel_path_token=funnel_path_token,
                 page_slug=page_slug,
                 page_payload=page_payload,
+                funnel_payload=funnel_payload,
                 source=source,
-                server_names=server_names,
+                public_server_names=public_server_names,
+                supporting_imported_html_documents=prepared_imported_html_documents or {},
             )
 
         raise ValueError(
@@ -4672,6 +4926,7 @@ WantedBy=multi-user.target
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
         prepared_html_document: str | None = None,
+        upstream_api_base_root: str | None = None,
     ) -> str:
         context_label = f"Artifact funnel '{product_slug}/{funnel_slug}/{page_slug}'"
         props = self._extract_standalone_imported_html_props(
@@ -4684,7 +4939,13 @@ WantedBy=multi-user.target
         page_id = str(page_payload.get("pageId") or "").strip()
         if not page_id:
             raise ValueError(f"{context_label} pageId is required for standalone HTML export.")
-        publication_id = str(page_payload.get("publicationId") or "").strip()
+        funnel_meta = funnel_payload.get("meta")
+        funnel_publication_id = (
+            str(funnel_meta.get("publicationId") or "").strip()
+            if isinstance(funnel_meta, dict)
+            else ""
+        )
+        publication_id = funnel_publication_id or str(page_payload.get("publicationId") or "").strip()
         if not publication_id:
             raise ValueError(f"{context_label} publicationId is required for standalone HTML export.")
         page_stage = str(page_payload.get("stage") or "").strip()
@@ -4888,6 +5149,7 @@ WantedBy=multi-user.target
     }
     window.__mosMetaPixelLoadScheduled = true;
     let timeoutId = null;
+    let idleCallbackId = null;
     const flush = () => {
       if (!window.__mosMetaPixelLoadScheduled) {
         return;
@@ -4897,6 +5159,10 @@ WantedBy=multi-user.target
         window.clearTimeout(timeoutId);
         timeoutId = null;
       }
+      if (idleCallbackId !== null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleCallbackId);
+        idleCallbackId = null;
+      }
       loadMetaPixelScript();
     };
     const listenerOptions = { capture: true, once: true };
@@ -4904,12 +5170,18 @@ WantedBy=multi-user.target
     window.addEventListener("keydown", flush, listenerOptions);
     window.addEventListener("touchstart", flush, listenerOptions);
     window.addEventListener("scroll", flush, { capture: true, once: true, passive: true });
+    window.addEventListener("load", flush, { once: true });
     window.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
         flush();
       }
     }, { once: true });
     window.addEventListener("pagehide", flush, { once: true });
+    if (typeof window.requestIdleCallback === "function") {
+      idleCallbackId = window.requestIdleCallback(flush, {
+        timeout: META_PIXEL_DEFER_TIMEOUT_MS,
+      });
+    }
     timeoutId = window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
   };
   const ensureMetaPixelBootstrap = () => {
@@ -5472,6 +5744,25 @@ WantedBy=multi-user.target
       delete element.dataset.mosSavedDisabled;
     }
   };
+  const resetBusyBoundElements = () => {
+    const candidates = Array.from(
+      document.querySelectorAll(
+        [
+          "[data-mos-standalone-bridge-bound='true'][aria-busy='true']",
+          "[data-mos-standalone-bridge-bound='true'][aria-disabled='true']",
+          "[data-mos-saved-pointer-events]",
+          "[data-mos-saved-opacity]",
+          "[data-mos-saved-cursor]",
+          "[data-mos-saved-disabled]",
+        ].join(","),
+      ),
+    );
+    for (const element of candidates) {
+      if (element instanceof HTMLElement) {
+        setElementBusy(element, false);
+      }
+    }
+  };
   const bindManifest = () => {
     const manifest = config.manifest;
     if (!manifest || !Array.isArray(manifest.bindings)) return;
@@ -5617,6 +5908,7 @@ WantedBy=multi-user.target
   };
   const initialize = () => {
     try {
+      resetBusyBoundElements();
       initializeWebVitalsTracking();
       bindManifest();
       handleCheckoutReturn();
@@ -5633,6 +5925,9 @@ WantedBy=multi-user.target
   } else {
     initialize();
   }
+  window.addEventListener("pageshow", () => {
+    resetBusyBoundElements();
+  });
 })();
             </script>"""
             .replace("__MOS_STANDALONE_IMPORTED_HTML_CONFIG__", _safe_inline_json(script_config))
@@ -5652,6 +5947,7 @@ WantedBy=multi-user.target
                 page_slug=page_slug,
                 page_payload=page_payload,
                 server_names=server_names,
+                upstream_api_base_root=upstream_api_base_root,
                 mirrored_url_map=mirrored_url_map,
                 mirrored_target_paths=mirrored_target_paths,
                 standalone_served_assets=standalone_served_assets,
@@ -5698,6 +5994,7 @@ WantedBy=multi-user.target
         page_slug: str,
         page_payload: Dict[str, Any],
         server_names: list[str],
+        upstream_api_base_root: str | None = None,
         mirrored_url_map: dict[str, str],
         mirrored_target_paths: set[str],
         standalone_served_assets: dict[str, _StandaloneServedAsset],
@@ -5721,6 +6018,12 @@ WantedBy=multi-user.target
             if not server_name:
                 continue
             parsed = urlsplit(server_name if "://" in server_name else f"https://{server_name}")
+            host = parsed.netloc.strip().lower()
+            if host:
+                normalized_server_hosts.add(host)
+        upstream_api_root = str(upstream_api_base_root or "").strip()
+        if upstream_api_root:
+            parsed = urlsplit(upstream_api_root if "://" in upstream_api_root else f"https://{upstream_api_root}")
             host = parsed.netloc.strip().lower()
             if host:
                 normalized_server_hosts.add(host)
@@ -5808,7 +6111,7 @@ WantedBy=multi-user.target
         *,
         site_dir: str,
         source: FunnelArtifactSourceSpec,
-        server_names: list[str],
+        public_server_names: list[str],
         mirrored_target_paths: set[str],
         standalone_served_assets: dict[str, _StandaloneServedAsset],
         standalone_image_sources: dict[str, _StandaloneImageSource],
@@ -5921,7 +6224,8 @@ WantedBy=multi-user.target
                                 funnel_slug=funnel_slug,
                                 page_slug=canonical_page_slug,
                                 page_payload=canonical_page_payload,
-                                server_names=server_names,
+                                server_names=public_server_names,
+                                upstream_api_base_root=str(source.upstream_api_base_root or ""),
                                 mirrored_url_map=mirrored_url_map,
                                 mirrored_target_paths=mirrored_target_paths,
                                 standalone_served_assets=standalone_served_assets,
@@ -5958,12 +6262,13 @@ WantedBy=multi-user.target
                             page_payload=page_payload,
                             funnel_payload=funnel_payload,
                             source=source,
-                            server_names=server_names,
+                            public_server_names=public_server_names,
                             mirrored_url_map=mirrored_url_map,
                             mirrored_target_paths=mirrored_target_paths,
                             standalone_served_assets=standalone_served_assets,
                             standalone_image_sources=standalone_image_sources,
                             prepared_imported_html_document=prepared_imported_html_documents.get(page_slug),
+                            prepared_imported_html_documents=prepared_imported_html_documents,
                         )
                     entry_html_document = rendered_pages.get(entry_slug)
                     if entry_html_document is None:
@@ -6156,7 +6461,10 @@ WantedBy=multi-user.target
             self._write_funnel_artifact_standalone_html_routes(
                 site_dir=site_dir,
                 source=source,
-                server_names=self._normalize_server_names(app.service_config.server_names),
+                public_server_names=(
+                    self._normalize_server_names(app.workspace_server_names)
+                    or self._normalize_server_names(app.service_config.server_names)
+                ),
                 mirrored_target_paths=standalone_uploaded_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,

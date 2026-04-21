@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 from uuid import uuid4
 
@@ -2493,7 +2494,84 @@ def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_fr
     source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
     assert source_ref["artifact_render_mode"] == "standalone_imported_html"
     assert "runtime_dist_path" not in source_ref
-    assert source_ref["artifact"]["meta"]["artifactId"] == "artifact-123"
+
+
+def test_hydrate_funnel_artifact_workload_patch_embeds_full_persisted_artifact_payload(monkeypatch):
+    artifact_payload = {
+        "meta": {"clientId": "client-1", "artifactId": "artifact-123", "artifactVersion": 7},
+        "products": {
+            "sample-product": {
+                "meta": {"productSlug": "sample-product"},
+                "funnels": {
+                    "sample-funnel": {
+                        "meta": {"entrySlug": "sales-page"},
+                        "pages": {
+                            "sales-page": {
+                                "slug": "sales-page",
+                                "puckData": {
+                                    "content": [
+                                        {
+                                            "type": "ImportedHtmlDocument",
+                                            "props": {"htmlDocument": "<html><body>ok</body></html>"},
+                                        }
+                                    ]
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "assets": {"items": {"asset-1": {"sizeBytes": 12, "bytesBase64": "YWJj"}}},
+    }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "persist_client_funnel_runtime_artifact",
+        lambda **_: {
+            "artifact_id": "artifact-123",
+            "artifact_version": 7,
+            "client_id": "client-1",
+        },
+    )
+
+    import app.db.repositories.artifacts as artifacts_module
+
+    class _ArtifactsRepo:
+        def __init__(self, session):
+            self.session = session
+
+        def get(self, org_id, artifact_id):
+            assert org_id == "org-1"
+            assert artifact_id == "artifact-123"
+            return SimpleNamespace(data=artifact_payload)
+
+    monkeypatch.setattr(artifacts_module, "ArtifactsRepository", _ArtifactsRepo)
+
+    workload_patch = {
+        "name": "brand-funnels-70124684-be65d76e",
+        "source_type": "funnel_artifact",
+        "source_ref": {
+            "upstream_api_base_root": "https://api.moshq.app",
+            "artifact": {"meta": {"clientId": "client-1"}, "products": {}},
+        },
+    }
+
+    hydrated = deploy_service.hydrate_funnel_artifact_workload_patch(
+        session=object(),
+        org_id="org-1",
+        funnel_id="funnel-1",
+        publication_id="publication-1",
+        workload_patch=workload_patch,
+        created_by_user_id="user-1",
+    )
+
+    assert hydrated["source_ref"]["client_id"] == "client-1"
+    assert hydrated["source_ref"]["artifact_id"] == "artifact-123"
+    assert hydrated["source_ref"]["artifact_version"] == 7
+    assert hydrated["source_ref"]["artifact"] == artifact_payload
+    assert hydrated["source_ref"]["artifact"] is not artifact_payload
+    assert hydrated["source_ref"]["artifact"]["meta"]["artifactId"] == "artifact-123"
 
 
 def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():
