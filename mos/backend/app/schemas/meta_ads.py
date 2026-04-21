@@ -71,6 +71,21 @@ class MetaAdSetCreateRequest(BaseModel):
     validateOnly: Optional[bool] = None
 
 
+class MetaAdSetUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    dailyBudget: Optional[int] = None
+    lifetimeBudget: Optional[int] = None
+    bidAmount: Optional[int] = None
+    clearBidAmount: Optional[bool] = None
+    bidStrategy: Optional[str] = None
+    dsaBeneficiary: Optional[str] = None
+    dsaPayor: Optional[str] = None
+    promotedObject: Optional[dict[str, Any]] = None
+    attributionSpec: Optional[list[dict[str, Any]]] = None
+    validateOnly: Optional[bool] = None
+
+
 class MetaAdCreateRequest(BaseModel):
     requestId: str
     adAccountId: Optional[str] = None

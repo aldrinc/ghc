@@ -118,6 +118,14 @@ class MetaAdsRepository:
         self.session.refresh(record)
         return record
 
+    def update_adset(self, record: MetaAdSet, **fields) -> MetaAdSet:
+        for key, value in fields.items():
+            setattr(record, key, value)
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
     def get_adset_by_meta_id(
         self, *, org_id: str, ad_account_id: str, meta_adset_id: str
     ) -> Optional[MetaAdSet]:

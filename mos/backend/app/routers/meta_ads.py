@@ -31,6 +31,7 @@ from app.db.models import (
     MetaAd,
     MetaAdAccountConnection,
     MetaAdCreative,
+    MetaAdSet,
     MetaAdSetSpec,
     MetaAssetUpload,
     MetaCampaign,
@@ -54,6 +55,7 @@ from app.schemas.meta_ads import (
     MetaAdSetCreateRequest,
     MetaAdSetSpecCreateRequest,
     MetaAdSetSpecUpdateRequest,
+    MetaAdSetUpdateRequest,
     MetaAssetUploadRequest,
     MetaCampaignCreateRequest,
     MetaPublishPlanValidationResponse,
@@ -2248,6 +2250,138 @@ def _create_meta_adset_internal(
     return jsonable_encoder(record)
 
 
+def _update_meta_adset_internal(
+    *,
+    meta_adset_id: str,
+    payload: MetaAdSetUpdateRequest,
+    auth: AuthContext,
+    session: Session,
+):
+    repo = MetaAdsRepository(session)
+    record = session.scalar(
+        select(MetaAdSet).where(
+            MetaAdSet.org_id == auth.org_id,
+            MetaAdSet.meta_adset_id == meta_adset_id,
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meta ad set not found")
+
+    workspace_config_id = _clean_optional_text(record.meta_workspace_config_id)
+    if not workspace_config_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Meta ad set is missing a workspace config reference.",
+        )
+    repo_configs = MetaAccountConfigsRepository(session)
+    workspace_config = repo_configs.get_workspace_config_by_id(
+        org_id=auth.org_id,
+        config_id=workspace_config_id,
+    )
+    if workspace_config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meta workspace config not found for the requested ad set.",
+        )
+    resolved = _resolve_meta_workspace_context_or_409(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(workspace_config.client_id),
+        config_id=workspace_config_id,
+    )
+
+    update_fields = payload.model_dump(exclude_unset=True)
+    if not update_fields:
+        return jsonable_encoder(record)
+    if payload.bidAmount is not None and payload.clearBidAmount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide bidAmount or clearBidAmount, not both.",
+        )
+
+    daily_budget = update_fields.get("dailyBudget")
+    lifetime_budget = update_fields.get("lifetimeBudget")
+    if daily_budget is not None and lifetime_budget is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide at most one of dailyBudget or lifetimeBudget.",
+        )
+    budget_errors = _validate_meta_adset_budget_fields(
+        daily_budget=daily_budget,
+        scope_label="Meta ad set",
+    )
+    if budget_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+
+    request_payload: dict[str, Any] = {}
+    if "name" in update_fields:
+        request_payload["name"] = _clean_optional_text(update_fields["name"])
+    if "status" in update_fields:
+        request_payload["status"] = _clean_optional_text(update_fields["status"])
+    if "dailyBudget" in update_fields:
+        request_payload["daily_budget"] = update_fields["dailyBudget"]
+    if "lifetimeBudget" in update_fields:
+        request_payload["lifetime_budget"] = update_fields["lifetimeBudget"]
+    if "bidAmount" in update_fields:
+        request_payload["bid_amount"] = update_fields["bidAmount"]
+    if update_fields.get("clearBidAmount"):
+        request_payload["bid_strategy"] = (
+            _clean_optional_text(update_fields.get("bidStrategy")) or "LOWEST_COST_WITHOUT_CAP"
+        )
+    elif "bidStrategy" in update_fields:
+        request_payload["bid_strategy"] = _clean_optional_text(update_fields["bidStrategy"])
+    if "dsaBeneficiary" in update_fields:
+        dsa_beneficiary = _resolve_dsa_party_value(
+            explicit_value=update_fields["dsaBeneficiary"],
+            workspace_page_name=resolved.workspace_config.page_name,
+            field_name="dsaBeneficiary",
+            targeting=None,
+        )
+        if dsa_beneficiary:
+            request_payload["dsa_beneficiary"] = dsa_beneficiary
+    if "dsaPayor" in update_fields:
+        dsa_payor = _resolve_dsa_party_value(
+            explicit_value=update_fields["dsaPayor"],
+            workspace_page_name=resolved.workspace_config.page_name,
+            field_name="dsaPayor",
+            targeting=None,
+        )
+        if dsa_payor:
+            request_payload["dsa_payor"] = dsa_payor
+    if "promotedObject" in update_fields:
+        request_payload["promoted_object"] = update_fields["promotedObject"]
+    if "attributionSpec" in update_fields:
+        request_payload["attribution_spec"] = update_fields["attributionSpec"]
+    if update_fields.get("validateOnly"):
+        request_payload["execution_options"] = ["validate_only"]
+
+    client = _get_meta_client(resolved=resolved)
+    try:
+        response = client.update_adset(adset_id=meta_adset_id, payload=request_payload)
+    except MetaAdsError as exc:
+        _raise_meta_error(exc)
+
+    if update_fields.get("validateOnly"):
+        return {"validateOnly": True, "response": response}
+
+    merged_metadata = dict(record.metadata_json) if isinstance(record.metadata_json, dict) else {}
+    merged_metadata["lastRemoteUpdate"] = {
+        "request": request_payload,
+        "response": response,
+    }
+    updated = repo.update_adset(
+        record,
+        name=_clean_optional_text(update_fields["name"]) if "name" in update_fields else record.name,
+        status=(
+            _clean_optional_text(update_fields["status"])
+            if "status" in update_fields
+            else record.status
+        ),
+        metadata_json=merged_metadata,
+    )
+    return jsonable_encoder(updated)
+
+
 def _create_meta_ad_internal(
     *,
     payload: MetaAdCreateRequest,
@@ -2867,6 +3001,21 @@ def create_meta_adset(
     session: Session = Depends(get_session),
 ):
     return _create_meta_adset_internal(payload=payload, auth=auth, session=session)
+
+
+@router.put("/adsets/{meta_adset_id}")
+def update_meta_adset(
+    meta_adset_id: str,
+    payload: MetaAdSetUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    return _update_meta_adset_internal(
+        meta_adset_id=meta_adset_id,
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
 
 
 @router.post("/ads", status_code=status.HTTP_201_CREATED)
