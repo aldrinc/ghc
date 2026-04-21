@@ -5620,7 +5620,7 @@ WantedBy=multi-user.target
     }
   };
   const normalizeSelection = (selection) => {
-    if (!isRecord(selection)) return {};
+    if (!isRecord(selection)) return null;
     const entries = Object.entries(selection)
       .map(([key, value]) => {
         const normalizedKey = cleanText(key);
@@ -5629,6 +5629,59 @@ WantedBy=multi-user.target
         return [normalizedKey, normalizedValue];
       })
       .filter(Boolean);
+    if (!entries.length) return null;
+    return Object.fromEntries(entries);
+  };
+  const normalizePurchaseMode = (value) => {
+    const normalized = cleanText(typeof value === "string" ? value : null);
+    if (!normalized) return null;
+    const lowered = normalized.toLowerCase();
+    if (lowered === "subscribe") return "subscribe";
+    if (["one-time", "one_time", "one time", "onetime"].includes(lowered)) return "one-time";
+    return null;
+  };
+  const detectCheckoutPurchaseMode = () => {
+    const hiddenInput = document.getElementById("mos-selected-purchase-mode");
+    if (
+      hiddenInput instanceof HTMLInputElement ||
+      hiddenInput instanceof HTMLTextAreaElement ||
+      hiddenInput instanceof HTMLSelectElement
+    ) {
+      const hiddenMode = normalizePurchaseMode(hiddenInput.value);
+      if (hiddenMode) return hiddenMode;
+    }
+    const quantitySelector = document.getElementById("quantity-selector");
+    if (quantitySelector instanceof HTMLElement) {
+      const attributeMode = normalizePurchaseMode(quantitySelector.getAttribute("data-mode"));
+      if (attributeMode) return attributeMode;
+    }
+    return null;
+  };
+  const augmentSelectionWithCheckoutContext = (selection) => {
+    const normalizedSelection = normalizeSelection(selection) || {};
+    const explicitPurchaseMode = normalizePurchaseMode(normalizedSelection.PurchaseMode);
+    if (explicitPurchaseMode) {
+      return {
+        ...normalizedSelection,
+        PurchaseMode: explicitPurchaseMode,
+      };
+    }
+    const detectedPurchaseMode = detectCheckoutPurchaseMode();
+    if (detectedPurchaseMode) {
+      return {
+        ...normalizedSelection,
+        PurchaseMode: detectedPurchaseMode,
+      };
+    }
+    return Object.keys(normalizedSelection).length ? normalizedSelection : null;
+  };
+  const stripCheckoutSelectionContext = (selection) => {
+    const normalizedSelection = normalizeSelection(selection);
+    if (!normalizedSelection) return null;
+    const entries = Object.entries(normalizedSelection).filter(
+      ([key]) => key.trim().toLowerCase() !== "purchasemode",
+    );
+    if (!entries.length) return null;
     return Object.fromEntries(entries);
   };
   const normalizeVariant = (variant) => {
@@ -5640,7 +5693,7 @@ WantedBy=multi-user.target
       provider: cleanText(typeof variant.provider === "string" ? variant.provider.toLowerCase() : null),
       price: typeof variant.price === "number" ? variant.price : null,
       currency: cleanText(variant.currency),
-      optionValues: normalizeSelection(variant.optionValues || variant.option_values || {}),
+      optionValues: normalizeSelection(variant.optionValues || variant.option_values || null),
     };
   };
   const variants = Array.isArray(config.variants)
@@ -5717,8 +5770,9 @@ WantedBy=multi-user.target
     return match ? cleanText(match.url) : null;
   };
   const selectionsMatch = (left, right) => {
-    const normalizedLeft = normalizeSelection(left);
-    const normalizedRight = normalizeSelection(right);
+    const normalizedLeft = stripCheckoutSelectionContext(left);
+    const normalizedRight = stripCheckoutSelectionContext(right);
+    if (!normalizedLeft || !normalizedRight) return false;
     const leftEntries = Object.entries(normalizedLeft);
     const rightEntries = Object.entries(normalizedRight);
     if (leftEntries.length !== rightEntries.length) return false;
@@ -5773,7 +5827,11 @@ WantedBy=multi-user.target
     if (resolver.type === "fixed") {
       const variantId = cleanText(resolver.variantId);
       const variant = variants.find((candidate) => candidate.id === variantId) || null;
-      return { variantId, variant, selection: selectionFromDom };
+      return {
+        variantId,
+        variant,
+        selection: selectionFromDom || (variant && variant.optionValues ? variant.optionValues : null),
+      };
     }
     if (resolver.type === "option_values") {
       const variant = variants.find((candidate) => selectionsMatch(candidate.optionValues, selectionFromDom)) || null;
@@ -5957,9 +6015,8 @@ WantedBy=multi-user.target
               throw new Error("Unsupported binding type.");
             }
             setElementBusy(element, true);
-            const resolvedSelection = readSelectionFromResolver(
-              binding.checkout.variantResolver,
-              String(binding.id || "unknown"),
+            const resolvedSelection = augmentSelectionWithCheckoutContext(
+              readSelectionFromResolver(binding.checkout.variantResolver, String(binding.id || "unknown")),
             );
             const { variantId, variant, selection } = resolveCheckoutVariant(binding.checkout, resolvedSelection);
             trackEvent(binding.trackEventType || "sales_to_checkout_click", {

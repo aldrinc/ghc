@@ -929,6 +929,28 @@ def test_standalone_imported_html_bridge_uses_funnel_meta_publication_id():
     assert '"publicationId":"pub-1"' not in entry_html
 
 
+def test_standalone_imported_html_bridge_augments_checkout_selection_with_purchase_mode():
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <div id="quantity-selector" data-mode="subscribe"></div>
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/presales/index.html"
+    entry_html = uploaded[entry_route_path]
+
+    assert 'document.getElementById("mos-selected-purchase-mode")' in entry_html
+    assert 'document.getElementById("quantity-selector")' in entry_html
+    assert 'key.trim().toLowerCase() !== "purchasemode"' in entry_html
+
+
 def test_standalone_imported_html_local_relative_image_assets_are_written(monkeypatch, tmp_path):
     html_document = """<!DOCTYPE html>
 <html>
