@@ -92,6 +92,7 @@ _PRODUCT_ASSET_ALLOWED_SUMMARY = (
 _PRODUCT_ASSET_MAX_BYTES = 200 * 1024 * 1024
 _SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 _SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
+_SHOPIFY_SELLING_PLAN_GID_PREFIX = "gid://shopify/SellingPlan/"
 _SHOPIFY_UNSYNCED_VARIANT_FIELDS = {
     "currency",
     "requiresShipping",
@@ -301,6 +302,20 @@ def _validate_shopify_variant_gid(external_price_id: str) -> str:
     return cleaned
 
 
+def _clean_optional_shopify_selling_plan_id(shopify_selling_plan_id: str | None) -> str | None:
+    if shopify_selling_plan_id is None:
+        return None
+    cleaned = shopify_selling_plan_id.strip()
+    if not cleaned:
+        return None
+    if not cleaned.startswith(_SHOPIFY_SELLING_PLAN_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopify shopifySellingPlanId must be a Shopify selling plan GID.",
+        )
+    return cleaned
+
+
 def _validate_variant_provider_mapping(
     *, provider: str | None, external_price_id: str | None
 ) -> None:
@@ -318,6 +333,19 @@ def _validate_variant_provider_mapping(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Shopify variant GIDs require provider="shopify".',
+        )
+
+
+def _validate_variant_shopify_subscription_mapping(
+    *, provider: str | None, shopify_selling_plan_id: str | None
+) -> None:
+    normalized_provider = _normalize_variant_provider(provider)
+    if shopify_selling_plan_id is None:
+        return
+    if normalized_provider != "shopify":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='shopifySellingPlanId requires provider="shopify".',
         )
 
 
@@ -903,6 +931,7 @@ def _build_shopify_source_of_truth_payload(
                 "optionValues": variant.option_values,
                 "provider": variant.provider,
                 "externalPriceId": variant.external_price_id,
+                "shopifySellingPlanId": variant.shopify_selling_plan_id,
             }
             for variant in variants
         ],
@@ -2107,9 +2136,16 @@ def create_variant(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider"
         )
+    cleaned_shopify_selling_plan_id = _clean_optional_shopify_selling_plan_id(
+        payload.shopifySellingPlanId
+    )
     _validate_variant_provider_mapping(
         provider=normalized_provider,
         external_price_id=payload.externalPriceId,
+    )
+    _validate_variant_shopify_subscription_mapping(
+        provider=normalized_provider,
+        shopify_selling_plan_id=cleaned_shopify_selling_plan_id,
     )
 
     fields: dict[str, object] = {
@@ -2125,6 +2161,8 @@ def create_variant(
         fields["provider"] = normalized_provider
     if payload.externalPriceId is not None:
         fields["external_price_id"] = payload.externalPriceId.strip()
+    if payload.shopifySellingPlanId is not None:
+        fields["shopify_selling_plan_id"] = cleaned_shopify_selling_plan_id
     if payload.optionValues is not None:
         fields["option_values"] = payload.optionValues
     if payload.sku is not None:
@@ -2215,9 +2253,21 @@ def update_variant(
     effective_external_price_id = (
         payload.externalPriceId if "externalPriceId" in fields_set else variant.external_price_id
     )
+    effective_shopify_selling_plan_id = (
+        payload.shopifySellingPlanId
+        if "shopifySellingPlanId" in fields_set
+        else variant.shopify_selling_plan_id
+    )
+    cleaned_shopify_selling_plan_id = _clean_optional_shopify_selling_plan_id(
+        effective_shopify_selling_plan_id
+    )
     _validate_variant_provider_mapping(
         provider=effective_provider,
         external_price_id=effective_external_price_id,
+    )
+    _validate_variant_shopify_subscription_mapping(
+        provider=effective_provider,
+        shopify_selling_plan_id=cleaned_shopify_selling_plan_id,
     )
 
     is_shopify_managed = (
@@ -2329,6 +2379,8 @@ def update_variant(
         fields["external_price_id"] = (
             payload.externalPriceId.strip() if payload.externalPriceId is not None else None
         )
+    if "shopifySellingPlanId" in fields_set:
+        fields["shopify_selling_plan_id"] = cleaned_shopify_selling_plan_id
     if "optionValues" in fields_set:
         fields["option_values"] = payload.optionValues
     if "offerId" in fields_set:

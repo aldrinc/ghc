@@ -327,6 +327,65 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return Object.fromEntries(entries);
   };
 
+  const normalizePurchaseMode = (value) => {
+    const normalized = cleanText(typeof value === "string" ? value : null);
+    if (!normalized) return null;
+    const lowered = normalized.toLowerCase();
+    if (lowered === "subscribe") return "subscribe";
+    if (["one-time", "one_time", "one time", "onetime"].includes(lowered)) return "one-time";
+    return null;
+  };
+
+  const detectCheckoutPurchaseMode = () => {
+    const hiddenInput = document.getElementById("mos-selected-purchase-mode");
+    if (
+      hiddenInput instanceof HTMLInputElement ||
+      hiddenInput instanceof HTMLTextAreaElement ||
+      hiddenInput instanceof HTMLSelectElement
+    ) {
+      const hiddenMode = normalizePurchaseMode(hiddenInput.value);
+      if (hiddenMode) return hiddenMode;
+    }
+
+    const quantitySelector = document.getElementById("quantity-selector");
+    if (quantitySelector instanceof HTMLElement) {
+      const attributeMode = normalizePurchaseMode(quantitySelector.getAttribute("data-mode"));
+      if (attributeMode) return attributeMode;
+    }
+    return null;
+  };
+
+  const augmentSelectionWithCheckoutContext = (selection) => {
+    const normalizedSelection = normalizeSelection(selection) || {};
+    const explicitPurchaseMode = normalizePurchaseMode(normalizedSelection.PurchaseMode);
+    if (explicitPurchaseMode) {
+      return {
+        ...normalizedSelection,
+        PurchaseMode: explicitPurchaseMode,
+      };
+    }
+
+    const detectedPurchaseMode = detectCheckoutPurchaseMode();
+    if (detectedPurchaseMode) {
+      return {
+        ...normalizedSelection,
+        PurchaseMode: detectedPurchaseMode,
+      };
+    }
+
+    return Object.keys(normalizedSelection).length ? normalizedSelection : null;
+  };
+
+  const stripCheckoutSelectionContext = (selection) => {
+    const normalizedSelection = normalizeSelection(selection);
+    if (!normalizedSelection) return null;
+    const entries = Object.entries(normalizedSelection).filter(
+      ([key]) => key.trim().toLowerCase() !== "purchasemode",
+    );
+    if (!entries.length) return null;
+    return Object.fromEntries(entries);
+  };
+
   const serializeVariant = (variant) => {
     if (!isRecord(variant)) return null;
     const id = cleanText(variant.id);
@@ -397,8 +456,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const selectionsMatch = (left, right) => {
-    const normalizedLeft = normalizeSelection(left);
-    const normalizedRight = normalizeSelection(right);
+    const normalizedLeft = stripCheckoutSelectionContext(left);
+    const normalizedRight = stripCheckoutSelectionContext(right);
     if (!normalizedLeft || !normalizedRight) return false;
     const leftEntries = Object.entries(normalizedLeft);
     const rightEntries = Object.entries(normalizedRight);
@@ -785,7 +844,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const resolveCheckoutBindingState = async (binding) => {
-    const selectionFromDom = readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown");
+    const selectionFromDom = augmentSelectionWithCheckoutContext(
+      readSelectionFromResolver(binding.checkout.variantResolver, binding.id || "unknown"),
+    );
     const checkoutVariants =
       selectionFromDom && !cachedVariants.length ? await loadCommerceVariants() : cachedVariants;
     const { variantId, variant, selection } = resolveVariantForCheckout(

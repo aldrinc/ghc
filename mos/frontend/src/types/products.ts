@@ -29,6 +29,7 @@ export interface ProductVariant {
   currency: string;
   provider?: string | null;
   external_price_id?: string | null;
+  shopify_selling_plan_id?: string | null;
   option_values?: Record<string, unknown> | null;
   compare_at_price?: number | null;
   sku?: string | null;

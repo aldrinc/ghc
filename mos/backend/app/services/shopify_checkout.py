@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 
 _VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
+_SELLING_PLAN_GID_PREFIX = "gid://shopify/SellingPlan/"
 
 
 def _require_checkout_service_config() -> tuple[str, str]:
@@ -61,17 +62,27 @@ def create_shopify_checkout(
     variant_gid: str,
     quantity: int,
     metadata: dict[str, Any],
+    selling_plan_id: str | None = None,
 ) -> dict[str, str]:
     if not variant_gid.startswith(_VARIANT_GID_PREFIX):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Shopify variant GID is invalid for this price point.",
         )
+    cleaned_selling_plan_id = str(selling_plan_id or "").strip() or None
+    if cleaned_selling_plan_id and not cleaned_selling_plan_id.startswith(_SELLING_PLAN_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify selling plan ID is invalid for this price point.",
+        )
 
     base_url, internal_token = _require_checkout_service_config()
+    line_item: dict[str, object] = {"merchandiseId": variant_gid, "quantity": quantity}
+    if cleaned_selling_plan_id:
+        line_item["sellingPlanId"] = cleaned_selling_plan_id
     payload = {
         "clientId": client_id,
-        "lines": [{"merchandiseId": variant_gid, "quantity": quantity}],
+        "lines": [line_item],
         "attributes": {
             key: _serialize_attribute(value)
             for key, value in metadata.items()

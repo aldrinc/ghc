@@ -251,6 +251,7 @@ class ProductVariant(Base):
     currency: Mapped[str] = mapped_column(String(length=3), nullable=False)
     provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_price_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shopify_selling_plan_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     option_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     compare_at_price: Mapped[Optional[int]] = mapped_column(
         "compare_at_price_cents", Integer, nullable=True

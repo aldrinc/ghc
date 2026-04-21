@@ -117,6 +117,68 @@ def test_validate_imported_html_document_manifest_accepts_checkout_binding_match
     assert normalized["bindings"][0]["selector"] == "a.buy-cta"
 
 
+def test_validate_imported_html_document_manifest_allows_purchase_mode_checkout_context():
+    html_document = """
+    <!doctype html>
+    <html>
+      <body>
+        <button id="buy-now">Start my protocol</button>
+        <input id="mos-selected-pack" value="2x" />
+        <input id="mos-selected-purchase-mode" value="subscribe" />
+      </body>
+    </html>
+    """
+    variant = ProductVariant(
+        product_id="product-1",
+        title="2 Pack",
+        price=7800,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    variant.id = "variant-1"
+    variant.option_values = {"Pack": "2x"}
+    manifest = {
+        "schemaVersion": "imported-html-instrumentation-v1",
+        "pageStage": "sales",
+        "bindings": [
+            {
+                "id": "primary-buy",
+                "type": "checkout",
+                "selector": "#buy-now",
+                "event": "click",
+                "trackEventType": "sales_to_checkout_click",
+                "checkout": {
+                    "mode": "public_checkout",
+                    "variantResolver": {
+                        "type": "option_values",
+                        "optionSelectors": [
+                            {"name": "Pack", "selector": "#mos-selected-pack", "source": "value"},
+                            {
+                                "name": "PurchaseMode",
+                                "selector": "#mos-selected-purchase-mode",
+                                "source": "value",
+                            },
+                        ],
+                    },
+                },
+            }
+        ],
+    }
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=html_document,
+        instrumentation_manifest=manifest,
+        current_page_stage="sales",
+        current_page_id="page-sales",
+        available_target_page_ids={"page-sales"},
+        checkout_ready_variants=[variant],
+        require_stage_bindings=True,
+    )
+
+    assert normalized["bindings"][0]["checkout"]["variantResolver"]["optionSelectors"][1]["name"] == "PurchaseMode"
+
+
 def test_validate_imported_html_document_manifest_rejects_unsupported_selector():
     html_document = """
     <!doctype html>

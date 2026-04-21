@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class CheckoutLine(BaseModel):
     merchandiseId: str = Field(min_length=1)
     quantity: int = Field(ge=1)
+    sellingPlanId: str | None = None
 
 
 class CheckoutBuyerIdentity(BaseModel):

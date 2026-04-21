@@ -109,6 +109,8 @@ _PREPARED_CHECKOUT_STATUS_EXPIRED = "expired"
 _PREPARED_CHECKOUT_TTL = timedelta(minutes=10)
 _PREPARED_CHECKOUT_PENDING_STALE_AFTER = timedelta(seconds=30)
 _PREPARED_CHECKOUT_POLL_AFTER_MS = 150
+_CHECKOUT_SELECTION_PURCHASE_MODE_KEY = "PurchaseMode"
+_CHECKOUT_SELECTION_RESERVED_KEYS = {_CHECKOUT_SELECTION_PURCHASE_MODE_KEY.lower()}
 
 
 def _resolve_public_medusa_stripe_account_id(
@@ -133,6 +135,7 @@ def create_shopify_checkout(
     variant_gid: str,
     quantity: int,
     metadata: dict[str, object],
+    selling_plan_id: str | None = None,
 ) -> dict[str, str]:
     return create_managed_checkout(
         provider="shopify",
@@ -140,6 +143,7 @@ def create_shopify_checkout(
         external_variant_id=variant_gid,
         quantity=quantity,
         metadata=metadata,
+        shopify_selling_plan_id=selling_plan_id,
     )
 
 
@@ -1023,6 +1027,36 @@ def _prepared_checkout_selection(selection: dict[str, object] | None) -> dict[st
     return json.loads(json.dumps(selection, sort_keys=True, separators=(",", ":")))
 
 
+def _variant_selection_from_checkout_selection(
+    selection: dict[str, object] | None,
+) -> dict[str, object]:
+    prepared_selection = _prepared_checkout_selection(selection)
+    return {
+        key: value
+        for key, value in prepared_selection.items()
+        if str(key).strip().lower() not in _CHECKOUT_SELECTION_RESERVED_KEYS
+    }
+
+
+def _purchase_mode_from_checkout_selection(selection: dict[str, object] | None) -> str | None:
+    if not isinstance(selection, dict):
+        return None
+    for key, value in selection.items():
+        if str(key).strip().lower() != _CHECKOUT_SELECTION_PURCHASE_MODE_KEY.lower():
+            continue
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        if normalized == "subscribe":
+            return "subscribe"
+        if normalized in {"one-time", "one_time", "onetime", "one time"}:
+            return "one-time"
+        return normalized
+    return None
+
+
 def _build_prepared_checkout_request_key(
     *,
     funnel_id: str,
@@ -1877,6 +1911,9 @@ def _resolve_public_checkout_context(
             detail="Funnel has no product configured.",
         )
 
+    prepared_selection = _prepared_checkout_selection(payload.selection)
+    variant_selection = _variant_selection_from_checkout_selection(payload.selection)
+    purchase_mode = _purchase_mode_from_checkout_selection(payload.selection)
     variant: ProductVariant | None = None
     if payload.variantId:
         variant_query = select(ProductVariant).where(
@@ -1888,18 +1925,18 @@ def _resolve_public_checkout_context(
         variant = session.scalars(variant_query).first()
         if not variant:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
-        if variant.option_values is None and payload.selection:
+        if variant.option_values is None and variant_selection:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Selection does not match variant options.",
             )
-        if variant.option_values is not None and payload.selection != variant.option_values:
+        if variant.option_values is not None and variant_selection != variant.option_values:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Selection does not match variant options.",
             )
     else:
-        if not payload.selection:
+        if not variant_selection:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="selection is required when variantId is not provided.",
@@ -1920,9 +1957,7 @@ def _resolve_public_checkout_context(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="No checkout-ready variants are configured for this funnel product.",
             )
-        matches = [
-            item for item in checkout_ready_candidates if item.option_values == payload.selection
-        ]
+        matches = [item for item in checkout_ready_candidates if item.option_values == variant_selection]
         if len(matches) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1942,6 +1977,18 @@ def _resolve_public_checkout_context(
             detail="Variant provider is required for checkout.",
         )
     external_price_id = str(variant.external_price_id or "").strip() or None
+    shopify_selling_plan_id = str(variant.shopify_selling_plan_id or "").strip() or None
+    if purchase_mode == "subscribe":
+        if normalized_provider != "shopify":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Subscribe & save is only supported for Shopify checkout variants.",
+            )
+        if not shopify_selling_plan_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Subscribe & save is not configured for this selection.",
+            )
     metadata = {
         "funnel_slug": _metadata_value(payload.funnelSlug, "funnelSlug"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
@@ -1953,7 +2000,8 @@ def _resolve_public_checkout_context(
         "page_id": _metadata_value(payload.pageId, "pageId"),
         "visitor_id": _metadata_value(payload.visitorId, "visitorId"),
         "session_id": _metadata_value(payload.sessionId, "sessionId"),
-        "selection": _metadata_value(payload.selection, "selection"),
+        "selection": _metadata_value(prepared_selection, "selection"),
+        "purchase_mode": _metadata_value(purchase_mode, "purchaseMode"),
         "utm": _metadata_value(payload.utm, "utm"),
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
@@ -1963,8 +2011,10 @@ def _resolve_public_checkout_context(
         "variant": variant,
         "normalized_provider": normalized_provider,
         "external_price_id": external_price_id,
+        "shopify_selling_plan_id": shopify_selling_plan_id if purchase_mode == "subscribe" else None,
+        "purchase_mode": purchase_mode,
         "metadata": metadata,
-        "selection": _prepared_checkout_selection(payload.selection),
+        "selection": prepared_selection,
     }
 
 
@@ -2107,12 +2157,32 @@ async def _prepare_shopify_checkout_async(
     )
     if status_value != _PREPARED_CHECKOUT_STATUS_PENDING:
         return
+    purchase_mode = _purchase_mode_from_checkout_selection(prepared_checkout.selection)
+    variant = session.get(ProductVariant, prepared_checkout.variant_id)
+    selling_plan_id = None
+    if purchase_mode == "subscribe":
+        if not variant:
+            prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
+            prepared_checkout.error_detail = "Checkout variant could not be loaded."
+            prepared_checkout.updated_at = _utcnow()
+            session.add(prepared_checkout)
+            session.commit()
+            return
+        selling_plan_id = str(variant.shopify_selling_plan_id or "").strip() or None
+        if not selling_plan_id:
+            prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
+            prepared_checkout.error_detail = "Subscribe & save is not configured for this selection."
+            prepared_checkout.updated_at = _utcnow()
+            session.add(prepared_checkout)
+            session.commit()
+            return
     try:
         checkout = create_shopify_checkout(
             client_id=str(prepared_checkout.client_id),
             variant_gid=str(prepared_checkout.external_variant_id),
             quantity=int(prepared_checkout.quantity),
             metadata=dict(prepared_checkout.checkout_metadata or {}),
+            selling_plan_id=selling_plan_id,
         )
     except HTTPException as exc:
         prepared_checkout.status = _PREPARED_CHECKOUT_STATUS_FAILED
@@ -2153,6 +2223,7 @@ def public_checkout(
     variant = context["variant"]
     normalized_provider = context["normalized_provider"]
     external_price_id = context["external_price_id"]
+    shopify_selling_plan_id = context["shopify_selling_plan_id"]
     metadata = context["metadata"]
     if normalized_provider == "stripe":
         if not external_price_id:
@@ -2210,6 +2281,7 @@ def public_checkout(
             variant_gid=external_price_id,
             quantity=payload.quantity,
             metadata=metadata,
+            selling_plan_id=shopify_selling_plan_id,
         )
         _schedule_checkout_started_event(
             session=session,

@@ -2476,6 +2476,71 @@ def test_expand_checkout_lines_with_offer_bonuses_returns_shopify_input_order_fo
     ]
 
 
+def test_expand_checkout_lines_with_offer_bonuses_preserves_selling_plan_on_purchased_line():
+    client = ShopifyApiClient()
+
+    async def fake_resolve_variant_product_gid(
+        *,
+        shop_domain: str,
+        access_token: str,
+        variant_gid: str,
+    ):
+        assert variant_gid == "gid://shopify/ProductVariant/100"
+        return "gid://shopify/Product/999"
+
+    async def fake_get_product(*, shop_domain: str, access_token: str, product_gid: str):
+        return {
+            "productGid": product_gid,
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "ACTIVE",
+            "sourceOfTruthPayload": {
+                "offers": [
+                    {
+                        "id": "offer-1",
+                        "basket": {
+                            "shopifyVariantGids": ["gid://shopify/ProductVariant/100"],
+                            "bonusProducts": [
+                                {
+                                    "id": "bonus-product-1",
+                                    "title": "Bonus Guide",
+                                    "shopifyVariantGid": "gid://shopify/ProductVariant/444",
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+            "variants": [],
+        }
+
+    client._resolve_variant_product_gid = fake_resolve_variant_product_gid  # type: ignore[method-assign]
+    client.get_product = fake_get_product  # type: ignore[method-assign]
+
+    lines = asyncio.run(
+        client.expand_checkout_lines_with_offer_bonuses(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            lines=[
+                {
+                    "merchandiseId": "gid://shopify/ProductVariant/100",
+                    "quantity": 1,
+                    "sellingPlanId": "gid://shopify/SellingPlan/2",
+                }
+            ],
+        )
+    )
+
+    assert lines == [
+        {"merchandiseId": "gid://shopify/ProductVariant/444", "quantity": 1},
+        {
+            "merchandiseId": "gid://shopify/ProductVariant/100",
+            "quantity": 1,
+            "sellingPlanId": "gid://shopify/SellingPlan/2",
+        },
+    ]
+
+
 def test_expand_checkout_lines_with_offer_bonuses_keeps_purchased_variants_ahead_of_bonus_lines():
     client = ShopifyApiClient()
 

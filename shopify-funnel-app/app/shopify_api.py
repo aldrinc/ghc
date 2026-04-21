@@ -4605,10 +4605,17 @@ class ShopifyApiClient:
         lines: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         expanded_lines = [
-            {
-                "merchandiseId": str(line["merchandiseId"]).strip(),
-                "quantity": int(line["quantity"]),
-            }
+            (
+                {
+                    "merchandiseId": str(line["merchandiseId"]).strip(),
+                    "quantity": int(line["quantity"]),
+                    **(
+                        {"sellingPlanId": str(line["sellingPlanId"]).strip()}
+                        if str(line.get("sellingPlanId") or "").strip()
+                        else {}
+                    ),
+                }
+            )
             for line in lines
         ]
         desired_display_lines = list(expanded_lines)

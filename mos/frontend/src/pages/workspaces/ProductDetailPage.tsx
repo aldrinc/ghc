@@ -187,6 +187,7 @@ export function ProductDetailPage() {
   const [variantOfferId, setVariantOfferId] = useState("");
   const [variantProvider, setVariantProvider] = useState("stripe");
   const [variantExternalId, setVariantExternalId] = useState("");
+  const [variantShopifySellingPlanId, setVariantShopifySellingPlanId] = useState("");
   const [variantOptionValues, setVariantOptionValues] = useState("");
   const [shopifyProductGidDraft, setShopifyProductGidDraft] = useState("");
   const [shopifyProductSearchQuery, setShopifyProductSearchQuery] = useState("");
@@ -259,6 +260,7 @@ export function ProductDetailPage() {
     setVariantOfferId("");
     setVariantProvider("stripe");
     setVariantExternalId("");
+    setVariantShopifySellingPlanId("");
     setVariantOptionValues("");
     setEditingVariant(null);
     setVariantFormMode("create");
@@ -279,6 +281,7 @@ export function ProductDetailPage() {
     setVariantOfferId(variant.offer_id || "");
     setVariantProvider(variant.provider || "");
     setVariantExternalId(variant.external_price_id || "");
+    setVariantShopifySellingPlanId(variant.shopify_selling_plan_id || "");
     setVariantOptionValues(variant.option_values ? JSON.stringify(variant.option_values, null, 2) : "");
     setIsVariantModalOpen(true);
   };
@@ -342,9 +345,14 @@ export function ProductDetailPage() {
     }
     const normalizedProvider = normalizeVariantProvider(variantProvider);
     const normalizedExternalPriceId = variantExternalId.trim() || null;
+    const normalizedShopifySellingPlanId = variantShopifySellingPlanId.trim() || null;
     const normalizedOfferId = variantOfferId.trim() || null;
     if (normalizedExternalPriceId && !normalizedProvider) {
       toast.error("Provider is required when external price ID is set.");
+      return;
+    }
+    if (normalizedShopifySellingPlanId && normalizedProvider !== "shopify") {
+      toast.error("Shopify selling plan ID requires provider=shopify.");
       return;
     }
     let optionValues: Record<string, unknown> | undefined;
@@ -370,6 +378,7 @@ export function ProductDetailPage() {
         offerId: normalizedOfferId || undefined,
         provider: normalizedProvider || undefined,
         externalPriceId: normalizedExternalPriceId || undefined,
+        shopifySellingPlanId: normalizedShopifySellingPlanId || undefined,
         optionValues,
       });
       resetVariantForm();
@@ -390,6 +399,7 @@ export function ProductDetailPage() {
       offerId?: string | null;
       provider?: string | null;
       externalPriceId?: string | null;
+      shopifySellingPlanId?: string | null;
       optionValues?: Record<string, unknown> | null;
     } = {};
 
@@ -405,6 +415,9 @@ export function ProductDetailPage() {
     if (normalizedProvider !== (editingVariant.provider || null)) patchPayload.provider = normalizedProvider;
     if (normalizedExternalPriceId !== (editingVariant.external_price_id || null)) {
       patchPayload.externalPriceId = normalizedExternalPriceId;
+    }
+    if (normalizedShopifySellingPlanId !== (editingVariant.shopify_selling_plan_id || null)) {
+      patchPayload.shopifySellingPlanId = normalizedShopifySellingPlanId;
     }
 
     const currentOptionValues = editingVariant.option_values || null;
@@ -1455,6 +1468,10 @@ export function ProductDetailPage() {
                             {variant.external_price_id || "—"}
                           </div>
                           <div>
+                            <span className="font-semibold text-content">Shopify selling plan ID:</span>{" "}
+                            {variant.shopify_selling_plan_id || "—"}
+                          </div>
+                          <div>
                             <span className="font-semibold text-content">Offer:</span>{" "}
                             {variant.offer_id ? offerNameById.get(variant.offer_id) || variant.offer_id : "—"}
                           </div>
@@ -1660,6 +1677,15 @@ export function ProductDetailPage() {
                   onChange={(e) => setVariantExternalId(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Shopify selling plan ID (optional)</label>
+              <Input
+                placeholder="gid://shopify/SellingPlan/..."
+                value={variantShopifySellingPlanId}
+                onChange={(e) => setVariantShopifySellingPlanId(e.target.value)}
+              />
             </div>
 
             <div className="space-y-1">

@@ -91,6 +91,7 @@ class ProductVariantCreateRequest(BaseModel):
     compareAtPrice: Optional[int] = None
     provider: Optional[str] = None
     externalPriceId: Optional[str] = None
+    shopifySellingPlanId: Optional[str] = None
     optionValues: Optional[dict[str, Any]] = None
     sku: Optional[str] = None
     barcode: Optional[str] = None
@@ -117,6 +118,7 @@ class ProductVariantUpdateRequest(BaseModel):
     compareAtPrice: Optional[int] = None
     provider: Optional[str] = None
     externalPriceId: Optional[str] = None
+    shopifySellingPlanId: Optional[str] = None
     optionValues: Optional[dict[str, Any]] = None
     sku: Optional[str] = None
     barcode: Optional[str] = None

@@ -31,11 +31,18 @@ def test_create_checkout_request_requires_exactly_one_target():
 def test_create_checkout_request_accepts_client_target():
     payload = CreateCheckoutRequest(
         clientId="client_1",
-        lines=[{"merchandiseId": "gid://shopify/ProductVariant/1", "quantity": 2}],
+        lines=[
+            {
+                "merchandiseId": "gid://shopify/ProductVariant/1",
+                "quantity": 2,
+                "sellingPlanId": "gid://shopify/SellingPlan/2",
+            }
+        ],
     )
 
     assert payload.clientId == "client_1"
     assert payload.shopDomain is None
+    assert payload.lines[0].sellingPlanId == "gid://shopify/SellingPlan/2"
 
 
 def test_verify_product_request_requires_exactly_one_target():

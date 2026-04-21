@@ -23,6 +23,7 @@ _IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 _TAG_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _ATTR_NAME_RE = re.compile(r"[A-Za-z_:][A-Za-z0-9_:\.-]*")
 _HTTPS_SCHEMES = {"https"}
+_CHECKOUT_RESERVED_OPTION_SELECTOR_NAMES = {"purchasemode"}
 
 
 def resolve_funnel_page_stage(
@@ -437,16 +438,24 @@ def _validate_checkout_binding(
             )
         if checkout_ready_variants:
             selector_names = {option.name.strip() for option in resolver.optionSelectors}
-            matching_variants = [
-                variant
-                for variant in checkout_ready_variants
-                if isinstance(variant.option_values, dict)
-                and selector_names.issubset({str(key) for key in variant.option_values.keys()})
-            ]
-            if not matching_variants:
-                raise ImportedHtmlRuntimeValidationError(
-                    f"Checkout binding '{binding.id}' option selector names do not match any checkout-ready variant options."
-                )
+            variant_selector_names = {
+                name
+                for name in selector_names
+                if name.strip().lower() not in _CHECKOUT_RESERVED_OPTION_SELECTOR_NAMES
+            }
+            if variant_selector_names:
+                matching_variants = [
+                    variant
+                    for variant in checkout_ready_variants
+                    if isinstance(variant.option_values, dict)
+                    and variant_selector_names.issubset(
+                        {str(key) for key in variant.option_values.keys()}
+                    )
+                ]
+                if not matching_variants:
+                    raise ImportedHtmlRuntimeValidationError(
+                        f"Checkout binding '{binding.id}' option selector names do not match any checkout-ready variant options."
+                    )
     else:  # pragma: no cover
         raise ImportedHtmlRuntimeValidationError(
             f"Checkout binding '{binding.id}' has unsupported variant resolver type."

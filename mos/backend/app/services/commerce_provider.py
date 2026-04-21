@@ -29,6 +29,7 @@ class CommerceProvider(Protocol):
         external_variant_id: str,
         quantity: int,
         metadata: dict[str, Any],
+        shopify_selling_plan_id: str | None = None,
     ) -> dict[str, str]: ...
 
     def get_connection_status(
@@ -91,8 +92,9 @@ class _MedusaCommerceProvider:
         external_variant_id: str,
         quantity: int,
         metadata: dict[str, Any],
+        shopify_selling_plan_id: str | None = None,
     ) -> dict[str, str]:
-        del client_id, external_variant_id, quantity, metadata
+        del client_id, external_variant_id, quantity, metadata, shopify_selling_plan_id
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Medusa checkout is not implemented yet.",
@@ -192,12 +194,14 @@ def create_managed_checkout(
     external_variant_id: str,
     quantity: int,
     metadata: dict[str, Any],
+    shopify_selling_plan_id: str | None = None,
 ) -> dict[str, str]:
     return get_commerce_provider(provider).create_checkout(
         client_id=client_id,
         external_variant_id=external_variant_id,
         quantity=quantity,
         metadata=metadata,
+        shopify_selling_plan_id=shopify_selling_plan_id,
     )
 
 

@@ -29,7 +29,13 @@ from app.services.integration_secrets import encrypt_secret_json
 from app.services.meta_ads import MetaAdsClient, MetaAdsError
 
 
-def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool = False):
+def _seed_shopify_funnel(
+    *,
+    db_session,
+    org_id: UUID,
+    with_selected_offer: bool = False,
+    shopify_selling_plan_id: str | None = None,
+):
     client = Client(org_id=org_id, name="Shopify Client", industry="Retail")
     db_session.add(client)
     db_session.commit()
@@ -63,6 +69,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
         currency="USD",
         provider="shopify",
         external_price_id="gid://shopify/ProductVariant/123456789",
+        shopify_selling_plan_id=shopify_selling_plan_id,
         option_values=None,
     )
     db_session.add(variant)
@@ -249,6 +256,84 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert metadata["offer_id"] == str(seeded["offer"].id)
 
 
+def test_public_checkout_routes_shopify_subscription_by_purchase_mode(
+    api_client, db_session, auth_context, monkeypatch
+):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+        shopify_selling_plan_id="gid://shopify/SellingPlan/222",
+    )
+    seeded["variant"].option_values = {"Pack": "2x"}
+    db_session.add(seeded["variant"])
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    def fake_create_shopify_checkout(**kwargs):
+        observed.update(kwargs)
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/subscription-token",
+            "cartId": "gid://shopify/Cart/subscription",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "selection": {"Pack": "2x", "PurchaseMode": "subscribe"},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": None,
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
+    assert observed["selling_plan_id"] == "gid://shopify/SellingPlan/222"
+    metadata = observed["metadata"]
+    assert isinstance(metadata, dict)
+    assert metadata["purchase_mode"] == "subscribe"
+
+
+def test_public_checkout_rejects_subscribe_when_selling_plan_is_missing(
+    api_client, db_session, auth_context
+):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    seeded["variant"].option_values = {"Pack": "2x"}
+    db_session.add(seeded["variant"])
+    db_session.commit()
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "selection": {"Pack": "2x", "PurchaseMode": "subscribe"},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": None,
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Subscribe & save is not configured for this selection."
+
+
 def test_public_checkout_persists_checkout_started_event(
     api_client, db_session, auth_context, monkeypatch
 ):
@@ -392,6 +477,52 @@ def test_prepared_public_checkout_reuses_prepared_cart_and_tracks_on_consume(
     assert event.props["provider"] == "shopify"
     assert event.props["checkout_session_id"] == "gid://shopify/Cart/prepared"
     assert event.props["variant_id"] == str(seeded["variant"].id)
+
+
+def test_prepared_public_checkout_routes_shopify_subscription_by_purchase_mode(
+    api_client, db_session, auth_context, monkeypatch
+):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+        shopify_selling_plan_id="gid://shopify/SellingPlan/333",
+    )
+    seeded["variant"].option_values = {"Pack": "3x"}
+    db_session.add(seeded["variant"])
+    db_session.commit()
+    sales_page = _publish_sales_page(db_session=db_session, funnel=seeded["funnel"])
+
+    observed: list[dict[str, object]] = []
+
+    def fake_create_shopify_checkout(**kwargs):
+        observed.append(kwargs)
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/prepared-subscription-token",
+            "cartId": "gid://shopify/Cart/prepared-subscription",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    response = api_client.post(
+        "/public/checkout/prepare",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "selection": {"Pack": "3x", "PurchaseMode": "subscribe"},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": str(sales_page.id),
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    assert len(observed) == 1
+    assert observed[0]["selling_plan_id"] == "gid://shopify/SellingPlan/333"
 
 
 def test_public_checkout_routes_shopify_provider_with_stale_formatting(

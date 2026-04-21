@@ -236,6 +236,68 @@ describe("StandaloneImportedHtmlPage", () => {
     dom.window.close();
   });
 
+  it("includes detected purchase mode in checkout selection for imported HTML pages", async () => {
+    const htmlDocument = `
+      <html>
+        <body>
+          <div id="quantity-selector" data-mode="subscribe"></div>
+          <input type="hidden" id="mos-selected-pack" value="3x" />
+          <input type="hidden" id="mos-selected-flavor" value="watermelon" />
+          <button id="main-cta">Buy now</button>
+        </body>
+      </html>
+    `;
+    const { injectedDocument } = await captureInjectedDocument({ htmlDocument });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM(htmlDocument, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page",
+    });
+
+    const observedBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/public/checkout/prepare")) {
+        if (init?.body && typeof init.body === "string") {
+          observedBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+        }
+        return new Response(
+          JSON.stringify({
+            preparedCheckoutId: "prepared-checkout-1",
+            status: "ready",
+            checkoutUrl: "#prepared-checkout",
+            sessionId: "checkout-session-1",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(observedBodies[0]?.selection).toEqual({
+      Pack: "3x",
+      Flavor: "watermelon",
+      PurchaseMode: "subscribe",
+    });
+
+    dom.window.close();
+  });
+
   it("optimizes imported HTML image loading before injecting the document", async () => {
     const { injectedDocument } = await captureInjectedDocument({
       htmlDocument: `

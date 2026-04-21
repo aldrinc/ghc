@@ -20,12 +20,14 @@ class ShopifyCommerceProvider:
         external_variant_id: str,
         quantity: int,
         metadata: dict[str, Any],
+        shopify_selling_plan_id: str | None = None,
     ) -> dict[str, str]:
         return create_shopify_checkout(
             client_id=client_id,
             variant_gid=external_variant_id,
             quantity=quantity,
             metadata=metadata,
+            selling_plan_id=shopify_selling_plan_id,
         )
 
     def get_connection_status(

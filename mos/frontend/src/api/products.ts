@@ -310,6 +310,7 @@ export function useCreateVariant(productId: string) {
       compareAtPrice?: number;
       provider?: string;
       externalPriceId?: string;
+      shopifySellingPlanId?: string;
       optionValues?: Record<string, unknown>;
       sku?: string;
       barcode?: string;
@@ -531,6 +532,7 @@ export function useUpdateVariant(variantId: string, productIdForInvalidation?: s
       compareAtPrice?: number | null;
       provider?: string | null;
       externalPriceId?: string | null;
+      shopifySellingPlanId?: string | null;
       optionValues?: Record<string, unknown> | null;
       sku?: string | null;
       barcode?: string | null;
