@@ -48,10 +48,9 @@ Restart backend after setting these.
 
 ### Production notes
 
-- `SHOPIFY_APP_BASE_URL` in `mos/backend` must point to the same bridge host used by `shopify-funnel-app` `SHOPIFY_APP_BASE_URL`.
-- This host must be reachable by both:
-  - end-user browser (for `/auth/install` redirect)
-  - `mos/backend` runtime (for server-to-server bridge calls)
+- `SHOPIFY_APP_BASE_URL` in `mos/backend` is the bridge URL used for server-to-server calls.
+- In colocated production, prefer the local bridge listener such as `http://127.0.0.1:8011`.
+- `shopify-funnel-app` may still use a separate public `SHOPIFY_APP_BASE_URL` for browser install/auth redirects.
 - `SHOPIFY_INTERNAL_API_TOKEN` in `mos/backend` and `SHOPIFY_INTERNAL_API_TOKEN` in `shopify-funnel-app` must match exactly.
 - After any env change, redeploy/restart both services.
 

@@ -91,6 +91,9 @@ _STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX = "/_standalone-assets"
 _STANDALONE_FONT_ASSET_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/fonts"
 _STANDALONE_COMPRESSED_IMAGE_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/compressed"
 _STANDALONE_RESPONSIVE_VARIANT_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/responsive"
+_STANDALONE_LOCAL_IMAGE_ASSET_ROOTS = (
+    Path(__file__).resolve().parents[2] / "app" / "templates" / "funnels",
+)
 _IMAGE_URL_SUFFIXES = (".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".webp")
 _CSS_URL_REFERENCE_PATTERN = re.compile(r"url\((?P<quote>['\"]?)(?P<url>[^)\"']+)(?P=quote)\)")
 _HTML_CLASS_ATTRIBUTE_PATTERN = re.compile(
@@ -391,6 +394,48 @@ def _extract_absolute_image_urls_from_img_tags(
                 continue
             src_url = srcset_token.split()[0].strip()
             if src_url and not src_url.lower().startswith("data:image/"):
+                _record(src_url)
+
+    return candidate_urls
+
+
+def _extract_relative_image_urls_from_img_tags(html_document: str) -> list[str]:
+    candidate_urls: list[str] = []
+    seen_urls: set[str] = set()
+
+    def _record(candidate_url: str) -> None:
+        normalized = str(candidate_url or "").strip()
+        if not normalized or normalized in seen_urls:
+            return
+        lowered = normalized.lower()
+        if lowered.startswith(("data:image/", "http://", "https://", "//")):
+            return
+        if lowered.startswith(("javascript:", "mailto:", "tel:", "#")):
+            return
+        parsed = urlsplit(normalized)
+        if parsed.scheme or parsed.netloc:
+            return
+        path = parsed.path or normalized
+        if not any(path.lower().endswith(suffix) for suffix in _IMAGE_URL_SUFFIXES):
+            return
+        seen_urls.add(normalized)
+        candidate_urls.append(normalized)
+
+    for match in re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE):
+        raw_tag = match.group(0)
+        raw_src = str(_read_html_tag_attribute(raw_tag, "src") or "").strip()
+        if raw_src:
+            _record(raw_src)
+
+        raw_srcset = str(_read_html_tag_attribute(raw_tag, "srcset") or "").strip()
+        if not raw_srcset:
+            continue
+        for raw_candidate in raw_srcset.split(","):
+            srcset_token = raw_candidate.strip()
+            if not srcset_token:
+                continue
+            src_url = srcset_token.split()[0].strip()
+            if src_url:
                 _record(src_url)
 
     return candidate_urls
@@ -2049,6 +2094,54 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             )
         return payload, str(content_type).strip().lower()
 
+    def _resolve_local_standalone_image_asset(
+        self,
+        *,
+        asset_url: str,
+        context_label: str,
+    ) -> tuple[bytes, str, str]:
+        normalized_url = str(asset_url or "").strip()
+        if not normalized_url:
+            raise ValueError(f"{context_label} local image asset URL must be non-empty.")
+
+        parsed = urlsplit(normalized_url)
+        relative_path = parsed.path or normalized_url
+        normalized_relative_path = relative_path.lstrip("/")
+        if not normalized_relative_path:
+            raise ValueError(f"{context_label} local image asset URL '{asset_url}' is invalid.")
+
+        for root in _STANDALONE_LOCAL_IMAGE_ASSET_ROOTS:
+            candidate_path = root / normalized_relative_path
+            if not candidate_path.is_file():
+                continue
+            payload = candidate_path.read_bytes()
+            if not payload:
+                raise ValueError(
+                    f"{context_label} local image asset '{candidate_path}' resolved from '{asset_url}' is empty."
+                )
+            content_type = _detect_raster_image_content_type(
+                payload=payload,
+                hinted_content_type=None,
+            )
+            if not content_type or not str(content_type).strip().lower().startswith("image/"):
+                raise ValueError(
+                    f"{context_label} local image asset '{candidate_path}' resolved from '{asset_url}' "
+                    f"did not decode as an image."
+                )
+            extension = _resolve_mirrored_image_extension(
+                content_type=str(content_type).strip().lower(),
+                source_url=normalized_relative_path,
+            )
+            digest = hashlib.sha256(payload).hexdigest()[:32]
+            route_path = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/{digest}{extension}"
+            return payload, str(content_type).strip().lower(), route_path
+
+        searched_roots = ", ".join(str(root) for root in _STANDALONE_LOCAL_IMAGE_ASSET_ROOTS)
+        raise ValueError(
+            f"{context_label} local image asset '{asset_url}' was not found under standalone asset roots: "
+            f"{searched_roots}."
+        )
+
     def _mirror_standalone_imported_html_image_assets(
         self,
         *,
@@ -2079,6 +2172,11 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 continue
             seen_urls.add(candidate_url)
             candidate_urls.append(candidate_url)
+        for candidate_url in _extract_relative_image_urls_from_img_tags(html_document):
+            if candidate_url in seen_urls:
+                continue
+            seen_urls.add(candidate_url)
+            candidate_urls.append(candidate_url)
 
         if not candidate_urls:
             return html_document
@@ -2090,35 +2188,51 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         for candidate_url in candidate_urls:
             local_url = mirrored_url_map.get(candidate_url)
             if local_url is None:
-                payload, content_type = self._fetch_remote_standalone_image_asset(
-                    url=candidate_url,
-                    context_label=context_label,
-                )
-                extension = _resolve_mirrored_image_extension(
-                    content_type=content_type,
-                    source_url=candidate_url,
-                )
-                digest = hashlib.sha256(payload).hexdigest()[:32]
-                local_url = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/{digest}{extension}"
-                target_path = f"{site_dir}{local_url}"
-                if target_path not in mirrored_target_paths:
-                    self.run(f"mkdir -p {shlex.quote(os.path.dirname(target_path))}")
-                    self.upload_bytes(payload, target_path)
-                    mirrored_target_paths.add(target_path)
-                self._register_standalone_served_asset(
-                    served_assets=standalone_served_assets,
-                    route_path=local_url,
-                    payload=payload,
-                    content_type=content_type,
-                    context_label=context_label,
-                )
-                self._register_standalone_image_source(
-                    image_sources=standalone_image_sources,
-                    route_path=local_url,
-                    payload=payload,
-                    content_type=content_type,
-                    context_label=context_label,
-                )
+                if _is_absolute_url_candidate(candidate_url, skip_hosts=skip_hosts):
+                    payload, content_type = self._fetch_remote_standalone_image_asset(
+                        url=candidate_url,
+                        context_label=context_label,
+                    )
+                    extension = _resolve_mirrored_image_extension(
+                        content_type=content_type,
+                        source_url=candidate_url,
+                    )
+                    digest = hashlib.sha256(payload).hexdigest()[:32]
+                    local_url = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/{digest}{extension}"
+                    target_path = f"{site_dir}{local_url}"
+                    if target_path not in mirrored_target_paths:
+                        self.run(f"mkdir -p {shlex.quote(os.path.dirname(target_path))}")
+                        self.upload_bytes(payload, target_path)
+                        mirrored_target_paths.add(target_path)
+                    self._register_standalone_served_asset(
+                        served_assets=standalone_served_assets,
+                        route_path=local_url,
+                        payload=payload,
+                        content_type=content_type,
+                        context_label=context_label,
+                    )
+                    self._register_standalone_image_source(
+                        image_sources=standalone_image_sources,
+                        route_path=local_url,
+                        payload=payload,
+                        content_type=content_type,
+                        context_label=context_label,
+                    )
+                else:
+                    payload, content_type, local_url = self._resolve_local_standalone_image_asset(
+                        asset_url=candidate_url,
+                        context_label=context_label,
+                    )
+                    self._write_standalone_route_asset(
+                        site_dir=site_dir,
+                        route_path=local_url,
+                        payload=payload,
+                        content_type=content_type,
+                        uploaded_target_paths=mirrored_target_paths,
+                        standalone_served_assets=standalone_served_assets,
+                        standalone_image_sources=standalone_image_sources,
+                        context_label=context_label,
+                    )
                 mirrored_url_map[candidate_url] = local_url
             rewritten_document = rewritten_document.replace(candidate_url, local_url)
 
@@ -6544,7 +6658,7 @@ WantedBy=multi-user.target
     }}
 
     location ^~ /api/ {{
-        proxy_pass {upstream_api_base_root}/;
+        proxy_pass {upstream_api_base_root};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;

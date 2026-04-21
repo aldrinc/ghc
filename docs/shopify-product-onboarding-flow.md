@@ -29,14 +29,13 @@ Required because Product page Shopify actions call `mos/backend`, and `mos/backe
 - `SHOPIFY_INTERNAL_API_TOKEN=<shared-secret>`
 
 2. Configure `mos/backend`:
-- `SHOPIFY_APP_BASE_URL=https://<same-bridge-domain>`
+- `SHOPIFY_APP_BASE_URL=http://127.0.0.1:8011` for colocated production installs, or another bridge URL that is directly reachable from the backend runtime
 - `SHOPIFY_INTERNAL_API_TOKEN=<same value as bridge token>`
 
 3. Important URL constraint:
-- `SHOPIFY_APP_BASE_URL` is used for both:
-  - server-to-server calls from `mos/backend` to bridge (`/admin/installations`, `/v1/catalog/*`, `/v1/checkouts`)
-  - browser redirect during connect flow (`/auth/install?...`)
-- So this URL must be reachable by both backend runtime and end-user browser.
+- `shopify-funnel-app` `SHOPIFY_APP_BASE_URL` is the browser-facing app URL for install/auth flows.
+- `mos/backend` `SHOPIFY_APP_BASE_URL` is the server-to-server bridge URL used for (`/admin/installations`, `/v1/catalog/*`, `/v1/checkouts`).
+- These may be different in production. The backend setting must resolve from the backend host without relying on a public TLS hop.
 
 4. Restart/redeploy requirements:
 - `mos/backend` must be restarted after env changes.
