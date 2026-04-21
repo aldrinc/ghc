@@ -270,6 +270,7 @@ class FunnelEventTypeEnum(str, Enum):
     custom_page_click = "custom_page_click"
     checkout_started = "checkout_started"
     order_completed = "order_completed"
+    web_vital_recorded = "web_vital_recorded"
 
 
 class AgentRunStatusEnum(str, Enum):

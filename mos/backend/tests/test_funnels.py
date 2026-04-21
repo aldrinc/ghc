@@ -14,6 +14,7 @@ from app.db.models import (
     ClientComplianceProfile,
     Funnel,
     FunnelDomain,
+    FunnelEvent,
     FunnelPage,
     PaidAdsPlatformProfile,
     Site,
@@ -280,6 +281,50 @@ def test_public_events_noop_for_site_preview(api_client: TestClient, db_session,
 
     assert response.status_code == 200
     assert response.json() == {"ingested": 0}
+
+
+def test_public_events_accept_valid_inactive_funnel_publication(api_client: TestClient, db_session):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Inactive Publication Events"
+    )
+
+    publish_1 = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish_1.status_code == 201
+    publication_id_1 = publish_1.json()["publicationId"]
+
+    publish_2 = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish_2.status_code == 201
+    publication_id_2 = publish_2.json()["publicationId"]
+    assert publication_id_2 != publication_id_1
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    page_id = meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "sales_page_view",
+                    "publicationId": publication_id_1,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": f"/{product_slug}/{route_slug}/sales-page",
+                    "props": {"source": "test"},
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": 1}
+
+    event = db_session.scalars(select(FunnelEvent).where(FunnelEvent.publication_id == publication_id_1)).first()
+    assert event is not None
+    assert str(event.funnel_id) == funnel_id
+    assert str(event.page_id) == page_id
 
 
 def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(
@@ -1042,6 +1087,7 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert workload_patch["source_type"] == "funnel_artifact"
     assert workload_patch["source_ref"]["client_id"] == client_id
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://moshq.app/api"
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "runtime_bundle"
     assert workload_patch["source_ref"]["runtime_dist_path"] == "mos/frontend/dist"
     assert workload_patch["source_ref"]["artifact"]["meta"]["clientId"] == client_id
     assert workload_patch["source_ref"]["artifact"]["products"] == {}
@@ -1053,7 +1099,59 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert deploy_request["apply_plan"] is True
     assert deploy_request["bunny_pull_zone"] is False
     assert deploy_request["bunny_pull_zone_origin_ip"] is None
+    assert deploy_request["artifact_render_mode_explicit"] is False
+    assert deploy_request["artifact_render_mode_requested"] is None
     assert captured["access_urls"] == ["https://landing.example.com/"]
+
+
+def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: TestClient, monkeypatch):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Explicit Standalone Deploy Funnel",
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_start_funnel_publish_job(
+        *,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
+    ):
+        _ = org_id, user_id, funnel_id, access_urls
+        captured["deploy_request"] = deploy_request
+        return {
+            "id": "publish-job-standalone",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": [],
+            "result": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "renderMode": "standalone_imported_html",
+            }
+        },
+    )
+    assert resp.status_code == 201
+
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "standalone_imported_html"
+    assert "runtime_dist_path" not in workload_patch["source_ref"]
+    assert deploy_request["artifact_render_mode_explicit"] is True
+    assert deploy_request["artifact_render_mode_requested"] == "standalone_imported_html"
 
 
 def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestClient, monkeypatch):
@@ -1104,6 +1202,81 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     deploy_request = captured["deploy_request"]
     assert deploy_request["bunny_pull_zone"] is True
     assert deploy_request["bunny_pull_zone_origin_ip"] == "46.225.124.104"
+    workload_patch = deploy_request["workload_patch"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
+    assert workload_patch["workspace_server_names"] == ["shop.shopemberco.com"]
+    assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
+
+
+def test_publish_with_bunny_pull_zone_uses_saved_workspace_domains_when_server_names_empty(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Bunny Saved Domains Funnel",
+    )
+
+    funnel_detail_resp = api_client.get(f"/funnels/{funnel_id}")
+    assert funnel_detail_resp.status_code == 200
+    funnel_detail = funnel_detail_resp.json()
+    client_id = funnel_detail["client_id"]
+    org_id = funnel_detail["org_id"]
+
+    from app.db.models import OrgDeployDomain
+
+    db_session.add(
+        OrgDeployDomain(
+            org_id=UUID(org_id),
+            client_id=UUID(client_id),
+            hostname="shop.shopemberco.com",
+        )
+    )
+    db_session.commit()
+
+    captured: dict[str, object] = {}
+
+    def fake_start_funnel_publish_job(
+        *,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
+    ):
+        _ = user_id
+        captured["org_id"] = org_id
+        captured["funnel_id"] = funnel_id
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
+        return {
+            "id": "publish-job-saved-domains",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "serverNames": [],
+                "bunnyPullZone": True,
+            }
+        },
+    )
+    assert resp.status_code == 201
+
+    deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False

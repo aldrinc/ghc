@@ -26,6 +26,7 @@ from app.db.models import (
     DesignSystem,
     Funnel,
     FunnelEvent,
+    FunnelPublication,
     FunnelPage,
     FunnelPageVersion,
     PreparedFunnelCheckout,
@@ -3442,9 +3443,14 @@ def ingest_public_events(
             detail="publicationId must be a valid UUID.",
         ) from exc
 
-    funnel = session.scalars(
-        select(Funnel).where(Funnel.active_publication_id == publication_uuid)
+    publication = session.scalars(
+        select(FunnelPublication).where(FunnelPublication.id == publication_uuid)
     ).first()
+    funnel = (
+        session.scalars(select(Funnel).where(Funnel.id == publication.funnel_id)).first()
+        if publication
+        else None
+    )
     if not funnel:
         site = session.scalars(
             select(Site).where(
@@ -3497,7 +3503,7 @@ def ingest_public_events(
             "client_id": str(funnel.client_id),
             "campaign_id": str(funnel.campaign_id) if funnel.campaign_id else None,
             "funnel_id": str(funnel.id),
-            "publication_id": str(publication_uuid),
+            "publication_id": str(publication.id if publication else publication_uuid),
         },
         host=request.headers.get("host"),
         events=ingested_events,

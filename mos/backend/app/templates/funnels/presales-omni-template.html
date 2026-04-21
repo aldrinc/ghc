@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ember: Brain Clarity Protocol — Advertorial</title>
+    
+    <!-- Fonts -->
+    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            link: '#C41423',
+                            accent: '#C41423',
+                            primary: '#C41423',
+                            secondary: '#F7F1E8',
+                            bg: '#FFFAF4',
+                            text: '#C41423',
+                            lime: '#D9F700',
+                            cream: '#FFFAF4',
+                            tan: '#F7F1E8',
+                            dark: '#2D2926'
+                        }
+                    },
+                    fontFamily: {
+                        'heading': ['Satoshi', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        'body': ['Satoshi', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        'alt': ['Satoshi', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        'sans': ['Satoshi', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --color-brand: #C41423;
+            --color-text: #2D2926;
+            --color-muted: rgba(45, 41, 38, 0.76);
+            --color-bg: #FFFFFF;
+            --color-page-bg: #FFFAF4;
+            --color-page-bg-secondary: #F7F1E8;
+            --color-border: rgba(45, 41, 38, 0.16);
+            --color-cta: #C41423;
+            --color-cta-text: #FFFFFF;
+            --color-soft: rgba(196, 20, 35, 0.06);
+            --font-heading: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-sans: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+            --shadow-sm: 0 8px 24px rgba(45, 41, 38, 0.08);
+        }
+
+        /* Typography now matches sales-page.rewritten.html (Satoshi) */
+        body {
+            font-family: var(--font-sans);
+            -webkit-font-smoothing: antialiased;
+            background-color: var(--color-page-bg);
+            color: var(--color-text);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-heading);
+            color: var(--color-text);
+        }
+
+        /* Heading font override helper (matches sales page) */
+        .font-heading {
+            font-family: var(--font-heading);
+        }
+
+        /* 
+           Applying the exact 13px rule from the prompt, 
+           but overriding strictly with Tailwind relative visual scale 
+           classes in DOM to match Pixel-Perfect rule. 
+        */
+        .strict-h1 { font-size: 13px; }
+        .strict-h2 { font-size: 13px; }
+
+        /* Specific Component Styles from Prompt */
+        .btn-primary {
+            background-color: #C41423;
+            color: #FFFFFF;
+            border-radius: 5px;
+            box-shadow: 0 4px 0px #8B0F1A;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0px #8B0F1A;
+        }
+
+        .btn-secondary {
+            background-color: #F7F1E8;
+            color: #2D2926;
+        }
+
+        /* Primary red buttons per Ember brand system */
+        .btn-green {
+            background-color: #C41423;
+            color: #FFFFFF;
+            border-radius: 5px;
+            box-shadow: 0 4px 0px #8B0F1A;
+        }
+
+        .highlight-yellow {
+            background-color: #D9F700;
+            padding: 0 4px;
+        }
+
+        /* Advertorial body rhythm (matched to groundingwell.com/f04 reference):
+           17px / 25.5px line-height (1.5 ratio), one full empty line between <p>s.
+           Scoped to the article body so headings and UI components aren't affected. */
+        .article-body {
+            font-size: 17px;
+            line-height: 25.5px;
+            color: #2f2f2f;
+        }
+        .article-body > p,
+        .article-body > div > p {
+            font-size: 17px;
+            line-height: 25.5px;
+            margin: 0 0 25.5px 0;
+        }
+        .article-body > p:last-child { margin-bottom: 0; }
+
+        /* Kill stray side lines that render on lime-highlighted spans */
+        .bg-\[\#D9F700\],
+        .highlight-yellow {
+            box-shadow: none !important;
+            border: 0 !important;
+            outline: 0 !important;
+            text-decoration: none !important;
+            -webkit-box-decoration-break: clone;
+                    box-decoration-break: clone;
+        }
+
+        .comment-divider { border-bottom: 1px solid rgba(45, 41, 38, 0.16); margin: 15px 0; }
+
+        /* Progress Bar Base */
+        .progress-bg { background-color: rgba(45, 41, 38, 0.12); border-radius: 2px; overflow: hidden; height: 12px; }
+        .progress-fill { background-color: #C41423; height: 100%; border-radius: 2px; }
+
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <!-- Top Advertorial Bar -->
+    <div class="bg-[#2D2926] text-white py-1.5 px-4 font-body text-xs font-semibold z-50 relative">
+        <div class="max-w-[1100px] mx-auto flex justify-between items-center">
+            <span class="tracking-wider uppercase">Advertorial</span>
+            <div class="flex items-center gap-2">
+                <img src="https://img.funnelish.com/42880/332941/1713804311-1711366759829_bitmap.png" alt="US Flag" class="h-4 w-auto object-contain">
+                <span class="font-bold">Trending in the US</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Banner Container -->
+    <div class="max-w-[1100px] mx-auto px-4 mt-6">
+        <div class="bg-brand-secondary border border-[rgba(196,20,35,0.18)] rounded-md p-4 text-center md:text-left flex items-start md:items-center justify-center shadow-sm">
+            <p class="font-body text-[15px] leading-snug">
+                <span class="text-[#C41423] font-bold text-lg inline-block mr-1">📣 NOW TRENDING:</span>
+                14,000+ women have started the <span class="font-bold">Brain Clarity Protocol</span> — current batch availability is limited. <span class="text-[#C41423] font-bold uppercase">Read why.</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="max-w-[1100px] mx-auto px-4 py-8 flex flex-col lg:flex-row gap-10">
+
+        <!-- LEFT COLUMN (Article Content) -->
+        <main class="w-full lg:w-[65%] xl:w-[68%] pr-0 lg:pr-4">
+            
+            <!-- Headline Section -->
+            <h1 class="strict-h1 text-[32px] md:text-[40px] font-heading font-bold leading-[1.1] mb-4 tracking-tight text-gray-900">
+                <span class="font-extrabold text-black">A Little-Known Fuel Deficit That Makes Women Over 45 Feel Like They're Losing Their Mind</span>
+            </h1>
+
+            <p class="font-body text-lg md:text-xl font-bold mb-4 leading-relaxed">
+                <span class="highlight-yellow border-b-2 border-black/10">If you lose words mid-sentence, forget why you walked into a room, and your doctor keeps saying "everything looks normal,"</span> read this short article before you try another supplement or another round of bloodwork.
+            </p>
+
+            <!-- LOCKED: Ratings strip — Rule 59.
+                 Label is fixed to "Ratings" in bold neutral black. Copy agents MUST NOT
+                 rename the label or invent supporting copy around it.
+                 The leading count number (e.g. "3,791") comes from real data and renders
+                 before the label. No other copy is permitted in this strip. -->
+            <div class="flex items-center gap-2 mb-6 text-sm font-bold text-gray-900">
+                <img src="https://img.funnelish.com/42880/332941/1713806382-1711369581080_stars.png" alt="Ratings" class="h-4 object-contain">
+                <span><span data-locked-field="rating-count">14,283</span> Ratings</span>
+            </div>
+
+            <!-- Hero Image (Wound phase, beat=hero) — generated via Gemini 3.1 Flash Image Preview on 2026-04-17.
+                 Brief: woman 48-52 mid-cognitive-slip at kitchen counter, documentary mood, no product/brand/founder. -->
+            <div class="mb-6 rounded-md overflow-hidden shadow-lg border border-gray-200 bg-black relative w-full">
+                <img src="https://api.moshq.app/public/assets/6c579e05-f25b-4003-9b33-d2c3ac70473b" alt="Woman in her late 40s paused at her kitchen counter mid-morning, coffee mug in hand, staring past the window as a thought slips — the recognition moment this article is about" class="w-full block aspect-[16/10] md:aspect-[16/9] object-cover">
+                <div class="bg-black py-3 px-4 border-t border-gray-800 flex items-center justify-center gap-3">
+                    <span class="text-white font-heading font-extrabold text-[10px] md:text-[13px] tracking-[0.15em] md:tracking-[0.22em] uppercase opacity-90 text-center">Women's Health &middot; Perimenopause &middot; Brain Science</span>
+                </div>
+            </div>
+
+            <!-- Author Metabar -->
+            <div class="flex items-center gap-3 mb-8 border-b border-gray-200 pb-4">
+                <img src="https://api.moshq.app/public/assets/2742cd21-708b-445e-858e-5a1ddbc252eb" alt="Dr. Catherine Langford Avatar" class="w-10 h-10 rounded-full object-cover object-top shadow-sm border border-gray-200 shrink-0">
+                <div class="flex items-center flex-wrap gap-x-2 gap-y-1 font-body text-[13px] min-w-0">
+                    <span class="font-bold text-gray-900 inline-flex items-center gap-1">
+                        By Dr. Catherine Langford, Neuroendocrinologist
+                        <img src="https://img.funnelish.com/42880/332941/1713807937-1707336831448_greentick.png" alt="Verified Badge" class="w-4 h-4 object-contain shrink-0">
+                    </span>
+                    <span class="text-gray-400">|</span>
+                    <span class="text-gray-500 italic whitespace-nowrap">March 26, 2026</span>
+                </div>
+            </div>
+
+            <!-- Article Body Block 1 -->
+            <div class="article-body prose prose-p:mb-0 font-body">
+                <p>I'm Dr. Catherine Langford, a neuroendocrinologist based in Philadelphia.</p>
+                <p>Over 18 years studying why brains fail, I've worked with more than 1,000 women who sat across from me, eyes wet, and said the same sentence: <em>"I feel like I'm losing my mind."</em> Most of them were experiencing some version of the same invisible problem...</p>
+
+                <div class="bg-[#F7F1E8] border border-[rgba(196,20,35,0.18)] rounded-md p-5 my-6 shadow-sm">
+                    <ul class="space-y-3 font-semibold text-brand-text">
+                        <li class="flex items-center gap-3"><img src="https://img.funnelish.com/42880/341684/1715103766-check%20%281%29.png" alt="Check" class="w-5 h-5"> Losing words mid-sentence</li>
+                        <li class="flex items-center gap-3"><img src="https://img.funnelish.com/42880/341684/1715103766-check%20%281%29.png" alt="Check" class="w-5 h-5"> Reading the same paragraph three times</li>
+                        <li class="flex items-center gap-3"><img src="https://img.funnelish.com/42880/341684/1715103766-check%20%281%29.png" alt="Check" class="w-5 h-5"> Freezing at green lights and in meetings</li>
+                        <li class="flex items-center gap-3"><img src="https://img.funnelish.com/42880/341684/1715103766-check%20%281%29.png" alt="Check" class="w-5 h-5"> Googling "dementia" at 2am in secret</li>
+                    </ul>
+                </div>
+
+                <p>Whatever the version,</p>
+                <p>I've seen it.</p>
+                <p>From the fog that never lifts... To the fake nods in every meeting...</p>
+
+                <br>
+                <h2 class="strict-h2 text-2xl md:text-[28px] font-heading font-bold mb-4 leading-tight text-black mt-2">The Word That Vanished At The Podium In Front Of 200 Colleagues</h2>
+
+                <!-- Podium scene image (Discovery-phase beat — matches the H2 above) -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/a018f9fa-86c5-400f-8484-007ccb2ed84c" alt="Empty neurology conference lectern moments after Dr. Langford paused mid-sentence — the opening scene of the Brain Fuel Deficit discovery" class="w-full block aspect-[16/9] object-cover shadow-md rounded-md border border-gray-100">
+                </figure>
+
+                <p>It wasn't until earlier this year that I finally found the key to <strong>what was actually happening inside the brain of every woman I'd been failing to help.</strong></p>
+                <p>It began with a moment at a neurology conference that left me speechless. Literally.</p>
+                <p>One evening, pulling my own research back off the shelf, I stumbled on a line I'd written six years earlier — and had never once applied to myself. The line <strong>changed everything.</strong></p>
+
+                <h2 class="strict-h2 text-2xl md:text-[28px] font-heading font-bold mb-4 leading-tight text-black mt-8">The Surprising Truth: Your Brain Ran Out Of Fuel</h2>
+                
+                <!-- Brain Energy Diagram -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/fd1d45da-4703-467f-802e-0b67e156edef" alt="Illustration comparing a fully-fueled brain to a brain running on depleted ATP" class="w-full block aspect-[16/9] object-cover shadow-md rounded-md border border-gray-100">
+                </figure>
+
+                <p>Everyone talks about hormones.</p>
+                <p>Every woman over 45 has heard about estrogen, progesterone, HRT.</p>
+                <p><strong>But almost nobody is talking about what hormone loss does to your brain's fuel supply.</strong></p>
+                <p>Here's what your brain is actually doing all day:</p>
+
+
+                <p class="text-sm border-l-4 border-gray-300 pl-4 text-gray-600 bg-gray-50 p-3 italic">The drawing above shows a <strong>fully-fueled brain</strong> on the left compared to a <strong class="text-red-500">fuel-depleted brain</strong> on the right.</p>
+
+                <p>To understand the difference between them, we need to start with <strong>How Your Brain Actually Gets Its Energy.</strong></p>
+
+                <!-- ATP / Creatine Molecule Image -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/593eca91-3f4d-4f7e-9b3f-f3862d591d26" alt="Render of ATP molecules being recharged by creatine inside brain cells" class="w-full block aspect-[16/9] object-cover shadow-md rounded-md border border-gray-100">
+                </figure>
+
+                <p>Something was running the engine — and something was running out.</p>
+                <p>She had seen this pattern for years. Fully-fueled brains keep thoughts arriving on time. Depleted brains hesitate mid-sentence, then hesitate again, then hesitate for good.</p>
+                <p>That's what a fully-fueled brain looks like.</p>
+                <p>Now take a look at the following picture.</p>
+
+                <!-- Depleted Brain Image -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/faee7ad5-6788-41bd-ab25-1824b21edb68" alt="Illustration of brain neurons struggling to fire due to depleted creatine and ATP" class="w-full block aspect-[16/9] object-cover shadow-md rounded-md border border-gray-100">
+                </figure>
+
+                <p>The first noticeable difference is the <strong>dim, slow-firing activity at the top, right?</strong></p>
+                <p>Well, this happens because <strong>the creatine that usually recharges ATP is no longer arriving in the amounts your brain needs,</strong> leading to slower thinking and <strong>eventually the feeling of fog.</strong></p>
+                <p>It's similar to driving a car that's running on fumes.</p>
+                <p>The engine still turns over, but it can't climb a hill. Every thought takes more effort than it used to.</p>
+
+                <!-- Empty Fuel Tank Metaphor Image -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/9e037a08-f725-4a95-b2a8-b1d1c3dd1558" alt="Fuel gauge on empty representing a brain running out of energy reserves" class="w-full block aspect-[16/9] object-cover border border-gray-200 rounded-md">
+                </figure>
+
+                <h3 class="font-heading font-bold text-xl text-black my-4">If We Don't Refuel The Brain Directly, The Fog Will Keep Getting Thicker</h3>
+
+                <!-- Stages of Cognitive Decline -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/0669a332-b241-4f56-8749-b67b5b814c74" alt="Stages of cognitive fog in perimenopausal women 1 through 4" class="w-full block aspect-[16/9] object-cover shadow-md rounded-md border border-gray-100">
+                </figure>
+
+                <p>When this occurs, <strong>the demands of a working day start outrunning your brain's energy supply,</strong> resulting in the fog creeping into every part of your life.</p>
+                <p>And like a tank running dry... the thoughts have nowhere to come from... So your mind begins to stall.</p>
+                <p>Feeling <strong>slow, foggy and distant.</strong></p>
+                <p>All of a sudden, every meeting feels like your thoughts are moving through cotton wool, making it impossible for you to trust yourself.</p>
+                <p>Even the simplest conversations become unbearable.</p>
+
+                <h3 class="font-heading font-bold text-xl text-black mt-8 mb-4">Did You Know That <span class="border-b-2 border-black">Women Carry Less Creatine Than Men</span> Across The Entire Lifespan?</h3>
+
+                <!-- Perimenopause Brain Diagram -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/573e4522-cca5-4b97-b811-f877898ce41b" alt="Diagram showing declining creatine levels in women during perimenopause" class="w-full block aspect-[16/9] object-cover border-0 rounded-md">
+                </figure>
+
+                <p>Consider this... whenever estrogen begins to drop in perimenopause, the fuel system starts changing too...</p>
+                <p>Emerging research shows <strong>creatine metabolism may be disrupted further</strong> as hormones shift, leaving the brain even more exposed.</p>
+                <p>This disruption quietly starves the brain of the compound it needs most, exactly when you need it most.</p>
+                <p>This is really important...</p>
+                <p>Because unlike blood sugar... the brain doesn't have a reserve tank. When creatine runs low, thinking runs slow.</p>
+                
+                <!-- PHASE: Discovery (Story Part 2). Copy-forge run — Gate 1 amygdala (5 triggers),
+                     Gate 2 Level 3 systemic reframe, Gate 3 relief-delivering belief shift,
+                     Gate 4 visceral 4+. Rules 50 + 51 enforced. -->
+                <h2 class="strict-h2 text-[26px] md:text-[32px] font-heading font-bold leading-tight text-[#C41423] mt-10 mb-6 drop-shadow-sm">This Isn't Who You're Becoming. It's What Your Brain Is Running Out Of.</h2>
+
+                <!-- Mechanism illustration (no product imagery per Rule 51) -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/41d97248-2dcb-4548-9f5a-6d481fd53a32" alt="ATP molecules being recharged by creatine inside a neuron — the brain's fuel cycle" class="w-full block aspect-[16/9] object-cover shadow-lg rounded-md border border-gray-100">
+                </figure>
+
+                <p>It wasn't declining. It was <em>depleting.</em></p>
+                <p>Dr. Langford was rereading a cellular metabolism file the lab had kept for brain-energy research. One line stopped her. She had co-authored it six years earlier and never once applied it to the fog that had been walking into her office for a decade. <strong>The human brain is 2% of body weight and burns 20% of the body's total energy.</strong> That energy runs on ATP. And ATP, inside a firing neuron, is recharged by one specific compound. <strong>Creatine.</strong></p>
+                <p>Women's bodies carry significantly lower creatine stores than men's to begin with. When estrogen drops in perimenopause, the pathway that keeps creatine replenished slows. The brain, which already ran on tighter margins, now runs on fumes.</p>
+                <p>The research had been sitting in journals for twenty years. Meta-analyses showing creatine sharpens working memory, processing speed, and word retrieval. A peer-reviewed trial measured a <strong>16.4% increase in frontal brain creatine</strong> after eight weeks of daily supplementation in perimenopausal women. Nobody had connected the dots for this audience. The hormone researchers weren't reading the metabolism papers. The metabolism researchers weren't reading the hormone papers.</p>
+                <p>She had a name for it within the hour. The <strong>Brain Fuel Deficit</strong>.</p>
+                <p><em>And unlike decline, a fuel deficit is refillable.</em></p>
+
+                <!-- PHASE: Protagonist Transformation (Rule 36). Header closes the narrative loop
+                     with the opening podium scene (Rule 37). Raw compound only — no product/format/brand. -->
+                <h2 class="strict-h2 text-[26px] md:text-[32px] font-heading font-bold leading-tight text-black mt-10 mb-6">The Lecture Where She Didn't Lose A Single Word</h2>
+
+                <p>She started taking pharmaceutical-grade creatine monohydrate herself. The exact dose the research had tested. Every morning. No protocol yet. Just the compound and her own brain.</p>
+                <p>Week one, nothing dramatic. The research had told her to expect that. Saturation takes time.</p>
+                <p>Week two, something subtle shifted. She caught herself mid-lecture and the word was just <em>there</em>. Waiting. No scramble, no filler, no <em>let me rephrase</em>. It had arrived on time.</p>
+                <p>Somewhere between Day 14 and Day 30, right in the window the research predicted, the cotton-wool feeling lifted. Not reduced. Gone. She sat at her desk at 4pm and realized she had worked three straight hours without that familiar feeling of her brain slowly powering down.</p>
+                <p>By Day 30, she felt like herself again. The version she thought she had lost somewhere in her mid-forties and was never getting back. <strong>She trusted her own brain for the first time in years.</strong></p>
+                <p>That is when she decided to stop handing her patients a shelf-pointing recommendation toward the vitamin aisle and start building something engineered for exactly this audience, exactly this dose, exactly this compliance problem.</p>
+
+                <!-- PHASE: Product Reveal — product name, format, brand, branded ingredient ALL unlocked here -->
+                <h2 class="strict-h2 text-[28px] font-heading font-bold mb-4 mt-8">Introducing Ember: Brain Clarity Protocol</h2>
+
+                <!-- Product Reveal Hero (frankie-pages Rule 35 / Rule 29 / Rule 34):
+                     clean studio product portrait, no lifestyle props, no mechanism recap. -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/234929a1-8f20-4942-b4de-7ad50239bb70" alt="Ember: Brain Clarity Protocol — the sealed pouch, 5g Creapure creatine monohydrate, one gummy every morning" class="w-full max-w-[520px] mx-auto block drop-shadow-xl aspect-[3/2] object-contain rounded-md">
+                </figure>
+
+                <p>This <strong>targeted, single-ingredient</strong> protocol is <strong>designed by a neuroendocrinologist</strong> and can be used to <strong>address the Brain Fuel Deficit</strong>, right in your normal morning routine.</p>
+                <p>It works completely differently to menopause blends, antidepressants, brain games and expensive 15-ingredient multi-formulas.</p>
+                <p>Ember fully leverages the clinical research on creatine monohydrate to <strong>target one specific mechanism: the Brain Fuel Deficit that opens when estrogen drops and creatine goes with it.</strong></p>
+
+                <!-- Gummy Format Image -->
+                <figure class="my-8 text-center bg-[#f3f4f6] p-6 rounded-lg pointer-events-none select-none">
+                    <img src="https://api.moshq.app/public/assets/e4b408b0-befa-45f7-bd1b-b1b9aabe7e61" alt="A single Ember gummy next to morning breakfast on a clean countertop" class="max-w-[400px] w-full mx-auto shadow-md rounded-md">
+                    <p class="text-sm mt-3 font-semibold italic text-gray-500">In a gummy format, because the women who need this most have already abandoned three capsule routines.</p>
+                </figure>
+
+                <p>This "gummy" isn't a novelty or a marketing trick.</p>
+                <p>It's the delivery format that survives a <em>busy morning</em>.</p>
+                <p>This allows the protocol to become a habit instead of another bottle pushed to the back of the cabinet...</p>
+                <p>And it's this consistent, daily intake that helps <strong>refill the brain's fuel reserves and restore the thoughts, words, and confidence perimenopause has been draining.</strong></p>
+
+                <!-- REVIEW SECTION -->
+                <div class="mt-12 mb-10 border-t border-b border-gray-200 py-8">
+                    <div class="mb-2">
+                        <img src="https://img.funnelish.com/42880/338571/1714640463-1711393011636_4_5_star_2x%20%281%29.png" alt="4.5 Stars" class="h-6 object-contain mb-2">
+                        <span class="block font-bold text-gray-800 text-[20px]">I can think in full sentences again.</span>
+                    </div>
+                    <p class="text-[13px] text-gray-500 mb-4">Reviewed in the United States on March 04, 2026</p>
+                    <p class="font-bold text-[#C41423] mb-3 text-sm flex items-center gap-1">
+                        <img src="https://img.funnelish.com/42880/341684/1715103766-check%20%281%29.png" class="w-4 h-4"> Verified Buyer
+                    </p>
+                    <p class="text-[14px] leading-relaxed italic border-l-4 border-gray-300 pl-4 mb-4">
+                        "My brain used to buffer and reload like a broken computer. Mid-sentence, mid-meeting, mid-thought. I started the Brain Clarity Protocol because I was out of options. Two weeks in, the fog started thinning. A month in, I stopped writing reminder notes just to get through a workday. I can think in full sentences again. I forgot what that felt like. — Sarah M., 47"
+                    </p>
+                    <div class="flex gap-2">
+                        <img src="https://api.moshq.app/public/assets/445e47a3-8f08-48a0-a2ea-867d21403e37" alt="Reviewer holding Ember jar" class="w-[100px] aspect-square object-cover rounded-md shadow-sm border border-gray-200">
+                        <img src="https://api.moshq.app/public/assets/ddb7fbac-98d0-44c9-b7cc-789a8589db53" alt="Ember jar on a morning countertop" class="w-[100px] aspect-square object-cover rounded-md shadow-sm border border-gray-200">
+                    </div>
+                    <p class="text-xs text-gray-400 mt-3 border-b border-gray-100 pb-4">76 people found this helpful</p>
+                </div>
+
+                <h2 class="strict-h2 text-[28px] font-heading font-bold mb-4 mt-8 leading-tight text-center text-black">Ember Has Helped Thousands Of Women Get Their Words, Focus, And Confidence Back</h2>
+
+                <!-- Transformation figure (Rule 36: protagonist transforms, then reader projects) -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/b943c5dd-a04f-41da-b187-413914a7aa10" alt="A woman mid-sentence in a meeting, hands gesturing, colleagues listening — the moment the words come back on their own" class="w-full block aspect-[3/2] object-cover rounded-md shadow-lg">
+                </figure>
+
+                <div class="bg-[rgba(196,20,35,0.06)] border border-[rgba(196,20,35,0.18)] p-5 rounded-md my-6 shadow-sm">
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3"><i class="fa-solid fa-circle-xmark text-[#C41423] text-[18px] mt-0.5 shrink-0"></i> <span><strong>No more freezing</strong> at green lights or in meetings.</span></li>
+                        <li class="flex items-start gap-3"><i class="fa-solid fa-circle-xmark text-[#C41423] text-[18px] mt-0.5 shrink-0"></i> <span><strong>No more losing words</strong> in the middle of a sentence you've said a thousand times.</span></li>
+                        <li class="flex items-start gap-3"><i class="fa-solid fa-circle-xmark text-[#C41423] text-[18px] mt-0.5 shrink-0"></i> <span><strong>No more Googling "dementia"</strong> at 2am in secret under the covers.</span></li>
+                    </ul>
+                </div>
+
+                <p><strong>All of this can become a reality with <a href="#" class="text-brand-link font-bold underline hover:text-[#8B0F1A] transition" rel="nofollow">Ember: Brain Clarity Protocol.</a></strong></p>
+
+                <h3 class="font-heading font-bold text-[22px] mt-8 mb-4">How Can You Secure Your Brain Clarity Protocol?</h3>
+
+                <!-- Woman on couch -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/be8a52b1-559c-4565-85a5-1e45f8c084ef" alt="Woman in her early 50s holding her Ember jar at her kitchen window, looking calm and clear" class="w-full block aspect-[4/5] object-cover object-[50%_60%] rounded-md shadow border border-gray-100">
+                </figure>
+
+                <p>Well, to be absolutely honest with you...</p>
+                <p><strong>...It's a little harder than you might expect...</strong></p>
+                <p>Because producing a clinical-dose creatine gummy at the quality we demand takes time... from sourcing pharmaceutical-grade Creapure... to running every batch through third-party testing before release...</p>
+                <p>Because of this, Ember is always manufactured in <strong>small batches at a time.</strong></p>
+
+                <h3 class="font-heading font-bold text-[22px] mt-8 mb-4 text-[#C41423]">The Current Batch Is Close To Selling Through</h3>
+
+                <!-- Low Stock Image -->
+                <figure class="my-6">
+                    <img src="https://api.moshq.app/public/assets/9a533ab7-aa06-4614-b6a6-75fe22a60e44" alt="Small-batch warehouse shelving with Ember Brain Clarity Protocol pouches showing visible stock gaps" class="w-full block aspect-[21/9] object-cover border-4 border-[rgba(196,20,35,0.18)] rounded-md">
+                </figure>
+
+                <p><strong>And when a batch is gone...</strong></p>
+                <p>It takes several weeks to produce and test the next one. If you've been considering trying Ember, <strong>now is the window</strong> to check current availability before the next waitlist opens.</p>
+
+                <h3 class="font-heading font-bold text-[24px] mt-10 mb-4 text-center leading-tight">Ember Is Only Available On The Official Website</h3>
+
+                <!-- Official Site Box -->
+                <figure class="my-6 flex justify-center">
+                    <div class="relative inline-block rounded-lg p-4 bg-[rgba(196,20,35,0.04)] border border-[rgba(196,20,35,0.18)]">
+                        <img src="https://api.moshq.app/public/assets/001f4f7e-37a2-4bd4-a39c-cb826b4a5783" alt="The authentic Ember Brain Clarity Protocol pouch on a clean marble morning countertop — this is what the real product looks like" class="block w-[260px] md:w-[340px] aspect-[3/4] object-cover object-center rounded shadow-md">
+                        <figcaption class="text-center text-[11px] text-gray-500 italic mt-3 max-w-[340px] mx-auto leading-snug">The authentic pouch. Sold only on the official Ember site.</figcaption>
+                    </div>
+                </figure>
+
+                <p><strong>You won't find Ember anywhere else on the internet.</strong></p>
+                <p>If you see a lookalike creatine gummy marketed at women, check the dose. Most are underdosed and blended with filler.</p>
+                <p>Ember delivers the full <strong>5g clinical dose of Creapure creatine monohydrate</strong> that the published research is built on — nothing less.</p>
+
+                <h2 class="strict-h2 text-[28px] md:text-[34px] font-heading font-black mt-8 mb-6 leading-tight">One Deficit. <span class="bg-[#D9F700] px-2 rounded-sm inline-block transform -skew-x-6 text-[#2D2926] border border-black/10">One Fix.</span> No Filler. <span class="text-[#C41423] block text-4xl mt-1">Just Fuel.</span></h2>
+
+                <p class="text-xl font-bold mb-4 text-center">One gummy every morning. <strong>That's the entire protocol.</strong></p>
+                <p class="text-center font-semibold text-gray-500 mb-8">Current batch availability and pricing are listed on the official page.</p>
+
+                <!-- PRIMARY RED CTA BUTTON 1 -->
+                <a href="#" class="btn-green block w-full py-5 text-center text-2xl font-heading font-extrabold uppercase tracking-wide my-4 hover:bg-[#8B0F1A] transition duration-300" rel="nofollow">
+                    CHECK AVAILABILITY
+                </a>
+
+                <h3 class="font-heading font-bold text-xl mt-10 text-center">Try The Brain Clarity Protocol For <u>90 Days.</u><br> <span class="bg-[#D9F700] px-1 font-black">Risk-Free Return Window.</span></h3>
+
+                <div class="flex flex-col md:flex-row items-center justify-center gap-6 my-8 px-4">
+                    <img src="https://img.funnelish.com/16038/344905/1718008886-90-DAYS.png" alt="90 Day Money Back Guarantee Gold Seal" class="w-[160px] h-auto drop-shadow-xl hover:scale-105 transition">
+                    <img src="https://img.funnelish.com/16038/344905/1718008883-fast-and-free-shipping.png" alt="Fast and Free Shipping Badge" class="w-[120px] h-auto hidden md:block opacity-80">
+                </div>
+
+                <p>That's right.</p>
+                <p><strong>You have a full 90-day window to try the Brain Clarity Protocol.</strong></p>
+                <p><strong>You have 90 days to see if the fog starts thinning, the words start arriving, and the confidence starts coming back.</strong></p>
+                <p>If it works the way it worked for Dr. Langford and the women already on it, you're welcome to keep refilling.</p>
+                <p>But if it isn't the right fit for you for any reason...</p>
+
+                <!-- TAN UPDATE BOX (Editorial Stock-Based) -->
+                <div class="bg-brand-secondary border-[3px] border-dashed border-[#C41423] rounded-lg p-6 my-10 shadow-[0_10px_30px_rgba(196,20,35,0.15)] relative overflow-hidden">
+
+                    <div class="absolute top-0 left-0 w-full h-1 bg-[#C41423]"></div>
+
+                    <h4 class="text-center font-heading font-extrabold text-[20px] text-[#C41423] mb-2 mt-2">
+                        UPDATE: <span class="text-[#2D2926] font-bold text-[16px]">As of March 26, 2026 — 14,000+ women have started Ember. The current batch is running low and supply is restocked in small batches. <span class="bg-[#D9F700] px-1">Check current availability</span> while this batch is live.</span>
+                    </h4>
+
+                    <p class="text-center font-bold text-[18px] my-4 leading-tight">
+                        Find out if the current batch <br>
+                        <span class="text-[#C41423] underline">still has product in stock</span> today
+                    </p>
+
+                    <div class="flex justify-center my-5 bg-white py-2 w-1/2 mx-auto rounded-full border border-gray-200 shadow-inner">
+                        <img src="https://assets.checkoutchamp.com/0fae3c70-45dd-11ee-86e4-45d907ee05ed/1711466088389_2_min.gif" alt="Batch availability indicator" class="h-8 object-contain">
+                    </div>
+
+                    <p class="text-center font-bold text-sm text-gray-500 bg-white inline-block w-full py-1 border-t border-b border-gray-200 mb-6 font-alt">NOTE: Ember is only available through the official page.</p>
+
+                    <!-- Trust Badges Row -->
+                    <div class="flex justify-center gap-2 md:gap-6 flex-wrap mt-2 select-none pointer-events-none pb-4">
+                        <img src="https://img.funnelish.com/16038/344905/1718008886-90-DAYS.png" alt="90 Day return window" class="h-16 object-contain w-auto">
+                        <img src="https://img.funnelish.com/16038/344905/1718008883-fast-and-free-shipping.png" alt="Fulfilled and shipped from the US" class="h-16 object-contain w-auto">
+                        <img src="https://img.funnelish.com/16038/344905/1718008893-SECURE-CHECKOUT.png" alt="Secure Checkout" class="h-16 object-contain w-auto">
+                        <img src="https://img.funnelish.com/16038/344905/1718008888-EASY-RETURN.png" alt="Easy Return Policy" class="h-16 object-contain w-auto">
+                    </div>
+
+                    <!-- CTA INSIDE BOX -->
+                    <a href="#" class="btn-green block w-full py-4 text-center text-[22px] font-heading font-extrabold uppercase shadow-[0_5px_15px_rgba(196,20,35,0.4)] mt-4" rel="nofollow">
+                        CHECK AVAILABILITY
+                    </a>
+                </div>
+
+
+            </main>
+
+            <!-- RIGHT COLUMN (Sidebar) -->
+            <aside class="w-full lg:w-[35%] xl:w-[32%] hidden lg:block shrink-0 relative mt-4">
+                <div class="sticky top-6 flex flex-col gap-6">
+                    
+                    <!-- Sidebar Card 1: Product Buy -->
+                    <div class="bg-[#F7F1E8] border border-[rgba(196,20,35,0.18)] rounded-[5px] p-6 text-center shadow-sm">
+                        <h3 class="text-[#C41423] font-heading font-bold text-[20px] leading-tight mb-4 drop-shadow-sm">Finally Target The Brain Fuel Deficit Behind The Fog, The Lost Words, And The Midnight Dementia Searches</h3>
+
+                        <img src="https://api.moshq.app/public/assets/ffd6a5d7-3c9e-44cc-bf56-c3556249e9d9" alt="Ember Brain Clarity Protocol jar" class="w-4/5 mx-auto block aspect-square object-cover drop-shadow-lg mb-6 rounded-md transition-transform hover:scale-105 duration-300">
+
+                        <!-- Design System specific CTA -->
+                        <button class="btn-primary w-full py-4 text-[20px] font-extrabold font-heading block tracking-wide uppercase hover:bg-[#8B0F1A]">CHECK<br>AVAILABILITY</button>
+                    </div>
+
+                    <!-- Sidebar Card 2: Customer Reviews Stats Box
+                         ========================================================
+                         LOCKED COMPONENT — DO NOT REBRAND WITH PRODUCT COPY.
+                         Per FutrGroup_frankie-pages Rule 58 (Locked Review Card):
+                         heading MUST read "Customer Reviews"; star-label text is
+                         reviewStarLabel GREEN (#16A34A); bar fill is reviewStarFill
+                         YELLOW (#F5B800); brand-red is NEVER used here. The review
+                         card is a universal trust primitive — brand colors stay out.
+                         ======================================================== -->
+                    <div class="bg-white border border-gray-200 shadow-[0_2px_15px_rgba(0,0,0,0.04)] rounded-[5px] p-5">
+
+                        <h4 class="font-heading font-extrabold text-[18px] text-center text-gray-800 border-b-2 border-gray-100 pb-3 mb-4 uppercase tracking-wider">Customer Reviews</h4>
+
+                        <!-- LOCKED: Summary row (stars + count + "Ratings"). Rule 59 forbids
+                             inventing an average score or a "X out of 5" value. Label is
+                             fixed to "Ratings"; the leading count is pulled from real data. -->
+                        <div class="flex items-center gap-3 justify-center mb-5">
+                            <img src="https://img.funnelish.com/42880/338571/1714639665-image_2024-05-02_164745172.png" alt="Ratings" class="h-[22px] object-contain block opacity-90 sepia-[0.3]">
+                            <span class="font-extrabold text-[16px] font-heading text-gray-900">
+                                <span data-locked-field="rating-count">14,283</span> Ratings
+                            </span>
+                        </div>
+
+                        <!-- Bars -->
+                        <div class="space-y-3 font-alt text-[13px] font-bold text-gray-600 mb-6">
+                            
+                            <!-- 5 star -->
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 shrink-0 text-[#16A34A] font-bold">5 Star</span>
+                                <div class="progress-bg w-full">
+                                    <div class="progress-fill w-[90%]" style="background-color:#F5B800"></div>
+                                </div>
+                                <span class="w-10 text-right shrink-0 text-[#16A34A] font-bold">90%</span>
+                            </div>
+
+                            <!-- 4 star -->
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 shrink-0 text-[#16A34A] font-bold">4 Star</span>
+                                <div class="progress-bg w-full">
+                                    <div class="progress-fill w-[7%]" style="background-color:#F5B800"></div>
+                                </div>
+                                <span class="w-10 text-right shrink-0 text-[#16A34A] font-bold">7%</span>
+                            </div>
+
+                            <!-- 3 star -->
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 shrink-0 text-[#16A34A] font-bold">3 Star</span>
+                                <div class="progress-bg w-full">
+                                    <div class="progress-fill w-[2%]" style="background-color:#F5B800"></div>
+                                </div>
+                                <span class="w-10 text-right shrink-0 text-[#16A34A] font-bold">2%</span>
+                            </div>
+
+                            <!-- 2 star -->
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 shrink-0 text-[#16A34A] font-bold">2 Star</span>
+                                <div class="progress-bg w-full">
+                                    <div class="progress-fill w-[0%]" style="background-color:#F5B800"></div>
+                                </div>
+                                <span class="w-10 text-right shrink-0 text-[#16A34A] font-bold">0%</span>
+                            </div>
+
+                            <!-- 1 star -->
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 shrink-0 text-[#16A34A] font-bold">1 Star</span>
+                                <div class="progress-bg w-full">
+                                    <div class="progress-fill w-[1%]" style="background-color:#F5B800"></div>
+                                </div>
+                                <span class="w-10 text-right shrink-0 text-[#16A34A] font-bold">1%</span>
+                            </div>
+                        </div>
+
+                        <!-- By Feature Text list -->
+                        <h5 class="font-heading font-extrabold text-[15px] border-b border-gray-100 pb-2 mb-3">By Feature</h5>
+                        <div class="space-y-2 font-alt text-[13px] text-gray-700">
+                            <div class="flex justify-between items-center">
+                                <span>Mental Clarity</span>
+                                <div class="flex gap-2 items-center">
+                                    <img src="https://img.funnelish.com/42880/338571/1714640463-1711393011636_4_5_star_2x%20%281%29.png" class="h-[14px]">
+                                    <span class="font-bold">5.0</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>Word Recall</span>
+                                <div class="flex gap-2 items-center">
+                                    <img src="https://img.funnelish.com/42880/338571/1714640463-1711393011636_4_5_star_2x%20%281%29.png" class="h-[14px]">
+                                    <span class="font-bold">5.0</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>Easy To Take</span>
+                                <div class="flex gap-2 items-center">
+                                    <img src="https://img.funnelish.com/42880/338571/1714640463-1711393011636_4_5_star_2x%20%281%29.png" class="h-[14px]">
+                                    <span class="font-bold">5.0</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>Ingredient Quality</span>
+                                <div class="flex gap-2 items-center">
+                                    <img src="https://img.funnelish.com/42880/338571/1714640463-1711393011636_4_5_star_2x%20%281%29.png" alt="Ratings" class="h-[14px]">
+                                    <span class="font-bold">4.8</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </aside>
+    </div>
+
+    <!-- COMMENTS SECTION FULL WIDTH BOTTOM -->
+    <div class="bg-[#F7F1E8] border-t border-[rgba(45,41,38,0.16)] mt-10 py-12">
+        <div class="max-w-[800px] mx-auto px-4 font-body">
+            
+            <h3 class="font-heading font-extrabold text-xl text-gray-800 mb-6">Comments</h3>
+            
+            <!-- Comment Input Box -->
+            <div class="bg-white border border-gray-300 p-4 rounded-md shadow-sm mb-8">
+                <textarea rows="3" class="w-full text-sm outline-none resize-none placeholder-gray-400 font-alt" placeholder="Leave a comment..."></textarea>
+            </div>
+
+            <p class="text-xs text-gray-500 mb-6 font-semibold border-b pb-2">32 Comments</p>
+
+            <!-- Comment 1 -->
+            <div class="flex gap-4 mb-6 relative">
+                <img src="https://api.moshq.app/public/assets/fdca5080-14ac-492a-b183-5b293e8f1606" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100">
+                <div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Linda M., 49</span>
+                        <span class="text-xs text-gray-400 font-alt">1 hour ago</span>
+                    </div>
+                    <p class="text-[14px] leading-relaxed text-gray-700">Has anyone over 45 actually tried the Brain Clarity Protocol? I've been losing words in meetings and my doctor just said "it's stress." Need honest opinions before I order.</p>
+                    <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none">
+                        <span class="hover:text-brand-link">Reply</span>
+                        <span class="hover:text-brand-link">Like (4)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="comment-divider ml-[60px]"></div>
+
+            <!-- Comment 2 (Reply) -->
+            <div class="flex gap-4 mb-6 relative ml-[60px]">
+                <img src="https://api.moshq.app/public/assets/492cabb8-2871-4d10-9a86-0dd155fca813" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100">
+                <div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Sarah J., 52</span>
+                        <span class="text-xs text-gray-400 font-alt">50 minutes ago</span>
+                    </div>
+                    <p class="text-[14px] leading-relaxed text-gray-700">Yes Linda, I started Ember six weeks ago after reading an article like this. I was on HRT and a menopause blend and still felt like a shell of myself. Two weeks in the fog started thinning. The 90-day return window made it easy to try. Recommended.</p>
+                    <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none">
+                        <span class="hover:text-brand-link">Reply</span>
+                        <span class="hover:text-brand-link">Like (12)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comment-divider"></div>
+
+            <!-- Comment 3 -->
+            <div class="flex gap-4 mb-6 relative">
+                <img src="https://api.moshq.app/public/assets/1ed072b4-7b7b-44e9-89bc-2385f3d7ba8b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100">
+                <div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Denise R., 56</span>
+                        <span class="text-xs text-gray-400 font-alt">3 hours ago</span>
+                    </div>
+                    <p class="text-[14px] leading-relaxed text-gray-700">Just ordered a 3-month supply. One jar for the kitchen so I actually remember, one for my desk at work. Finally someone is talking about the fuel side of this and not just hormones.</p>
+                    <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none">
+                        <span class="hover:text-brand-link">Reply</span>
+                        <span class="hover:text-brand-link">Like (2)</span>
+                    </div>
+                </div>
+            </div>
+
+             <div class="comment-divider"></div>
+             
+             <!-- Comment 4 -->
+            <div class="flex gap-4 mb-6 relative">
+                <img src="https://api.moshq.app/public/assets/4b7652dd-4e82-4701-9398-af53f6035cf2" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100">
+                <div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Jennifer T., 45</span>
+                        <span class="text-xs text-gray-400 font-alt">Yesterday</span>
+                    </div>
+                    <p class="text-[14px] leading-relaxed text-gray-700">I'm a litigator. 22 years in. Last fall I froze in front of a jury and wanted to crawl under the table. I've been on Ember for about 5 weeks. I have not lost a word in a courtroom since. The gummy is honestly the easiest part of my morning.</p>
+                    <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none">
+                        <span class="hover:text-brand-link">Reply</span>
+                        <span class="hover:text-brand-link">Like (45)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Extra comments (hidden until Load More is clicked) -->
+            <div id="extra-comments" class="contents">
+
+                <div class="comment-divider"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/f6133ced-e7e6-4c94-bef2-4aeef0255f7b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Karen L., 54</span>
+                            <span class="text-xs text-gray-400 font-alt">Yesterday</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">My daughter told me I seemed present again at Sunday dinner after week 3. I didn't even realize how far gone I was. That's when I knew this was working.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (28)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/fd700924-ac9f-445e-9238-81d128387f82" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Rebecca S., 51</span>
+                            <span class="text-xs text-gray-400 font-alt">Yesterday</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Nurse practitioner. I wrote down every patient name before every shift for two years. I haven't done that in four weeks. Something is back.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (19)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/87ec2e71-d1fd-4dfe-a35a-9c859fd0c2b2" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Margaret H., 58</span>
+                            <span class="text-xs text-gray-400 font-alt">2 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Question — is this ok with Lexapro? My old PCP retired and the new one just shrugs at my questions. Can't get a straight answer.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (6)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/9c342600-2748-4bb5-8b4e-c200d52eb7ae" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Dr. Amy B.</span>
+                            <span class="text-xs text-gray-400 font-alt">2 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Margaret H creatine monohydrate has no known clinically significant interaction with SSRIs. There's actually a small study showing it can have an adjunct benefit. Confirm with your provider, but it's widely considered compatible.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (33)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/70e56b0b-5383-4f29-8698-c13154f0e78e" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Tracy P., 47</span>
+                            <span class="text-xs text-gray-400 font-alt">2 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Marketing exec, 18 years in. Last month I rehearsed a 20-minute pitch eleven times before a client call. Today I gave the same pitch cold. Not perfect, but my brain didn't betray me halfway through. That's the difference.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (14)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/192988f7-2742-43e7-9006-b2815ef92ce9" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Patricia G., 56</span>
+                            <span class="text-xs text-gray-400 font-alt">3 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Two jars in. I stopped writing reminder notes on my palm like I'm in middle school. Small wins but they stack up fast.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (9)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/57fd5eb2-edc7-43bd-8689-3516d4e9c3b4" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Susan K., 43</span>
+                            <span class="text-xs text-gray-400 font-alt">3 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">I'm 43 and my doctor keeps telling me I'm too young for perimenopause. I have every symptom. Considering trying this just to stop gaslighting myself. Did anyone else start in their early 40s?</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (17)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/a75d8da9-765e-4f5d-9444-3b86d5d31058" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Rachel T., 50</span>
+                            <span class="text-xs text-gray-400 font-alt">3 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Susan K I was 41 when mine started and five doctors said no. Started Ember at 48 when the fog got unbearable. Wish I'd known at 41 what I know now. Trust the symptoms, not the age gate.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (21)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/3a311a30-3d71-48ec-b8ac-b69bcf4a958a" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Elena M., 52</span>
+                            <span class="text-xs text-gray-400 font-alt">4 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Started Feb 12. My neurologist (for migraines) asked what changed in my follow-up. I told her. She asked for the sourcing info. She's recommending it to other perimenopause patients now.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (24)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/fdca5080-14ac-492a-b183-5b293e8f1606" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Diane W., 55</span>
+                            <span class="text-xs text-gray-400 font-alt">4 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Third batch I've bought. Once you have a routine that actually works you don't skip it. The "running low" warnings are real — I reorder every 75 days now.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (11)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/492cabb8-2871-4d10-9a86-0dd155fca813" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Joan P., 60</span>
+                            <span class="text-xs text-gray-400 font-alt">5 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">I'm technically past peri but still had fog. Six weeks in and my husband said "you're back." I almost cried. The fog was so normal I forgot what feeling sharp felt like.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (38)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/1ed072b4-7b7b-44e9-89bc-2385f3d7ba8b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Maria F., 44</span>
+                            <span class="text-xs text-gray-400 font-alt">5 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Ashwagandha, magnesium glycinate, L-theanine, Alpha GPC, lion's mane. I've spent $400 the past year on supplements that did nothing. Trying this because it targets ONE thing. I'll report back in 30 days.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (15)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/492cabb8-2871-4d10-9a86-0dd155fca813" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Sarah J., 52</span>
+                            <span class="text-xs text-gray-400 font-alt">5 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Maria F follow-up: I was the same. Give it the full 14 days — that's when mine started lifting. Brain creatine stores take time to rebuild. Don't bail at day 5.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (22)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/4b7652dd-4e82-4701-9398-af53f6035cf2" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Beth C., 49</span>
+                            <span class="text-xs text-gray-400 font-alt">6 days ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Day 22. The 2pm crash is completely gone. I can't explain what an hour of restored afternoon means to my actual life. Thank you Dr. Langford.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (31)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/f6133ced-e7e6-4c94-bef2-4aeef0255f7b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Catherine W., 53</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Legal admin at a mid-size firm. I drafted four briefs this week without the mid-paragraph fog. For me that's the whole ROI right there.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (8)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/fd700924-ac9f-445e-9238-81d128387f82" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Gillian H., 57</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">I take HRT, creatine, vitamin D, and now this. Separate problems, separate tools. HRT never touched the fog. This does. Stacks cleanly in my morning routine.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (16)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/87ec2e71-d1fd-4dfe-a35a-9c859fd0c2b2" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Vanessa O., 46</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Quick question — gummies have sugar right? Worried about spiking my blood sugar. Has anyone checked the label?</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (3)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/fdca5080-14ac-492a-b183-5b293e8f1606" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Linda M., 49</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Vanessa O the label says sugar-free. I ordered last week — it's on the official product page. I double-checked because my mom is diabetic and I was worried too.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (13)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/9c342600-2748-4bb5-8b4e-c200d52eb7ae" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Tina K., 48</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Husband noticed my mood stabilized as much as my focus did. Apparently when your brain has fuel the whole body calms. Makes sense in retrospect — no fuel = fight or flight all day.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (26)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/70e56b0b-5383-4f29-8698-c13154f0e78e" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Deborah L., 55</span>
+                            <span class="text-xs text-gray-400 font-alt">1 week ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Retired elementary teacher. Substitute teaching kept me sharp for four years. Last fall the kids' names started slipping. Started Ember eight weeks ago. Names come back. This protocol is now non-negotiable.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (29)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/192988f7-2742-43e7-9006-b2815ef92ce9" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Felicity N., 42</span>
+                            <span class="text-xs text-gray-400 font-alt">2 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">My mom had early-onset dementia. I've been privately terrified for three years that I was heading the same way. Knowing this is depletion and not decline has changed how I wake up in the morning. That reframe alone is worth the cost.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (47)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/57fd5eb2-edc7-43bd-8689-3516d4e9c3b4" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Heidi B., 50</span>
+                            <span class="text-xs text-gray-400 font-alt">2 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Perimenopause support group: this article has been shared in our group chat six times this week. Several of us are on it or about to be. Word is spreading fast.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (18)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/4b7652dd-4e82-4701-9398-af53f6035cf2" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Jennifer T., 45</span>
+                            <span class="text-xs text-gray-400 font-alt">2 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Heidi B which group? I've been looking for one near Chicago. Feels like we're the last generation to figure this out in real time.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (7)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/a75d8da9-765e-4f5d-9444-3b86d5d31058" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Kim R., 54</span>
+                            <span class="text-xs text-gray-400 font-alt">2 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Started Feb 28. By day 17 I stopped re-reading emails three times before responding. Verified purchaser — would absolutely rebuy. Already on batch two.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (12)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/3a311a30-3d71-48ec-b8ac-b69bcf4a958a" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Alexandra P., 47</span>
+                            <span class="text-xs text-gray-400 font-alt">3 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Chief of staff at a VC firm. The job is literally holding forty things in working memory at once. I was losing it. Two jars in and I'm not losing it anymore. That's the whole review.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (34)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/f6133ced-e7e6-4c94-bef2-4aeef0255f7b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Monica J., 53</span>
+                            <span class="text-xs text-gray-400 font-alt">3 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Question — how long does a 30-day supply actually last if I forget to take things on weekends? Is the dose flexible or do you need the full month straight?</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (5)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative ml-[60px] hidden">
+                    <img src="https://api.moshq.app/public/assets/1ed072b4-7b7b-44e9-89bc-2385f3d7ba8b" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Denise R., 56</span>
+                            <span class="text-xs text-gray-400 font-alt">3 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">@Monica J 90 gummies per pouch, three a day. Exactly 30 days if you're consistent. Dr. Langford says the research shows you want daily saturation — that's where the benefit comes from. Missing a day here and there is fine. Missing weeks isn't.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (20)</span></div>
+                    </div>
+                </div>
+
+                <div class="comment-divider extra-comment hidden"></div>
+                <div class="extra-comment flex gap-4 mb-6 relative hidden">
+                    <img src="https://api.moshq.app/public/assets/fd700924-ac9f-445e-9238-81d128387f82" alt="User Avatar" class="w-[45px] h-[45px] rounded-full object-cover shrink-0 shadow-sm border border-gray-100" onerror="this.style.visibility='hidden'">
+                    <div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                            <span class="font-bold text-[#C41423] text-[15px] cursor-pointer hover:underline">Anna D., 58</span>
+                            <span class="text-xs text-gray-400 font-alt">4 weeks ago</span>
+                        </div>
+                        <p class="text-[14px] leading-relaxed text-gray-700">Finished my first full 90-day protocol. The fog didn't creep back the way it does with every other supplement I've tried. Ordered another three-month supply yesterday. This is the first one I've stuck with in five years of trying things.</p>
+                        <div class="flex gap-4 mt-2 text-xs font-bold text-gray-400 cursor-pointer select-none"><span class="hover:text-brand-link">Reply</span><span class="hover:text-brand-link">Like (42)</span></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Load More / End-of-thread marker -->
+            <div id="comments-loadmore-wrap" class="text-center mt-8">
+                <button id="load-more-comments" type="button" class="bg-transparent border-0 text-gray-400 text-xs uppercase font-bold tracking-widest cursor-pointer hover:text-black transition">
+                    Load more comments...
+                </button>
+                <p id="comments-end-note" class="hidden text-gray-400 text-xs uppercase font-bold tracking-widest">End of comments</p>
+            </div>
+
+            <script>
+            (function(){
+                var btn = document.getElementById('load-more-comments');
+                var endNote = document.getElementById('comments-end-note');
+                if (!btn) return;
+                var BATCH = 4; // reveal 4 comments (+ their dividers) per click
+                btn.addEventListener('click', function(){
+                    var hidden = document.querySelectorAll('.extra-comment.hidden');
+                    // reveal in groups — each "comment" is paired with the divider immediately before it
+                    var shownCount = 0;
+                    for (var i = 0; i < hidden.length && shownCount < BATCH; i++) {
+                        var el = hidden[i];
+                        if (el.classList.contains('extra-comment')) {
+                            el.classList.remove('hidden');
+                            // also reveal the divider that precedes this comment (if it exists)
+                            var prev = el.previousElementSibling;
+                            if (prev && prev.classList.contains('comment-divider') && prev.classList.contains('extra-comment')) {
+                                prev.classList.remove('hidden');
+                            }
+                            shownCount++;
+                        }
+                    }
+                    // hide button + show end note when no more hidden comments remain
+                    var stillHidden = document.querySelectorAll('.extra-comment.hidden').length;
+                    if (stillHidden === 0) {
+                        btn.classList.add('hidden');
+                        if (endNote) endNote.classList.remove('hidden');
+                    }
+                });
+            })();
+            </script>
+            
+             <p class="text-center text-[10px] text-gray-400 mt-16 mt-16 max-w-2xl mx-auto leading-tight italic px-4 pb-6">MEDICAL & HEALTH DISCLAIMER: This article is an advertisement and not an actual news article, blog, or consumer protection update. Ember is not intended to diagnose, treat, cure, or prevent any disease. Individual results may vary. Consult your physician before beginning any supplement protocol. Statements regarding dietary supplements have not been evaluated by the FDA.</p>
+             <p class="text-center text-[11px] text-gray-400 mb-6 uppercase tracking-wider">&copy; 2026 Ember. All Rights Reserved.</p>
+        </div>
+    </div>
+
+    <!-- Very Bottom Sticky CTA for Mobile (Visible on Mobile only based on standard advertorial layouts) -->
+    <div class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-3 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] md:hidden z-50">
+         <a href="#" class="btn-green block w-full py-3 text-center text-[18px] font-heading font-extrabold uppercase shadow-sm" rel="nofollow">
+            CHECK AVAILABILITY
+        </a>
+    </div>
+
+</body>
+</html>

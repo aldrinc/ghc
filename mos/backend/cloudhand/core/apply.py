@@ -8,6 +8,7 @@ from pathlib import Path
 from ..adapters.deployer import ServerDeployer
 from ..models import ApplicationSourceType, ApplicationSpec, DesiredStateSpec
 from ..secrets import get_or_create_project_ssh_key
+from .config import load_provider_config
 from ..terraform_gen import get_generator
 from .paths import cloudhand_dir, terraform_dir
 
@@ -201,6 +202,75 @@ def _compute_stale_workloads(
     return stale
 
 
+def _validate_moshq_frontend_workloads(
+    spec: DesiredStateSpec, *, workload_names: set[str] | None = None
+) -> None:
+    for inst in spec.instances:
+        for app in inst.workloads:
+            if workload_names and app.name not in workload_names:
+                continue
+            if app.source_type != ApplicationSourceType.GIT:
+                continue
+
+            server_names = {name.strip().lower() for name in app.service_config.server_names if name.strip()}
+            if "moshq.app" not in server_names:
+                continue
+
+            install_command = (app.build_config.install_command or "").strip()
+            build_command = (app.build_config.build_command or "").strip()
+            lowered_command = (app.service_config.command or "").strip().lower()
+
+            if not install_command:
+                raise ValueError(
+                    f"moshq.app workload '{app.name}' on instance '{inst.name}' must set "
+                    "build_config.install_command to rebuild frontend assets during deploy."
+                )
+            if not build_command:
+                raise ValueError(
+                    f"moshq.app workload '{app.name}' on instance '{inst.name}' must set "
+                    "build_config.build_command to rebuild frontend assets during deploy."
+                )
+            if (
+                "python -m http.server" in lowered_command
+                or "python3 -m http.server" in lowered_command
+                or "python -m simplehttpserver" in lowered_command
+                or "python3 -m simplehttpserver" in lowered_command
+            ):
+                raise ValueError(
+                    f"moshq.app workload '{app.name}' on instance '{inst.name}' may not use "
+                    "Python's built-in static file server. Use a real SPA-capable frontend server instead."
+                )
+
+
+def _normalize_selected_workload_names(*, workload_names: list[str] | None) -> set[str]:
+    return {
+        str(raw_name or "").strip()
+        for raw_name in (workload_names or [])
+        if str(raw_name or "").strip()
+    }
+
+
+def _resolve_provider_credential_env(*, root: Path, provider: str, env: dict[str, str]) -> None:
+    normalized_provider = (provider or "").strip().lower()
+    if normalized_provider != "hetzner":
+        return
+
+    existing = (env.get("TF_VAR_hcloud_token") or "").strip()
+    if existing:
+        return
+
+    token = (env.get("HCLOUD_TOKEN") or "").strip()
+    if not token:
+        token = (load_provider_config("hetzner", root=root).get("token") or "").strip()
+    if not token:
+        raise ValueError(
+            "Missing Hetzner provider token. Set HCLOUD_TOKEN or TF_VAR_hcloud_token, "
+            "or add providers.hetzner.token to cloudhand/secrets.json."
+        )
+
+    env["TF_VAR_hcloud_token"] = token
+
+
 def apply_plan(
     root: Path,
     plan_path: Path,
@@ -208,6 +278,7 @@ def apply_plan(
     terraform_bin: str = "terraform",
     project_id: str = "default",
     workspace_id: str = "default",
+    workload_names: list[str] | None = None,
 ) -> int:
     if not plan_path.exists():
         raise FileNotFoundError(f"Plan file not found at {plan_path}")
@@ -219,6 +290,11 @@ def apply_plan(
 
     # Validate and persist new spec
     new_spec = DesiredStateSpec.model_validate(new_spec_data)
+    selected_workload_names = _normalize_selected_workload_names(workload_names=workload_names)
+    _validate_moshq_frontend_workloads(
+        new_spec,
+        workload_names=(selected_workload_names or None),
+    )
     for inst in new_spec.instances:
         app_models = [
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
@@ -250,8 +326,7 @@ def apply_plan(
         raise FileNotFoundError(f"Terraform binary '{terraform_bin}' not found in PATH")
 
     env = os.environ.copy()
-    if "TF_VAR_hcloud_token" not in env and os.getenv("HCLOUD_TOKEN"):
-        env["TF_VAR_hcloud_token"] = os.getenv("HCLOUD_TOKEN", "")
+    _resolve_provider_credential_env(root=root, provider=new_spec.provider, env=env)
     env["TF_VAR_ssh_public_key"] = pub_key
 
     subprocess.run([tf_bin, "init", "-input=false", "-upgrade"], cwd=tf_dir, check=True, env=env)
@@ -276,10 +351,17 @@ def apply_plan(
 
     for inst in new_spec.instances:
         ip = server_ips.get(inst.name)
-        stale_apps = stale_workloads_by_instance.get(inst.name, [])
+        stale_apps = [
+            app
+            for app in stale_workloads_by_instance.get(inst.name, [])
+            if not selected_workload_names or app.name in selected_workload_names
+        ]
         if not ip:
             continue
-        if not inst.workloads and not stale_apps:
+        target_apps = [
+            app for app in inst.workloads if not selected_workload_names or app.name in selected_workload_names
+        ]
+        if not target_apps and not stale_apps:
             continue
         print(f" Configuring {inst.name} ({ip})...")
         deployer = ServerDeployer(ip, priv_key, local_root=root)
@@ -289,12 +371,12 @@ def apply_plan(
             for stale_app in stale_apps:
                 deployer.remove_workload(stale_app)
 
-        if not inst.workloads:
+        if not target_apps:
             continue
 
         app_models = [
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
-            for app in inst.workloads
+            for app in target_apps
         ]
 
         # Nginx routing modes:
@@ -323,6 +405,11 @@ def apply_plan(
 
     # Handle stale workloads for instances removed from the desired spec but still present in outputs.
     for instance_name, stale_apps in stale_workloads_by_instance.items():
+        stale_apps = [
+            app for app in stale_apps if not selected_workload_names or app.name in selected_workload_names
+        ]
+        if not stale_apps:
+            continue
         if instance_name in desired_instance_names:
             continue
         ip = server_ips.get(instance_name)

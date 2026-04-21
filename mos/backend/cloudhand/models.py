@@ -64,6 +64,11 @@ class ApplicationSourceType(str, Enum):
     FUNNEL_ARTIFACT = "funnel_artifact"
 
 
+class FunnelArtifactRenderMode(str, Enum):
+    RUNTIME_BUNDLE = "runtime_bundle"
+    STANDALONE_IMPORTED_HTML = "standalone_imported_html"
+
+
 class FunnelPublicationSourceSpec(BaseModel):
     public_id: str
     upstream_base_url: str
@@ -76,6 +81,7 @@ class FunnelArtifactSourceSpec(BaseModel):
     artifact_id: Optional[str] = None
     artifact_version: Optional[int] = None
     upstream_api_base_root: str
+    artifact_render_mode: FunnelArtifactRenderMode = FunnelArtifactRenderMode.RUNTIME_BUNDLE
     runtime_dist_path: str = "mos/frontend/dist"
     artifact: Dict[str, Any]
 
@@ -84,6 +90,8 @@ class ServiceSpec(BaseModel):
     """How to run the app in the background."""
 
     command: Optional[str] = None
+    static_root: Optional[str] = None
+    spa_fallback: bool = False
     environment: Dict[str, str] = Field(default_factory=dict)
     environment_file: Optional[str] = None
     environment_file_upload: Optional[str] = None
@@ -120,13 +128,56 @@ class ApplicationSpec(BaseModel):
             repo_url = (self.repo_url or "").strip()
             if not repo_url:
                 raise ValueError("repo_url is required when source_type='git'.")
+
             command = (self.service_config.command or "").strip()
-            if not command:
-                raise ValueError("service_config.command is required when source_type='git'.")
+            static_root = (self.service_config.static_root or "").strip()
+            install_command = (self.build_config.install_command or "").strip()
+            build_command = (self.build_config.build_command or "").strip()
+
+            if self.service_config.spa_fallback and not static_root:
+                raise ValueError(
+                    "service_config.static_root is required when service_config.spa_fallback is enabled."
+                )
+            if static_root and command:
+                raise ValueError(
+                    "service_config.command must be omitted when service_config.static_root is configured."
+                )
+            if static_root and not build_command:
+                raise ValueError(
+                    "build_config.build_command is required when service_config.static_root is configured."
+                )
+            if not command and not static_root:
+                raise ValueError(
+                    "service_config.command is required when source_type='git' unless "
+                    "service_config.static_root is configured."
+                )
             if self.source_ref is not None:
                 raise ValueError("source_ref is not allowed when source_type='git'.")
+            server_names = [name.strip().lower() for name in self.service_config.server_names if name.strip()]
+            lowered_command = command.lower()
+            if "moshq.app" in server_names and not install_command:
+                raise ValueError(
+                    "moshq.app workloads must set build_config.install_command to rebuild frontend assets during deploy."
+                )
+            if "moshq.app" in server_names and not build_command:
+                raise ValueError(
+                    "moshq.app workloads must set build_config.build_command to rebuild frontend assets during deploy."
+                )
+            if "moshq.app" in server_names and (
+                "python -m http.server" in lowered_command
+                or "python3 -m http.server" in lowered_command
+                or "python -m simplehttpserver" in lowered_command
+                or "python3 -m simplehttpserver" in lowered_command
+            ):
+                raise ValueError(
+                    "moshq.app workloads may not use Python's built-in static file server. "
+                    "Use a frontend server with explicit SPA deep-link fallback instead."
+                )
             self.repo_url = repo_url
-            self.service_config.command = command
+            self.build_config.install_command = install_command or None
+            self.build_config.build_command = build_command or None
+            self.service_config.command = command or None
+            self.service_config.static_root = static_root or None
             return self
 
         if self.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
@@ -165,7 +216,10 @@ class ApplicationSpec(BaseModel):
                 raise ValueError("source_ref.client_id must be non-empty for source_type='funnel_artifact'.")
             if not self.source_ref.upstream_api_base_root.startswith(("http://", "https://")):
                 raise ValueError("source_ref.upstream_api_base_root must start with http:// or https://.")
-            if not self.source_ref.runtime_dist_path:
+            if (
+                self.source_ref.artifact_render_mode == FunnelArtifactRenderMode.RUNTIME_BUNDLE
+                and not self.source_ref.runtime_dist_path
+            ):
                 raise ValueError("source_ref.runtime_dist_path must be non-empty for source_type='funnel_artifact'.")
             if not isinstance(self.source_ref.artifact, dict):
                 raise ValueError("source_ref.artifact must be an object for source_type='funnel_artifact'.")

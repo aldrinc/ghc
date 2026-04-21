@@ -354,6 +354,7 @@ export function FunnelDetailPage() {
       workloadPayload.source_ref = {
         client_id: funnel?.client_id,
         upstream_api_base_root: normalizedApiBaseRoot,
+        artifact_render_mode: "standalone_imported_html",
         artifact: {
           meta: {
             clientId: funnel?.client_id,
@@ -407,6 +408,7 @@ export function FunnelDetailPage() {
         https?: boolean;
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
+        renderMode?: "runtime_bundle" | "standalone_imported_html";
       };
     } = {
       deploy: {
@@ -414,6 +416,7 @@ export function FunnelDetailPage() {
         createIfMissing: true,
         applyPlan: true,
         bunnyPullZone: true,
+        renderMode: "standalone_imported_html",
       },
     };
 

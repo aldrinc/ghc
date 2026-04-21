@@ -40,6 +40,88 @@ def test_git_source_allows_default_source_type_when_repo_url_present():
     assert app.repo_url == "https://github.com/example/repo"
 
 
+def test_git_source_allows_static_root_without_command():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["service_config"]["command"] = None
+    payload["service_config"]["static_root"] = "dist"
+    payload["service_config"]["spa_fallback"] = True
+
+    app = ApplicationSpec.model_validate(payload)
+    assert app.service_config.command is None
+    assert app.service_config.static_root == "dist"
+    assert app.service_config.spa_fallback is True
+
+
+def test_git_source_rejects_spa_fallback_without_static_root():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["service_config"]["spa_fallback"] = True
+
+    with pytest.raises(
+        ValidationError,
+        match=r"service_config\.static_root is required when service_config\.spa_fallback is enabled",
+    ):
+        ApplicationSpec.model_validate(payload)
+
+
+def test_git_source_rejects_command_when_static_root_is_configured():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["service_config"]["static_root"] = "dist"
+    payload["service_config"]["spa_fallback"] = True
+
+    with pytest.raises(
+        ValidationError,
+        match=r"service_config\.command must be omitted when service_config\.static_root is configured",
+    ):
+        ApplicationSpec.model_validate(payload)
+
+
+def test_git_source_requires_build_command_when_static_root_is_configured():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["build_config"]["build_command"] = None
+    payload["service_config"]["command"] = None
+    payload["service_config"]["static_root"] = "dist"
+    payload["service_config"]["spa_fallback"] = True
+
+    with pytest.raises(
+        ValidationError,
+        match=r"build_config\.build_command is required when service_config\.static_root is configured",
+    ):
+        ApplicationSpec.model_validate(payload)
+
+
+def test_git_source_rejects_python_http_server_for_moshq_app():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["runtime"] = "python"
+    payload["service_config"]["server_names"] = ["moshq.app"]
+    payload["service_config"]["command"] = "python3 -m http.server 5173 --directory dist --bind 0.0.0.0"
+
+    with pytest.raises(
+        ValidationError,
+        match=r"moshq\.app workloads may not use Python's built-in static file server",
+    ):
+        ApplicationSpec.model_validate(payload)
+
+
+def test_git_source_requires_build_commands_for_moshq_app():
+    payload = _base_app_payload()
+    payload["repo_url"] = "https://github.com/example/repo"
+    payload["build_config"]["install_command"] = None
+    payload["build_config"]["build_command"] = None
+    payload["service_config"]["server_names"] = ["moshq.app"]
+    payload["service_config"]["command"] = "npx serve -s dist -l 3000"
+
+    with pytest.raises(
+        ValidationError,
+        match=r"moshq\.app workloads must set build_config\.install_command",
+    ):
+        ApplicationSpec.model_validate(payload)
+
+
 def test_funnel_publication_source_requires_source_ref_and_forbids_repo_url():
     payload = _base_app_payload()
     payload["source_type"] = "funnel_publication"
@@ -139,3 +221,66 @@ def test_funnel_artifact_source_legacy_shape_is_rejected():
 
     with pytest.raises(ValidationError):
         ApplicationSpec.model_validate(payload)
+
+
+def test_funnel_artifact_source_allows_standalone_render_mode_without_runtime_dist_path():
+    payload = _base_app_payload()
+    payload["source_type"] = "funnel_artifact"
+    payload["service_config"]["command"] = None
+    payload["service_config"]["ports"] = []
+    payload["source_ref"] = {
+        "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        "upstream_api_base_root": "https://moshq.app/api/",
+        "artifact_render_mode": "standalone_imported_html",
+        "artifact": {
+            "meta": {
+                "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            },
+            "products": {
+                "example-product": {
+                    "meta": {
+                        "productId": "p1",
+                        "productSlug": "example-product",
+                    },
+                    "funnels": {
+                        "example-funnel": {
+                            "meta": {
+                                "funnelSlug": "example-funnel",
+                                "funnelId": "f1",
+                                "publicationId": "pub1",
+                                "entrySlug": "presales",
+                                "pages": [{"pageId": "p1", "slug": "presales"}],
+                            },
+                            "pages": {
+                                "presales": {
+                                    "funnelId": "f1",
+                                    "publicationId": "pub1",
+                                    "pageId": "p1",
+                                    "slug": "presales",
+                                    "puckData": {
+                                        "root": {"props": {"title": "Imported HTML"}},
+                                        "content": [
+                                            {
+                                                "type": "ImportedHtmlDocument",
+                                                "props": {
+                                                    "htmlDocument": "<!doctype html><html><body><main>Imported content</main></body></html>"
+                                                },
+                                            }
+                                        ],
+                                        "zones": {},
+                                    },
+                                    "pageMap": {"p1": "presales"},
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+        },
+    }
+
+    app = ApplicationSpec.model_validate(payload)
+    assert app.source_type == ApplicationSourceType.FUNNEL_ARTIFACT
+    assert app.source_ref is not None
+    assert app.source_ref.artifact_render_mode.value == "standalone_imported_html"
+    assert app.source_ref.runtime_dist_path == "mos/frontend/dist"

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +56,8 @@ _PUBLIC_ASSET_URL_PREFIXES = (
     "/api/public/assets/",
     "api/public/assets/",
 )
+_FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE = "runtime_bundle"
+_FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML = "standalone_imported_html"
 _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
     r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/([^\s\"'<>?#/]+)"
 )
@@ -124,6 +127,67 @@ def _assert_under_cloudhand(path: Path) -> Path:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _read_positive_timeout_from_env(*, env_name: str, default_seconds: float) -> float | None:
+    raw_value = str(os.getenv(env_name, "")).strip()
+    if not raw_value:
+        return default_seconds
+    try:
+        timeout_seconds = float(raw_value)
+    except ValueError as exc:
+        raise DeployError(f"{env_name} must be a valid number of seconds.") from exc
+    if timeout_seconds <= 0:
+        return None
+    return timeout_seconds
+
+
+def _deploy_apply_timeout_seconds() -> float | None:
+    return _read_positive_timeout_from_env(
+        env_name="DEPLOY_APPLY_TIMEOUT_SECONDS",
+        default_seconds=30 * 60,
+    )
+
+
+async def _collect_subprocess_output(
+    stream: asyncio.StreamReader | None,
+    *,
+    logs: list[str],
+) -> None:
+    if stream is None:
+        return
+    async for raw in stream:
+        logs.append(raw.decode(errors="ignore"))
+
+
+async def _terminate_subprocess(proc: asyncio.subprocess.Process) -> None:
+    if proc.returncode is not None:
+        return
+
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGTERM)
+        else:  # pragma: no cover - windows
+            proc.terminate()
+        await asyncio.wait_for(proc.wait(), timeout=10)
+        return
+    except ProcessLookupError:
+        return
+    except asyncio.TimeoutError:
+        pass
+
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:  # pragma: no cover - windows
+            proc.kill()
+    except ProcessLookupError:
+        return
+
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=5)
+    except asyncio.TimeoutError:  # pragma: no cover - defensive
+        return
 
 
 def _jobs_dir() -> Path:
@@ -489,6 +553,7 @@ def build_funnel_publication_workload_patch(
     server_names: list[str],
     https: bool,
     destination_path: str,
+    artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
 ) -> dict[str, Any]:
     name = workload_name.strip()
     if not name:
@@ -520,22 +585,35 @@ def build_funnel_publication_workload_patch(
     if not destination:
         raise DeployError("Deploy destinationPath must be non-empty.")
 
+    normalized_render_mode = str(artifact_render_mode or "").strip().lower()
+    if normalized_render_mode not in {
+        _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
+        _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
+    }:
+        raise DeployError(
+            "Deploy renderMode must be 'runtime_bundle' or 'standalone_imported_html'."
+        )
+
     https_enabled = https and bool(normalized_server_names)
+
+    source_ref: dict[str, Any] = {
+        "client_id": resolved_client_id,
+        "upstream_api_base_root": api_base_root,
+        "artifact_render_mode": normalized_render_mode,
+        "artifact": {
+            "meta": {
+                "clientId": resolved_client_id,
+            },
+            "products": {},
+        },
+    }
+    if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE:
+        source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
 
     return {
         "name": name,
         "source_type": "funnel_artifact",
-        "source_ref": {
-            "client_id": resolved_client_id,
-            "upstream_api_base_root": api_base_root,
-            "runtime_dist_path": settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH,
-            "artifact": {
-                "meta": {
-                    "clientId": resolved_client_id,
-                },
-                "products": {},
-            },
-        },
+        "source_ref": source_ref,
         "repo_url": None,
         "runtime": "static",
         "build_config": {
@@ -563,6 +641,7 @@ def build_funnel_artifact_workload_patch(
     server_names: list[str],
     https: bool,
     destination_path: str,
+    artifact_render_mode: str = _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
 ) -> dict[str, Any]:
     return build_funnel_publication_workload_patch(
         workload_name=workload_name,
@@ -572,6 +651,7 @@ def build_funnel_artifact_workload_patch(
         server_names=server_names,
         https=https,
         destination_path=destination_path,
+        artifact_render_mode=artifact_render_mode,
     )
 
 
@@ -1065,6 +1145,7 @@ def build_client_funnel_runtime_artifact_payload(
     client_id: str,
     updated_from_funnel_id: str,
     updated_from_publication_id: str,
+    publication_id_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     from fastapi.encoders import jsonable_encoder
     from sqlalchemy import select
@@ -1148,6 +1229,12 @@ def build_client_funnel_runtime_artifact_payload(
         raise DeployError("No published funnels found for client deploy artifact.")
 
     product_ids: set[str] = set()
+    normalized_publication_overrides = {
+        str(raw_funnel_id or "").strip(): str(raw_publication_id or "").strip()
+        for raw_funnel_id, raw_publication_id in (publication_id_overrides or {}).items()
+        if str(raw_funnel_id or "").strip() and str(raw_publication_id or "").strip()
+    }
+
     for client_funnel in client_funnels:
         if not client_funnel.product_id:
             raise DeployError(f"Published funnel '{client_funnel.id}' is missing product_id.")
@@ -1197,7 +1284,10 @@ def build_client_funnel_runtime_artifact_payload(
             )
         product_slug_to_product_id[product_slug] = product_id
 
-        active_publication_id = str(client_funnel.active_publication_id or "").strip()
+        active_publication_id = normalized_publication_overrides.get(
+            str(client_funnel.id),
+            str(client_funnel.active_publication_id or "").strip(),
+        )
         if not active_publication_id:
             raise DeployError(f"Published funnel '{client_funnel.id}' has no active publication.")
         active_publication = public_repo.get_active_publication(
@@ -1257,6 +1347,17 @@ def build_client_funnel_runtime_artifact_payload(
             if page_type
         }
         tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
+        from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+
+        compliance_profile = ClientComplianceProfilesRepository(session).get(
+            org_id=str(client_funnel.org_id),
+            client_id=str(client_funnel.client_id),
+        )
+        compliance_support_email = (
+            str(compliance_profile.support_email or "").strip()
+            if compliance_profile is not None
+            else ""
+        )
         pages_payload: dict[str, dict[str, Any]] = {}
         for artifact_slug, page_id, version, page in page_details:
             tokens = resolve_design_system_tokens(
@@ -1269,6 +1370,10 @@ def build_client_funnel_runtime_artifact_payload(
             materialized_puck_data = _materialize_design_system_brand_logo_in_puck_data(
                 puck_data=version.puck_data,
                 design_system_tokens=tokens if isinstance(tokens, dict) else None,
+            )
+            _apply_compliance_support_email_to_puck_data(
+                puck_data=materialized_puck_data,
+                support_email=compliance_support_email,
             )
             metadata = build_public_page_metadata_for_context(
                 session=session,
@@ -1409,6 +1514,7 @@ def persist_client_funnel_runtime_artifact(
         client_id=client_id,
         updated_from_funnel_id=str(funnel.id),
         updated_from_publication_id=publication_id,
+        publication_id_overrides={str(funnel.id): publication_id},
     )
 
     artifacts_repo = ArtifactsRepository(session)
@@ -1431,6 +1537,152 @@ def persist_client_funnel_runtime_artifact(
         "artifact_version": int(artifact.version),
         "client_id": client_id,
     }
+
+
+def _apply_compliance_support_email_to_puck_data(
+    *,
+    puck_data: dict[str, Any],
+    support_email: str | None,
+) -> None:
+    normalized_support_email = str(support_email or "").strip()
+    if not normalized_support_email:
+        return
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            if str(node.get("type") or "").strip() == "FunnelCompliancePage":
+                props = node.get("props")
+                if isinstance(props, dict) and not str(props.get("supportEmail") or "").strip():
+                    props["supportEmail"] = normalized_support_email
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(puck_data)
+
+
+def _page_payload_supports_standalone_imported_html(*, page_payload: dict[str, Any]) -> bool:
+    puck_data = page_payload.get("puckData")
+    if not isinstance(puck_data, dict):
+        return False
+
+    content = puck_data.get("content")
+    if not isinstance(content, list) or len(content) != 1:
+        return False
+
+    block = content[0]
+    if not isinstance(block, dict) or str(block.get("type") or "").strip() != "ImportedHtmlDocument":
+        return False
+
+    props = block.get("props")
+    if not isinstance(props, dict):
+        return False
+
+    html_document = props.get("htmlDocument")
+    if not isinstance(html_document, str) or not html_document.strip():
+        return False
+
+    from app.services.imported_html_runtime import coerce_imported_html_instrumentation_manifest
+
+    try:
+        coerce_imported_html_instrumentation_manifest(props.get("instrumentationManifest"))
+    except Exception:
+        return False
+
+    return True
+
+
+def _page_payload_supports_standalone_compliance(*, page_payload: dict[str, Any]) -> bool:
+    puck_data = page_payload.get("puckData")
+    if not isinstance(puck_data, dict):
+        return False
+
+    content = puck_data.get("content")
+    if not isinstance(content, list) or len(content) != 1:
+        return False
+
+    block = content[0]
+    if not isinstance(block, dict) or str(block.get("type") or "").strip() != "FunnelCompliancePage":
+        return False
+
+    props = block.get("props")
+    if not isinstance(props, dict):
+        return False
+
+    page_key = str(props.get("pageKey") or "").strip()
+    return bool(page_key)
+
+
+def _artifact_payload_supports_standalone_imported_html(*, artifact_payload: dict[str, Any]) -> bool:
+    products = artifact_payload.get("products")
+    if not isinstance(products, dict) or not products:
+        return False
+
+    for product_payload in products.values():
+        if not isinstance(product_payload, dict):
+            return False
+        funnels = product_payload.get("funnels")
+        if not isinstance(funnels, dict) or not funnels:
+            return False
+        for funnel_payload in funnels.values():
+            if not isinstance(funnel_payload, dict):
+                return False
+            pages = funnel_payload.get("pages")
+            if not isinstance(pages, dict) or not pages:
+                return False
+            for page_payload in pages.values():
+                if not isinstance(page_payload, dict):
+                    return False
+                if (
+                    not _page_payload_supports_standalone_imported_html(page_payload=page_payload)
+                    and not _page_payload_supports_standalone_compliance(page_payload=page_payload)
+                ):
+                    return False
+
+    return True
+
+
+def _resolve_publish_job_artifact_render_mode(
+    *,
+    artifact_payload: dict[str, Any],
+    requested_render_mode: str | None,
+    render_mode_was_explicit: bool,
+) -> str:
+    normalized_requested_mode = str(requested_render_mode or "").strip().lower()
+    if render_mode_was_explicit:
+        return (
+            normalized_requested_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+        )
+    if _artifact_payload_supports_standalone_imported_html(artifact_payload=artifact_payload):
+        return _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+    return _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+
+
+def _apply_publish_job_artifact_render_mode(
+    *,
+    workload_patch: dict[str, Any],
+    artifact_payload: dict[str, Any],
+    requested_render_mode: str | None,
+    render_mode_was_explicit: bool,
+) -> dict[str, Any]:
+    source_ref = workload_patch.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError("Hydrated funnel deploy workload is missing source_ref.")
+
+    resolved_render_mode = _resolve_publish_job_artifact_render_mode(
+        artifact_payload=artifact_payload,
+        requested_render_mode=requested_render_mode,
+        render_mode_was_explicit=render_mode_was_explicit,
+    )
+    source_ref["artifact_render_mode"] = resolved_render_mode
+    if resolved_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        source_ref.pop("runtime_dist_path", None)
+    else:
+        source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+    workload_patch["source_ref"] = source_ref
+    return workload_patch
 
 
 def hydrate_funnel_artifact_workload_patch(
@@ -1457,17 +1709,23 @@ def hydrate_funnel_artifact_workload_patch(
         publication_id=publication_id,
         created_by_user_id=created_by_user_id,
     )
+    from app.db.repositories.artifacts import ArtifactsRepository
+
+    artifact_record = ArtifactsRepository(session).get(org_id=org_id, artifact_id=str(artifact_ref["artifact_id"]))
+    if artifact_record is None:
+        raise DeployError(
+            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' could not be reloaded for deploy hydration."
+        )
+    artifact_payload = artifact_record.data
+    if not isinstance(artifact_payload, dict):
+        raise DeployError(
+            f"Persisted funnel runtime artifact '{artifact_ref['artifact_id']}' has an invalid payload."
+        )
+
     source_ref["client_id"] = str(artifact_ref["client_id"])
     source_ref["artifact_id"] = str(artifact_ref["artifact_id"])
     source_ref["artifact_version"] = int(artifact_ref["artifact_version"])
-    source_ref["artifact"] = {
-        "meta": {
-            "clientId": str(artifact_ref["client_id"]),
-            "artifactId": str(artifact_ref["artifact_id"]),
-            "artifactVersion": int(artifact_ref["artifact_version"]),
-        },
-        "products": {},
-    }
+    source_ref["artifact"] = copy.deepcopy(artifact_payload)
     workload_patch["source_ref"] = source_ref
     return workload_patch
 
@@ -2072,9 +2330,28 @@ def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any])
             f"Workload '{name}' has invalid source_ref.upstream_api_base_root '{upstream_api_base_root}'."
         )
 
+    explicit_render_mode = source_ref.get("artifact_render_mode")
+    raw_render_mode = str(
+        explicit_render_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+    ).strip().lower()
+    if raw_render_mode not in {
+        _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
+        _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
+    }:
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.artifact_render_mode '{raw_render_mode}'."
+        )
+    if explicit_render_mode is not None and explicit_render_mode != raw_render_mode:
+        source_ref["artifact_render_mode"] = raw_render_mode
+        changed = True
+
     runtime_dist_path = str(source_ref.get("runtime_dist_path") or "").strip()
-    if not runtime_dist_path:
-        source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+    if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE:
+        if not runtime_dist_path:
+            source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+            changed = True
+    elif "runtime_dist_path" in source_ref:
+        source_ref.pop("runtime_dist_path", None)
         changed = True
 
     artifact = source_ref.get("artifact")
@@ -2120,7 +2397,9 @@ def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any])
     return changed
 
 
-def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
+def _materialize_funnel_artifacts_for_apply(
+    *, plan_file: Path, workload_names: set[str] | None = None
+) -> Path:
     try:
         plan = json.loads(plan_file.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -2142,6 +2421,9 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
             continue
         for workload in workloads:
             if not isinstance(workload, dict):
+                continue
+            workload_name = str(workload.get("name") or "").strip()
+            if workload_names and workload_name not in workload_names:
                 continue
             source_type = str(workload.get("source_type") or "").strip().lower()
             if source_type == "funnel_publication":
@@ -2165,6 +2447,27 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
             artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
                 artifact_id=artifact_id
             )
+            raw_render_mode = str(source_ref.get("artifact_render_mode") or "").strip().lower()
+            if not raw_render_mode:
+                inferred_render_mode = (
+                    _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
+                    if _artifact_payload_supports_standalone_imported_html(
+                        artifact_payload=artifact_payload
+                    )
+                    else _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
+                )
+                source_ref["artifact_render_mode"] = inferred_render_mode
+                raw_render_mode = inferred_render_mode
+                has_changes = True
+
+            if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+                if "runtime_dist_path" in source_ref:
+                    source_ref.pop("runtime_dist_path", None)
+                    has_changes = True
+            elif not str(source_ref.get("runtime_dist_path") or "").strip():
+                source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+                has_changes = True
+
             if source_ref.get("artifact") != artifact_payload:
                 source_ref["artifact"] = artifact_payload
                 workload["source_ref"] = source_ref
@@ -2184,7 +2487,9 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
     return materialized_path
 
 
-async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
+async def apply_plan(
+    *, plan_path: str | None = None, workload_names: list[str] | None = None
+) -> dict[str, Any]:
     """
     Apply a plan using the embedded Cloudhand engine (Terraform + SSH deploy).
 
@@ -2211,7 +2516,18 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         raise DeployError("No plan found.")
 
     requested_plan_file = plan_file
-    plan_file = _materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    normalized_workload_names: list[str] = []
+    selected_workload_names: set[str] = set()
+    for raw_name in workload_names or []:
+        workload_name = str(raw_name or "").strip()
+        if not workload_name or workload_name in selected_workload_names:
+            continue
+        selected_workload_names.add(workload_name)
+        normalized_workload_names.append(workload_name)
+    plan_file = _materialize_funnel_artifacts_for_apply(
+        plan_file=plan_file,
+        workload_names=(selected_workload_names or None),
+    )
 
     # Run Cloudhand apply in a subprocess so we can stream/capture Terraform output.
     env = os.environ.copy()
@@ -2231,6 +2547,8 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         "--terraform-bin",
         terraform_bin,
     ]
+    for workload_name in normalized_workload_names:
+        cmd.extend(["--workload-name", workload_name])
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -2239,14 +2557,28 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        start_new_session=True,
     )
 
     logs: list[str] = []
-    assert proc.stdout
-    async for raw in proc.stdout:
-        logs.append(raw.decode(errors="ignore"))
-
-    rc = await proc.wait()
+    reader_task = asyncio.create_task(_collect_subprocess_output(proc.stdout, logs=logs))
+    timeout_seconds = _deploy_apply_timeout_seconds()
+    try:
+        if timeout_seconds is None:
+            rc = await proc.wait()
+        else:
+            rc = await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
+    except asyncio.TimeoutError as exc:
+        logs.append(
+            f"Error: Cloudhand apply timed out after {int(timeout_seconds)} seconds "
+            f"for plan '{requested_plan_file}'.\n"
+        )
+        await _terminate_subprocess(proc)
+        raise DeployError(
+            f"Cloudhand apply timed out after {int(timeout_seconds)} seconds."
+        ) from exc
+    finally:
+        await reader_task
 
     # Try to read terraform outputs for convenience
     server_ips: dict[str, str] = {}
@@ -2490,7 +2822,9 @@ def _resolve_publish_job_workspace_server_names(
     if raw_workspace_server_names is not None:
         if not isinstance(raw_workspace_server_names, list):
             raise DeployError("Publish deploy workload workspace_server_names must be a list.")
-        return _normalize_workload_server_names(server_names=raw_workspace_server_names)
+        normalized = _normalize_workload_server_names(server_names=raw_workspace_server_names)
+        if normalized:
+            return normalized
 
     return OrgDeployDomainsRepository(session).list_hostnames(
         org_id=org_id,
@@ -3217,6 +3551,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
     path = _publish_job_path(job_id)
     job["status"] = "running"
     job["started_at"] = _utc_now_iso()
+    job["phase"] = "publishing_funnel"
     _write_json_atomic(path, job)
 
     org_id = str(job.get("org_id") or "").strip()
@@ -3240,6 +3575,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 session=session, org_id=org_id, user_id=user_id, funnel_id=funnel_id
             )
             result_payload["publicationId"] = str(publication.id)
+            job["result"] = result_payload
+            job["phase"] = "publication_created"
+            _write_json_atomic(path, job)
 
             if deploy_request is not None:
                 if not isinstance(deploy_request, dict):
@@ -3267,13 +3605,36 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         raise DeployError(
                             "Hydrated funnel deploy workload is missing source_ref.artifact_id."
                         )
+                    artifact_payload = _load_funnel_runtime_artifact_payload_for_apply(
+                        artifact_id=artifact_id
+                    )
+                    workload_patch = _apply_publish_job_artifact_render_mode(
+                        workload_patch=workload_patch,
+                        artifact_payload=artifact_payload,
+                        requested_render_mode=deploy_request.get("artifact_render_mode_requested"),
+                        render_mode_was_explicit=bool(
+                            deploy_request.get("artifact_render_mode_explicit", False)
+                        ),
+                    )
+                    hydrated_source_ref = workload_patch.get("source_ref")
+                    if not isinstance(hydrated_source_ref, dict):
+                        raise DeployError(
+                            "Hydrated funnel deploy workload lost source_ref after render mode resolution."
+                        )
+                    resolved_render_mode = str(
+                        hydrated_source_ref.get("artifact_render_mode") or ""
+                    ).strip()
                     runtime_artifact_payload: dict[str, Any] = {
                         "id": artifact_id,
                         "clientId": client_id,
+                        "renderMode": resolved_render_mode,
                     }
                     if isinstance(artifact_version, int):
                         runtime_artifact_payload["version"] = artifact_version
                     result_payload["runtimeArtifact"] = runtime_artifact_payload
+                    job["result"] = result_payload
+                    job["phase"] = "artifact_hydrated"
+                    _write_json_atomic(path, job)
 
                 plan_resolution = ensure_plan_for_funnel_publish_workload(
                     workload_patch=workload_patch,
@@ -3290,6 +3651,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     in_place=bool(deploy_request.get("in_place", False)),
                 )
                 deploy_response: dict[str, Any] = {"patch": patch_result}
+                job["phase"] = "plan_patched"
+                job["result"] = result_payload
+                _write_json_atomic(path, job)
                 if plan_resolution.get("bootstrapped"):
                     deploy_response["bootstrap"] = {
                         "created": True,
@@ -3299,7 +3663,17 @@ async def _run_funnel_publish_job(job_id: str) -> None:
 
                 apply_plan_enabled = bool(deploy_request.get("apply_plan", True))
                 if apply_plan_enabled:
-                    apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
+                    workload_name = str(workload_patch.get("name") or "").strip()
+                    if not workload_name:
+                        raise DeployError(
+                            "Publish deploy workload patch is missing workload name."
+                        )
+                    job["phase"] = "applying_plan"
+                    _write_json_atomic(path, job)
+                    apply_result = await apply_plan(
+                        plan_path=patch_result["updated_plan_path"],
+                        workload_names=[workload_name],
+                    )
                     return_code, summary = _summarize_apply_result(apply_result)
                     deploy_response["apply"] = summary
                     if return_code != 0:
@@ -3314,11 +3688,6 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         _write_json_atomic(path, job)
                         return
                     if not access_urls:
-                        workload_name = str(workload_patch.get("name") or "").strip()
-                        if not workload_name:
-                            raise DeployError(
-                                "Publish deploy workload patch is missing workload name."
-                            )
                         access_urls = _infer_external_access_urls(
                             server_ips=summary.get("server_ips") or {},
                             workload_name=workload_name,
@@ -3328,6 +3697,9 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     deploy_response["apply"] = summary
 
                 if bool(deploy_request.get("bunny_pull_zone", False)):
+                    job["phase"] = "reconciling_bunny"
+                    job["result"] = result_payload
+                    _write_json_atomic(path, job)
                     workload_name = str(workload_patch.get("name") or "").strip()
                     if not workload_name:
                         raise DeployError("Publish deploy workload patch is missing workload name.")
@@ -3367,6 +3739,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
         job["result"] = result_payload
         job["access_urls"] = access_urls
         job["status"] = "succeeded"
+        job["phase"] = "completed"
         job["error"] = None
     except ValueError as exc:
         job["status"] = "failed"

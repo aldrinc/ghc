@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -153,6 +155,57 @@ def test_validate_imported_html_document_manifest_rejects_unsupported_selector()
         assert "Supported selector syntax" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected unsupported selector validation to fail.")
+
+
+def test_local_sales_omni_template_manifest_validates():
+    template_path = Path(__file__).resolve().parents[1] / "app/templates/funnels/sales_omni_template.json"
+    payload = json.loads(template_path.read_text())
+    props = payload["puckData"]["content"][0]["props"]
+
+    variant = ProductVariant(
+        product_id="product-1",
+        title="3 Pack Watermelon",
+        price=8900,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/123456789",
+    )
+    variant.id = "33333333-3333-3333-3333-333333333333"
+    variant.option_values = {"Pack": "3x", "Flavor": "watermelon"}
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=props["htmlDocument"],
+        instrumentation_manifest=props["instrumentationManifest"],
+        current_page_stage="sales",
+        current_page_id="11111111-1111-1111-1111-111111111111",
+        available_target_page_ids={"11111111-1111-1111-1111-111111111111"},
+        checkout_ready_variants=[variant],
+        require_stage_bindings=True,
+    )
+
+    assert len(normalized["bindings"]) == 2
+
+
+def test_local_presales_omni_template_manifest_validates():
+    template_path = Path(__file__).resolve().parents[1] / "app/templates/funnels/presales_omni_template.json"
+    payload = json.loads(template_path.read_text())
+    props = payload["puckData"]["content"][0]["props"]
+    manifest = props["instrumentationManifest"]
+    target_page_ids = {binding["targetPageId"] for binding in manifest["bindings"]}
+    next_page_id = next(iter(target_page_ids))
+
+    normalized = validate_imported_html_document_manifest(
+        html_document=props["htmlDocument"],
+        instrumentation_manifest=manifest,
+        current_page_stage="pre_sales",
+        current_page_id="44444444-4444-4444-4444-444444444444",
+        next_page_id=next_page_id,
+        available_target_page_ids={"44444444-4444-4444-4444-444444444444", next_page_id},
+        checkout_ready_variants=[],
+        require_stage_bindings=True,
+    )
+
+    assert len(normalized["bindings"]) == 2
 
 
 def test_resolve_funnel_page_stage_prefers_template_id():

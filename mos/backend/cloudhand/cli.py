@@ -202,8 +202,20 @@ def plan(ctx: click.Context, description: str) -> None:
 @click.argument("plan_file")
 @click.option("--auto-approve", is_flag=True, help="Skip interactive approval")
 @click.option("--terraform-bin", default="terraform", show_default=True, help="Terraform binary to use")
+@click.option(
+    "--workload-name",
+    "workload_names",
+    multiple=True,
+    help="Limit workload deployment/materialization to the named workload. Repeat for multiple workloads.",
+)
 @click.pass_context
-def apply(ctx: click.Context, plan_file: str, auto_approve: bool, terraform_bin: str) -> None:
+def apply(
+    ctx: click.Context,
+    plan_file: str,
+    auto_approve: bool,
+    terraform_bin: str,
+    workload_names: tuple[str, ...],
+) -> None:
     """Apply a plan."""
     try:
         project_id = ((ctx.obj or {}).get("project")) or "default"
@@ -214,6 +226,7 @@ def apply(ctx: click.Context, plan_file: str, auto_approve: bool, terraform_bin:
             terraform_bin=terraform_bin,
             project_id=project_id,
             workspace_id=project_id,
+            workload_names=list(workload_names),
         )
         if ret != 0:
             sys.exit(ret)
