@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import HTTPException
 from sqlalchemy import select
 
@@ -2149,7 +2151,9 @@ def test_update_product_allows_clearing_published_at(api_client):
         json={"publishedAt": "2026-03-11T12:00:00Z"},
     )
     assert publish_resp.status_code == 200
-    assert publish_resp.json()["published_at"] == "2026-03-11T12:00:00+00:00"
+    assert datetime.fromisoformat(publish_resp.json()["published_at"]).astimezone(
+        timezone.utc
+    ) == datetime(2026, 3, 11, 12, 0, tzinfo=timezone.utc)
 
     unpublish_resp = api_client.patch(
         f"/products/{product_id}",

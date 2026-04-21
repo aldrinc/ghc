@@ -6600,6 +6600,12 @@ WantedBy=multi-user.target
             listen_port = int(ports[0])
 
         upstream_api_base_root = source.upstream_api_base_root.rstrip("/")
+        parsed_upstream_api_base_root = urlsplit(upstream_api_base_root)
+        # Nginx needs a trailing slash when proxying to a non-root path so requests
+        # under `/api/` keep their path separators when the location prefix is replaced.
+        upstream_api_proxy_pass = upstream_api_base_root
+        if parsed_upstream_api_base_root.path not in {"", "/"}:
+            upstream_api_proxy_pass = f"{upstream_api_base_root}/"
         canonical_redirect_host = None
         canonical_redirect_scheme = "http"
         workspace_server_names = self._normalize_server_names(app.workspace_server_names)
@@ -6658,7 +6664,7 @@ WantedBy=multi-user.target
     }}
 
     location ^~ /api/ {{
-        proxy_pass {upstream_api_base_root};
+        proxy_pass {upstream_api_proxy_pass};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
