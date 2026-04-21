@@ -520,7 +520,12 @@ def test_prepared_public_checkout_routes_shopify_subscription_by_purchase_mode(
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == "ready"
+    prepared_payload = response.json()
+    prepared_id = prepared_payload["preparedCheckoutId"]
+
+    status_response = api_client.get(f"/public/checkout/prepare/{prepared_id}")
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "ready"
     assert len(observed) == 1
     assert observed[0]["selling_plan_id"] == "gid://shopify/SellingPlan/333"
 
