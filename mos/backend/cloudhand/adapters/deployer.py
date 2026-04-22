@@ -3491,14 +3491,17 @@ WantedBy=multi-user.target
         if service_exists or unit_removed:
             self.run("systemctl daemon-reload")
 
+    def _run_bash_lc(self, script: str) -> str:
+        return self.run("bash -lc " + shlex.quote(script))
+
     def _service_unit_exists(self, service_name: str) -> bool:
-        safe_name = service_name.replace("'", "'\"'\"'")
-        out = self.run(f"bash -lc \"systemctl cat '{safe_name}.service' >/dev/null 2>&1 && echo yes || true\"")
+        safe_service_unit = shlex.quote(f"{service_name}.service")
+        out = self._run_bash_lc(f"systemctl cat {safe_service_unit} >/dev/null 2>&1 && echo yes || true")
         return out.strip() == "yes"
 
     def _path_exists(self, path: str) -> bool:
         safe_path = shlex.quote(path)
-        out = self.run(f"bash -lc \"test -e {safe_path} && echo yes || true\"")
+        out = self._run_bash_lc(f"test -e {safe_path} && echo yes || true")
         return out.strip() == "yes"
 
     def _remove_path_if_exists(self, path: str, *, recursive: bool = False) -> bool:
@@ -4254,8 +4257,8 @@ WantedBy=multi-user.target
     def _remote_tree_contains_text(self, *, root_path: str, text: str) -> bool:
         safe_root = shlex.quote(root_path)
         safe_text = shlex.quote(text)
-        out = self.run(
-            f'bash -lc "grep -R -F -q -- {safe_text} {safe_root} >/dev/null 2>&1 && echo yes || true"'
+        out = self._run_bash_lc(
+            f"grep -R -F -q -- {safe_text} {safe_root} >/dev/null 2>&1 && echo yes || true"
         )
         return out.strip() == "yes"
 

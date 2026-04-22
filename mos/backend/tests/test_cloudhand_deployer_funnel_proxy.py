@@ -2373,6 +2373,45 @@ def test_validate_funnel_artifact_site_output_requires_posthog_bootstrap_when_tr
         )
 
 
+def test_remote_tree_contains_text_handles_shell_sensitive_tracker_snippets(tmp_path: Path):
+    site_dir = tmp_path / "release dir"
+    site_dir.mkdir(parents=True)
+    (site_dir / "index.html").write_text(
+        '<script>window.fbq("init", "970868055499017");</script>',
+        encoding="utf-8",
+    )
+
+    deployer = object.__new__(ServerDeployer)
+    deployer.run = lambda cmd: subprocess.run(
+        cmd,
+        shell=True,
+        check=False,
+        capture_output=True,
+        text=True,
+        executable="/bin/bash",
+    ).stdout
+
+    assert deployer._remote_tree_contains_text(root_path=str(site_dir), text='fbq("init"') is True
+
+
+def test_path_exists_handles_shell_sensitive_paths(tmp_path: Path):
+    target_path = tmp_path / "release's \"current\" dir" / "index.html"
+    target_path.parent.mkdir(parents=True)
+    target_path.write_text("ok", encoding="utf-8")
+
+    deployer = object.__new__(ServerDeployer)
+    deployer.run = lambda cmd: subprocess.run(
+        cmd,
+        shell=True,
+        check=False,
+        capture_output=True,
+        text=True,
+        executable="/bin/bash",
+    ).stdout
+
+    assert deployer._path_exists(str(target_path)) is True
+
+
 def test_validate_funnel_artifact_site_output_requires_posthog_web_analytics_capture_when_tracking_is_declared():
     app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
     deployer = object.__new__(ServerDeployer)
