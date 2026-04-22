@@ -963,6 +963,32 @@ def test_published_public_funnel_page_exposes_posthog_tracking(
     }
 
 
+def test_published_public_funnel_page_defaults_posthog_person_profiles_to_always(
+    api_client: TestClient,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", None)
+
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="PostHog Default Person Profiles Funnel",
+    )
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    entry_slug = meta.json()["entrySlug"]
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"]["posthogPersonProfiles"] == "always"
+
+
 def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(
     api_client: TestClient,
     db_session,

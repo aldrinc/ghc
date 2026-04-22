@@ -83,6 +83,41 @@ describe("capturePostHogEvent", () => {
     );
   });
 
+  it("defaults person profiles to always when tracking omits the setting", () => {
+    const trackingWithoutPersonProfiles = { ...tracking };
+    delete (trackingWithoutPersonProfiles as { posthogPersonProfiles?: string }).posthogPersonProfiles;
+
+    capturePostHogEvent({
+      tracking: trackingWithoutPersonProfiles,
+      distinctId: "visitor-1",
+      productSlug: "example-product",
+      funnelSlug: "example-funnel",
+      publicationId: "publication-1",
+      pageId: "page-1",
+      pageSlug: "sales-page",
+      pageStage: "sales",
+      sessionId: "session-1",
+      eventType: "sales_page_view",
+      props: {
+        pageStage: "sales",
+      },
+      utm: {},
+    });
+
+    const root = window.posthog as { _i?: unknown[] };
+    expect(root._i).toEqual(
+      expect.arrayContaining([
+        [
+          "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          expect.objectContaining({
+            person_profiles: "always",
+          }),
+          "mosFunnel",
+        ],
+      ]),
+    );
+  });
+
   it("maps checkout clicks to AddToCart instead of the internal event name", () => {
     capturePostHogEvent({
       tracking,

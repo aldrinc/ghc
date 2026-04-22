@@ -560,4 +560,52 @@ describe("StandaloneImportedHtmlPage", () => {
 
     dom.window.close();
   });
+
+  it("defaults standalone PostHog person profiles to always when omitted", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
+      page: {
+        tracking: {
+          provider: "posthog",
+          mode: "public_funnel_runtime",
+          posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          posthogApiHost: "https://us.i.posthog.com",
+          posthogDefaults: "2026-01-30",
+        },
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM("<html><body><button id=\"main-cta\">Buy now</button></body></html>", {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page",
+    });
+    dom.window.fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const posthogRoot = dom.window.posthog as { _i?: unknown[] };
+    expect(posthogRoot._i).toEqual(
+      expect.arrayContaining([
+        [
+          "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          expect.objectContaining({
+            person_profiles: "always",
+          }),
+          "mosFunnel",
+        ],
+      ]),
+    );
+
+    dom.window.close();
+  });
 });

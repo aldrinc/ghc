@@ -309,7 +309,7 @@ export function ensurePostHogInstance({
       api_host: apiHost,
       ...(uiHost ? { ui_host: uiHost } : {}),
       defaults: cleanText(tracking?.posthogDefaults) || "2026-01-30",
-      person_profiles: cleanText(tracking?.posthogPersonProfiles) || "identified_only",
+      person_profiles: cleanText(tracking?.posthogPersonProfiles) || "always",
       autocapture: false,
       capture_pageview: false,
       capture_pageleave: false,

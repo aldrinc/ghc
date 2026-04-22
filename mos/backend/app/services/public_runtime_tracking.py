@@ -113,7 +113,7 @@ def resolve_public_posthog_tracking(*, session: Session, funnel: Funnel) -> dict
 
     api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
     defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
-    person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
+    person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES) or "always"
 
     if not api_key:
         raise RuntimeError(
