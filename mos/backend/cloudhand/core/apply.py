@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import hashlib
 from pathlib import Path
+import requests
 
 from ..adapters.deployer import ServerDeployer
 from ..models import ApplicationSourceType, ApplicationSpec, DesiredStateSpec
@@ -271,6 +272,78 @@ def _resolve_provider_credential_env(*, root: Path, provider: str, env: dict[str
     env["TF_VAR_hcloud_token"] = token
 
 
+def _list_terraform_state_addresses(*, tf_bin: str, tf_dir: Path, env: dict[str, str]) -> set[str]:
+    result = subprocess.run(
+        [tf_bin, "state", "list"],
+        cwd=tf_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return set()
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def _import_existing_hetzner_servers(
+    *,
+    root: Path,
+    spec: DesiredStateSpec,
+    tf_bin: str,
+    tf_dir: Path,
+    env: dict[str, str],
+) -> None:
+    normalized_provider = (spec.provider or "").strip().lower()
+    if normalized_provider != "hetzner":
+        return
+
+    token = (env.get("TF_VAR_hcloud_token") or "").strip()
+    if not token:
+        token = (env.get("HCLOUD_TOKEN") or "").strip()
+    if not token:
+        token = (load_provider_config("hetzner", root=root).get("token") or "").strip()
+    if not token:
+        return
+
+    state_addresses = _list_terraform_state_addresses(tf_bin=tf_bin, tf_dir=tf_dir, env=env)
+    for inst in spec.instances:
+        resource_name = inst.name.replace("-", "_")
+        state_address = f"hcloud_server.{resource_name}"
+        if state_address in state_addresses:
+            continue
+
+        response = requests.get(
+            "https://api.hetzner.cloud/v1/servers",
+            params={"name": inst.name},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        servers = response.json().get("servers", [])
+        if not servers:
+            continue
+
+        server_id = servers[0]["id"]
+        print(f"Importing existing server {inst.name} (id {server_id}) into state...")
+        import_result = subprocess.run(
+            [tf_bin, "import", state_address, str(server_id)],
+            cwd=tf_dir,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if import_result.returncode != 0:
+            stderr = (import_result.stderr or "").strip()
+            stdout = (import_result.stdout or "").strip()
+            detail = stderr or stdout or "unknown terraform import failure"
+            raise RuntimeError(
+                f"Failed to import existing Hetzner server '{inst.name}' into Terraform state: {detail}"
+            )
+        state_addresses.add(state_address)
+
+
 def apply_plan(
     root: Path,
     plan_path: Path,
@@ -330,6 +403,13 @@ def apply_plan(
     env["TF_VAR_ssh_public_key"] = pub_key
 
     subprocess.run([tf_bin, "init", "-input=false", "-upgrade"], cwd=tf_dir, check=True, env=env)
+    _import_existing_hetzner_servers(
+        root=root,
+        spec=new_spec,
+        tf_bin=tf_bin,
+        tf_dir=tf_dir,
+        env=env,
+    )
 
     cmd = [tf_bin, "apply"]
     if auto_approve:

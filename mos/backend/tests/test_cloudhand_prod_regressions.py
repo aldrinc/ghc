@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
 import cloudhand.secrets as secrets_module
-from cloudhand.core.apply import _resolve_provider_credential_env
-from cloudhand.models import ApplicationSpec
+from cloudhand.core.apply import _import_existing_hetzner_servers, _resolve_provider_credential_env
+from cloudhand.models import ApplicationSpec, DesiredStateSpec
 from cloudhand.secrets import _resolve_local_keys_dir
 
 
@@ -33,6 +34,33 @@ def _moshq_git_app_payload() -> dict:
         },
         "destination_path": "/opt/apps",
     }
+
+
+def _instance_payload(name: str) -> dict:
+    return {
+        "name": name,
+        "size": "cx23",
+        "network": "default",
+        "region": "hel1",
+        "labels": {},
+        "workloads": [],
+        "maintenance": None,
+    }
+
+
+def _desired_spec(instances: list[dict]) -> DesiredStateSpec:
+    return DesiredStateSpec.model_validate(
+        {
+            "provider": "hetzner",
+            "region": "hel1",
+            "networks": [{"name": "default", "cidr": "10.0.0.0/16"}],
+            "instances": instances,
+            "load_balancers": [],
+            "firewalls": [],
+            "dns_records": [],
+            "containers": [],
+        }
+    )
 
 
 def test_moshq_git_workload_rejects_python_http_server() -> None:
@@ -126,6 +154,115 @@ def test_resolve_provider_credential_env_errors_cleanly_when_token_is_missing(
         match=r"Missing Hetzner provider token",
     ):
         _resolve_provider_credential_env(root=tmp_path, provider="hetzner", env=env)
+
+
+def test_import_existing_hetzner_servers_imports_missing_server_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    spec = _desired_spec([_instance_payload("ubuntu-4gb-hel1-2")])
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, cwd=None, env=None, capture_output=False, text=False, check=False):
+        calls.append(cmd)
+        if cmd[1:3] == ["state", "list"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[1] == "import":
+            return SimpleNamespace(returncode=0, stdout="imported", stderr="")
+        raise AssertionError(f"Unexpected subprocess.run call: {cmd}")
+
+    class _Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"servers": [{"id": 424242}]}
+
+    monkeypatch.setattr("cloudhand.core.apply.subprocess.run", fake_run)
+    monkeypatch.setattr("cloudhand.core.apply.requests.get", lambda *args, **kwargs: _Response())
+
+    _import_existing_hetzner_servers(
+        root=tmp_path,
+        spec=spec,
+        tf_bin="terraform",
+        tf_dir=tmp_path,
+        env={"TF_VAR_hcloud_token": "token"},
+    )
+
+    assert calls == [
+        ["terraform", "state", "list"],
+        ["terraform", "import", "hcloud_server.ubuntu_4gb_hel1_2", "424242"],
+    ]
+
+
+def test_import_existing_hetzner_servers_skips_when_server_already_in_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    spec = _desired_spec([_instance_payload("ubuntu-4gb-hel1-2")])
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, cwd=None, env=None, capture_output=False, text=False, check=False):
+        calls.append(cmd)
+        if cmd[1:3] == ["state", "list"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="hcloud_server.ubuntu_4gb_hel1_2\n",
+                stderr="",
+            )
+        raise AssertionError(f"Unexpected subprocess.run call: {cmd}")
+
+    monkeypatch.setattr("cloudhand.core.apply.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "cloudhand.core.apply.requests.get",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("requests.get should not be called")),
+    )
+
+    _import_existing_hetzner_servers(
+        root=tmp_path,
+        spec=spec,
+        tf_bin="terraform",
+        tf_dir=tmp_path,
+        env={"TF_VAR_hcloud_token": "token"},
+    )
+
+    assert calls == [["terraform", "state", "list"]]
+
+
+def test_import_existing_hetzner_servers_errors_cleanly_when_import_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    spec = _desired_spec([_instance_payload("ubuntu-4gb-hel1-2")])
+
+    def fake_run(cmd, cwd=None, env=None, capture_output=False, text=False, check=False):
+        if cmd[1:3] == ["state", "list"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[1] == "import":
+            return SimpleNamespace(returncode=1, stdout="", stderr="boom")
+        raise AssertionError(f"Unexpected subprocess.run call: {cmd}")
+
+    class _Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"servers": [{"id": 424242}]}
+
+    monkeypatch.setattr("cloudhand.core.apply.subprocess.run", fake_run)
+    monkeypatch.setattr("cloudhand.core.apply.requests.get", lambda *args, **kwargs: _Response())
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"Failed to import existing Hetzner server 'ubuntu-4gb-hel1-2' into Terraform state: boom",
+    ):
+        _import_existing_hetzner_servers(
+            root=tmp_path,
+            spec=spec,
+            tf_bin="terraform",
+            tf_dir=tmp_path,
+            env={"TF_VAR_hcloud_token": "token"},
+        )
 
 
 def test_resolve_local_keys_dir_prefers_existing_shared_project_keypair(
