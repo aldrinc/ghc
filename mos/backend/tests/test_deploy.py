@@ -923,6 +923,27 @@ def test_list_bunny_pull_zones_accepts_array_response(monkeypatch):
     assert zones[1]["Id"] == 456
 
 
+def test_purge_bunny_pull_zone_cache_calls_expected_endpoint(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return None
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
+
+    output = deploy_service._purge_bunny_pull_zone_cache(zone_id=777)
+
+    assert captured == {
+        "method": "POST",
+        "path": "/pullzone/777/purgeCache",
+        "payload": None,
+    }
+    assert output == {"zoneId": 777, "status": "purged"}
+
+
 def test_ensure_bunny_pull_zone_hostname_skips_create_when_hostname_already_on_same_zone(monkeypatch):
     monkeypatch.setattr(
         deploy_service,
@@ -2828,3 +2849,181 @@ def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_pr
     )
 
     assert extracted == {current_logo_id, gallery_asset_id}
+
+
+def _write_publish_job_fixture(tmp_path: Path, *, job_id: str, deploy_request: dict) -> Path:
+    job_path = tmp_path / "publish-jobs" / f"{job_id}.json"
+    job_path.parent.mkdir(parents=True, exist_ok=True)
+    job_path.write_text(
+        json.dumps(
+            {
+                "id": job_id,
+                "status": "queued",
+                "created_at": "2026-04-22T00:00:00+00:00",
+                "started_at": None,
+                "finished_at": None,
+                "org_id": str(TEST_ORG_ID),
+                "user_id": "user-123",
+                "funnel_id": "funnel-123",
+                "deploy_request": deploy_request,
+                "result": None,
+                "access_urls": [],
+                "error": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return job_path
+
+
+def _install_publish_job_mocks(monkeypatch):
+    import app.db.base as db_base
+    import app.services.funnels as funnels_service
+
+    class DummySession:
+        def close(self):
+            return None
+
+    monkeypatch.setattr(db_base, "SessionLocal", lambda: DummySession())
+    monkeypatch.setattr(
+        funnels_service,
+        "publish_funnel",
+        lambda **kwargs: SimpleNamespace(id=UUID("00000000-0000-0000-0000-000000000999")),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "hydrate_funnel_artifact_workload_patch",
+        lambda **kwargs: {
+            "name": "brand-funnels-70124684-be65d76e",
+            "source_type": "funnel_artifact",
+            "source_ref": {
+                "client_id": "70124684-505f-48af-a25c-5f7a79601fa0",
+                "artifact_id": "artifact-123",
+                "artifact_version": 30,
+                "artifact_render_mode": "standalone_imported_html",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_load_funnel_runtime_artifact_payload_for_apply",
+        lambda *, artifact_id: {"meta": {"artifactId": artifact_id}, "products": {}},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_apply_publish_job_artifact_render_mode",
+        lambda **kwargs: kwargs["workload_patch"],
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "ensure_plan_for_funnel_publish_workload",
+        lambda **kwargs: {"plan_path": "/tmp/plan.json", "bootstrapped": False},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "patch_workload_in_plan",
+        lambda **kwargs: {
+            "status": "ok",
+            "updated_plan_path": "/tmp/plan.json",
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_resolve_publish_job_workspace_server_names",
+        lambda **kwargs: ["shoptenorco.com"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_purges_bunny_cache_after_reconcile(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+
+    calls: list[object] = []
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_reconcile_bunny_pull_zone_for_published_workload",
+        lambda **kwargs: calls.append(("reconcile", kwargs["workload_name"]))
+        or {
+            "provider": "bunny",
+            "pull_zone": {
+                "id": 777,
+                "name": "brand-funnels-70124684-be65d76e",
+                "accessUrls": ["https://shoptenorco.com/"],
+            },
+        },
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_purge_bunny_pull_zone_cache",
+        lambda *, zone_id, cache_tag=None: calls.append(("purge", zone_id, cache_tag))
+        or {"zoneId": zone_id, "status": "purged"},
+    )
+
+    job_id = "publish-job-success"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": False,
+            "bunny_pull_zone": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "succeeded"
+    assert job["phase"] == "completed"
+    assert calls == [
+        ("reconcile", "brand-funnels-70124684-be65d76e"),
+        ("purge", 777, None),
+    ]
+    assert job["access_urls"] == ["https://shoptenorco.com/"]
+    assert job["result"]["deploy"]["cdn"]["cachePurge"] == {"zoneId": 777, "status": "purged"}
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_fails_when_bunny_cache_purge_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_reconcile_bunny_pull_zone_for_published_workload",
+        lambda **kwargs: {
+            "provider": "bunny",
+            "pull_zone": {
+                "id": 777,
+                "name": "brand-funnels-70124684-be65d76e",
+                "accessUrls": ["https://shoptenorco.com/"],
+            },
+        },
+    )
+
+    def _raise_purge_error(*, zone_id, cache_tag=None):
+        raise deploy_service.DeployError(
+            f"Bunny API request failed (POST /pullzone/{zone_id}/purgeCache) with status 500: purge failed"
+        )
+
+    monkeypatch.setattr(deploy_service, "_purge_bunny_pull_zone_cache", _raise_purge_error)
+
+    job_id = "publish-job-purge-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": False,
+            "bunny_pull_zone": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "purging_bunny_cache"
+    assert "purgeCache" in job["error"]

@@ -3207,6 +3207,37 @@ def _ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: s
     return zone
 
 
+def _purge_bunny_pull_zone_cache(*, zone_id: int, cache_tag: str | None = None) -> dict[str, Any]:
+    if zone_id <= 0:
+        raise DeployError("Bunny pull zone Id must be greater than zero.")
+
+    payload: dict[str, Any] | None = None
+    normalized_cache_tag = str(cache_tag or "").strip()
+    if normalized_cache_tag:
+        payload = {"CacheTag": normalized_cache_tag}
+
+    response = _bunny_api_request(
+        method="POST",
+        path=f"/pullzone/{zone_id}/purgeCache",
+        payload=payload,
+    )
+    if response is not None and not isinstance(response, (dict, bool, str)):
+        raise DeployError(
+            "Bunny purge cache response must be an object, bool, or string when present."
+        )
+
+    result: dict[str, Any] = {"zoneId": zone_id, "status": "purged"}
+    if normalized_cache_tag:
+        result["cacheTag"] = normalized_cache_tag
+    if isinstance(response, dict) and response:
+        result["response"] = response
+    elif isinstance(response, bool):
+        result["ok"] = response
+    elif isinstance(response, str) and response.strip():
+        result["message"] = response.strip()
+    return result
+
+
 def _load_workload_from_plan(
     *,
     workload_name: str,
@@ -3802,6 +3833,22 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         bunny_access_urls = bunny_pull_zone_payload.get("accessUrls")
                     else:
                         bunny_access_urls = []
+                    if not isinstance(bunny_pull_zone_payload, dict):
+                        raise DeployError("Publish deploy Bunny pull zone payload must be an object.")
+                    try:
+                        bunny_zone_id = int(bunny_pull_zone_payload.get("id"))
+                    except (TypeError, ValueError) as exc:
+                        raise DeployError(
+                            "Publish deploy Bunny pull zone payload is missing a valid id."
+                        ) from exc
+                    if bunny_zone_id <= 0:
+                        raise DeployError(
+                            "Publish deploy Bunny pull zone payload id must be greater than zero."
+                        )
+                    job["phase"] = "purging_bunny_cache"
+                    job["result"] = result_payload
+                    _write_json_atomic(path, job)
+                    bunny_config["cachePurge"] = _purge_bunny_pull_zone_cache(zone_id=bunny_zone_id)
                     access_urls = _normalize_access_urls(access_urls + bunny_access_urls)
                     deploy_response["cdn"] = bunny_config
 
