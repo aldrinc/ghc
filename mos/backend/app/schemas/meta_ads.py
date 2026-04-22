@@ -64,6 +64,7 @@ class MetaAdSetCreateRequest(BaseModel):
     startTime: Optional[str] = None
     endTime: Optional[str] = None
     bidAmount: Optional[int] = None
+    bidStrategy: Optional[str] = None
     dsaBeneficiary: Optional[str] = None
     dsaPayor: Optional[str] = None
     promotedObject: Optional[dict[str, Any]] = None

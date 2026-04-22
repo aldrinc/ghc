@@ -1269,6 +1269,7 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
     adset_counter = {"count": 0}
     creative_counter = {"count": 0}
     ad_creations: list[str] = []
+    adset_payloads: list[dict[str, Any]] = []
 
     class _FakeStorage:
         def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
@@ -1287,6 +1288,7 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
 
         def create_adset(self, **kwargs):
             adset_counter["count"] += 1
+            adset_payloads.append(kwargs["payload"])
             return {"id": f"meta_adset_{adset_counter['count']}", "status": "PAUSED"}
 
         def create_adcreative(self, **kwargs):
@@ -1319,6 +1321,7 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
     assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert creative_counter["count"] == 7
     assert len({item["adsetSpecId"] for item in publish_payload["items"]}) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+    assert {payload["bid_strategy"] for payload in adset_payloads} == {"LOWEST_COST_WITHOUT_CAP"}
     bucket_counts = Counter(int(item["metadata"]["bucketIndex"]) for item in publish_payload["items"])
     assert bucket_counts == Counter({1: 2, 2: 2, 3: 1, 4: 1, 5: 1})
 

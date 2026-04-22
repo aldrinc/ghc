@@ -2332,6 +2332,7 @@ def _create_meta_adset_internal(
         "status": payload.status,
         "billing_event": payload.billingEvent,
         "optimization_goal": payload.optimizationGoal,
+        "bid_strategy": _clean_optional_text(payload.bidStrategy) or "LOWEST_COST_WITHOUT_CAP",
         "targeting": _merge_targeting_with_placements(
             targeting=payload.targeting,
             placements=payload.placements,
@@ -4063,6 +4064,7 @@ def create_meta_publish_run(
                         placements=adset_spec.placements if isinstance(adset_spec.placements, dict) else None,
                         startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
                         endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
+                        bidStrategy="LOWEST_COST_WITHOUT_CAP",
                         dsaBeneficiary=_clean_optional_text(adset_spec.dsa_beneficiary),
                         dsaPayor=_clean_optional_text(adset_spec.dsa_payor),
                         promotedObject=adset_spec.promoted_object,
