@@ -4,6 +4,7 @@ import type { PublicFunnelMeta } from "@/types/funnels";
 import {
   buildPublicFunnelPath,
   isStandaloneBundleMode,
+  resolvePreferredPublicFunnelSlug,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
 import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
@@ -47,10 +48,14 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
+        const preferredSlug = resolvePreferredPublicFunnelSlug(meta);
+        if (!preferredSlug) {
+          throw new Error("This funnel has no redirectable page configured.");
+        }
         const entryPath = buildPublicFunnelPath({
           productSlug,
           funnelSlug,
-          slug: meta.entrySlug,
+          slug: preferredSlug,
           bundleMode,
         });
         navigate(

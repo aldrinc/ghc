@@ -1999,6 +1999,46 @@ def test_funnel_artifact_site_uses_canonical_domain_for_default_route_when_works
     )
 
 
+def test_funnel_artifact_site_root_redirect_prefers_sales_page_when_available():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>Standalone Sales</title>
+  </head>
+  <body>
+    <main id="app">
+      <a id="main-cta" href="#shop">Start my protocol</a>
+    </main>
+  </body>
+</html>
+"""
+    app = _artifact_app(
+        render_mode="standalone_imported_html",
+        html_document=html_document,
+        workspace_server_names=["shop.example.com"],
+    )
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["pages"]["sales-page"] = {
+        **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
+        "pageId": "page-2",
+        "slug": "sales-page",
+        "pageMap": {"page-1": "presales", "page-2": "sales-page"},
+    }
+    funnel_payload["meta"]["pages"] = [
+        {"pageId": "page-1", "slug": "presales"},
+        {"pageId": "page-2", "slug": "sales-page"},
+    ]
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert (
+        "return 302 https://shop.example.com/example-product/example-funnel/sales-page$is_args$args;"
+        in conf
+    )
+
+
 def test_funnel_artifact_site_standalone_export_errors_on_unsupported_page_blocks():
     app = _artifact_app(render_mode="standalone_imported_html")
     deployer, _uploaded, _commands = _stub_deployer()
@@ -2321,6 +2361,32 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     assert '"preloadedFunnel":{"productSlug":"example-product","funnelSlug":"f85405a4"' in runtime_block
 
 
+def test_funnel_artifact_site_prefers_sales_page_for_default_route_and_preload():
+    app = _artifact_app()
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["pages"]["sales-page"] = {
+        **json.loads(json.dumps(funnel_payload["pages"]["presales"])),
+        "pageId": "page-2",
+        "slug": "sales-page",
+        "pageMap": {"page-1": "presales", "page-2": "sales-page"},
+    }
+    funnel_payload["meta"]["pages"] = [
+        {"pageId": "page-1", "slug": "presales"},
+        {"pageId": "page-2", "slug": "sales-page"},
+    ]
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_script_path = next((path for path in uploaded if path.startswith("/tmp/cloudhand-runtime-config-")), "")
+    assert runtime_script_path
+    runtime_block = _extract_runtime_block(uploaded[runtime_script_path])
+    assert '"defaultEntrySlug":"sales-page"' in runtime_block
+    assert '"pages":{"sales-page":' in runtime_block
+    assert '"example-product/example-funnel/sales-page":"11111111-1111-1111-1111-111111111111"' in runtime_block
+
+
 def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
     app = _artifact_app()
     first_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
@@ -2392,8 +2458,8 @@ def test_funnel_artifact_site_only_inlines_the_entry_page_in_runtime_config():
     assert isinstance(runtime_inject_script, str)
     runtime_block = _extract_runtime_block(runtime_inject_script)
 
-    assert '"pages":{"presales":' in runtime_block
-    assert '"pageId":"page-2","slug":"sales-page","puckData"' not in runtime_block
+    assert '"pages":{"sales-page":' in runtime_block
+    assert '"pageId":"page-1","slug":"presales","puckData"' not in runtime_block
 
 
 def test_funnel_artifact_site_escapes_html_script_terminators_in_runtime_config():

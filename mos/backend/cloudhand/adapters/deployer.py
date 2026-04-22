@@ -4079,6 +4079,40 @@ WantedBy=multi-user.target
 
         return canonical_payload
 
+    def _resolve_funnel_artifact_default_page_slug(
+        self,
+        *,
+        funnel_meta: Dict[str, Any],
+        funnel_payload: Dict[str, Any],
+    ) -> str:
+        entry_slug = self._canonical_funnel_artifact_page_slug(funnel_meta.get("entrySlug"))
+        if not entry_slug:
+            return ""
+
+        available_page_slugs: set[str] = set()
+
+        pages = funnel_payload.get("pages")
+        if isinstance(pages, dict):
+            for raw_page_slug in pages.keys():
+                canonical_page_slug = self._canonical_funnel_artifact_page_slug(raw_page_slug)
+                if canonical_page_slug:
+                    available_page_slugs.add(canonical_page_slug)
+
+        meta_pages = funnel_meta.get("pages")
+        if isinstance(meta_pages, list):
+            for raw_page in meta_pages:
+                if not isinstance(raw_page, dict):
+                    continue
+                canonical_page_slug = self._canonical_funnel_artifact_page_slug(raw_page.get("slug"))
+                if canonical_page_slug:
+                    available_page_slugs.add(canonical_page_slug)
+
+        for candidate_slug in ("sales-page", "sales"):
+            if candidate_slug in available_page_slugs:
+                return candidate_slug
+
+        return entry_slug
+
     def _build_entry_image_preload_map(self, *, source: FunnelArtifactSourceSpec) -> Dict[str, str]:
         artifact = source.artifact or {}
         products = artifact.get("products")
@@ -4107,30 +4141,34 @@ WantedBy=multi-user.target
                 if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
                     continue
 
-                entry_slug = self._canonical_funnel_artifact_page_slug(funnel_meta.get("entrySlug"))
-                if not entry_slug:
+                default_page_slug = self._resolve_funnel_artifact_default_page_slug(
+                    funnel_meta=funnel_meta,
+                    funnel_payload=funnel_payload,
+                )
+                if not default_page_slug:
                     continue
 
-                entry_page_payload: Optional[Dict[str, Any]] = None
+                default_page_payload: Optional[Dict[str, Any]] = None
                 for raw_page_slug, page_payload in pages.items():
                     page_slug = self._canonical_funnel_artifact_page_slug(raw_page_slug)
-                    if page_slug != entry_slug:
+                    if page_slug != default_page_slug:
                         continue
                     if not isinstance(page_payload, dict):
                         raise ValueError(
-                            f"Artifact page payload for '{product_slug}/{funnel_slug}/{entry_slug}' must be an object."
+                            f"Artifact page payload for '{product_slug}/{funnel_slug}/{default_page_slug}' must be an object."
                         )
-                    entry_page_payload = page_payload
+                    default_page_payload = page_payload
                     break
 
-                if entry_page_payload is None:
+                if default_page_payload is None:
                     raise ValueError(
-                        f"Artifact funnel '{product_slug}/{funnel_slug}' entrySlug '{entry_slug}' was not found in pages."
+                        f"Artifact funnel '{product_slug}/{funnel_slug}' default page slug "
+                        f"'{default_page_slug}' was not found in pages."
                     )
 
                 preload_asset_public_id = self._resolve_entry_preload_asset_public_id(
-                    page_payload=entry_page_payload,
-                    context_label=f"Artifact funnel '{product_slug}/{funnel_slug}/{entry_slug}'",
+                    page_payload=default_page_payload,
+                    context_label=f"Artifact funnel '{product_slug}/{funnel_slug}/{default_page_slug}'",
                 )
                 if not preload_asset_public_id:
                     continue
@@ -4143,7 +4181,7 @@ WantedBy=multi-user.target
                     normalized_funnel_path_token = str(funnel_path_token or "").strip().lower()
                     if not normalized_funnel_path_token:
                         continue
-                    route_key = f"{product_slug}/{normalized_funnel_path_token}/{entry_slug}"
+                    route_key = f"{product_slug}/{normalized_funnel_path_token}/{default_page_slug}"
                     existing_asset = preload_map.get(route_key)
                     if existing_asset and existing_asset != preload_asset_public_id:
                         raise ValueError(
@@ -4163,7 +4201,7 @@ WantedBy=multi-user.target
         return (
             str(resolved_target["productSlug"]),
             str(resolved_target["funnelSlug"]),
-            str(resolved_target["entrySlug"]),
+            str(resolved_target.get("defaultPageSlug") or resolved_target["entrySlug"]),
         )
 
     def _funnel_artifact_declares_posthog_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
@@ -4346,6 +4384,10 @@ WantedBy=multi-user.target
                     "productSlug": product_slug,
                     "funnelSlug": canonical_funnel_slug,
                     "entrySlug": entry_slug,
+                    "defaultPageSlug": self._resolve_funnel_artifact_default_page_slug(
+                        funnel_meta=canonical_funnel_meta,
+                        funnel_payload=funnel_payload,
+                    ),
                     "funnelMeta": canonical_funnel_meta,
                     "funnelPayload": funnel_payload,
                 }
@@ -4408,15 +4450,16 @@ WantedBy=multi-user.target
                 page_slug=str(raw_page_slug or ""),
                 page_payload=page_payload,
             )
-        entry_slug = self._canonical_funnel_artifact_page_slug(canonical_meta.get("entrySlug"))
-        if not entry_slug:
+        default_page_slug = str(resolved_target.get("defaultPageSlug") or "").strip()
+        if not default_page_slug:
             raise ValueError(
-                f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical entry slug for runtime preload."
+                f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical default page slug for runtime preload."
             )
-        entry_page_payload = canonical_pages.get(entry_slug)
-        if not isinstance(entry_page_payload, dict):
+        default_page_payload = canonical_pages.get(default_page_slug)
+        if not isinstance(default_page_payload, dict):
             raise ValueError(
-                f"Artifact funnel '{product_slug}/{funnel_slug}' entrySlug '{entry_slug}' was not found in pages."
+                f"Artifact funnel '{product_slug}/{funnel_slug}' default page slug "
+                f"'{default_page_slug}' was not found in pages."
             )
         return {
             "productSlug": product_slug,
@@ -4425,8 +4468,8 @@ WantedBy=multi-user.target
                 **canonical_meta,
                 "funnelSlug": funnel_slug,
             },
-            # Keep the deploy-time inline runtime lean so mobile webviews only pay for the entry page.
-            "pages": {entry_slug: entry_page_payload},
+            # Keep the deploy-time inline runtime lean so mobile webviews only pay for the default landing page.
+            "pages": {default_page_slug: default_page_payload},
         }
 
     def _inject_funnel_runtime_config(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:

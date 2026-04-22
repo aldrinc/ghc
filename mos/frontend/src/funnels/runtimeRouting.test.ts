@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   getStandaloneDefaultPageRoute,
   getStandalonePreloadedFunnelData,
+  resolvePreferredPublicFunnelSlug,
 } from "@/funnels/runtimeRouting";
 
 declare global {
@@ -93,5 +94,26 @@ describe("runtimeRouting standalone preload helpers", () => {
     });
 
     expect(preloaded).toBeNull();
+  });
+
+  it("prefers the sales page when resolving a no-slug public funnel redirect", () => {
+    expect(
+      resolvePreferredPublicFunnelSlug({
+        entrySlug: "presales",
+        pages: [
+          { pageId: "page-1", slug: "presales" },
+          { pageId: "page-2", slug: "sales-page" },
+        ],
+      }),
+    ).toBe("sales-page");
+  });
+
+  it("falls back to the published entry slug when there is no sales page", () => {
+    expect(
+      resolvePreferredPublicFunnelSlug({
+        entrySlug: "presales",
+        pages: [{ pageId: "page-1", slug: "presales" }],
+      }),
+    ).toBe("presales");
   });
 });

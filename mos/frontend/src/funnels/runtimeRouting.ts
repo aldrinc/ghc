@@ -87,6 +87,30 @@ export function getStandaloneDefaultFunnelSlug(): string | null {
   return getStandaloneDefaultRoute()?.funnelSlug ?? null;
 }
 
+export function resolvePreferredPublicFunnelSlug(
+  meta:
+    | Pick<PublicFunnelMeta, "entrySlug" | "pages">
+    | null
+    | undefined,
+): string | null {
+  const pageSlugs = new Set(
+    Array.isArray(meta?.pages)
+      ? meta.pages
+          .map((page) => normalizeRouteToken(page?.slug))
+          .filter((slug): slug is string => Boolean(slug))
+      : [],
+  );
+
+  for (const candidate of ["sales-page", "sales"]) {
+    if (pageSlugs.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  const entrySlug = normalizeRouteToken(meta?.entrySlug);
+  return entrySlug || null;
+}
+
 export function getStandalonePreloadedFunnelData(
   options?: {
     productSlug?: string | null;
