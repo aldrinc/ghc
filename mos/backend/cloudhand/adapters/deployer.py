@@ -3002,16 +3002,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                     trial_document = _replace_nth_img_tag(trial_document, image_index, candidate_tag)
                 if trial_document == rewritten_document:
                     continue
-                if not _is_presales_stage(page_stage):
-                    try:
-                        self._validate_standalone_imported_html_visual_parity(
-                            before_html=html_document,
-                            after_html=trial_document,
-                            standalone_served_assets=standalone_served_assets,
-                            context_label=context_label,
-                        )
-                    except ValueError:
-                        continue
                 rewritten_document = trial_document
                 accepted = True
                 break
@@ -3338,16 +3328,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 )
             if trial_document == rewritten_document:
                 continue
-            if not _is_presales_stage(page_stage):
-                try:
-                    self._validate_standalone_imported_html_visual_parity(
-                        before_html=html_document,
-                        after_html=trial_document,
-                        standalone_served_assets=standalone_served_assets,
-                        context_label=context_label,
-                    )
-                except ValueError:
-                    continue
             rewritten_document = trial_document
 
         image_plans = image_plans[:_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES]
@@ -3376,16 +3356,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 image_index,
                 candidate_tag,
             )
-            if not _is_presales_stage(page_stage):
-                try:
-                    self._validate_standalone_imported_html_visual_parity(
-                        before_html=html_document,
-                        after_html=trial_document,
-                        standalone_served_assets=standalone_served_assets,
-                        context_label=context_label,
-                    )
-                except ValueError:
-                    continue
             rewritten_document = trial_document
         if rewritten_document == html_document and not variant_route_cache:
             return html_document
@@ -6705,6 +6675,7 @@ WantedBy=multi-user.target
             origin_hints = _origin_hint_markup_for_html_document(html_document)
             if origin_hints:
                 html_document = _inject_head_html_block(html_document=html_document, block=origin_hints)
+        image_rewrite_baseline_html = html_document
         html_document = self._rewrite_standalone_imported_html_compressed_images(
             site_dir=site_dir,
             html_document=html_document,
@@ -6723,6 +6694,13 @@ WantedBy=multi-user.target
             context_label=context_label,
             page_stage=page_stage,
         )
+        if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
+            self._validate_standalone_imported_html_visual_parity(
+                before_html=image_rewrite_baseline_html,
+                after_html=html_document,
+                standalone_served_assets=standalone_served_assets,
+                context_label=context_label,
+            )
         html_document = _optimize_standalone_imported_html_document(html_document)
         render_optimization_css = _build_standalone_render_optimization_css(page_stage=page_stage)
         if render_optimization_css:

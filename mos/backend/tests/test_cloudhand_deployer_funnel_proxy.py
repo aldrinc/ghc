@@ -1894,7 +1894,7 @@ def test_presales_responsive_rewrites_emit_webp_variants(monkeypatch):
     assert "srcset=" in entry_html
 
 
-def test_responsive_image_parity_checks_always_compare_against_original_html(monkeypatch):
+def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
     html_document = """<!DOCTYPE html>
 <html>
   <body>
@@ -1904,7 +1904,14 @@ def test_responsive_image_parity_checks_always_compare_against_original_html(mon
 </html>
 """
     app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
     deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
     monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
     monkeypatch.setattr(
@@ -1912,10 +1919,10 @@ def test_responsive_image_parity_checks_always_compare_against_original_html(mon
         "_measure_standalone_imported_html_image_layouts",
         lambda **_: {0: {"desktop": 400, "mobile": 200}},
     )
-    recorded_before_html: list[str] = []
+    recorded_validations: list[tuple[str, str]] = []
 
-    def record_validate(*, before_html: str, **_kwargs):
-        recorded_before_html.append(before_html)
+    def record_validate(*, before_html: str, after_html: str, **_kwargs):
+        recorded_validations.append((before_html, after_html))
 
     monkeypatch.setattr(
         deployer,
@@ -1925,8 +1932,12 @@ def test_responsive_image_parity_checks_always_compare_against_original_html(mon
 
     deployer._configure_funnel_artifact_site(app)
 
-    assert recorded_before_html
-    assert all(before_html == html_document for before_html in recorded_before_html)
+    assert len(recorded_validations) == 1
+    before_html, after_html = recorded_validations[0]
+    assert before_html == html_document
+    assert after_html != before_html
+    assert "/_standalone-assets/" in after_html
+    assert "srcset=" in after_html
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
     assert "srcset=" in uploaded[entry_route_path]
 
