@@ -1297,6 +1297,7 @@ class ServerDeployer:
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.local_root = Path(local_root).expanduser().resolve() if local_root else None
+        self._known_remote_dirs: set[str] = {"/"}
 
     def connect(self):
         for _ in range(10):
@@ -1358,11 +1359,21 @@ class ServerDeployer:
         if not parent_dir or parent_dir == "/":
             return
 
+        known_remote_dirs = getattr(self, "_known_remote_dirs", None)
+        if known_remote_dirs is None:
+            known_remote_dirs = {"/"}
+            self._known_remote_dirs = known_remote_dirs
+        if parent_dir in known_remote_dirs:
+            return
+
         pending_dirs: list[str] = []
         current_dir = parent_dir
         while current_dir and current_dir != "/":
+            if current_dir in known_remote_dirs:
+                break
             try:
                 sftp.stat(current_dir)
+                known_remote_dirs.add(current_dir)
                 break
             except OSError:
                 pending_dirs.append(current_dir)
@@ -1377,6 +1388,7 @@ class ServerDeployer:
                     raise ValueError(
                         f"Failed to create remote directory '{missing_dir}' for '{remote_path}': {exc}"
                     ) from exc
+            known_remote_dirs.add(missing_dir)
 
     def _upload_local_directory(self, *, local_dir: Path, remote_dir: str) -> None:
         if not local_dir.is_dir():
@@ -2087,7 +2099,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         route_path = f"{route_prefix}/{digest}{extension}"
         target_path = f"{site_dir}{route_path}"
         if target_path not in mirrored_target_paths:
-            self.run(f"mkdir -p {shlex.quote(os.path.dirname(target_path))}")
             self.upload_bytes(payload, target_path)
             mirrored_target_paths.add(target_path)
         self._register_standalone_served_asset(
@@ -2228,7 +2239,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                     local_url = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/{digest}{extension}"
                     target_path = f"{site_dir}{local_url}"
                     if target_path not in mirrored_target_paths:
-                        self.run(f"mkdir -p {shlex.quote(os.path.dirname(target_path))}")
                         self.upload_bytes(payload, target_path)
                         mirrored_target_paths.add(target_path)
                     self._register_standalone_served_asset(
@@ -2620,7 +2630,6 @@ fs.writeFileSync(outputPath, result.css, "utf8");
     ) -> None:
         target_path = f"{site_dir}{route_path}"
         if target_path not in uploaded_target_paths:
-            self.run(f"mkdir -p {shlex.quote(os.path.dirname(target_path))}")
             self.upload_bytes(payload, target_path)
             uploaded_target_paths.add(target_path)
         self._register_standalone_served_asset(
@@ -6826,7 +6835,6 @@ WantedBy=multi-user.target
                     entry_route_path = f"{entry_route_dir}/index.html"
                     if entry_route_path in written_route_paths:
                         raise ValueError(f"Standalone artifact route '{entry_route_path}' was generated more than once.")
-                    self.run(f"mkdir -p {shlex.quote(entry_route_dir)}")
                     self.upload_file(entry_html_document, entry_route_path)
                     written_route_paths.add(entry_route_path)
 
@@ -6837,7 +6845,6 @@ WantedBy=multi-user.target
                             raise ValueError(
                                 f"Standalone artifact route '{page_route_path}' was generated more than once."
                             )
-                        self.run(f"mkdir -p {shlex.quote(page_route_dir)}")
                         self.upload_file(html_document, page_route_path)
                         written_route_paths.add(page_route_path)
 

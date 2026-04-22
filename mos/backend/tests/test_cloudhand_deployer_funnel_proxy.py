@@ -474,6 +474,21 @@ def test_upload_file_creates_missing_remote_parent_directories():
     assert "/opt/apps/example/site/contact-us" in sftp.mkdir_calls
 
 
+def test_upload_file_reuses_cached_remote_parent_directories():
+    deployer = object.__new__(ServerDeployer)
+    sftp = _FakeSFTP()
+    deployer.client = _FakeSSHClient(sftp)
+    deployer.connect = lambda: None
+
+    deployer.upload_file("hello", "/opt/apps/example/site/contact-us/index.html")
+    sftp.mkdir_calls.clear()
+
+    deployer.upload_file("world", "/opt/apps/example/site/contact-us/next.html")
+
+    assert sftp.files["/opt/apps/example/site/contact-us/next.html"] == "world"
+    assert sftp.mkdir_calls == []
+
+
 def test_upload_bytes_wraps_remote_parent_directory_creation_errors():
     deployer = object.__new__(ServerDeployer)
 
@@ -489,6 +504,29 @@ def test_upload_bytes_wraps_remote_parent_directory_creation_errors():
 
     with pytest.raises(ValueError, match="Failed to create remote directory '/opt/apps'"):
         deployer.upload_bytes(b"abc", "/opt/apps/example/site/index.html")
+
+
+def test_write_standalone_route_asset_avoids_shell_mkdir_before_upload():
+    deployer, uploaded, commands = _stub_deployer()
+    deployer._register_standalone_served_asset = lambda **_: None
+    deployer._register_standalone_image_source = lambda **_: None
+
+    deployer._write_standalone_route_asset(
+        site_dir="/opt/apps/example/site",
+        route_path="/_standalone-assets/responsive/example.webp",
+        payload=b"image-bytes",
+        content_type="image/webp",
+        uploaded_target_paths=set(),
+        standalone_served_assets={},
+        standalone_image_sources={},
+        context_label="Test asset",
+    )
+
+    assert commands == []
+    assert (
+        uploaded["/opt/apps/example/site/_standalone-assets/responsive/example.webp"]
+        == b"image-bytes"
+    )
 
 
 def test_funnel_proxy_redirects_slug_paths_on_same_host_and_port():
