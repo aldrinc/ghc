@@ -2145,13 +2145,12 @@ def _build_funnel_tracking_validation_plan(
         expected_posthog_events.extend(expected_meta_events)
 
     checkout_config = checkout_binding.get("checkout")
+    raw_external_checkout_urls = (
+        checkout_config.get("externalUrlsByVariant") if isinstance(checkout_config, dict) else []
+    )
     external_checkout_urls = [
         str(item.get("url") or "").strip()
-        for item in (
-            checkout_config.get("externalUrlsByVariant")
-            if isinstance(checkout_config, dict)
-            else []
-        )
+        for item in (raw_external_checkout_urls or [])
         if isinstance(item, dict) and str(item.get("url") or "").strip()
     ]
 
@@ -2295,6 +2294,23 @@ def _validate_observed_tracking_events(*, validation_plan: dict[str, Any], obser
         )
 
 
+def _activate_tracking_validation_target(*, page: Any, selector: str) -> None:
+    locator = page.locator(selector).first
+    locator.wait_for(state="attached", timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS)
+    locator.evaluate(
+        """
+(element) => {
+  try {
+    element.scrollIntoView({ block: "center", inline: "center" });
+  } catch (_error) {
+    // ignore scroll errors and still attempt click
+  }
+  element.click();
+}
+"""
+    )
+
+
 def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[str, Any]) -> None:
     from playwright.sync_api import sync_playwright
 
@@ -2378,10 +2394,7 @@ def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[st
 
             pre_sales_selector = str(validation_plan.get("pre_sales_click_selector") or "").strip()
             if pre_sales_selector:
-                page.locator(pre_sales_selector).first.click(
-                    force=True,
-                    timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
-                )
+                _activate_tracking_validation_target(page=page, selector=pre_sales_selector)
                 page.wait_for_url(
                     re.compile(re.escape(urlsplit(sales_url).path)),
                     timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
@@ -2389,12 +2402,9 @@ def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[st
                 page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
 
             checkout_selector = str(validation_plan.get("checkout_selector") or "").strip()
-            page.locator(checkout_selector).first.click(
-                force=True,
-                timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
-            )
             checkout_mode = str(validation_plan.get("checkout_mode") or "").strip()
             if checkout_mode == "external_checkout_url":
+                _activate_tracking_validation_target(page=page, selector=checkout_selector)
                 external_checkout_urls = [
                     str(url or "").strip()
                     for url in validation_plan.get("external_checkout_urls", [])
@@ -2414,10 +2424,9 @@ def _run_funnel_tracking_post_deploy_validation_sync(*, validation_plan: dict[st
                     timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
                 )
             else:
-                page.wait_for_url(
-                    re.compile(re.escape(urlsplit(mock_checkout_url).path)),
-                    timeout=_DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS,
-                )
+                with page.expect_request(re.compile(r".*/api/public/checkout(?:\?.*)?$")) as checkout_request:
+                    _activate_tracking_validation_target(page=page, selector=checkout_selector)
+                checkout_request.value
             page.wait_for_timeout(_DEPLOY_TRACKING_VALIDATION_STEP_WAIT_MS)
             observed_state = page.evaluate(
                 f"""

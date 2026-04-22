@@ -3386,6 +3386,26 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
     assert plan["expected_posthog_events"] == plan["expected_meta_events"]
 
 
+def test_build_funnel_tracking_validation_plan_allows_null_external_checkout_urls():
+    artifact_payload = _build_tracking_validation_artifact_payload(include_presales=True)
+    checkout = (
+        artifact_payload["products"]["ember"]["funnels"]["daily"]["pages"]["sales-page"]["puckData"]["content"][0]["props"][
+            "instrumentationManifest"
+        ]["bindings"][0]["checkout"]
+    )
+    checkout["externalUrlsByVariant"] = None
+
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=artifact_payload,
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="standalone_imported_html",
+    )
+
+    assert plan["external_checkout_urls"] == []
+
+
 def test_validate_observed_tracking_events_accepts_expected_sequence():
     plan = deploy_service._build_funnel_tracking_validation_plan(
         artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
@@ -3483,6 +3503,155 @@ def test_validate_observed_tracking_events_rejects_missing_checkout_event():
             validation_plan=plan,
             observed_state=observed_state,
         )
+
+
+def test_activate_tracking_validation_target_uses_dom_click():
+    calls: list[object] = []
+
+    class FakeLocator:
+        @property
+        def first(self):
+            return self
+
+        def wait_for(self, *, state=None, timeout=None):
+            calls.append(("wait_for", state, timeout))
+
+        def evaluate(self, script):
+            calls.append(("evaluate", script))
+
+    class FakePage:
+        def locator(self, selector):
+            calls.append(("locator", selector))
+            return FakeLocator()
+
+    deploy_service._activate_tracking_validation_target(page=FakePage(), selector="#checkout-btn")
+
+    assert calls[0] == ("locator", "#checkout-btn")
+    assert calls[1] == ("wait_for", "attached", deploy_service._DEPLOY_TRACKING_VALIDATION_PAGE_TIMEOUT_MS)
+    assert calls[2][0] == "evaluate"
+    assert "element.click()" in calls[2][1]
+
+
+def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(monkeypatch):
+    calls: list[object] = []
+    validated: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_validate_deployed_tracking_html",
+        lambda **kwargs: calls.append(("validate_html", kwargs["validation_plan"]["checkout_mode"])),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_validate_observed_tracking_events",
+        lambda **kwargs: validated.update(kwargs),
+    )
+
+    class FakeExpectRequest:
+        def __enter__(self):
+            calls.append(("expect_request_enter",))
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            calls.append(("expect_request_exit", exc_type.__name__ if exc_type else None))
+            return False
+
+        @property
+        def value(self):
+            calls.append(("expect_request_value",))
+            return {"url": "/api/public/checkout"}
+
+    class FakeLocator:
+        @property
+        def first(self):
+            return self
+
+        def wait_for(self, *, state=None, timeout=None):
+            calls.append(("locator_wait_for", state, timeout))
+
+        def evaluate(self, script):
+            calls.append(("locator_evaluate", script))
+
+    class FakePage:
+        def locator(self, selector):
+            calls.append(("locator", selector))
+            return FakeLocator()
+
+        def goto(self, url, **kwargs):
+            calls.append(("goto", url, kwargs.get("wait_until"), kwargs.get("timeout")))
+
+        def wait_for_timeout(self, ms):
+            calls.append(("wait_for_timeout", ms))
+
+        def wait_for_url(self, pattern, **kwargs):
+            calls.append(("wait_for_url", getattr(pattern, "pattern", str(pattern)), kwargs.get("timeout")))
+
+        def expect_request(self, pattern):
+            calls.append(("expect_request", getattr(pattern, "pattern", str(pattern))))
+            return FakeExpectRequest()
+
+        def evaluate(self, script):
+            calls.append(("page_evaluate",))
+            return {
+                "internal": [],
+                "meta": [],
+                "posthog": {"inits": [], "captures": []},
+            }
+
+    fake_page = FakePage()
+
+    class FakeContext:
+        def route(self, pattern, handler):
+            calls.append(("route", pattern))
+
+        def add_init_script(self, script):
+            calls.append(("add_init_script", bool(script)))
+
+        def new_page(self):
+            calls.append(("new_page",))
+            return fake_page
+
+    class FakeBrowser:
+        def new_context(self, **kwargs):
+            calls.append(("new_context", kwargs))
+            return FakeContext()
+
+        def close(self):
+            calls.append(("browser_close",))
+
+    class FakePlaywrightManager:
+        def __enter__(self):
+            calls.append(("playwright_enter",))
+            return SimpleNamespace(chromium=SimpleNamespace(launch=lambda: FakeBrowser()))
+
+        def __exit__(self, exc_type, exc, tb):
+            calls.append(("playwright_exit", exc_type.__name__ if exc_type else None))
+            return False
+
+    import playwright.sync_api as sync_api
+
+    monkeypatch.setattr(sync_api, "sync_playwright", lambda: FakePlaywrightManager())
+
+    deploy_service._run_funnel_tracking_post_deploy_validation_sync(
+        validation_plan={
+            "render_mode": "standalone_imported_html",
+            "origin": "https://shoptenorco.com",
+            "start_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
+            "sales_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
+            "pre_sales_click_selector": None,
+            "checkout_selector": "#main-cta",
+            "checkout_mode": "public_checkout",
+            "external_checkout_urls": [],
+            "tracking": {},
+            "expected_internal_events": [],
+            "expected_meta_events": [],
+            "expected_posthog_events": [],
+        }
+    )
+
+    assert ("expect_request", r".*/api/public/checkout(?:\?.*)?$") in calls
+    assert not any(call[0] == "wait_for_url" for call in calls if isinstance(call, tuple))
+    assert validated["observed_state"]["posthog"]["captures"] == []
 
 
 @pytest.mark.asyncio
