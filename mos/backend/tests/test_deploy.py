@@ -2692,6 +2692,38 @@ def test_extract_embedded_asset_public_ids_collects_urls_inside_imported_html_do
     }
 
 
+def test_extract_embedded_asset_public_ids_ignores_relative_standalone_asset_paths_in_imported_html():
+    output = deploy_service._extract_embedded_asset_public_ids(
+        puck_data={
+            "root": {"props": {}},
+            "content": [
+                {
+                    "type": "ImportedHtmlDocument",
+                    "props": {
+                        "htmlDocument": """
+<!DOCTYPE html>
+<html>
+  <body>
+    <img src="public/assets/generated/chart.jpg" alt="Generated chart">
+    <img src="public/assets/hero/ember-pouch.webp" alt="Local hero image">
+    <img src="https://api.moshq.app/public/assets/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" alt="Remote hero">
+  </body>
+</html>
+""",
+                    },
+                }
+            ],
+            "zones": {},
+        },
+        design_system_tokens=None,
+        context_label="imported-html-page",
+    )
+
+    assert output == {
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    }
+
+
 def test_extract_embedded_asset_public_ids_errors_on_invalid_uuid():
     with pytest.raises(deploy_service.DeployError, match="invalid assetPublicId"):
         deploy_service._extract_embedded_asset_public_ids(
@@ -2709,6 +2741,33 @@ def test_extract_embedded_asset_public_ids_errors_on_invalid_uuid():
             },
             design_system_tokens=None,
             context_label="test-page",
+        )
+
+
+def test_extract_embedded_asset_public_ids_errors_on_invalid_canonical_asset_url_in_imported_html():
+    with pytest.raises(deploy_service.DeployError, match="invalid public asset URL"):
+        deploy_service._extract_embedded_asset_public_ids(
+            puck_data={
+                "root": {"props": {}},
+                "content": [
+                    {
+                        "type": "ImportedHtmlDocument",
+                        "props": {
+                            "htmlDocument": """
+<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/not-a-uuid" alt="Broken asset">
+  </body>
+</html>
+""",
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+            design_system_tokens=None,
+            context_label="imported-html-page",
         )
 
 

@@ -59,7 +59,7 @@ _PUBLIC_ASSET_URL_PREFIXES = (
 _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE = "runtime_bundle"
 _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML = "standalone_imported_html"
 _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
-    r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/([^\s\"'<>?#/]+)"
+    r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/[^\s\"'<>?#]+"
 )
 
 
@@ -886,10 +886,10 @@ def _materialize_design_system_brand_logo_in_puck_data(
     return cloned
 
 
-def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
+def _classify_public_asset_url(raw_value: str) -> tuple[str | None, str | None]:
     value = str(raw_value or "").strip()
     if not value:
-        return None
+        return None, None
 
     path = value
     if value.startswith(("http://", "https://")):
@@ -901,33 +901,50 @@ def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
         if not lowered_path.startswith(prefix):
             continue
         remainder = trimmed_path[len(prefix) :]
-        token = remainder.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0].strip()
+        remainder = remainder.split("?", 1)[0].split("#", 1)[0].strip()
+        token, has_nested_path, _rest = remainder.partition("/")
+        token = token.strip()
         if not token:
-            return None
+            return None, None
         if "." in token:
             token = token.split(".", 1)[0]
         if not token:
-            return None
-        return token
+            return None, None
+        try:
+            return str(UUID(token)), None
+        except ValueError:
+            if has_nested_path:
+                # Relative standalone assets like public/assets/generated/foo.jpg are
+                # handled by the standalone deployer and are not canonical MOS asset ids.
+                return None, None
+            return None, token
 
-    return None
+    return None, None
 
 
-def _extract_public_asset_ids_from_text(raw_value: str) -> set[str]:
+def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
+    public_id, _invalid_token = _classify_public_asset_url(raw_value)
+    return public_id
+
+
+def _extract_public_asset_refs_from_text(raw_value: str) -> tuple[set[str], list[str]]:
     value = str(raw_value or "").strip()
     if not value:
-        return set()
+        return set(), []
 
     matches = set()
+    invalid_urls: list[str] = []
     for match in _PUBLIC_ASSET_URL_IN_TEXT_RE.finditer(value):
-        token = str(match.group(1) or "").strip()
-        if not token:
+        candidate = str(match.group(0) or "").strip()
+        if not candidate:
             continue
-        if "." in token:
-            token = token.split(".", 1)[0]
-        if token:
-            matches.add(token)
-    return matches
+        public_id, invalid_token = _classify_public_asset_url(candidate)
+        if public_id:
+            matches.add(public_id)
+            continue
+        if invalid_token:
+            invalid_urls.append(candidate)
+    return matches, invalid_urls
 
 
 def _extract_embedded_asset_public_ids(
@@ -959,20 +976,23 @@ def _extract_embedded_asset_public_ids(
         for raw_value in obj.values():
             if not isinstance(raw_value, str):
                 continue
-            matched_public_ids = _extract_public_asset_ids_from_text(raw_value)
+            matched_public_ids, invalid_urls = _extract_public_asset_refs_from_text(raw_value)
+            if invalid_urls:
+                raise DeployError(
+                    f"{context_label} includes invalid public asset URL '{invalid_urls[0]}'. "
+                    "Expected /public/assets/<uuid>."
+                )
             if not matched_public_ids:
-                public_id_from_url = _extract_public_asset_id_from_url(raw_value)
+                public_id_from_url, invalid_token = _classify_public_asset_url(raw_value)
                 if public_id_from_url:
                     matched_public_ids = {public_id_from_url}
-            for public_id_from_url in matched_public_ids:
-                try:
-                    normalized_from_url = str(UUID(public_id_from_url))
-                except ValueError as exc:
+                elif invalid_token:
                     raise DeployError(
                         f"{context_label} includes invalid public asset URL '{raw_value}'. "
                         "Expected /public/assets/<uuid>."
-                    ) from exc
-                public_ids.add(normalized_from_url)
+                    )
+            for public_id_from_url in matched_public_ids:
+                public_ids.add(public_id_from_url)
 
     if isinstance(design_system_tokens, dict):
         brand = design_system_tokens.get("brand")
