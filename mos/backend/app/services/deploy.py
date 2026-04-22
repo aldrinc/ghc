@@ -2800,6 +2800,40 @@ def _find_bunny_pull_zone_by_hostname(*, hostname: str) -> dict[str, Any] | None
     return matches[0] if matches else None
 
 
+def _resolve_existing_bunny_pull_zone_for_hostnames(
+    *,
+    server_names: list[str] | None,
+) -> dict[str, Any] | None:
+    normalized_server_names = _normalize_workload_server_names(server_names=server_names or [])
+    if not normalized_server_names:
+        return None
+
+    matched_zones: dict[int, dict[str, Any]] = {}
+    matched_hostnames_by_zone: dict[int, list[str]] = {}
+    for hostname in normalized_server_names:
+        zone = _find_bunny_pull_zone_by_hostname(hostname=hostname)
+        if zone is None:
+            continue
+        zone_id = _coerce_bunny_pull_zone_id(zone=zone)
+        matched_zones[zone_id] = zone
+        matched_hostnames_by_zone.setdefault(zone_id, []).append(hostname)
+
+    if not matched_zones:
+        return None
+    if len(matched_zones) > 1:
+        zone_descriptions: list[str] = []
+        for zone_id, zone in sorted(matched_zones.items()):
+            zone_name = str(zone.get("Name") or "").strip() or str(zone_id)
+            hostnames = ", ".join(sorted(matched_hostnames_by_zone.get(zone_id, [])))
+            zone_descriptions.append(f"{zone_name} (id={zone_id}; hostnames={hostnames})")
+        raise DeployError(
+            "Bunny custom domains for this workload already exist on multiple pull zones: "
+            + "; ".join(zone_descriptions)
+            + ". Consolidate the domains onto a single pull zone before retrying."
+        )
+    return next(iter(matched_zones.values()))
+
+
 def _coerce_bunny_pull_zone_id(*, zone: dict[str, Any]) -> int:
     raw_id = zone.get("Id")
     try:
@@ -3126,9 +3160,19 @@ def _resolve_bunny_origin_context_for_workload(
     return server_names, workload_port, workload_port_source
 
 
-def _ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str) -> dict[str, Any]:
+def _ensure_bunny_pull_zone(
+    *,
+    client_id: str,
+    workload_name: str,
+    origin_url: str,
+    server_names: list[str] | None = None,
+) -> dict[str, Any]:
     zone_name = _build_bunny_pull_zone_name(client_id=client_id, workload_name=workload_name)
-    existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
+    existing_zone_by_name = _find_bunny_pull_zone_by_name(zone_name=zone_name)
+    existing_zone_by_hostname = _resolve_existing_bunny_pull_zone_for_hostnames(
+        server_names=server_names,
+    )
+    existing_zone = existing_zone_by_hostname or existing_zone_by_name
 
     zone: dict[str, Any]
     if existing_zone is None:
@@ -3327,6 +3371,7 @@ def configure_bunny_pull_zone_for_workload(
         client_id=resolved_client_id,
         workload_name=workload_name,
         origin_url=origin_url,
+        server_names=workload_server_names,
     )
     domain_provisioning = _provision_bunny_custom_domains(
         bunny_zone=bunny_zone,
@@ -3406,6 +3451,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         client_id=resolved_client_id,
         workload_name=workload_name,
         origin_url=origin_url,
+        server_names=workload_server_names,
     )
     domain_provisioning = _provision_bunny_custom_domains(
         bunny_zone=bunny_zone,

@@ -908,6 +908,83 @@ def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
     assert calls[1][1] == "/pullzone"
 
 
+def test_ensure_bunny_pull_zone_adopts_existing_zone_from_custom_domain(monkeypatch):
+    monkeypatch.setattr(deploy_service, "_find_bunny_pull_zone_by_name", lambda *, zone_name: None)
+    monkeypatch.setattr(
+        deploy_service,
+        "_resolve_existing_bunny_pull_zone_for_hostnames",
+        lambda *, server_names: {
+            "Id": 5692458,
+            "Name": "brand-funnels-486a8718-18ac0fe1",
+            "OriginUrl": "http://46.225.124.104:22001",
+            "Hostnames": [
+                {"Value": "brand-funnels-486a8718-18ac0fe1.b-cdn.net"},
+                {"Value": "shop.shopemberco.com"},
+            ],
+        },
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["payload"] = payload
+        return {
+            "Id": 5692458,
+            "Name": "brand-funnels-486a8718-18ac0fe1",
+            "OriginUrl": "http://46.225.124.104:22689",
+            "Hostnames": [
+                {"Value": "brand-funnels-486a8718-18ac0fe1.b-cdn.net"},
+                {"Value": "shop.shopemberco.com"},
+            ],
+        }
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
+
+    zone = deploy_service._ensure_bunny_pull_zone(
+        client_id="486a8718-a2e8-4ff9-8c02-1f11ae33b8bc",
+        workload_name="brand-funnels-070d6cf7-18ac0fe1",
+        origin_url="http://46.225.124.104:22689",
+        server_names=["shop.shopemberco.com"],
+    )
+
+    assert zone["Id"] == 5692458
+    assert zone["Name"] == "brand-funnels-486a8718-18ac0fe1"
+    assert captured == {
+        "method": "POST",
+        "path": "/pullzone/5692458",
+        "payload": {"OriginUrl": "http://46.225.124.104:22689"},
+    }
+
+
+def test_resolve_existing_bunny_pull_zone_for_hostnames_errors_when_domains_span_multiple_zones(
+    monkeypatch,
+):
+    zone_map = {
+        "shop-one.example.com": {
+            "Id": 100,
+            "Name": "zone-one",
+            "Hostnames": [{"Value": "shop-one.example.com"}],
+        },
+        "shop-two.example.com": {
+            "Id": 200,
+            "Name": "zone-two",
+            "Hostnames": [{"Value": "shop-two.example.com"}],
+        },
+    }
+    monkeypatch.setattr(
+        deploy_service,
+        "_find_bunny_pull_zone_by_hostname",
+        lambda *, hostname: zone_map.get(hostname),
+    )
+
+    with pytest.raises(deploy_service.DeployError, match="multiple pull zones"):
+        deploy_service._resolve_existing_bunny_pull_zone_for_hostnames(
+            server_names=["shop-one.example.com", "shop-two.example.com"],
+        )
+
+
 def test_list_bunny_pull_zones_accepts_array_response(monkeypatch):
     monkeypatch.setattr(
         deploy_service,
@@ -1204,10 +1281,17 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1250,6 +1334,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
         "client_id": "workspace-123",
         "workload_name": "brand-funnels-brand-abc",
         "origin_url": "http://46.225.124.104",
+        "server_names": ["offers.example.com"],
     }
 
 
@@ -1283,10 +1368,17 @@ def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1318,6 +1410,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_workspace_id_for_zone_scope
         "client_id": "client-456",
         "workload_name": "brand-funnels-brand-abc",
         "origin_url": "http://46.225.124.104",
+        "server_names": ["offers.example.com"],
     }
 
 
@@ -1351,10 +1444,17 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1380,6 +1480,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domai
         "client_id": "workspace-123",
         "workload_name": "brand-funnels-brand-abc",
         "origin_url": "http://46.225.124.104:24123",
+        "server_names": [],
     }
 
 
@@ -1413,10 +1514,17 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1441,6 +1549,7 @@ def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, mo
         "client_id": "workspace-123",
         "workload_name": "brand-funnels-brand-abc",
         "origin_url": "http://46.225.124.104",
+        "server_names": [],
     }
 
 
@@ -1474,10 +1583,17 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
 
     captured: dict[str, object] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["zone_server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1509,6 +1625,7 @@ def test_configure_bunny_pull_zone_for_workload_uses_explicit_server_name_overri
     assert captured["client_id"] == "workspace-123"
     assert captured["workload_name"] == "brand-funnels-brand-abc"
     assert captured["origin_url"] == "http://46.225.124.104"
+    assert captured["zone_server_names"] == ["shop.example.com"]
     assert captured["server_names"] == ["shop.example.com"]
     assert captured["request_ssl"] is False
 
@@ -1601,10 +1718,17 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
 
     captured: dict[str, str] = {}
 
-    def fake_ensure_bunny_pull_zone(*, client_id: str, workload_name: str, origin_url: str):
+    def fake_ensure_bunny_pull_zone(
+        *,
+        client_id: str,
+        workload_name: str,
+        origin_url: str,
+        server_names: list[str] | None = None,
+    ):
         captured["client_id"] = client_id
         captured["workload_name"] = workload_name
         captured["origin_url"] = origin_url
+        captured["server_names"] = server_names
         return {
             "Id": 999,
             "Name": workload_name,
@@ -1631,6 +1755,7 @@ def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_pat
         "client_id": "workspace-123",
         "workload_name": "brand-funnels-brand-abc",
         "origin_url": "http://46.225.124.104:24123",
+        "server_names": [],
     }
 
 
