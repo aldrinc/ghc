@@ -1209,6 +1209,110 @@ def test_publish_meta_run_marks_partial_failures_without_poisoning_all_remaining
     assert payload["metadata"]["resultSummary"]["failedStageCounts"] == {"ad": 1}
 
 
+def test_publish_meta_run_retries_retryable_meta_creative_create_failures(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-creative-retry",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-creative-retry"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-creative-retry",
+        asset_brief_id=brief_id,
+    )
+    _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-publish-creative-retry",
+        with_targeting=True,
+    )
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    creative_counter = {"count": 0}
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key == "creative/publish-creative-retry.jpg"
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            assert kwargs["ad_account_id"] == "act_123456"
+            return {"images": {kwargs["filename"]: {"hash": "hash_creative_retry"}}}
+
+        def create_campaign(self, **_kwargs):
+            return {"id": "meta_campaign_creative_retry", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            bucket_suffix = kwargs["payload"]["name"].split()[-1]
+            return {"id": f"meta_adset_creative_retry_{bucket_suffix}", "status": "PAUSED"}
+
+        def create_adcreative(self, **_kwargs):
+            creative_counter["count"] += 1
+            if creative_counter["count"] == 1:
+                raise MetaAdsError(
+                    "Meta Graph API error (400).",
+                    status_code=400,
+                    error_payload={
+                        "error": {
+                            "message": "Invalid parameter",
+                            "type": "OAuthException",
+                            "code": 100,
+                            "error_subcode": 1487390,
+                            "is_transient": False,
+                            "error_user_title": "Adcreative Create Failed",
+                            "error_user_msg": (
+                                "The Adcreative Create Failed for the following reason: "
+                                "Something went wrong. Please try again later"
+                            ),
+                        }
+                    },
+                )
+            return {"id": f"meta_creative_creative_retry_{creative_counter['count']}"}
+
+        def create_ad(self, **_kwargs):
+            return {"id": "meta_ad_creative_retry", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **_kwargs: _FakeMetaClient())
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert publish_response.status_code == 200, publish_response.text
+    payload = publish_response.json()
+    assert payload["status"] == "published"
+    assert payload["items"][0]["status"] == "published"
+    assert payload["items"][0]["metaCreativeId"] == "meta_creative_creative_retry_2"
+    assert creative_counter["count"] == 2
+
+
 def test_apply_tracking_url_parameters_overrides_existing_utm_values() -> None:
     tracked_url = meta_ads_router._apply_tracking_url_parameters(
         destination_url="https://example.com/presales?foo=bar&utm_source=old#section-1",

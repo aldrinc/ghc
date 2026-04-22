@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import mimetypes
 import re
 from collections import defaultdict
@@ -126,6 +127,7 @@ from app.services.campaign_creative_context import ensure_campaign_creative_cont
 from app.services.storefront_domains import normalize_absolute_origin, resolve_shop_hosted_origin
 
 router = APIRouter(prefix="/meta", tags=["meta"])
+logger = logging.getLogger("meta.ads.router")
 
 _EU_COUNTRY_CODES = frozenset(
     {
@@ -284,6 +286,29 @@ def _raise_meta_error(exc: MetaAdsError) -> None:
     if exc.error_payload is not None:
         detail = {"message": str(exc), "meta": exc.error_payload}
     raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+def _meta_graph_error_details(exc: MetaAdsError) -> dict[str, Any] | None:
+    if not isinstance(exc.error_payload, dict):
+        return None
+    payload_error = exc.error_payload.get("error")
+    if not isinstance(payload_error, dict):
+        return None
+    return payload_error
+
+
+def _is_retryable_meta_creative_create_error(exc: MetaAdsError) -> bool:
+    error_details = _meta_graph_error_details(exc)
+    if not error_details:
+        return False
+    if error_details.get("error_subcode") != 1487390:
+        return False
+    if error_details.get("error_user_title") != "Adcreative Create Failed":
+        return False
+    error_user_msg = error_details.get("error_user_msg")
+    if not isinstance(error_user_msg, str):
+        return False
+    return "Something went wrong. Please try again later" in error_user_msg
 
 
 def _infer_media_type(content_type: Optional[str], asset_kind: Optional[str]) -> Optional[str]:
@@ -2128,10 +2153,36 @@ def _create_meta_creative_internal(
         request_payload["execution_options"] = ["validate_only"]
 
     client = _get_meta_client(resolved=resolved)
-    try:
-        response = client.create_adcreative(ad_account_id=ad_account_id, payload=request_payload)
-    except MetaAdsError as exc:
-        _raise_meta_error(exc)
+    response: dict[str, Any] | None = None
+    creative_retry_limit = 3
+    last_creative_error: MetaAdsError | None = None
+    for attempt in range(1, creative_retry_limit + 1):
+        try:
+            response = client.create_adcreative(ad_account_id=ad_account_id, payload=request_payload)
+            last_creative_error = None
+            break
+        except MetaAdsError as exc:
+            if attempt < creative_retry_limit and _is_retryable_meta_creative_create_error(exc):
+                logger.warning(
+                    "Retrying Meta ad creative creation after transient Meta failure.",
+                    extra={
+                        "asset_id": str(asset.id),
+                        "request_id": payload.requestId,
+                        "attempt": attempt,
+                        "ad_account_id": ad_account_id,
+                    },
+                )
+                last_creative_error = exc
+                continue
+            _raise_meta_error(exc)
+
+    if response is None:
+        if last_creative_error is not None:
+            _raise_meta_error(last_creative_error)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Meta ad creative request did not return a response.",
+        )
 
     if payload.validateOnly:
         return {"validateOnly": True, "response": response}
