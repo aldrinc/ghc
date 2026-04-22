@@ -44,11 +44,26 @@ def _encode_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 class MetaAdsClient:
-    def __init__(self, *, access_token: str, api_version: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        access_token: str,
+        api_version: str,
+        base_url: str | None = None,
+        request_timeout_seconds: float | None = None,
+        connect_timeout_seconds: float | None = None,
+    ) -> None:
         self.access_token = access_token
         self.api_version = api_version
         self.base_url = (base_url or "https://graph.facebook.com").rstrip("/")
-        self.timeout = httpx.Timeout(30.0)
+        self.timeout = httpx.Timeout(
+            request_timeout_seconds
+            if request_timeout_seconds is not None
+            else settings.META_GRAPH_REQUEST_TIMEOUT_SECONDS,
+            connect=connect_timeout_seconds
+            if connect_timeout_seconds is not None
+            else settings.META_GRAPH_CONNECT_TIMEOUT_SECONDS,
+        )
 
     @classmethod
     def from_settings(cls) -> "MetaAdsClient":

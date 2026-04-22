@@ -16,7 +16,13 @@ from app.services.meta_management_benchmarks import (
 
 
 class MetaMediaBuyingPlanError(RuntimeError):
-    def __init__(self, message: str, *, status_code: int | None = None, error_payload: Any = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        error_payload: Any = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error_payload = error_payload
@@ -40,7 +46,9 @@ def _to_float(value: Any, *, field: str) -> float:
         try:
             return float(raw)
         except ValueError as exc:
-            raise MetaMediaBuyingPlanError(f"Invalid {field}: expected float-like value, got {value!r}") from exc
+            raise MetaMediaBuyingPlanError(
+                f"Invalid {field}: expected float-like value, got {value!r}"
+            ) from exc
     raise MetaMediaBuyingPlanError(f"Invalid {field}: expected float-like value, got {value!r}")
 
 
@@ -48,7 +56,9 @@ def _parse_action_list(value: Any, *, field: str) -> dict[str, float]:
     if value is None:
         return {}
     if not isinstance(value, list):
-        raise MetaMediaBuyingPlanError(f"Invalid {field}: expected a list, got {type(value).__name__}")
+        raise MetaMediaBuyingPlanError(
+            f"Invalid {field}: expected a list, got {type(value).__name__}"
+        )
     out: dict[str, float] = {}
     for item in value:
         if not isinstance(item, dict):
@@ -65,7 +75,6 @@ def _parse_action_list(value: Any, *, field: str) -> dict[str, float]:
 
 def _sum_action(value: Any, *, field: str) -> int:
     action_map = _parse_action_list(value, field=field)
-    # These are counts (should be ints), but Meta returns them as strings. Sum safely as ints.
     total = 0
     for k, v in action_map.items():
         _ = k
@@ -75,8 +84,10 @@ def _sum_action(value: Any, *, field: str) -> int:
 
 @dataclass(frozen=True)
 class MetaEventMappings:
+    landing_page_view_action_type: Optional[str] = "landing_page_view"
     content_view_action_type: Optional[str] = "offsite_conversion.fb_pixel_view_content"
     add_to_cart_action_type: Optional[str] = "offsite_conversion.fb_pixel_add_to_cart"
+    initiate_checkout_action_type: Optional[str] = "offsite_conversion.fb_pixel_initiate_checkout"
     purchase_action_type: Optional[str] = "offsite_conversion.fb_pixel_purchase"
     purchase_value_action_type: Optional[str] = "offsite_conversion.fb_pixel_purchase"
 
@@ -94,6 +105,50 @@ class MetaCutRuleConfig(BaseModel):
     maxCpm: float = 50.0
     minLinkCtr: float = 1.0
     maxLinkCpc: float = 3.0
+
+
+class MetaCustomMetricDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metricId: str
+    label: str
+    description: str
+    formula: str
+    sourcePlane: str
+    sourceClass: str
+    unit: str
+    numeratorLabel: str
+    denominatorLabel: str
+    minimum: float | None = None
+    target: float | None = None
+    good: float | None = None
+
+
+class MetaCustomMetricEvaluation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metricId: str
+    scope: str
+    status: str
+    value: float | None = None
+    unit: str
+    numerator: int | None = None
+    denominator: int | None = None
+    minimum: float | None = None
+    target: float | None = None
+    good: float | None = None
+    resolvedSources: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    reason: str | None = None
+    recommendation: str | None = None
+
+
+class MetaCustomMetricRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    adId: str
+    adName: str = ""
+    metrics: list[MetaCustomMetricEvaluation] = Field(default_factory=list)
 
 
 class MetaAdMetrics(BaseModel):
@@ -159,6 +214,45 @@ class MetaManagementBenchmarkStatus(BaseModel):
     reason: str | None = None
 
 
+class MetaObjectStatusCount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str
+    count: int
+
+
+class MetaIssueSample(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    adId: str
+    adName: str = ""
+    adsetId: str | None = None
+    status: str | None = None
+    effectiveStatus: str | None = None
+    errorCode: int | None = None
+    errorSummary: str | None = None
+    errorMessage: str | None = None
+
+
+class MetaObjectStateSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    campaignStatus: str | None = None
+    campaignEffectiveStatus: str | None = None
+    adsetCount: int = 0
+    adCount: int = 0
+    insightsRowCount: int = 0
+    deliveryState: str
+    deliverySummary: str
+    adsetStatusCounts: list[MetaObjectStatusCount] = Field(default_factory=list)
+    adsetEffectiveStatusCounts: list[MetaObjectStatusCount] = Field(default_factory=list)
+    adStatusCounts: list[MetaObjectStatusCount] = Field(default_factory=list)
+    adEffectiveStatusCounts: list[MetaObjectStatusCount] = Field(default_factory=list)
+    issueCount: int = 0
+    reviewPendingCount: int = 0
+    issueSamples: list[MetaIssueSample] = Field(default_factory=list)
+
+
 class MetaManagementPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -167,6 +261,7 @@ class MetaManagementPlan(BaseModel):
     window: dict[str, Any]
     campaign: dict[str, Any]
     adsets: list[dict[str, Any]]
+    objectState: MetaObjectStateSummary
     observedActionTypes: dict[str, list[str]] = Field(default_factory=dict)
     rows: list[MetaAdMetrics]
     actions: list[MetaPlannedAction]
@@ -184,17 +279,408 @@ class MetaManagementPlan(BaseModel):
     benchmarkContext: MetaBenchmarkContext | None = None
     funnelSnapshot: MetaFunnelMetricsSnapshot | None = None
     benchmarkEvaluations: list[MetaBenchmarkEvaluation] = Field(default_factory=list)
+    customMetricDefinitions: list[MetaCustomMetricDefinition] = Field(default_factory=list)
+    customMetricSummary: list[MetaCustomMetricEvaluation] = Field(default_factory=list)
+    customMetricRows: list[MetaCustomMetricRow] = Field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class _MetaCustomMetricSpec:
+    metric_id: str
+    label: str
+    description: str
+    formula: str
+    numerator_primitive: str
+    denominator_primitive: str
+    numerator_label: str
+    denominator_label: str
+    minimum: float | None = None
+    target: float | None = None
+    good: float | None = None
+
+
+@dataclass(frozen=True)
+class _ResolvedPrimitive:
+    value: int
+    source_key: str
+    observed: bool
+    warnings: tuple[str, ...] = ()
+
+
+_META_CUSTOM_METRIC_SPECS: tuple[_MetaCustomMetricSpec, ...] = (
+    _MetaCustomMetricSpec(
+        metric_id="meta_atc_ratio_pct",
+        label="ATC Ratio",
+        description=(
+            "Adds to cart divided by website landing page views. This shows whether the "
+            "landing page is converting paid visitors into shopping intent."
+        ),
+        formula="Adds to cart / Landing page views",
+        numerator_primitive="adds_to_cart",
+        denominator_primitive="landing_page_views",
+        numerator_label="Adds to cart",
+        denominator_label="Landing page views",
+        minimum=10.0,
+    ),
+    _MetaCustomMetricSpec(
+        metric_id="meta_conversion_rate_pct",
+        label="Conversion Rate",
+        description=(
+            "Purchases divided by website landing page views. This is the Meta-estimated "
+            "end-to-end conversion rate from ad visit to order."
+        ),
+        formula="Purchases / Landing page views",
+        numerator_primitive="purchases",
+        denominator_primitive="landing_page_views",
+        numerator_label="Purchases",
+        denominator_label="Landing page views",
+        minimum=1.0,
+        good=3.0,
+    ),
+    _MetaCustomMetricSpec(
+        metric_id="meta_ic_ratio_pct",
+        label="IC Ratio",
+        description=(
+            "Initiated checkouts divided by website landing page views. This shows how many "
+            "landing page visitors reach checkout start."
+        ),
+        formula="Initiated checkouts / Landing page views",
+        numerator_primitive="initiated_checkouts",
+        denominator_primitive="landing_page_views",
+        numerator_label="Initiated checkouts",
+        denominator_label="Landing page views",
+    ),
+    _MetaCustomMetricSpec(
+        metric_id="meta_purchase_ratio_pct",
+        label="Purchase Ratio",
+        description=(
+            "Purchases divided by adds to cart. This is a checkout-efficiency read on how "
+            "many carts finish as orders."
+        ),
+        formula="Purchases / Adds to cart",
+        numerator_primitive="purchases",
+        denominator_primitive="adds_to_cart",
+        numerator_label="Purchases",
+        denominator_label="Adds to cart",
+        minimum=30.0,
+    ),
+    _MetaCustomMetricSpec(
+        metric_id="meta_video_hold_rate_pct",
+        label="Video Hold Rate",
+        description=(
+            "50% video plays divided by impressions. This shows whether the body of the ad "
+            "holds attention after the hook."
+        ),
+        formula="Video plays at 50% / Impressions",
+        numerator_primitive="video_p50_plays",
+        denominator_primitive="impressions",
+        numerator_label="Video plays at 50%",
+        denominator_label="Impressions",
+        minimum=25.0,
+    ),
+)
+
+
+_CUSTOM_METRIC_RECOMMENDATIONS: dict[str, str] = {
+    "meta_atc_ratio_pct": (
+        "Landing page efficiency is below KPI. Audit message match, offer clarity, proof, "
+        "and CTA density before adding spend."
+    ),
+    "meta_conversion_rate_pct": (
+        "Overall conversion from landing page view to purchase is weak. Review the full path "
+        "from creative promise through checkout completion."
+    ),
+    "meta_purchase_ratio_pct": (
+        "Purchases are not keeping up with cart volume. Check for checkout friction, price "
+        "shock, payment failures, or missing trust elements."
+    ),
+    "meta_video_hold_rate_pct": (
+        "The creative is losing attention after the hook. Tighten the body, pacing, and "
+        "proof sequence before scaling."
+    ),
+}
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _dedupe_strings(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+    return out
+
+
+def _build_custom_metric_definitions() -> list[MetaCustomMetricDefinition]:
+    return [
+        MetaCustomMetricDefinition(
+            metricId=spec.metric_id,
+            label=spec.label,
+            description=spec.description,
+            formula=spec.formula,
+            sourcePlane="meta_ads",
+            sourceClass="meta_estimated",
+            unit="pct",
+            numeratorLabel=spec.numerator_label,
+            denominatorLabel=spec.denominator_label,
+            minimum=spec.minimum,
+            target=spec.target,
+            good=spec.good,
+        )
+        for spec in _META_CUSTOM_METRIC_SPECS
+    ]
+
+
+def _resolve_action_primitive(
+    *,
+    actions: dict[str, float],
+    observed_action_types: set[str],
+    action_type: str | None,
+    warning_code: str,
+) -> _ResolvedPrimitive:
+    if not action_type:
+        return _ResolvedPrimitive(value=0, source_key="", observed=False, warnings=(warning_code,))
+    return _ResolvedPrimitive(
+        value=int(actions.get(action_type, 0.0)),
+        source_key=action_type,
+        observed=action_type in observed_action_types,
+        warnings=tuple([warning_code]) if action_type not in observed_action_types else (),
+    )
+
+
+def _resolve_video_p50_primitive(*, row: dict[str, Any]) -> _ResolvedPrimitive:
+    if "video_p50_watched_actions" not in row:
+        return _ResolvedPrimitive(
+            value=0,
+            source_key="video_p50_watched_actions",
+            observed=False,
+            warnings=("missing_source.video_p50",),
+        )
+    try:
+        return _ResolvedPrimitive(
+            value=_sum_action(row.get("video_p50_watched_actions"), field="video_p50_watched_actions"),
+            source_key="video_p50_watched_actions",
+            observed=True,
+            warnings=(),
+        )
+    except MetaMediaBuyingPlanError:
+        return _ResolvedPrimitive(
+            value=0,
+            source_key="video_p50_watched_actions",
+            observed=False,
+            warnings=("invalid_source.video_p50",),
+        )
+
+
+def _resolve_custom_metric_primitives(
+    *,
+    row: dict[str, Any],
+    observed_action_types: set[str],
+    event_mappings: MetaEventMappings,
+) -> dict[str, _ResolvedPrimitive]:
+    actions = _parse_action_list(row.get("actions"), field="actions")
+    return {
+        "impressions": _ResolvedPrimitive(
+            value=_to_int(row.get("impressions"), field="impressions"),
+            source_key="impressions",
+            observed=True,
+        ),
+        "landing_page_views": _resolve_action_primitive(
+            actions=actions,
+            observed_action_types=observed_action_types,
+            action_type=event_mappings.landing_page_view_action_type,
+            warning_code="missing_source.landing_page_views",
+        ),
+        "adds_to_cart": _resolve_action_primitive(
+            actions=actions,
+            observed_action_types=observed_action_types,
+            action_type=event_mappings.add_to_cart_action_type,
+            warning_code="missing_source.adds_to_cart",
+        ),
+        "initiated_checkouts": _resolve_action_primitive(
+            actions=actions,
+            observed_action_types=observed_action_types,
+            action_type=event_mappings.initiate_checkout_action_type,
+            warning_code="missing_source.initiated_checkouts",
+        ),
+        "purchases": _resolve_action_primitive(
+            actions=actions,
+            observed_action_types=observed_action_types,
+            action_type=event_mappings.purchase_action_type,
+            warning_code="missing_source.purchases",
+        ),
+        "video_p50_plays": _resolve_video_p50_primitive(row=row),
+    }
+
+
+def _aggregate_custom_metric_primitives(
+    primitive_sets: list[dict[str, _ResolvedPrimitive]],
+) -> dict[str, _ResolvedPrimitive]:
+    aggregated: dict[str, _ResolvedPrimitive] = {}
+    for primitive_name in {
+        "impressions",
+        "landing_page_views",
+        "adds_to_cart",
+        "initiated_checkouts",
+        "purchases",
+        "video_p50_plays",
+    }:
+        values = [primitive_set[primitive_name] for primitive_set in primitive_sets]
+        aggregated[primitive_name] = _ResolvedPrimitive(
+            value=sum(item.value for item in values),
+            source_key=values[0].source_key if values else "",
+            observed=any(item.observed for item in values),
+            warnings=tuple(
+                _dedupe_strings([warning for item in values for warning in item.warnings])
+            ),
+        )
+    return aggregated
+
+
+def _evaluate_custom_metric_status(
+    *,
+    value: float,
+    definition: MetaCustomMetricDefinition,
+) -> tuple[str, str | None]:
+    if definition.good is not None and value >= definition.good:
+        return "good", f"{definition.label} cleared the strong-performance threshold."
+    if definition.target is not None:
+        if value >= definition.target:
+            return "on_target", f"{definition.label} met the KPI target."
+        return "below_target", f"{definition.label} is below the KPI target."
+    if definition.minimum is not None:
+        if value >= definition.minimum:
+            return "on_target", f"{definition.label} met the KPI floor."
+        return "below_target", f"{definition.label} is below the KPI floor."
+    return "target_not_configured", "Target not configured for this metric yet."
+
+
+def _evaluate_custom_metric(
+    *,
+    definition: MetaCustomMetricDefinition,
+    numerator: _ResolvedPrimitive,
+    denominator: _ResolvedPrimitive,
+    scope: str,
+) -> MetaCustomMetricEvaluation:
+    warnings = _dedupe_strings(["estimated_metric_source", *numerator.warnings, *denominator.warnings])
+    resolved_sources = _dedupe_strings([numerator.source_key, denominator.source_key])
+    if not denominator.observed:
+        return MetaCustomMetricEvaluation(
+            metricId=definition.metricId,
+            scope=scope,
+            status="unavailable",
+            unit=definition.unit,
+            numerator=numerator.value,
+            denominator=denominator.value,
+            minimum=definition.minimum,
+            target=definition.target,
+            good=definition.good,
+            resolvedSources=resolved_sources,
+            warnings=warnings,
+            reason=(
+                f"Meta did not return the configured source for "
+                f"{definition.denominatorLabel.lower()} in this window."
+            ),
+            recommendation=None,
+        )
+    if denominator.value <= 0:
+        return MetaCustomMetricEvaluation(
+            metricId=definition.metricId,
+            scope=scope,
+            status="insufficient_data",
+            unit=definition.unit,
+            numerator=numerator.value,
+            denominator=denominator.value,
+            minimum=definition.minimum,
+            target=definition.target,
+            good=definition.good,
+            resolvedSources=resolved_sources,
+            warnings=warnings,
+            reason=f"{definition.denominatorLabel} was 0 in the selected window.",
+            recommendation=None,
+        )
+
+    value = (numerator.value / denominator.value) * 100.0
+    status, reason = _evaluate_custom_metric_status(value=value, definition=definition)
+    recommendation = _CUSTOM_METRIC_RECOMMENDATIONS.get(definition.metricId) if status == "below_target" else None
+    return MetaCustomMetricEvaluation(
+        metricId=definition.metricId,
+        scope=scope,
+        status=status,
+        value=value,
+        unit=definition.unit,
+        numerator=numerator.value,
+        denominator=denominator.value,
+        minimum=definition.minimum,
+        target=definition.target,
+        good=definition.good,
+        resolvedSources=resolved_sources,
+        warnings=warnings,
+        reason=reason,
+        recommendation=recommendation,
+    )
+
+
+def _build_custom_metric_payload(
+    *,
+    rows: list[dict[str, Any]],
+    computed_rows: list[MetaAdMetrics],
+    observed_action_types: set[str],
+    event_mappings: MetaEventMappings,
+) -> tuple[list[MetaCustomMetricDefinition], list[MetaCustomMetricEvaluation], list[MetaCustomMetricRow]]:
+    definitions = _build_custom_metric_definitions()
+    definition_map = {definition.metricId: definition for definition in definitions}
+    row_primitive_sets = [
+        _resolve_custom_metric_primitives(
+            row=row,
+            observed_action_types=observed_action_types,
+            event_mappings=event_mappings,
+        )
+        for row in rows
+    ]
+    custom_metric_rows: list[MetaCustomMetricRow] = []
+    for computed_row, primitives in zip(computed_rows, row_primitive_sets):
+        metrics = [
+            _evaluate_custom_metric(
+                definition=definition_map[spec.metric_id],
+                numerator=primitives[spec.numerator_primitive],
+                denominator=primitives[spec.denominator_primitive],
+                scope="ad",
+            )
+            for spec in _META_CUSTOM_METRIC_SPECS
+        ]
+        custom_metric_rows.append(
+            MetaCustomMetricRow(
+                adId=computed_row.adId,
+                adName=computed_row.adName,
+                metrics=metrics,
+            )
+        )
+
+    summary_primitives = _aggregate_custom_metric_primitives(row_primitive_sets)
+    custom_metric_summary = [
+        _evaluate_custom_metric(
+            definition=definition_map[spec.metric_id],
+            numerator=summary_primitives[spec.numerator_primitive],
+            denominator=summary_primitives[spec.denominator_primitive],
+            scope="campaign",
+        )
+        for spec in _META_CUSTOM_METRIC_SPECS
+    ]
+    return definitions, custom_metric_summary, custom_metric_rows
+
+
 def fetch_meta_campaign_snapshot(
     *,
     client: MetaAdsClient,
     campaign_id: str,
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     campaign_fields = ",".join(
         [
             "id",
@@ -236,7 +722,171 @@ def fetch_meta_campaign_snapshot(
     else:
         raise MetaMediaBuyingPlanError("Meta returned non-list adsets data.")
 
-    return campaign, adsets_list
+    ads_fields = ",".join(
+        [
+            "id",
+            "name",
+            "status",
+            "effective_status",
+            "adset_id",
+            "campaign_id",
+            "issues_info",
+        ]
+    )
+    ads_out: list[dict[str, Any]] = []
+    after: Optional[str] = None
+    seen: set[str] = set()
+    while True:
+        params: dict[str, Any] = {"fields": ads_fields, "limit": 200}
+        if after:
+            params["after"] = after
+        resp = client._request("GET", f"{campaign_id}/ads", params=params)
+        data = resp.get("data") if isinstance(resp, dict) else None
+        if data:
+            ads_out.extend([row for row in data if isinstance(row, dict)])
+        paging = resp.get("paging") if isinstance(resp, dict) else None
+        cursors = paging.get("cursors") if isinstance(paging, dict) else None
+        after = cursors.get("after") if isinstance(cursors, dict) else None
+        if not after:
+            break
+        if after in seen:
+            raise MetaMediaBuyingPlanError("Meta ads pagination cursor repeated; aborting to avoid infinite loop.")
+        seen.add(after)
+
+    return campaign, adsets_list, ads_out
+
+
+def _to_status_label(value: Any) -> str | None:
+    cleaned = str(value).strip() if value is not None else ""
+    return cleaned or None
+
+
+def _status_counts(rows: list[dict[str, Any]], *, field: str) -> list[MetaObjectStatusCount]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        value = _to_status_label(row.get(field))
+        if value is None:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    return [
+        MetaObjectStatusCount(value=value, count=count)
+        for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def _issue_entries(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return [entry for entry in value if isinstance(entry, dict)]
+    return []
+
+
+def _extract_issue_sample(ad: dict[str, Any]) -> MetaIssueSample | None:
+    issues = _issue_entries(ad.get("issues_info"))
+    first_issue = issues[0] if issues else {}
+    error_code = first_issue.get("error_code")
+    if not isinstance(error_code, int):
+        try:
+            error_code = int(str(error_code)) if error_code is not None else None
+        except (TypeError, ValueError):
+            error_code = None
+
+    error_summary = first_issue.get("error_summary")
+    error_message = first_issue.get("error_message")
+    if not isinstance(error_summary, str):
+        error_summary = None
+    if not isinstance(error_message, str):
+        error_message = None
+    if not issues and _to_status_label(ad.get("effective_status")) != "WITH_ISSUES":
+        return None
+    ad_id = ad.get("id")
+    if not isinstance(ad_id, str) or not ad_id.strip():
+        return None
+    return MetaIssueSample(
+        adId=ad_id,
+        adName=ad.get("name") if isinstance(ad.get("name"), str) else "",
+        adsetId=ad.get("adset_id") if isinstance(ad.get("adset_id"), str) else None,
+        status=_to_status_label(ad.get("status")),
+        effectiveStatus=_to_status_label(ad.get("effective_status")),
+        errorCode=error_code,
+        errorSummary=error_summary,
+        errorMessage=error_message,
+    )
+
+
+def _review_pending(sample: MetaIssueSample) -> bool:
+    candidates = [sample.effectiveStatus, sample.errorSummary, sample.errorMessage]
+    joined = " ".join(value.lower() for value in candidates if isinstance(value, str))
+    return "review" in joined or sample.effectiveStatus == "PENDING_REVIEW"
+
+
+def _build_object_state_summary(
+    *,
+    campaign: dict[str, Any],
+    adsets: list[dict[str, Any]],
+    ads: list[dict[str, Any]],
+    insights_row_count: int,
+) -> MetaObjectStateSummary:
+    issue_samples = [sample for sample in (_extract_issue_sample(ad) for ad in ads) if sample is not None]
+    review_pending_count = sum(1 for sample in issue_samples if _review_pending(sample))
+
+    campaign_status = _to_status_label(campaign.get("status"))
+    campaign_effective_status = _to_status_label(campaign.get("effective_status"))
+    ad_effective_statuses = {
+        count.value for count in _status_counts(ads, field="effective_status") if count.count > 0
+    }
+
+    if insights_row_count > 0:
+        delivery_state = "delivering"
+        delivery_summary = (
+            f"Meta returned {insights_row_count} ad-level insight row"
+            f"{'' if insights_row_count == 1 else 's'} for the selected window."
+        )
+    elif review_pending_count > 0:
+        delivery_state = "review_blocked"
+        delivery_summary = (
+            f"{review_pending_count} ad{'' if review_pending_count == 1 else 's'} "
+            "appear to be blocked in Meta review, so no delivery rows were returned yet."
+        )
+    elif "WITH_ISSUES" in ad_effective_statuses:
+        delivery_state = "ads_with_issues"
+        delivery_summary = (
+            f"{len(issue_samples)} ad{'' if len(issue_samples) == 1 else 's'} are marked "
+            "`WITH_ISSUES`, so delivery data may be unavailable until Meta clears them."
+        )
+    elif campaign_effective_status == "ARCHIVED" or campaign_status == "ARCHIVED":
+        delivery_state = "archived"
+        delivery_summary = "This campaign is archived, so fresh delivery metrics are not expected."
+    elif campaign_effective_status == "PAUSED" or campaign_status == "PAUSED":
+        delivery_state = "paused"
+        delivery_summary = "This campaign is paused in Meta, so the selected window returned no ad-level delivery rows."
+    elif not ads:
+        delivery_state = "no_ads"
+        delivery_summary = "Meta campaign snapshot returned no ads yet."
+    else:
+        delivery_state = "no_recent_delivery"
+        delivery_summary = (
+            "Meta returned no ad-level insights for this window. Check the selected date range, "
+            "review state, and whether the campaign is actively serving."
+        )
+
+    return MetaObjectStateSummary(
+        campaignStatus=campaign_status,
+        campaignEffectiveStatus=campaign_effective_status,
+        adsetCount=len(adsets),
+        adCount=len(ads),
+        insightsRowCount=insights_row_count,
+        deliveryState=delivery_state,
+        deliverySummary=delivery_summary,
+        adsetStatusCounts=_status_counts(adsets, field="status"),
+        adsetEffectiveStatusCounts=_status_counts(adsets, field="effective_status"),
+        adStatusCounts=_status_counts(ads, field="status"),
+        adEffectiveStatusCounts=_status_counts(ads, field="effective_status"),
+        issueCount=len(issue_samples),
+        reviewPendingCount=review_pending_count,
+        issueSamples=issue_samples[:10],
+    )
 
 
 def fetch_ad_level_insights(
@@ -317,21 +967,17 @@ def _compute_ad_metrics(
     frequency = _to_float(frequency_raw, field="frequency") if frequency_raw is not None else None
 
     inline_link_clicks_raw = row.get("inline_link_clicks")
-    inline_link_clicks = (
-        _to_int(inline_link_clicks_raw, field="inline_link_clicks") if inline_link_clicks_raw is not None else None
-    )
+    inline_link_clicks = _to_int(inline_link_clicks_raw, field="inline_link_clicks") if inline_link_clicks_raw is not None else None
 
     link_ctr_raw = row.get("inline_link_click_ctr")
     link_ctr_pct = _to_float(link_ctr_raw, field="inline_link_click_ctr") if link_ctr_raw is not None else None
     if link_ctr_pct is None and inline_link_clicks is not None and impressions > 0:
-        # Meta sometimes omits derived rate fields when the numerator is 0; compute explicitly.
         link_ctr_pct = (inline_link_clicks / impressions) * 100.0
         warnings.append("computed_link_ctr_pct_from_counts")
 
     link_cpc_raw = row.get("cost_per_inline_link_click")
     link_cpc = _to_float(link_cpc_raw, field="cost_per_inline_link_click") if link_cpc_raw is not None else None
     if link_cpc is None and inline_link_clicks is not None and inline_link_clicks > 0:
-        # Meta sometimes omits derived cost fields; compute explicitly.
         link_cpc = spend / inline_link_clicks
         warnings.append("computed_link_cpc_from_spend_and_clicks")
 
@@ -423,7 +1069,7 @@ def build_management_plan(
         raise MetaMediaBuyingPlanError("mode must be plan_only or apply")
 
     try:
-        campaign, adsets = fetch_meta_campaign_snapshot(client=client, campaign_id=campaign_id)
+        campaign, adsets, ads = fetch_meta_campaign_snapshot(client=client, campaign_id=campaign_id)
         rows = fetch_ad_level_insights(
             client=client,
             ad_account_id=ad_account_id,
@@ -437,6 +1083,13 @@ def build_management_plan(
             error_payload=exc.error_payload,
         ) from exc
 
+    object_state = _build_object_state_summary(
+        campaign=campaign,
+        adsets=adsets,
+        ads=ads,
+        insights_row_count=len(rows),
+    )
+
     computed_rows: list[MetaAdMetrics] = []
     observed_actions: set[str] = set()
     observed_action_values: set[str] = set()
@@ -444,6 +1097,13 @@ def build_management_plan(
         observed_actions.update(_parse_action_list(row.get("actions"), field="actions").keys())
         observed_action_values.update(_parse_action_list(row.get("action_values"), field="action_values").keys())
         computed_rows.append(_compute_ad_metrics(row=row, event_mappings=event_mappings, include_raw=include_raw))
+
+    custom_metric_definitions, custom_metric_summary, custom_metric_rows = _build_custom_metric_payload(
+        rows=rows,
+        computed_rows=computed_rows,
+        observed_action_types=observed_actions,
+        event_mappings=event_mappings,
+    )
 
     actions: list[MetaPlannedAction] = []
     for r in computed_rows:
@@ -481,10 +1141,16 @@ def build_management_plan(
         )
 
     warnings: list[str] = []
+    if not rows:
+        warnings.append(f"no_delivery_rows.{object_state.deliveryState}")
+    if not event_mappings.landing_page_view_action_type:
+        warnings.append("missing_event_mapping.landing_page_view_action_type")
     if not event_mappings.content_view_action_type:
         warnings.append("missing_event_mapping.content_view_action_type")
     if not event_mappings.add_to_cart_action_type:
         warnings.append("missing_event_mapping.add_to_cart_action_type")
+    if not event_mappings.initiate_checkout_action_type:
+        warnings.append("missing_event_mapping.initiate_checkout_action_type")
     if not event_mappings.purchase_action_type:
         warnings.append("missing_event_mapping.purchase_action_type")
     if not event_mappings.purchase_value_action_type:
@@ -545,6 +1211,7 @@ def build_management_plan(
         window={"datePreset": insights.datePreset},
         campaign=campaign,
         adsets=adsets,
+        objectState=object_state,
         observedActionTypes={
             "actions": sorted(observed_actions),
             "action_values": sorted(observed_action_values),
@@ -553,4 +1220,7 @@ def build_management_plan(
         actions=actions,
         appliedActions=applied_actions,
         warnings=warnings,
+        customMetricDefinitions=custom_metric_definitions,
+        customMetricSummary=custom_metric_summary,
+        customMetricRows=custom_metric_rows,
     )

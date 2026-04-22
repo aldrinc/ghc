@@ -309,6 +309,7 @@ def persist_meta_management_artifacts(
             "window": plan.window,
             "campaign": plan.campaign,
             "adsets": plan.adsets,
+            "objectState": plan.objectState.model_dump(mode="json"),
             "rows": [row.model_dump(mode="json") for row in plan.rows],
             "observedActionTypes": plan.observedActionTypes,
             "managementScope": plan.managementScope,
@@ -321,6 +322,15 @@ def persist_meta_management_artifacts(
             ),
             "benchmarkEvaluations": [
                 evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations
+            ],
+            "customMetricDefinitions": [
+                definition.model_dump(mode="json") for definition in plan.customMetricDefinitions
+            ],
+            "customMetricSummary": [
+                metric.model_dump(mode="json") for metric in plan.customMetricSummary
+            ],
+            "customMetricRows": [
+                row.model_dump(mode="json") for row in plan.customMetricRows
             ],
         },
         created_by_user=user_id,
@@ -340,6 +350,9 @@ def persist_meta_management_artifacts(
             "warnings": plan.warnings,
             "benchmarkEvaluations": [
                 evaluation.model_dump(mode="json") for evaluation in plan.benchmarkEvaluations
+            ],
+            "customMetricSummary": [
+                metric.model_dump(mode="json") for metric in plan.customMetricSummary
             ],
         },
         created_by_user=user_id,

@@ -164,6 +164,8 @@ class Settings(BaseSettings):
 
     META_GRAPH_API_VERSION: str | None = None
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
+    META_GRAPH_REQUEST_TIMEOUT_SECONDS: float = 120.0
+    META_GRAPH_CONNECT_TIMEOUT_SECONDS: float = 10.0
     META_ACCESS_TOKEN: str | None = None
     META_AD_ACCOUNT_ID: str | None = None
     META_PAGE_ID: str | None = None

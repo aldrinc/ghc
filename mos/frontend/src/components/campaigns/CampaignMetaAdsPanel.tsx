@@ -54,7 +54,6 @@ type MetaPublishAdSetForm = {
   placementsJson: string;
   dailyBudget: string;
   lifetimeBudget: string;
-  bidAmount: string;
   startTime: string;
   endTime: string;
   promotedObjectJson: string;
@@ -367,7 +366,6 @@ function buildAdSetForm(spec: MetaAdSetSpec): MetaPublishAdSetForm {
     placementsJson: formatJsonInput(spec.placements),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
-    bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
     startTime: toLocalDateTimeValue(spec.start_time),
     endTime: toLocalDateTimeValue(spec.end_time),
     promotedObjectJson: formatJsonInput(spec.promoted_object),
@@ -1015,7 +1013,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
         placements: parseJsonObjectInput(form.placementsJson, `${spec.name || spec.id} placements`),
         dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
         lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
-        bidAmount: parseIntegerInput(form.bidAmount, `${spec.name || spec.id} bid amount`),
+        bidAmount: null,
         startTime: fromLocalDateTimeValue(form.startTime),
         endTime: fromLocalDateTimeValue(form.endTime),
         promotedObject: parseJsonObjectInput(form.promotedObjectJson, `${spec.name || spec.id} promoted object`),
@@ -1625,14 +1623,6 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                   />
                                 </label>
                                 <label className="block space-y-1">
-                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Bid Amount</div>
-                                  <Input
-                                    value={form.bidAmount}
-                                    onChange={(event) => updatePublishAdSetField(spec.id, "bidAmount", event.target.value)}
-                                    placeholder="Optional"
-                                  />
-                                </label>
-                                <label className="block space-y-1">
                                   <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Start Time</div>
                                   <Input
                                     type="datetime-local"
@@ -1648,6 +1638,9 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
                                     onChange={(event) => updatePublishAdSetField(spec.id, "endTime", event.target.value)}
                                   />
                                 </label>
+                              </div>
+                              <div className="text-xs text-content-muted">
+                                Bid caps are no longer used in mOS. Saving this publish config clears any legacy bid-cap value on the linked ad set spec.
                               </div>
                               <label className="block space-y-1">
                                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">Targeting JSON</div>

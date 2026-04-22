@@ -58,7 +58,6 @@ export type MetaPublishAdSetForm = {
   attributionSpecJson: string;
   dailyBudget: string;
   lifetimeBudget: string;
-  bidAmount: string;
   dsaBeneficiary: string;
   dsaPayor: string;
   startTime: string;
@@ -291,7 +290,6 @@ export function buildAdSetForm(
     attributionSpecJson: formatJsonArrayInput(resolveAdSetAttributionSpec(spec)),
     dailyBudget: spec.daily_budget != null ? String(spec.daily_budget) : "",
     lifetimeBudget: spec.lifetime_budget != null ? String(spec.lifetime_budget) : "",
-    bidAmount: spec.bid_amount != null ? String(spec.bid_amount) : "",
     dsaBeneficiary: readString(spec.dsa_beneficiary) || defaultPageName,
     dsaPayor: readString(spec.dsa_payor) || defaultPageName,
     startTime: toLocalDateTimeValue(spec.start_time),
@@ -1092,7 +1090,7 @@ export function MetaPublishProvider({
         placements: parseJsonObjectInput(form.placementsJson, `${spec.name || spec.id} placements`),
         dailyBudget: parseIntegerInput(form.dailyBudget, `${spec.name || spec.id} daily budget`),
         lifetimeBudget: parseIntegerInput(form.lifetimeBudget, `${spec.name || spec.id} lifetime budget`),
-        bidAmount: parseIntegerInput(form.bidAmount, `${spec.name || spec.id} bid amount`),
+        bidAmount: null,
         dsaBeneficiary: form.dsaBeneficiary.trim() || readString(config?.pageName) || null,
         dsaPayor: form.dsaPayor.trim() || readString(config?.pageName) || null,
         startTime: fromLocalDateTimeValue(form.startTime),

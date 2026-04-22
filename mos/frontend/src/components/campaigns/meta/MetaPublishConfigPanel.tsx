@@ -258,9 +258,6 @@ export function MetaPublishConfigPanel() {
                     <Field label="Lifetime budget">
                       <Input value={form.lifetimeBudget} onChange={(e) => updatePublishAdSetField(spec.id, "lifetimeBudget", e.target.value)} placeholder="Leave blank for campaign CBO" />
                     </Field>
-                    <Field label="Bid amount">
-                      <Input value={form.bidAmount} onChange={(e) => updatePublishAdSetField(spec.id, "bidAmount", e.target.value)} placeholder="Optional" />
-                    </Field>
                     <Field label="DSA beneficiary">
                       <Input
                         value={form.dsaBeneficiary}
@@ -281,6 +278,10 @@ export function MetaPublishConfigPanel() {
                     <Field label="End time">
                       <Input type="datetime-local" value={form.endTime} onChange={(e) => updatePublishAdSetField(spec.id, "endTime", e.target.value)} />
                     </Field>
+                  </div>
+
+                  <div className="text-xs text-content-muted">
+                    Bid caps are no longer used in mOS. Saving this publish config clears any legacy bid-cap value on the linked ad set spec.
                   </div>
 
                   <div className="space-y-3">

@@ -32,6 +32,7 @@ from app.db.models import (
     FunnelPublication,
     FunnelPublicationPage,
     MetaAdAccountConnection,
+    MetaAdSet,
     MetaAdSetSpec,
     MetaCampaign,
     MetaPublishRun,
@@ -41,6 +42,7 @@ from app.db.models import (
     ProductVariant,
 )
 from app.routers import meta_ads as meta_ads_router
+from app.services.meta_ads import MetaAdsError
 from app.services.meta_media_buying import fetch_ad_level_insights
 from app.services.meta_management_service import run_meta_management_monitoring_snapshot
 from app.services.integration_secrets import encrypt_secret_json
@@ -1107,6 +1109,106 @@ def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_se
     assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
 
 
+def test_publish_meta_run_marks_partial_failures_without_poisoning_all_remaining_items(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-partial-failure",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-partial-failure"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+
+    expected_storage_keys: set[str] = set()
+    for index in range(2):
+        asset = _create_asset(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            batch_id="latest-run",
+            suffix=f"publish-partial-failure-{index}",
+            asset_brief_id=brief_id,
+        )
+        expected_storage_keys.add(str(asset.storage_key))
+        _create_meta_publish_inputs(
+            db_session,
+            asset=asset,
+            campaign_id=campaign_id,
+            experiment_key=f"exp-publish-partial-failure-{index}",
+            with_targeting=True,
+        )
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    ad_counter = {"count": 0}
+    creative_counter = {"count": 0}
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key in expected_storage_keys
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            return {"images": {kwargs["filename"]: {"hash": f"hash_{kwargs['filename']}"}}}
+
+        def create_campaign(self, **_kwargs):
+            return {"id": "meta_campaign_partial_failure", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            bucket_suffix = kwargs["payload"]["name"].split()[-1]
+            return {"id": f"meta_adset_partial_failure_{bucket_suffix}", "status": "PAUSED"}
+
+        def create_adcreative(self, **_kwargs):
+            creative_counter["count"] += 1
+            return {"id": f"meta_creative_partial_failure_{creative_counter['count']}"}
+
+        def create_ad(self, **_kwargs):
+            ad_counter["count"] += 1
+            if ad_counter["count"] == 2:
+                raise MetaAdsError("Meta Graph API request failed: The read operation timed out")
+            return {"id": f"meta_ad_partial_failure_{ad_counter['count']}", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **_kwargs: _FakeMetaClient())
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert publish_response.status_code == 200, publish_response.text
+    payload = publish_response.json()
+    assert payload["status"] == "partial_failed"
+    assert "1 of 2 publish items failed" in payload["errorMessage"]
+    published_items = [item for item in payload["items"] if item["status"] == "published"]
+    failed_items = [item for item in payload["items"] if item["status"] == "failed"]
+    assert len(published_items) == 1
+    assert len(failed_items) == 1
+    assert failed_items[0]["metadata"]["failedStage"] == "ad"
+    assert failed_items[0]["errorMessage"].startswith("Meta ad creation failed:")
+    assert payload["metadata"]["resultSummary"]["publishedCount"] == 1
+    assert payload["metadata"]["resultSummary"]["failedCount"] == 1
+    assert payload["metadata"]["resultSummary"]["failedStageCounts"] == {"ad": 1}
+
+
 def test_apply_tracking_url_parameters_overrides_existing_utm_values() -> None:
     tracked_url = meta_ads_router._apply_tracking_url_parameters(
         destination_url="https://example.com/presales?foo=bar&utm_source=old#section-1",
@@ -1217,6 +1319,8 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
     assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert creative_counter["count"] == 7
     assert len({item["adsetSpecId"] for item in publish_payload["items"]}) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+    bucket_counts = Counter(int(item["metadata"]["bucketIndex"]) for item in publish_payload["items"])
+    assert bucket_counts == Counter({1: 2, 2: 2, 3: 1, 4: 1, 5: 1})
 
     meta_adset_counts = Counter(item["metaAdSetId"] for item in publish_payload["items"])
     assert meta_adset_counts == Counter(
@@ -1358,6 +1462,188 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
     assert counters["create_adset"] == 2 * DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert counters["create_adcreative"] == 2
     assert counters["create_ad"] == 2
+
+
+def test_update_meta_adset_clears_bid_cap_in_place(api_client, db_session, monkeypatch) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="update-adset-clear-bid-cap",
+        db_session=db_session,
+    )
+    _ = product_id
+    workspace_config = _seed_meta_workspace_config(db_session, client_id=client_id)
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    local_meta_adset = MetaAdSet(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        meta_workspace_config_id=str(workspace_config.id),
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:adset",
+        meta_campaign_id="meta_campaign_existing_123",
+        meta_adset_id="meta_adset_existing_123",
+        name="Bucket 1",
+        status="PAUSED",
+        metadata_json={"id": "meta_adset_existing_123", "bid_amount": "2500"},
+    )
+    db_session.add(local_meta_adset)
+    db_session.commit()
+
+    update_calls: list[dict[str, object]] = []
+
+    class _FakeMetaClient:
+        def update_adset(self, *, adset_id: str, payload: dict[str, object]):
+            update_calls.append({"adset_id": adset_id, "payload": payload})
+            return {"success": True}
+
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **_kwargs: _FakeMetaClient())
+
+    response = api_client.put(
+        "/meta/adsets/meta_adset_existing_123",
+        json={"clearBidAmount": True},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["meta_adset_id"] == "meta_adset_existing_123"
+    assert update_calls == [
+        {
+            "adset_id": "meta_adset_existing_123",
+            "payload": {"bid_strategy": "LOWEST_COST_WITHOUT_CAP"},
+        }
+    ]
+    db_session.refresh(local_meta_adset)
+    assert (
+        local_meta_adset.metadata_json["lastRemoteUpdate"]["request"]["bid_strategy"]
+        == "LOWEST_COST_WITHOUT_CAP"
+    )
+
+
+def test_update_meta_adset_spec_rejects_bid_amount(api_client, db_session) -> None:
+    client_id, _product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="reject-bid-amount",
+        db_session=db_session,
+    )
+    _ = client_id
+
+    adset_spec = MetaAdSetSpec(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign_id,
+        name="Bucket 1",
+        status="draft",
+        optimization_goal="OFFSITE_CONVERSIONS",
+        billing_event="IMPRESSIONS",
+        targeting={"geo_locations": {"countries": ["US"]}},
+        placements={"publisher_platforms": ["facebook"]},
+        daily_budget=None,
+        lifetime_budget=None,
+        bid_amount=None,
+        start_time=None,
+        end_time=None,
+        promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
+        conversion_domain="shop.thehonestherbalist.com",
+        metadata_json=default_meta_publish_bucket_metadata(1),
+    )
+    db_session.add(adset_spec)
+    db_session.commit()
+    db_session.refresh(adset_spec)
+
+    response = api_client.put(
+        f"/meta/specs/adsets/{adset_spec.id}",
+        json={"bidAmount": 2500},
+    )
+
+    assert response.status_code == 400, response.text
+    assert "bidAmount is no longer supported" in response.json()["detail"]
+    db_session.refresh(adset_spec)
+    assert adset_spec.bid_amount is None
+
+
+def test_publish_meta_run_ignores_legacy_bid_amount_on_adset_specs(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-ignore-legacy-bid-amount",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-ignore-legacy-bid-amount"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-ignore-legacy-bid-amount",
+        asset_brief_id=brief_id,
+    )
+    _creative_spec, adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-publish-ignore-legacy-bid-amount",
+        with_targeting=True,
+    )
+    adset_spec.bid_amount = 2500
+    db_session.add(adset_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    create_adset_payloads: list[dict[str, object]] = []
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key == "creative/publish-ignore-legacy-bid-amount.jpg"
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **_kwargs):
+            return {"images": {"creative.jpg": {"hash": "hash_legacy_bid_amount"}}}
+
+        def create_campaign(self, **_kwargs):
+            return {"id": "meta_campaign_legacy_bid_amount", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            create_adset_payloads.append(kwargs["payload"])
+            assert "bid_amount" not in kwargs["payload"]
+            return {"id": f"meta_adset_{len(create_adset_payloads)}", "status": "PAUSED"}
+
+        def create_adcreative(self, **_kwargs):
+            return {"id": "meta_creative_legacy_bid_amount"}
+
+        def create_ad(self, **_kwargs):
+            return {"id": "meta_ad_legacy_bid_amount", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **_kwargs: _FakeMetaClient())
+
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert len(create_adset_payloads) == DEFAULT_META_PUBLISH_BUCKET_COUNT
 
 
 def test_validate_meta_publish_plan_blocks_eu_targeting_without_dsa_defaults(api_client, db_session) -> None:
@@ -1893,6 +2179,7 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
         lambda **_kwargs: (
             {"id": "meta_campaign_apply_123", "name": "Managed Campaign", "status": "ACTIVE"},
             [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+            [{"id": "meta_ad_123", "name": "Ad One", "status": "ACTIVE", "effective_status": "ACTIVE"}],
         ),
     )
     monkeypatch.setattr(
@@ -1927,8 +2214,10 @@ def test_meta_management_apply_mode_persists_artifacts(api_client, db_session, m
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["mode"] == "apply"
+    assert payload["objectState"]["deliveryState"] == "delivering"
     assert payload["actions"][0]["kind"] == "pause_ad"
     assert payload["appliedActions"][0]["status"] == "applied"
+    assert payload["customMetricSummary"][0]["metricId"] == "meta_atc_ratio_pct"
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
     assert payload["artifacts"]["recommendedActionsArtifactId"]
     assert payload["artifacts"]["approvalDecisionArtifactId"]
@@ -1953,6 +2242,90 @@ def test_fetch_ad_level_insights_normalizes_ad_account_id() -> None:
 
     assert rows == []
     assert captured_paths == ["act_123456/insights"]
+
+
+def test_meta_management_plan_reports_object_state_when_insights_are_empty(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="management-object-state",
+        db_session=db_session,
+    )
+    _ = product_id
+    _seed_meta_workspace_config(db_session, client_id=client_id)
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    local_meta_campaign = MetaCampaign(
+        org_id=TEST_ORG_ID,
+        campaign_id=campaign.id,
+        ad_account_id="act_123456",
+        request_id="meta-launch-plan:test:object-state",
+        meta_campaign_id="meta_campaign_object_state_123",
+        name="Managed Campaign",
+        objective="OUTCOME_SALES",
+        status="ACTIVE",
+        metadata_json={},
+    )
+    db_session.add(local_meta_campaign)
+    db_session.commit()
+
+    class _FakeManagementClient:
+        pass
+
+    monkeypatch.setattr(
+        "app.services.meta_management_service.meta_ads_client_for_connection",
+        lambda *_args, **_kwargs: _FakeManagementClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
+        lambda **_kwargs: (
+            {
+                "id": "meta_campaign_object_state_123",
+                "name": "Managed Campaign",
+                "status": "PAUSED",
+                "effective_status": "PAUSED",
+            },
+            [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "PAUSED", "effective_status": "PAUSED"}],
+            [
+                {
+                    "id": "meta_ad_123",
+                    "name": "Ad One",
+                    "status": "PAUSED",
+                    "effective_status": "WITH_ISSUES",
+                    "adset_id": "meta_adset_123",
+                    "issues_info": [
+                        {
+                            "error_code": 2446211,
+                            "error_summary": "Ad needs review",
+                            "error_message": "Ad needs review before delivery can start.",
+                        }
+                    ],
+                }
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.meta_media_buying.fetch_ad_level_insights",
+        lambda **_kwargs: [],
+    )
+
+    response = api_client.post(
+        "/meta/management/plan",
+        json={
+            "metaCampaignId": "meta_campaign_object_state_123",
+            "clientId": client_id,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["rows"] == []
+    assert payload["objectState"]["deliveryState"] == "review_blocked"
+    assert payload["objectState"]["reviewPendingCount"] == 1
+    assert payload["objectState"]["issueSamples"][0]["errorSummary"] == "Ad needs review"
+    assert "no_delivery_rows.review_blocked" in payload["warnings"]
 
 
 def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_client, db_session, monkeypatch) -> None:
@@ -2010,6 +2383,7 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
         lambda **_kwargs: (
             {"id": "meta_campaign_benchmark_123", "name": "Benchmark Campaign", "status": "ACTIVE"},
             [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+            [{"id": "meta_ad_123", "name": "Ad One", "status": "ACTIVE", "effective_status": "ACTIVE"}],
         ),
     )
     monkeypatch.setattr(
@@ -2026,8 +2400,14 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
                 "inline_link_clicks": "30",
                 "inline_link_click_ctr": "3.0",
                 "cost_per_inline_link_click": "2.17",
-                "actions": [],
+                "actions": [
+                    {"action_type": "landing_page_view", "value": "20"},
+                    {"action_type": "offsite_conversion.fb_pixel_add_to_cart", "value": "3"},
+                    {"action_type": "offsite_conversion.fb_pixel_initiate_checkout", "value": "2"},
+                    {"action_type": "offsite_conversion.fb_pixel_purchase", "value": "1"},
+                ],
                 "action_values": [],
+                "video_p50_watched_actions": [{"action_type": "video_view", "value": "8"}],
             }
         ],
     )
@@ -2046,6 +2426,7 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
     payload = response.json()
     assert payload["managementScope"] == "meta_plus_funnel"
     assert payload["benchmarkStatus"]["available"] is True
+    assert payload["objectState"]["deliveryState"] == "delivering"
     assert payload["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
     assert payload["benchmarkContext"]["atcPriceBandId"] == "core_97_126"
     assert payload["funnelSnapshot"]["presellPageViewSessions"] == 10
@@ -2055,11 +2436,17 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
     assert payload["funnelSnapshot"]["orderCompletedSessions"] == 1
 
     evaluations = {entry["metricId"]: entry for entry in payload["benchmarkEvaluations"]}
+    custom_metric_summary = {entry["metricId"]: entry for entry in payload["customMetricSummary"]}
     assert evaluations["ad_link_ctr_pct"]["status"] == "good"
     assert evaluations["presell_ctr_pct"]["status"] == "on_target"
     assert evaluations["sales_pdp_atc_pct"]["status"] == "on_target"
     assert evaluations["sales_pdp_purchase_cvr_pct"]["status"] == "good"
     assert evaluations["checkout_cvr_pct"]["status"] == "on_target"
+    assert round(custom_metric_summary["meta_atc_ratio_pct"]["value"], 2) == 15.0
+    assert round(custom_metric_summary["meta_conversion_rate_pct"]["value"], 2) == 5.0
+    assert round(custom_metric_summary["meta_ic_ratio_pct"]["value"], 2) == 10.0
+    assert round(custom_metric_summary["meta_purchase_ratio_pct"]["value"], 2) == 33.33
+    assert round(custom_metric_summary["meta_video_hold_rate_pct"]["value"], 2) == 0.8
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
 
     metrics_artifact = db_session.scalars(
@@ -2068,9 +2455,11 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
     assert metrics_artifact is not None
     assert metrics_artifact.data["managementScope"] == "meta_plus_funnel"
     assert metrics_artifact.data["benchmarkStatus"]["available"] is True
+    assert metrics_artifact.data["objectState"]["deliveryState"] == "delivering"
     assert metrics_artifact.data["benchmarkContext"]["funnelId"] == str(funnel_data["funnel"].id)
     assert metrics_artifact.data["funnelSnapshot"]["checkoutStartedSessions"] == 1
     assert len(metrics_artifact.data["benchmarkEvaluations"]) == 5
+    assert len(metrics_artifact.data["customMetricSummary"]) == 5
 
 
 def test_meta_management_plan_allows_external_url_campaigns_without_funnel_benchmarks(
@@ -2118,6 +2507,7 @@ def test_meta_management_plan_allows_external_url_campaigns_without_funnel_bench
         lambda **_kwargs: (
             {"id": "meta_campaign_external_urls_123", "name": "External URL Campaign", "status": "ACTIVE"},
             [{"id": "meta_adset_123", "name": "Managed Ad Set", "status": "ACTIVE"}],
+            [{"id": "meta_ad_123", "name": "Ad One", "status": "ACTIVE", "effective_status": "ACTIVE"}],
         ),
     )
     monkeypatch.setattr(
@@ -2154,6 +2544,7 @@ def test_meta_management_plan_allows_external_url_campaigns_without_funnel_bench
     assert payload["managementScope"] == "meta_only"
     assert payload["benchmarkStatus"]["available"] is False
     assert payload["benchmarkStatus"]["reasonCode"] == "unsupported_delivery_mode"
+    assert payload["objectState"]["deliveryState"] == "delivering"
     assert payload["benchmarkEvaluations"] == []
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
 
@@ -2163,6 +2554,7 @@ def test_meta_management_plan_allows_external_url_campaigns_without_funnel_bench
     assert metrics_artifact is not None
     assert metrics_artifact.data["managementScope"] == "meta_only"
     assert metrics_artifact.data["benchmarkStatus"]["reasonCode"] == "unsupported_delivery_mode"
+    assert metrics_artifact.data["objectState"]["deliveryState"] == "delivering"
     assert metrics_artifact.data["benchmarkContext"] is None
 
 
@@ -2366,6 +2758,7 @@ def test_meta_management_plan_errors_when_benchmark_profile_is_missing(api_clien
         "app.services.meta_media_buying.fetch_meta_campaign_snapshot",
         lambda **_kwargs: (
             {"id": "meta_campaign_missing_profile_123", "name": "Benchmark Campaign", "status": "ACTIVE"},
+            [],
             [],
         ),
     )

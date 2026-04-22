@@ -21,6 +21,22 @@ function formatMinorUnitsBudget(value: number | null): string | null {
   return `$${(value / 100).toFixed(2)}/day`;
 }
 
+function publishStatusTone(status: string): "neutral" | "accent" | "success" | "danger" {
+  if (status === "published") return "success";
+  if (status === "partial_failed" || status === "running") return "accent";
+  if (status === "failed") return "danger";
+  return "neutral";
+}
+
+function readStage(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function formatStage(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/_/g, " ");
+}
+
 export function MetaPublishHistoryPanel() {
   const { visiblePublishRuns, publishRunsLoading, publishRunsError } = useMetaPublishContext();
 
@@ -46,9 +62,7 @@ export function MetaPublishHistoryPanel() {
                   <div className="space-y-1">
                     <div className="text-sm font-semibold text-content">{run.campaignName}</div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={run.status === "published" ? "success" : run.status === "failed" ? "danger" : "accent"}>
-                        {run.status}
-                      </Badge>
+                      <Badge tone={publishStatusTone(run.status)}>{run.status}</Badge>
                       <Badge tone="neutral">{run.generationKey}</Badge>
                       {run.metaCampaignId ? <Badge tone="neutral">Meta {shortId(run.metaCampaignId, 5)}</Badge> : null}
                       {budgetScopeLabel ? <Badge tone="neutral">{budgetScopeLabel}</Badge> : null}
@@ -63,9 +77,21 @@ export function MetaPublishHistoryPanel() {
                     <div key={`run-item-${item.id}`} className="rounded-md border border-border bg-background px-3 py-2 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs text-content-muted">{shortId(item.assetId, 5)}</span>
-                        <Badge tone={item.status === "published" ? "success" : item.status === "failed" ? "danger" : "accent"}>
-                          {item.status}
-                        </Badge>
+                        <Badge tone={publishStatusTone(item.status)}>{item.status}</Badge>
+                        {formatStage(
+                          readStage(item.metadata?.failedStage) ||
+                            readStage(item.metadata?.lastStage) ||
+                            readStage(item.metadata?.currentStage),
+                        ) ? (
+                          <span className="text-xs text-content-muted">
+                            Stage{" "}
+                            {formatStage(
+                              readStage(item.metadata?.failedStage) ||
+                                readStage(item.metadata?.lastStage) ||
+                                readStage(item.metadata?.currentStage),
+                            )}
+                          </span>
+                        ) : null}
                         {item.metaAdId ? <span className="text-content-muted">Ad {shortId(item.metaAdId, 5)}</span> : null}
                         {item.metaCreativeId ? <span className="text-content-muted">Creative {shortId(item.metaCreativeId, 5)}</span> : null}
                         {item.metaAdSetId ? <span className="text-content-muted">Ad set {shortId(item.metaAdSetId, 5)}</span> : null}

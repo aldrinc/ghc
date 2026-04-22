@@ -334,8 +334,10 @@ export type MetaManagementPlanRequest = {
     maxLinkCpc?: number;
   } | null;
   eventMappings?: {
+    landingPageViewActionType?: string;
     contentViewActionType?: string;
     addToCartActionType?: string;
+    initiateCheckoutActionType?: string;
     purchaseActionType?: string;
     purchaseValueActionType?: string;
   } | null;
@@ -378,6 +380,39 @@ export type MetaManagementAppliedAction = {
   before: Record<string, unknown>;
   after: Record<string, unknown>;
   error?: string | null;
+};
+
+export type MetaObjectStatusCount = {
+  value: string;
+  count: number;
+};
+
+export type MetaIssueSample = {
+  adId: string;
+  adName: string;
+  adsetId?: string | null;
+  status?: string | null;
+  effectiveStatus?: string | null;
+  errorCode?: number | null;
+  errorSummary?: string | null;
+  errorMessage?: string | null;
+};
+
+export type MetaObjectStateSummary = {
+  campaignStatus?: string | null;
+  campaignEffectiveStatus?: string | null;
+  adsetCount: number;
+  adCount: number;
+  insightsRowCount: number;
+  deliveryState: string;
+  deliverySummary: string;
+  adsetStatusCounts: MetaObjectStatusCount[];
+  adsetEffectiveStatusCounts: MetaObjectStatusCount[];
+  adStatusCounts: MetaObjectStatusCount[];
+  adEffectiveStatusCounts: MetaObjectStatusCount[];
+  issueCount: number;
+  reviewPendingCount: number;
+  issueSamples: MetaIssueSample[];
 };
 
 export type MetaManagementBenchmarkContext = {
@@ -437,12 +472,59 @@ export type MetaManagementBenchmarkEvaluation = {
   context: Record<string, unknown>;
 };
 
+export type MetaManagementCustomMetricDefinition = {
+  metricId: string;
+  label: string;
+  description: string;
+  formula: string;
+  sourcePlane: string;
+  sourceClass: string;
+  unit: string;
+  numeratorLabel: string;
+  denominatorLabel: string;
+  minimum?: number | null;
+  target?: number | null;
+  good?: number | null;
+};
+
+export type MetaManagementCustomMetricEvaluationStatus =
+  | "below_target"
+  | "on_target"
+  | "good"
+  | "insufficient_data"
+  | "unavailable"
+  | "target_not_configured";
+
+export type MetaManagementCustomMetricEvaluation = {
+  metricId: string;
+  scope: string;
+  status: MetaManagementCustomMetricEvaluationStatus;
+  value?: number | null;
+  unit: string;
+  numerator?: number | null;
+  denominator?: number | null;
+  minimum?: number | null;
+  target?: number | null;
+  good?: number | null;
+  resolvedSources: string[];
+  warnings: string[];
+  reason?: string | null;
+  recommendation?: string | null;
+};
+
+export type MetaManagementCustomMetricRow = {
+  adId: string;
+  adName: string;
+  metrics: MetaManagementCustomMetricEvaluation[];
+};
+
 export type MetaManagementPlan = {
   mode: string;
   generatedAt: string;
   window: Record<string, unknown>;
   campaign: Record<string, unknown>;
   adsets: Record<string, unknown>[];
+  objectState: MetaObjectStateSummary;
   observedActionTypes: Record<string, string[]>;
   rows: MetaManagementAdMetrics[];
   actions: MetaManagementPlannedAction[];
@@ -458,6 +540,9 @@ export type MetaManagementPlan = {
   benchmarkContext?: MetaManagementBenchmarkContext | null;
   funnelSnapshot?: MetaManagementFunnelSnapshot | null;
   benchmarkEvaluations: MetaManagementBenchmarkEvaluation[];
+  customMetricDefinitions: MetaManagementCustomMetricDefinition[];
+  customMetricSummary: MetaManagementCustomMetricEvaluation[];
+  customMetricRows: MetaManagementCustomMetricRow[];
   artifacts?: {
     metricsSnapshotArtifactId?: string;
     recommendedActionsArtifactId?: string;
