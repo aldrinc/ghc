@@ -1942,6 +1942,53 @@ def test_image_rewrites_validate_visual_parity_once_after_batching(monkeypatch):
     assert "srcset=" in uploaded[entry_route_path]
 
 
+def test_image_rewrites_revert_to_baseline_when_visual_parity_fails(monkeypatch):
+    html_document = """<!DOCTYPE html>
+<html>
+  <body>
+    <img src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero">
+    <a id="main-cta" href="#shop">Start my protocol</a>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    noisy_jpeg = _make_noisy_jpeg_bytes(width=1600, height=900)
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"] = {
+        "contentType": "image/jpeg",
+        "sizeBytes": len(noisy_jpeg),
+        "bytesBase64": base64.b64encode(noisy_jpeg).decode("ascii"),
+    }
+    deployer, uploaded, _commands = _stub_deployer()
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES", 1)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES", 0)
+    monkeypatch.setattr(deployer_module, "_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES", 1)
+    monkeypatch.setattr(
+        deployer,
+        "_measure_standalone_imported_html_image_layouts",
+        lambda **_: {0: {"desktop": 400, "mobile": 200}},
+    )
+
+    def fail_validate(**_kwargs):
+        raise ValueError(
+            "Artifact funnel 'example-product/example-funnel/presales' visual parity failed for viewport 'desktop': "
+            "0.278% of pixels changed (allowed <= 0.050%)."
+        )
+
+    monkeypatch.setattr(
+        deployer,
+        "_validate_standalone_imported_html_visual_parity",
+        fail_validate,
+    )
+
+    deployer._configure_funnel_artifact_site(app)
+
+    entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    entry_html = uploaded[entry_route_path]
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert "srcset=" not in entry_html
+    assert "/_standalone-assets/compressed/" not in entry_html
+
+
 def test_funnel_artifact_site_keeps_exact_image_sources_when_responsive_rewrites_are_disabled(monkeypatch):
     html_document = """<!DOCTYPE html>
 <html>

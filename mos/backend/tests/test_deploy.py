@@ -3198,6 +3198,11 @@ def _install_publish_job_mocks(monkeypatch):
         "_resolve_publish_job_workspace_server_names",
         lambda **kwargs: ["shoptenorco.com"],
     )
+    monkeypatch.setattr(
+        deploy_service,
+        "_validate_standalone_funnel_artifact_preflight",
+        lambda **kwargs: None,
+    )
 
     async def _default_tracking_validation(**kwargs):
         return {"status": "validated", "startUrl": kwargs["access_urls"][0]}
@@ -3507,6 +3512,82 @@ async def test_run_funnel_publish_job_records_tracking_validation_result(tmp_pat
         "startUrl": "https://shop.shopemberco.com/ember/daily/presales/",
         "expectedInternalEvents": ["Entered Funnel", "pre_sales_page_view"],
     }
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_runs_standalone_preflight_before_apply(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        deploy_service,
+        "_validate_standalone_funnel_artifact_preflight",
+        lambda *, workload_patch: calls.append(str(workload_patch["name"])),
+    )
+
+    async def _apply_plan(**kwargs):
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "materialized_plan_path": "/tmp/plan.json",
+            "server_ips": {"ubuntu-4gb-hel1-2": "135.181.93.244"},
+            "live_url": "http://135.181.93.244",
+            "logs": "",
+        }
+
+    monkeypatch.setattr(deploy_service, "apply_plan", _apply_plan)
+    monkeypatch.setattr(
+        deploy_service,
+        "_infer_external_access_urls",
+        lambda **kwargs: ["https://shop.shopemberco.com/"],
+    )
+
+    job_id = "publish-job-standalone-preflight-success"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert calls == ["brand-funnels-70124684-be65d76e"]
+    assert job["status"] == "succeeded"
+    assert job["phase"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_fails_when_standalone_preflight_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_validate_standalone_funnel_artifact_preflight",
+        lambda *, workload_patch: (_ for _ in ()).throw(deploy_service.DeployError("parity mismatch")),
+    )
+
+    job_id = "publish-job-standalone-preflight-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "preflighting_standalone"
+    assert job["error"] == "parity mismatch"
 
 
 @pytest.mark.asyncio

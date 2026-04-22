@@ -6695,12 +6695,18 @@ WantedBy=multi-user.target
             page_stage=page_stage,
         )
         if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
-            self._validate_standalone_imported_html_visual_parity(
-                before_html=image_rewrite_baseline_html,
-                after_html=html_document,
-                standalone_served_assets=standalone_served_assets,
-                context_label=context_label,
-            )
+            try:
+                self._validate_standalone_imported_html_visual_parity(
+                    before_html=image_rewrite_baseline_html,
+                    after_html=html_document,
+                    standalone_served_assets=standalone_served_assets,
+                    context_label=context_label,
+                )
+            except ValueError as exc:
+                if "visual parity failed" not in str(exc):
+                    raise
+                print(f"Warning: {exc} Reverting to baseline imported HTML for {context_label}.")
+                html_document = image_rewrite_baseline_html
         html_document = _optimize_standalone_imported_html_document(html_document)
         render_optimization_css = _build_standalone_render_optimization_css(page_stage=page_stage)
         if render_optimization_css:

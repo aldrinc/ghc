@@ -4358,6 +4358,62 @@ def _infer_external_access_urls(
     return resolved
 
 
+def _validate_standalone_funnel_artifact_preflight(*, workload_patch: dict[str, Any]) -> None:
+    from cloudhand.adapters.deployer import ServerDeployer
+    from cloudhand.models import ApplicationSourceType, ApplicationSpec, FunnelArtifactRenderMode
+    from cloudhand.secrets import get_or_create_project_ssh_key
+
+    try:
+        app = ApplicationSpec.model_validate(workload_patch)
+    except Exception as exc:  # pragma: no cover
+        raise DeployError(f"Standalone preflight could not parse the workload patch: {exc}") from exc
+
+    if app.source_type != ApplicationSourceType.FUNNEL_ARTIFACT:
+        return
+    source = app.source_ref
+    if source is None:
+        raise DeployError("Standalone preflight requires source_ref on the artifact workload.")
+    if source.artifact_render_mode != FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
+        return
+
+    private_key, _public_key = get_or_create_project_ssh_key(settings.DEPLOY_PROJECT_ID)
+    deployer = ServerDeployer(
+        ip="127.0.0.1",
+        private_key_str=private_key,
+        local_root=_cloudhand_dir().parent,
+    )
+    deployer.upload_bytes = lambda payload, target_path: None  # type: ignore[method-assign]
+    deployer.upload_file = lambda local_path, target_path: None  # type: ignore[method-assign]
+    deployer.run = lambda cmd, cwd=None, mask=None: ""  # type: ignore[method-assign]
+
+    standalone_uploaded_target_paths: set[str] = set()
+    standalone_served_assets: dict[str, Any] = {}
+    standalone_image_sources: dict[str, Any] = {}
+    site_dir = "/tmp/mos-standalone-preflight"
+
+    try:
+        deployer._write_funnel_artifact_assets(
+            site_dir=site_dir,
+            source=source,
+            uploaded_target_paths=standalone_uploaded_target_paths,
+            standalone_served_assets=standalone_served_assets,
+            standalone_image_sources=standalone_image_sources,
+        )
+        deployer._write_funnel_artifact_standalone_html_routes(
+            site_dir=site_dir,
+            source=source,
+            public_server_names=(
+                deployer._normalize_server_names(app.workspace_server_names)
+                or deployer._normalize_server_names(app.service_config.server_names)
+            ),
+            mirrored_target_paths=standalone_uploaded_target_paths,
+            standalone_served_assets=standalone_served_assets,
+            standalone_image_sources=standalone_image_sources,
+        )
+    except Exception as exc:
+        raise DeployError(f"Standalone artifact preflight failed: {exc}") from exc
+
+
 def _summarize_apply_result(result: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     rc = int(result.get("returncode", 1))
     summary: dict[str, Any] = {
@@ -4510,6 +4566,14 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     job["result"] = result_payload
                     job["phase"] = "artifact_hydrated"
                     _write_json_atomic(path, job)
+                    if resolved_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+                        job["phase"] = "preflighting_standalone"
+                        _write_json_atomic(path, job)
+                        _validate_standalone_funnel_artifact_preflight(
+                            workload_patch=workload_patch,
+                        )
+                        job["phase"] = "standalone_preflight_validated"
+                        _write_json_atomic(path, job)
 
                 plan_resolution = ensure_plan_for_funnel_publish_workload(
                     workload_patch=workload_patch,
