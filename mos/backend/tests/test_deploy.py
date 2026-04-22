@@ -3060,6 +3060,88 @@ def _write_publish_job_fixture(tmp_path: Path, *, job_id: str, deploy_request: d
     return job_path
 
 
+def _build_tracking_validation_artifact_payload(*, include_presales: bool) -> dict:
+    tracking = {
+        "metaPixelId": "pixel-123",
+        "posthogProjectApiKey": "phc_test_123",
+        "posthogApiHost": "https://emb.shopemberco.com",
+        "posthogUiHost": "https://us.posthog.com",
+        "posthogDefaults": "2026-01-30",
+        "posthogPersonProfiles": "always",
+    }
+    sales_page = {
+        "pageId": "sales-page-id",
+        "stage": "sales",
+        "tracking": tracking,
+        "puckData": {
+            "content": [
+                {
+                    "type": "ImportedHtml",
+                    "props": {
+                        "instrumentationManifest": {
+                            "pageStage": "sales",
+                            "bindings": [
+                                {
+                                    "type": "checkout",
+                                    "selector": "#checkout-btn",
+                                    "trackEventType": "sales_to_checkout_click",
+                                    "checkout": {
+                                        "mode": "public_checkout",
+                                        "externalUrlsByVariant": [],
+                                    },
+                                }
+                            ],
+                        }
+                    },
+                }
+            ]
+        },
+    }
+    pages = {"sales-page": sales_page}
+    if include_presales:
+        pages["presales"] = {
+            "pageId": "presales-page-id",
+            "stage": "pre_sales",
+            "tracking": tracking,
+            "puckData": {
+                "content": [
+                    {
+                        "type": "ImportedHtml",
+                        "props": {
+                            "instrumentationManifest": {
+                                "pageStage": "pre_sales",
+                                "bindings": [
+                                    {
+                                        "type": "internal_navigation",
+                                        "selector": "#to-sales",
+                                        "targetPageId": "sales-page-id",
+                                        "trackEventType": "pre_sales_to_sales_click",
+                                    }
+                                ],
+                            }
+                        },
+                    }
+                ]
+            },
+        }
+
+    return {
+        "products": {
+            "ember": {
+                "funnels": {
+                    "daily": {
+                        "meta": {
+                            "funnelId": "funnel-123",
+                            "publicationId": "00000000-0000-0000-0000-000000000999",
+                        },
+                        "pages": pages,
+                    }
+                }
+            }
+        }
+    }
+
+
 def _install_publish_job_mocks(monkeypatch):
     import app.db.base as db_base
     import app.services.funnels as funnels_service
@@ -3116,6 +3198,170 @@ def _install_publish_job_mocks(monkeypatch):
         "_resolve_publish_job_workspace_server_names",
         lambda **kwargs: ["shoptenorco.com"],
     )
+
+    async def _default_tracking_validation(**kwargs):
+        return {"status": "validated", "startUrl": kwargs["access_urls"][0]}
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation",
+        _default_tracking_validation,
+    )
+
+
+def test_build_funnel_tracking_validation_plan_for_presales_flow():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="standalone_imported_html",
+    )
+
+    assert plan["start_page"]["slug"] == "presales"
+    assert plan["sales_page"]["slug"] == "sales-page"
+    assert plan["pre_sales_click_selector"] == "#to-sales"
+    assert plan["checkout_selector"] == "#checkout-btn"
+    assert plan["expected_internal_events"] == [
+        "Entered Funnel",
+        "pre_sales_page_view",
+        "pre_sales_to_sales_click",
+        "sales_page_view",
+        "sales_to_checkout_click",
+    ]
+    assert plan["expected_meta_events"] == [
+        "Entered Funnel",
+        "PageView",
+        "PreSalesToSalesClick",
+        "PageView",
+        "EnteredSales",
+        "AddToCart",
+    ]
+    assert plan["expected_posthog_events"] == plan["expected_meta_events"]
+
+
+def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="standalone_imported_html",
+    )
+
+    assert plan["start_page"]["slug"] == "sales-page"
+    assert plan["pre_sales_click_selector"] is None
+    assert plan["expected_internal_events"] == [
+        "Entered Funnel",
+        "sales_page_view",
+        "sales_to_checkout_click",
+    ]
+    assert plan["expected_meta_events"] == [
+        "Entered Funnel",
+        "PageView",
+        "ViewContent",
+        "AddToCart",
+    ]
+    assert plan["expected_posthog_events"] == plan["expected_meta_events"]
+
+
+def test_validate_observed_tracking_events_accepts_expected_sequence():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=True),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="standalone_imported_html",
+    )
+
+    observed_state = {
+        "internal": [
+            {"eventType": "Entered Funnel"},
+            {"eventType": "pre_sales_page_view"},
+            {"eventType": "pre_sales_to_sales_click"},
+            {"eventType": "sales_page_view"},
+            {"eventType": "sales_to_checkout_click"},
+        ],
+        "meta": [
+            ["init", "pixel-123"],
+            ["track", "Entered Funnel", {}],
+            ["track", "PageView", {}],
+            ["track", "PreSalesToSalesClick", {}],
+            ["track", "PageView", {}],
+            ["track", "EnteredSales", {}],
+            ["track", "AddToCart", {}],
+        ],
+        "posthog": {
+            "inits": [
+                [
+                    "phc_test_123",
+                    {
+                        "api_host": "https://emb.shopemberco.com",
+                        "ui_host": "https://us.posthog.com",
+                    },
+                ]
+            ],
+            "captures": [
+                ["Entered Funnel", {}],
+                ["PageView", {}],
+                ["PreSalesToSalesClick", {}],
+                ["PageView", {}],
+                ["EnteredSales", {}],
+                ["AddToCart", {}],
+            ],
+        },
+    }
+
+    deploy_service._validate_observed_tracking_events(
+        validation_plan=plan,
+        observed_state=observed_state,
+    )
+
+
+def test_validate_observed_tracking_events_rejects_missing_checkout_event():
+    plan = deploy_service._build_funnel_tracking_validation_plan(
+        artifact_payload=_build_tracking_validation_artifact_payload(include_presales=False),
+        funnel_id="funnel-123",
+        publication_id="00000000-0000-0000-0000-000000000999",
+        access_urls=["https://shop.shopemberco.com/"],
+        render_mode="standalone_imported_html",
+    )
+
+    observed_state = {
+        "internal": [
+            {"eventType": "Entered Funnel"},
+            {"eventType": "sales_page_view"},
+            {"eventType": "sales_to_checkout_click"},
+        ],
+        "meta": [
+            ["init", "pixel-123"],
+            ["track", "Entered Funnel", {}],
+            ["track", "PageView", {}],
+            ["track", "ViewContent", {}],
+        ],
+        "posthog": {
+            "inits": [
+                [
+                    "phc_test_123",
+                    {
+                        "api_host": "https://emb.shopemberco.com",
+                        "ui_host": "https://us.posthog.com",
+                    },
+                ]
+            ],
+            "captures": [
+                ["Entered Funnel", {}],
+                ["PageView", {}],
+                ["ViewContent", {}],
+            ],
+        },
+    }
+
+    with pytest.raises(deploy_service.DeployError, match="Meta Pixel events"):
+        deploy_service._validate_observed_tracking_events(
+            validation_plan=plan,
+            observed_state=observed_state,
+        )
 
 
 @pytest.mark.asyncio
@@ -3211,3 +3457,129 @@ async def test_run_funnel_publish_job_fails_when_bunny_cache_purge_fails(tmp_pat
     assert job["status"] == "failed"
     assert job["phase"] == "purging_bunny_cache"
     assert "purgeCache" in job["error"]
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_records_tracking_validation_result(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+    monkeypatch.setattr(
+        deploy_service,
+        "_load_funnel_runtime_artifact_payload_for_apply",
+        lambda *, artifact_id: _build_tracking_validation_artifact_payload(include_presales=True),
+    )
+
+    captured: dict[str, object] = {}
+
+    async def _tracking_validation(**kwargs):
+        captured.update(kwargs)
+        return {
+            "startUrl": "https://shop.shopemberco.com/ember/daily/presales/",
+            "expectedInternalEvents": ["Entered Funnel", "pre_sales_page_view"],
+        }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation",
+        _tracking_validation,
+    )
+
+    job_id = "publish-job-tracking-validation-success"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": False,
+            "access_urls": ["https://shop.shopemberco.com/"],
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "succeeded"
+    assert job["phase"] == "completed"
+    assert captured["publication_id"] == "00000000-0000-0000-0000-000000000999"
+    assert captured["funnel_id"] == "funnel-123"
+    assert captured["access_urls"] == ["https://shop.shopemberco.com/"]
+    assert job["result"]["deploy"]["trackingValidation"] == {
+        "startUrl": "https://shop.shopemberco.com/ember/daily/presales/",
+        "expectedInternalEvents": ["Entered Funnel", "pre_sales_page_view"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_fails_when_tracking_validation_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+    monkeypatch.setattr(
+        deploy_service,
+        "_load_funnel_runtime_artifact_payload_for_apply",
+        lambda *, artifact_id: _build_tracking_validation_artifact_payload(include_presales=True),
+    )
+
+    async def _tracking_validation(**kwargs):
+        raise deploy_service.DeployError("tracking mismatch")
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_run_funnel_tracking_post_deploy_validation",
+        _tracking_validation,
+    )
+
+    job_id = "publish-job-tracking-validation-failure"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": False,
+            "access_urls": ["https://shop.shopemberco.com/"],
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "validating_tracking"
+    assert job["error"] == "tracking mismatch"
+
+
+@pytest.mark.asyncio
+async def test_run_funnel_publish_job_fails_when_tracking_validation_has_no_public_access_url(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    _install_publish_job_mocks(monkeypatch)
+
+    async def _apply_plan(**kwargs):
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "server_ips": {},
+            "live_url": None,
+            "logs": "",
+        }
+
+    monkeypatch.setattr(deploy_service, "apply_plan", _apply_plan)
+    monkeypatch.setattr(deploy_service, "_infer_external_access_urls", lambda **kwargs: [])
+
+    job_id = "publish-job-tracking-validation-no-url"
+    job_path = _write_publish_job_fixture(
+        tmp_path,
+        job_id=job_id,
+        deploy_request={
+            "workload_patch": {"name": "brand-funnels-70124684-be65d76e"},
+            "apply_plan": True,
+        },
+    )
+
+    await deploy_service._run_funnel_publish_job(job_id)
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["status"] == "failed"
+    assert job["phase"] == "applying_plan"
+    assert "public access URL" in job["error"]
