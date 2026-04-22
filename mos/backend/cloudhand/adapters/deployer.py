@@ -4226,6 +4226,31 @@ WantedBy=multi-user.target
                         return True
         return False
 
+    def _funnel_artifact_declares_meta_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
+        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(source=source)
+        for product_payload in products.values():
+            if not isinstance(product_payload, dict):
+                continue
+            funnels = product_payload.get("funnels")
+            if not isinstance(funnels, dict):
+                continue
+            for funnel_payload in funnels.values():
+                if not isinstance(funnel_payload, dict):
+                    continue
+                pages = funnel_payload.get("pages")
+                if not isinstance(pages, dict):
+                    continue
+                for page_payload in pages.values():
+                    if not isinstance(page_payload, dict):
+                        continue
+                    tracking = page_payload.get("tracking")
+                    if not isinstance(tracking, dict):
+                        continue
+                    pixel_id = str(tracking.get("metaPixelId") or "").strip()
+                    if pixel_id:
+                        return True
+        return False
+
     def _remote_tree_contains_text(self, *, root_path: str, text: str) -> bool:
         safe_root = shlex.quote(root_path)
         safe_text = shlex.quote(text)
@@ -4286,6 +4311,34 @@ WantedBy=multi-user.target
                 "Standalone funnel artifact export declared PostHog tracking but did not emit the PostHog bootstrap. "
                 "The site was not activated."
             )
+        if self._funnel_artifact_declares_posthog_tracking(source=source):
+            if self._remote_tree_contains_text(root_path=site_dir, text="capture_pageview: false"):
+                raise ValueError(
+                    "Standalone funnel artifact export declared PostHog tracking but disabled capture_pageview. "
+                    "The site was not activated."
+                )
+            if self._remote_tree_contains_text(root_path=site_dir, text="capture_pageleave: false"):
+                raise ValueError(
+                    "Standalone funnel artifact export declared PostHog tracking but disabled capture_pageleave. "
+                    "The site was not activated."
+                )
+        if self._funnel_artifact_declares_meta_tracking(source=source):
+            if not self._remote_tree_contains_text(
+                root_path=site_dir,
+                text="connect.facebook.net/en_US/fbevents.js",
+            ):
+                raise ValueError(
+                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel script. "
+                    "The site was not activated."
+                )
+            if not self._remote_tree_contains_text(
+                root_path=site_dir,
+                text='window.fbq("init", pixelId);',
+            ):
+                raise ValueError(
+                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel bootstrap. "
+                    "The site was not activated."
+                )
 
     def _activate_funnel_artifact_site_release(
         self,

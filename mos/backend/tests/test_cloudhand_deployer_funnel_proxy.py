@@ -840,10 +840,14 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "https://us.posthog.com" in entry_html
     assert "ui_host" in entry_html
     assert "window.posthog.init(" in entry_html
+    assert "capture_pageview: true" in entry_html
+    assert "capture_pageleave: true" in entry_html
     assert "posthog.capture(capture.eventName, capture.eventProps);" in entry_html
     assert "CTA Link Click" in entry_html
     assert "internal_event_type" in entry_html
     assert "content_category" in entry_html
+    assert "connect.facebook.net/en_US/fbevents.js" in entry_html
+    assert 'window.fbq("init", pixelId);' in entry_html
 
     assert page_html == entry_html
     assert "/example-product/example-funnel/presales/" in entry_html
@@ -2362,6 +2366,44 @@ def test_validate_funnel_artifact_site_output_requires_posthog_bootstrap_when_tr
     deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
 
     with pytest.raises(ValueError, match="PostHog bootstrap"):
+        deployer._validate_funnel_artifact_site_output(
+            site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
+            source=app.source_ref,
+            render_mode=FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML,
+        )
+
+
+def test_validate_funnel_artifact_site_output_requires_posthog_web_analytics_capture_when_tracking_is_declared():
+    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    deployer = object.__new__(ServerDeployer)
+    deployer._path_exists = lambda path: True
+    deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: True
+    deployer._funnel_artifact_declares_meta_tracking = lambda *, source: False
+    deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text in {
+        "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START",
+        "window.posthog.init(",
+        "capture_pageview: false",
+    }
+
+    with pytest.raises(ValueError, match="capture_pageview"):
+        deployer._validate_funnel_artifact_site_output(
+            site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
+            source=app.source_ref,
+            render_mode=FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML,
+        )
+
+
+def test_validate_funnel_artifact_site_output_requires_meta_pixel_bootstrap_when_tracking_is_declared():
+    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    deployer = object.__new__(ServerDeployer)
+    deployer._path_exists = lambda path: True
+    deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: False
+    deployer._funnel_artifact_declares_meta_tracking = lambda *, source: True
+    deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
+
+    with pytest.raises(ValueError, match="Meta Pixel script"):
         deployer._validate_funnel_artifact_site_output(
             site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
             source=app.source_ref,
