@@ -45,6 +45,7 @@ class MetaCampaignCreateRequest(BaseModel):
     # Required by Meta when creating ABO campaigns without a campaign-level budget.
     # For Structure B (CBO), you should set a campaign budget instead.
     isAdsetBudgetSharingEnabled: Optional[bool] = None
+    bidStrategy: Optional[str] = None
     validateOnly: Optional[bool] = None
 
 

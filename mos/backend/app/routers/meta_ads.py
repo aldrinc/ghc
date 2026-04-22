@@ -2213,6 +2213,7 @@ def _create_meta_campaign_internal(
         "name": payload.name,
         "objective": payload.objective,
         "status": payload.status,
+        "bid_strategy": _clean_optional_text(payload.bidStrategy) or "LOWEST_COST_WITHOUT_CAP",
     }
     request_payload["special_ad_categories"] = payload.specialAdCategories
     if payload.buyingType:
@@ -4007,6 +4008,7 @@ def create_meta_publish_run(
                 status="PAUSED",
                 specialAdCategories=payload.specialAdCategories,
                 buyingType=payload.buyingType,
+                bidStrategy="LOWEST_COST_WITHOUT_CAP",
                 dailyBudget=campaign_daily_budget,
                 isAdsetBudgetSharingEnabled=False if publish_budget_scope == "adset" else None,
             ),

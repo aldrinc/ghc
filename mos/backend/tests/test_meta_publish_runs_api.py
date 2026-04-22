@@ -1284,6 +1284,7 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
 
         def create_campaign(self, **kwargs):
             assert kwargs["payload"]["daily_budget"] == DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS
+            assert kwargs["payload"]["bid_strategy"] == "LOWEST_COST_WITHOUT_CAP"
             return {"id": "meta_campaign_bucket_distribution", "status": "PAUSED"}
 
         def create_adset(self, **kwargs):
