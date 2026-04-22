@@ -46,6 +46,70 @@ def test_deploy_apply_alias_works(api_client, monkeypatch):
     assert resp.status_code == 200
 
 
+def test_deploy_apply_async_starts_scoped_job(api_client, monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_start_apply_plan_job(*, plan_path=None, workload_names=None, access_urls=None):
+        captured["plan_path"] = plan_path
+        captured["workload_names"] = workload_names
+        captured["access_urls"] = access_urls
+        return {
+            "id": "job-123",
+            "status": "queued",
+            "plan_path": "/tmp/plan.json",
+            "workload_names": ["brand-funnels-ember"],
+        }
+
+    monkeypatch.setattr(deploy_service, "start_apply_plan_job", fake_start_apply_plan_job)
+
+    resp = api_client.post(
+        "/deploy/plans/apply-async",
+        json={"plan_path": "/tmp/plan.json", "workload_names": ["brand-funnels-ember"]},
+    )
+    assert resp.status_code == 200
+    assert captured == {
+        "plan_path": "/tmp/plan.json",
+        "workload_names": ["brand-funnels-ember"],
+        "access_urls": None,
+    }
+    assert resp.json() == {
+        "jobId": "job-123",
+        "status": "queued",
+        "planPath": "/tmp/plan.json",
+        "statusPath": "/deploy/plans/apply-jobs/job-123",
+        "workloadNames": ["brand-funnels-ember"],
+    }
+
+
+def test_deploy_apply_async_alias_works(api_client, monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "start_apply_plan_job",
+        lambda **_: {
+            "id": "job-123",
+            "status": "queued",
+            "plan_path": "/tmp/plan.json",
+            "workload_names": [],
+        },
+    )
+
+    resp = api_client.post("/deploy/apply-async", json={})
+    assert resp.status_code == 200
+    assert resp.json()["jobId"] == "job-123"
+
+
+def test_get_apply_plan_job_route_returns_status(api_client, monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "get_apply_plan_job",
+        lambda *, job_id: {"id": job_id, "status": "running", "plan_path": "/tmp/plan.json"},
+    )
+
+    resp = api_client.get("/deploy/plans/apply-jobs/job-123")
+    assert resp.status_code == 200
+    assert resp.json() == {"id": "job-123", "status": "running", "plan_path": "/tmp/plan.json"}
+
+
 def test_deploy_apply_forwards_workload_names(api_client, monkeypatch):
     async def fake_apply_plan(*, plan_path=None, workload_names=None):
         assert plan_path == "/tmp/plan.json"
@@ -115,6 +179,58 @@ async def test_apply_plan_scopes_materialization_and_cli_to_selected_workload(tm
     assert "--workload-name" in subprocess_args
     assert subprocess_args.count("--workload-name") == 1
     assert subprocess_args[-2:] == ["--workload-name", "brand-funnels-tenor"]
+
+
+@pytest.mark.asyncio
+async def test_run_apply_plan_job_forwards_scoped_workload_names(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+
+    captured: dict[str, object] = {}
+
+    async def fake_apply_plan(*, plan_path=None, workload_names=None):
+        captured["plan_path"] = plan_path
+        captured["workload_names"] = workload_names
+        return {
+            "returncode": 0,
+            "plan_path": "/tmp/plan.json",
+            "materialized_plan_path": "/tmp/plan.materialized.json",
+            "server_ips": {"ubuntu-4gb-hel1-2": "135.181.93.244"},
+            "live_url": "http://135.181.93.244",
+            "logs": "",
+        }
+
+    monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
+
+    jobs_dir = tmp_path / "jobs"
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    job_path = jobs_dir / "job-123.json"
+    job_path.write_text(
+        json.dumps(
+            {
+                "id": "job-123",
+                "status": "queued",
+                "created_at": "2026-04-22T00:00:00+00:00",
+                "started_at": None,
+                "finished_at": None,
+                "plan_path": "/tmp/plan.json",
+                "workload_names": ["brand-funnels-ember"],
+                "access_urls": [],
+                "result": None,
+                "error": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    await deploy_service._run_apply_plan_job("job-123")
+
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert captured == {
+        "plan_path": "/tmp/plan.json",
+        "workload_names": ["brand-funnels-ember"],
+    }
+    assert job["status"] == "succeeded"
+    assert job["result"]["materialized_plan_path"] == "/tmp/plan.materialized.json"
 
 
 def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):

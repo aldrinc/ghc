@@ -282,3 +282,57 @@ async def apply_latest_plan_alias(
     Backwards-compatible alias for /deploy/plans/apply.
     """
     return await apply_plan(request=request, payload=payload, _auth=_auth)
+
+
+@router.post("/plans/apply-async")
+async def apply_plan_async(
+    request: Request,
+    payload: Optional[ApplyPayload] = None,
+    _auth: AuthContext = Depends(get_current_user),
+):
+    _require_internal_proxy(request)
+    try:
+        job = deploy_service.start_apply_plan_job(
+            plan_path=(payload.plan_path if payload else None),
+            workload_names=(payload.workload_names if payload else None),
+        )
+    except deploy_service.DeployError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return {
+        "jobId": job["id"],
+        "status": job["status"],
+        "planPath": job["plan_path"],
+        "statusPath": f"/deploy/plans/apply-jobs/{job['id']}",
+        "workloadNames": job.get("workload_names", []),
+    }
+
+
+@router.post("/apply-async")
+async def apply_latest_plan_async_alias(
+    request: Request,
+    payload: Optional[ApplyPayload] = None,
+    _auth: AuthContext = Depends(get_current_user),
+):
+    return await apply_plan_async(request=request, payload=payload, _auth=_auth)
+
+
+@router.get("/plans/apply-jobs/{job_id}")
+async def get_apply_plan_job(
+    request: Request,
+    job_id: str,
+    _auth: AuthContext = Depends(get_current_user),
+):
+    _require_internal_proxy(request)
+    try:
+        return deploy_service.get_apply_plan_job(job_id=job_id)
+    except deploy_service.DeployError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/apply-jobs/{job_id}")
+async def get_apply_plan_job_alias(
+    request: Request,
+    job_id: str,
+    _auth: AuthContext = Depends(get_current_user),
+):
+    return await get_apply_plan_job(request=request, job_id=job_id, _auth=_auth)

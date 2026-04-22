@@ -4433,6 +4433,16 @@ async def _run_apply_plan_job(job_id: str) -> None:
     job = _read_job(job_id)
     path = _job_path(job_id)
     plan_path = str(job.get("plan_path") or "").strip()
+    workload_names_raw = job.get("workload_names")
+    workload_names: list[str] | None
+    if isinstance(workload_names_raw, list):
+        workload_names = [
+            str(name).strip()
+            for name in workload_names_raw
+            if isinstance(name, str) and str(name).strip()
+        ]
+    else:
+        workload_names = None
     if not plan_path:
         job["status"] = "failed"
         job["error"] = "Job is missing plan_path."
@@ -4445,7 +4455,7 @@ async def _run_apply_plan_job(job_id: str) -> None:
     _write_json_atomic(path, job)
 
     try:
-        result = await apply_plan(plan_path=plan_path)
+        result = await apply_plan(plan_path=plan_path, workload_names=workload_names)
         rc, summary = _summarize_apply_result(result)
 
         access_urls = _normalize_access_urls(job.get("access_urls"))
@@ -4757,6 +4767,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
 def start_apply_plan_job(
     *,
     plan_path: str | None = None,
+    workload_names: list[str] | None = None,
     access_urls: list[str] | None = None,
 ) -> dict[str, Any]:
     if plan_path:
@@ -4766,6 +4777,15 @@ def start_apply_plan_job(
     if not plan_file or not plan_file.exists():
         raise DeployError("No plan found.")
 
+    normalized_workload_names: list[str] = []
+    seen_workload_names: set[str] = set()
+    for raw_name in workload_names or []:
+        workload_name = str(raw_name or "").strip()
+        if not workload_name or workload_name in seen_workload_names:
+            continue
+        seen_workload_names.add(workload_name)
+        normalized_workload_names.append(workload_name)
+
     job_id = str(uuid4())
     job = {
         "id": job_id,
@@ -4774,6 +4794,7 @@ def start_apply_plan_job(
         "started_at": None,
         "finished_at": None,
         "plan_path": str(plan_file),
+        "workload_names": normalized_workload_names,
         "access_urls": _normalize_access_urls(access_urls),
         "result": None,
         "error": None,
