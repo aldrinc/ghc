@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mapRuntimeEventToMetaPixelEvents } from "./metaFunnelEvents";
+import { CTA_LINK_CLICK_EVENT_NAME, mapRuntimeEventToMetaPixelEvents } from "./metaFunnelEvents";
 
 describe("mapRuntimeEventToMetaPixelEvents", () => {
   it("maps funnel entries to a Meta custom event", () => {
@@ -27,7 +27,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ).toEqual([{ eventName: "PageView", params: { page_stage: "pre_sales" } }]);
   });
 
-  it("maps sales page views to Meta PageView and ViewContent", () => {
+  it("maps direct sales page views to Meta PageView and ViewContent", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "sales_page_view",
@@ -36,6 +36,18 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ).toEqual([
       { eventName: "PageView", params: { page_stage: "sales" } },
       { eventName: "ViewContent", params: { page_stage: "sales" } },
+    ]);
+  });
+
+  it("maps attributed sales page views to Meta PageView and EnteredSales", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "sales_page_view",
+        props: { pageStage: "sales", fromPresale: true },
+      }),
+    ).toEqual([
+      { eventName: "PageView", params: { page_stage: "sales" } },
+      { eventName: "EnteredSales", method: "trackCustom", params: { page_stage: "sales" } },
     ]);
   });
 
@@ -75,12 +87,18 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ]);
   });
 
-  it("does not map custom clicks without a variant", () => {
+  it("maps custom clicks to a CTA link click custom event", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "custom_page_click",
         props: { href: "https://example.com" },
       }),
-    ).toEqual([]);
+    ).toEqual([
+      {
+        eventName: CTA_LINK_CLICK_EVENT_NAME,
+        method: "trackCustom",
+        params: { href: "https://example.com" },
+      },
+    ]);
   });
 });

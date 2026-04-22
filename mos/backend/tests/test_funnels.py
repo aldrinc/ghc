@@ -895,6 +895,7 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
                     "ViewContent",
                     "EnteredSales",
                     "PreSalesToSalesClick",
+                    "CTA Link Click",
                     "AddToCart",
                     "Purchase",
                 ],
@@ -959,6 +960,65 @@ def test_published_public_funnel_page_exposes_posthog_tracking(
         "posthogApiHost": "https://us.i.posthog.com",
         "posthogDefaults": "2026-01-30",
         "posthogPersonProfiles": "identified_only",
+    }
+
+
+def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_UI_HOST", "https://us.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", "always")
+
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="PostHog Managed Proxy Funnel",
+    )
+
+    funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
+    assert funnel is not None
+
+    db_session.add(
+        PaidAdsPlatformProfile(
+            org_id=funnel.org_id,
+            client_id=funnel.client_id,
+            platform="meta",
+            ruleset_version=RULESET_VERSION,
+            tracking_provider="mos",
+            metadata_json={
+                "mosPosthogTracking": {
+                    "status": "active",
+                    "mode": "managed_reverse_proxy",
+                    "apiHost": "https://beacon.example-brand.com",
+                    "uiHost": "https://app.posthog.com",
+                }
+            },
+        )
+    )
+    db_session.commit()
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    entry_slug = meta.json()["entrySlug"]
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"] == {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+        "posthogApiHost": "https://beacon.example-brand.com",
+        "posthogUiHost": "https://app.posthog.com",
+        "posthogDefaults": "2026-01-30",
+        "posthogPersonProfiles": "always",
     }
 
 

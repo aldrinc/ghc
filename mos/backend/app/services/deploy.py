@@ -24,6 +24,7 @@ from app.config import settings
 from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.imported_html_runtime import resolve_funnel_page_stage
 from app.services import namecheap_dns as namecheap_dns_service
+from app.services.public_runtime_tracking import resolve_public_runtime_tracking
 
 
 class DeployError(RuntimeError):
@@ -1189,11 +1190,10 @@ def build_client_funnel_runtime_artifact_payload(
     from app.db.enums import FunnelStatusEnum
     from app.db.models import Funnel, FunnelPage, Product, ProductVariant
     from app.db.repositories.funnels import FunnelPublicRepository
-    from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
     from app.services.design_systems import resolve_design_system_tokens
     from app.services.funnel_template_categories import resolve_funnel_template_artifact_slug
     from app.services.funnel_templates import resolve_funnel_template_page_type
-    from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
+    from app.services.paid_ads_qa import clean_optional_text
     from app.services.public_routing import require_product_route_slug
 
     template_to_artifact: dict[str, str] = {
@@ -1202,8 +1202,6 @@ def build_client_funnel_runtime_artifact_payload(
         "sales-pdp": "sales",
         "sales_pdp": "sales",
     }
-    mos_meta_tracking_metadata_key = "mosMetaTracking"
-
     def _artifact_page_slug(*, publication_slug: Any, template_id: str) -> str:
         artifact_slug = resolve_funnel_template_artifact_slug(template_id)
         if artifact_slug == "presales":
@@ -1222,67 +1220,6 @@ def build_client_funnel_runtime_artifact_payload(
             f"Unsupported template '{template_id or 'unknown'}' for deploy artifact page slug."
         )
 
-    def _resolve_public_meta_tracking_for_funnel(client_funnel: Funnel) -> dict[str, str] | None:
-        profile = PaidAdsQaRepository(session).get_platform_profile(
-            org_id=str(client_funnel.org_id),
-            client_id=str(client_funnel.client_id),
-            platform="meta",
-        )
-        if profile is None:
-            return None
-        metadata_json = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
-        mos_tracking = metadata_json.get(mos_meta_tracking_metadata_key)
-        if not isinstance(mos_tracking, dict):
-            return None
-        if normalize_tracking_provider(mos_tracking.get("status")) != "active":
-            return None
-        if normalize_tracking_provider(mos_tracking.get("mode")) != "public_funnel_runtime":
-            return None
-        if normalize_tracking_provider(mos_tracking.get("channel")) != "meta":
-            return None
-        pixel_id = clean_optional_text(mos_tracking.get("pixelId")) or clean_optional_text(profile.pixel_id)
-        if not pixel_id:
-            return None
-        return {
-            "provider": "meta",
-            "mode": "public_funnel_runtime",
-            "metaPixelId": pixel_id,
-        }
-
-    def _resolve_public_posthog_tracking_for_funnel() -> dict[str, str] | None:
-        if not settings.POSTHOG_FUNNELS_ENABLED:
-            return None
-
-        api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
-        api_host = clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
-        defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
-        person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
-
-        if not api_key:
-            raise DeployError(
-                "POSTHOG_FUNNELS_PROJECT_API_KEY is required when POSTHOG_FUNNELS_ENABLED is true."
-            )
-        if not api_host:
-            raise DeployError(
-                "POSTHOG_FUNNELS_API_HOST is required when POSTHOG_FUNNELS_ENABLED is true."
-            )
-        if not defaults:
-            raise DeployError(
-                "POSTHOG_FUNNELS_DEFAULTS is required when POSTHOG_FUNNELS_ENABLED is true."
-            )
-        if person_profiles not in {"identified_only", "always"}:
-            raise DeployError(
-                "POSTHOG_FUNNELS_PERSON_PROFILES must be 'identified_only' or 'always' when POSTHOG_FUNNELS_ENABLED is true."
-            )
-
-        return {
-            "provider": "posthog",
-            "mode": "public_funnel_runtime",
-            "posthogProjectApiKey": api_key,
-            "posthogApiHost": api_host,
-            "posthogDefaults": defaults,
-            "posthogPersonProfiles": person_profiles,
-        }
 
     client_funnels = list(
         session.scalars(
@@ -1417,17 +1354,14 @@ def build_client_funnel_runtime_artifact_payload(
             ]
             if page_type
         }
-        tracking: dict[str, str] = {}
-        meta_tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
-        if meta_tracking:
-            tracking.update(meta_tracking)
-        posthog_tracking = _resolve_public_posthog_tracking_for_funnel()
-        if posthog_tracking:
-            tracking.update(posthog_tracking)
-            if "provider" not in tracking or tracking["provider"] == "posthog":
-                tracking["provider"] = "posthog"
-            if "mode" not in tracking:
-                tracking["mode"] = "public_funnel_runtime"
+        try:
+            tracking = resolve_public_runtime_tracking(
+                session=session,
+                funnel=client_funnel,
+                include_posthog=True,
+            ) or {}
+        except RuntimeError as exc:
+            raise DeployError(str(exc)) from exc
         from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 
         compliance_profile = ClientComplianceProfilesRepository(session).get(

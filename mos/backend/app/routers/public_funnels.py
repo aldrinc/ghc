@@ -44,7 +44,6 @@ from app.db.repositories.funnels import (
     FunnelPublicRepository,
     FunnelsRepository,
 )
-from app.db.repositories.paid_ads_qa import PaidAdsQaRepository
 from app.schemas.commerce import (
     PublicCheckoutRequest,
     PublicPreparedCheckoutResponse,
@@ -64,7 +63,8 @@ from app.services.compliance import (
     render_policy_template_markdown,
 )
 from app.services.design_systems import resolve_design_system_tokens
-from app.services.paid_ads_qa import clean_optional_text, normalize_tracking_provider
+from app.services.paid_ads_qa import clean_optional_text
+from app.services.public_runtime_tracking import resolve_public_runtime_tracking
 from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.funnel_templates import resolve_funnel_template_page_type
 from app.services.imported_html_runtime import resolve_funnel_page_stage
@@ -104,7 +104,6 @@ from app.services.medusa_store_runtime import (
 )
 
 router = APIRouter(prefix="/public", tags=["public"])
-_MOS_META_TRACKING_METADATA_KEY = "mosMetaTracking"
 _PREPARED_CHECKOUT_STATUS_PENDING = "pending"
 _PREPARED_CHECKOUT_STATUS_READY = "ready"
 _PREPARED_CHECKOUT_STATUS_FAILED = "failed"
@@ -1201,95 +1200,6 @@ def _schedule_checkout_started_event(
     )
 
 
-def _resolve_public_meta_tracking(*, session: Session, funnel: Funnel) -> dict[str, str] | None:
-    profile = PaidAdsQaRepository(session).get_platform_profile(
-        org_id=str(funnel.org_id),
-        client_id=str(funnel.client_id),
-        platform="meta",
-    )
-    if profile is None:
-        return None
-    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
-    mos_tracking = metadata.get(_MOS_META_TRACKING_METADATA_KEY)
-    if not isinstance(mos_tracking, dict):
-        return None
-    if normalize_tracking_provider(mos_tracking.get("status")) != "active":
-        return None
-    if normalize_tracking_provider(mos_tracking.get("mode")) != "public_funnel_runtime":
-        return None
-    if normalize_tracking_provider(mos_tracking.get("channel")) != "meta":
-        return None
-    pixel_id = clean_optional_text(mos_tracking.get("pixelId")) or clean_optional_text(
-        profile.pixel_id
-    )
-    if not pixel_id:
-        return None
-    return {
-        "provider": "meta",
-        "mode": "public_funnel_runtime",
-        "metaPixelId": pixel_id,
-    }
-
-
-def _resolve_public_posthog_tracking() -> dict[str, str] | None:
-    if not settings.POSTHOG_FUNNELS_ENABLED:
-        return None
-
-    api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
-    api_host = clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
-    defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
-    person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
-
-    if not api_key:
-        raise RuntimeError(
-            "POSTHOG_FUNNELS_PROJECT_API_KEY is required when POSTHOG_FUNNELS_ENABLED is true."
-        )
-    if not api_host:
-        raise RuntimeError(
-            "POSTHOG_FUNNELS_API_HOST is required when POSTHOG_FUNNELS_ENABLED is true."
-        )
-    if not defaults:
-        raise RuntimeError(
-            "POSTHOG_FUNNELS_DEFAULTS is required when POSTHOG_FUNNELS_ENABLED is true."
-        )
-    if person_profiles not in {"identified_only", "always"}:
-        raise RuntimeError(
-            "POSTHOG_FUNNELS_PERSON_PROFILES must be 'identified_only' or 'always' when POSTHOG_FUNNELS_ENABLED is true."
-        )
-
-    return {
-        "provider": "posthog",
-        "mode": "public_funnel_runtime",
-        "posthogProjectApiKey": api_key,
-        "posthogApiHost": api_host,
-        "posthogDefaults": defaults,
-        "posthogPersonProfiles": person_profiles,
-    }
-
-
-def _resolve_public_runtime_tracking(
-    *,
-    session: Session,
-    funnel: Funnel,
-    include_posthog: bool,
-) -> dict[str, str] | None:
-    tracking: dict[str, str] = {}
-
-    meta_tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
-    if meta_tracking:
-        tracking.update(meta_tracking)
-
-    if include_posthog:
-        posthog_tracking = _resolve_public_posthog_tracking()
-        if posthog_tracking:
-            tracking.update(posthog_tracking)
-            if "provider" not in tracking or tracking["provider"] == "posthog":
-                tracking["provider"] = "posthog"
-            if "mode" not in tracking:
-                tracking["mode"] = "public_funnel_runtime"
-
-    return tracking or None
-
 
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     """
@@ -1584,7 +1494,7 @@ def public_funnel_page(
             page=page,
             puck_data=version.puck_data,
         )
-        tracking = _resolve_public_runtime_tracking(
+        tracking = resolve_public_runtime_tracking(
             session=session,
             funnel=funnel,
             include_posthog=True,
@@ -1707,7 +1617,7 @@ def public_funnel_page(
         page=page,
         puck_data=version.puck_data,
     )
-    tracking = _resolve_public_runtime_tracking(
+    tracking = resolve_public_runtime_tracking(
         session=session,
         funnel=funnel,
         include_posthog=False,

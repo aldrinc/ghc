@@ -1657,7 +1657,7 @@ def test_patch_workload_in_plan_assigns_and_preserves_org_scoped_port(tmp_path, 
         workload_name="brand-funnels-1",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -1813,7 +1813,7 @@ def test_apply_publish_job_artifact_render_mode_keeps_runtime_bundle_for_incompa
         workload_name="fallback-runtime-funnel",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -1890,7 +1890,7 @@ def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_p
         workload_name="brand-funnels-a",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -1899,7 +1899,7 @@ def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_p
         workload_name="brand-funnels-b",
         client_id="3d8cf9b0-6e31-4f8f-9a56-9c94bbf2d68d",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -1938,7 +1938,7 @@ def test_ensure_plan_for_funnel_publish_workload_bootstraps_when_missing(tmp_pat
         workload_name="landing-page",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -2254,7 +2254,7 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_publication_so
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2287,14 +2287,14 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_publication_so
     source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
     assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
     assert source_ref["upstream_base_url"] == "https://moshq.app"
-    assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
+    assert source_ref["upstream_api_base_url"] == "https://api.moshq.app"
 
 
 def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_source_ref(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
     client_id = "f51f25df-e761-4ead-850b-a35a20b35fde"
     product_id = "638d19db-9480-4bbd-91c6-052b07b6537d"
 
@@ -2321,7 +2321,7 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_sourc
                                     "source_type": "funnel_artifact",
                                     "source_ref": {
                                         "product_id": product_id,
-                                        "upstream_api_base_url": "https://moshq.app/api",
+                                        "upstream_api_base_url": "https://api.moshq.app",
                                         "artifact": {
                                             "meta": {"productId": product_id},
                                             "funnels": {},
@@ -2343,7 +2343,7 @@ def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_sourc
     workload = payload["new_spec"]["instances"][0]["workloads"][0]
     source_ref = workload["source_ref"]
     assert source_ref["client_id"] == client_id
-    assert source_ref["upstream_api_base_root"] == "https://moshq.app/api"
+    assert source_ref["upstream_api_base_root"] == "https://api.moshq.app"
     assert source_ref["runtime_dist_path"] == deploy_service.settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
     assert "legacy-product" in source_ref["artifact"]["products"]
 
@@ -2353,7 +2353,7 @@ def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2389,7 +2389,7 @@ def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_
     assert workload["source_type"] == "funnel_publication"
     assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
     assert source_ref["upstream_base_url"] == "https://moshq.app"
-    assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
+    assert source_ref["upstream_api_base_url"] == "https://api.moshq.app"
 
 
 def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode_without_runtime_path(
@@ -2397,7 +2397,7 @@ def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
 
     plan_file = tmp_path / "plan-input.json"
     plan_file.write_text(
@@ -2442,7 +2442,7 @@ def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_fr
 ):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
-    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://api.moshq.app")
 
     def _fake_load(*, artifact_id: str):
         assert artifact_id == "artifact-123"

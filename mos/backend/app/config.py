@@ -158,6 +158,7 @@ class Settings(BaseSettings):
     POSTHOG_FUNNELS_ENABLED: bool = False
     POSTHOG_FUNNELS_PROJECT_API_KEY: str | None = None
     POSTHOG_FUNNELS_API_HOST: str | None = None
+    POSTHOG_FUNNELS_UI_HOST: str | None = None
     POSTHOG_FUNNELS_DEFAULTS: str | None = None
     POSTHOG_FUNNELS_PERSON_PROFILES: str | None = None
 

@@ -184,6 +184,7 @@ def _artifact_app(
                 "metaPixelId": "pixel-123",
                 "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
                 "posthogApiHost": "https://us.i.posthog.com",
+                "posthogUiHost": "https://us.posthog.com",
                 "posthogDefaults": "2026-01-30",
                 "posthogPersonProfiles": "identified_only",
             },
@@ -813,8 +814,13 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "pixel-123" in entry_html
     assert "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk" in entry_html
     assert "https://us.i.posthog.com" in entry_html
+    assert "https://us.posthog.com" in entry_html
+    assert "ui_host" in entry_html
     assert "window.posthog.init(" in entry_html
-    assert "posthog.capture(eventType, eventProps);" in entry_html
+    assert "posthog.capture(capture.eventName, capture.eventProps);" in entry_html
+    assert "CTA Link Click" in entry_html
+    assert "internal_event_type" in entry_html
+    assert "content_category" in entry_html
 
     assert page_html == entry_html
     assert "/example-product/example-funnel/presales/" in entry_html
@@ -931,7 +937,7 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     assert 'nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);' in entry_html
     assert "element.href = buildInternalNavigationUrl(targetPath, {" in entry_html
     assert "window.location.href = buildInternalNavigationUrl(targetPath, {" in entry_html
-    assert 'trackMetaPixel("trackCustom", "EnteredSales", pageViewParams);' in entry_html
+    assert '"EnteredSales"' in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html
 
 
@@ -995,6 +1001,7 @@ def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
                     "metaPixelId": "pixel-456",
                     "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
                     "posthogApiHost": "https://us.i.posthog.com",
+                    "posthogUiHost": "https://us.posthog.com",
                     "posthogDefaults": "2026-01-30",
                     "posthogPersonProfiles": "identified_only",
                 },
@@ -2466,7 +2473,7 @@ def test_funnel_artifact_site_prefers_updated_from_funnel_for_runtime_config():
     assert '"commerce":' not in runtime_block
 
 
-def test_funnel_artifact_site_only_inlines_the_entry_page_in_runtime_config():
+def test_funnel_artifact_site_only_inlines_non_entry_pages_in_runtime_config():
     app = _artifact_app()
     funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
     funnel_payload["pages"]["sales-page"] = {

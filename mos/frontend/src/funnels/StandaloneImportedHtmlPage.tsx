@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { optimizeImportedHtmlDocument } from "@/funnels/importedHtmlRuntime";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { CTA_LINK_CLICK_EVENT_NAME } from "@/lib/metaFunnelEvents";
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type {
   ImportedHtmlInstrumentationManifest,
@@ -106,6 +107,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
   const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
+  const POSTHOG_INSTANCE_NAME = "mosFunnel";
 
   const cleanText = (value) => {
     if (typeof value !== "string") return null;
@@ -121,6 +123,80 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
   const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
+
+  const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
+  const PRESALE_SOURCE_PARAM = "src";
+  const PRESALE_SOURCE_VALUE = "presale";
+
+  const isPresaleToSalesNavigation = (fromStage, toStage) =>
+    cleanText(fromStage) === "pre_sales" && cleanText(toStage) === "sales";
+
+  const presaleAttributionStorageKey = () => {
+    const product = cleanText(config.productSlug);
+    const funnel = cleanText(config.funnelSlug);
+    if (!product || !funnel) return null;
+    return "from_presale:" + product + ":" + funnel;
+  };
+
+  const markPresaleAttribution = () => {
+    const key = presaleAttributionStorageKey();
+    if (!key) return;
+    try {
+      window.sessionStorage.setItem(key, "1");
+    } catch (_) {
+      // ignore storage write failures
+    }
+  };
+
+  const hasPresaleSourceParam = () =>
+    new URLSearchParams(window.location.search).get(PRESALE_SOURCE_PARAM) === PRESALE_SOURCE_VALUE;
+
+  const hasStoredPresaleAttribution = () => {
+    const key = presaleAttributionStorageKey();
+    if (!key) return false;
+    try {
+      return window.sessionStorage.getItem(key) === "1";
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const hasPresaleReferrerAttribution = () => {
+    if (!document.referrer) return false;
+    try {
+      const referrerUrl = new URL(document.referrer, window.location.href);
+      if (referrerUrl.origin !== window.location.origin) {
+        return false;
+      }
+      const preSalesPaths = Object.entries(config.pageStageById || {})
+        .filter(([, stage]) => cleanText(stage) === "pre_sales")
+        .map(([pageId]) => cleanText(config.pagePathById && config.pagePathById[pageId]))
+        .filter(Boolean);
+      return preSalesPaths.some((path) => new URL(path, window.location.href).pathname === referrerUrl.pathname);
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const resolvePresaleAttribution = () => {
+    if (hasPresaleSourceParam()) return "url";
+    if (hasStoredPresaleAttribution()) return "session";
+    if (hasPresaleReferrerAttribution()) return "referrer";
+    return null;
+  };
+
+  const buildInternalNavigationUrl = (targetPath, options) => {
+    const normalizedTargetPath = cleanText(targetPath);
+    if (!normalizedTargetPath) return window.location.href;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.delete("checkout");
+    const nextUrl = new URL(normalizedTargetPath, window.location.href);
+    nextUrl.search = currentUrl.search;
+    if (isPresaleToSalesNavigation(options && options.fromStage, options && options.toStage)) {
+      nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);
+    }
+    return nextUrl.toString();
+  };
 
   const getUtmParams = () => {
     const params = new URLSearchParams(window.location.search);
@@ -185,7 +261,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   };
 
   const ensureMetaPixelBootstrap = () => {
-    if (!config.tracking || config.tracking.provider !== "meta" || !config.tracking.metaPixelId) {
+    if (!config.tracking || !config.tracking.metaPixelId) {
       return null;
     }
     const pixelId = String(config.tracking.metaPixelId || "").trim();
@@ -219,9 +295,119 @@ function buildStandaloneImportedHtmlRuntimeScript({
     return pixelId;
   };
 
+  const ensurePostHogInstance = () => {
+    const apiKey = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogProjectApiKey);
+    const apiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogApiHost);
+    const uiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogUiHost);
+    if (!apiKey || !apiHost) {
+      return null;
+    }
+
+    const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
+    const personProfiles =
+      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "identified_only";
+    const distinctId = cleanText(config.visitorId) || "anonymous-funnel-visitor";
+
+    !function(t,e){var o,n,p,r,d;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0])&&r.parentNode?r.parentNode.insertBefore(p,r):(d=t.head||t.body||t.documentElement)&&d.appendChild(p);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Ir Sr init jr $r Ci qr Hr Dr capture calculateEventProperties Wr register register_once register_for_session unregister unregister_for_session Qr getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync tn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty Jr Yr createPersonProfile setInternalOrTestUser Kr Pr nn opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing zr debug ki Xr getPageViewId captureTraceFeedback captureTraceMetric Mr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+
+    const existingInstance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
+    if (existingInstance && existingInstance.__mosFunnelConfigured === "true") {
+      return existingInstance;
+    }
+
+    window.posthog.init(
+      apiKey,
+      {
+        api_host: apiHost,
+        ...(uiHost ? { ui_host: uiHost } : {}),
+        defaults,
+        person_profiles: personProfiles,
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        bootstrap: {
+          distinctID: distinctId,
+          isIdentifiedID: false,
+        },
+      },
+      POSTHOG_INSTANCE_NAME,
+    );
+
+    const instance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
+    if (!instance) {
+      return null;
+    }
+
+    if (typeof instance.register === "function") {
+      instance.register({
+        productSlug: cleanText(config.productSlug),
+        funnelSlug: cleanText(config.funnelSlug),
+        publicationId: cleanText(config.publicationId),
+      });
+    }
+    instance.__mosFunnelConfigured = "true";
+    return instance;
+  };
+
+  const trackPostHogEvent = (eventType, props) => {
+    const posthog = ensurePostHogInstance();
+    if (!posthog || typeof posthog.capture !== "function") {
+      return;
+    }
+
+    const baseEventProps = {
+      productSlug: cleanText(config.productSlug),
+      funnelSlug: cleanText(config.funnelSlug),
+      publicationId: cleanText(config.publicationId),
+      pageId: cleanText(config.pageId),
+      pageSlug: cleanText(config.pageSlug),
+      pageStage: cleanText((props && props.pageStage) || config.pageStage),
+      visitorId: cleanText(config.visitorId),
+      sessionId: cleanText(config.sessionId),
+      path: window.location.pathname + window.location.search,
+      referrer: document.referrer || undefined,
+      utm: getUtmParams(),
+    };
+
+    const captures = resolvePostHogCaptures(eventType, props, baseEventProps);
+    captures.forEach((capture) => {
+      posthog.capture(capture.eventName, capture.eventProps);
+    });
+  };
+
   const resolveMetaPixelPageStage = (props) => {
     const pageStage = cleanText(props && props.pageStage);
     return pageStage || cleanText(config.pageStage);
+  };
+
+  const resolvePostHogContentCategory = (pageStage) => {
+    if (pageStage === "pre_sales") return "pre_sales_page";
+    if (pageStage === "sales") return "sales_page";
+    if (pageStage === "checkout") return "checkout_page";
+    if (pageStage === "thank_you") return "thank_you_page";
+    if (pageStage === "custom") return "custom_page";
+    return null;
+  };
+
+  const buildPostHogEventId = (eventName, eventType, index) => {
+    return [
+      cleanText(eventName) || "capture",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(config.sessionId) || "session",
+      String(index),
+      String(Date.now()),
+    ].join(":");
+  };
+
+  const sanitizePostHogProps = (props) => {
+    if (!isRecord(props)) {
+      return {};
+    }
+    const nextProps = { ...props };
+    delete nextProps.fromPresale;
+    return nextProps;
   };
 
   const trackMetaPixel = (method, eventName, params) => {
@@ -235,51 +421,110 @@ function buildStandaloneImportedHtmlRuntimeScript({
     window.fbq(method, eventName);
   };
 
+  const resolveMappedMetaEvents = (eventType, props) => {
+    const pageStage = resolveMetaPixelPageStage(props);
+    const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
+    const fromPresale = props && props.fromPresale === true;
+    if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
+      return [{ method: "track", eventName: "PageView", params: pageViewParams }];
+    }
+    if (eventType === "sales_page_view") {
+      const captures = [{ method: "track", eventName: "PageView", params: pageViewParams }];
+      if (fromPresale) {
+        captures.push({ method: "trackCustom", eventName: "EnteredSales", params: pageViewParams });
+        return captures;
+      }
+      captures.push({ method: "track", eventName: "ViewContent", params: pageViewParams });
+      return captures;
+    }
+    if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
+      return [{ method: "track", eventName: "PageView", params: pageViewParams }];
+    }
+    if (eventType === "sales_to_checkout_click") {
+      const variantId = cleanText(props && props.variantId);
+      if (variantId) {
+        return [{
+          method: "track",
+          eventName: "AddToCart",
+          params: {
+            content_ids: [variantId],
+            content_type: "product",
+            num_items: 1,
+          },
+        }];
+      }
+      return [];
+    }
+    if (eventType === "pre_sales_to_sales_click") {
+      return [{
+        method: "trackCustom",
+        eventName: "PreSalesToSalesClick",
+        params: {
+          from_stage: "pre_sales",
+          to_stage: "sales",
+        },
+      }];
+    }
+    if (eventType === "custom_page_click") {
+      return [{ method: "trackCustom", eventName: CTA_LINK_CLICK_EVENT_NAME, params: props || {} }];
+    }
+    if (eventType === "Entered Funnel") {
+      return [{ method: "trackCustom", eventName: "Entered Funnel", params: pageViewParams }];
+    }
+    return [];
+  };
+
+  const resolvePostHogCaptures = (eventType, props, baseEventProps) => {
+    const sanitizedProps = sanitizePostHogProps(props);
+    const pageStage = cleanText((props && props.pageStage) || config.pageStage);
+    const contentCategory = resolvePostHogContentCategory(pageStage);
+    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    if (!mappedCaptures.length) {
+      return [{
+        eventName: eventType,
+        eventProps: {
+          ...baseEventProps,
+          ...sanitizedProps,
+          internal_event_type: eventType,
+          $event_id: buildPostHogEventId(eventType, eventType, 0),
+        },
+      }];
+    }
+    return mappedCaptures.map((capture, index) => {
+      const eventProps = {
+        ...baseEventProps,
+        ...sanitizedProps,
+        ...(isRecord(capture.params) ? capture.params : {}),
+        internal_event_type: eventType,
+        $event_id: buildPostHogEventId(capture.eventName, eventType, index),
+      };
+      if (contentCategory) {
+        eventProps.content_category = contentCategory;
+      }
+      if (eventType === "sales_page_view") {
+        eventProps.from_presale = props && props.fromPresale === true;
+      }
+      return {
+        eventName: capture.eventName,
+        eventProps,
+      };
+    });
+  };
+
   const trackMetaPixelForEvent = (eventType, props) => {
     const pixelId = ensureMetaPixelBootstrap();
     if (!pixelId || typeof window.fbq !== "function") {
       return;
     }
-    const pageStage = resolveMetaPixelPageStage(props);
-    const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
-    if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
-      return;
-    }
-    if (eventType === "sales_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
-      trackMetaPixel("track", "ViewContent", pageViewParams);
-      return;
-    }
-    if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
-      return;
-    }
-    if (eventType === "sales_to_checkout_click") {
-      const variantId = cleanText(props && props.variantId);
-      if (variantId) {
-        trackMetaPixel("track", "AddToCart", {
-          content_ids: [variantId],
-          content_type: "product",
-          num_items: 1,
-        });
-      }
-      return;
-    }
-    if (eventType === "pre_sales_to_sales_click") {
-      trackMetaPixel("trackCustom", "PreSalesToSalesClick", {
-        from_stage: "pre_sales",
-        to_stage: "sales",
-      });
-      return;
-    }
-    if (eventType === "custom_page_click") {
-      trackMetaPixel("trackCustom", "custom_page_click", props || {});
-    }
+    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    mappedCaptures.forEach((capture) => {
+      trackMetaPixel(capture.method, capture.eventName, capture.params);
+    });
   };
 
   const trackEvent = (eventType, props) => {
     trackMetaPixelForEvent(eventType, props || {});
+    trackPostHogEvent(eventType, props || {});
     try {
       void fetch(config.apiBaseUrl + "/public/events", {
         method: "POST",
@@ -435,8 +680,15 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
     trackedPageViewIds.push(config.pageId);
     window.__mosStandaloneImportedHtmlTrackedPageViewIds = trackedPageViewIds;
+    const presaleSignal = config.pageStage === "sales" ? resolvePresaleAttribution() : null;
     trackEvent(resolvePageViewEventType(), {
       pageStage: config.pageStage,
+      ...(presaleSignal
+        ? {
+            fromPresale: true,
+            presaleSignal,
+          }
+        : {}),
     });
   };
 
@@ -1195,8 +1447,24 @@ function buildStandaloneImportedHtmlRuntimeScript({
         if (binding.type === "checkout" && binding.checkout) {
           registerCheckoutElement(String(binding.id || "unknown"), element);
         }
+        if (binding.type === "internal_navigation" && element instanceof HTMLAnchorElement) {
+          const targetPath = config.pagePathById[String(binding.targetPageId || "")];
+          const targetStage = cleanText(config.pageStageById && config.pageStageById[String(binding.targetPageId || "")]);
+          if (targetPath) {
+            element.href = buildInternalNavigationUrl(targetPath, {
+              fromStage: config.pageStage,
+              toStage: targetStage || "custom",
+            });
+          }
+        }
         element.dataset.mosStandaloneImportedHtmlBound = "true";
         element.addEventListener("click", async (event) => {
+          const modifiedClick =
+            event instanceof MouseEvent &&
+            (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
+          if (binding.type === "internal_navigation" && modifiedClick) {
+            return;
+          }
           event.preventDefault();
           event.stopPropagation();
 
@@ -1214,7 +1482,13 @@ function buildStandaloneImportedHtmlRuntimeScript({
                 targetPageId: binding.targetPageId,
                 buttonText: buttonText || undefined,
               });
-              window.location.href = targetPath;
+              if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
+                markPresaleAttribution();
+              }
+              window.location.href = buildInternalNavigationUrl(targetPath, {
+                fromStage: config.pageStage,
+                toStage: targetStage || "custom",
+              });
               return;
             }
 

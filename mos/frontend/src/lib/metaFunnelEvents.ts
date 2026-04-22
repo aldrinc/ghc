@@ -6,10 +6,16 @@ export type MetaPixelRuntimeEvent = {
   method?: "track" | "trackCustom";
 };
 
+export const CTA_LINK_CLICK_EVENT_NAME = "CTA Link Click";
+
 function pageViewParams(event: RuntimeTrackingEvent) {
   const pageStage =
     typeof event.props?.pageStage === "string" ? event.props.pageStage.trim() : "";
   return pageStage ? { page_stage: pageStage } : undefined;
+}
+
+function isFromPresale(event: RuntimeTrackingEvent): boolean {
+  return event.props?.fromPresale === true;
 }
 
 export function mapRuntimeEventToMetaPixelEvents(
@@ -24,7 +30,16 @@ export function mapRuntimeEventToMetaPixelEvents(
   if (event.eventType === "sales_page_view") {
     return [
       { eventName: "PageView", params: pageViewParams(event) },
-      { eventName: "ViewContent", params: pageViewParams(event) },
+      isFromPresale(event)
+        ? {
+            eventName: "EnteredSales",
+            method: "trackCustom",
+            params: pageViewParams(event),
+          }
+        : {
+            eventName: "ViewContent",
+            params: pageViewParams(event),
+          },
     ];
   }
   if (event.eventType === "checkout_page_view") {
@@ -58,6 +73,13 @@ export function mapRuntimeEventToMetaPixelEvents(
         },
       }];
     }
+  }
+  if (event.eventType === "custom_page_click") {
+    return [{
+      eventName: CTA_LINK_CLICK_EVENT_NAME,
+      method: "trackCustom",
+      params: event.props || {},
+    }];
   }
   return [];
 }

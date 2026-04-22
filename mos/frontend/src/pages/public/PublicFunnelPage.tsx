@@ -24,6 +24,8 @@ import {
 import { pageViewEventForStage, type RuntimeTrackingEvent } from "@/lib/funnelTracking";
 import { mapRuntimeEventToMetaPixelEvents } from "@/lib/metaFunnelEvents";
 import { ensureMetaPixel, trackMetaPixelEvent } from "@/lib/metaPixel";
+import { resolvePresaleAttributionSource } from "@/lib/presaleAttribution";
+import { capturePostHogEvent } from "@/lib/posthog";
 import { PublicFunnelShellMessage } from "@/pages/public/publicFunnelShell";
 
 const apiBaseUrl = resolvePublicApiBaseUrl();
@@ -293,13 +295,61 @@ function hasPaidEntryAttribution(): boolean {
   return false;
 }
 
+function resolveSalesPageViewProps({
+  page,
+  productSlug,
+  funnelSlug,
+  bundleMode,
+}: {
+  page: PublicFunnelPageType;
+  productSlug: string | undefined;
+  funnelSlug: string | undefined;
+  bundleMode: boolean;
+}): Record<string, unknown> {
+  const preSalesPaths = Object.entries(page.pageStageMap)
+    .filter(([, stage]) => stage === "pre_sales")
+    .map(([pageId]) => page.pageMap[pageId])
+    .filter((slug): slug is string => typeof slug === "string" && Boolean(slug.trim()))
+    .map((slug) =>
+      buildPublicFunnelPath({
+        productSlug: productSlug || page.productSlug,
+        funnelSlug: funnelSlug || "",
+        slug,
+        bundleMode,
+      }),
+    );
+  const presaleSignal = resolvePresaleAttributionSource({
+    search: window.location.search,
+    storage: window.sessionStorage,
+    productSlug: productSlug || page.productSlug,
+    funnelSlug,
+    referrer: document.referrer,
+    preSalesPaths,
+    origin: window.location.origin,
+  });
+
+  if (!presaleSignal) {
+    return { pageStage: page.stage };
+  }
+  return {
+    pageStage: page.stage,
+    fromPresale: true,
+    presaleSignal,
+  };
+}
+
 export function PublicFunnelPage() {
-  const { productSlug: routeProductSlug, funnelSlug: routeFunnelSlug, slug: routeSlug } = useParams();
+  const {
+    productSlug: routeProductSlug,
+    funnelSlug: routeFunnelSlug,
+    slug: routeSlug,
+    "*": routeWildcardSlug,
+  } = useParams();
   const productSlug = routeProductSlug || undefined;
   const bundleMode = isStandaloneBundleMode();
   const funnelSlug = routeFunnelSlug || (bundleMode ? getStandaloneDefaultFunnelSlug() || undefined : undefined);
   const navigate = useNavigate();
-  const effectiveSlug = routeSlug || undefined;
+  const effectiveSlug = routeSlug || routeWildcardSlug || undefined;
   const preloadedFunnel = useMemo(
     () =>
       bundleMode
@@ -433,7 +483,7 @@ export function PublicFunnelPage() {
 
   const trackEvent = (event: RuntimeTrackingEvent) => {
     if (!page) return;
-    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    const metaPixelId = page.tracking?.metaPixelId || null;
     const mappedMetaEvents = mapRuntimeEventToMetaPixelEvents(event);
     const payload = {
       events: [
@@ -463,6 +513,20 @@ export function PublicFunnelPage() {
         mappedMetaEvent.method,
       );
     }
+    capturePostHogEvent({
+      tracking: page.tracking,
+      distinctId: visitorId,
+      productSlug,
+      funnelSlug,
+      publicationId: page.publicationId,
+      pageId: page.pageId,
+      pageSlug: page.slug,
+      pageStage: String(event.props?.pageStage || page.stage || ""),
+      sessionId,
+      eventType: event.eventType,
+      props: event.props,
+      utm: getUtmParams(),
+    });
     try {
       void fetch(`${apiBaseUrl}/public/events`, {
         method: "POST",
@@ -482,8 +546,17 @@ export function PublicFunnelPage() {
     if (page.stage === "sales" && checkoutStatusFromLocation()) return;
     if (sentPageViewRef.current === page.pageId) return;
     sentPageViewRef.current = page.pageId;
-    void trackEvent(pageViewEventForStage(page.stage, { pageStage: page.stage }));
-  }, [page]);
+    const pageViewProps =
+      page.stage === "sales"
+        ? resolveSalesPageViewProps({
+            page,
+            productSlug,
+            funnelSlug,
+            bundleMode,
+          })
+        : { pageStage: page.stage };
+    void trackEvent(pageViewEventForStage(page.stage, pageViewProps));
+  }, [bundleMode, funnelSlug, page, productSlug]);
 
   useEffect(() => {
     if (!page) return;
@@ -515,9 +588,9 @@ export function PublicFunnelPage() {
   }, [page]);
 
   useEffect(() => {
-    const metaPixelId = page?.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    const metaPixelId = page?.tracking?.metaPixelId || null;
     ensureMetaPixel(metaPixelId);
-  }, [page?.tracking?.metaPixelId, page?.tracking?.provider]);
+  }, [page?.tracking?.metaPixelId]);
 
   useEffect(() => {
     if (!page) return;
@@ -537,7 +610,7 @@ export function PublicFunnelPage() {
     }
     handledCheckoutReturnRef.current = checkoutMarker;
 
-    const metaPixelId = page.tracking?.provider === "meta" ? page.tracking.metaPixelId || null : null;
+    const metaPixelId = page.tracking?.metaPixelId || null;
     if (checkoutStatus === "success") {
       void trackEvent(
         pageViewEventForStage("thank_you", {
@@ -548,6 +621,20 @@ export function PublicFunnelPage() {
       );
       if (pendingPurchase?.provider === "stripe") {
         trackMetaPixelEvent(metaPixelId, "Purchase", buildPurchaseEventParams(pendingPurchase));
+        capturePostHogEvent({
+          tracking: page.tracking,
+          distinctId: visitorId,
+          productSlug,
+          funnelSlug,
+          publicationId: page.publicationId,
+          pageId: page.pageId,
+          pageSlug: page.slug,
+          pageStage: "thank_you",
+          sessionId,
+          eventType: "Purchase",
+          props: buildPurchaseEventParams(pendingPurchase),
+          utm: getUtmParams(),
+        });
       }
     }
 

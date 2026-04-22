@@ -97,6 +97,11 @@ class PublicFunnelPageResponse(BaseModel):
         provider: str
         mode: str
         metaPixelId: Optional[str] = None
+        posthogProjectApiKey: Optional[str] = None
+        posthogApiHost: Optional[str] = None
+        posthogUiHost: Optional[str] = None
+        posthogDefaults: Optional[str] = None
+        posthogPersonProfiles: Optional[Literal["identified_only", "always"]] = None
 
     productSlug: str
     funnelId: str

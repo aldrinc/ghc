@@ -186,6 +186,11 @@ export type PublicFunnelPage = {
     provider: string;
     mode: string;
     metaPixelId?: string | null;
+    posthogProjectApiKey?: string | null;
+    posthogApiHost?: string | null;
+    posthogUiHost?: string | null;
+    posthogDefaults?: string | null;
+    posthogPersonProfiles?: "identified_only" | "always" | null;
   } | null;
   nextPageId?: string | null;
   redirectToSlug?: string;

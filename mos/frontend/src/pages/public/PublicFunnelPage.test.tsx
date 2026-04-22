@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 import type { PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
+import { capturePostHogEvent } from "@/lib/posthog";
 
 const importedHtmlRendererMock = vi.fn(() => <div data-testid="standalone-imported-html-page" />);
 
@@ -36,6 +37,10 @@ vi.mock("@/funnels/runtimeRouting", () => ({
 vi.mock("@/lib/metaPixel", () => ({
   ensureMetaPixel: vi.fn(),
   trackMetaPixelEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/posthog", () => ({
+  capturePostHogEvent: vi.fn(),
 }));
 
 function buildImportedHtmlPage(): PublicFunnelPageType {
@@ -78,7 +83,14 @@ function buildImportedHtmlPage(): PublicFunnelPageType {
       lang: "en",
       brandName: "Ember",
     },
-    tracking: null,
+    tracking: {
+      provider: "posthog",
+      mode: "public_funnel_runtime",
+      posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+      posthogApiHost: "https://us.i.posthog.com",
+      posthogDefaults: "2026-01-30",
+      posthogPersonProfiles: "identified_only",
+    },
     nextPageId: "page-2",
   };
 }
@@ -88,6 +100,16 @@ function renderPage() {
     <MemoryRouter initialEntries={["/example-product/example-funnel/presales"]}>
       <Routes>
         <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function renderWildcardPage() {
+  return render(
+    <MemoryRouter initialEntries={["/f/example-product/example-funnel/presales"]}>
+      <Routes>
+        <Route path="/f/:productSlug/:funnelSlug/*" element={<PublicFunnelPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -159,5 +181,36 @@ describe("PublicFunnelPage", () => {
       "page-1": "/example-product/example-funnel/presales",
       "page-2": "/example-product/example-funnel/sales-page",
     });
+  });
+
+  it("captures PostHog events for public funnel page views when tracking is configured", async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(capturePostHogEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "pre_sales_page_view",
+          productSlug: "example-product",
+          funnelSlug: "example-funnel",
+          publicationId: "publication-1",
+          pageId: "page-1",
+          pageSlug: "presales",
+          pageStage: "pre_sales",
+          tracking: expect.objectContaining({
+            posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          }),
+        }),
+      );
+    });
+  });
+
+  it("loads page content when mounted under a wildcard public route", async () => {
+    renderWildcardPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("standalone-imported-html-page")).toBeInTheDocument();
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/pages/presales"));
   });
 });

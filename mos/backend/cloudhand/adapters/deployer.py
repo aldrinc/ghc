@@ -5638,6 +5638,7 @@ WantedBy=multi-user.target
   const ensurePostHogInstance = () => {
     const apiKey = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogProjectApiKey);
     const apiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogApiHost);
+    const uiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogUiHost);
     if (!apiKey || !apiHost) return null;
     const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
     const personProfiles =
@@ -5652,6 +5653,7 @@ WantedBy=multi-user.target
       apiKey,
       {
         api_host: apiHost,
+        ...(uiHost ? { ui_host: uiHost } : {}),
         defaults,
         person_profiles: personProfiles,
         autocapture: false,
@@ -5679,7 +5681,7 @@ WantedBy=multi-user.target
   const trackPostHogEvent = (eventType, props) => {
     const posthog = ensurePostHogInstance();
     if (!posthog || typeof posthog.capture !== "function") return;
-    const eventProps = {
+    const baseEventProps = {
       productSlug: cleanText(config.productSlug),
       funnelSlug: cleanText(config.funnelSlug),
       publicationId: cleanText(config.publicationId),
@@ -5691,9 +5693,40 @@ WantedBy=multi-user.target
       path: window.location.pathname + window.location.search,
       referrer: document.referrer || undefined,
       utm: getUtmParams(),
-      ...(isRecord(props) ? props : {}),
     };
-    posthog.capture(eventType, eventProps);
+    const captures = resolvePostHogCaptures(eventType, props, baseEventProps);
+    captures.forEach((capture) => {
+      posthog.capture(capture.eventName, capture.eventProps);
+    });
+  };
+  const resolveMetaPixelPageStage = (props) => {
+    const pageStage = cleanText(props && props.pageStage);
+    return pageStage || cleanText(config.pageStage);
+  };
+  const resolvePostHogContentCategory = (pageStage) => {
+    if (pageStage === "pre_sales") return "pre_sales_page";
+    if (pageStage === "sales") return "sales_page";
+    if (pageStage === "checkout") return "checkout_page";
+    if (pageStage === "thank_you") return "thank_you_page";
+    if (pageStage === "custom") return "custom_page";
+    return null;
+  };
+  const buildPostHogEventId = (eventName, eventType, index) => {
+    return [
+      cleanText(eventName) || "capture",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(sessionId) || "session",
+      String(index),
+      String(Date.now()),
+    ].join(":");
+  };
+  const sanitizePostHogProps = (props) => {
+    if (!isRecord(props)) return {};
+    const nextProps = { ...props };
+    delete nextProps.fromPresale;
+    return nextProps;
   };
   const trackMetaPixel = (method, eventName, params) => {
     if (typeof window.fbq !== "function") return;
@@ -5703,58 +5736,101 @@ WantedBy=multi-user.target
     }
     window.fbq(method, eventName);
   };
-  const resolveMetaPixelPageStage = (props) => {
-    const pageStage = cleanText(props && props.pageStage);
-    return pageStage || cleanText(config.pageStage);
-  };
-  const trackMetaPixelForEvent = (eventType, props) => {
-    const pixelId = ensureMetaPixelBootstrap();
-    if (!pixelId || typeof window.fbq !== "function") return;
+  const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
     const fromPresale = props && props.fromPresale === true;
     if (eventType === "Entered Funnel") {
-      trackMetaPixel("trackCustom", "Entered Funnel", pageViewParams);
-      return;
+      return [{ method: "trackCustom", eventName: "Entered Funnel", params: pageViewParams }];
     }
     if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
-      return;
+      return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
+      const captures = [{ method: "track", eventName: "PageView", params: pageViewParams }];
       if (fromPresale) {
-        trackMetaPixel("trackCustom", "EnteredSales", pageViewParams);
-        return;
+        captures.push({ method: "trackCustom", eventName: "EnteredSales", params: pageViewParams });
+        return captures;
       }
-      trackMetaPixel("track", "ViewContent", pageViewParams);
-      return;
+      captures.push({ method: "track", eventName: "ViewContent", params: pageViewParams });
+      return captures;
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
-      trackMetaPixel("track", "PageView", pageViewParams);
-      return;
+      return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_to_checkout_click") {
       const variantId = cleanText(props && props.variantId);
       if (variantId) {
-        trackMetaPixel("track", "AddToCart", {
-          content_ids: [variantId],
-          content_type: "product",
-          num_items: 1,
-        });
+        return [{
+          method: "track",
+          eventName: "AddToCart",
+          params: {
+            content_ids: [variantId],
+            content_type: "product",
+            num_items: 1,
+          },
+        }];
       }
-      return;
+      return [];
     }
     if (eventType === "pre_sales_to_sales_click") {
-      trackMetaPixel("trackCustom", "PreSalesToSalesClick", {
-        from_stage: "pre_sales",
-        to_stage: "sales",
-      });
-      return;
+      return [{
+        method: "trackCustom",
+        eventName: "PreSalesToSalesClick",
+        params: {
+          from_stage: "pre_sales",
+          to_stage: "sales",
+        },
+      }];
     }
     if (eventType === "custom_page_click") {
-      trackMetaPixel("trackCustom", "custom_page_click", props || {});
+      return [{ method: "trackCustom", eventName: "CTA Link Click", params: props || {} }];
     }
+    return [];
+  };
+  const resolvePostHogCaptures = (eventType, props, baseEventProps) => {
+    const sanitizedProps = sanitizePostHogProps(props);
+    const pageStage = cleanText((props && props.pageStage) || config.pageStage);
+    const contentCategory = resolvePostHogContentCategory(pageStage);
+    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    if (!mappedCaptures.length) {
+      return [{
+        eventName: eventType,
+        eventProps: {
+          ...baseEventProps,
+          ...sanitizedProps,
+          internal_event_type: eventType,
+          $event_id: buildPostHogEventId(eventType, eventType, 0),
+        },
+      }];
+    }
+    return mappedCaptures.map((capture, index) => {
+      const eventProps = {
+        ...baseEventProps,
+        ...sanitizedProps,
+        ...(isRecord(capture.params) ? capture.params : {}),
+        internal_event_type: eventType,
+        $event_id: buildPostHogEventId(capture.eventName, eventType, index),
+      };
+      if (contentCategory) {
+        eventProps.content_category = contentCategory;
+      }
+      if (eventType === "sales_page_view") {
+        eventProps.from_presale = props && props.fromPresale === true;
+      }
+      return {
+        eventName: capture.eventName,
+        eventProps,
+      };
+    });
+  };
+  const trackMetaPixelForEvent = (eventType, props) => {
+    const pixelId = ensureMetaPixelBootstrap();
+    if (!pixelId || typeof window.fbq !== "function") return;
+    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    mappedCaptures.forEach((capture) => {
+      trackMetaPixel(capture.method, capture.eventName, capture.params);
+    });
   };
   const postTrackingPayload = (payload) => {
     if (typeof payload !== "string" || !payload) return;
@@ -6115,6 +6191,7 @@ WantedBy=multi-user.target
       });
       if (pendingPurchase && cleanText(pendingPurchase.provider) === "stripe") {
         trackMetaPixel("track", "Purchase", buildPurchaseEventParams(pendingPurchase));
+        trackPostHogEvent("Purchase", buildPurchaseEventParams(pendingPurchase));
       }
     }
     clearPendingMetaPurchase(pendingPurchaseKey);

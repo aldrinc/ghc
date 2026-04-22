@@ -365,4 +365,199 @@ describe("StandaloneImportedHtmlPage", () => {
 
     dom.window.close();
   });
+
+  it("tracks EnteredSales for presale-attributed standalone sales pages", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
+      page: {
+        tracking: {
+          provider: "meta",
+          metaPixelId: "970868055499017",
+        },
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM("<html><body><button id=\"main-cta\">Buy now</button></body></html>", {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page?src=presale",
+    });
+    const eventBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        if (typeof init?.body === "string") {
+          eventBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const fbqQueue = dom.window.fbq?.queue ?? [];
+    expect(fbqQueue).toEqual(
+      expect.arrayContaining([
+        ["init", "970868055499017"],
+        ["track", "PageView", { page_stage: "sales" }],
+        ["trackCustom", "EnteredSales", { page_stage: "sales" }],
+      ]),
+    );
+    expect(fbqQueue).not.toContainEqual(["track", "ViewContent", { page_stage: "sales" }]);
+    expect(eventBodies[0]).toEqual(
+      expect.objectContaining({
+        events: [
+          expect.objectContaining({
+            eventType: "sales_page_view",
+            props: expect.objectContaining({
+              pageStage: "sales",
+              fromPresale: true,
+              presaleSignal: "url",
+            }),
+          }),
+        ],
+      }),
+    );
+
+    dom.window.close();
+  });
+
+  it("queues PostHog captures for standalone sales pages when tracking is configured", async () => {
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument: "<html><body><button id=\"main-cta\">Buy now</button></body></html>",
+      page: {
+        tracking: {
+          provider: "posthog",
+          mode: "public_funnel_runtime",
+          posthogProjectApiKey: "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          posthogApiHost: "https://us.i.posthog.com",
+          posthogUiHost: "https://us.posthog.com",
+          posthogDefaults: "2026-01-30",
+          posthogPersonProfiles: "identified_only",
+        },
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM("<html><body><button id=\"main-cta\">Buy now</button></body></html>", {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/sales-page?utm_source=meta&utm_campaign=test",
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    });
+    dom.window.fetch = fetchMock as typeof dom.window.fetch;
+    dom.window.console.error = vi.fn();
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const posthogRoot = dom.window.posthog as {
+      _i?: unknown[];
+      mosFunnel?: unknown[];
+    };
+    expect(posthogRoot._i).toEqual(
+      expect.arrayContaining([
+        [
+          "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+          expect.objectContaining({
+            api_host: "https://us.i.posthog.com",
+            ui_host: "https://us.posthog.com",
+            autocapture: false,
+            capture_pageview: false,
+            capture_pageleave: false,
+            defaults: "2026-01-30",
+            person_profiles: "identified_only",
+          }),
+          "mosFunnel",
+        ],
+      ]),
+    );
+    expect(posthogRoot.mosFunnel).toEqual(
+      expect.arrayContaining([
+        [
+          "register",
+          expect.objectContaining({
+            productSlug: "example-product",
+            funnelSlug: "example-funnel",
+            publicationId: "publication-1",
+          }),
+        ],
+        [
+          "capture",
+          "PageView",
+          expect.objectContaining({
+            productSlug: "example-product",
+            funnelSlug: "example-funnel",
+            publicationId: "publication-1",
+            pageId: "page-1",
+            pageSlug: "sales-page",
+            pageStage: "sales",
+            page_stage: "sales",
+            visitorId: "visitor-1",
+            sessionId: "session-1",
+            internal_event_type: "sales_page_view",
+            content_category: "sales_page",
+            from_presale: false,
+            $event_id: expect.any(String),
+            utm: {
+              utm_campaign: "test",
+              utm_source: "meta",
+            },
+          }),
+        ],
+        [
+          "capture",
+          "ViewContent",
+          expect.objectContaining({
+            productSlug: "example-product",
+            funnelSlug: "example-funnel",
+            publicationId: "publication-1",
+            pageId: "page-1",
+            pageSlug: "sales-page",
+            pageStage: "sales",
+            page_stage: "sales",
+            visitorId: "visitor-1",
+            sessionId: "session-1",
+            internal_event_type: "sales_page_view",
+            content_category: "sales_page",
+            from_presale: false,
+            $event_id: expect.any(String),
+            utm: {
+              utm_campaign: "test",
+              utm_source: "meta",
+            },
+          }),
+        ],
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/public/events"),
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    dom.window.close();
+  });
 });
