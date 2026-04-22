@@ -1298,8 +1298,10 @@ class ServerDeployer:
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.local_root = Path(local_root).expanduser().resolve() if local_root else None
         self._known_remote_dirs: set[str] = {"/"}
+        self._sftp_client: Any | None = None
 
     def connect(self):
+        self._reset_sftp_client()
         for _ in range(10):
             try:
                 self.client.connect(self.ip, username=self.user, pkey=self.key, timeout=10)
@@ -1308,9 +1310,30 @@ class ServerDeployer:
                 time.sleep(5)
         raise ConnectionError(f"Could not connect to {self.ip}")
 
-    def run(self, cmd: str, cwd: str = None, mask: Optional[List[str]] = None) -> str:
-        if self.client.get_transport() is None or not self.client.get_transport().is_active():
+    def _reset_sftp_client(self) -> None:
+        existing = getattr(self, "_sftp_client", None)
+        if existing is not None:
+            try:
+                existing.close()
+            except Exception:
+                pass
+        self._sftp_client = None
+
+    def _ensure_transport(self) -> None:
+        transport = self.client.get_transport()
+        if transport is None or not transport.is_active():
             self.connect()
+
+    def _get_sftp_client(self):
+        self._ensure_transport()
+        sftp = getattr(self, "_sftp_client", None)
+        if sftp is None:
+            sftp = self.client.open_sftp()
+            self._sftp_client = sftp
+        return sftp
+
+    def run(self, cmd: str, cwd: str = None, mask: Optional[List[str]] = None) -> str:
+        self._ensure_transport()
 
         final_cmd = f"cd {cwd} && {cmd}" if cwd else cmd
         display_cmd = final_cmd
@@ -1329,30 +1352,24 @@ class ServerDeployer:
         return out
 
     def upload_file(self, content: str, remote_path: str):
-        if self.client.get_transport() is None or not self.client.get_transport().is_active():
-            self.connect()
-        sftp = self.client.open_sftp()
         try:
+            sftp = self._get_sftp_client()
             self._ensure_remote_parent_directory(sftp=sftp, remote_path=remote_path)
             with sftp.file(remote_path, "w") as f:
                 f.write(content)
         except OSError as exc:
+            self._reset_sftp_client()
             raise ValueError(f"Failed to upload remote file '{remote_path}': {exc}") from exc
-        finally:
-            sftp.close()
 
     def upload_bytes(self, content: bytes, remote_path: str):
-        if self.client.get_transport() is None or not self.client.get_transport().is_active():
-            self.connect()
-        sftp = self.client.open_sftp()
         try:
+            sftp = self._get_sftp_client()
             self._ensure_remote_parent_directory(sftp=sftp, remote_path=remote_path)
             with sftp.file(remote_path, "wb") as f:
                 f.write(content)
         except OSError as exc:
+            self._reset_sftp_client()
             raise ValueError(f"Failed to upload remote file '{remote_path}': {exc}") from exc
-        finally:
-            sftp.close()
 
     def _ensure_remote_parent_directory(self, *, sftp: Any, remote_path: str) -> None:
         parent_dir = posixpath.dirname(str(remote_path or "").strip())
@@ -1394,8 +1411,7 @@ class ServerDeployer:
         if not local_dir.is_dir():
             raise ValueError(f"Local runtime directory does not exist: {local_dir}")
 
-        if self.client.get_transport() is None or not self.client.get_transport().is_active():
-            self.connect()
+        self._ensure_transport()
 
         archive_stream = io.BytesIO()
         with tarfile.open(fileobj=archive_stream, mode="w:gz") as tar:
@@ -1410,12 +1426,13 @@ class ServerDeployer:
         archive_stream.seek(0)
 
         remote_archive = f"/tmp/cloudhand-runtime-{int(time.time() * 1000)}.tar.gz"
-        sftp = self.client.open_sftp()
+        sftp = self._get_sftp_client()
         try:
             with sftp.file(remote_archive, "wb") as remote_file:
                 remote_file.write(archive_stream.read())
-        finally:
-            sftp.close()
+        except OSError as exc:
+            self._reset_sftp_client()
+            raise ValueError(f"Failed to upload runtime archive '{remote_archive}': {exc}") from exc
 
         remote_dir_q = shlex.quote(remote_dir)
         remote_archive_q = shlex.quote(remote_archive)
@@ -6951,7 +6968,6 @@ WantedBy=multi-user.target
                 raise ValueError(f"Artifact product '{product_slug}' is missing a funnels object.")
 
             product_dir = f"{base_root}/{product_slug}"
-            self.run(f"mkdir -p {shlex.quote(product_dir)}")
             self.upload_file(json.dumps(product_meta, ensure_ascii=False), f"{product_dir}/meta.json")
             seen_funnel_path_tokens: set[str] = set()
 
@@ -6997,7 +7013,6 @@ WantedBy=multi-user.target
 
                     funnel_dir = f"{product_dir}/{funnel_path_token}"
                     pages_dir = f"{funnel_dir}/pages"
-                    self.run(f"mkdir -p {shlex.quote(pages_dir)}")
                     self.upload_file(json.dumps(canonical_funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
 
                     if isinstance(commerce, dict):

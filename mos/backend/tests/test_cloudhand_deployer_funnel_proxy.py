@@ -390,8 +390,11 @@ class _FakeSFTP:
         self.directories = {"/", "/opt"}
         self.files: dict[str, str | bytes] = {}
         self.mkdir_calls: list[str] = []
+        self.stat_calls: list[str] = []
+        self.close_calls = 0
 
     def stat(self, path: str):
+        self.stat_calls.append(path)
         if path in self.directories or path in self.files:
             return SimpleNamespace()
         raise FileNotFoundError(path)
@@ -407,6 +410,7 @@ class _FakeSFTP:
         return _FakeRemoteFile(sftp=self, path=path)
 
     def close(self):
+        self.close_calls += 1
         return None
 
 
@@ -418,11 +422,13 @@ class _FakeTransport:
 class _FakeSSHClient:
     def __init__(self, sftp: _FakeSFTP) -> None:
         self._sftp = sftp
+        self.open_sftp_calls = 0
 
     def get_transport(self):
         return _FakeTransport()
 
     def open_sftp(self):
+        self.open_sftp_calls += 1
         return self._sftp
 
 
@@ -488,6 +494,23 @@ def test_upload_file_reuses_cached_remote_parent_directories():
 
     assert sftp.files["/opt/apps/example/site/contact-us/next.html"] == "world"
     assert sftp.mkdir_calls == []
+
+
+def test_uploads_reuse_persistent_sftp_connection():
+    deployer = object.__new__(ServerDeployer)
+    sftp = _FakeSFTP()
+    client = _FakeSSHClient(sftp)
+    deployer.client = client
+    deployer.connect = lambda: None
+
+    deployer.upload_file("hello", "/opt/apps/example/site/contact-us/index.html")
+    deployer.upload_file("world", "/opt/apps/example/site/contact-us/faq/index.html")
+
+    assert client.open_sftp_calls == 1
+    assert sftp.close_calls == 0
+    assert sftp.files["/opt/apps/example/site/contact-us/index.html"] == "hello"
+    assert sftp.files["/opt/apps/example/site/contact-us/faq/index.html"] == "world"
+    assert sftp.stat_calls.count("/opt/apps/example/site/contact-us") == 1
 
 
 def test_upload_bytes_wraps_remote_parent_directory_creation_errors():
