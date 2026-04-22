@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.config import settings
 from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import Client, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.db.models import ProductVariant
@@ -371,7 +372,13 @@ def test_publish_funnel_rejects_imported_html_without_manifest(db_session):
         )
 
 
-def test_deploy_artifact_includes_tracking_and_stage_map_for_imported_html(db_session):
+def test_deploy_artifact_includes_tracking_and_stage_map_for_imported_html(db_session, monkeypatch):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", "identified_only")
+
     client = Client(org_id=TEST_ORG_ID, name="Deploy Client", industry="Wellness")
     db_session.add(client)
     db_session.commit()
@@ -480,3 +487,11 @@ def test_deploy_artifact_includes_tracking_and_stage_map_for_imported_html(db_se
     assert sales_page["stage"] == "sales"
     assert sales_page["pageStageMap"][str(page.id)] == "sales"
     assert "tracking" in sales_page
+    assert sales_page["tracking"] == {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+        "posthogApiHost": "https://us.i.posthog.com",
+        "posthogDefaults": "2026-01-30",
+        "posthogPersonProfiles": "identified_only",
+    }

@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +24,7 @@ from cloudhand.adapters.deployer import (
     _rewrite_standalone_compliance_navigation_links,
 )
 from cloudhand.models import ApplicationSpec
+from cloudhand.models import FunnelArtifactRenderMode
 
 
 def _make_png_bytes(*, width: int, height: int, color: tuple[int, int, int, int]) -> bytes:
@@ -180,6 +182,10 @@ def _artifact_app(
                 "provider": "meta",
                 "mode": "public_funnel_runtime",
                 "metaPixelId": "pixel-123",
+                "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+                "posthogApiHost": "https://us.i.posthog.com",
+                "posthogDefaults": "2026-01-30",
+                "posthogPersonProfiles": "identified_only",
             },
             "puckData": {
                 "root": {"props": {"title": "Imported HTML"}},
@@ -239,7 +245,11 @@ def _artifact_app(
 
     source_ref = {
         "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
-        "upstream_api_base_root": "https://moshq.app/api",
+        "upstream_api_base_root": (
+            "https://api.moshq.app"
+            if render_mode == "standalone_imported_html"
+            else "https://moshq.app/api"
+        ),
         "artifact_render_mode": render_mode,
         "artifact": {
             "meta": {
@@ -323,11 +333,18 @@ def _stub_deployer():
     uploaded: dict[str, str | bytes] = {}
     commands: list[str] = []
 
+    def normalize_remote_path(remote_path: str) -> str:
+        return re.sub(
+            r"(/opt/apps/[^/]+)/(?:site-releases/[^/]+|site\.__staging__[^/]+)",
+            r"\1/site",
+            remote_path,
+        )
+
     def fake_upload(content: str, remote_path: str):
-        uploaded[remote_path] = content
+        uploaded[normalize_remote_path(remote_path)] = content
 
     def fake_upload_bytes(content: bytes, remote_path: str):
-        uploaded[remote_path] = content
+        uploaded[normalize_remote_path(remote_path)] = content
 
     def fake_run(cmd: str, cwd: str = None, mask=None) -> str:
         commands.append(cmd)
@@ -340,6 +357,7 @@ def _stub_deployer():
     deployer._enable_https = lambda server_names: None
     deployer._measure_standalone_imported_html_image_layouts = lambda **_: {}
     deployer._validate_standalone_imported_html_visual_parity = lambda **_: None
+    deployer._validate_funnel_artifact_site_output = lambda **_: None
     return deployer, uploaded, commands
 
 
@@ -616,6 +634,38 @@ def test_remove_workload_cleans_service_nginx_and_app_dir():
     assert ("/opt/apps/honest-herbalist", True) in removed
 
 
+def test_deploy_funnel_artifact_updates_in_place_without_removing_existing_workload():
+    app = _artifact_app()
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    configure_calls: list[str] = []
+    disable_calls: list[str] = []
+    deployer.remove_workload = lambda _app: (_ for _ in ()).throw(AssertionError("remove_workload should not run"))
+    deployer._disable_service_unit = lambda service_name: disable_calls.append(service_name)
+    deployer._configure_nginx = lambda app_arg: configure_calls.append(app_arg.name)
+
+    deployer.deploy(app)
+
+    assert disable_calls == ["landing-artifact"]
+    assert configure_calls == ["landing-artifact"]
+
+
+def test_deploy_funnel_publication_updates_in_place_without_removing_existing_workload():
+    app = _funnel_app()
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    configure_calls: list[str] = []
+    disable_calls: list[str] = []
+    deployer.remove_workload = lambda _app: (_ for _ in ()).throw(AssertionError("remove_workload should not run"))
+    deployer._disable_service_unit = lambda service_name: disable_calls.append(service_name)
+    deployer._configure_nginx = lambda app_arg: configure_calls.append(app_arg.name)
+
+    deployer.deploy(app)
+
+    assert disable_calls == ["landing-page"]
+    assert configure_calls == ["landing-page"]
+
+
 def test_funnel_artifact_site_proxies_live_api_and_keeps_bundle_routes():
     app = _artifact_app()
     deployer, uploaded, commands = _stub_deployer()
@@ -723,6 +773,10 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "__MOS_DEPLOY_RUNTIME__" not in entry_html
     assert "funnel_visitor_id" in entry_html
     assert "pixel-123" in entry_html
+    assert "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk" in entry_html
+    assert "https://us.i.posthog.com" in entry_html
+    assert "window.posthog.init(" in entry_html
+    assert "posthog.capture(eventType, eventProps);" in entry_html
 
     assert page_html == entry_html
     assert "/example-product/example-funnel/presales/" in entry_html
@@ -731,6 +785,26 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert uploaded[asset_path] == _PRIMARY_ASSET_BYTES
     assert uploaded[public_asset_path] == _PRIMARY_ASSET_BYTES
     assert runtime_page_path not in uploaded
+
+
+def test_funnel_artifact_site_standalone_builds_release_before_live_activation():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head><title>Standalone Sales</title></head>
+  <body><a id="main-cta" href="#shop">Start</a></body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "root /opt/apps/landing-artifact/site;" in conf
+    assert any(cmd.startswith("mkdir -p /opt/apps/landing-artifact/site-releases") for cmd in commands)
+    assert any(cmd.startswith("mkdir -p /opt/apps/landing-artifact/site-releases/") for cmd in commands)
+    assert any("ln -sfn " in cmd and "/opt/apps/landing-artifact/site.__next__" in cmd for cmd in commands)
+    assert any("mv -Tf \"$next_link\" \"$live_site\"" in cmd for cmd in commands)
 
 
 def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifact_assets(monkeypatch):
@@ -756,18 +830,24 @@ def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifac
         workspace_server_names=["shop.example.com"],
     )
     deployer, uploaded, _commands = _stub_deployer()
+    observed_urls: list[str] = []
 
-    def fail_remote_image_fetch(**kwargs):
-        raise AssertionError(f"unexpected remote image fetch: {kwargs['url']}")
+    def fetch_remote_image(**kwargs):
+        observed_urls.append(kwargs["url"])
+        return _PRIMARY_ASSET_BYTES, "image/png"
 
-    deployer._fetch_remote_standalone_image_asset = fail_remote_image_fetch
+    deployer._fetch_remote_standalone_image_asset = fetch_remote_image
     deployer._configure_funnel_artifact_site(app)
 
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
+    mirrored_digest = hashlib.sha256(_PRIMARY_ASSET_BYTES).hexdigest()[:32]
+    mirrored_path = f"/opt/apps/landing-artifact/site/_standalone-assets/{mirrored_digest}.png"
     entry_html = uploaded[entry_route_path]
+    assert observed_urls == ["https://moshq.app/api/public/assets/11111111-1111-1111-1111-111111111111"]
     assert "https://moshq.app/api/public/assets/" not in entry_html
-    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
-    assert 'href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert f'src="/_standalone-assets/{mirrored_digest}.png"' in entry_html
+    assert f'href="/_standalone-assets/{mirrored_digest}.png"' in entry_html
+    assert uploaded[mirrored_path] == _PRIMARY_ASSET_BYTES
 
 
 def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_params():
@@ -807,11 +887,13 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
     entry_html = uploaded[entry_route_path]
 
-    assert "const buildInternalNavigationUrl = (targetPath) => {" in entry_html
+    assert "const buildInternalNavigationUrl = (targetPath, options) => {" in entry_html
     assert 'currentUrl.searchParams.delete("checkout");' in entry_html
     assert "nextUrl.search = currentUrl.search;" in entry_html
-    assert "element.href = buildInternalNavigationUrl(targetPath);" in entry_html
-    assert "window.location.href = buildInternalNavigationUrl(targetPath);" in entry_html
+    assert 'nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);' in entry_html
+    assert "element.href = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "window.location.href = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert 'trackMetaPixel("trackCustom", "EnteredSales", pageViewParams);' in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html
 
 
@@ -873,6 +955,10 @@ def test_funnel_artifact_site_standalone_export_scopes_to_preferred_funnel():
                     "provider": "meta",
                     "mode": "public_funnel_runtime",
                     "metaPixelId": "pixel-456",
+                    "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+                    "posthogApiHost": "https://us.i.posthog.com",
+                    "posthogDefaults": "2026-01-30",
+                    "posthogPersonProfiles": "identified_only",
                 },
                 "puckData": {
                     "root": {"props": {"title": "Other Funnel"}},
@@ -1449,10 +1535,9 @@ def test_funnel_artifact_site_mirrors_non_canonical_public_asset_urls_locally(mo
 
     assert "https://cdn.tailwindcss.com" not in entry_html
     assert 'data-mos-compiled-tailwind="true"' in entry_html
-    assert f'src="/_standalone-assets/{mirrored_digest}.jpg"' in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
     assert 'src="https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111"' not in entry_html
-    assert mirrored_path in uploaded
-    assert uploaded[mirrored_path] == mirrored_payload
+    assert mirrored_path not in uploaded
 
 
 def test_funnel_artifact_site_mirrors_extensionless_absolute_img_urls(monkeypatch):
@@ -1549,13 +1634,11 @@ def test_funnel_artifact_site_prioritizes_large_hero_image_over_decorative_icons
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
     entry_html = uploaded[entry_route_path]
     badge_digest = hashlib.sha256(mirrored_assets["https://img.funnelish.com/badge.png"][0]).hexdigest()[:32]
-    hero_digest = hashlib.sha256(mirrored_assets["https://api.moshq.app/public/assets/11111111-1111-1111-1111-111111111111"][0]).hexdigest()[:32]
-    avatar_digest = hashlib.sha256(mirrored_assets["https://api.moshq.app/public/assets/22222222-2222-2222-2222-222222222222"][0]).hexdigest()[:32]
 
     assert f'src="/_standalone-assets/{badge_digest}.png" alt="Ratings" class="h-4 object-contain" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
-    assert f'src="/_standalone-assets/{hero_digest}.jpg" alt="Hero" class="w-full block aspect-[16/10] object-cover" loading="eager" decoding="async" fetchpriority="high"' in entry_html
-    assert f'rel="preload" as="image" fetchpriority="high" href="/_standalone-assets/{hero_digest}.jpg"' in entry_html
-    assert f'src="/_standalone-assets/{avatar_digest}.png" alt="Reviewer Avatar" class="w-10 h-10 rounded-full" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111" alt="Hero" class="w-full block aspect-[16/10] object-cover" loading="eager" decoding="async" fetchpriority="high"' in entry_html
+    assert 'rel="preload" as="image" fetchpriority="high" href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert 'src="/public/assets/22222222-2222-2222-2222-222222222222" alt="Reviewer Avatar" class="w-10 h-10 rounded-full" loading="lazy" decoding="async" fetchpriority="low"' in entry_html
 
 
 def test_funnel_artifact_site_errors_when_mirroring_required_image_asset_fails(monkeypatch):
@@ -2047,27 +2130,17 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
     }
 
     deployer, uploaded, _commands = _stub_deployer()
-    observed: dict[str, str] = {}
-
-    def _fake_fetch(**kwargs):
-        observed["website_url"] = kwargs["website_url"]
-        return {
-        "title": "Terms of Service",
-        "markdown": "# Terms of Service\n\n## Contact Information\nFor help, email **support@example.com**.\n",
-        }
-
-    deployer._fetch_standalone_compliance_policy_page = _fake_fetch
 
     deployer._configure_funnel_artifact_site(app)
 
     compliance_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/terms-of-service/index.html"
     compliance_html = uploaded[compliance_route_path]
-    assert observed["website_url"].startswith("https://shoptenorco.com/example-product/")
-    assert observed["website_url"].endswith("/presales/")
     assert "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in compliance_html
-    assert "<h1>Terms of Service</h1>" in compliance_html
-    assert "<h2>Contact Information</h2>" in compliance_html
-    assert "<strong>support@shoptenorco.com</strong>" in compliance_html
+    assert 'id="mos-standalone-policy-content"' in compliance_html
+    assert 'Loading policy content...' in compliance_html
+    assert "/api/public/funnels/example-product/example-funnel/policy-pages/terms_of_service" in compliance_html
+    assert 'params.set("support_email", supportEmailOverride);' in compliance_html
+    assert "payload.html" in compliance_html
     assert '<body class="brand-body">' in compliance_html
     assert 'id="header-shop-link" href="/example-product/example-funnel/presales/#shop"' in compliance_html
     assert 'href="/example-product/example-funnel/contact-us/" rel="nofollow">Contact</a>' in compliance_html
@@ -2075,6 +2148,59 @@ def test_funnel_artifact_site_standalone_export_renders_compliance_pages():
     assert 'href="/example-product/example-funnel/terms-of-service/" rel="nofollow">Terms</a>' in compliance_html
     assert 'href="/example-product/example-funnel/privacy-policy/" rel="nofollow">Privacy</a>' in compliance_html
     assert 'href="/example-product/example-funnel/refund-policy/" rel="nofollow">Refunds</a>' in compliance_html
+
+
+def test_funnel_artifact_site_standalone_export_uses_pathless_api_origin_for_proxy():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head><title>Standalone Sales</title></head>
+  <body>
+    <main id="app"><a id="main-cta" href="#shop">Start</a></main>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "location ^~ /api/ {" in conf
+    assert "proxy_pass https://api.moshq.app/;" in conf
+    assert "proxy_set_header Host api.moshq.app;" in conf
+
+
+def test_funnel_artifact_site_standalone_export_requires_origin_api_base_url():
+    html_document = """<!DOCTYPE html>
+<html>
+  <head><title>Standalone Sales</title></head>
+  <body>
+    <main id="app"><a id="main-cta" href="#shop">Start</a></main>
+  </body>
+</html>
+"""
+    app = _artifact_app(render_mode="standalone_imported_html", html_document=html_document)
+    app.source_ref.upstream_api_base_root = "https://moshq.app/api"
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="origin URL without a path"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_validate_funnel_artifact_site_output_requires_posthog_bootstrap_when_tracking_is_declared():
+    app = _artifact_app(render_mode="standalone_imported_html", html_document="<!DOCTYPE html><html><body>Hi</body></html>")
+    deployer = object.__new__(ServerDeployer)
+    deployer._path_exists = lambda path: True
+    deployer._funnel_artifact_declares_posthog_tracking = lambda *, source: True
+    deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
+    deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
+
+    with pytest.raises(ValueError, match="PostHog bootstrap"):
+        deployer._validate_funnel_artifact_site_output(
+            site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
+            source=app.source_ref,
+            render_mode=FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML,
+        )
 
 
 def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing_slug():

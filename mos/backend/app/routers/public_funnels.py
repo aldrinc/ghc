@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta, timezone
+from html import escape
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -58,6 +60,7 @@ from app.services.compliance import (
     get_policy_template,
     get_workspace_policy_override_markdown,
     list_policy_page_keys,
+    markdown_to_shopify_html,
     render_policy_template_markdown,
 )
 from app.services.design_systems import resolve_design_system_tokens
@@ -1228,6 +1231,66 @@ def _resolve_public_meta_tracking(*, session: Session, funnel: Funnel) -> dict[s
     }
 
 
+def _resolve_public_posthog_tracking() -> dict[str, str] | None:
+    if not settings.POSTHOG_FUNNELS_ENABLED:
+        return None
+
+    api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
+    api_host = clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
+    defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
+    person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
+
+    if not api_key:
+        raise RuntimeError(
+            "POSTHOG_FUNNELS_PROJECT_API_KEY is required when POSTHOG_FUNNELS_ENABLED is true."
+        )
+    if not api_host:
+        raise RuntimeError(
+            "POSTHOG_FUNNELS_API_HOST is required when POSTHOG_FUNNELS_ENABLED is true."
+        )
+    if not defaults:
+        raise RuntimeError(
+            "POSTHOG_FUNNELS_DEFAULTS is required when POSTHOG_FUNNELS_ENABLED is true."
+        )
+    if person_profiles not in {"identified_only", "always"}:
+        raise RuntimeError(
+            "POSTHOG_FUNNELS_PERSON_PROFILES must be 'identified_only' or 'always' when POSTHOG_FUNNELS_ENABLED is true."
+        )
+
+    return {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": api_key,
+        "posthogApiHost": api_host,
+        "posthogDefaults": defaults,
+        "posthogPersonProfiles": person_profiles,
+    }
+
+
+def _resolve_public_runtime_tracking(
+    *,
+    session: Session,
+    funnel: Funnel,
+    include_posthog: bool,
+) -> dict[str, str] | None:
+    tracking: dict[str, str] = {}
+
+    meta_tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
+    if meta_tracking:
+        tracking.update(meta_tracking)
+
+    if include_posthog:
+        posthog_tracking = _resolve_public_posthog_tracking()
+        if posthog_tracking:
+            tracking.update(posthog_tracking)
+            if "provider" not in tracking or tracking["provider"] == "posthog":
+                tracking["provider"] = "posthog"
+            if "mode" not in tracking:
+                tracking["mode"] = "public_funnel_runtime"
+
+    return tracking or None
+
+
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     """
     For unpublished funnels, we treat "preview" pages as those with at least one saved version
@@ -1521,7 +1584,11 @@ def public_funnel_page(
             page=page,
             puck_data=version.puck_data,
         )
-        tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
+        tracking = _resolve_public_runtime_tracking(
+            session=session,
+            funnel=funnel,
+            include_posthog=True,
+        )
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
             "productSlug": resolved_product_slug,
@@ -1640,7 +1707,11 @@ def public_funnel_page(
         page=page,
         puck_data=version.puck_data,
     )
-    tracking = _resolve_public_meta_tracking(session=session, funnel=funnel)
+    tracking = _resolve_public_runtime_tracking(
+        session=session,
+        funnel=funnel,
+        include_posthog=False,
+    )
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
         "productSlug": resolved_product_slug,
@@ -1671,6 +1742,7 @@ def public_funnel_policy_page(
     page_key: str,
     website_url: str,
     response: Response,
+    support_email: str | None = None,
     session: Session = Depends(get_session),
 ):
     target_kind, runtime_target, _product, _resolved_product_slug = _get_public_runtime_target_or_404(
@@ -1738,6 +1810,15 @@ def public_funnel_policy_page(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
+    rendered_html = markdown_to_shopify_html(markdown)
+    support_email_override = clean_optional_text(support_email)
+    if support_email_override and "@" in support_email_override:
+        rendered_html = re.sub(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+            lambda _match: escape(support_email_override),
+            rendered_html,
+        )
+
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     # Keep CDN cache short so workspace overrides (edited via
     # PUT /clients/{client_id}/compliance/policy-pages/{page_key}) propagate
@@ -1747,6 +1828,7 @@ def public_funnel_policy_page(
         "pageKey": page_key,
         "title": template["title"],
         "markdown": markdown,
+        "html": rendered_html,
     }
 
 

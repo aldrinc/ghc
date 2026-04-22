@@ -63,6 +63,19 @@ _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
 )
 
 
+def _require_standalone_upstream_api_origin(*, upstream_api_base_url: str) -> str:
+    normalized = upstream_api_base_url.strip().rstrip("/")
+    parsed = urlsplit(normalized)
+    if not parsed.scheme or not parsed.netloc:
+        raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise DeployError(
+            "Standalone imported HTML deploys require deploy.upstreamApiBaseUrl to be an origin URL without a path, "
+            f"for example 'https://api.example.com'; got '{normalized}'."
+        )
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _find_repo_root(start: Path) -> Path:
     """
     Locate the ghc repo root by walking upwards from `start`.
@@ -593,6 +606,9 @@ def build_funnel_publication_workload_patch(
         raise DeployError(
             "Deploy renderMode must be 'runtime_bundle' or 'standalone_imported_html'."
         )
+
+    if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        api_base_root = _require_standalone_upstream_api_origin(upstream_api_base_url=api_base_root)
 
     https_enabled = https and bool(normalized_server_names)
 
@@ -1213,6 +1229,41 @@ def build_client_funnel_runtime_artifact_payload(
             "metaPixelId": pixel_id,
         }
 
+    def _resolve_public_posthog_tracking_for_funnel() -> dict[str, str] | None:
+        if not settings.POSTHOG_FUNNELS_ENABLED:
+            return None
+
+        api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
+        api_host = clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
+        defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
+        person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
+
+        if not api_key:
+            raise DeployError(
+                "POSTHOG_FUNNELS_PROJECT_API_KEY is required when POSTHOG_FUNNELS_ENABLED is true."
+            )
+        if not api_host:
+            raise DeployError(
+                "POSTHOG_FUNNELS_API_HOST is required when POSTHOG_FUNNELS_ENABLED is true."
+            )
+        if not defaults:
+            raise DeployError(
+                "POSTHOG_FUNNELS_DEFAULTS is required when POSTHOG_FUNNELS_ENABLED is true."
+            )
+        if person_profiles not in {"identified_only", "always"}:
+            raise DeployError(
+                "POSTHOG_FUNNELS_PERSON_PROFILES must be 'identified_only' or 'always' when POSTHOG_FUNNELS_ENABLED is true."
+            )
+
+        return {
+            "provider": "posthog",
+            "mode": "public_funnel_runtime",
+            "posthogProjectApiKey": api_key,
+            "posthogApiHost": api_host,
+            "posthogDefaults": defaults,
+            "posthogPersonProfiles": person_profiles,
+        }
+
     client_funnels = list(
         session.scalars(
             select(Funnel)
@@ -1346,7 +1397,17 @@ def build_client_funnel_runtime_artifact_payload(
             ]
             if page_type
         }
-        tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
+        tracking: dict[str, str] = {}
+        meta_tracking = _resolve_public_meta_tracking_for_funnel(client_funnel)
+        if meta_tracking:
+            tracking.update(meta_tracking)
+        posthog_tracking = _resolve_public_posthog_tracking_for_funnel()
+        if posthog_tracking:
+            tracking.update(posthog_tracking)
+            if "provider" not in tracking or tracking["provider"] == "posthog":
+                tracking["provider"] = "posthog"
+            if "mode" not in tracking:
+                tracking["mode"] = "public_funnel_runtime"
         from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 
         compliance_profile = ClientComplianceProfilesRepository(session).get(
@@ -1403,7 +1464,7 @@ def build_client_funnel_runtime_artifact_payload(
                 "pageTypeMap": page_type_map,
                 "designSystemTokens": tokens,
                 "metadata": metadata,
-                "tracking": tracking,
+                "tracking": tracking or None,
                 "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
             }
 
@@ -1678,6 +1739,9 @@ def _apply_publish_job_artifact_render_mode(
     )
     source_ref["artifact_render_mode"] = resolved_render_mode
     if resolved_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        source_ref["upstream_api_base_root"] = _require_standalone_upstream_api_origin(
+            upstream_api_base_url=str(source_ref.get("upstream_api_base_root") or "")
+        )
         source_ref.pop("runtime_dist_path", None)
     else:
         source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
@@ -2344,6 +2408,15 @@ def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any])
     if explicit_render_mode is not None and explicit_render_mode != raw_render_mode:
         source_ref["artifact_render_mode"] = raw_render_mode
         changed = True
+
+    if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
+        normalized_api_origin = _require_standalone_upstream_api_origin(
+            upstream_api_base_url=upstream_api_base_root
+        )
+        if normalized_api_origin != upstream_api_base_root:
+            source_ref["upstream_api_base_root"] = normalized_api_origin
+            upstream_api_base_root = normalized_api_origin
+            changed = True
 
     runtime_dist_path = str(source_ref.get("runtime_dist_path") or "").strip()
     if raw_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE:

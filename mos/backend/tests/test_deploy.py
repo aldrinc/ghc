@@ -1676,7 +1676,7 @@ def test_build_funnel_publication_workload_patch_supports_standalone_imported_ht
         workload_name="standalone-funnel",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=["shop.example.com"],
         https=True,
         destination_path="/opt/apps",
@@ -1685,7 +1685,22 @@ def test_build_funnel_publication_workload_patch_supports_standalone_imported_ht
 
     source_ref = patch["source_ref"]
     assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert source_ref["upstream_api_base_root"] == "https://api.moshq.app"
     assert "runtime_dist_path" not in source_ref
+
+
+def test_build_funnel_publication_workload_patch_rejects_pathful_api_base_for_standalone():
+    with pytest.raises(deploy_service.DeployError, match="origin URL without a path"):
+        deploy_service.build_funnel_publication_workload_patch(
+            workload_name="standalone-funnel",
+            client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            upstream_base_url="https://moshq.app",
+            upstream_api_base_url="https://moshq.app/api",
+            server_names=["shop.example.com"],
+            https=True,
+            destination_path="/opt/apps",
+            artifact_render_mode="standalone_imported_html",
+        )
 
 
 def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatible_artifact(monkeypatch):
@@ -1694,7 +1709,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
         workload_name="auto-standalone-funnel",
         client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api",
+        upstream_api_base_url="https://api.moshq.app",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -1767,6 +1782,7 @@ def test_apply_publish_job_artifact_render_mode_prefers_standalone_for_compatibl
 
     source_ref = patched["source_ref"]
     assert source_ref["artifact_render_mode"] == "standalone_imported_html"
+    assert source_ref["upstream_api_base_root"] == "https://api.moshq.app"
     assert "runtime_dist_path" not in source_ref
 
 
@@ -2111,7 +2127,7 @@ def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_pa
                                     "source_ref": {
                                         "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
                                         "artifact_id": "artifact-123",
-                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "upstream_api_base_root": "https://api.moshq.app",
                                         "runtime_dist_path": "mos/frontend/dist",
                                         "artifact": {"meta": {"clientId": "c1"}, "products": {}},
                                     },
@@ -2176,7 +2192,7 @@ def test_materialize_funnel_artifacts_for_apply_replaces_stale_inline_artifact_w
                                     "source_ref": {
                                         "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
                                         "artifact_id": "artifact-123",
-                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "upstream_api_base_root": "https://api.moshq.app",
                                         "runtime_dist_path": "mos/frontend/dist",
                                         "artifact": {
                                             "meta": {"artifactId": "artifact-old", "publicationId": "pub-old"},
@@ -2377,7 +2393,7 @@ def test_materialize_funnel_artifacts_for_apply_preserves_standalone_render_mode
                                     "source_ref": {
                                         "client_id": "client-1",
                                         "artifact_render_mode": "standalone_imported_html",
-                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "upstream_api_base_root": "https://api.moshq.app",
                                         "artifact": {
                                             "meta": {"clientId": "client-1"},
                                             "products": {},
@@ -2472,7 +2488,7 @@ def test_materialize_funnel_artifacts_for_apply_infers_standalone_render_mode_fr
                                     "source_ref": {
                                         "client_id": "client-1",
                                         "artifact_id": "artifact-123",
-                                        "upstream_api_base_root": "https://moshq.app/api",
+                                        "upstream_api_base_root": "https://api.moshq.app",
                                         "runtime_dist_path": "mos/frontend/dist",
                                         "artifact": {
                                             "meta": {"clientId": "client-1"},

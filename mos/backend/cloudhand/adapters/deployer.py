@@ -42,6 +42,8 @@ _NGINX_PROXY_READ_TIMEOUT = "3600s"
 # Leave headroom above the 200 MiB backend product-asset limit for multipart framing.
 _NGINX_APP_CLIENT_MAX_BODY_SIZE = "250m"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
+_FUNNEL_ARTIFACT_RELEASES_DIRNAME = "site-releases"
+_FUNNEL_ARTIFACT_LIVE_DIRNAME = "site"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 _ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpHero", "SalesPdpTemplate"}
 _ENV_ASSIGNMENT_PATTERN = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
@@ -200,6 +202,31 @@ def _safe_inline_json(value: Any) -> str:
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
     )
+
+
+def _resolve_standalone_upstream_api_origin(*, upstream_api_base_root: str) -> tuple[str, str]:
+    normalized = str(upstream_api_base_root or "").strip().rstrip("/")
+    if not normalized.startswith(("http://", "https://")):
+        raise ValueError(
+            "Standalone funnel artifacts require source_ref.upstream_api_base_root to be an absolute http(s) URL."
+        )
+
+    parsed = urlsplit(normalized)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(
+            "Standalone funnel artifacts require source_ref.upstream_api_base_root to include a scheme and host."
+        )
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise ValueError(
+            "Standalone funnel artifacts require source_ref.upstream_api_base_root to be an origin URL without a path, "
+            f"query, or fragment; got '{normalized}'."
+        )
+
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", "")), parsed.netloc
+
+
+def _funnel_artifact_release_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def _normalize_uploaded_env_line(raw_line: str) -> str | None:
@@ -4139,6 +4166,129 @@ WantedBy=multi-user.target
             str(resolved_target["entrySlug"]),
         )
 
+    def _funnel_artifact_declares_posthog_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
+        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(source=source)
+        for product_payload in products.values():
+            if not isinstance(product_payload, dict):
+                continue
+            funnels = product_payload.get("funnels")
+            if not isinstance(funnels, dict):
+                continue
+            for funnel_payload in funnels.values():
+                if not isinstance(funnel_payload, dict):
+                    continue
+                pages = funnel_payload.get("pages")
+                if not isinstance(pages, dict):
+                    continue
+                for page_payload in pages.values():
+                    if not isinstance(page_payload, dict):
+                        continue
+                    tracking = page_payload.get("tracking")
+                    if not isinstance(tracking, dict):
+                        continue
+                    api_key = str(tracking.get("posthogProjectApiKey") or "").strip()
+                    api_host = str(tracking.get("posthogApiHost") or "").strip()
+                    if api_key and api_host:
+                        return True
+        return False
+
+    def _remote_tree_contains_text(self, *, root_path: str, text: str) -> bool:
+        safe_root = shlex.quote(root_path)
+        safe_text = shlex.quote(text)
+        out = self.run(
+            f'bash -lc "grep -R -F -q -- {safe_text} {safe_root} >/dev/null 2>&1 && echo yes || true"'
+        )
+        return out.strip() == "yes"
+
+    def _validate_funnel_artifact_site_output(
+        self,
+        *,
+        site_dir: str,
+        source: FunnelArtifactSourceSpec,
+        render_mode: FunnelArtifactRenderMode,
+    ) -> None:
+        if render_mode == FunnelArtifactRenderMode.RUNTIME_BUNDLE:
+            index_path = f"{site_dir}/index.html"
+            if not self._path_exists(index_path):
+                raise ValueError(
+                    f"Funnel artifact runtime bundle export did not produce '{index_path}'."
+                )
+            return
+
+        default_route = self._resolve_funnel_artifact_default_route(source=source)
+        if default_route:
+            default_index_path = f"{site_dir}/{'/'.join(default_route)}/index.html"
+            if not self._path_exists(default_index_path):
+                raise ValueError(
+                    "Standalone funnel artifact export did not produce the default route entry page "
+                    f"at '{default_index_path}'."
+                )
+
+        if not self._remote_tree_contains_text(
+            root_path=site_dir,
+            text="MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START",
+        ):
+            raise ValueError(
+                "Standalone funnel artifact export is missing the imported HTML bridge marker. "
+                "The site was not activated."
+            )
+
+        unresolved_tokens = (
+            "__MOS_STANDALONE_IMPORTED_HTML_CONFIG__",
+            "__MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__",
+        )
+        for token in unresolved_tokens:
+            if self._remote_tree_contains_text(root_path=site_dir, text=token):
+                raise ValueError(
+                    "Standalone funnel artifact export still contains unresolved runtime placeholders "
+                    f"('{token}'). The site was not activated."
+                )
+
+        if self._funnel_artifact_declares_posthog_tracking(source=source) and not self._remote_tree_contains_text(
+            root_path=site_dir,
+            text="window.posthog.init(",
+        ):
+            raise ValueError(
+                "Standalone funnel artifact export declared PostHog tracking but did not emit the PostHog bootstrap. "
+                "The site was not activated."
+            )
+
+    def _activate_funnel_artifact_site_release(
+        self,
+        *,
+        app_dir: str,
+        live_site_dir: str,
+        built_site_dir: str,
+    ) -> None:
+        next_link_path = f"{app_dir}/{_FUNNEL_ARTIFACT_LIVE_DIRNAME}.__next__"
+        release_id = str(Path(built_site_dir).name or "").strip() or _funnel_artifact_release_id()
+        legacy_site_dir = f"{app_dir}/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}/legacy-{release_id}"
+        self.run(
+            "bash -lc "
+            + shlex.quote(
+                "\n".join(
+                    [
+                        "set -euo pipefail",
+                        f"live_site={shlex.quote(live_site_dir)}",
+                        f"built_site={shlex.quote(built_site_dir)}",
+                        f"next_link={shlex.quote(next_link_path)}",
+                        f"legacy_site={shlex.quote(legacy_site_dir)}",
+                        'rm -f "$next_link"',
+                        'if [ ! -d "$built_site" ]; then',
+                        '  echo "missing built standalone site: $built_site" >&2',
+                        "  exit 1",
+                        "fi",
+                        'if [ -e "$live_site" ] && [ ! -L "$live_site" ]; then',
+                        '  rm -rf "$legacy_site"',
+                        '  mv "$live_site" "$legacy_site"',
+                        "fi",
+                        'ln -sfn "$built_site" "$next_link"',
+                        'mv -Tf "$next_link" "$live_site"',
+                    ]
+                )
+            )
+        )
+
     def _resolve_funnel_artifact_runtime_target(
         self, *, source: FunnelArtifactSourceSpec
     ) -> Optional[Dict[str, Any]]:
@@ -4706,29 +4856,14 @@ WantedBy=multi-user.target
             or f"/{quote(product_slug, safe='')}/{quote(funnel_path_token, safe='')}/"
         )
 
-        base_origin = "https://example.invalid"
-        if public_server_names:
-            primary_server_name = str(public_server_names[0] or "").strip().lower()
-            if primary_server_name:
-                base_origin = f"https://{primary_server_name}"
-        website_url = f"{base_origin.rstrip('/')}{shop_path}"
-
         public_funnel_token = self._resolve_standalone_public_funnel_token(
             funnel_slug=funnel_slug,
             funnel_meta=funnel_meta,
         )
-        policy_payload = self._fetch_standalone_compliance_policy_page(
-            upstream_api_base_root=str(source.upstream_api_base_root or ""),
-            product_slug=product_slug,
-            public_funnel_token=public_funnel_token,
-            page_key=str(props["pageKey"]),
-            website_url=website_url,
+        policy_api_path = (
+            f"/api/public/funnels/{quote(product_slug, safe='')}/{quote(public_funnel_token, safe='')}"
+            f"/policy-pages/{quote(str(props['pageKey']), safe='')}"
         )
-
-        from app.services.compliance import markdown_to_shopify_html
-
-        rendered_policy_html = markdown_to_shopify_html(str(policy_payload["markdown"]))
-        page_title = str(props.get("pageTitle") or policy_payload["title"]).strip() or str(policy_payload["title"])
         design_system_tokens = page_payload.get("designSystemTokens")
         if not isinstance(design_system_tokens, dict):
             design_system_tokens = {}
@@ -4739,12 +4874,7 @@ WantedBy=multi-user.target
             str(props.get("supportEmail") or "").strip()
             or str(brand_tokens.get("supportEmail") or "").strip()
         )
-        if support_email_override and "@" in support_email_override:
-            rendered_policy_html = re.sub(
-                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
-                lambda _match: escape(support_email_override),
-                rendered_policy_html,
-            )
+        page_title = str(props.get("pageTitle") or props["pageKey"]).strip() or "Policy"
 
         footer_terms = page_path_by_slug.get("terms-of-service", "#")
         footer_privacy = page_path_by_slug.get("privacy-policy", "#")
@@ -4815,6 +4945,13 @@ WantedBy=multi-user.target
             footer_contact=footer_contact,
         )
 
+        page_title_json = _safe_inline_json(page_title)
+        policy_api_path_json = _safe_inline_json(policy_api_path)
+        shop_path_json = _safe_inline_json(shop_path)
+        support_email_override_json = _safe_inline_json(
+            support_email_override if support_email_override and "@" in support_email_override else None
+        )
+
         return f"""<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -4868,10 +5005,21 @@ WantedBy=multi-user.target
         color: #191919;
         font-weight: 400;
       }}
+      .mos-standalone-compliance-content a {{
+        color: #E51E25;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }}
       .mos-standalone-compliance-content p {{ margin: 0 0 14px; }}
       .mos-standalone-compliance-content ul {{ margin: 0 0 18px; padding-left: 22px; }}
       .mos-standalone-compliance-content li {{ margin-bottom: 8px; }}
       .mos-standalone-compliance-content strong {{ color: #0F0F0F; font-weight: 700; }}
+      .mos-standalone-compliance-loading {{
+        color: rgba(25, 25, 25, 0.72);
+      }}
+      .mos-standalone-compliance-error {{
+        color: #9F1D1D;
+      }}
       @media (min-width: 768px) {{
         .mos-standalone-compliance-main {{ padding: 64px 32px 96px; }}
       }}
@@ -4882,13 +5030,62 @@ WantedBy=multi-user.target
       {supporting_header_html}
       <main class="mos-standalone-compliance-main">
         <div class="mos-standalone-compliance-container">
-          <article class="mos-standalone-compliance-card mos-standalone-compliance-content">
-            {rendered_policy_html}
+          <article
+            id="mos-standalone-policy-content"
+            class="mos-standalone-compliance-card mos-standalone-compliance-content"
+          >
+            <h1>{escape(page_title)}</h1>
+            <p class="mos-standalone-compliance-loading">Loading policy content...</p>
           </article>
         </div>
       </main>
       {supporting_footer_html}
     </div>
+    <script>
+      (() => {{
+        const article = document.getElementById("mos-standalone-policy-content");
+        const fallbackTitle = {page_title_json};
+        const policyApiPath = {policy_api_path_json};
+        const shopPath = {shop_path_json};
+        const supportEmailOverride = {support_email_override_json};
+
+        async function run() {{
+          if (!article) return;
+
+          try {{
+            const params = new URLSearchParams();
+            params.set("website_url", `${{window.location.origin}}${{shopPath}}`);
+            if (typeof supportEmailOverride === "string" && supportEmailOverride) {{
+              params.set("support_email", supportEmailOverride);
+            }}
+
+            const response = await fetch(`${{policyApiPath}}?${{params.toString()}}`, {{
+              headers: {{ Accept: "application/json" }},
+            }});
+            if (!response.ok) {{
+              throw new Error(`HTTP ${{response.status}}`);
+            }}
+
+            const payload = await response.json();
+            const title = String(payload.title || fallbackTitle || "").trim() || fallbackTitle;
+            const html = typeof payload.html === "string" ? payload.html.trim() : "";
+            if (!html) {{
+              throw new Error("Missing policy html");
+            }}
+
+            document.title = title;
+            article.innerHTML = html;
+          }} catch (_error) {{
+            article.innerHTML =
+              `<h1>${{fallbackTitle}}</h1>` +
+              '<p class="mos-standalone-compliance-error">We couldn\\'t load this policy page right now.</p>' +
+              `<p><a href="${{shopPath}}">Return to the sales page</a></p>`;
+          }}
+        }}
+
+        run();
+      }})();
+    </script>
   </body>
 </html>
 """
@@ -5112,6 +5309,9 @@ WantedBy=multi-user.target
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
   const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = __MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__;
+  const POSTHOG_INSTANCE_NAME = "mosFunnel";
+  const PRESALE_SOURCE_PARAM = "src";
+  const PRESALE_SOURCE_VALUE = "presale";
   const EVENTS_ENDPOINT = String(config.apiBasePath || "/api") + "/public/events";
   let pageLifecycleFinalizing = false;
 
@@ -5123,6 +5323,7 @@ WantedBy=multi-user.target
   const normalizeText = (value) => String(value || "").replace(/\\s+/g, " ").trim();
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
   const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
+  const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
   const createFallbackId = (prefix) =>
     prefix + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   const getOrCreateStoredId = (storage, key, prefix) => {
@@ -5155,6 +5356,56 @@ WantedBy=multi-user.target
     }
     return utm;
   };
+  const isPresaleToSalesNavigation = (fromStage, toStage) =>
+    cleanText(fromStage) === "pre_sales" && cleanText(toStage) === "sales";
+  const presaleAttributionStorageKey = () => {
+    const product = cleanText(config.productSlug);
+    const funnel = cleanText(config.funnelSlug);
+    if (!product || !funnel) return null;
+    return "from_presale:" + product + ":" + funnel;
+  };
+  const markPresaleAttribution = () => {
+    const key = presaleAttributionStorageKey();
+    if (!key) return;
+    try {
+      window.sessionStorage.setItem(key, "1");
+    } catch (_) {
+      // ignore storage write failures
+    }
+  };
+  const hasPresaleSourceParam = () =>
+    new URLSearchParams(window.location.search).get(PRESALE_SOURCE_PARAM) === PRESALE_SOURCE_VALUE;
+  const hasStoredPresaleAttribution = () => {
+    const key = presaleAttributionStorageKey();
+    if (!key) return false;
+    try {
+      return window.sessionStorage.getItem(key) === "1";
+    } catch (_) {
+      return false;
+    }
+  };
+  const hasPresaleReferrerAttribution = () => {
+    if (!document.referrer) return false;
+    try {
+      const referrerUrl = new URL(document.referrer, window.location.href);
+      if (referrerUrl.origin !== window.location.origin) {
+        return false;
+      }
+      const preSalesPaths = Object.entries(config.pageStageById || {})
+        .filter(([, stage]) => cleanText(stage) === "pre_sales")
+        .map(([pageId]) => cleanText(config.pagePathById && config.pagePathById[pageId]))
+        .filter(Boolean);
+      return preSalesPaths.some((path) => new URL(path, window.location.href).pathname === referrerUrl.pathname);
+    } catch (_) {
+      return false;
+    }
+  };
+  const resolvePresaleAttribution = () => {
+    if (hasPresaleSourceParam()) return "url";
+    if (hasStoredPresaleAttribution()) return "session";
+    if (hasPresaleReferrerAttribution()) return "referrer";
+    return null;
+  };
   const checkoutStatusFromLocation = () => {
     const checkoutStatus = new URL(window.location.href).searchParams.get("checkout");
     return checkoutStatus === "success" || checkoutStatus === "cancel" ? checkoutStatus : null;
@@ -5164,13 +5415,16 @@ WantedBy=multi-user.target
     nextUrl.searchParams.delete("checkout");
     return nextUrl.toString();
   };
-  const buildInternalNavigationUrl = (targetPath) => {
+  const buildInternalNavigationUrl = (targetPath, options) => {
     const normalizedTargetPath = cleanText(targetPath);
     if (!normalizedTargetPath) return window.location.href;
     const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.delete("checkout");
     const nextUrl = new URL(normalizedTargetPath, window.location.href);
     nextUrl.search = currentUrl.search;
+    if (isPresaleToSalesNavigation(options && options.fromStage, options && options.toStage)) {
+      nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);
+    }
     return nextUrl.toString();
   };
   const resolveSameDocumentHashTarget = (element) => {
@@ -5299,7 +5553,7 @@ WantedBy=multi-user.target
     timeoutId = window.setTimeout(flush, META_PIXEL_DEFER_TIMEOUT_MS);
   };
   const ensureMetaPixelBootstrap = () => {
-    if (!config.tracking || config.tracking.provider !== "meta" || !config.tracking.metaPixelId) {
+    if (!config.tracking || !config.tracking.metaPixelId) {
       return null;
     }
     const pixelId = String(config.tracking.metaPixelId || "").trim();
@@ -5329,6 +5583,66 @@ WantedBy=multi-user.target
     }
     return pixelId;
   };
+  const ensurePostHogInstance = () => {
+    const apiKey = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogProjectApiKey);
+    const apiHost = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogApiHost);
+    if (!apiKey || !apiHost) return null;
+    const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
+    const personProfiles =
+      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "identified_only";
+    const distinctId = cleanText(visitorId) || "anonymous-funnel-visitor";
+    !function(t,e){var o,n,p,r,d;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0])&&r.parentNode?r.parentNode.insertBefore(p,r):(d=t.head||t.body||t.documentElement)&&d.appendChild(p);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Ir Sr init jr $r Ci qr Hr Dr capture calculateEventProperties Wr register register_once register_for_session unregister unregister_for_session Qr getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync tn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty Jr Yr createPersonProfile setInternalOrTestUser Kr Pr nn opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing zr debug ki Xr getPageViewId captureTraceFeedback captureTraceMetric Mr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    const existingInstance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
+    if (existingInstance && existingInstance.__mosFunnelConfigured === "true") {
+      return existingInstance;
+    }
+    window.posthog.init(
+      apiKey,
+      {
+        api_host: apiHost,
+        defaults,
+        person_profiles: personProfiles,
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        bootstrap: {
+          distinctID: distinctId,
+          isIdentifiedID: false,
+        },
+      },
+      POSTHOG_INSTANCE_NAME,
+    );
+    const instance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
+    if (!instance) return null;
+    if (typeof instance.register === "function") {
+      instance.register({
+        productSlug: cleanText(config.productSlug),
+        funnelSlug: cleanText(config.funnelSlug),
+        publicationId: cleanText(config.publicationId),
+      });
+    }
+    instance.__mosFunnelConfigured = "true";
+    return instance;
+  };
+  const trackPostHogEvent = (eventType, props) => {
+    const posthog = ensurePostHogInstance();
+    if (!posthog || typeof posthog.capture !== "function") return;
+    const eventProps = {
+      productSlug: cleanText(config.productSlug),
+      funnelSlug: cleanText(config.funnelSlug),
+      publicationId: cleanText(config.publicationId),
+      pageId: cleanText(config.pageId),
+      pageSlug: cleanText(config.pageSlug),
+      pageStage: cleanText((props && props.pageStage) || config.pageStage),
+      visitorId: cleanText(visitorId),
+      sessionId: cleanText(sessionId),
+      path: window.location.pathname + window.location.search,
+      referrer: document.referrer || undefined,
+      utm: getUtmParams(),
+      ...(isRecord(props) ? props : {}),
+    };
+    posthog.capture(eventType, eventProps);
+  };
   const trackMetaPixel = (method, eventName, params) => {
     if (typeof window.fbq !== "function") return;
     if (isNonEmptyRecord(params)) {
@@ -5346,6 +5660,7 @@ WantedBy=multi-user.target
     if (!pixelId || typeof window.fbq !== "function") return;
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
+    const fromPresale = props && props.fromPresale === true;
     if (eventType === "Entered Funnel") {
       trackMetaPixel("trackCustom", "Entered Funnel", pageViewParams);
       return;
@@ -5356,6 +5671,10 @@ WantedBy=multi-user.target
     }
     if (eventType === "sales_page_view") {
       trackMetaPixel("track", "PageView", pageViewParams);
+      if (fromPresale) {
+        trackMetaPixel("trackCustom", "EnteredSales", pageViewParams);
+        return;
+      }
       trackMetaPixel("track", "ViewContent", pageViewParams);
       return;
     }
@@ -5421,6 +5740,7 @@ WantedBy=multi-user.target
   };
   const trackEvent = (eventType, props) => {
     trackMetaPixelForEvent(eventType, props || {});
+    trackPostHogEvent(eventType, props || {});
     postTrackingPayload(
       JSON.stringify({
         events: [
@@ -5711,8 +6031,10 @@ WantedBy=multi-user.target
     if (trackedPageViewIds.includes(config.pageId)) return;
     trackedPageViewIds.push(config.pageId);
     window.__mosStandaloneImportedHtmlTrackedPageViewIds = trackedPageViewIds;
+    const presaleSignal = config.pageStage === "sales" ? resolvePresaleAttribution() : null;
     trackEvent(resolvePageViewEventType(), {
       pageStage: config.pageStage,
+      ...(presaleSignal ? { fromPresale: true, presaleSignal } : {}),
     });
   };
   const trackEnteredFunnelIfNeeded = () => {
@@ -5959,8 +6281,12 @@ WantedBy=multi-user.target
         element.dataset.mosStandaloneBridgeBound = "true";
         if (binding.type === "internal_navigation" && element instanceof HTMLAnchorElement) {
           const targetPath = cleanText(config.pagePathById && config.pagePathById[String(binding.targetPageId || "")]);
+          const targetStage = cleanText(config.pageStageById && config.pageStageById[String(binding.targetPageId || "")]);
           if (targetPath) {
-            element.href = buildInternalNavigationUrl(targetPath);
+            element.href = buildInternalNavigationUrl(targetPath, {
+              fromStage: config.pageStage,
+              toStage: targetStage || "custom",
+            });
           }
         }
         element.addEventListener("click", async (event) => {
@@ -5999,7 +6325,13 @@ WantedBy=multi-user.target
                 targetPageId: binding.targetPageId,
                 buttonText: buttonText || undefined,
               });
-              window.location.href = buildInternalNavigationUrl(targetPath);
+              if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
+                markPresaleAttribution();
+              }
+              window.location.href = buildInternalNavigationUrl(targetPath, {
+                fromStage: config.pageStage,
+                toStage: targetStage || "custom",
+              });
               return;
             }
             if (binding.type === "track_only") {
@@ -6584,13 +6916,22 @@ WantedBy=multi-user.target
         render_mode = source.artifact_render_mode
 
         app_dir = f"{app.destination_path}/{app.name}"
-        site_dir = f"{app_dir}/site"
+        site_dir = f"{app_dir}/{_FUNNEL_ARTIFACT_LIVE_DIRNAME}"
         app_dir_q = shlex.quote(app_dir)
         site_dir_q = shlex.quote(site_dir)
-
-        self.run(f"mkdir -p {app_dir_q}")
-        self.run(f"rm -rf {site_dir_q}")
-        self.run(f"mkdir -p {site_dir_q}")
+        build_site_dir = site_dir
+        if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
+            releases_dir = f"{app_dir}/{_FUNNEL_ARTIFACT_RELEASES_DIRNAME}"
+            release_id = _funnel_artifact_release_id()
+            build_site_dir = f"{releases_dir}/{release_id}"
+            self.run(f"mkdir -p {app_dir_q}")
+            self.run(f"mkdir -p {shlex.quote(releases_dir)}")
+            self.run(f"rm -rf {shlex.quote(build_site_dir)}")
+            self.run(f"mkdir -p {shlex.quote(build_site_dir)}")
+        else:
+            self.run(f"mkdir -p {app_dir_q}")
+            self.run(f"rm -rf {site_dir_q}")
+            self.run(f"mkdir -p {site_dir_q}")
         standalone_uploaded_target_paths: set[str] = set()
         standalone_served_assets: dict[str, _StandaloneServedAsset] = {}
         standalone_image_sources: dict[str, _StandaloneImageSource] = {}
@@ -6621,16 +6962,21 @@ WantedBy=multi-user.target
             self._inject_funnel_runtime_config(site_dir=site_dir, source=source)
             self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
             self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
+            self._validate_funnel_artifact_site_output(
+                site_dir=site_dir,
+                source=source,
+                render_mode=render_mode,
+            )
         elif render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
             self._write_funnel_artifact_assets(
-                site_dir=site_dir,
+                site_dir=build_site_dir,
                 source=source,
                 uploaded_target_paths=standalone_uploaded_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,
             )
             self._write_funnel_artifact_standalone_html_routes(
-                site_dir=site_dir,
+                site_dir=build_site_dir,
                 source=source,
                 public_server_names=(
                     self._normalize_server_names(app.workspace_server_names)
@@ -6639,6 +6985,16 @@ WantedBy=multi-user.target
                 mirrored_target_paths=standalone_uploaded_target_paths,
                 standalone_served_assets=standalone_served_assets,
                 standalone_image_sources=standalone_image_sources,
+            )
+            self._validate_funnel_artifact_site_output(
+                site_dir=build_site_dir,
+                source=source,
+                render_mode=render_mode,
+            )
+            self._activate_funnel_artifact_site_release(
+                app_dir=app_dir,
+                live_site_dir=site_dir,
+                built_site_dir=build_site_dir,
             )
         else:  # pragma: no cover - defensive guard for future enum drift
             raise ValueError(f"Unsupported funnel artifact render mode '{render_mode}'.")
@@ -6657,12 +7013,15 @@ WantedBy=multi-user.target
             listen_port = int(ports[0])
 
         upstream_api_base_root = source.upstream_api_base_root.rstrip("/")
-        parsed_upstream_api_base_root = urlsplit(upstream_api_base_root)
-        # Nginx needs a trailing slash when proxying to a non-root path so requests
-        # under `/api/` keep their path separators when the location prefix is replaced.
-        upstream_api_proxy_pass = upstream_api_base_root
-        if parsed_upstream_api_base_root.path not in {"", "/"}:
-            upstream_api_proxy_pass = f"{upstream_api_base_root}/"
+        upstream_api_proxy_base = upstream_api_base_root
+        upstream_api_proxy_host_header = "$host"
+        if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
+            (
+                upstream_api_proxy_base,
+                upstream_api_proxy_host_header,
+            ) = _resolve_standalone_upstream_api_origin(
+                upstream_api_base_root=source.upstream_api_base_root,
+            )
         canonical_redirect_host = None
         canonical_redirect_scheme = "http"
         workspace_server_names = self._normalize_server_names(app.workspace_server_names)
@@ -6721,9 +7080,9 @@ WantedBy=multi-user.target
     }}
 
     location ^~ /api/ {{
-        proxy_pass {upstream_api_proxy_pass};
+        proxy_pass {upstream_api_proxy_base}/;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
+        proxy_set_header Host {upstream_api_proxy_host_header};
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -6942,9 +7301,10 @@ WantedBy=multi-user.target
                 f"DEBIAN_FRONTEND=noninteractive apt-get install -y {' '.join(app.build_config.system_packages)}"
             )
         if app.source_type in {ApplicationSourceType.FUNNEL_PUBLICATION, ApplicationSourceType.FUNNEL_ARTIFACT}:
-            # Funnel publication workloads are nginx proxies only. Remove same-name
-            # legacy service/site artifacts before configuring the proxy.
-            self.remove_workload(app)
+            # Funnel publication/artifact workloads should update in place so the
+            # current site keeps serving until the replacement proxy or artifact
+            # has been fully written and validated.
+            self._disable_service_unit(app.name)
             if configure_nginx:
                 self._configure_nginx(app)
             return

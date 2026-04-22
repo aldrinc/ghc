@@ -155,6 +155,11 @@ class Settings(BaseSettings):
     MEDUSA_PUBLIC_PUBLISHABLE_KEY: str | None = None
     MEDUSA_PUBLIC_DEFAULT_REGION_ID: str | None = None
     MEDUSA_PUBLIC_DEFAULT_COUNTRY_CODE: str = "us"
+    POSTHOG_FUNNELS_ENABLED: bool = False
+    POSTHOG_FUNNELS_PROJECT_API_KEY: str | None = None
+    POSTHOG_FUNNELS_API_HOST: str | None = None
+    POSTHOG_FUNNELS_DEFAULTS: str | None = None
+    POSTHOG_FUNNELS_PERSON_PROFILES: str | None = None
 
     SCREENSHOT_TO_CODE_WS_URL: str = "ws://127.0.0.1:7001/generate-code"
     SITE_IMPORT_DEFAULT_MODEL_SLOT_COUNT: int = 1

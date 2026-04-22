@@ -426,6 +426,18 @@ def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(
     assert policy_payload["pageKey"] == "privacy_policy"
     assert "Honest Herbalist" in policy_payload["markdown"]
     assert "support@honest-herbalist.test" in policy_payload["markdown"]
+    assert "Privacy Policy" in policy_payload["html"]
+    assert "support@honest-herbalist.test" in policy_payload["html"]
+
+    overridden_resp = api_client.get(
+        f"/public/funnels/{product_slug}/{route_slug}/policy-pages/privacy_policy",
+        params={
+            "website_url": f"https://store.test/f/{product_slug}/{route_slug}/us",
+            "support_email": "help@honest-herbalist.test",
+        },
+    )
+    assert overridden_resp.status_code == 200
+    assert "help@honest-herbalist.test" in overridden_resp.json()["html"]
 
 
 def test_sync_funnel_compliance_pages_creates_terms_privacy_and_refunds(
@@ -881,6 +893,7 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
                     "Entered Funnel",
                     "PageView",
                     "ViewContent",
+                    "EnteredSales",
                     "PreSalesToSalesClick",
                     "AddToCart",
                     "Purchase",
@@ -914,6 +927,39 @@ def test_public_funnel_page_exposes_meta_tracking_when_mos_tracking_is_active(
         "metaPixelId": "pixel-123",
     }
     assert public_page.json()["stage"] == "custom"
+
+
+def test_published_public_funnel_page_exposes_posthog_tracking(
+    api_client: TestClient,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_ENABLED", True)
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PROJECT_API_KEY", "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_API_HOST", "https://us.i.posthog.com")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_DEFAULTS", "2026-01-30")
+    monkeypatch.setattr(settings, "POSTHOG_FUNNELS_PERSON_PROFILES", "identified_only")
+
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="PostHog Tracking Funnel",
+    )
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    entry_slug = meta.json()["entrySlug"]
+
+    public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{entry_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["tracking"] == {
+        "provider": "posthog",
+        "mode": "public_funnel_runtime",
+        "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+        "posthogApiHost": "https://us.i.posthog.com",
+        "posthogDefaults": "2026-01-30",
+        "posthogPersonProfiles": "identified_only",
+    }
 
 
 def test_public_funnel_commerce_requires_offers(api_client: TestClient):
@@ -1139,7 +1185,7 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
             "deploy": {
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
-                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "upstreamApiBaseUrl": "https://api.moshq.app",
                 "renderMode": "standalone_imported_html",
             }
         },
@@ -1149,9 +1195,32 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_ref"]["artifact_render_mode"] == "standalone_imported_html"
+    assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://api.moshq.app"
     assert "runtime_dist_path" not in workload_patch["source_ref"]
     assert deploy_request["artifact_render_mode_explicit"] is True
     assert deploy_request["artifact_render_mode_requested"] == "standalone_imported_html"
+
+
+def test_publish_with_deploy_rejects_pathful_api_base_for_explicit_standalone(api_client: TestClient):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Invalid Standalone Deploy Funnel",
+    )
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "renderMode": "standalone_imported_html",
+            }
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "origin URL without a path" in resp.json()["detail"]
 
 
 def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestClient, monkeypatch):
