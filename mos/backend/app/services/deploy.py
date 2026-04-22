@@ -4579,7 +4579,8 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     if resolved_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
                         job["phase"] = "preflighting_standalone"
                         _write_json_atomic(path, job)
-                        _validate_standalone_funnel_artifact_preflight(
+                        await asyncio.to_thread(
+                            _validate_standalone_funnel_artifact_preflight,
                             workload_patch=workload_patch,
                         )
                         job["phase"] = "standalone_preflight_validated"

@@ -80,6 +80,15 @@ def _resolve_posthog_metadata_override(*, session: Session, funnel: Funnel) -> d
             f"{sorted(_ALLOWED_POSTHOG_OVERRIDE_MODES)} when configured."
         )
 
+    api_key = clean_optional_text(posthog_tracking.get("projectApiKey")) or clean_optional_text(
+        posthog_tracking.get("posthogProjectApiKey")
+    )
+    defaults = clean_optional_text(posthog_tracking.get("defaults")) or clean_optional_text(
+        posthog_tracking.get("posthogDefaults")
+    )
+    person_profiles = clean_optional_text(
+        posthog_tracking.get("personProfiles")
+    ) or clean_optional_text(posthog_tracking.get("posthogPersonProfiles"))
     api_host_raw = clean_optional_text(posthog_tracking.get("apiHost")) or clean_optional_text(
         posthog_tracking.get("posthogApiHost")
     )
@@ -98,8 +107,19 @@ def _resolve_posthog_metadata_override(*, session: Session, funnel: Funnel) -> d
         raise RuntimeError(
             f"{_MOS_POSTHOG_TRACKING_METADATA_KEY}.uiHost must be an https origin without a path."
         )
+    if person_profiles and person_profiles not in _ALLOWED_POSTHOG_PERSON_PROFILES:
+        raise RuntimeError(
+            f"{_MOS_POSTHOG_TRACKING_METADATA_KEY}.personProfiles must be one of "
+            f"{sorted(_ALLOWED_POSTHOG_PERSON_PROFILES)} when configured."
+        )
 
     resolved: dict[str, str] = {}
+    if api_key:
+        resolved["posthogProjectApiKey"] = api_key
+    if defaults:
+        resolved["posthogDefaults"] = defaults
+    if person_profiles:
+        resolved["posthogPersonProfiles"] = person_profiles
     if api_host:
         resolved["posthogApiHost"] = api_host
     if ui_host:
@@ -111,9 +131,16 @@ def resolve_public_posthog_tracking(*, session: Session, funnel: Funnel) -> dict
     if not settings.POSTHOG_FUNNELS_ENABLED:
         return None
 
-    api_key = clean_optional_text(settings.POSTHOG_FUNNELS_PROJECT_API_KEY)
-    defaults = clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
-    person_profiles = clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES) or "always"
+    override = _resolve_posthog_metadata_override(session=session, funnel=funnel) or {}
+    api_key = override.get("posthogProjectApiKey") or clean_optional_text(
+        settings.POSTHOG_FUNNELS_PROJECT_API_KEY
+    )
+    defaults = override.get("posthogDefaults") or clean_optional_text(settings.POSTHOG_FUNNELS_DEFAULTS)
+    person_profiles = (
+        override.get("posthogPersonProfiles")
+        or clean_optional_text(settings.POSTHOG_FUNNELS_PERSON_PROFILES)
+        or "always"
+    )
 
     if not api_key:
         raise RuntimeError(
@@ -129,7 +156,6 @@ def resolve_public_posthog_tracking(*, session: Session, funnel: Funnel) -> dict
             "POSTHOG_FUNNELS_ENABLED is true."
         )
 
-    override = _resolve_posthog_metadata_override(session=session, funnel=funnel) or {}
     api_host = override.get("posthogApiHost") or clean_optional_text(settings.POSTHOG_FUNNELS_API_HOST)
     ui_host = override.get("posthogUiHost") or clean_optional_text(settings.POSTHOG_FUNNELS_UI_HOST)
 

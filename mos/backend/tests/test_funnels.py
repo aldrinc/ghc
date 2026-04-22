@@ -1020,8 +1020,11 @@ def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(
                 "mosPosthogTracking": {
                     "status": "active",
                     "mode": "managed_reverse_proxy",
+                    "projectApiKey": "phc_workspace_override",
                     "apiHost": "https://beacon.example-brand.com",
                     "uiHost": "https://app.posthog.com",
+                    "defaults": "2026-02-01",
+                    "personProfiles": "identified_only",
                 }
             },
         )
@@ -1040,11 +1043,11 @@ def test_published_public_funnel_page_prefers_posthog_managed_proxy_override(
     assert public_page.json()["tracking"] == {
         "provider": "posthog",
         "mode": "public_funnel_runtime",
-        "posthogProjectApiKey": "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
+        "posthogProjectApiKey": "phc_workspace_override",
         "posthogApiHost": "https://beacon.example-brand.com",
         "posthogUiHost": "https://app.posthog.com",
-        "posthogDefaults": "2026-01-30",
-        "posthogPersonProfiles": "always",
+        "posthogDefaults": "2026-02-01",
+        "posthogPersonProfiles": "identified_only",
     }
 
 
