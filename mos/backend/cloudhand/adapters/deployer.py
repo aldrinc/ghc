@@ -4331,9 +4331,9 @@ WantedBy=multi-user.target
                     "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel script. "
                     "The site was not activated."
                 )
-            if not self._remote_tree_contains_text(
-                root_path=site_dir,
-                text='window.fbq("init", pixelId);',
+            if not (
+                self._remote_tree_contains_text(root_path=site_dir, text='fbq("init"')
+                or self._remote_tree_contains_text(root_path=site_dir, text="fbq('init'")
             ):
                 raise ValueError(
                     "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel bootstrap. "
