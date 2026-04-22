@@ -311,6 +311,15 @@ def _is_retryable_meta_creative_create_error(exc: MetaAdsError) -> bool:
     return "Something went wrong. Please try again later" in error_user_msg
 
 
+def _is_retryable_meta_mutation_error(exc: MetaAdsError) -> bool:
+    if exc.status_code is not None and exc.status_code >= 500:
+        return True
+    error_details = _meta_graph_error_details(exc)
+    if not error_details:
+        return False
+    return error_details.get("is_transient") is True
+
+
 def _infer_media_type(content_type: Optional[str], asset_kind: Optional[str]) -> Optional[str]:
     if content_type:
         if content_type.startswith("image/"):
@@ -2162,7 +2171,10 @@ def _create_meta_creative_internal(
             last_creative_error = None
             break
         except MetaAdsError as exc:
-            if attempt < creative_retry_limit and _is_retryable_meta_creative_create_error(exc):
+            if attempt < creative_retry_limit and (
+                _is_retryable_meta_mutation_error(exc)
+                or _is_retryable_meta_creative_create_error(exc)
+            ):
                 logger.warning(
                     "Retrying Meta ad creative creation after transient Meta failure.",
                     extra={
@@ -2644,10 +2656,37 @@ def _create_meta_ad_internal(
         request_payload["execution_options"] = ["validate_only"]
 
     client = _get_meta_client(resolved=resolved)
-    try:
-        response = client.create_ad(ad_account_id=ad_account_id, payload=request_payload)
-    except MetaAdsError as exc:
-        _raise_meta_error(exc)
+    response: dict[str, Any] | None = None
+    ad_retry_limit = 3
+    last_ad_error: MetaAdsError | None = None
+    for attempt in range(1, ad_retry_limit + 1):
+        try:
+            response = client.create_ad(ad_account_id=ad_account_id, payload=request_payload)
+            last_ad_error = None
+            break
+        except MetaAdsError as exc:
+            if attempt < ad_retry_limit and _is_retryable_meta_mutation_error(exc):
+                logger.warning(
+                    "Retrying Meta ad creation after transient Meta failure.",
+                    extra={
+                        "adset_id": payload.adsetId,
+                        "creative_id": payload.creativeId,
+                        "request_id": payload.requestId,
+                        "attempt": attempt,
+                        "ad_account_id": ad_account_id,
+                    },
+                )
+                last_ad_error = exc
+                continue
+            _raise_meta_error(exc)
+
+    if response is None:
+        if last_ad_error is not None:
+            _raise_meta_error(last_ad_error)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Meta ad request did not return a response.",
+        )
 
     if payload.validateOnly:
         return {"validateOnly": True, "response": response}
