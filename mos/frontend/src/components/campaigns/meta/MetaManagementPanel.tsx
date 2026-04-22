@@ -151,6 +151,20 @@ function statusCountSummary(counts: MetaObjectStatusCount[]): string {
   return counts.map((entry) => `${entry.value} ${entry.count}`).join(" · ");
 }
 
+function preferredManagementRun(runs: MetaPublishRun[]): MetaPublishRun | null {
+  const explicitlyBound = runs.find((run) => {
+    const trackedId = runManagementMetaCampaignId(run);
+    const publishedId = typeof run.metaCampaignId === "string" ? run.metaCampaignId.trim() : "";
+    return Boolean(trackedId && publishedId && trackedId !== publishedId);
+  });
+  if (explicitlyBound) return explicitlyBound;
+  const published = runs.find((run) => run.status === "published");
+  if (published) return published;
+  const running = runs.find((run) => run.status === "running");
+  if (running) return running;
+  return runs[0] || null;
+}
+
 export function MetaManagementPanel() {
   const { campaign, visiblePublishRuns, publishRunsLoading, publishRunsError } = useMetaPublishContext();
   const { planManagement } = useMetaApi();
@@ -164,17 +178,18 @@ export function MetaManagementPanel() {
     () => visiblePublishRuns.filter((run) => Boolean(runManagementMetaCampaignId(run))),
     [visiblePublishRuns],
   );
+  const defaultRun = useMemo(() => preferredManagementRun(runnableRuns), [runnableRuns]);
 
   useEffect(() => {
     setSelectedRunId((current) => {
       if (current && runnableRuns.some((run) => run.id === current)) return current;
-      return runnableRuns[0]?.id || "";
+      return defaultRun?.id || "";
     });
-  }, [runnableRuns]);
+  }, [defaultRun, runnableRuns]);
 
   const selectedRun = useMemo(
-    () => runnableRuns.find((run) => run.id === selectedRunId) || runnableRuns[0] || null,
-    [runnableRuns, selectedRunId],
+    () => runnableRuns.find((run) => run.id === selectedRunId) || defaultRun || null,
+    [defaultRun, runnableRuns, selectedRunId],
   );
 
   const customMetricDefinitions = useMemo(() => {
@@ -191,7 +206,7 @@ export function MetaManagementPanel() {
     [runnableRuns],
   );
 
-  const loadPlan = useCallback(async () => {
+  const loadPlan = useCallback(async (options?: { refresh?: boolean }) => {
     const trackedMetaCampaignId = runManagementMetaCampaignId(selectedRun);
     if (!trackedMetaCampaignId) {
       setPlan(null);
@@ -206,6 +221,7 @@ export function MetaManagementPanel() {
         metaConfigId: selectedRun?.metaConfigId || undefined,
         datePreset,
         mode: "plan_only",
+        refresh: options?.refresh ?? false,
         benchmarkMode: "best_effort",
       });
       setPlan(nextPlan);
@@ -253,7 +269,12 @@ export function MetaManagementPanel() {
           <div className="w-[140px]">
             <Select value={datePreset} onValueChange={setDatePreset} options={DATE_PRESET_OPTIONS} disabled={!runOptions.length} />
           </div>
-          <Button variant="secondary" size="sm" onClick={() => void loadPlan()} disabled={!selectedRun || loading}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void loadPlan({ refresh: true })}
+            disabled={!selectedRun || loading}
+          >
             {loading ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
@@ -274,6 +295,12 @@ export function MetaManagementPanel() {
         <Callout variant="warning" size="sm" title="Managing a rebound Meta target">
           This run was originally published to Meta {shortId(publishedMetaCampaignId || "", 5)}, but management is
           currently bound to Meta {shortId(trackedMetaCampaignId || "", 5)}.
+        </Callout>
+      ) : null}
+      {selectedRun && selectedRun.status !== "published" ? (
+        <Callout variant="warning" size="sm" title="Selected run is not the canonical live publish">
+          This target comes from a `{selectedRun.status}` publish run. Use Refresh only when you intentionally want to
+          inspect that retry lineage.
         </Callout>
       ) : null}
       {error ? (

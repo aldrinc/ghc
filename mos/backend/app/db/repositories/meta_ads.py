@@ -311,6 +311,24 @@ class MetaAdsRepository:
         )
         return self.session.scalars(stmt).first()
 
+    def get_latest_run_by_plan_fingerprint(
+        self,
+        *,
+        org_id: str,
+        campaign_id: str,
+        plan_fingerprint: str,
+        statuses: tuple[str, ...] | None = None,
+    ) -> Optional[MetaPublishRun]:
+        candidate_statuses = statuses or ("running", "failed", "partial_failed", "published")
+        for run in self.list_publish_runs(org_id=org_id, campaign_id=campaign_id):
+            if run.status not in candidate_statuses:
+                continue
+            metadata = run.metadata_json if isinstance(run.metadata_json, dict) else {}
+            stored_fingerprint = metadata.get("planFingerprint")
+            if isinstance(stored_fingerprint, str) and stored_fingerprint == plan_fingerprint:
+                return run
+        return None
+
     def get_publish_run(self, *, org_id: str, publish_run_id: str) -> Optional[MetaPublishRun]:
         stmt = select(MetaPublishRun).where(
             MetaPublishRun.org_id == org_id,

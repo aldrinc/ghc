@@ -7,7 +7,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.services.meta_ads import MetaAdsClient, MetaAdsError, _normalize_ad_account_id
+from app.services.meta_ads import MetaAdsClient, MetaAdsError, MetaAdsRateLimitError, _normalize_ad_account_id
 from app.services.meta_management_benchmarks import (
     MetaBenchmarkContext,
     MetaBenchmarkEvaluation,
@@ -680,6 +680,7 @@ def fetch_meta_campaign_snapshot(
     *,
     client: MetaAdsClient,
     campaign_id: str,
+    ad_account_id: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     campaign_fields = ",".join(
         [
@@ -695,7 +696,12 @@ def fetch_meta_campaign_snapshot(
             "is_adset_budget_sharing_enabled",
         ]
     )
-    campaign = client._request("GET", campaign_id, params={"fields": campaign_fields})
+    campaign = client._request(
+        "GET",
+        campaign_id,
+        params={"fields": campaign_fields},
+        throttle_scope=ad_account_id,
+    )
 
     adsets_fields = ",".join(
         [
@@ -712,9 +718,12 @@ def fetch_meta_campaign_snapshot(
             "end_time",
         ]
     )
-    adsets = client._request("GET", f"{campaign_id}/adsets", params={"fields": adsets_fields, "limit": 200}).get(
-        "data"
-    )
+    adsets = client._request(
+        "GET",
+        f"{campaign_id}/adsets",
+        params={"fields": adsets_fields, "limit": 200},
+        throttle_scope=ad_account_id,
+    ).get("data")
     if adsets is None:
         adsets_list: list[dict[str, Any]] = []
     elif isinstance(adsets, list):
@@ -740,7 +749,12 @@ def fetch_meta_campaign_snapshot(
         params: dict[str, Any] = {"fields": ads_fields, "limit": 200}
         if after:
             params["after"] = after
-        resp = client._request("GET", f"{campaign_id}/ads", params=params)
+        resp = client._request(
+            "GET",
+            f"{campaign_id}/ads",
+            params=params,
+            throttle_scope=ad_account_id,
+        )
         data = resp.get("data") if isinstance(resp, dict) else None
         if data:
             ads_out.extend([row for row in data if isinstance(row, dict)])
@@ -934,7 +948,12 @@ def fetch_ad_level_insights(
     while True:
         if after:
             params["after"] = after
-        resp = client._request("GET", f"{normalized_ad_account_id}/insights", params=params)
+        resp = client._request(
+            "GET",
+            f"{normalized_ad_account_id}/insights",
+            params=params,
+            throttle_scope=ad_account_id,
+        )
         data = resp.get("data") if isinstance(resp, dict) else None
         if data:
             out.extend([row for row in data if isinstance(row, dict)])
@@ -1069,13 +1088,38 @@ def build_management_plan(
         raise MetaMediaBuyingPlanError("mode must be plan_only or apply")
 
     try:
-        campaign, adsets, ads = fetch_meta_campaign_snapshot(client=client, campaign_id=campaign_id)
-        rows = fetch_ad_level_insights(
+        campaign, adsets, ads = fetch_meta_campaign_snapshot(
             client=client,
-            ad_account_id=ad_account_id,
             campaign_id=campaign_id,
-            date_preset=insights.datePreset,
+            ad_account_id=ad_account_id,
         )
+        preflight_object_state = _build_object_state_summary(
+            campaign=campaign,
+            adsets=adsets,
+            ads=ads,
+            insights_row_count=0,
+        )
+        if preflight_object_state.deliveryState in {
+            "review_blocked",
+            "ads_with_issues",
+            "archived",
+            "paused",
+            "no_ads",
+        }:
+            rows = []
+        else:
+            rows = fetch_ad_level_insights(
+                client=client,
+                ad_account_id=ad_account_id,
+                campaign_id=campaign_id,
+                date_preset=insights.datePreset,
+            )
+    except MetaAdsRateLimitError as exc:
+        raise MetaMediaBuyingPlanError(
+            "Meta management snapshot deferred due to ad account pressure.",
+            status_code=exc.status_code,
+            error_payload=exc.error_payload,
+        ) from exc
     except MetaAdsError as exc:
         raise MetaMediaBuyingPlanError(
             str(exc),
@@ -1165,18 +1209,34 @@ def build_management_plan(
             target_entity_id = action.metaAdId
             try:
                 if action.kind == "pause_ad":
-                    before = client.get_object(object_id=action.metaAdId, fields="id,status,effective_status")
+                    before = client.get_object(
+                        object_id=action.metaAdId,
+                        fields="id,status,effective_status",
+                        throttle_scope=ad_account_id,
+                    )
                     request_payload = {"status": "PAUSED"}
-                    after = client.update_ad(ad_id=action.metaAdId, payload=request_payload)
+                    after = client.update_ad(
+                        ad_id=action.metaAdId,
+                        payload=request_payload,
+                        throttle_scope=ad_account_id,
+                    )
                 elif action.kind == "adjust_campaign_budget":
-                    before = client.get_object(object_id=campaign_id, fields="id,daily_budget,lifetime_budget,status")
+                    before = client.get_object(
+                        object_id=campaign_id,
+                        fields="id,daily_budget,lifetime_budget,status",
+                        throttle_scope=ad_account_id,
+                    )
                     request_payload = action.metrics.get("requestedChange") if isinstance(action.metrics, dict) else {}
                     if not isinstance(request_payload, dict) or not request_payload:
                         raise MetaMediaBuyingPlanError(
                             "adjust_campaign_budget action is missing metrics.requestedChange payload."
                         )
                     target_entity_id = campaign_id
-                    after = client.update_campaign(campaign_id=campaign_id, payload=request_payload)
+                    after = client.update_campaign(
+                        campaign_id=campaign_id,
+                        payload=request_payload,
+                        throttle_scope=ad_account_id,
+                    )
                 else:
                     raise MetaMediaBuyingPlanError(f"Unsupported apply action kind: {action.kind}")
             except MetaAdsError as exc:

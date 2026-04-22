@@ -104,7 +104,9 @@ from app.services.meta_media_buying import (
 )
 from app.services.meta_management_service import (
     MetaManagementExecutionError,
+    build_management_snapshot_request,
     execute_meta_management_plan,
+    load_cached_meta_management_snapshot,
     persist_meta_management_artifacts,
     resolve_publish_run_management_meta_campaign_id,
     resolve_management_benchmark_mode,
@@ -190,6 +192,7 @@ class MetaManagementPlanRequest(BaseModel):
     mode: Literal["plan_only", "apply"] = "plan_only"
     datePreset: str = "last_3d"
     includeRaw: bool = False
+    refresh: bool = False
     benchmarkMode: Literal["disabled", "best_effort", "required"] | None = None
     evaluateBenchmarks: bool | None = None
     cutRules: MetaCutRuleConfig | None = None
@@ -1295,7 +1298,14 @@ def _publish_run_item_response(record: MetaPublishRunItem) -> MetaPublishRunItem
     )
 
 
-def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) -> MetaPublishRunResponse:
+def _publish_run_metadata(run: MetaPublishRun) -> dict[str, Any]:
+    return run.metadata_json if isinstance(run.metadata_json, dict) else {}
+
+
+def _publish_run_response(
+    run: MetaPublishRun,
+    items: list[MetaPublishRunItem] | None = None,
+) -> MetaPublishRunResponse:
     special_ad_categories = run.special_ad_categories_json if isinstance(run.special_ad_categories_json, list) else []
     return MetaPublishRunResponse(
         id=str(run.id),
@@ -1314,8 +1324,8 @@ def _publish_run_response(run: MetaPublishRun, items: list[MetaPublishRunItem]) 
         metaCampaignId=run.meta_campaign_id,
         managementMetaCampaignId=resolve_publish_run_management_meta_campaign_id(run),
         errorMessage=run.error_message,
-        metadata=run.metadata_json if isinstance(run.metadata_json, dict) else {},
-        items=[_publish_run_item_response(item) for item in items],
+        metadata=_publish_run_metadata(run),
+        items=[_publish_run_item_response(item) for item in (items or [])],
         createdByUserId=run.created_by_user_id,
         createdAt=run.created_at.isoformat(),
         updatedAt=run.updated_at.isoformat(),
@@ -1354,6 +1364,40 @@ def _campaign_delivery_config_snapshot(*, session: Session, auth: AuthContext, c
 def _launch_plan_key(payload: dict[str, Any]) -> str:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _plan_fingerprint_payload(launch_plan_payload: dict[str, Any]) -> dict[str, Any]:
+    items = launch_plan_payload.get("items")
+    normalized_items = (
+        sorted(
+            [item for item in items if isinstance(item, dict)],
+            key=lambda item: (
+                str(item.get("assetId") or ""),
+                str(item.get("creativeSpecId") or ""),
+                str(item.get("adsetSpecId") or ""),
+            ),
+        )
+        if isinstance(items, list)
+        else []
+    )
+    return {
+        "campaignId": launch_plan_payload.get("campaignId"),
+        "generationKey": launch_plan_payload.get("generationKey"),
+        "funnelId": launch_plan_payload.get("funnelId"),
+        "publishBaseUrl": launch_plan_payload.get("publishBaseUrl"),
+        "publishDomain": launch_plan_payload.get("publishDomain"),
+        "campaignObjective": launch_plan_payload.get("campaignObjective"),
+        "buyingType": launch_plan_payload.get("buyingType"),
+        "budgetScope": launch_plan_payload.get("budgetScope"),
+        "campaignDailyBudget": launch_plan_payload.get("campaignDailyBudget"),
+        "specialAdCategories": launch_plan_payload.get("specialAdCategories"),
+        "campaignDelivery": launch_plan_payload.get("campaignDelivery"),
+        "items": normalized_items,
+    }
+
+
+def _plan_fingerprint(launch_plan_payload: dict[str, Any]) -> str:
+    return _launch_plan_key(_plan_fingerprint_payload(launch_plan_payload))
 
 
 def _meta_asset_upload_request_id(*, asset_id: str) -> str:
@@ -1630,6 +1674,67 @@ def _publish_run_result_status(
     if published_count > 0:
         return "partial_failed", error_message, summary
     return "failed", error_message, summary
+
+
+def _publish_run_item_is_complete(record: MetaPublishRunItem) -> bool:
+    return record.status == "published" and bool(_clean_optional_text(record.meta_ad_id))
+
+
+def _create_publish_run_item_record(
+    *,
+    repo: MetaAdsRepository,
+    org_id: str,
+    publish_run_id: str,
+    resolved: dict[str, Any],
+    source_item: MetaPublishRunItem | None = None,
+) -> MetaPublishRunItem:
+    asset = resolved["asset"]
+    creative_spec = resolved["creative_spec"]
+    adset_spec = resolved["adset_spec"]
+    base_metadata = {
+        "assetPublicId": str(asset.public_id),
+        "creativeSpecName": creative_spec.name,
+        "adsetSpecName": adset_spec.name,
+        "bucketIndex": resolved.get("bucket_index"),
+    }
+    if source_item is not None:
+        source_metadata = _publish_run_item_metadata(source_item)
+        merged_metadata = {
+            **source_metadata,
+            **base_metadata,
+            "resumedFromRunItemId": str(source_item.id),
+        }
+        return repo.create_publish_run_item(
+            org_id=org_id,
+            publish_run_id=publish_run_id,
+            asset_id=str(asset.id),
+            creative_spec_id=str(creative_spec.id),
+            adset_spec_id=str(adset_spec.id),
+            status="published" if _publish_run_item_is_complete(source_item) else "pending",
+            resolved_destination_url=resolved["resolved_destination_url"],
+            meta_asset_upload_id=source_item.meta_asset_upload_id,
+            meta_creative_id=source_item.meta_creative_id,
+            meta_adset_id=source_item.meta_adset_id,
+            meta_ad_id=source_item.meta_ad_id,
+            error_message=None,
+            metadata_json=merged_metadata,
+        )
+
+    return repo.create_publish_run_item(
+        org_id=org_id,
+        publish_run_id=publish_run_id,
+        asset_id=str(asset.id),
+        creative_spec_id=str(creative_spec.id),
+        adset_spec_id=str(adset_spec.id),
+        status="pending",
+        resolved_destination_url=resolved["resolved_destination_url"],
+        meta_asset_upload_id=None,
+        meta_creative_id=None,
+        meta_adset_id=None,
+        meta_ad_id=None,
+        error_message=None,
+        metadata_json=base_metadata,
+    )
 
 
 def _validate_publish_plan(
@@ -2582,7 +2687,11 @@ def _update_meta_adset_internal(
 
     client = _get_meta_client(resolved=resolved)
     try:
-        response = client.update_adset(adset_id=meta_adset_id, payload=request_payload)
+        response = client.update_adset(
+            adset_id=meta_adset_id,
+            payload=request_payload,
+            throttle_scope=resolved.connection.ad_account_id,
+        )
     except MetaAdsError as exc:
         _raise_meta_error(exc)
 
@@ -3351,6 +3460,33 @@ def plan_meta_management(
             benchmark_mode=payload.benchmarkMode,
             evaluate_benchmarks=payload.evaluateBenchmarks,
         )
+        snapshot_request = build_management_snapshot_request(
+            meta_campaign_id=payload.metaCampaignId,
+            date_preset=payload.datePreset,
+            include_raw=payload.includeRaw,
+            benchmark_mode=benchmark_mode,
+            cut_rules=cut_rules,
+            event_mappings=event_mappings,
+        )
+        if payload.mode == "plan_only" and not payload.refresh:
+            cached_snapshot = load_cached_meta_management_snapshot(
+                session=session,
+                org_id=auth.org_id,
+                client_id=payload.clientId,
+                meta_config_id=payload.metaConfigId,
+                meta_campaign_id=payload.metaCampaignId,
+                date_preset=payload.datePreset,
+                include_raw=payload.includeRaw,
+                benchmark_mode=benchmark_mode,
+                cut_rules=cut_rules,
+                event_mappings=event_mappings,
+            )
+            if cached_snapshot is not None:
+                response_payload = jsonable_encoder(cached_snapshot.plan)
+                response_payload["artifacts"] = {
+                    "metricsSnapshotArtifactId": cached_snapshot.artifact_id,
+                }
+                return response_payload
         result = execute_meta_management_plan(
             session=session,
             org_id=auth.org_id,
@@ -3376,6 +3512,7 @@ def plan_meta_management(
             user_id=auth.user_id,
             campaign=result.campaign,
             plan=result.plan,
+            snapshot_request=snapshot_request,
         )
     return response_payload
 
@@ -3750,6 +3887,7 @@ def validate_meta_publish_plan(
 @router.get("/campaigns/{campaign_id}/publish-runs", response_model=list[MetaPublishRunResponse])
 def list_meta_publish_runs(
     campaign_id: str,
+    includeItems: bool = False,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -3760,10 +3898,36 @@ def list_meta_publish_runs(
 
     repo = MetaAdsRepository(session)
     runs = repo.list_publish_runs(org_id=auth.org_id, campaign_id=str(campaign.id))
+    if not includeItems:
+        return [_publish_run_response(run) for run in runs]
     return [
-        _publish_run_response(run, repo.list_publish_run_items(org_id=auth.org_id, publish_run_id=str(run.id)))
+        _publish_run_response(
+            run,
+            repo.list_publish_run_items(org_id=auth.org_id, publish_run_id=str(run.id)),
+        )
         for run in runs
     ]
+
+
+@router.get("/campaigns/{campaign_id}/publish-runs/{publish_run_id}", response_model=MetaPublishRunResponse)
+def get_meta_publish_run(
+    campaign_id: str,
+    publish_run_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaigns_repo = CampaignsRepository(session)
+    campaign = campaigns_repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    repo = MetaAdsRepository(session)
+    run = repo.get_publish_run(org_id=auth.org_id, publish_run_id=publish_run_id)
+    if run is None or str(run.campaign_id) != str(campaign.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publish run not found")
+
+    items = repo.list_publish_run_items(org_id=auth.org_id, publish_run_id=str(run.id))
+    return _publish_run_response(run, items)
 
 
 @router.post("/campaigns/{campaign_id}/management-target", response_model=MetaManagementTargetBindResponse)
@@ -3821,6 +3985,7 @@ def bind_meta_management_target(
         remote_campaign = client.get_object(
             object_id=requested_meta_campaign_id,
             fields="id,name,status,effective_status,objective,account_id,created_time,updated_time",
+            throttle_scope=ad_account_id,
         )
     except MetaAdsError as exc:
         _raise_meta_error(exc)
@@ -3989,13 +4154,13 @@ def create_meta_publish_run(
         launch_context_readiness=launch_context_readiness,
         delivery_snapshot=delivery_snapshot,
     )
+    plan_fingerprint = _plan_fingerprint(launch_plan_payload)
     launch_plan_artifact_id = _persist_launch_plan_artifact(
         session=session,
         auth=auth,
         campaign=campaign,
         launch_plan_payload=launch_plan_payload,
     )
-    launch_plan_key = str(launch_plan_payload["launchPlanKey"])
     publish_budget_scope = validation_response.budgetScope
     campaign_daily_budget = validation_response.campaignDailyBudget
 
@@ -4003,12 +4168,73 @@ def create_meta_publish_run(
     page_id = _require_meta_page_id(workspace_config=resolved_meta_config.workspace_config)
 
     repo = MetaAdsRepository(session)
+    resume_source_run = repo.get_latest_run_by_plan_fingerprint(
+        org_id=auth.org_id,
+        campaign_id=str(campaign.id),
+        plan_fingerprint=plan_fingerprint,
+    )
+    resume_source_items_by_asset_id: dict[str, MetaPublishRunItem] = {}
+    resume_launch_plan_key: str | None = None
+    resume_run_metadata: dict[str, Any] = {}
+    if resume_source_run is not None:
+        if resume_source_run.status == "running":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "An equivalent Meta publish run is already running. "
+                    "Wait for it to finish before retrying."
+                ),
+            )
+        resume_source_items = repo.list_publish_run_items(
+            org_id=auth.org_id,
+            publish_run_id=str(resume_source_run.id),
+        )
+        resume_source_items_by_asset_id = {str(item.asset_id): item for item in resume_source_items}
+        resume_run_metadata = _publish_run_metadata(resume_source_run)
+        stored_launch_plan_key = _clean_optional_text(resume_run_metadata.get("launchPlanKey"))
+        if stored_launch_plan_key:
+            resume_launch_plan_key = stored_launch_plan_key
+        source_summary = _summarize_publish_run_items(resume_source_items)
+        if (
+            resume_source_run.status == "published"
+            and source_summary["totalCount"] > 0
+            and source_summary["publishedCount"] == source_summary["totalCount"]
+            and _clean_optional_text(resume_source_run.meta_campaign_id)
+        ):
+            return _publish_run_response(resume_source_run, resume_source_items)
+
+    launch_plan_key = resume_launch_plan_key or str(launch_plan_payload["launchPlanKey"])
+    resume_attempt_count = 0
+    if isinstance(resume_run_metadata.get("resumeAttemptCount"), int):
+        resume_attempt_count = int(resume_run_metadata["resumeAttemptCount"])
+    if resume_source_run is not None:
+        resume_attempt_count += 1
+
+    run_metadata: dict[str, Any] = {
+        "validation": validation_response.model_dump(mode="json"),
+        "funnelId": _clean_optional_text(payload.funnelId),
+        "launchPlanArtifactId": launch_plan_artifact_id,
+        "launchPlanKey": launch_plan_key,
+        "planFingerprint": plan_fingerprint,
+        "campaignDelivery": delivery_snapshot,
+        "budgetScope": publish_budget_scope,
+        "campaignDailyBudget": campaign_daily_budget,
+        "resumeAttemptCount": resume_attempt_count,
+    }
+    if resume_source_run is not None:
+        run_metadata["resumeFromRunId"] = str(resume_source_run.id)
+        run_metadata["resumedAt"] = datetime.now(timezone.utc).isoformat()
+        if isinstance(resume_run_metadata.get("campaign"), dict):
+            run_metadata["campaign"] = resume_run_metadata["campaign"]
+
     run = repo.create_publish_run(
         org_id=auth.org_id,
         campaign_id=str(campaign.id),
         generation_key=payload.generationKey,
         status="running",
-        campaign_name=payload.campaignName,
+        campaign_name=(
+            resume_source_run.campaign_name if resume_source_run is not None else payload.campaignName
+        ),
         campaign_objective=payload.campaignObjective,
         buying_type=payload.buyingType,
         special_ad_categories_json=payload.specialAdCategories,
@@ -4017,49 +4243,31 @@ def create_meta_publish_run(
         meta_workspace_config_id=str(resolved_meta_config.workspace_config.id),
         ad_account_id=ad_account_id,
         page_id=page_id,
-        meta_campaign_id=None,
+        meta_campaign_id=(
+            _clean_optional_text(resume_source_run.meta_campaign_id)
+            if resume_source_run is not None
+            else None
+        ),
         created_by_user_id=auth.user_id,
         error_message=None,
-        metadata_json={
-            "validation": validation_response.model_dump(mode="json"),
-            "funnelId": _clean_optional_text(payload.funnelId),
-            "launchPlanArtifactId": launch_plan_artifact_id,
-            "launchPlanKey": launch_plan_key,
-            "campaignDelivery": delivery_snapshot,
-            "budgetScope": publish_budget_scope,
-            "campaignDailyBudget": campaign_daily_budget,
-        },
+        metadata_json=run_metadata,
         completed_at=None,
     )
 
     run_items_by_asset_id: dict[str, MetaPublishRunItem] = {}
     run_items_by_adset_spec_id: defaultdict[str, list[MetaPublishRunItem]] = defaultdict(list)
     for resolved in resolved_items:
-        asset = resolved["asset"]
-        creative_spec = resolved["creative_spec"]
-        adset_spec = resolved["adset_spec"]
-        run_item = repo.create_publish_run_item(
+        asset_id = str(resolved["asset"].id)
+        source_item = resume_source_items_by_asset_id.get(asset_id)
+        run_item = _create_publish_run_item_record(
+            repo=repo,
             org_id=auth.org_id,
             publish_run_id=str(run.id),
-            asset_id=str(asset.id),
-            creative_spec_id=str(creative_spec.id),
-            adset_spec_id=str(adset_spec.id),
-            status="pending",
-            resolved_destination_url=resolved["resolved_destination_url"],
-            meta_asset_upload_id=None,
-            meta_creative_id=None,
-            meta_adset_id=None,
-            meta_ad_id=None,
-            error_message=None,
-            metadata_json={
-                "assetPublicId": str(asset.public_id),
-                "creativeSpecName": creative_spec.name,
-                "adsetSpecName": adset_spec.name,
-                "bucketIndex": resolved.get("bucket_index"),
-            },
+            resolved=resolved,
+            source_item=source_item,
         )
-        run_items_by_asset_id[str(asset.id)] = run_item
-        run_items_by_adset_spec_id[str(adset_spec.id)].append(run_item)
+        run_items_by_asset_id[asset_id] = run_item
+        run_items_by_adset_spec_id[str(run_item.adset_spec_id)].append(run_item)
 
     def _finalize_publish_run(
         *,
@@ -4067,10 +4275,7 @@ def create_meta_publish_run(
         run_error_message: str | None,
         result_summary: dict[str, Any],
     ) -> MetaPublishRun:
-        next_metadata = {
-            **(run.metadata_json if isinstance(run.metadata_json, dict) else {}),
-            "resultSummary": result_summary,
-        }
+        next_metadata = {**_publish_run_metadata(run), "resultSummary": result_summary}
         if result_summary.get("publishedCount", 0) > 0:
             next_metadata["metaManagementMonitoring"] = _reconcile_meta_management_schedule(
                 org_id=auth.org_id,
@@ -4087,34 +4292,36 @@ def create_meta_publish_run(
 
     run_failure_stage = "campaign"
     try:
-        created_campaign = _create_meta_campaign_internal(
-            payload=MetaCampaignCreateRequest(
-                requestId=f"meta-launch-plan:{launch_plan_key}:campaign",
-                adAccountId=ad_account_id,
-                metaConfigId=str(resolved_meta_config.workspace_config.id),
-                campaignId=str(campaign.id),
-                name=payload.campaignName,
-                objective=payload.campaignObjective,
-                status="PAUSED",
-                specialAdCategories=payload.specialAdCategories,
-                buyingType=payload.buyingType,
-                bidStrategy="LOWEST_COST_WITHOUT_CAP",
-                dailyBudget=campaign_daily_budget,
-                isAdsetBudgetSharingEnabled=False if publish_budget_scope == "adset" else None,
-            ),
-            auth=auth,
-            session=session,
-            resolved_meta_config=resolved_meta_config,
-        )
-        meta_campaign_id = _clean_optional_text(created_campaign.get("meta_campaign_id"))
-        run = repo.update_publish_run(
-            run,
-            meta_campaign_id=meta_campaign_id,
-            metadata_json={
-                **(run.metadata_json if isinstance(run.metadata_json, dict) else {}),
-                "campaign": created_campaign,
-            },
-        )
+        meta_campaign_id = _clean_optional_text(run.meta_campaign_id)
+        if not meta_campaign_id:
+            created_campaign = _create_meta_campaign_internal(
+                payload=MetaCampaignCreateRequest(
+                    requestId=f"meta-launch-plan:{launch_plan_key}:campaign",
+                    adAccountId=ad_account_id,
+                    metaConfigId=str(resolved_meta_config.workspace_config.id),
+                    campaignId=str(campaign.id),
+                    name=payload.campaignName,
+                    objective=payload.campaignObjective,
+                    status="PAUSED",
+                    specialAdCategories=payload.specialAdCategories,
+                    buyingType=payload.buyingType,
+                    bidStrategy="LOWEST_COST_WITHOUT_CAP",
+                    dailyBudget=campaign_daily_budget,
+                    isAdsetBudgetSharingEnabled=False if publish_budget_scope == "adset" else None,
+                ),
+                auth=auth,
+                session=session,
+                resolved_meta_config=resolved_meta_config,
+            )
+            meta_campaign_id = _clean_optional_text(created_campaign.get("meta_campaign_id"))
+            run = repo.update_publish_run(
+                run,
+                meta_campaign_id=meta_campaign_id,
+                metadata_json={
+                    **_publish_run_metadata(run),
+                    "campaign": created_campaign,
+                },
+            )
 
         meta_adset_id_by_spec_id: dict[str, str] = {}
         run_failure_stage = "adset"
@@ -4140,34 +4347,44 @@ def create_meta_publish_run(
             adset_spec_id = str(adset_spec.id)
             bucket_run_items = run_items_by_adset_spec_id.get(adset_spec_id, [])
             try:
-                created_adset = _create_meta_adset_internal(
-                    payload=MetaAdSetCreateRequest(
-                        requestId=f"meta-launch-plan:{launch_plan_key}:adset:{adset_spec_id}",
-                        adAccountId=ad_account_id,
-                        metaConfigId=str(resolved_meta_config.workspace_config.id),
-                        campaignId=meta_campaign_id or "",
-                        name=_clean_optional_text(adset_spec.name) or adset_spec_id,
-                        status="PAUSED",
-                        dailyBudget=adset_spec.daily_budget if publish_budget_scope == "adset" else None,
-                        lifetimeBudget=adset_spec.lifetime_budget if publish_budget_scope == "adset" else None,
-                        billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
-                        optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
-                        targeting=adset_spec.targeting or {},
-                        placements=adset_spec.placements if isinstance(adset_spec.placements, dict) else None,
-                        startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
-                        endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
-                        bidStrategy="LOWEST_COST_WITHOUT_CAP",
-                        dsaBeneficiary=_clean_optional_text(adset_spec.dsa_beneficiary),
-                        dsaPayor=_clean_optional_text(adset_spec.dsa_payor),
-                        promotedObject=adset_spec.promoted_object,
-                        attributionSpec=_resolved_publish_adset_attribution_spec(adset_spec),
-                        validateOnly=False,
+                meta_adset_id = next(
+                    (
+                        _clean_optional_text(item.meta_adset_id)
+                        for item in bucket_run_items
+                        if _clean_optional_text(item.meta_adset_id)
                     ),
-                    auth=auth,
-                    session=session,
-                    resolved_meta_config=resolved_meta_config,
+                    None,
                 )
-                meta_adset_id = _clean_optional_text(created_adset.get("meta_adset_id"))
+                created_adset = None
+                if not meta_adset_id:
+                    created_adset = _create_meta_adset_internal(
+                        payload=MetaAdSetCreateRequest(
+                            requestId=f"meta-launch-plan:{launch_plan_key}:adset:{adset_spec_id}",
+                            adAccountId=ad_account_id,
+                            metaConfigId=str(resolved_meta_config.workspace_config.id),
+                            campaignId=meta_campaign_id or "",
+                            name=_clean_optional_text(adset_spec.name) or adset_spec_id,
+                            status="PAUSED",
+                            dailyBudget=adset_spec.daily_budget if publish_budget_scope == "adset" else None,
+                            lifetimeBudget=adset_spec.lifetime_budget if publish_budget_scope == "adset" else None,
+                            billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
+                            optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
+                            targeting=adset_spec.targeting or {},
+                            placements=adset_spec.placements if isinstance(adset_spec.placements, dict) else None,
+                            startTime=adset_spec.start_time.isoformat() if adset_spec.start_time else None,
+                            endTime=adset_spec.end_time.isoformat() if adset_spec.end_time else None,
+                            bidStrategy="LOWEST_COST_WITHOUT_CAP",
+                            dsaBeneficiary=_clean_optional_text(adset_spec.dsa_beneficiary),
+                            dsaPayor=_clean_optional_text(adset_spec.dsa_payor),
+                            promotedObject=adset_spec.promoted_object,
+                            attributionSpec=_resolved_publish_adset_attribution_spec(adset_spec),
+                            validateOnly=False,
+                        ),
+                        auth=auth,
+                        session=session,
+                        resolved_meta_config=resolved_meta_config,
+                    )
+                    meta_adset_id = _clean_optional_text(created_adset.get("meta_adset_id"))
                 if not meta_adset_id:
                     raise HTTPException(
                         status_code=status.HTTP_502_BAD_GATEWAY,
@@ -4185,7 +4402,7 @@ def create_meta_publish_run(
                         stage_status="ready",
                         status=bucket_run_item.status,
                         meta_adset_id=meta_adset_id,
-                        metadata_updates={"adset": created_adset},
+                        metadata_updates={"adset": created_adset} if created_adset else None,
                     )
                     run_items_by_asset_id[str(updated_item.asset_id)] = updated_item
             except (HTTPException, Exception) as exc:  # noqa: PERF203
@@ -4212,6 +4429,8 @@ def create_meta_publish_run(
             run_item = run_items_by_asset_id[str(asset.id)]
             if run_item.status == "failed":
                 continue
+            if _publish_run_item_is_complete(run_item):
+                continue
 
             meta_adset_id = meta_adset_id_by_spec_id.get(str(adset_spec.id))
             if not meta_adset_id:
@@ -4228,64 +4447,80 @@ def create_meta_publish_run(
 
             current_stage = "asset_upload"
             try:
-                run_item = _update_publish_run_item_stage(
-                    repo=repo,
-                    record=run_item,
-                    stage=current_stage,
-                    stage_status="running",
-                    status="running",
-                    meta_adset_id=meta_adset_id,
+                item_metadata = _publish_run_item_metadata(run_item)
+                uploaded_asset = (
+                    item_metadata.get("upload")
+                    if isinstance(item_metadata.get("upload"), dict)
+                    else None
                 )
-                uploaded_asset = _upload_meta_asset_internal(
-                    asset_id=str(asset.id),
-                    payload=MetaAssetUploadRequest(
-                        requestId=_meta_asset_upload_request_id(asset_id=str(asset.id)),
-                        adAccountId=ad_account_id,
-                        metaConfigId=str(resolved_meta_config.workspace_config.id),
-                    ),
-                    auth=auth,
-                    session=session,
-                    resolved_meta_config=resolved_meta_config,
+                created_creative = (
+                    item_metadata.get("creative")
+                    if isinstance(item_metadata.get("creative"), dict)
+                    else None
                 )
-                meta_asset_upload_id = _clean_optional_text(uploaded_asset.get("id"))
 
-                current_stage = "creative"
-                run_item = _update_publish_run_item_stage(
-                    repo=repo,
-                    record=run_item,
-                    stage=current_stage,
-                    stage_status="running",
-                    status="running",
-                    meta_asset_upload_id=meta_asset_upload_id,
-                    meta_adset_id=meta_adset_id,
-                    metadata_updates={"upload": uploaded_asset},
-                )
-                created_creative = _create_meta_creative_internal(
-                    payload=MetaCreativeCreateRequest(
-                        requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:creative",
-                        adAccountId=ad_account_id,
-                        metaConfigId=str(resolved_meta_config.workspace_config.id),
-                        assetId=str(asset.id),
-                        name=_clean_optional_text(creative_spec.name) or str(asset.public_id),
-                        pageId=resolved["effective_page_id"],
-                        instagramActorId=_clean_optional_text(creative_spec.instagram_actor_id),
-                        linkUrl=resolved["resolved_destination_url"],
-                        message=_clean_optional_text(creative_spec.primary_text),
-                        headline=_clean_optional_text(creative_spec.headline),
-                        description=_clean_optional_text(creative_spec.description),
-                        callToActionType=_clean_optional_text(creative_spec.call_to_action_type),
-                        validateOnly=False,
-                    ),
-                    auth=auth,
-                    session=session,
-                    resolved_meta_config=resolved_meta_config,
-                )
-                meta_creative_id = _clean_optional_text(created_creative.get("meta_creative_id"))
-                if not meta_creative_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f"Meta publish run did not receive a meta_creative_id for asset {asset.id}.",
+                meta_asset_upload_id = _clean_optional_text(run_item.meta_asset_upload_id)
+                if not meta_asset_upload_id:
+                    run_item = _update_publish_run_item_stage(
+                        repo=repo,
+                        record=run_item,
+                        stage=current_stage,
+                        stage_status="running",
+                        status="running",
+                        meta_adset_id=meta_adset_id,
                     )
+                    uploaded_asset = _upload_meta_asset_internal(
+                        asset_id=str(asset.id),
+                        payload=MetaAssetUploadRequest(
+                            requestId=_meta_asset_upload_request_id(asset_id=str(asset.id)),
+                            adAccountId=ad_account_id,
+                            metaConfigId=str(resolved_meta_config.workspace_config.id),
+                        ),
+                        auth=auth,
+                        session=session,
+                        resolved_meta_config=resolved_meta_config,
+                    )
+                    meta_asset_upload_id = _clean_optional_text(uploaded_asset.get("id"))
+
+                meta_creative_id = _clean_optional_text(run_item.meta_creative_id)
+                if not meta_creative_id:
+                    current_stage = "creative"
+                    run_item = _update_publish_run_item_stage(
+                        repo=repo,
+                        record=run_item,
+                        stage=current_stage,
+                        stage_status="running",
+                        status="running",
+                        meta_asset_upload_id=meta_asset_upload_id,
+                        meta_adset_id=meta_adset_id,
+                        metadata_updates={"upload": uploaded_asset} if uploaded_asset else None,
+                    )
+                    created_creative = _create_meta_creative_internal(
+                        payload=MetaCreativeCreateRequest(
+                            requestId=f"meta-launch-plan:{launch_plan_key}:asset:{asset.id}:creative",
+                            adAccountId=ad_account_id,
+                            metaConfigId=str(resolved_meta_config.workspace_config.id),
+                            assetId=str(asset.id),
+                            name=_clean_optional_text(creative_spec.name) or str(asset.public_id),
+                            pageId=resolved["effective_page_id"],
+                            instagramActorId=_clean_optional_text(creative_spec.instagram_actor_id),
+                            linkUrl=resolved["resolved_destination_url"],
+                            message=_clean_optional_text(creative_spec.primary_text),
+                            headline=_clean_optional_text(creative_spec.headline),
+                            description=_clean_optional_text(creative_spec.description),
+                            callToActionType=_clean_optional_text(creative_spec.call_to_action_type),
+                            validateOnly=False,
+                        ),
+                        auth=auth,
+                        session=session,
+                        resolved_meta_config=resolved_meta_config,
+                    )
+                    meta_creative_id = _clean_optional_text(created_creative.get("meta_creative_id"))
+                    if not meta_creative_id:
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail=f"Meta publish run did not receive a meta_creative_id for asset {asset.id}.",
+                        )
 
                 current_stage = "ad"
                 run_item = _update_publish_run_item_stage(

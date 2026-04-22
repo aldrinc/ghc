@@ -1131,7 +1131,6 @@ export function MetaPublishProvider({
       await persistPublishAdSetConfigs();
       await refreshPipeline();
       setPublishValidation(await validatePublishPlan(campaign.id, buildPublishRequestPayload()));
-      await refreshPublishRuns();
     } catch (err) {
       setPublishFormError(getErrorMessage(err));
       const apiError = err as ApiError;

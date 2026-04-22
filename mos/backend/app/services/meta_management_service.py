@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -58,6 +59,13 @@ class MetaManagementMonitoringRunResult:
     benchmark_available: bool = False
     benchmark_reason_code: str | None = None
     artifact_ids: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class CachedMetaManagementSnapshot:
+    campaign: Campaign
+    plan: MetaManagementPlan
+    artifact_id: str
 
 
 def resolve_publish_run_management_meta_campaign_id(run: MetaPublishRun) -> str | None:
@@ -125,6 +133,148 @@ def _apply_benchmark_status(
             ),
             "warnings": warnings,
         }
+    )
+
+
+def build_management_snapshot_request(
+    *,
+    meta_campaign_id: str,
+    date_preset: str,
+    include_raw: bool,
+    benchmark_mode: MetaManagementBenchmarkMode,
+    cut_rules: MetaCutRuleConfig,
+    event_mappings: MetaEventMappings,
+) -> dict[str, Any]:
+    return {
+        "metaCampaignId": meta_campaign_id,
+        "datePreset": date_preset,
+        "includeRaw": include_raw,
+        "benchmarkMode": benchmark_mode,
+        "cutRules": cut_rules.model_dump(mode="json"),
+        "eventMappings": {
+            "landingPageViewActionType": event_mappings.landing_page_view_action_type,
+            "contentViewActionType": event_mappings.content_view_action_type,
+            "addToCartActionType": event_mappings.add_to_cart_action_type,
+            "initiateCheckoutActionType": event_mappings.initiate_checkout_action_type,
+            "purchaseActionType": event_mappings.purchase_action_type,
+            "purchaseValueActionType": event_mappings.purchase_value_action_type,
+        },
+    }
+
+
+def _management_snapshot_ttl(date_preset: str) -> timedelta:
+    if date_preset == "last_3d":
+        return timedelta(minutes=15)
+    if date_preset == "last_7d":
+        return timedelta(minutes=30)
+    if date_preset == "maximum":
+        return timedelta(minutes=60)
+    return timedelta(minutes=15)
+
+
+def load_cached_meta_management_snapshot(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str | None,
+    meta_config_id: str | None,
+    meta_campaign_id: str,
+    date_preset: str,
+    include_raw: bool,
+    benchmark_mode: MetaManagementBenchmarkMode,
+    cut_rules: MetaCutRuleConfig,
+    event_mappings: MetaEventMappings,
+) -> CachedMetaManagementSnapshot | None:
+    try:
+        resolved = resolve_workspace_config_for_client_or_config(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            config_id=meta_config_id,
+        )
+        ad_account_id = resolve_ad_account_id_for_context(resolved=resolved)
+    except MetaWorkspaceConfigError as exc:
+        message = str(exc)
+        if message == "clientId or metaConfigId is required.":
+            raise MetaManagementExecutionError(status_code=400, detail=message) from exc
+        if message == "Meta workspace config not found.":
+            raise MetaManagementExecutionError(status_code=404, detail=message) from exc
+        raise MetaManagementExecutionError(status_code=409, detail=message) from exc
+
+    repo = MetaAdsRepository(session)
+    local_meta_campaign = repo.get_campaign_by_meta_id(
+        org_id=org_id,
+        ad_account_id=ad_account_id,
+        meta_campaign_id=meta_campaign_id,
+    )
+    if local_meta_campaign is None or local_meta_campaign.campaign_id is None:
+        return None
+
+    campaign = CampaignsRepository(session).get(
+        org_id=org_id,
+        campaign_id=str(local_meta_campaign.campaign_id),
+    )
+    if campaign is None:
+        return None
+
+    artifact = ArtifactsRepository(session).get_latest_by_type_for_campaign(
+        org_id=org_id,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.meta_management_metrics_snapshot,
+    )
+    if artifact is None:
+        return None
+    if artifact.created_at < datetime.now(timezone.utc) - _management_snapshot_ttl(date_preset):
+        return None
+    data = artifact.data if isinstance(artifact.data, dict) else {}
+    expected_request = build_management_snapshot_request(
+        meta_campaign_id=meta_campaign_id,
+        date_preset=date_preset,
+        include_raw=include_raw,
+        benchmark_mode=benchmark_mode,
+        cut_rules=cut_rules,
+        event_mappings=event_mappings,
+    )
+    if data.get("snapshotRequest") != expected_request:
+        return None
+
+    try:
+        plan = MetaManagementPlan.model_validate(
+            {
+                "mode": "plan_only",
+                "generatedAt": data["generatedAt"],
+                "window": data["window"],
+                "campaign": data["campaign"],
+                "adsets": data["adsets"],
+                "objectState": data["objectState"],
+                "observedActionTypes": data.get("observedActionTypes", {}),
+                "rows": data.get("rows", []),
+                "actions": data.get("actions", []),
+                "appliedActions": data.get("appliedActions", []),
+                "warnings": data.get("warnings", []),
+                "managementScope": data.get("managementScope", "meta_only"),
+                "benchmarkStatus": data["benchmarkStatus"],
+                "benchmarkContext": data.get("benchmarkContext"),
+                "funnelSnapshot": data.get("funnelSnapshot"),
+                "benchmarkEvaluations": data.get("benchmarkEvaluations", []),
+                "customMetricDefinitions": data.get("customMetricDefinitions", []),
+                "customMetricSummary": data.get("customMetricSummary", []),
+                "customMetricRows": data.get("customMetricRows", []),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise MetaManagementExecutionError(
+            status_code=409,
+            detail=(
+                "Cached management snapshot is invalid for this campaign. "
+                "Refresh explicitly to rebuild it."
+            ),
+        ) from exc
+
+    return CachedMetaManagementSnapshot(
+        campaign=campaign,
+        plan=plan,
+        artifact_id=str(artifact.id),
     )
 
 
@@ -296,6 +446,7 @@ def persist_meta_management_artifacts(
     user_id: str | None,
     campaign: Campaign,
     plan: MetaManagementPlan,
+    snapshot_request: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     artifacts_repo = ArtifactsRepository(session)
     metrics_artifact = artifacts_repo.insert(
@@ -305,13 +456,18 @@ def persist_meta_management_artifacts(
         campaign_id=str(campaign.id),
         artifact_type=ArtifactTypeEnum.meta_management_metrics_snapshot,
         data={
+            "snapshotRequest": snapshot_request,
             "generatedAt": plan.generatedAt,
+            "mode": plan.mode,
             "window": plan.window,
             "campaign": plan.campaign,
             "adsets": plan.adsets,
             "objectState": plan.objectState.model_dump(mode="json"),
             "rows": [row.model_dump(mode="json") for row in plan.rows],
             "observedActionTypes": plan.observedActionTypes,
+            "actions": [action.model_dump(mode="json") for action in plan.actions],
+            "appliedActions": [action.model_dump(mode="json") for action in plan.appliedActions],
+            "warnings": plan.warnings,
             "managementScope": plan.managementScope,
             "benchmarkStatus": plan.benchmarkStatus.model_dump(mode="json"),
             "benchmarkContext": (
@@ -342,6 +498,7 @@ def persist_meta_management_artifacts(
         campaign_id=str(campaign.id),
         artifact_type=ArtifactTypeEnum.meta_management_recommended_actions,
         data={
+            "snapshotRequest": snapshot_request,
             "generatedAt": plan.generatedAt,
             "mode": plan.mode,
             "managementScope": plan.managementScope,
@@ -444,6 +601,14 @@ def run_meta_management_monitoring_snapshot(
         user_id=None,
         campaign=campaign,
         plan=result.plan,
+        snapshot_request=build_management_snapshot_request(
+            meta_campaign_id=meta_campaign_id,
+            date_preset=date_preset,
+            include_raw=False,
+            benchmark_mode="best_effort",
+            cut_rules=MetaCutRuleConfig(),
+            event_mappings=MetaEventMappings(),
+        ),
     )
     return MetaManagementMonitoringRunResult(
         status="applied",

@@ -325,6 +325,7 @@ export type MetaManagementPlanRequest = {
   mode?: "plan_only" | "apply";
   datePreset?: string;
   includeRaw?: boolean;
+  refresh?: boolean;
   benchmarkMode?: "disabled" | "best_effort" | "required";
   evaluateBenchmarks?: boolean | null;
   cutRules?: {

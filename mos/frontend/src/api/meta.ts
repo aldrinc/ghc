@@ -220,7 +220,20 @@ export function useMetaApi() {
   );
 
   const listPublishRuns = useCallback(
-    (campaignId: string) => get<MetaPublishRun[]>(`/meta/campaigns/${campaignId}/publish-runs`),
+    (campaignId: string, options?: { includeItems?: boolean }) => {
+      const params = new URLSearchParams();
+      if (options?.includeItems) params.set("includeItems", "true");
+      const qs = params.toString();
+      return get<MetaPublishRun[]>(
+        qs ? `/meta/campaigns/${campaignId}/publish-runs?${qs}` : `/meta/campaigns/${campaignId}/publish-runs`,
+      );
+    },
+    [get],
+  );
+
+  const getPublishRun = useCallback(
+    (campaignId: string, publishRunId: string) =>
+      get<MetaPublishRun>(`/meta/campaigns/${campaignId}/publish-runs/${publishRunId}`),
     [get],
   );
 
@@ -265,6 +278,7 @@ export function useMetaApi() {
     updateAdSetSpec,
     validatePublishPlan,
     listPublishRuns,
+    getPublishRun,
     createPublishRun,
     planManagement,
   };
