@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -340,8 +341,10 @@ def test_apply_plan_deploys_only_selected_workload(tmp_path, monkeypatch):
         def remove_workload(self, app):
             deployed.append(f"remove:{app.name}")
 
-    def fake_run(cmd, cwd=None, check=False, env=None):
-        _ = cwd, check, env
+    def fake_run(cmd, cwd=None, check=False, env=None, **kwargs):
+        _ = cwd, check, env, kwargs
+        if len(cmd) >= 3 and cmd[1:3] == ["state", "list"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         if len(cmd) >= 2 and cmd[1] == "apply":
             return FakeCompleted(returncode=0)
         return FakeCompleted(returncode=0)
@@ -356,6 +359,14 @@ def test_apply_plan_deploys_only_selected_workload(tmp_path, monkeypatch):
         lambda cmd, cwd=None, env=None: json.dumps(
             {"server_ips": {"value": {"mos-ghc-1": "127.0.0.1"}}}
         ).encode("utf-8"),
+    )
+    monkeypatch.setattr(
+        apply_module.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"servers": []},
+        ),
     )
     monkeypatch.setattr(apply_module, "ServerDeployer", FakeDeployer)
     monkeypatch.setenv("HCLOUD_TOKEN", "token")
