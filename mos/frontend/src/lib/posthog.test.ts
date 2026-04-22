@@ -110,6 +110,8 @@ describe("capturePostHogEvent", () => {
         [
           "gPFG-Lz2YfpQgyEjLvec7KsmvBEbyiQa8HkeY8lsmVk",
           expect.objectContaining({
+            capture_pageview: true,
+            capture_pageleave: true,
             person_profiles: "always",
           }),
           "mosFunnel",

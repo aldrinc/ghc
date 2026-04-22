@@ -311,8 +311,8 @@ export function ensurePostHogInstance({
       defaults: cleanText(tracking?.posthogDefaults) || "2026-01-30",
       person_profiles: cleanText(tracking?.posthogPersonProfiles) || "always",
       autocapture: false,
-      capture_pageview: false,
-      capture_pageleave: false,
+      capture_pageview: true,
+      capture_pageleave: true,
       bootstrap: {
         distinctID: cleanText(distinctId) || "anonymous-funnel-visitor",
         isIdentifiedID: false,

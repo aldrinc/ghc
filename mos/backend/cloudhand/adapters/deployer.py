@@ -5644,8 +5644,8 @@ WantedBy=multi-user.target
         defaults,
         person_profiles: personProfiles,
         autocapture: false,
-        capture_pageview: false,
-        capture_pageleave: false,
+        capture_pageview: true,
+        capture_pageleave: true,
         bootstrap: {
           distinctID: distinctId,
           isIdentifiedID: false,
