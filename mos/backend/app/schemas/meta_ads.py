@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.services.meta_publish_defaults import DEFAULT_META_PUBLISH_BUCKET_COUNT
 
 
 class MetaAssetUploadRequest(BaseModel):
@@ -263,6 +265,8 @@ class MetaPublishRunRequest(BaseModel):
     buyingType: str | None = None
     specialAdCategories: list[str] = Field(default_factory=list)
     campaignDailyBudget: int | None = None
+    bucketCount: int | None = None
+    bucketDestinationUrls: list[str] = Field(default_factory=list)
 
     @field_validator("generationKey")
     @classmethod
@@ -329,11 +333,50 @@ class MetaPublishRunRequest(BaseModel):
             cleaned.append(normalized)
         return cleaned
 
+    @field_validator("bucketCount")
+    @classmethod
+    def _validate_bucket_count(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if value < 1 or value > DEFAULT_META_PUBLISH_BUCKET_COUNT:
+            raise ValueError(
+                f"bucketCount must be between 1 and {DEFAULT_META_PUBLISH_BUCKET_COUNT}."
+            )
+        return value
+
+    @field_validator("bucketDestinationUrls")
+    @classmethod
+    def _validate_bucket_destination_urls(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                raise ValueError(
+                    "bucketDestinationUrls must contain non-empty absolute http(s) URLs."
+                )
+            normalized = entry.strip()
+            parsed = urlparse(normalized)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError(
+                    "bucketDestinationUrls must contain absolute http(s) URLs."
+                )
+            cleaned.append(normalized)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _validate_bucket_destination_url_count(self) -> "MetaPublishRunRequest":
+        if self.bucketDestinationUrls:
+            if self.bucketCount is None:
+                raise ValueError("bucketCount is required when bucketDestinationUrls are provided.")
+            if len(self.bucketDestinationUrls) != self.bucketCount:
+                raise ValueError("bucketDestinationUrls length must match bucketCount.")
+        return self
+
 
 class MetaPublishPlanValidationItemResponse(BaseModel):
     assetId: str
     creativeSpecId: str | None = None
     adsetSpecId: str | None = None
+    bucketIndex: int | None = None
     resolvedDestinationUrl: str | None = None
     status: Literal["ok", "blocked"]
     blockers: list[str] = Field(default_factory=list)
@@ -345,10 +388,12 @@ class MetaPublishPlanValidationResponse(BaseModel):
     ok: bool
     includedCount: int
     adsetCount: int
+    bucketCount: int = DEFAULT_META_PUBLISH_BUCKET_COUNT
     publishBaseUrl: str
     publishDomain: str | None = None
     budgetScope: Literal["campaign", "adset", "mixed"] = "campaign"
     campaignDailyBudget: int | None = None
+    bucketDestinationUrls: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     items: list[MetaPublishPlanValidationItemResponse] = Field(default_factory=list)
 

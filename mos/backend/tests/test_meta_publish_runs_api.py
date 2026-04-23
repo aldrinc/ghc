@@ -911,6 +911,86 @@ def test_validate_meta_publish_plan_respects_requested_campaign_daily_budget(api
     assert payload["campaignDailyBudget"] == 25000
 
 
+def test_validate_meta_publish_plan_respects_custom_bucket_count_and_urls(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-custom-buckets-validate",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-custom-buckets-validate"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+
+    assets: list[Asset] = []
+    for suffix in ("custom-bucket-1", "custom-bucket-2", "custom-bucket-3", "custom-bucket-4"):
+        asset = _create_asset(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            batch_id="latest-run",
+            suffix=suffix,
+            asset_brief_id=brief_id,
+        )
+        _create_meta_publish_inputs(
+            db_session,
+            asset=asset,
+            campaign_id=campaign_id,
+            experiment_key=f"exp-{suffix}",
+            with_targeting=True,
+        )
+        assets.append(asset)
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    bucket_destination_urls = [
+        "https://shop.thehonestherbalist.com/presales-a",
+        "https://shop.thehonestherbalist.com/presales-b",
+        "https://shop.thehonestherbalist.com/presales-c",
+    ]
+    response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Launch",
+            "campaignObjective": "OUTCOME_SALES",
+            "bucketCount": 3,
+            "bucketDestinationUrls": bucket_destination_urls,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["bucketCount"] == 3
+    assert payload["adsetCount"] == 3
+    assert payload["bucketDestinationUrls"] == bucket_destination_urls
+    assert len(payload["items"]) == len(assets)
+    bucket_index_counts = Counter(item["bucketIndex"] for item in payload["items"])
+    assert bucket_index_counts == Counter({1: 2, 2: 1, 3: 1})
+    resolved_destination_counts = Counter(
+        item["resolvedDestinationUrl"] for item in payload["items"]
+    )
+    assert resolved_destination_counts == Counter(
+        {
+            bucket_destination_urls[0]: 2,
+            bucket_destination_urls[1]: 1,
+            bucket_destination_urls[2]: 1,
+        }
+    )
+
+
 def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_session, monkeypatch) -> None:
     client_id, product_id, campaign_id = _create_campaign_with_product(
         api_client,
@@ -1683,6 +1763,114 @@ def test_publish_meta_run_distributes_creatives_across_five_cbo_buckets(
         }
     )
     assert Counter(ad_creations) == meta_adset_counts
+
+
+def test_publish_meta_run_respects_custom_bucket_count_and_urls(
+    api_client,
+    db_session,
+    monkeypatch,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-custom-buckets-run",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-custom-buckets-run"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+
+    for suffix in ("custom-run-1", "custom-run-2", "custom-run-3", "custom-run-4"):
+        asset = _create_asset(
+            db_session,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            batch_id="latest-run",
+            suffix=suffix,
+            asset_brief_id=brief_id,
+        )
+        _create_meta_publish_inputs(
+            db_session,
+            asset=asset,
+            campaign_id=campaign_id,
+            experiment_key=f"exp-{suffix}",
+            with_targeting=True,
+        )
+
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    adset_counter = {"count": 0}
+    creative_links: list[str] = []
+    bucket_destination_urls = [
+        "https://shop.thehonestherbalist.com/presales-a",
+        "https://shop.thehonestherbalist.com/presales-b",
+        "https://shop.thehonestherbalist.com/presales-c",
+    ]
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key.startswith("creative/")
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            return {"images": {kwargs["filename"]: {"hash": f"hash_{kwargs['filename']}"}}}
+
+        def create_campaign(self, **_kwargs):
+            return {"id": "meta_campaign_custom_buckets", "status": "PAUSED"}
+
+        def create_adset(self, **_kwargs):
+            adset_counter["count"] += 1
+            return {"id": f"meta_adset_custom_bucket_{adset_counter['count']}", "status": "PAUSED"}
+
+        def create_adcreative(self, **kwargs):
+            creative_links.append(kwargs["payload"]["object_story_spec"]["link_data"]["link"])
+            return {"id": f"meta_creative_custom_bucket_{len(creative_links)}"}
+
+        def create_ad(self, **_kwargs):
+            return {"id": f"meta_ad_custom_bucket_{len(creative_links)}", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **_kwargs: _FakeMetaClient())
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist 3 Bucket Launch",
+            "campaignObjective": "OUTCOME_SALES",
+            "bucketCount": 3,
+            "bucketDestinationUrls": bucket_destination_urls,
+        },
+    )
+
+    assert publish_response.status_code == 200, publish_response.text
+    publish_payload = publish_response.json()
+    assert publish_payload["status"] == "published"
+    assert publish_payload["metadata"]["bucketCount"] == 3
+    assert publish_payload["metadata"]["bucketDestinationUrls"] == bucket_destination_urls
+    assert publish_payload["metadata"]["validation"]["bucketCount"] == 3
+    assert adset_counter["count"] == 3
+    tracked_bucket_destination_urls = [
+        f"{url}?utm_source=meta&utm_medium=paid" for url in bucket_destination_urls
+    ]
+    assert Counter(creative_links) == Counter(
+        {
+            tracked_bucket_destination_urls[0]: 2,
+            tracked_bucket_destination_urls[1]: 1,
+            tracked_bucket_destination_urls[2]: 1,
+        }
+    )
 
 
 def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(

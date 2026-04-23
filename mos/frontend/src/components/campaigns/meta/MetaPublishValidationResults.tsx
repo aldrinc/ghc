@@ -18,6 +18,10 @@ export function MetaPublishValidationResults() {
   if (!publishValidation) return null;
   const budgetScopeLabel = formatBudgetScopeLabel(publishValidation.budgetScope);
   const campaignBudgetLabel = formatMinorUnitsBudget(publishValidation.campaignDailyBudget);
+  const bucketCount =
+    typeof publishValidation.bucketCount === "number"
+      ? publishValidation.bucketCount
+      : publishValidation.adsetCount;
 
   return (
     <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3">
@@ -25,6 +29,9 @@ export function MetaPublishValidationResults() {
         <div className="text-sm font-semibold text-content">Publish validation</div>
         <Badge tone={publishValidation.ok ? "success" : "danger"}>
           {publishValidation.ok ? "Ready to publish" : "Blocked"}
+        </Badge>
+        <Badge tone="neutral">
+          {publishValidation.adsetCount}/{bucketCount} bucket{bucketCount === 1 ? "" : "s"}
         </Badge>
         {publishValidation.publishDomain ? <Badge tone="neutral">{publishValidation.publishDomain}</Badge> : null}
         {budgetScopeLabel ? <Badge tone="neutral">{budgetScopeLabel}</Badge> : null}
@@ -45,6 +52,7 @@ export function MetaPublishValidationResults() {
               <Badge tone={item.status === "ok" ? "success" : "danger"}>
                 {item.status === "ok" ? "OK" : "Blocked"}
               </Badge>
+              {item.bucketIndex ? <Badge tone="neutral">{`Bucket ${item.bucketIndex}`}</Badge> : null}
               {item.resolvedDestinationUrl ? (
                 <span className="truncate text-content-muted">{item.resolvedDestinationUrl}</span>
               ) : null}

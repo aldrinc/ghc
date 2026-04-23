@@ -369,7 +369,7 @@ def _campaign_bucket_specs(
         if bucket_index in bucket_specs_by_index:
             blockers.append(
                 "Campaign has duplicate Meta CBO bucket specs. "
-                "Each bucket index 1-5 must exist at most once."
+                "Each bucket index must exist at most once."
             )
             continue
         bucket_specs_by_index[bucket_index] = spec
@@ -379,10 +379,26 @@ def _campaign_bucket_specs(
     )
 
 
-def _campaign_bucket_spec_count_blocker_message(count: int) -> str:
+def _campaign_bucket_spec_count_blocker_message(
+    *,
+    requested_bucket_count: int,
+    available_bucket_indices: list[int],
+) -> str:
+    missing_bucket_indices = [
+        bucket_index
+        for bucket_index in range(1, requested_bucket_count + 1)
+        if bucket_index not in available_bucket_indices
+    ]
+    if missing_bucket_indices:
+        missing_label = ", ".join(str(bucket_index) for bucket_index in missing_bucket_indices)
+        return (
+            f"Campaign CBO launch for this publish run requires bucket indices 1-{requested_bucket_count}. "
+            f"Missing buckets: {missing_label}. "
+            "Run Prepare Meta review to generate the default bucket specs."
+        )
     return (
-        f"Campaign CBO launch requires exactly {DEFAULT_META_PUBLISH_BUCKET_COUNT} "
-        f"campaign-scoped Meta ad set buckets. Found {count}. "
+        f"Campaign CBO launch for this publish run requires bucket indices 1-{requested_bucket_count}. "
+        f"Found compatible buckets: {', '.join(str(index) for index in available_bucket_indices) or 'none'}. "
         "Run Prepare Meta review to generate the default bucket specs."
     )
 
@@ -412,6 +428,46 @@ def _assign_assets_to_bucket_specs(
     for position, asset in enumerate(ordered_assets):
         assignments[str(asset.id)] = bucket_specs[position % len(bucket_specs)]
     return assignments
+
+
+def _resolved_publish_bucket_count(payload: MetaPublishRunRequest) -> int:
+    return payload.bucketCount or DEFAULT_META_PUBLISH_BUCKET_COUNT
+
+
+def _selected_campaign_bucket_specs(
+    *,
+    campaign_bucket_specs: list[MetaAdSetSpec],
+    requested_bucket_count: int,
+) -> tuple[list[MetaAdSetSpec], list[int]]:
+    bucket_specs_by_index = {
+        bucket_index: spec
+        for spec in campaign_bucket_specs
+        if (bucket_index := read_default_meta_publish_bucket_index(spec.metadata_json)) is not None
+    }
+    missing_bucket_indices = [
+        bucket_index
+        for bucket_index in range(1, requested_bucket_count + 1)
+        if bucket_index not in bucket_specs_by_index
+    ]
+    selected_bucket_specs = [
+        bucket_specs_by_index[bucket_index]
+        for bucket_index in range(1, requested_bucket_count + 1)
+        if bucket_index in bucket_specs_by_index
+    ]
+    return selected_bucket_specs, missing_bucket_indices
+
+
+def _publish_bucket_destination_urls_by_index(
+    *,
+    payload: MetaPublishRunRequest,
+    requested_bucket_count: int,
+) -> dict[int, str]:
+    if not payload.bucketDestinationUrls:
+        return {}
+    return {
+        bucket_index: payload.bucketDestinationUrls[bucket_index - 1]
+        for bucket_index in range(1, requested_bucket_count + 1)
+    }
 
 
 def _asset_generation_key(asset: Asset) -> str:
@@ -1390,6 +1446,8 @@ def _plan_fingerprint_payload(launch_plan_payload: dict[str, Any]) -> dict[str, 
         "buyingType": launch_plan_payload.get("buyingType"),
         "budgetScope": launch_plan_payload.get("budgetScope"),
         "campaignDailyBudget": launch_plan_payload.get("campaignDailyBudget"),
+        "bucketCount": launch_plan_payload.get("bucketCount"),
+        "bucketDestinationUrls": launch_plan_payload.get("bucketDestinationUrls"),
         "specialAdCategories": launch_plan_payload.get("specialAdCategories"),
         "campaignDelivery": launch_plan_payload.get("campaignDelivery"),
         "items": normalized_items,
@@ -1427,6 +1485,7 @@ def _build_launch_plan_payload(
                 "creativeSpecName": creative_spec.name,
                 "adsetSpecId": str(adset_spec.id),
                 "adsetSpecName": adset_spec.name,
+                "bucketIndex": resolved.get("bucket_index"),
                 "resolvedDestinationUrl": resolved["resolved_destination_url"],
                 "effectivePageId": resolved["effective_page_id"],
                 "creative": {
@@ -1463,6 +1522,8 @@ def _build_launch_plan_payload(
         "buyingType": payload.buyingType,
         "budgetScope": validation_response.budgetScope,
         "campaignDailyBudget": validation_response.campaignDailyBudget,
+        "bucketCount": validation_response.bucketCount,
+        "bucketDestinationUrls": validation_response.bucketDestinationUrls,
         "specialAdCategories": payload.specialAdCategories,
         "launchContextReadiness": launch_context_readiness,
         "campaignDelivery": delivery_snapshot,
@@ -1833,6 +1894,11 @@ def _validate_publish_plan(
     profile_page_id = _clean_optional_text(resolved_meta_config.workspace_config.page_id)
     if not ad_account_id:
         blockers.append("The selected Meta workspace config is missing adAccountId.")
+    requested_bucket_count = _resolved_publish_bucket_count(payload)
+    bucket_destination_urls_by_index = _publish_bucket_destination_urls_by_index(
+        payload=payload,
+        requested_bucket_count=requested_bucket_count,
+    )
 
     asset_ids = [str(asset.id) for asset in selected_assets]
     asset_rows = session.scalars(
@@ -1860,13 +1926,26 @@ def _validate_publish_plan(
     ).all()
     campaign_bucket_specs, bucket_spec_blockers = _campaign_bucket_specs(adset_specs)
     blockers.extend(bucket_spec_blockers)
-    if len(campaign_bucket_specs) != DEFAULT_META_PUBLISH_BUCKET_COUNT:
-        blockers.append(_campaign_bucket_spec_count_blocker_message(len(campaign_bucket_specs)))
+    selected_campaign_bucket_specs, missing_bucket_indices = _selected_campaign_bucket_specs(
+        campaign_bucket_specs=campaign_bucket_specs,
+        requested_bucket_count=requested_bucket_count,
+    )
+    if missing_bucket_indices:
+        blockers.append(
+            _campaign_bucket_spec_count_blocker_message(
+                requested_bucket_count=requested_bucket_count,
+                available_bucket_indices=[
+                    read_default_meta_publish_bucket_index(spec.metadata_json)
+                    for spec in campaign_bucket_specs
+                    if read_default_meta_publish_bucket_index(spec.metadata_json) is not None
+                ],
+            )
+        )
     asset_bucket_assignments = _assign_assets_to_bucket_specs(
         assets=selected_assets,
         bucket_specs=(
-            campaign_bucket_specs
-            if len(campaign_bucket_specs) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+            selected_campaign_bucket_specs
+            if len(selected_campaign_bucket_specs) == requested_bucket_count
             and not bucket_spec_blockers
             else []
         ),
@@ -1882,6 +1961,7 @@ def _validate_publish_plan(
         asset = assets_by_id.get(asset_id)
         creative_spec = creative_specs_by_asset_id.get(asset_id)
         adset_spec: MetaAdSetSpec | None = None
+        bucket_index: int | None = None
         resolved_destination_url: str | None = None
 
         if asset is None:
@@ -1896,8 +1976,13 @@ def _validate_publish_plan(
                 item_blockers.append(str(exc))
 
             adset_spec = asset_bucket_assignments.get(asset_id)
+            bucket_index = (
+                read_default_meta_publish_bucket_index(adset_spec.metadata_json)
+                if adset_spec is not None
+                else None
+            )
             if (
-                len(campaign_bucket_specs) == DEFAULT_META_PUBLISH_BUCKET_COUNT
+                len(selected_campaign_bucket_specs) == requested_bucket_count
                 and not bucket_spec_blockers
                 and adset_spec is None
             ):
@@ -1947,7 +2032,9 @@ def _validate_publish_plan(
                 item_blockers.append("Final-package asset is missing an effective Meta pageId.")
 
             resolved_destination_url = _resolve_publish_destination_url(
-                destination_url=_clean_optional_text(creative_spec.destination_url),
+                destination_url=bucket_destination_urls_by_index.get(bucket_index)
+                if bucket_index is not None and bucket_destination_urls_by_index
+                else _clean_optional_text(creative_spec.destination_url),
                 publish_base_url=publish_base_url,
             )
             if not resolved_destination_url:
@@ -1964,6 +2051,7 @@ def _validate_publish_plan(
                 assetId=asset_id,
                 creativeSpecId=str(creative_spec.id) if creative_spec else None,
                 adsetSpecId=str(adset_spec.id) if adset_spec else None,
+                bucketIndex=bucket_index,
                 resolvedDestinationUrl=resolved_destination_url,
                 status="blocked" if item_blockers else "ok",
                 blockers=item_blockers,
@@ -1985,9 +2073,11 @@ def _validate_publish_plan(
             )
 
     budget_scope = _publish_budget_scope_for_specs(
-        campaign_bucket_specs if campaign_bucket_specs else _unique_publish_adset_specs(resolved_items)
+        selected_campaign_bucket_specs
+        if selected_campaign_bucket_specs
+        else _unique_publish_adset_specs(resolved_items)
     )
-    if campaign_bucket_specs and budget_scope != "campaign":
+    if selected_campaign_bucket_specs and budget_scope != "campaign":
         blockers.append(_campaign_bucket_budget_scope_blocker_message())
     if budget_scope == "mixed":
         blockers.append(_publish_budget_scope_blocker_message())
@@ -2012,14 +2102,16 @@ def _validate_publish_plan(
         ok=not blockers and all(item.status == "ok" for item in validation_items),
         includedCount=len(selected_assets),
         adsetCount=(
-            len(campaign_bucket_specs)
-            if campaign_bucket_specs
+            len(selected_campaign_bucket_specs)
+            if selected_campaign_bucket_specs
             else len({str(item["adset_spec"].id) for item in resolved_items})
         ),
+        bucketCount=requested_bucket_count,
         publishBaseUrl=publish_base_url,
         publishDomain=next(iter(publish_domains)) if len(publish_domains) == 1 else None,
         budgetScope=budget_scope,
         campaignDailyBudget=campaign_daily_budget,
+        bucketDestinationUrls=payload.bucketDestinationUrls,
         blockers=blockers,
         items=validation_items,
     )
@@ -4163,6 +4255,7 @@ def create_meta_publish_run(
     )
     publish_budget_scope = validation_response.budgetScope
     campaign_daily_budget = validation_response.campaignDailyBudget
+    requested_bucket_count = validation_response.bucketCount
 
     ad_account_id = _resolved_ad_account_id_for_context(resolved=resolved_meta_config)
     page_id = _require_meta_page_id(workspace_config=resolved_meta_config.workspace_config)
@@ -4219,6 +4312,8 @@ def create_meta_publish_run(
         "campaignDelivery": delivery_snapshot,
         "budgetScope": publish_budget_scope,
         "campaignDailyBudget": campaign_daily_budget,
+        "bucketCount": requested_bucket_count,
+        "bucketDestinationUrls": validation_response.bucketDestinationUrls,
         "resumeAttemptCount": resume_attempt_count,
     }
     if resume_source_run is not None:
@@ -4337,13 +4432,24 @@ def create_meta_publish_run(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=" ".join(bucket_spec_blockers),
             )
-        if len(bucket_adset_specs) != DEFAULT_META_PUBLISH_BUCKET_COUNT:
+        selected_bucket_adset_specs, missing_bucket_indices = _selected_campaign_bucket_specs(
+            campaign_bucket_specs=bucket_adset_specs,
+            requested_bucket_count=requested_bucket_count,
+        )
+        if missing_bucket_indices:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=_campaign_bucket_spec_count_blocker_message(len(bucket_adset_specs)),
+                detail=_campaign_bucket_spec_count_blocker_message(
+                    requested_bucket_count=requested_bucket_count,
+                    available_bucket_indices=[
+                        read_default_meta_publish_bucket_index(spec.metadata_json)
+                        for spec in bucket_adset_specs
+                        if read_default_meta_publish_bucket_index(spec.metadata_json) is not None
+                    ],
+                ),
             )
 
-        for adset_spec in bucket_adset_specs:
+        for adset_spec in selected_bucket_adset_specs:
             adset_spec_id = str(adset_spec.id)
             bucket_run_items = run_items_by_adset_spec_id.get(adset_spec_id, [])
             try:

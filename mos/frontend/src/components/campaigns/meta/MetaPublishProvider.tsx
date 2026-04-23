@@ -47,6 +47,8 @@ export type MetaPublishCampaignForm = {
   buyingType: string;
   specialAdCategories: string;
   campaignDailyBudget: string;
+  bucketCount: string;
+  bucketDestinationUrls: string[];
 };
 
 export type MetaPublishAdSetForm = {
@@ -102,6 +104,7 @@ export type GroupedPipelineEntry = {
 // ---------------------------------------------------------------------------
 
 const apiBaseUrl = resolveRequiredApiBaseUrl();
+const DEFAULT_META_PUBLISH_BUCKET_COUNT = 5;
 
 export function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -225,6 +228,36 @@ export function parseIntegerInput(value: string, label: string): number | null {
     throw new Error(`${label} must be a whole number.`);
   }
   return Number(cleaned);
+}
+
+function readBucketIndex(metadata: Record<string, unknown> | null | undefined): number | null {
+  const raw = metadata?.bucketIndex;
+  if (typeof raw === "number" && Number.isInteger(raw)) return raw;
+  if (typeof raw === "string" && /^\d+$/.test(raw.trim())) return Number(raw.trim());
+  return null;
+}
+
+function sortBucketSpecs(specs: MetaAdSetSpec[]): MetaAdSetSpec[] {
+  return [...specs].sort((left, right) => {
+    const leftBucketIndex = readBucketIndex(left.metadata_json);
+    const rightBucketIndex = readBucketIndex(right.metadata_json);
+    if (leftBucketIndex != null && rightBucketIndex != null && leftBucketIndex !== rightBucketIndex) {
+      return leftBucketIndex - rightBucketIndex;
+    }
+    if (leftBucketIndex != null && rightBucketIndex == null) return -1;
+    if (leftBucketIndex == null && rightBucketIndex != null) return 1;
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function clampPublishBucketCount(value: number): number {
+  return Math.min(DEFAULT_META_PUBLISH_BUCKET_COUNT, Math.max(1, value));
+}
+
+function resizeBucketDestinationUrls(urls: string[], bucketCount: number): string[] {
+  const next = urls.slice(0, bucketCount);
+  while (next.length < bucketCount) next.push("");
+  return next;
 }
 
 export function toLocalDateTimeValue(value?: string | null): string {
@@ -439,6 +472,7 @@ type MetaPublishContextValue = {
   creativeQaNotice: string | null;
   includedPackageItems: MetaPipelineAsset[];
   excludedPackageCount: number;
+  availableBucketCount: number;
   includedAdSetSpecs: MetaAdSetSpec[];
   publishSelections: MetaPublishSelection[];
   selectionByAssetId: Map<string, MetaPublishSelection>;
@@ -449,7 +483,10 @@ type MetaPublishContextValue = {
 
   // Publish forms
   publishCampaignForm: MetaPublishCampaignForm;
+  publishBucketCount: number;
   updatePublishCampaignField: <K extends keyof MetaPublishCampaignForm>(field: K, value: MetaPublishCampaignForm[K]) => void;
+  setPublishBucketCount: (value: string) => void;
+  updatePublishBucketDestinationUrl: (bucketIndex: number, value: string) => void;
   publishAdSetForms: Record<string, MetaPublishAdSetForm>;
   updatePublishAdSetField: <K extends keyof MetaPublishAdSetForm>(specId: string, field: K, value: MetaPublishAdSetForm[K]) => void;
   publishFormError: string | null;
@@ -561,6 +598,8 @@ export function MetaPublishProvider({
     buyingType: "AUCTION",
     specialAdCategories: "",
     campaignDailyBudget: String(META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS),
+    bucketCount: String(DEFAULT_META_PUBLISH_BUCKET_COUNT),
+    bucketDestinationUrls: resizeBucketDestinationUrls([], DEFAULT_META_PUBLISH_BUCKET_COUNT),
   }));
   const [publishAdSetForms, setPublishAdSetForms] = useState<Record<string, MetaPublishAdSetForm>>({});
   const [publishFormError, setPublishFormError] = useState<string | null>(null);
@@ -788,13 +827,23 @@ export function MetaPublishProvider({
     [activeFunnelId, latestGenerationKey, qaRuns, qaRunsError, qaRunsLoading, requiresFunnelScope],
   );
 
-  const includedAdSetSpecs = useMemo(() => {
+  const availableBucketSpecs = useMemo(() => {
     const byId = new Map<string, MetaAdSetSpec>();
     includedPackageItems.forEach((item) => {
       (item.adset_specs || []).forEach((spec) => { if (!spec.id || byId.has(spec.id)) return; byId.set(spec.id, spec); });
     });
-    return Array.from(byId.values());
+    return sortBucketSpecs(Array.from(byId.values()));
   }, [includedPackageItems]);
+  const availableBucketCount = availableBucketSpecs.length;
+  const publishBucketCount = useMemo(() => {
+    const cleaned = publishCampaignForm.bucketCount.trim();
+    if (!cleaned || !/^\d+$/.test(cleaned)) return DEFAULT_META_PUBLISH_BUCKET_COUNT;
+    return clampPublishBucketCount(Number(cleaned));
+  }, [publishCampaignForm.bucketCount]);
+  const includedAdSetSpecs = useMemo(
+    () => availableBucketSpecs.slice(0, publishBucketCount),
+    [availableBucketSpecs, publishBucketCount],
+  );
 
   // ---- Derived: grouped pipeline --------------------------------------------
   const groupedPipeline = useMemo(() => {
@@ -909,7 +958,7 @@ export function MetaPublishProvider({
 
   useEffect(() => {
     setPublishAdSetForms((cur) => {
-      const next: Record<string, MetaPublishAdSetForm> = {};
+      const next: Record<string, MetaPublishAdSetForm> = { ...cur };
       includedAdSetSpecs.forEach((spec) => {
         const seeded = buildAdSetForm(spec, { pageName: config?.pageName });
         const existing = cur[spec.id];
@@ -1044,6 +1093,36 @@ export function MetaPublishProvider({
     [],
   );
 
+  const setPublishBucketCount = useCallback((value: string) => {
+    setPublishCampaignForm((cur) => {
+      const cleaned = value.trim();
+      if (!cleaned) {
+        return { ...cur, bucketCount: value };
+      }
+      if (!/^\d+$/.test(cleaned)) {
+        return { ...cur, bucketCount: value };
+      }
+      const nextBucketCount = clampPublishBucketCount(Number(cleaned));
+      return {
+        ...cur,
+        bucketCount: String(nextBucketCount),
+        bucketDestinationUrls: resizeBucketDestinationUrls(cur.bucketDestinationUrls, nextBucketCount),
+      };
+    });
+  }, []);
+
+  const updatePublishBucketDestinationUrl = useCallback((bucketIndex: number, value: string) => {
+    setPublishCampaignForm((cur) => {
+      const nextBucketCount = publishBucketCount;
+      const nextUrls = resizeBucketDestinationUrls(cur.bucketDestinationUrls, nextBucketCount);
+      nextUrls[bucketIndex - 1] = value;
+      return {
+        ...cur,
+        bucketDestinationUrls: nextUrls,
+      };
+    });
+  }, [publishBucketCount]);
+
   const updatePublishAdSetField = useCallback(
     <K extends keyof MetaPublishAdSetForm>(specId: string, field: K, value: MetaPublishAdSetForm[K]) => {
       setPublishAdSetForms((cur) => ({
@@ -1064,6 +1143,26 @@ export function MetaPublishProvider({
   const buildPublishRequestPayload = useCallback(() => {
     if (!latestGenerationKey) throw new Error("No latest generation is selected for publish.");
     if (requiresFunnelScope && !activeFunnelId) throw new Error("Pick one funnel before validating or publishing the Meta package.");
+    const bucketCount = parseIntegerInput(publishCampaignForm.bucketCount, "Bucket count");
+    if (bucketCount == null) {
+      throw new Error("Bucket count is required.");
+    }
+    if (bucketCount < 1 || bucketCount > DEFAULT_META_PUBLISH_BUCKET_COUNT) {
+      throw new Error(`Bucket count must be between 1 and ${DEFAULT_META_PUBLISH_BUCKET_COUNT}.`);
+    }
+    const bucketDestinationUrls = resizeBucketDestinationUrls(
+      publishCampaignForm.bucketDestinationUrls,
+      bucketCount,
+    ).map((entry) => entry.trim());
+    const nonEmptyBucketDestinationUrlCount = bucketDestinationUrls.filter(Boolean).length;
+    if (
+      nonEmptyBucketDestinationUrlCount > 0 &&
+      nonEmptyBucketDestinationUrlCount !== bucketCount
+    ) {
+      throw new Error(
+        "Provide either all bucket destination URLs or leave every bucket destination override blank.",
+      );
+    }
     return {
       generationKey: latestGenerationKey,
       funnelId: requiresFunnelScope ? activeFunnelId : null,
@@ -1073,6 +1172,9 @@ export function MetaPublishProvider({
       buyingType: publishCampaignForm.buyingType.trim() || null,
       specialAdCategories: publishCampaignForm.specialAdCategories.split(",").map((e) => e.trim()).filter(Boolean),
       campaignDailyBudget: parseIntegerInput(publishCampaignForm.campaignDailyBudget, "Campaign daily budget"),
+      bucketCount,
+      bucketDestinationUrls:
+        nonEmptyBucketDestinationUrlCount === bucketCount ? bucketDestinationUrls : [],
     };
   }, [activeFunnelId, latestGenerationKey, publishCampaignForm, requiresFunnelScope]);
 
@@ -1231,6 +1333,7 @@ export function MetaPublishProvider({
       creativeQaNotice: creativeQaState.notice,
       includedPackageItems,
       excludedPackageCount,
+      availableBucketCount,
       includedAdSetSpecs,
       publishSelections,
       selectionByAssetId,
@@ -1239,7 +1342,10 @@ export function MetaPublishProvider({
       selectionPendingAssetIds,
       handleSetPublishDecision,
       publishCampaignForm,
+      publishBucketCount,
       updatePublishCampaignField,
+      setPublishBucketCount,
+      updatePublishBucketDestinationUrl,
       publishAdSetForms,
       updatePublishAdSetField,
       publishFormError,
@@ -1271,8 +1377,8 @@ export function MetaPublishProvider({
       visibleMissingCreativeSpecCount, prepareAssetBriefIds, groupedPipeline,
       canManagePublishPackage, canPrepareMetaReview, includedPackageItems, excludedPackageCount,
       creativeQaState,
-      includedAdSetSpecs, publishSelections, selectionByAssetId, selectionLoading, selectionError, selectionPendingAssetIds,
-      handleSetPublishDecision, publishCampaignForm, updatePublishCampaignField,
+      availableBucketCount, includedAdSetSpecs, publishBucketCount, publishSelections, selectionByAssetId, selectionLoading, selectionError, selectionPendingAssetIds,
+      handleSetPublishDecision, publishCampaignForm, updatePublishCampaignField, setPublishBucketCount, updatePublishBucketDestinationUrl,
       publishAdSetForms, updatePublishAdSetField, publishFormError,
       publishValidation, publishValidationPending, publishPending,
       handleValidatePublishPlan, handlePublishToMeta,

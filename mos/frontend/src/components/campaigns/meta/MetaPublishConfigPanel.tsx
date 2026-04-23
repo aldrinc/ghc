@@ -79,10 +79,14 @@ export function MetaPublishConfigPanel() {
     activeFunnelId,
     latestGenerationKey,
     selectionLoading,
+    availableBucketCount,
     includedAdSetSpecs,
     config,
     publishCampaignForm,
+    publishBucketCount,
     updatePublishCampaignField,
+    setPublishBucketCount,
+    updatePublishBucketDestinationUrl,
     publishAdSetForms,
     updatePublishAdSetField,
     publishFormError,
@@ -187,6 +191,17 @@ export function MetaPublishConfigPanel() {
               placeholder={String(META_DEFAULT_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS)}
             />
           </Field>
+          <Field label="Bucket count">
+            <Input
+              type="number"
+              min="1"
+              max="5"
+              step="1"
+              value={publishCampaignForm.bucketCount}
+              onChange={(e) => setPublishBucketCount(e.target.value)}
+              placeholder="5"
+            />
+          </Field>
           <div className="sm:col-span-2 space-y-1">
             <div className="text-xs font-medium text-content-muted">Special ad categories</div>
             <SpecialAdCategoriesCheckboxGroup
@@ -202,6 +217,33 @@ export function MetaPublishConfigPanel() {
               ? "This draft currently uses ad set budgets because at least one linked ad set has its own daily or lifetime budget. The campaign daily budget stays visible here, but Meta will ignore it until all ad set budgets are blank."
               : "This draft mixes campaign-level and ad-set budgets. Publish validation will block until every linked ad set uses the same budget scope."}
         </Callout>
+        <Callout variant="info" size="sm">
+          This temporary launch path can use {publishBucketCount} bucket{publishBucketCount === 1 ? "" : "s"} instead of the default five. The current package exposes {availableBucketCount} reusable bucket spec{availableBucketCount === 1 ? "" : "s"}.
+        </Callout>
+        <div className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-content-muted">Bucket Destination Overrides</div>
+          <div className="text-sm text-content-muted">
+            Optional temporary routing override. If you fill one bucket URL, fill all {publishBucketCount}. mOS will apply these URLs at creative publish time, one per bucket.
+          </div>
+          <div className="grid gap-3">
+            {Array.from({ length: publishBucketCount }, (_, index) => {
+              const bucketIndex = index + 1;
+              const bucketSpec = includedAdSetSpecs[index];
+              return (
+                <Field
+                  key={`bucket-destination-${bucketIndex}`}
+                  label={`${bucketSpec?.name || `CBO Bucket ${bucketIndex}`} destination URL`}
+                >
+                  <Input
+                    value={publishCampaignForm.bucketDestinationUrls[index] || ""}
+                    onChange={(e) => updatePublishBucketDestinationUrl(bucketIndex, e.target.value)}
+                    placeholder="https://example.com/presales-variant"
+                  />
+                </Field>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       {/* Divider */}
@@ -217,6 +259,11 @@ export function MetaPublishConfigPanel() {
               ? `Active workspace Meta config validation is invalid${config?.lastValidationError ? `: ${config.lastValidationError}` : ""}. mOS will not auto-fill Pixel ID until the workspace config is revalidated.`
               : "Active workspace Meta config has not been validated against Meta yet. mOS will not auto-fill Pixel ID until that validation runs."}
         </Callout>
+        {includedAdSetSpecs.length ? (
+          <Callout variant="info" size="sm">
+            mOS auto-distributes included creatives across these {includedAdSetSpecs.length} campaign-scoped CBO buckets at publish time. One ad goes to one bucket, and the split is deterministic rather than experiment-bound.
+          </Callout>
+        ) : null}
         {includedAdSetSpecs.length ? (
           <div className="space-y-5">
             {includedAdSetSpecs.map((spec) => {

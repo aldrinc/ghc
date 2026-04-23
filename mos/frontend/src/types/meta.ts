@@ -119,6 +119,7 @@ export type MetaPublishPlanValidationItem = {
   assetId: string;
   creativeSpecId?: string | null;
   adsetSpecId?: string | null;
+  bucketIndex?: number | null;
   resolvedDestinationUrl?: string | null;
   status: "ok" | "blocked";
   blockers: string[];
@@ -130,10 +131,12 @@ export type MetaPublishPlanValidation = {
   ok: boolean;
   includedCount: number;
   adsetCount: number;
+  bucketCount: number;
   publishBaseUrl: string;
   publishDomain?: string | null;
   budgetScope?: "campaign" | "adset" | "mixed";
   campaignDailyBudget?: number | null;
+  bucketDestinationUrls: string[];
   blockers: string[];
   items: MetaPublishPlanValidationItem[];
 };
@@ -148,6 +151,8 @@ export type MetaPublishRunRequest = {
   buyingType?: string | null;
   specialAdCategories?: string[];
   campaignDailyBudget?: number | null;
+  bucketCount?: number | null;
+  bucketDestinationUrls?: string[];
 };
 
 export type MetaPublishRunItem = {
