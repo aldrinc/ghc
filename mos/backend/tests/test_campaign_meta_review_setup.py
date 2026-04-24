@@ -9,6 +9,7 @@ from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_TARGETING,
+    MAX_META_PUBLISH_BUCKET_COUNT,
 )
 from app.services.paid_ads_qa import RULESET_VERSION
 from tests.helpers.manual_creative_context import manual_creative_context_payload
@@ -337,6 +338,35 @@ def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
     assert len(library_pipeline) == 1
     assert len(library_pipeline[0]["adset_specs"]) == DEFAULT_META_PUBLISH_BUCKET_COUNT
     assert library_pipeline[0]["adset_specs"][0]["metadata_json"]["bucketIndex"] == 1
+
+    custom_bucket_setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={
+            "assetBriefIds": [brief_id],
+            "funnelId": str(funnel.id),
+            "bucketCount": MAX_META_PUBLISH_BUCKET_COUNT,
+        },
+    )
+    assert custom_bucket_setup_resp.status_code == 200
+    custom_bucket_setup_payload = custom_bucket_setup_resp.json()
+    assert len(custom_bucket_setup_payload["createdAdSetSpecIds"]) == (
+        MAX_META_PUBLISH_BUCKET_COUNT - DEFAULT_META_PUBLISH_BUCKET_COUNT
+    )
+
+    custom_bucket_specs = db_session.scalars(
+        select(MetaAdSetSpec).where(
+            MetaAdSetSpec.campaign_id == campaign_id,
+            MetaAdSetSpec.org_id == campaign.org_id,
+        )
+    ).all()
+    custom_bucket_indices = sorted(
+        spec.metadata_json.get("bucketIndex") for spec in custom_bucket_specs
+    )
+    assert custom_bucket_indices == list(range(1, MAX_META_PUBLISH_BUCKET_COUNT + 1))
+    custom_bucket_eight = next(
+        spec for spec in custom_bucket_specs if spec.metadata_json.get("bucketIndex") == 8
+    )
+    assert custom_bucket_eight.metadata_json["bucketCount"] == MAX_META_PUBLISH_BUCKET_COUNT
 
 
 def test_campaign_meta_review_setup_uses_external_campaign_delivery_urls(

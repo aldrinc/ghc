@@ -394,12 +394,12 @@ def _campaign_bucket_spec_count_blocker_message(
         return (
             f"Campaign CBO launch for this publish run requires bucket indices 1-{requested_bucket_count}. "
             f"Missing buckets: {missing_label}. "
-            "Run Prepare Meta review to generate the default bucket specs."
+            "Run Prepare Meta review to generate the requested bucket specs."
         )
     return (
         f"Campaign CBO launch for this publish run requires bucket indices 1-{requested_bucket_count}. "
         f"Found compatible buckets: {', '.join(str(index) for index in available_bucket_indices) or 'none'}. "
-        "Run Prepare Meta review to generate the default bucket specs."
+        "Run Prepare Meta review to generate the requested bucket specs."
     )
 
 

@@ -195,7 +195,7 @@ export function MetaPublishConfigPanel() {
             <Input
               type="number"
               min="1"
-              max="5"
+              max="8"
               step="1"
               value={publishCampaignForm.bucketCount}
               onChange={(e) => setPublishBucketCount(e.target.value)}

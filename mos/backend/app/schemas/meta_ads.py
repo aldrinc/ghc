@@ -6,7 +6,10 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.services.meta_publish_defaults import DEFAULT_META_PUBLISH_BUCKET_COUNT
+from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_BUCKET_COUNT,
+    MAX_META_PUBLISH_BUCKET_COUNT,
+)
 
 
 class MetaAssetUploadRequest(BaseModel):
@@ -149,6 +152,7 @@ class CampaignMetaReviewSetupRequest(BaseModel):
     assetBriefIds: list[str] = Field(default_factory=list)
     generationBatchId: str | None = None
     funnelId: str | None = None
+    bucketCount: int | None = None
 
     @field_validator("assetBriefIds")
     @classmethod
@@ -184,6 +188,17 @@ class CampaignMetaReviewSetupRequest(BaseModel):
         if not isinstance(value, str) or not value.strip():
             raise ValueError("funnelId must be a non-empty string when provided.")
         return value.strip()
+
+    @field_validator("bucketCount")
+    @classmethod
+    def _validate_review_bucket_count(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if value < 1 or value > MAX_META_PUBLISH_BUCKET_COUNT:
+            raise ValueError(
+                f"bucketCount must be between 1 and {MAX_META_PUBLISH_BUCKET_COUNT}."
+            )
+        return value
 
 
 MetaPublishSelectionDecision = Literal["excluded"]
@@ -338,9 +353,9 @@ class MetaPublishRunRequest(BaseModel):
     def _validate_bucket_count(cls, value: int | None) -> int | None:
         if value is None:
             return None
-        if value < 1 or value > DEFAULT_META_PUBLISH_BUCKET_COUNT:
+        if value < 1 or value > MAX_META_PUBLISH_BUCKET_COUNT:
             raise ValueError(
-                f"bucketCount must be between 1 and {DEFAULT_META_PUBLISH_BUCKET_COUNT}."
+                f"bucketCount must be between 1 and {MAX_META_PUBLISH_BUCKET_COUNT}."
             )
         return value
 

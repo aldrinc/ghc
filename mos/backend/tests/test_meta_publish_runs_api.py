@@ -63,6 +63,7 @@ from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_TARGETING,
+    MAX_META_PUBLISH_BUCKET_COUNT,
     default_meta_publish_bucket_metadata,
     default_meta_publish_bucket_name,
     read_default_meta_publish_bucket_index,
@@ -213,6 +214,7 @@ def _create_meta_publish_inputs(
     campaign_id: str,
     experiment_key: str,
     with_targeting: bool = True,
+    bucket_count: int = DEFAULT_META_PUBLISH_BUCKET_COUNT,
 ) -> tuple[MetaCreativeSpec, MetaAdSetSpec]:
     creative_spec = MetaCreativeSpec(
         org_id=TEST_ORG_ID,
@@ -240,7 +242,7 @@ def _create_meta_publish_inputs(
         for spec in existing_adset_specs
         if (bucket_index := read_default_meta_publish_bucket_index(spec.metadata_json)) is not None
     }
-    for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1):
+    for bucket_index in range(1, bucket_count + 1):
         if bucket_index in adset_specs_by_bucket_index:
             continue
         adset_spec = MetaAdSetSpec(
@@ -259,7 +261,10 @@ def _create_meta_publish_inputs(
             end_time=None,
             promoted_object={"pixel_id": "pixel_123", "custom_event_type": "PURCHASE"},
             conversion_domain="shop.thehonestherbalist.com",
-            metadata_json=default_meta_publish_bucket_metadata(bucket_index),
+            metadata_json=default_meta_publish_bucket_metadata(
+                bucket_index,
+                bucket_count=bucket_count,
+            ),
         )
         db_session.add(adset_spec)
         adset_specs_by_bucket_index[bucket_index] = adset_spec
@@ -268,7 +273,7 @@ def _create_meta_publish_inputs(
     db_session.refresh(creative_spec)
     adset_specs = [
         adset_specs_by_bucket_index[bucket_index]
-        for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1)
+        for bucket_index in range(1, bucket_count + 1)
     ]
     for adset_spec in adset_specs:
         db_session.refresh(adset_spec)
@@ -1785,7 +1790,8 @@ def test_publish_meta_run_respects_custom_bucket_count_and_urls(
         funnel_id=funnel_id,
     )
 
-    for suffix in ("custom-run-1", "custom-run-2", "custom-run-3", "custom-run-4"):
+    for index in range(1, 31):
+        suffix = f"custom-run-{index:02d}"
         asset = _create_asset(
             db_session,
             client_id=client_id,
@@ -1801,6 +1807,7 @@ def test_publish_meta_run_respects_custom_bucket_count_and_urls(
             campaign_id=campaign_id,
             experiment_key=f"exp-{suffix}",
             with_targeting=True,
+            bucket_count=MAX_META_PUBLISH_BUCKET_COUNT,
         )
 
     _upsert_meta_profile(api_client, client_id=client_id)
@@ -1809,9 +1816,8 @@ def test_publish_meta_run_respects_custom_bucket_count_and_urls(
     adset_counter = {"count": 0}
     creative_links: list[str] = []
     bucket_destination_urls = [
-        "https://shop.thehonestherbalist.com/presales-a",
-        "https://shop.thehonestherbalist.com/presales-b",
-        "https://shop.thehonestherbalist.com/presales-c",
+        f"https://shop.thehonestherbalist.com/presales-{index}"
+        for index in range(1, MAX_META_PUBLISH_BUCKET_COUNT + 1)
     ]
 
     class _FakeStorage:
@@ -1847,9 +1853,9 @@ def test_publish_meta_run_respects_custom_bucket_count_and_urls(
             "generationKey": "batch:latest-run",
             "funnelId": funnel_id,
             "publishBaseUrl": "https://shop.thehonestherbalist.com",
-            "campaignName": "Honest Herbalist 3 Bucket Launch",
+            "campaignName": "Honest Herbalist 8 Bucket Launch",
             "campaignObjective": "OUTCOME_SALES",
-            "bucketCount": 3,
+            "bucketCount": MAX_META_PUBLISH_BUCKET_COUNT,
             "bucketDestinationUrls": bucket_destination_urls,
         },
     )
@@ -1857,18 +1863,17 @@ def test_publish_meta_run_respects_custom_bucket_count_and_urls(
     assert publish_response.status_code == 200, publish_response.text
     publish_payload = publish_response.json()
     assert publish_payload["status"] == "published"
-    assert publish_payload["metadata"]["bucketCount"] == 3
+    assert publish_payload["metadata"]["bucketCount"] == MAX_META_PUBLISH_BUCKET_COUNT
     assert publish_payload["metadata"]["bucketDestinationUrls"] == bucket_destination_urls
-    assert publish_payload["metadata"]["validation"]["bucketCount"] == 3
-    assert adset_counter["count"] == 3
+    assert publish_payload["metadata"]["validation"]["bucketCount"] == MAX_META_PUBLISH_BUCKET_COUNT
+    assert adset_counter["count"] == MAX_META_PUBLISH_BUCKET_COUNT
     tracked_bucket_destination_urls = [
         f"{url}?utm_source=meta&utm_medium=paid" for url in bucket_destination_urls
     ]
     assert Counter(creative_links) == Counter(
         {
-            tracked_bucket_destination_urls[0]: 2,
-            tracked_bucket_destination_urls[1]: 1,
-            tracked_bucket_destination_urls[2]: 1,
+            **{url: 4 for url in tracked_bucket_destination_urls[:6]},
+            **{url: 3 for url in tracked_bucket_destination_urls[6:]},
         }
     )
 

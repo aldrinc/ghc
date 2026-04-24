@@ -1,5 +1,6 @@
-from uuid import uuid4
+from copy import deepcopy
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -56,6 +57,7 @@ from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_BILLING_EVENT,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
+    MAX_META_PUBLISH_BUCKET_COUNT,
     default_meta_publish_bucket_metadata,
     default_meta_publish_bucket_name,
     default_meta_publish_targeting,
@@ -145,7 +147,7 @@ def _campaign_bucket_specs_by_index(campaign_adset_specs: list[object]) -> dict[
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
                     "Campaign has duplicate Meta CBO bucket specs. "
-                    "Each bucket index 1-5 must exist at most once."
+                    f"Each bucket index 1-{MAX_META_PUBLISH_BUCKET_COUNT} must exist at most once."
                 ),
             )
         bucket_specs[bucket_index] = record
@@ -1185,6 +1187,16 @@ def setup_campaign_meta_review(
         if meta_workspace_context is not None
         else None
     )
+    default_pixel_id = (
+        getattr(meta_workspace_context.workspace_config, "pixel_id", None)
+        if meta_workspace_context is not None
+        else None
+    )
+    default_promoted_object = (
+        {"pixel_id": str(default_pixel_id).strip(), "custom_event_type": "PURCHASE"}
+        if isinstance(default_pixel_id, str) and default_pixel_id.strip()
+        else None
+    )
 
     brief_map = load_campaign_asset_brief_map(
         org_id=auth.org_id,
@@ -1360,6 +1372,15 @@ def setup_campaign_meta_review(
         campaign_id=str(campaign.id),
     )
     existing_bucket_specs_by_index = _campaign_bucket_specs_by_index(campaign_adset_specs)
+    requested_bucket_count = payload.bucketCount or DEFAULT_META_PUBLISH_BUCKET_COUNT
+    bucket_template_spec = next(
+        (
+            existing_bucket_specs_by_index[index]
+            for index in range(1, MAX_META_PUBLISH_BUCKET_COUNT + 1)
+            if index in existing_bucket_specs_by_index
+        ),
+        None,
+    )
 
     created_creative_spec_ids: list[str] = []
     updated_creative_spec_ids: list[str] = []
@@ -1602,21 +1623,62 @@ def setup_campaign_meta_review(
             },
         )
 
-    for bucket_index in range(1, DEFAULT_META_PUBLISH_BUCKET_COUNT + 1):
+    for bucket_index in range(1, requested_bucket_count + 1):
         adset_spec = existing_bucket_specs_by_index.get(bucket_index)
         if adset_spec is None:
+            template_metadata = (
+                getattr(bucket_template_spec, "metadata_json", None)
+                if bucket_template_spec is not None
+                else None
+            )
+            template_targeting = (
+                getattr(bucket_template_spec, "targeting", None)
+                if bucket_template_spec is not None
+                else None
+            )
+            template_placements = (
+                getattr(bucket_template_spec, "placements", None)
+                if bucket_template_spec is not None
+                else None
+            )
             new_adset_spec = meta_repo.create_adset_spec(
                 org_id=auth.org_id,
                 campaign_id=str(campaign.id),
                 name=default_meta_publish_bucket_name(bucket_index),
                 status="draft",
-                optimization_goal=DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
-                billing_event=DEFAULT_META_PUBLISH_BILLING_EVENT,
-                targeting=default_meta_publish_targeting(),
+                optimization_goal=(
+                    getattr(bucket_template_spec, "optimization_goal", None)
+                    or DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL
+                ),
+                billing_event=(
+                    getattr(bucket_template_spec, "billing_event", None)
+                    or DEFAULT_META_PUBLISH_BILLING_EVENT
+                ),
+                targeting=deepcopy(template_targeting)
+                if isinstance(template_targeting, dict)
+                else default_meta_publish_targeting(),
+                placements=deepcopy(template_placements)
+                if isinstance(template_placements, dict)
+                else None,
                 bid_amount=None,
+                dsa_beneficiary=getattr(bucket_template_spec, "dsa_beneficiary", None),
+                dsa_payor=getattr(bucket_template_spec, "dsa_payor", None),
+                start_time=getattr(bucket_template_spec, "start_time", None),
+                end_time=getattr(bucket_template_spec, "end_time", None),
+                promoted_object=(
+                    deepcopy(getattr(bucket_template_spec, "promoted_object", None))
+                    or default_promoted_object
+                ),
+                conversion_domain=getattr(bucket_template_spec, "conversion_domain", None),
                 metadata_json=default_meta_publish_bucket_metadata(
                     bucket_index,
+                    bucket_count=requested_bucket_count,
                     base_metadata={
+                        **(
+                            template_metadata
+                            if isinstance(template_metadata, dict)
+                            else {}
+                        ),
                         "source": "campaign_meta_review_setup",
                         "campaignGoalDescription": campaign.goal_description,
                         "campaignChannels": campaign.channels or [],

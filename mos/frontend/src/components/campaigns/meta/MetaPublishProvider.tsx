@@ -105,6 +105,7 @@ export type GroupedPipelineEntry = {
 
 const apiBaseUrl = resolveRequiredApiBaseUrl();
 const DEFAULT_META_PUBLISH_BUCKET_COUNT = 5;
+const MAX_META_PUBLISH_BUCKET_COUNT = 8;
 
 export function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -251,7 +252,7 @@ function sortBucketSpecs(specs: MetaAdSetSpec[]): MetaAdSetSpec[] {
 }
 
 function clampPublishBucketCount(value: number): number {
-  return Math.min(DEFAULT_META_PUBLISH_BUCKET_COUNT, Math.max(1, value));
+  return Math.min(MAX_META_PUBLISH_BUCKET_COUNT, Math.max(1, value));
 }
 
 function resizeBucketDestinationUrls(urls: string[], bucketCount: number): string[] {
@@ -1033,6 +1034,7 @@ export function MetaPublishProvider({
         assetBriefIds: prepareAssetBriefIds,
         funnelId: requiresFunnelScope ? activeFunnelId : undefined,
         generationBatchId: latestGenerationOnly && latestGenerationSummary?.kind === "batch" ? latestGenerationBatchId : undefined,
+        bucketCount: publishBucketCount,
       });
       setLastPreparedAt(new Date().toISOString());
       setPrepareIssues([]);
@@ -1067,7 +1069,7 @@ export function MetaPublishProvider({
     } finally {
       setPreparePending(false);
     }
-  }, [activeFunnelId, campaign.id, canPrepareMetaReview, latestGenerationBatchId, latestGenerationOnly, latestGenerationSummary, post, prepareAssetBriefIds, refreshPipeline, requiresFunnelScope]);
+  }, [activeFunnelId, campaign.id, canPrepareMetaReview, latestGenerationBatchId, latestGenerationOnly, latestGenerationSummary, post, prepareAssetBriefIds, publishBucketCount, refreshPipeline, requiresFunnelScope]);
 
   const handleSetPublishDecision = useCallback(
     async (assetId: string, decision: MetaPublishSelectionDecision | null) => {
@@ -1147,8 +1149,8 @@ export function MetaPublishProvider({
     if (bucketCount == null) {
       throw new Error("Bucket count is required.");
     }
-    if (bucketCount < 1 || bucketCount > DEFAULT_META_PUBLISH_BUCKET_COUNT) {
-      throw new Error(`Bucket count must be between 1 and ${DEFAULT_META_PUBLISH_BUCKET_COUNT}.`);
+    if (bucketCount < 1 || bucketCount > MAX_META_PUBLISH_BUCKET_COUNT) {
+      throw new Error(`Bucket count must be between 1 and ${MAX_META_PUBLISH_BUCKET_COUNT}.`);
     }
     const bucketDestinationUrls = resizeBucketDestinationUrls(
       publishCampaignForm.bucketDestinationUrls,
