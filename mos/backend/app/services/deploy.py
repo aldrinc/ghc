@@ -1406,10 +1406,14 @@ def build_client_funnel_runtime_artifact_payload(
     }
     def _artifact_page_slug(*, publication_slug: Any, template_id: str) -> str:
         artifact_slug = resolve_funnel_template_artifact_slug(template_id)
+        normalized_publication_slug = str(publication_slug or "").strip().lower()
         if artifact_slug == "presales":
+            if normalized_publication_slug:
+                if normalized_publication_slug in {"pre-sales", "pre_sales"}:
+                    return "presales"
+                return normalized_publication_slug
             return artifact_slug
 
-        normalized_publication_slug = str(publication_slug or "").strip().lower()
         if normalized_publication_slug:
             if normalized_publication_slug == "pre-sales":
                 return "presales"
