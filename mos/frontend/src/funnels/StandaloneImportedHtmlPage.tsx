@@ -108,6 +108,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const META_PIXEL_SCRIPT_SRC = "/__mos/meta/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
   const POSTHOG_INSTANCE_NAME = "mosFunnel";
+  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
 
   const cleanText = (value) => {
     if (typeof value !== "string") return null;
@@ -557,6 +558,11 @@ function buildStandaloneImportedHtmlRuntimeScript({
       console.error("[StandaloneImportedHtmlPage] Tracking failed.", error);
     }
   };
+
+  const waitForTrackingNavigationFlush = () =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+    });
 
   const normalizeSelection = (selection) => {
     if (!isRecord(selection)) return null;
@@ -1485,6 +1491,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
               if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
                 markPresaleAttribution();
               }
+              await waitForTrackingNavigationFlush();
               window.location.href = buildInternalNavigationUrl(targetPath, {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",

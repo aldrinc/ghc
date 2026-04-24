@@ -969,6 +969,7 @@ def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_par
     assert "nextUrl.search = currentUrl.search;" in entry_html
     assert 'nextUrl.searchParams.set(PRESALE_SOURCE_PARAM, PRESALE_SOURCE_VALUE);' in entry_html
     assert "element.href = buildInternalNavigationUrl(targetPath, {" in entry_html
+    assert "await waitForTrackingNavigationFlush();" in entry_html
     assert "window.location.href = buildInternalNavigationUrl(targetPath, {" in entry_html
     assert '"EnteredSales"' in entry_html
     assert '"/example-product/example-funnel/sales-page/"' in entry_html

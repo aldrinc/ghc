@@ -5432,6 +5432,7 @@ WantedBy=multi-user.target
   const POSTHOG_INSTANCE_NAME = "mosFunnel";
   const PRESALE_SOURCE_PARAM = "src";
   const PRESALE_SOURCE_VALUE = "presale";
+  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
   const EVENTS_ENDPOINT = String(config.apiBasePath || "/api") + "/public/events";
   let pageLifecycleFinalizing = false;
 
@@ -5961,6 +5962,10 @@ WantedBy=multi-user.target
       }),
     );
   };
+  const waitForTrackingNavigationFlush = () =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+    });
   const resolveWebVitalRating = (metricName, metricValue) => {
     const thresholds = {
       FCP: [1800, 3000],
@@ -6525,6 +6530,7 @@ WantedBy=multi-user.target
               if (isPresaleToSalesNavigation(config.pageStage, targetStage || "custom")) {
                 markPresaleAttribution();
               }
+              await waitForTrackingNavigationFlush();
               window.location.href = buildInternalNavigationUrl(targetPath, {
                 fromStage: config.pageStage,
                 toStage: targetStage || "custom",
