@@ -855,6 +855,9 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "proxy_pass https://connect.facebook.net/signals/config/;" in conf
     assert "location ^~ /__mos/meta/tr/" in conf
     assert "proxy_pass https://www.facebook.com/tr/;" in conf
+    assert "location ^~ /__mos/meta/privacy_sandbox/" in conf
+    assert "proxy_pass https://www.facebook.com/privacy_sandbox/;" in conf
+    assert "proxy_set_header Host www.facebook.com;" in conf
     assert (
         "sub_filter 'CDN_BASE_URL:\"https://connect.facebook.net/\"' 'CDN_BASE_URL:\"/__mos/meta/\"';"
         in conf

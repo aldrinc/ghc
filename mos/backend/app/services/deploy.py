@@ -2394,6 +2394,31 @@ def _validate_posthog_asset_endpoint(*, api_host: str) -> None:
         response.raise_for_status()
 
 
+def _validate_meta_proxy_endpoint(
+    *,
+    client: httpx.Client,
+    origin: str,
+    path: str,
+    pixel_id: str,
+    page_url: str,
+) -> None:
+    endpoint = f"{origin.rstrip('/')}{path}"
+    params = {
+        "id": pixel_id,
+        "ev": "PageView",
+        "dl": page_url,
+        "_mos_validation": "1",
+    }
+    try:
+        response = client.get(endpoint, params=params)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise DeployError(
+            "Post-deploy tracking validation failed: Meta proxy endpoint "
+            f"'{endpoint}' returned HTTP {exc.response.status_code}."
+        ) from exc
+
+
 def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None:
     if validation_plan.get("render_mode") != _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
         return
@@ -2431,6 +2456,20 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                         raise DeployError(
                             "Post-deploy tracking validation failed: proxied Meta script still points nested requests at connect.facebook.net."
                         )
+                    _validate_meta_proxy_endpoint(
+                        client=client,
+                        origin=origin,
+                        path="/__mos/meta/tr/",
+                        pixel_id=expected_meta_pixel_id,
+                        page_url=page_url,
+                    )
+                    _validate_meta_proxy_endpoint(
+                        client=client,
+                        origin=origin,
+                        path="/__mos/meta/privacy_sandbox/pixel/register/trigger/",
+                        pixel_id=expected_meta_pixel_id,
+                        page_url=page_url,
+                    )
                     seen_meta_proxy_origins.add(origin)
 
             expected_posthog_api_key = str(tracking_config.get("posthogProjectApiKey") or "").strip()

@@ -3536,6 +3536,76 @@ def test_activate_tracking_validation_target_uses_dom_click():
     assert "element.click()" in calls[2][1]
 
 
+def test_validate_deployed_tracking_html_checks_meta_nested_proxy_endpoints(monkeypatch):
+    requested_urls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, url: str, *, status_code: int = 200, text: str = ""):
+            self.url = url
+            self.status_code = status_code
+            self.text = text
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                request = deploy_service.httpx.Request("GET", self.url)
+                response = deploy_service.httpx.Response(
+                    self.status_code,
+                    request=request,
+                    text=self.text,
+                )
+                raise deploy_service.httpx.HTTPStatusError(
+                    "error",
+                    request=request,
+                    response=response,
+                )
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, **kwargs):
+            requested_urls.append(str(url))
+            if str(url).endswith("/sales-page/"):
+                return FakeResponse(
+                    str(url),
+                    text='pixel-123<script src="/__mos/meta/fbevents.js"></script>',
+                )
+            if str(url).endswith("/__mos/meta/fbevents.js"):
+                return FakeResponse(
+                    str(url),
+                    text='CDN_BASE_URL:"/__mos/meta/"',
+                )
+            return FakeResponse(str(url))
+
+    monkeypatch.setattr(deploy_service.httpx, "Client", FakeClient)
+
+    deploy_service._validate_deployed_tracking_html(
+        validation_plan={
+            "render_mode": deploy_service._FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
+            "origin": "https://shoptenorco.com",
+            "pages_to_validate": [
+                {
+                    "url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/",
+                    "tracking": {"metaPixelId": "pixel-123"},
+                }
+            ],
+        }
+    )
+
+    assert "https://shoptenorco.com/__mos/meta/fbevents.js" in requested_urls
+    assert "https://shoptenorco.com/__mos/meta/tr/" in requested_urls
+    assert (
+        "https://shoptenorco.com/__mos/meta/privacy_sandbox/pixel/register/trigger/"
+        in requested_urls
+    )
+
+
 def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(monkeypatch):
     calls: list[object] = []
     validated: dict[str, object] = {}
