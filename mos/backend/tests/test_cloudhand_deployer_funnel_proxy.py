@@ -851,20 +851,14 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert 'window.fbq("init", pixelId);' in entry_html
     assert "location = /__mos/meta/fbevents.js" in conf
     assert "proxy_pass https://connect.facebook.net/en_US/fbevents.js;" in conf
-    assert "location ^~ /__mos/meta/signals/config/" in conf
-    assert "proxy_pass https://connect.facebook.net/signals/config/;" in conf
     assert "location ^~ /__mos/meta/tr/" in conf
     assert "proxy_pass https://www.facebook.com/tr/;" in conf
-    assert "location ^~ /__mos/meta/privacy_sandbox/" in conf
-    assert "proxy_pass https://www.facebook.com/privacy_sandbox/;" in conf
     assert "proxy_set_header Host www.facebook.com;" in conf
-    assert "proxy_buffer_size 32k;" in conf
-    assert "proxy_buffers 8 32k;" in conf
-    assert "proxy_busy_buffers_size 64k;" in conf
-    assert (
-        "sub_filter 'CDN_BASE_URL:\"https://connect.facebook.net/\"' 'CDN_BASE_URL:\"/__mos/meta/\"';"
-        in conf
-    )
+    assert "location ^~ /__mos/meta/signals/config/" not in conf
+    assert "location ^~ /__mos/meta/privacy_sandbox/" not in conf
+    assert "fbevents_telemetry" not in conf
+    assert "instagram/tr" not in conf
+    assert "CDN_BASE_URL" not in conf
 
     assert page_html == entry_html
     assert "/example-product/example-funnel/presales/" in entry_html

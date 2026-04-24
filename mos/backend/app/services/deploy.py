@@ -2452,21 +2452,14 @@ def _validate_deployed_tracking_html(*, validation_plan: dict[str, Any]) -> None
                 if origin and origin not in seen_meta_proxy_origins:
                     proxy_response = client.get(f"{origin}/__mos/meta/fbevents.js")
                     proxy_response.raise_for_status()
-                    if 'CDN_BASE_URL:"https://connect.facebook.net/"' in proxy_response.text:
+                    if "/__mos/meta/tr" not in proxy_response.text:
                         raise DeployError(
-                            "Post-deploy tracking validation failed: proxied Meta script still points nested requests at connect.facebook.net."
+                            "Post-deploy tracking validation failed: proxied Meta script does not rewrite event beacons through /__mos/meta/tr."
                         )
                     _validate_meta_proxy_endpoint(
                         client=client,
                         origin=origin,
                         path="/__mos/meta/tr/",
-                        pixel_id=expected_meta_pixel_id,
-                        page_url=page_url,
-                    )
-                    _validate_meta_proxy_endpoint(
-                        client=client,
-                        origin=origin,
-                        path="/__mos/meta/privacy_sandbox/pixel/register/trigger/",
                         pixel_id=expected_meta_pixel_id,
                         page_url=page_url,
                     )

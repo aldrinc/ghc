@@ -3536,7 +3536,7 @@ def test_activate_tracking_validation_target_uses_dom_click():
     assert "element.click()" in calls[2][1]
 
 
-def test_validate_deployed_tracking_html_checks_meta_nested_proxy_endpoints(monkeypatch):
+def test_validate_deployed_tracking_html_checks_meta_event_proxy_endpoint(monkeypatch):
     requested_urls: list[str] = []
 
     class FakeResponse:
@@ -3579,7 +3579,7 @@ def test_validate_deployed_tracking_html_checks_meta_nested_proxy_endpoints(monk
             if str(url).endswith("/__mos/meta/fbevents.js"):
                 return FakeResponse(
                     str(url),
-                    text='CDN_BASE_URL:"/__mos/meta/"',
+                    text='fbqSendBeacon("/__mos/meta/tr/")',
                 )
             return FakeResponse(str(url))
 
@@ -3600,10 +3600,6 @@ def test_validate_deployed_tracking_html_checks_meta_nested_proxy_endpoints(monk
 
     assert "https://shoptenorco.com/__mos/meta/fbevents.js" in requested_urls
     assert "https://shoptenorco.com/__mos/meta/tr/" in requested_urls
-    assert (
-        "https://shoptenorco.com/__mos/meta/privacy_sandbox/pixel/register/trigger/"
-        in requested_urls
-    )
 
 
 def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_for_public_checkout(monkeypatch):

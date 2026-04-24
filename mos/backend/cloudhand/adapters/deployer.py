@@ -2718,15 +2718,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                             payload=b";",
                         )
                         return
-                    if path.startswith("/__mos/meta/signals/config/"):
+                    if path == "/__mos/meta/tr" or path.startswith("/__mos/meta/tr/"):
                         self._write_response(
-                            status=200,
-                            content_type="application/javascript; charset=utf-8",
-                            payload=b";",
+                            status=204,
+                            content_type="text/plain; charset=utf-8",
                         )
                         return
-                    self._write_response(status=204, content_type="text/plain; charset=utf-8")
-                    return
                 if path.startswith("/api/"):
                     payload = b"{}"
                     self._write_response(status=200, content_type="application/json; charset=utf-8", payload=payload)
@@ -2745,7 +2742,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
             def do_POST(self) -> None:  # noqa: N802
                 path = urlsplit(self.path).path
-                if path.startswith("/__mos/meta/"):
+                if path == "/__mos/meta/tr" or path.startswith("/__mos/meta/tr/"):
                     length = int(self.headers.get("Content-Length", "0") or "0")
                     if length > 0:
                         self.rfile.read(length)
@@ -7303,23 +7300,6 @@ WantedBy=multi-user.target
         sub_filter_types application/javascript text/javascript;
         sub_filter 'https://www.facebook.com/tr/' '/__mos/meta/tr/';
         sub_filter 'https://www.facebook.com/tr' '/__mos/meta/tr';
-        sub_filter 'https://www.instagram.com/tr/' '/__mos/meta/instagram/tr/';
-        sub_filter 'https://www.instagram.com/tr' '/__mos/meta/instagram/tr';
-        sub_filter 'https://connect.facebook.net/signals/config/' '/__mos/meta/signals/config/';
-        sub_filter 'https://connect.facebook.net/log/fbevents_telemetry/' '/__mos/meta/log/fbevents_telemetry/';
-        sub_filter 'https://www.facebook.com/privacy_sandbox/' '/__mos/meta/privacy_sandbox/';
-        sub_filter 'CDN_BASE_URL:"https://connect.facebook.net/"' 'CDN_BASE_URL:"/__mos/meta/"';
-    }}
-
-    location ^~ /__mos/meta/signals/config/ {{
-        proxy_pass https://connect.facebook.net/signals/config/;
-        proxy_http_version 1.1;
-        proxy_set_header Host connect.facebook.net;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_ssl_server_name on;
     }}
 
     location = /__mos/meta/tr {{
@@ -7333,37 +7313,6 @@ WantedBy=multi-user.target
         proxy_pass https://www.facebook.com/tr/;
         proxy_http_version 1.1;
         proxy_set_header Host www.facebook.com;
-        proxy_ssl_server_name on;
-    }}
-
-    location = /__mos/meta/instagram/tr {{
-        proxy_pass https://www.instagram.com/tr;
-        proxy_http_version 1.1;
-        proxy_set_header Host www.instagram.com;
-        proxy_ssl_server_name on;
-    }}
-
-    location ^~ /__mos/meta/instagram/tr/ {{
-        proxy_pass https://www.instagram.com/tr/;
-        proxy_http_version 1.1;
-        proxy_set_header Host www.instagram.com;
-        proxy_ssl_server_name on;
-    }}
-
-    location ^~ /__mos/meta/log/fbevents_telemetry/ {{
-        proxy_pass https://connect.facebook.net/log/fbevents_telemetry/;
-        proxy_http_version 1.1;
-        proxy_set_header Host connect.facebook.net;
-        proxy_ssl_server_name on;
-    }}
-
-    location ^~ /__mos/meta/privacy_sandbox/ {{
-        proxy_pass https://www.facebook.com/privacy_sandbox/;
-        proxy_http_version 1.1;
-        proxy_set_header Host www.facebook.com;
-        proxy_buffer_size 32k;
-        proxy_buffers 8 32k;
-        proxy_busy_buffers_size 64k;
         proxy_ssl_server_name on;
     }}
 
