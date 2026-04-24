@@ -7297,7 +7297,7 @@ WantedBy=multi-user.target
         proxy_set_header Accept-Encoding "";
         proxy_ssl_server_name on;
         sub_filter_once off;
-        sub_filter_types application/javascript text/javascript;
+        sub_filter_types application/javascript application/x-javascript text/javascript;
         sub_filter 'https://www.facebook.com/tr/' '/__mos/meta/tr/';
         sub_filter 'https://www.facebook.com/tr' '/__mos/meta/tr';
     }}

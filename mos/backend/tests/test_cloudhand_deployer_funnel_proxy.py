@@ -851,6 +851,7 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert 'window.fbq("init", pixelId);' in entry_html
     assert "location = /__mos/meta/fbevents.js" in conf
     assert "proxy_pass https://connect.facebook.net/en_US/fbevents.js;" in conf
+    assert "sub_filter_types application/javascript application/x-javascript text/javascript;" in conf
     assert "location ^~ /__mos/meta/tr/" in conf
     assert "proxy_pass https://www.facebook.com/tr/;" in conf
     assert "proxy_set_header Host www.facebook.com;" in conf
