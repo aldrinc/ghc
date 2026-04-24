@@ -7361,6 +7361,9 @@ WantedBy=multi-user.target
         proxy_pass https://www.facebook.com/privacy_sandbox/;
         proxy_http_version 1.1;
         proxy_set_header Host www.facebook.com;
+        proxy_buffer_size 32k;
+        proxy_buffers 8 32k;
+        proxy_busy_buffers_size 64k;
         proxy_ssl_server_name on;
     }}
 
