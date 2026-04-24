@@ -2356,12 +2356,6 @@ def _build_funnel_tracking_validation_plan(
         )
 
     pages_to_validate_by_url: dict[str, dict[str, Any]] = {}
-    for entry in page_entries:
-        tracking = entry.get("tracking")
-        if isinstance(tracking, dict) and (
-            _tracking_config_has_meta(tracking) or _tracking_config_has_posthog(tracking)
-        ):
-            pages_to_validate_by_url[str(entry["url"])] = entry
     for path_plan in path_plans:
         pages_to_validate_by_url[str(path_plan["start_page"]["url"])] = path_plan["start_page"]
         pages_to_validate_by_url[str(path_plan["sales_page"]["url"])] = path_plan["sales_page"]

@@ -3240,6 +3240,12 @@ def _build_tracking_validation_artifact_payload(*, include_presales: bool) -> di
                 ]
             },
         }
+    pages["contact-us"] = {
+        "pageId": "contact-page-id",
+        "stage": "custom",
+        "tracking": tracking,
+        "puckData": {"content": []},
+    }
 
     return {
         "products": {
@@ -3360,6 +3366,10 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "AddToCart",
     ]
     assert path_plan["expected_posthog_events"] == path_plan["expected_meta_events"]
+    assert sorted(page["slug"] for page in plan["pages_to_validate"]) == [
+        "presales",
+        "sales-page",
+    ]
 
 
 def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
@@ -3386,6 +3396,7 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         "AddToCart",
     ]
     assert path_plan["expected_posthog_events"] == path_plan["expected_meta_events"]
+    assert [page["slug"] for page in plan["pages_to_validate"]] == ["sales-page"]
 
 
 def test_build_funnel_tracking_validation_plan_allows_null_external_checkout_urls():
