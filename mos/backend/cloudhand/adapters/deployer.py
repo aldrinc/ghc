@@ -89,6 +89,10 @@ _FONTAWESOME_STYLESHEET_HOSTS = {
 _LEGACY_INSECURE_PUBLIC_ASSET_HOSTS = {
     "api.moshq.app",
 }
+_MOS_PUBLIC_ASSET_HOSTS = {
+    "moshq.app",
+    *_LEGACY_INSECURE_PUBLIC_ASSET_HOSTS,
+}
 _STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX = "/_standalone-assets"
 _STANDALONE_FONT_ASSET_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/fonts"
 _STANDALONE_COMPRESSED_IMAGE_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/compressed"
@@ -154,9 +158,10 @@ _STANDALONE_COMPRESSED_IMAGE_MIN_BYTES = 64 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_BYTES = 4 * 1024
 _STANDALONE_MIN_COMPRESSED_IMAGE_SAVINGS_RATIO = 0.03
 _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES = 16 * 1024
-_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 16
-_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 8
-_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 16
+# Keep standalone imports byte-stable; optional image rewrites are too slow/risky for paid-traffic deploys.
+_STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES = 0
+_STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES = 0
+_STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES = 0
 _STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS = 2500
 _STANDALONE_MODERN_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -710,7 +715,7 @@ def _normalize_standalone_public_asset_urls(
         if normalized_hosts:
             origin = str(match.group("origin") or "").strip()
             host = urlsplit(origin).netloc.strip().lower()
-            if host not in normalized_hosts:
+            if host not in normalized_hosts and host not in _MOS_PUBLIC_ASSET_HOSTS:
                 return match.group(0)
         return f"/public/assets/{match.group(2)}{match.group('suffix') or ''}"
 
@@ -2705,6 +2710,23 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 path = urlsplit(self.path).path
                 if self._handle_html():
                     return
+                if path.startswith("/__mos/meta/"):
+                    if path == "/__mos/meta/fbevents.js":
+                        self._write_response(
+                            status=200,
+                            content_type="application/javascript; charset=utf-8",
+                            payload=b";",
+                        )
+                        return
+                    if path.startswith("/__mos/meta/signals/config/"):
+                        self._write_response(
+                            status=200,
+                            content_type="application/javascript; charset=utf-8",
+                            payload=b";",
+                        )
+                        return
+                    self._write_response(status=204, content_type="text/plain; charset=utf-8")
+                    return
                 if path.startswith("/api/"):
                     payload = b"{}"
                     self._write_response(status=200, content_type="application/json; charset=utf-8", payload=payload)
@@ -2723,6 +2745,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
             def do_POST(self) -> None:  # noqa: N802
                 path = urlsplit(self.path).path
+                if path.startswith("/__mos/meta/"):
+                    length = int(self.headers.get("Content-Length", "0") or "0")
+                    if length > 0:
+                        self.rfile.read(length)
+                    self._write_response(status=204, content_type="text/plain; charset=utf-8")
+                    return
                 if path.startswith("/api/"):
                     length = int(self.headers.get("Content-Length", "0") or "0")
                     if length > 0:
@@ -4328,15 +4356,15 @@ WantedBy=multi-user.target
         if self._funnel_artifact_declares_meta_tracking(source=source):
             if not self._remote_tree_contains_text(
                 root_path=site_dir,
-                text="connect.facebook.net/en_US/fbevents.js",
+                text="/__mos/meta/fbevents.js",
             ):
                 raise ValueError(
-                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel script. "
+                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel proxy script. "
                     "The site was not activated."
                 )
-            if not (
-                self._remote_tree_contains_text(root_path=site_dir, text='fbq("init"')
-                or self._remote_tree_contains_text(root_path=site_dir, text="fbq('init'")
+            if not self._remote_tree_contains_text(
+                root_path=site_dir,
+                text='window.fbq("init", pixelId);',
             ):
                 raise ValueError(
                     "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel bootstrap. "
@@ -5402,7 +5430,7 @@ WantedBy=multi-user.target
 (() => {
   const config = __MOS_STANDALONE_IMPORTED_HTML_CONFIG__;
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
-  const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+  const META_PIXEL_SCRIPT_SRC = "/__mos/meta/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = __MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__;
   const POSTHOG_INSTANCE_NAME = "mosFunnel";
   const PRESALE_SOURCE_PARAM = "src";
@@ -7259,6 +7287,81 @@ WantedBy=multi-user.target
     location ^~ {_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/ {{
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable";
+    }}
+
+    location = /__mos/meta/fbevents.js {{
+        proxy_pass https://connect.facebook.net/en_US/fbevents.js;
+        proxy_http_version 1.1;
+        proxy_set_header Host connect.facebook.net;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        proxy_ssl_server_name on;
+        sub_filter_once off;
+        sub_filter_types application/javascript text/javascript;
+        sub_filter 'https://www.facebook.com/tr/' '/__mos/meta/tr/';
+        sub_filter 'https://www.facebook.com/tr' '/__mos/meta/tr';
+        sub_filter 'https://www.instagram.com/tr/' '/__mos/meta/instagram/tr/';
+        sub_filter 'https://www.instagram.com/tr' '/__mos/meta/instagram/tr';
+        sub_filter 'https://connect.facebook.net/signals/config/' '/__mos/meta/signals/config/';
+        sub_filter 'https://connect.facebook.net/log/fbevents_telemetry/' '/__mos/meta/log/fbevents_telemetry/';
+        sub_filter 'https://www.facebook.com/privacy_sandbox/' '/__mos/meta/privacy_sandbox/';
+        sub_filter 'CDN_BASE_URL:"https://connect.facebook.net/"' 'CDN_BASE_URL:"/__mos/meta/"';
+    }}
+
+    location ^~ /__mos/meta/signals/config/ {{
+        proxy_pass https://connect.facebook.net/signals/config/;
+        proxy_http_version 1.1;
+        proxy_set_header Host connect.facebook.net;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+    }}
+
+    location = /__mos/meta/tr {{
+        proxy_pass https://www.facebook.com/tr;
+        proxy_http_version 1.1;
+        proxy_set_header Host www.facebook.com;
+        proxy_ssl_server_name on;
+    }}
+
+    location ^~ /__mos/meta/tr/ {{
+        proxy_pass https://www.facebook.com/tr/;
+        proxy_http_version 1.1;
+        proxy_set_header Host www.facebook.com;
+        proxy_ssl_server_name on;
+    }}
+
+    location = /__mos/meta/instagram/tr {{
+        proxy_pass https://www.instagram.com/tr;
+        proxy_http_version 1.1;
+        proxy_set_header Host www.instagram.com;
+        proxy_ssl_server_name on;
+    }}
+
+    location ^~ /__mos/meta/instagram/tr/ {{
+        proxy_pass https://www.instagram.com/tr/;
+        proxy_http_version 1.1;
+        proxy_set_header Host www.instagram.com;
+        proxy_ssl_server_name on;
+    }}
+
+    location ^~ /__mos/meta/log/fbevents_telemetry/ {{
+        proxy_pass https://connect.facebook.net/log/fbevents_telemetry/;
+        proxy_http_version 1.1;
+        proxy_set_header Host connect.facebook.net;
+        proxy_ssl_server_name on;
+    }}
+
+    location ^~ /__mos/meta/privacy_sandbox/ {{
+        proxy_pass https://www.facebook.com/privacy_sandbox/;
+        proxy_http_version 1.1;
+        proxy_set_header Host www.facebook.com;
+        proxy_ssl_server_name on;
     }}
 
     location ^~ /api/ {{

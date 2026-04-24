@@ -105,7 +105,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const config = ${JSON.stringify(scriptConfig)};
 
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
-  const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+  const META_PIXEL_SCRIPT_SRC = "/__mos/meta/fbevents.js";
   const META_PIXEL_DEFER_TIMEOUT_MS = 1500;
   const POSTHOG_INSTANCE_NAME = "mosFunnel";
 

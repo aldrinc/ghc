@@ -3339,18 +3339,19 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         render_mode="standalone_imported_html",
     )
 
-    assert plan["start_page"]["slug"] == "presales"
     assert plan["sales_page"]["slug"] == "sales-page"
-    assert plan["pre_sales_click_selector"] == "#to-sales"
-    assert plan["checkout_selector"] == "#checkout-btn"
-    assert plan["expected_internal_events"] == [
+    path_plan = plan["path_plans"][0]
+    assert path_plan["start_page"]["slug"] == "presales"
+    assert path_plan["pre_sales_click_selectors"] == ["#to-sales"]
+    assert [target["selector"] for target in path_plan["checkout_targets"]] == ["#checkout-btn"]
+    assert path_plan["expected_internal_events"] == [
         "Entered Funnel",
         "pre_sales_page_view",
         "pre_sales_to_sales_click",
         "sales_page_view",
         "sales_to_checkout_click",
     ]
-    assert plan["expected_meta_events"] == [
+    assert path_plan["expected_meta_events"] == [
         "Entered Funnel",
         "PageView",
         "PreSalesToSalesClick",
@@ -3358,7 +3359,7 @@ def test_build_funnel_tracking_validation_plan_for_presales_flow():
         "EnteredSales",
         "AddToCart",
     ]
-    assert plan["expected_posthog_events"] == plan["expected_meta_events"]
+    assert path_plan["expected_posthog_events"] == path_plan["expected_meta_events"]
 
 
 def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
@@ -3370,20 +3371,21 @@ def test_build_funnel_tracking_validation_plan_for_direct_sales_flow():
         render_mode="standalone_imported_html",
     )
 
-    assert plan["start_page"]["slug"] == "sales-page"
-    assert plan["pre_sales_click_selector"] is None
-    assert plan["expected_internal_events"] == [
+    path_plan = plan["path_plans"][0]
+    assert path_plan["start_page"]["slug"] == "sales-page"
+    assert path_plan["pre_sales_click_selectors"] == []
+    assert path_plan["expected_internal_events"] == [
         "Entered Funnel",
         "sales_page_view",
         "sales_to_checkout_click",
     ]
-    assert plan["expected_meta_events"] == [
+    assert path_plan["expected_meta_events"] == [
         "Entered Funnel",
         "PageView",
         "ViewContent",
         "AddToCart",
     ]
-    assert plan["expected_posthog_events"] == plan["expected_meta_events"]
+    assert path_plan["expected_posthog_events"] == path_plan["expected_meta_events"]
 
 
 def test_build_funnel_tracking_validation_plan_allows_null_external_checkout_urls():
@@ -3403,7 +3405,7 @@ def test_build_funnel_tracking_validation_plan_allows_null_external_checkout_url
         render_mode="standalone_imported_html",
     )
 
-    assert plan["external_checkout_urls"] == []
+    assert plan["path_plans"][0]["checkout_targets"][0]["external_urls"] == []
 
 
 def test_validate_observed_tracking_events_accepts_expected_sequence():
@@ -3454,7 +3456,7 @@ def test_validate_observed_tracking_events_accepts_expected_sequence():
     }
 
     deploy_service._validate_observed_tracking_events(
-        validation_plan=plan,
+        path_plan=plan["path_plans"][0],
         observed_state=observed_state,
     )
 
@@ -3500,7 +3502,7 @@ def test_validate_observed_tracking_events_rejects_missing_checkout_event():
 
     with pytest.raises(deploy_service.DeployError, match="Meta Pixel events"):
         deploy_service._validate_observed_tracking_events(
-            validation_plan=plan,
+            path_plan=plan["path_plans"][0],
             observed_state=observed_state,
         )
 
@@ -3520,6 +3522,8 @@ def test_activate_tracking_validation_target_uses_dom_click():
             calls.append(("evaluate", script))
 
     class FakePage:
+        url = "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"
+
         def locator(self, selector):
             calls.append(("locator", selector))
             return FakeLocator()
@@ -3539,7 +3543,7 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
     monkeypatch.setattr(
         deploy_service,
         "_validate_deployed_tracking_html",
-        lambda **kwargs: calls.append(("validate_html", kwargs["validation_plan"]["checkout_mode"])),
+        lambda **kwargs: calls.append(("validate_html", kwargs["validation_plan"]["checkout_validated"])),
     )
     monkeypatch.setattr(
         deploy_service,
@@ -3573,6 +3577,8 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
             calls.append(("locator_evaluate", script))
 
     class FakePage:
+        url = "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"
+
         def locator(self, selector):
             calls.append(("locator", selector))
             return FakeLocator()
@@ -3611,6 +3617,9 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
             calls.append(("new_page",))
             return fake_page
 
+        def close(self):
+            calls.append(("context_close",))
+
     class FakeBrowser:
         def new_context(self, **kwargs):
             calls.append(("new_context", kwargs))
@@ -3636,20 +3645,29 @@ def test_run_funnel_tracking_post_deploy_validation_sync_uses_checkout_request_f
         validation_plan={
             "render_mode": "standalone_imported_html",
             "origin": "https://shoptenorco.com",
-            "start_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
-            "sales_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
-            "pre_sales_click_selector": None,
-            "checkout_selector": "#main-cta",
-            "checkout_mode": "public_checkout",
-            "external_checkout_urls": [],
-            "tracking": {},
-            "expected_internal_events": [],
-            "expected_meta_events": [],
-            "expected_posthog_events": [],
+            "checkout_validated": True,
+            "path_plans": [
+                {
+                    "start_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
+                    "sales_page": {"url": "https://shoptenorco.com/8b89a76d/be65d76e/sales-page/"},
+                    "pre_sales_click_selectors": [],
+                    "checkout_targets": [
+                        {
+                            "selector": "#main-cta",
+                            "mode": "public_checkout",
+                            "external_urls": [],
+                        }
+                    ],
+                    "tracking": {},
+                    "expected_internal_events": [],
+                    "expected_meta_events": [],
+                    "expected_posthog_events": [],
+                }
+            ],
         }
     )
 
-    assert ("expect_request", r".*/api/public/checkout(?:\?.*)?$") in calls
+    assert ("expect_request", r".*/(?:api/)?public/checkout(?:\?.*)?$") in calls
     assert not any(call[0] == "wait_for_url" for call in calls if isinstance(call, tuple))
     assert validated["observed_state"]["posthog"]["captures"] == []
 

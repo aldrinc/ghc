@@ -846,8 +846,19 @@ def test_funnel_artifact_site_exports_standalone_imported_html_without_runtime_b
     assert "CTA Link Click" in entry_html
     assert "internal_event_type" in entry_html
     assert "content_category" in entry_html
-    assert "connect.facebook.net/en_US/fbevents.js" in entry_html
+    assert "/__mos/meta/fbevents.js" in entry_html
+    assert "connect.facebook.net/en_US/fbevents.js" not in entry_html
     assert 'window.fbq("init", pixelId);' in entry_html
+    assert "location = /__mos/meta/fbevents.js" in conf
+    assert "proxy_pass https://connect.facebook.net/en_US/fbevents.js;" in conf
+    assert "location ^~ /__mos/meta/signals/config/" in conf
+    assert "proxy_pass https://connect.facebook.net/signals/config/;" in conf
+    assert "location ^~ /__mos/meta/tr/" in conf
+    assert "proxy_pass https://www.facebook.com/tr/;" in conf
+    assert (
+        "sub_filter 'CDN_BASE_URL:\"https://connect.facebook.net/\"' 'CDN_BASE_URL:\"/__mos/meta/\"';"
+        in conf
+    )
 
     assert page_html == entry_html
     assert "/example-product/example-funnel/presales/" in entry_html
@@ -901,24 +912,18 @@ def test_standalone_imported_html_rewrites_upstream_public_asset_urls_to_artifac
         workspace_server_names=["shop.example.com"],
     )
     deployer, uploaded, _commands = _stub_deployer()
-    observed_urls: list[str] = []
 
-    def fetch_remote_image(**kwargs):
-        observed_urls.append(kwargs["url"])
-        return _PRIMARY_ASSET_BYTES, "image/png"
+    def fail_remote_image_fetch(**kwargs):
+        raise AssertionError(f"unexpected remote image fetch: {kwargs['url']}")
 
-    deployer._fetch_remote_standalone_image_asset = fetch_remote_image
+    deployer._fetch_remote_standalone_image_asset = fail_remote_image_fetch
     deployer._configure_funnel_artifact_site(app)
 
     entry_route_path = "/opt/apps/landing-artifact/site/example-product/example-funnel/index.html"
-    mirrored_digest = hashlib.sha256(_PRIMARY_ASSET_BYTES).hexdigest()[:32]
-    mirrored_path = f"/opt/apps/landing-artifact/site/_standalone-assets/{mirrored_digest}.png"
     entry_html = uploaded[entry_route_path]
-    assert observed_urls == ["https://moshq.app/api/public/assets/11111111-1111-1111-1111-111111111111"]
     assert "https://moshq.app/api/public/assets/" not in entry_html
-    assert f'src="/_standalone-assets/{mirrored_digest}.png"' in entry_html
-    assert f'href="/_standalone-assets/{mirrored_digest}.png"' in entry_html
-    assert uploaded[mirrored_path] == _PRIMARY_ASSET_BYTES
+    assert 'src="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
+    assert 'href="/public/assets/11111111-1111-1111-1111-111111111111"' in entry_html
 
 
 def test_funnel_artifact_site_standalone_internal_navigation_preserves_query_params():
@@ -2442,7 +2447,7 @@ def test_validate_funnel_artifact_site_output_requires_meta_pixel_bootstrap_when
     deployer._resolve_funnel_artifact_default_route = lambda *, source: ("example-product", "example-funnel", "presales")
     deployer._remote_tree_contains_text = lambda *, root_path, text: text == "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START"
 
-    with pytest.raises(ValueError, match="Meta Pixel script"):
+    with pytest.raises(ValueError, match="Meta Pixel proxy script"):
         deployer._validate_funnel_artifact_site_output(
             site_dir="/opt/apps/landing-artifact/site-releases/20260422T000000Z",
             source=app.source_ref,
