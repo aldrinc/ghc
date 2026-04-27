@@ -361,7 +361,7 @@ jobs:
                       "system_packages": [],
                   },
                   "service_config": {
-                      "command": None,
+                      "command": "",
                       "static_root": "/tmp/tenor-tracking-hotfix-static",
                       "spa_fallback": False,
                       "environment": {},
