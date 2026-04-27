@@ -1,0 +1,240 @@
+name: Tenor Tracking Hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tenor-tracking-hotfix.yml
+  workflow_dispatch:
+
+jobs:
+  patch-tenor-artifact:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Patch Tenor standalone tracking runtime
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            ARTIFACT_HOST="135.181.93.244"
+            ARTIFACT_KEY="/root/tmp/mos_cloudhand_project_key"
+            if [ ! -f "${ARTIFACT_KEY}" ]; then
+              echo "Artifact SSH key missing on deploy host: ${ARTIFACT_KEY}" >&2
+              exit 1
+            fi
+
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "${ARTIFACT_KEY}" "root@${ARTIFACT_HOST}" 'python3 -' <<'PY'
+            from __future__ import annotations
+
+            import json
+            import shutil
+            from datetime import datetime, timezone
+            from pathlib import Path
+
+            SITE_ROOT = Path("/opt/apps/brand-funnels-70124684-be65d76e/site")
+            BACKUP_ROOT = SITE_ROOT.parent / (
+                "tracking-wait-backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            )
+
+            CONSTANT_NEEDLE = '  const POSTHOG_INSTANCE_NAME = "mosFunnel";\n  const PRESALE_SOURCE_PARAM = "src";'
+            CONSTANT_REPLACEMENT = (
+                '  const POSTHOG_INSTANCE_NAME = "mosFunnel";\n'
+                '  const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;\n'
+                '  const META_ATTRIBUTION_WAIT_POLL_MS = 50;\n'
+                '  const PRESALE_SOURCE_PARAM = "src";'
+            )
+
+            OLD_ATTRIBUTION_PROPS = '''  const resolveMetaAttributionProps = () => {
+                const props = { action_source: "website" };
+                assignCleanProp(props, "fbp", readCookie("_fbp"));
+                assignCleanProp(props, "fbc", readCookie("_fbc"));
+                const currentUrl = new URL(window.location.href);
+                assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+                assignCleanProp(props, "event_source_url", currentUrl.href);
+                return props;
+              };
+            '''.replace("            ", "")
+            NEW_ATTRIBUTION_PROPS = '''  const resolveMetaAttributionProps = (eventSourceUrl) => {
+                const props = { action_source: "website" };
+                assignCleanProp(props, "fbp", readCookie("_fbp"));
+                assignCleanProp(props, "fbc", readCookie("_fbc"));
+                const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+                assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+                assignCleanProp(props, "event_source_url", currentUrl.href);
+                assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
+                return props;
+              };
+              const resolveMetaAttributionReady = (eventSourceUrl) => {
+                const eventUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+                const hasFbclid = Boolean(cleanText(eventUrl.searchParams.get("fbclid")));
+                const hasFbp = Boolean(readCookie("_fbp"));
+                const hasFbc = Boolean(readCookie("_fbc"));
+                return hasFbp && (!hasFbclid || hasFbc);
+              };
+              const waitForMetaAttribution = (eventSourceUrl) => {
+                const startedAt = Date.now();
+                return new Promise((resolve) => {
+                  const poll = () => {
+                    const elapsedMs = Date.now() - startedAt;
+                    if (resolveMetaAttributionReady(eventSourceUrl)) {
+                      resolve({ elapsedMs, timedOut: false });
+                      return;
+                    }
+                    if (elapsedMs >= META_ATTRIBUTION_WAIT_TIMEOUT_MS) {
+                      resolve({ elapsedMs, timedOut: true });
+                      return;
+                    }
+                    window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+                  };
+                  window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+                });
+              };
+            '''.replace("            ", "")
+
+            OLD_TRACK_POSTHOG = '''  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
+                const posthog = ensurePostHogInstance();
+                if (!posthog || typeof posthog.capture !== "function") return;
+                const baseEventProps = {
+                  productSlug: cleanText(config.productSlug),
+                  funnelSlug: cleanText(config.funnelSlug),
+                  publicationId: cleanText(config.publicationId),
+                  pageId: cleanText(config.pageId),
+                  pageSlug: cleanText(config.pageSlug),
+                  pageStage: cleanText((props && props.pageStage) || config.pageStage),
+                  visitorId: cleanText(visitorId),
+                  sessionId: cleanText(sessionId),
+                  path: window.location.pathname + window.location.search,
+                  referrer: document.referrer || undefined,
+                  utm: getUtmParams(),
+                };
+                const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures);
+                captures.forEach((capture) => {
+                  posthog.capture(capture.eventName, capture.eventProps);
+                });
+              };
+            '''.replace("            ", "")
+            NEW_TRACK_POSTHOG = '''  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
+                const posthog = ensurePostHogInstance();
+                if (!posthog || typeof posthog.capture !== "function") return;
+                const eventSourceUrl = window.location.href;
+                const baseEventProps = {
+                  productSlug: cleanText(config.productSlug),
+                  funnelSlug: cleanText(config.funnelSlug),
+                  publicationId: cleanText(config.publicationId),
+                  pageId: cleanText(config.pageId),
+                  pageSlug: cleanText(config.pageSlug),
+                  pageStage: cleanText((props && props.pageStage) || config.pageStage),
+                  visitorId: cleanText(visitorId),
+                  sessionId: cleanText(sessionId),
+                  path: window.location.pathname + window.location.search,
+                  referrer: document.referrer || undefined,
+                  utm: getUtmParams(),
+                };
+                const emitCaptures = (additionalEventProps) => {
+                  const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures, eventSourceUrl);
+                  captures.forEach((capture) => {
+                    posthog.capture(capture.eventName, {
+                      ...capture.eventProps,
+                      ...(additionalEventProps || {}),
+                    });
+                  });
+                };
+                if (Array.isArray(mappedCaptures) && mappedCaptures.length && !resolveMetaAttributionReady(eventSourceUrl)) {
+                  waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
+                    emitCaptures({
+                      meta_cookie_wait_ms: elapsedMs,
+                      ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
+                    });
+                  });
+                  return;
+                }
+                emitCaptures();
+              };
+            '''.replace("            ", "")
+
+            def replace_once(text: str, old: str, new: str, label: str, path: Path) -> str:
+                count = text.count(old)
+                if count != 1:
+                    raise RuntimeError(f"{path}: expected exactly one {label} block, found {count}")
+                return text.replace(old, new, 1)
+
+            def patch_html(path: Path) -> str:
+                text = path.read_text(encoding="utf-8")
+                if "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in text:
+                    return "skipped"
+                if "resolveMetaAttributionProps" not in text:
+                    return "skipped"
+                if all(
+                    marker in text
+                    for marker in (
+                        "waitForMetaAttribution",
+                        "resolveMetaAttributionReady",
+                        "meta_cookie_wait_ms",
+                        "$raw_user_agent",
+                        "META_ATTRIBUTION_WAIT_TIMEOUT_MS",
+                    )
+                ):
+                    return "already_patched"
+
+                original = text
+                if "META_ATTRIBUTION_WAIT_TIMEOUT_MS" not in text:
+                    text = replace_once(text, CONSTANT_NEEDLE, CONSTANT_REPLACEMENT, "attribution constants", path)
+                if "resolveMetaAttributionReady" not in text:
+                    text = replace_once(text, OLD_ATTRIBUTION_PROPS, NEW_ATTRIBUTION_PROPS, "attribution helpers", path)
+                text = replace_once(text, OLD_TRACK_POSTHOG, NEW_TRACK_POSTHOG, "PostHog delayed capture", path)
+                text = text.replace(
+                    "  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures) => {",
+                    "  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {",
+                    1,
+                )
+                text = text.replace("        ...resolveMetaAttributionProps(),", "        ...resolveMetaAttributionProps(eventSourceUrl),", 1)
+
+                required = (
+                    "waitForMetaAttribution",
+                    "resolveMetaAttributionReady",
+                    "meta_cookie_wait_ms",
+                    "$raw_user_agent",
+                    "META_ATTRIBUTION_WAIT_TIMEOUT_MS",
+                    "resolveMetaAttributionProps(eventSourceUrl)",
+                )
+                missing = [marker for marker in required if marker not in text]
+                if missing:
+                    raise RuntimeError(f"{path}: missing required markers after patch: {missing}")
+                if text == original:
+                    raise RuntimeError(f"{path}: patch produced no changes")
+
+                backup_path = BACKUP_ROOT / path.relative_to(SITE_ROOT)
+                backup_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, backup_path)
+                path.write_text(text, encoding="utf-8")
+                return "patched"
+
+            if not SITE_ROOT.is_dir():
+                raise SystemExit(f"Tenor site root missing: {SITE_ROOT}")
+
+            summary = {"patched": [], "already_patched": [], "skipped": 0, "backup_root": str(BACKUP_ROOT)}
+            for html_path in sorted(SITE_ROOT.rglob("*.html")):
+                result = patch_html(html_path)
+                if result == "patched":
+                    summary["patched"].append(str(html_path))
+                elif result == "already_patched":
+                    summary["already_patched"].append(str(html_path))
+                else:
+                    summary["skipped"] += 1
+
+            if not summary["patched"] and not summary["already_patched"]:
+                raise SystemExit("No Tenor standalone HTML files were patchable.")
+
+            print(json.dumps(summary, indent=2))
+            PY
+
+            curl -fsSL "https://shoptenorco.com/8b89a76d/be65d76e/presales?fbclid=deploycheck&utm_source=meta" \
+              | grep -q "waitForMetaAttribution"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/be65d76e/presales?fbclid=deploycheck&utm_source=meta" \
+              | grep -q "meta_cookie_wait_ms"
