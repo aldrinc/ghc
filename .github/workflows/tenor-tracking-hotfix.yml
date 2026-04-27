@@ -342,6 +342,7 @@ jobs:
 
           def apply_workload() -> Any:
               response = request("POST", "/api/applications/plans/apply", {"workload_names": [WORKLOAD_NAME]})
+              print(json.dumps(response, indent=2)[:30000])
               validate_apply_response(response)
               return response
 
@@ -429,21 +430,24 @@ jobs:
           print(f"Saving temporary workload {WORKLOAD_NAME!r} on instance {instance_name!r}.")
           put_plan(plan)
 
+          apply_completed = False
           try:
               print(f"Applying temporary workload {WORKLOAD_NAME!r}.")
               apply_response = apply_workload()
-              print(json.dumps(apply_response, indent=2)[:12000])
+              apply_completed = True
               verify_live_page()
           finally:
               print(f"Removing temporary workload {WORKLOAD_NAME!r} from the deployment plan.")
               cleanup_plan = extract_plan(request("GET", "/api/applications/plans/latest"))
               if remove_hotfix_workload(cleanup_plan):
                   put_plan(cleanup_plan)
-                  try:
-                      cleanup_response = apply_workload()
-                      print(json.dumps(cleanup_response, indent=2)[:12000])
-                  except Exception as exc:
-                      print(f"Cleanup apply failed after live patch verification: {exc}", flush=True)
+                  if apply_completed:
+                      try:
+                          apply_workload()
+                      except Exception as exc:
+                          print(f"Cleanup apply failed after live patch verification: {exc}", flush=True)
+                  else:
+                      print("Deploy apply did not complete, so cleanup only removed the temporary workload from the saved plan.")
               else:
                   print("Temporary workload was already absent from the latest plan.")
 
