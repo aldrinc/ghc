@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Patch Tenor standalone tracking runtime
+      - name: Patch Tenor RMBC supplemental tracking
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -33,208 +33,648 @@ jobs:
             from __future__ import annotations
 
             import json
+            import re
             import shutil
             from datetime import datetime, timezone
             from pathlib import Path
 
-            SITE_ROOT = Path("/opt/apps/brand-funnels-70124684-be65d76e/site")
-            BACKUP_ROOT = SITE_ROOT.parent / (
-                "tracking-wait-backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            SEARCH_ROOT = Path("/opt/apps")
+            TARGET_PAGE_ID = "efc9c373-72d1-45a5-9140-e839a71811d5"
+            TARGET_PATH_HINT = "/8b89a76d/daily-drive-essentials/sales-page"
+            KLAVIYO_SITE_ID = "VHSTxF"
+            MARKER_START = "<!-- TENOR_RMBC_SUPPLEMENTAL_TRACKING_START -->"
+            MARKER_END = "<!-- TENOR_RMBC_SUPPLEMENTAL_TRACKING_END -->"
+            BACKUP_ROOT = SEARCH_ROOT / (
+                "tenor-rmbc-backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             )
 
-            CONSTANT_NEEDLE = '  const POSTHOG_INSTANCE_NAME = "mosFunnel";\n  const PRESALE_SOURCE_PARAM = "src";'
-            CONSTANT_REPLACEMENT = (
-                '  const POSTHOG_INSTANCE_NAME = "mosFunnel";\n'
-                '  const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;\n'
-                '  const META_ATTRIBUTION_WAIT_POLL_MS = 50;\n'
-                '  const PRESALE_SOURCE_PARAM = "src";'
-            )
+            SUPPLEMENTAL_SCRIPT = r'''<!-- TENOR_RMBC_SUPPLEMENTAL_TRACKING_START -->
+            <script id="tenor-rmbc-supplemental-tracking">
+            (function () {
+              if (window.__tenorRmbcSupplementalTrackingLoaded === true) return;
+              window.__tenorRmbcSupplementalTrackingLoaded = true;
 
-            OLD_ATTRIBUTION_PROPS = '''  const resolveMetaAttributionProps = () => {
-                const props = { action_source: "website" };
-                assignCleanProp(props, "fbp", readCookie("_fbp"));
-                assignCleanProp(props, "fbc", readCookie("_fbc"));
-                const currentUrl = new URL(window.location.href);
-                assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
-                assignCleanProp(props, "event_source_url", currentUrl.href);
-                return props;
+              const POSTHOG_API_KEY = "phc_yLtqJCnriQyYGxLyPjhTMr7aveLZKzySCv4mJnJLrYDx";
+              const POSTHOG_CAPTURE_URL = "https://ten.shoptenorco.com/capture/";
+              const CONFIG = {
+                productSlug: "8b89a76d",
+                funnelSlug: "9fb75e73",
+                publicationId: "5e5338a7-a5c6-4463-ad68-9623673f11de",
+                pageId: "efc9c373-72d1-45a5-9140-e839a71811d5",
+                pageSlug: "sales-page",
+                pageStage: "sales"
               };
-            '''.replace("            ", "")
-            NEW_ATTRIBUTION_PROPS = '''  const resolveMetaAttributionProps = (eventSourceUrl) => {
-                const props = { action_source: "website" };
-                assignCleanProp(props, "fbp", readCookie("_fbp"));
-                assignCleanProp(props, "fbc", readCookie("_fbc"));
-                const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
-                assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
-                assignCleanProp(props, "event_source_url", currentUrl.href);
-                assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
-                return props;
-              };
-              const resolveMetaAttributionReady = (eventSourceUrl) => {
-                const eventUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
-                const hasFbclid = Boolean(cleanText(eventUrl.searchParams.get("fbclid")));
-                const hasFbp = Boolean(readCookie("_fbp"));
-                const hasFbc = Boolean(readCookie("_fbc"));
-                return hasFbp && (!hasFbclid || hasFbc);
-              };
-              const waitForMetaAttribution = (eventSourceUrl) => {
-                const startedAt = Date.now();
-                return new Promise((resolve) => {
-                  const poll = () => {
-                    const elapsedMs = Date.now() - startedAt;
-                    if (resolveMetaAttributionReady(eventSourceUrl)) {
-                      resolve({ elapsedMs, timedOut: false });
-                      return;
-                    }
-                    if (elapsedMs >= META_ATTRIBUTION_WAIT_TIMEOUT_MS) {
-                      resolve({ elapsedMs, timedOut: true });
-                      return;
-                    }
-                    window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
-                  };
-                  window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
-                });
-              };
-            '''.replace("            ", "")
+              const QUALIFIED_ACTIVE_TIME_MS = 3000;
+              const QUALIFIED_SCROLL_DEPTH_PCT = 25;
+              const SCROLL_DEPTH_MILESTONES = [25, 50, 75, 90, 100];
 
-            OLD_TRACK_POSTHOG = '''  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
-                const posthog = ensurePostHogInstance();
-                if (!posthog || typeof posthog.capture !== "function") return;
-                const baseEventProps = {
-                  productSlug: cleanText(config.productSlug),
-                  funnelSlug: cleanText(config.funnelSlug),
-                  publicationId: cleanText(config.publicationId),
-                  pageId: cleanText(config.pageId),
-                  pageSlug: cleanText(config.pageSlug),
-                  pageStage: cleanText((props && props.pageStage) || config.pageStage),
-                  visitorId: cleanText(visitorId),
-                  sessionId: cleanText(sessionId),
+              const VIEW_TARGETS = [
+                { eventType: "section_view", kind: "section", id: "hero_product", selector: "#shopify-section-template--20252015853735__main", label: "Hero product module" },
+                { eventType: "section_view", kind: "section", id: "press_logos", selector: "#shopify-section-template--20252015853735__im8_press_logos_1", label: "As featured in logos" },
+                { eventType: "section_view", kind: "section", id: "upgrade_spectrum", selector: "#shopify-section-template--20252015853735__im8_pro_upgrade_spectrum_hf3dRq", label: "Upgrade spectrum" },
+                { eventType: "section_view", kind: "section", id: "body_support", selector: "#shopify-section-template--20252015853735__im8_pro_body_support_fKG9Va", label: "Body support mechanism" },
+                { eventType: "section_view", kind: "section", id: "stack_cost", selector: "#shopify-section-template--20252015853735__tenorOffer_stack_cost_ep", label: "Stack cost comparison" },
+                { eventType: "section_view", kind: "section", id: "clinical_comparison", selector: "#shopify-section-template--20252015853735__im8_comparison_table_ep", label: "Clinical comparison" },
+                { eventType: "section_view", kind: "section", id: "science_advisory", selector: "#shopify-section-template--20252015853735__im8_pro_science_advisory_ep", label: "Science advisory" },
+                { eventType: "section_view", kind: "section", id: "faq", selector: "#shopify-section-template--20252015853735__im8_pro_faq_ep", label: "FAQ" },
+                { eventType: "proof_view", kind: "proof", id: "hero_reviews", selector: ".im8-hero-reviews", label: "Hero review carousel" },
+                { eventType: "proof_view", kind: "proof", id: "social_proof", selector: "#im8-social-proof", label: "Social proof" },
+                { eventType: "proof_view", kind: "proof", id: "reviews_zone", selector: "#im8-reviews-zone-template--20252015853735__social_proof_ep_reviews", label: "Reviews zone" },
+                { eventType: "proof_view", kind: "proof", id: "clinical_proof", selector: "#shopify-section-template--20252015853735__statistics_grid_ep", label: "Clinical proof stats" },
+                { eventType: "cta_view", kind: "cta", id: "sales-primary-submit", selector: "button.mos-sales-checkout-button", label: "Primary checkout button" },
+                { eventType: "cta_view", kind: "cta", id: "sales-announcement-link", selector: "a.Header_announcement_bar_main_new--clickable", label: "Announcement bar checkout" },
+                { eventType: "cta_view", kind: "cta", id: "sales-one-time-purchase-link", selector: "a.one-time-purchase-link", label: "One-time purchase link" },
+                { eventType: "cta_view", kind: "cta", id: "sales-subscription-promo", selector: "button[data-tenor-subscription-promo-cta]", label: "Subscription promo CTA" },
+                { eventType: "cta_view", kind: "cta", id: "sales-sticky-buy", selector: "button.product-buy-sticky__button", label: "Sticky buy button" },
+                { eventType: "offer_stack_view", kind: "offer_stack", id: "primary_offer_form", selector: "#ProductInfo-template--20252015853735__main", label: "Primary offer form" },
+                { eventType: "offer_stack_view", kind: "offer_stack", id: "stack_cost_offer", selector: "#im8-tenor-offer-stack", label: "Tenor offer stack cost section" },
+                { eventType: "value_stack_view", kind: "value_stack", id: "subscription_savings", selector: ".product-form__input--plan", label: "Subscription savings selector" },
+                { eventType: "value_stack_view", kind: "value_stack", id: "stack_cost_value", selector: "#im8-tenor-offer-stack", label: "Stack cost value comparison" },
+                { eventType: "price_reveal_view", kind: "price_reveal", id: "hero_price", selector: "#price-template--20252015853735__main", label: "Hero price" },
+                { eventType: "price_reveal_view", kind: "price_reveal", id: "plan_prices", selector: ".variant_option_price", label: "Plan option prices" },
+                { eventType: "guarantee_view", kind: "guarantee", id: "risk_free_guarantee", selector: "#im8-pro-guarantee-template--20252015853735__im8_pro_risk_free_ep", label: "Risk free guarantee" },
+                { eventType: "trust_element_view", kind: "trust_element", id: "trusted_by", selector: "#im8-pro-trusted-template--20252015853735__im8_pro_trusted_by_ep", label: "Trusted by" },
+                { eventType: "trust_element_view", kind: "trust_element", id: "press_logos", selector: "#shopify-section-template--20252015853735__im8_press_logos_1", label: "Press logos" }
+              ];
+              const INTERACTION_TARGETS = [
+                { eventType: "selector_interaction", kind: "selector", id: "purchase_plan_selector", selector: "input[name=\"Plan-2\"]", label: "Purchase plan selector", event: "change", source: "value", interactionType: "purchase_plan" },
+                { eventType: "selector_interaction", kind: "selector", id: "hidden_purchase_mode", selector: "#mos-selected-purchase-mode", label: "Resolved purchase mode", event: "change", source: "value", interactionType: "purchase_mode" },
+                { eventType: "selector_interaction", kind: "selector", id: "hidden_pack", selector: "#mos-selected-pack", label: "Resolved pack", event: "change", source: "value", interactionType: "pack" },
+                { eventType: "product_detail_interaction", kind: "product_detail", id: "supplement_facts_open", selector: "[data-im8-facts-open]", label: "Supplement facts open", event: "click", source: "text", interactionType: "supplement_facts_open" },
+                { eventType: "product_detail_interaction", kind: "product_detail", id: "one_time_purchase_open", selector: "a.one-time-purchase-link", label: "One-time purchase link", event: "click", source: "text", interactionType: "one_time_purchase_open" }
+              ];
+              const CHECKOUT_CLICK_TARGETS = [
+                { id: "sales-primary-submit", selector: "button.mos-sales-checkout-button", label: "Primary checkout button" },
+                { id: "sales-shopbar-link", selector: "a.js-essentials-pro-bar-cta, a.js-daily-drive-essentials-bar-cta", label: "Sticky shop bar checkout" },
+                { id: "sales-announcement-link", selector: "a.Header_announcement_bar_main_new--clickable", label: "Announcement bar checkout" },
+                { id: "sales-one-time-purchase-link", selector: "a.one-time-purchase-link", label: "One-time purchase link" }
+              ];
+              const CHECKOUT_VARIANTS_BY_PACK = {
+                "3x": { variantId: "9b9cb990-e080-4839-8559-20e30a4e8f6b", pricePointId: "9b9cb990-e080-4839-8559-20e30a4e8f6b", value: 105, currency: "usd", purchaseMode: "subscribe" },
+                "1x": { variantId: "tenor-30-day-subscription", pricePointId: "tenor-30-day-subscription", value: 44, currency: "usd", purchaseMode: "subscribe" },
+                "one-time": { variantId: "tenor-one-time-purchase", pricePointId: "tenor-one-time-purchase", value: 59, currency: "usd", purchaseMode: "one-time" }
+              };
+
+              function cleanText(value) {
+                return typeof value === "string" && value.trim() ? value.trim() : null;
+              }
+              function normalizeText(value) {
+                return cleanText(String(value || "").replace(/\s+/g, " "));
+              }
+              function createFallbackId(prefix) {
+                return prefix + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+              }
+              function getOrCreateStoredId(storage, key, prefix) {
+                try {
+                  const existing = storage.getItem(key);
+                  if (existing) return existing;
+                  const nextId = window.crypto && typeof window.crypto.randomUUID === "function"
+                    ? window.crypto.randomUUID()
+                    : createFallbackId(prefix);
+                  storage.setItem(key, nextId);
+                  return nextId;
+                } catch (_) {
+                  return createFallbackId(prefix);
+                }
+              }
+              const visitorId = getOrCreateStoredId(window.localStorage, "funnel_visitor_id", "funnel-visitor");
+              const sessionId = getOrCreateStoredId(
+                window.sessionStorage,
+                "funnel_session_id:" + CONFIG.productSlug + ":" + CONFIG.funnelSlug,
+                "funnel-session"
+              );
+              function readCookie(name) {
+                const prefix = name + "=";
+                const match = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+                return match ? cleanText(match.slice(prefix.length)) : null;
+              }
+              function getUtmParams() {
+                const utm = {};
+                const params = new URLSearchParams(window.location.search);
+                for (const [key, value] of params.entries()) {
+                  if (key.startsWith("utm_")) utm[key] = value;
+                }
+                return utm;
+              }
+              function getUrlParams() {
+                const values = {};
+                const params = new URLSearchParams(window.location.search);
+                for (const [key, value] of params.entries()) {
+                  values[key] = value;
+                }
+                return values;
+              }
+              function resolveClickId() {
+                const params = new URLSearchParams(window.location.search);
+                const keys = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
+                for (const key of keys) {
+                  const value = cleanText(params.get(key));
+                  if (value) return { clickId: value, clickIdType: key };
+                }
+                return {};
+              }
+              function resolveDeviceType() {
+                if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) return "mobile";
+                if (window.innerWidth < 768) return "mobile";
+                if (window.innerWidth < 1024) return "tablet";
+                return "desktop";
+              }
+              function activeTimeMs() {
+                if (document.visibilityState === "hidden") return activeAccumulatedMs;
+                return activeAccumulatedMs + Math.max(0, Date.now() - activeStartedAt);
+              }
+              function eventId(eventName, id) {
+                return [eventName, CONFIG.publicationId, CONFIG.pageId, sessionId, id || "event"].join(":");
+              }
+              function baseProps() {
+                const click = resolveClickId();
+                return {
+                  productSlug: CONFIG.productSlug,
+                  funnelSlug: CONFIG.funnelSlug,
+                  publicationId: CONFIG.publicationId,
+                  pageId: CONFIG.pageId,
+                  pageSlug: CONFIG.pageSlug,
+                  pageStage: CONFIG.pageStage,
+                  visitorId,
+                  sessionId,
                   path: window.location.pathname + window.location.search,
                   referrer: document.referrer || undefined,
                   utm: getUtmParams(),
+                  url_params: getUrlParams(),
+                  deviceType: resolveDeviceType(),
+                  fbp: readCookie("_fbp") || undefined,
+                  fbc: readCookie("_fbc") || undefined,
+                  event_source_url: window.location.href,
+                  ...click
                 };
-                const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures);
-                captures.forEach((capture) => {
-                  posthog.capture(capture.eventName, capture.eventProps);
+              }
+              function capture(eventName, props) {
+                const eventProps = {
+                  ...baseProps(),
+                  internal_event_type: eventName,
+                  ...(props || {})
+                };
+                if (!eventProps.$event_id) eventProps.$event_id = eventId(eventName, eventProps.targetId || eventProps.reason || "event");
+                return fetch(POSTHOG_CAPTURE_URL, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  keepalive: true,
+                  body: JSON.stringify({
+                    api_key: POSTHOG_API_KEY,
+                    event: eventName,
+                    distinct_id: visitorId,
+                    properties: {
+                      ...eventProps,
+                      $insert_id: eventProps.$event_id
+                    }
+                  })
+                }).catch((error) => {
+                  console.error("[Tenor RMBC] PostHog capture failed.", error);
                 });
-              };
-            '''.replace("            ", "")
-            NEW_TRACK_POSTHOG = '''  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
-                const posthog = ensurePostHogInstance();
-                if (!posthog || typeof posthog.capture !== "function") return;
-                const eventSourceUrl = window.location.href;
-                const baseEventProps = {
-                  productSlug: cleanText(config.productSlug),
-                  funnelSlug: cleanText(config.funnelSlug),
-                  publicationId: cleanText(config.publicationId),
-                  pageId: cleanText(config.pageId),
-                  pageSlug: cleanText(config.pageSlug),
-                  pageStage: cleanText((props && props.pageStage) || config.pageStage),
-                  visitorId: cleanText(visitorId),
-                  sessionId: cleanText(sessionId),
-                  path: window.location.pathname + window.location.search,
-                  referrer: document.referrer || undefined,
-                  utm: getUtmParams(),
-                };
-                const emitCaptures = (additionalEventProps) => {
-                  const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures, eventSourceUrl);
-                  captures.forEach((capture) => {
-                    posthog.capture(capture.eventName, {
-                      ...capture.eventProps,
-                      ...(additionalEventProps || {}),
+              }
+              function captureOnce(eventName, keyPart, props) {
+                const key = "tenor_rmbc:" + CONFIG.pageId + ":" + sessionId + ":" + eventName + ":" + keyPart;
+                try {
+                  if (window.sessionStorage.getItem(key)) return;
+                  window.sessionStorage.setItem(key, "1");
+                } catch (_) {
+                  if (seenKeys[key]) return;
+                  seenKeys[key] = true;
+                }
+                capture(eventName, {
+                  ...(props || {}),
+                  $event_id: eventId(eventName, keyPart)
+                });
+              }
+
+              const seenKeys = {};
+              const trackedScrollDepthMilestones = {};
+              let maxScrollDepthPct = 0;
+              let scrollTrackingScheduled = false;
+              let qualifiedSessionTracked = false;
+              let activeStartedAt = Date.now();
+              let activeAccumulatedMs = 0;
+              let interactionSequence = 0;
+
+              function pauseActiveTime() {
+                if (document.visibilityState === "hidden") return;
+                activeAccumulatedMs = activeTimeMs();
+              }
+              function resumeActiveTime() {
+                activeStartedAt = Date.now();
+              }
+              function trackQualifiedSession(reason) {
+                if (qualifiedSessionTracked) return;
+                qualifiedSessionTracked = true;
+                captureOnce("qualified_session", "qualified", {
+                  reason,
+                  activeTimeMs: Math.round(activeTimeMs()),
+                  maxScrollDepthPct,
+                  qualificationActiveTimeMs: QUALIFIED_ACTIVE_TIME_MS,
+                  qualificationScrollDepthPct: QUALIFIED_SCROLL_DEPTH_PCT
+                });
+              }
+              function evaluateQualifiedSession(reason) {
+                if (activeTimeMs() >= QUALIFIED_ACTIVE_TIME_MS || maxScrollDepthPct >= QUALIFIED_SCROLL_DEPTH_PCT) {
+                  trackQualifiedSession(reason);
+                }
+              }
+              function calculateScrollDepthPct() {
+                const doc = document.documentElement;
+                const body = document.body;
+                const scrollTop = window.scrollY || doc.scrollTop || (body && body.scrollTop) || 0;
+                const viewportHeight = window.innerHeight || doc.clientHeight || 0;
+                const scrollHeight = Math.max(
+                  doc.scrollHeight || 0,
+                  body ? body.scrollHeight || 0 : 0,
+                  doc.offsetHeight || 0,
+                  body ? body.offsetHeight || 0 : 0,
+                  viewportHeight
+                );
+                if (!scrollHeight || viewportHeight >= scrollHeight) return 100;
+                return Math.max(0, Math.min(100, Math.round(((scrollTop + viewportHeight) / scrollHeight) * 100)));
+              }
+              function handleScrollDepthTracking() {
+                scrollTrackingScheduled = false;
+                maxScrollDepthPct = Math.max(maxScrollDepthPct, calculateScrollDepthPct());
+                for (const milestone of SCROLL_DEPTH_MILESTONES) {
+                  if (maxScrollDepthPct >= milestone && trackedScrollDepthMilestones[milestone] !== true) {
+                    trackedScrollDepthMilestones[milestone] = true;
+                    captureOnce("scroll_depth", String(milestone), {
+                      scrollDepthPct: milestone,
+                      maxScrollDepthPct,
+                      activeTimeMs: Math.round(activeTimeMs())
                     });
-                  });
-                };
-                if (Array.isArray(mappedCaptures) && mappedCaptures.length && !resolveMetaAttributionReady(eventSourceUrl)) {
-                  waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
-                    emitCaptures({
-                      meta_cookie_wait_ms: elapsedMs,
-                      ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
-                    });
-                  });
+                  }
+                }
+                evaluateQualifiedSession("scroll_depth");
+              }
+              function scheduleScrollDepthTracking() {
+                if (scrollTrackingScheduled) return;
+                scrollTrackingScheduled = true;
+                if (typeof window.requestAnimationFrame === "function") {
+                  window.requestAnimationFrame(handleScrollDepthTracking);
                   return;
                 }
-                emitCaptures();
-              };
-            '''.replace("            ", "")
+                window.setTimeout(handleScrollDepthTracking, 0);
+              }
+              function targetIdProps(target) {
+                if (target.kind === "cta") return { ctaId: target.id };
+                if (target.kind === "section") return { sectionId: target.id };
+                if (target.kind === "proof") return { proofId: target.id };
+                if (target.kind === "offer_stack") return { offerStackId: target.id, offer_id: target.id };
+                if (target.kind === "value_stack") return { valueStackId: target.id };
+                if (target.kind === "price_reveal") return { priceRevealId: target.id };
+                if (target.kind === "guarantee") return { guaranteeId: target.id, guarantee_id: target.id };
+                if (target.kind === "trust_element") return { trustElementId: target.id };
+                return {};
+              }
+              function trackObservedViewTarget(target, element, index) {
+                const keyPart = target.id + ":" + index;
+                captureOnce(target.eventType, keyPart, {
+                  targetKind: target.kind,
+                  targetId: target.id,
+                  selector: target.selector,
+                  label: target.label,
+                  text: normalizeText(element.textContent || "")?.slice(0, 160) || undefined,
+                  activeTimeMs: Math.round(activeTimeMs()),
+                  maxScrollDepthPct,
+                  ...targetIdProps(target)
+                });
+              }
+              function initializeViewTracking() {
+                if (typeof window.IntersectionObserver !== "function") return;
+                const observer = new window.IntersectionObserver((entries) => {
+                  entries.forEach((entry) => {
+                    if (!entry.isIntersecting || entry.intersectionRatio < 0.5) return;
+                    const target = entry.target.__tenorRmbcTarget;
+                    const index = entry.target.__tenorRmbcTargetIndex || 0;
+                    if (target) trackObservedViewTarget(target, entry.target, index);
+                    observer.unobserve(entry.target);
+                  });
+                }, { threshold: [0.5] });
+                VIEW_TARGETS.forEach((target) => {
+                  let matches = [];
+                  try {
+                    matches = Array.from(document.querySelectorAll(target.selector));
+                  } catch (error) {
+                    console.error("[Tenor RMBC] Invalid selector.", target.selector, error);
+                    return;
+                  }
+                  matches.forEach((element, index) => {
+                    if (!(element instanceof HTMLElement)) return;
+                    element.__tenorRmbcTarget = target;
+                    element.__tenorRmbcTargetIndex = index;
+                    observer.observe(element);
+                  });
+                });
+              }
+              function readInteractionValue(element, source) {
+                if (source === "checked") {
+                  return element instanceof HTMLInputElement ? (element.checked ? "checked" : "unchecked") : undefined;
+                }
+                if (source === "text") return normalizeText(element.textContent || "") || undefined;
+                if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+                  return normalizeText(element.value || "") || undefined;
+                }
+                return normalizeText(element.textContent || "") || undefined;
+              }
+              function selectedValueLooksSubscribed(value) {
+                const normalized = String(value || "").trim().toLowerCase();
+                return normalized === "subscribe" || normalized === "subscription" || normalized.includes("subscribe");
+              }
+              function trackInteractionTarget(target, element) {
+                interactionSequence += 1;
+                const selectedValue = readInteractionValue(element, target.source);
+                const props = {
+                  targetKind: target.kind,
+                  targetId: target.id,
+                  selector: target.selector,
+                  label: target.label,
+                  interactionType: target.interactionType,
+                  selectedValue,
+                  text: normalizeText(element.textContent || "")?.slice(0, 160) || undefined,
+                  activeTimeMs: Math.round(activeTimeMs()),
+                  maxScrollDepthPct,
+                  interactionSequence,
+                  ...(target.kind === "selector" ? { selectorId: target.id } : {}),
+                  ...(target.kind === "product_detail" ? { productDetailId: target.id } : {})
+                };
+                capture(target.eventType, {
+                  ...props,
+                  $event_id: eventId(target.eventType, target.id + ":" + interactionSequence)
+                });
+                if (target.eventType === "selector_interaction" && selectedValueLooksSubscribed(selectedValue)) {
+                  capture("subscription_selected", {
+                    ...props,
+                    subscription_flag: true,
+                    $event_id: eventId("subscription_selected", target.id + ":" + interactionSequence)
+                  });
+                }
+                evaluateQualifiedSession("element_interaction");
+              }
+              function checkoutSelectionForTarget(target, element) {
+                const packInput = document.getElementById("mos-selected-pack");
+                const modeInput = document.getElementById("mos-selected-purchase-mode");
+                const isOneTimeLink = element && typeof element.closest === "function" && element.closest("a.one-time-purchase-link");
+                const pack = isOneTimeLink ? "one-time" : (cleanText(packInput && packInput.value) || "3x");
+                const variant = CHECKOUT_VARIANTS_BY_PACK[pack] || CHECKOUT_VARIANTS_BY_PACK["3x"];
+                const purchaseMode = isOneTimeLink ? "one-time" : (cleanText(modeInput && modeInput.value) || variant.purchaseMode);
+                return {
+                  pack,
+                  purchaseMode,
+                  selection: { Pack: pack, PurchaseMode: purchaseMode },
+                  ...variant
+                };
+              }
+              function trackCheckoutClickTarget(target, element) {
+                interactionSequence += 1;
+                const resolved = checkoutSelectionForTarget(target, element);
+                const sequenceKey = target.id + ":" + interactionSequence;
+                capture("SalesToCheckoutClick", {
+                  internal_event_type: "sales_to_checkout_click",
+                  meta_event_name: "SalesToCheckoutClick",
+                  targetKind: "checkout_cta",
+                  targetId: target.id,
+                  selector: target.selector,
+                  label: target.label,
+                  ctaId: target.id,
+                  bindingId: target.id,
+                  fromStage: "sales",
+                  toStage: "checkout",
+                  transitionId: eventId("checkout_transition", sequenceKey),
+                  buttonText: normalizeText(element && element.textContent || "")?.slice(0, 160) || undefined,
+                  variantId: resolved.variantId,
+                  pricePointId: resolved.pricePointId,
+                  value: resolved.value,
+                  currency: resolved.currency,
+                  selection: resolved.selection,
+                  subscription_flag: resolved.purchaseMode === "subscribe",
+                  activeTimeMs: Math.round(activeTimeMs()),
+                  maxScrollDepthPct,
+                  interactionSequence,
+                  $event_id: eventId("SalesToCheckoutClick", sequenceKey)
+                });
+                evaluateQualifiedSession("checkout_click");
+              }
+              function initializeCheckoutClickTracking() {
+                CHECKOUT_CLICK_TARGETS.forEach((target) => {
+                  let matches = [];
+                  try {
+                    matches = Array.from(document.querySelectorAll(target.selector));
+                  } catch (error) {
+                    console.error("[Tenor RMBC] Invalid checkout selector.", target.selector, error);
+                    return;
+                  }
+                  matches.forEach((element, index) => {
+                    if (!(element instanceof HTMLElement)) return;
+                    element.__tenorRmbcCheckoutBoundKeys = element.__tenorRmbcCheckoutBoundKeys || {};
+                    const key = target.id + ":" + index;
+                    if (element.__tenorRmbcCheckoutBoundKeys[key]) return;
+                    element.__tenorRmbcCheckoutBoundKeys[key] = true;
+                    element.addEventListener("click", () => trackCheckoutClickTarget(target, element), { capture: true, passive: true });
+                  });
+                });
+              }
+              function initializeInteractionTracking() {
+                INTERACTION_TARGETS.forEach((target) => {
+                  let matches = [];
+                  try {
+                    matches = Array.from(document.querySelectorAll(target.selector));
+                  } catch (error) {
+                    console.error("[Tenor RMBC] Invalid interaction selector.", target.selector, error);
+                    return;
+                  }
+                  matches.forEach((element) => {
+                    if (!(element instanceof HTMLElement)) return;
+                    const key = "tenorRmbcBound:" + target.eventType + ":" + target.id + ":" + target.event;
+                    if (element.dataset[key]) return;
+                    element.dataset[key] = "true";
+                    element.addEventListener(target.event, () => trackInteractionTarget(target, element), { passive: true });
+                  });
+                });
+              }
+              function initialize() {
+                captureOnce("offer_page_view", "offer_page_view", {
+                  pageStage: CONFIG.pageStage
+                });
+                document.addEventListener("visibilitychange", () => {
+                  if (document.visibilityState === "hidden") {
+                    pauseActiveTime();
+                    return;
+                  }
+                  resumeActiveTime();
+                });
+                window.addEventListener("pagehide", pauseActiveTime);
+                window.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true });
+                window.addEventListener("resize", scheduleScrollDepthTracking);
+                window.setInterval(() => evaluateQualifiedSession("active_time"), 1000);
+                scheduleScrollDepthTracking();
+                initializeViewTracking();
+                initializeInteractionTracking();
+                initializeCheckoutClickTracking();
+                window.setTimeout(initializeViewTracking, 250);
+                window.setTimeout(initializeInteractionTracking, 250);
+                window.setTimeout(initializeCheckoutClickTracking, 250);
+                window.setTimeout(initializeViewTracking, 1000);
+                window.setTimeout(initializeInteractionTracking, 1000);
+                window.setTimeout(initializeCheckoutClickTracking, 1000);
+              }
+              if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", initialize, { once: true });
+              } else {
+                initialize();
+              }
+            })();
+            </script>
+            <!-- TENOR_RMBC_SUPPLEMENTAL_TRACKING_END -->'''
 
-            def replace_once(text: str, old: str, new: str, label: str, path: Path) -> str:
-                count = text.count(old)
-                if count != 1:
-                    raise RuntimeError(f"{path}: expected exactly one {label} block, found {count}")
-                return text.replace(old, new, 1)
+            block_pattern = re.compile(
+                re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END),
+                re.DOTALL,
+            )
+            config_marker = "const config = "
+            klaviyo_binding_ids = {
+                "tenor-footer-newsletter",
+                "tenor-popup-newsletter",
+                "tenor-popup-52-off-email",
+            }
+
+            def tenor_klaviyo_email_capture_bindings() -> list[dict]:
+                klaviyo = {
+                    "publicApiKey": KLAVIYO_SITE_ID,
+                    "revision": "2026-04-15",
+                }
+                return [
+                    {
+                        "id": "tenor-footer-newsletter",
+                        "type": "email_capture",
+                        "selector": "form#ContactFooter",
+                        "event": "submit",
+                        "trackEventType": "email_capture_submit",
+                        "emailCapture": {
+                            "provider": "klaviyo",
+                            "emailSelector": "input[name='contact[email]']",
+                            "source": "shoptenorco_daily_drive_sales_footer",
+                            "successMessage": "You're subscribed.",
+                            "errorMessage": "We couldn't save your email. Please try again.",
+                            "klaviyo": klaviyo,
+                        },
+                    },
+                    {
+                        "id": "tenor-popup-52-off-email",
+                        "type": "email_capture",
+                        "selector": "form[data-tenor-mars-offer-form]",
+                        "event": "submit",
+                        "trackEventType": "email_capture_submit",
+                        "emailCapture": {
+                            "provider": "klaviyo",
+                            "emailSelector": "input[name='email']",
+                            "source": "shoptenorco_daily_drive_sales_popup",
+                            "successBehavior": "redispatch_submit",
+                            "errorMessage": "We couldn't save your email. Please try again.",
+                            "klaviyo": klaviyo,
+                        },
+                    },
+                ]
+
+            def find_json_object_end(text: str, start: int) -> int:
+                depth = 0
+                in_string = False
+                escaped = False
+                for index in range(start, len(text)):
+                    char = text[index]
+                    if in_string:
+                        if escaped:
+                            escaped = False
+                        elif char == "\\":
+                            escaped = True
+                        elif char == '"':
+                            in_string = False
+                        continue
+                    if char == '"':
+                        in_string = True
+                    elif char == "{":
+                        depth += 1
+                    elif char == "}":
+                        depth -= 1
+                        if depth == 0:
+                            return index
+                return -1
+
+            def patch_runtime_config(text: str) -> str:
+                marker_index = text.find(config_marker)
+                if marker_index == -1:
+                    raise RuntimeError("Standalone runtime config marker not found.")
+                json_start = marker_index + len(config_marker)
+                json_end = find_json_object_end(text, json_start)
+                if json_end == -1:
+                    raise RuntimeError("Standalone runtime config JSON end not found.")
+                config = json.loads(text[json_start : json_end + 1])
+                manifest = config.setdefault("manifest", {})
+                bindings = manifest.setdefault("bindings", [])
+                if not isinstance(bindings, list):
+                    raise RuntimeError("Standalone runtime config manifest.bindings must be a list.")
+                bindings[:] = [
+                    binding
+                    for binding in bindings
+                    if not (isinstance(binding, dict) and binding.get("id") in klaviyo_binding_ids)
+                ]
+                bindings.extend(json.loads(json.dumps(tenor_klaviyo_email_capture_bindings())))
+                patched_config = json.dumps(config, separators=(",", ":"), ensure_ascii=False)
+                return text[:json_start] + patched_config + text[json_end + 1 :]
 
             def patch_html(path: Path) -> str:
                 text = path.read_text(encoding="utf-8")
-                if "MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START" not in text:
+                if TARGET_PAGE_ID not in text or TARGET_PATH_HINT not in text:
                     return "skipped"
-                if "resolveMetaAttributionProps" not in text:
-                    return "skipped"
-                if all(
-                    marker in text
-                    for marker in (
-                        "waitForMetaAttribution",
-                        "resolveMetaAttributionReady",
-                        "meta_cookie_wait_ms",
-                        "$raw_user_agent",
-                        "META_ATTRIBUTION_WAIT_TIMEOUT_MS",
-                    )
-                ):
-                    return "already_patched"
-
                 original = text
-                if "META_ATTRIBUTION_WAIT_TIMEOUT_MS" not in text:
-                    text = replace_once(text, CONSTANT_NEEDLE, CONSTANT_REPLACEMENT, "attribution constants", path)
-                if "resolveMetaAttributionReady" not in text:
-                    text = replace_once(text, OLD_ATTRIBUTION_PROPS, NEW_ATTRIBUTION_PROPS, "attribution helpers", path)
-                text = replace_once(text, OLD_TRACK_POSTHOG, NEW_TRACK_POSTHOG, "PostHog delayed capture", path)
-                text = text.replace(
-                    "  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures) => {",
-                    "  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {",
-                    1,
-                )
-                text = text.replace("        ...resolveMetaAttributionProps(),", "        ...resolveMetaAttributionProps(eventSourceUrl),", 1)
-
-                required = (
-                    "waitForMetaAttribution",
-                    "resolveMetaAttributionReady",
-                    "meta_cookie_wait_ms",
-                    "$raw_user_agent",
-                    "META_ATTRIBUTION_WAIT_TIMEOUT_MS",
-                    "resolveMetaAttributionProps(eventSourceUrl)",
-                )
-                missing = [marker for marker in required if marker not in text]
-                if missing:
-                    raise RuntimeError(f"{path}: missing required markers after patch: {missing}")
+                text = patch_runtime_config(text)
+                if MARKER_START in text:
+                    text = block_pattern.sub(SUPPLEMENTAL_SCRIPT, text, count=1)
+                elif "</body>" in text:
+                    text = text.replace("</body>", SUPPLEMENTAL_SCRIPT + "\n</body>", 1)
+                else:
+                    text = text + "\n" + SUPPLEMENTAL_SCRIPT
                 if text == original:
-                    raise RuntimeError(f"{path}: patch produced no changes")
-
-                backup_path = BACKUP_ROOT / path.relative_to(SITE_ROOT)
+                    return "unchanged"
+                backup_path = BACKUP_ROOT / path.relative_to(SEARCH_ROOT)
                 backup_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, backup_path)
                 path.write_text(text, encoding="utf-8")
                 return "patched"
 
-            if not SITE_ROOT.is_dir():
-                raise SystemExit(f"Tenor site root missing: {SITE_ROOT}")
+            if not SEARCH_ROOT.is_dir():
+                raise SystemExit(f"Search root missing: {SEARCH_ROOT}")
 
-            summary = {"patched": [], "already_patched": [], "skipped": 0, "backup_root": str(BACKUP_ROOT)}
-            for html_path in sorted(SITE_ROOT.rglob("*.html")):
-                result = patch_html(html_path)
+            summary = {"patched": [], "unchanged": [], "skipped": 0, "backup_root": str(BACKUP_ROOT)}
+            for html_path in sorted(SEARCH_ROOT.rglob("*.html")):
+                try:
+                    result = patch_html(html_path)
+                except UnicodeDecodeError:
+                    result = "skipped"
                 if result == "patched":
                     summary["patched"].append(str(html_path))
-                elif result == "already_patched":
-                    summary["already_patched"].append(str(html_path))
+                elif result == "unchanged":
+                    summary["unchanged"].append(str(html_path))
                 else:
                     summary["skipped"] += 1
 
-            if not summary["patched"] and not summary["already_patched"]:
-                raise SystemExit("No Tenor standalone HTML files were patchable.")
+            if not summary["patched"] and not summary["unchanged"]:
+                raise SystemExit("No Tenor Daily Drive sales-page HTML files were patched.")
 
             print(json.dumps(summary, indent=2))
             PY
 
-            curl -fsSL "https://shoptenorco.com/8b89a76d/be65d76e/presales?fbclid=deploycheck&utm_source=meta" \
-              | grep -q "waitForMetaAttribution"
-            curl -fsSL "https://shoptenorco.com/8b89a76d/be65d76e/presales?fbclid=deploycheck&utm_source=meta" \
-              | grep -q "meta_cookie_wait_ms"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "TENOR_RMBC_SUPPLEMENTAL_TRACKING_START"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "qualified_session"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "offer_stack_view"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "tenor-footer-newsletter"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "tenor-popup-52-off-email"
+            curl -fsSL "https://shoptenorco.com/8b89a76d/daily-drive-essentials/sales-page/" \
+              | grep -q "VHSTxF"
