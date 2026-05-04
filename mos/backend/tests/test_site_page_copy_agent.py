@@ -1,12 +1,17 @@
 from app.services.site_page_copy_agent import (
     SitePageCopyAgentError,
+    SitePageCopySlot,
+    _validate_site_page_copy_assignment,
     apply_site_page_copy_assignments,
+    build_site_page_copy_prompt,
     chunk_site_page_copy_batches,
     extract_site_page_copy_slots,
     group_site_page_copy_slots,
     parse_site_page_copy_agent_response,
 )
+import json
 import pytest
+from types import SimpleNamespace
 
 
 def _build_imported_page_puck() -> dict:
@@ -172,6 +177,262 @@ def _build_imported_page_puck() -> dict:
     }
 
 
+def _build_feature_stack_puck() -> dict:
+    return {
+        "root": {"props": {"title": "Feature Stack Page"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Feature Stack Page",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "feature-section",
+                                "displayName": "Optimize Your Routine",
+                                "sourceSectionId": "optimize-your-routine",
+                                "sectionType": "feature_stack",
+                                "content": [
+                                    {
+                                        "type": "ImportedFeatureStackSection",
+                                        "props": {
+                                            "id": "feature-block",
+                                            "componentName": "OptimizeYourRoutine",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Feature 3 description",
+                                                    "originalText": (
+                                                        "Know what's safe before you use it, especially with kids, "
+                                                        "medications, or during pregnancy. The handbook flags critical "
+                                                        "interactions and when to see a clinician."
+                                                    ),
+                                                    "text": (
+                                                        "Know what's safe before you use it, especially with kids, "
+                                                        "medications, or during pregnancy. The handbook flags critical "
+                                                        "interactions and when to see a clinician."
+                                                    ),
+                                                }
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _build_feature_stack_puck_with_verbose_current_text() -> dict:
+    return {
+        "root": {"props": {"title": "Feature Stack Page"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Feature Stack Page",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "feature-section",
+                                "displayName": "Optimize Your Routine",
+                                "sourceSectionId": "optimize-your-routine",
+                                "sectionType": "feature_stack",
+                                "content": [
+                                    {
+                                        "type": "ImportedFeatureStackSection",
+                                        "props": {
+                                            "id": "feature-block",
+                                            "componentName": "OptimizeYourRoutine",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Body copy",
+                                                    "originalText": "Creatine supports cellular energy and daily stamina.",
+                                                    "text": (
+                                                        "Creatine supports cellular energy and daily stamina for demanding work. "
+                                                        "Use it to restore focus, verbal fluency, meeting confidence, and day-long "
+                                                        "mental resilience with third-party tested proof behind every serving."
+                                                    ),
+                                                }
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _build_feature_stack_title_overflow_puck() -> dict:
+    return {
+        "root": {"props": {"title": "Feature Stack Page"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Feature Stack Page",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "feature-section",
+                                "displayName": "Know What You're Actually Using",
+                                "sourceSectionId": "know-what-youre-actually-using",
+                                "sectionType": "feature_stack",
+                                "content": [
+                                    {
+                                        "type": "ImportedFeatureStackSection",
+                                        "props": {
+                                            "id": "feature-block",
+                                            "componentName": "KnowWhatYoureActuallyUsing",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Feature 3 title",
+                                                    "originalText": (
+                                                        "NSF testing confirms dosing and purity. No marketing fluff "
+                                                        "just proof that what's on the label is actually in the bottle. "
+                                                        "Built for knowledge workers who demand evidence, not hype."
+                                                    ),
+                                                    "text": (
+                                                        "NSF testing confirms dosing and purity. No marketing fluff "
+                                                        "just proof that what's on the label is actually in the bottle. "
+                                                        "Built for knowledge workers who demand evidence, not hype."
+                                                    ),
+                                                }
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _build_hero_puck_with_body_in_section_name() -> dict:
+    return {
+        "root": {"props": {"title": "Hero Page"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Hero Page",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "hero-section",
+                                "displayName": "Creatine For Body & Mind",
+                                "sourceSectionId": "hero-section",
+                                "sectionType": "hero",
+                                "content": [
+                                    {
+                                        "type": "ImportedHeroSection",
+                                        "props": {
+                                            "id": "hero-block",
+                                            "componentName": "HeroSection",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Headline Part 1",
+                                                    "originalText": "The Honest Herbal",
+                                                    "text": "The Honest Herbal",
+                                                },
+                                                {
+                                                    "label": "Body Copy",
+                                                    "originalText": (
+                                                        "Organized dosing guidance, interaction warnings, and clear "
+                                                        "safety notes in one place."
+                                                    ),
+                                                    "text": (
+                                                        "Organized dosing guidance, interaction warnings, and clear "
+                                                        "safety notes in one place."
+                                                    ),
+                                                },
+                                                {
+                                                    "label": "Guarantee Text",
+                                                    "originalText": "60-day read-it-use-it-decide guarantee",
+                                                    "text": "60-day read-it-use-it-decide guarantee",
+                                                },
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
+def _build_proof_bar_feature_puck() -> dict:
+    return {
+        "root": {"props": {"title": "Proof Bar"}},
+        "content": [
+            {
+                "type": "ImportedPage",
+                "props": {
+                    "id": "page-root",
+                    "pageName": "Proof Bar",
+                    "pageType": "home",
+                    "content": [
+                        {
+                            "type": "ImportedSection",
+                            "props": {
+                                "id": "proof-section",
+                                "displayName": "Fresh & Light Taste",
+                                "sourceSectionId": "proof-section",
+                                "sectionType": "proof_bar",
+                                "content": [
+                                    {
+                                        "type": "ImportedProofBarSection",
+                                        "props": {
+                                            "id": "proof-block",
+                                            "componentName": "App",
+                                            "textSlots": [
+                                                {
+                                                    "label": "Feature 1",
+                                                    "originalText": "Fresh & Light Taste",
+                                                    "text": "Fresh & Light Taste",
+                                                }
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+
 def test_extract_site_page_copy_slots_includes_source_backed_imported_blocks():
     slots = extract_site_page_copy_slots(_build_imported_page_puck())
 
@@ -193,10 +454,20 @@ def test_extract_site_page_copy_slots_includes_source_backed_imported_blocks():
 
     assert by_path[comparison_path].current_value == "OMNI Gummies"
     assert by_path[proof_stat_path].current_value == "80%"
+    assert by_path[proof_stat_path].source_value == "80%"
     assert by_path[proof_button_path].current_value == "TRY OMNI NOW"
+    assert by_path[proof_button_path].source_value == "TRY OMNI NOW"
     assert by_path[faq_path].current_value == "Take 3 gummies daily."
+    assert by_path[faq_path].source_value == "Take 3 gummies daily."
     assert by_path[runtime_path].current_value == "OMNI Creatine Gummy"
+    assert by_path[runtime_path].source_value == "OMNI Creatine Gummy"
     assert by_path[runtime_image_path].current_value == "https://cdn.example.com/omni-cover.jpg"
+    assert by_path[runtime_image_path].source_value == "https://cdn.example.com/omni-cover.jpg"
+    assert by_path[proof_stat_path].max_chars is not None
+    assert by_path[proof_button_path].max_chars is not None
+    assert by_path[faq_path].max_chars is not None
+    assert by_path[runtime_image_path].max_chars is None
+    assert by_path[proof_button_path].max_chars < by_path[faq_path].max_chars
 
 
 def test_apply_site_page_copy_assignments_updates_imported_text_slots_and_legacy_overrides():
@@ -248,6 +519,247 @@ def test_parse_site_page_copy_agent_response_errors_cleanly_on_non_json_output()
         parse_site_page_copy_agent_response(
             raw_output="I wrote the assignments to a file instead.",
             base_puck_data=_build_imported_page_puck(),
+            slots=slots,
+        )
+
+
+def test_build_site_page_copy_prompt_includes_slot_limits():
+    slots = extract_site_page_copy_slots(_build_imported_page_puck())
+    prompt = build_site_page_copy_prompt(
+        site=SimpleNamespace(name="Ember Gummies"),
+        page=SimpleNamespace(
+            name="Home",
+            slug="home",
+            page_type="home",
+            page_role="home",
+        ),
+        puck_data=_build_imported_page_puck(),
+        page_context=[{"id": "page-1", "slug": "home", "name": "Home"}],
+        prompt="Rewrite the page.",
+        messages=None,
+        slots=slots,
+    )
+
+    assert '"maxChars"' in prompt
+    assert '"maxWords"' in prompt
+    assert '"sourceValue"' in prompt
+    assert "hard copy limits" in prompt
+
+
+def test_feature_stack_body_copy_limits_follow_original_source_density():
+    slots = extract_site_page_copy_slots(_build_feature_stack_puck_with_verbose_current_text())
+
+    assert len(slots) == 1
+    assert slots[0].section_type == "feature_stack"
+    assert slots[0].source_value == "Creatine supports cellular energy and daily stamina."
+    assert slots[0].max_chars is not None
+    assert slots[0].max_words is not None
+    assert slots[0].max_chars < len(slots[0].current_value)
+    assert slots[0].max_words < len(slots[0].current_value.split())
+
+
+def test_proof_bar_feature_slots_stay_tight_for_strip_layouts():
+    slots = extract_site_page_copy_slots(_build_proof_bar_feature_puck())
+
+    assert len(slots) == 1
+    slot = slots[0]
+    assert slot.section_type == "proof_bar"
+    assert slot.max_chars == 26
+    assert slot.max_words == 5
+
+
+def test_split_headline_fragments_stay_close_to_source_length():
+    slots = extract_site_page_copy_slots(_build_imported_page_puck())
+    by_label = {slot.label: slot for slot in slots}
+
+    headline_prefix = by_label["Why Choose OMNI? / UsVsThem / Headline part 1"]
+    headline_suffix = by_label["Why Choose OMNI? / UsVsThem / Headline part 2"]
+
+    assert headline_prefix.limit_note is not None
+    assert "split headline fragment" in headline_prefix.limit_note.lower()
+    assert headline_prefix.max_chars == 21
+    assert headline_prefix.max_words == 4
+    assert headline_suffix.limit_note is not None
+    assert "split headline fragment" in headline_suffix.limit_note.lower()
+    assert headline_suffix.max_chars == 14
+    assert headline_suffix.max_words == 3
+
+
+def test_feature_stack_structural_title_slot_stays_short_even_when_source_text_is_long():
+    slots = extract_site_page_copy_slots(_build_feature_stack_title_overflow_puck())
+
+    assert len(slots) == 1
+    slot = slots[0]
+    assert slot.label.endswith("Feature 3 title")
+    assert slot.limit_note is not None
+    assert "short title label" in slot.limit_note.lower()
+    assert slot.max_chars is not None
+    assert slot.max_words is not None
+    assert slot.max_chars <= 56
+    assert slot.max_words <= 8
+    assert slot.max_chars < len(slot.current_value)
+    assert slot.max_words < len(slot.current_value.split())
+
+
+def test_hero_headline_limit_uses_slot_label_not_section_title_keywords():
+    slots = extract_site_page_copy_slots(_build_hero_puck_with_body_in_section_name())
+    by_label = {slot.label: slot for slot in slots}
+
+    headline = by_label["Creatine For Body & Mind / HeroSection / Headline Part 1"]
+    body = by_label["Creatine For Body & Mind / HeroSection / Body Copy"]
+    guarantee = by_label["Creatine For Body & Mind / HeroSection / Guarantee Text"]
+
+    assert headline.limit_note is not None
+    assert "headline" in headline.limit_note.lower()
+    assert body.limit_note is not None
+    assert "paragraph density" in body.limit_note.lower()
+    assert guarantee.limit_note is not None
+    assert "support line" in guarantee.limit_note.lower()
+    assert headline.max_chars is not None
+    assert body.max_chars is not None
+    assert guarantee.max_words is not None
+    assert headline.max_chars < body.max_chars
+    assert guarantee.max_words >= 8
+
+
+def test_parse_site_page_copy_agent_response_rejects_over_limit_copy():
+    slots = extract_site_page_copy_slots(_build_imported_page_puck())
+    assignments = [{"path": slot.path, "value": slot.current_value} for slot in slots]
+    button_assignment = next(
+        item
+        for item in assignments
+        if item["path"] == "/content/0/props/content/1/props/content/0/props/buttonSlots/0/text"
+    )
+    button_assignment["value"] = "GET THE FULL EMBER BRAIN CLARITY PROTOCOL HANDBOOK RIGHT NOW"
+
+    with pytest.raises(SitePageCopyAgentError, match="character limit"):
+        parse_site_page_copy_agent_response(
+            raw_output=json.dumps(
+                {
+                    "assistantMessage": "Updated slots.",
+                    "assignments": assignments,
+                }
+            ),
+            base_puck_data=_build_imported_page_puck(),
+            slots=slots,
+        )
+
+
+def test_parse_site_page_copy_agent_response_allows_minor_copy_overage_within_tolerance():
+    slots = extract_site_page_copy_slots(_build_imported_page_puck())
+    assignments = [{"path": slot.path, "value": slot.current_value} for slot in slots]
+    button_assignment = next(
+        item
+        for item in assignments
+        if item["path"] == "/content/0/props/content/1/props/content/0/props/buttonSlots/0/text"
+    )
+    button_assignment["value"] = "GET YOUR HANDBOOK NOW"
+
+    result = parse_site_page_copy_agent_response(
+        raw_output=json.dumps(
+            {
+                "assistantMessage": "Updated slots.",
+                "assignments": assignments,
+            }
+        ),
+        base_puck_data=_build_imported_page_puck(),
+        slots=slots,
+    )
+
+    assert any(
+        item["path"] == "/content/0/props/content/1/props/content/0/props/buttonSlots/0/text"
+        and item["value"] == "GET YOUR HANDBOOK NOW"
+        for item in result.assignments
+    )
+
+
+def test_validate_site_page_copy_assignment_rejects_short_ui_copy_that_only_fits_by_old_tolerance():
+    slot = SitePageCopySlot(
+        path="/proof/feature-1",
+        kind="text",
+        label="Fresh & Light Taste / App / Feature 1",
+        section_display_name="Fresh & Light Taste",
+        section_type="proof_bar",
+        component_name="App",
+        source_value="Fresh & Light Taste",
+        current_value="Fresh & Light Taste",
+        max_chars=26,
+        max_words=5,
+        limit_note="Keep this compact strip/checklist label extremely short so the original layout does not clip.",
+    )
+
+    with pytest.raises(SitePageCopyAgentError, match="character limit"):
+        _validate_site_page_copy_assignment(
+            slot=slot,
+            value="Creatine for brain energy, not fitness",
+        )
+
+
+def test_validate_site_page_copy_assignment_rejects_duplicate_years_in_copyright_slots():
+    slot = SitePageCopySlot(
+        path="/footer/copyright",
+        kind="text",
+        label="Global Footer / GlobalFooter / Copyright Text",
+        section_display_name="Global Footer",
+        section_type="footer",
+        component_name="GlobalFooter",
+        source_value="Omni Creatine. All rights reserved.",
+        current_value="Omni Creatine. All rights reserved.",
+        max_chars=38,
+        max_words=6,
+        limit_note="Keep this copyright line concise. Do not repeat a year if the surrounding component already renders one.",
+    )
+
+    with pytest.raises(SitePageCopyAgentError, match="duplicated a year"):
+        _validate_site_page_copy_assignment(
+            slot=slot,
+            value="Ember © 2026. All rights reserved.",
+        )
+
+
+def test_validate_site_page_copy_assignment_rejects_duplicate_copyright_marks_in_copyright_slots():
+    slot = SitePageCopySlot(
+        path="/footer/copyright",
+        kind="text",
+        label="Global Footer / GlobalFooter / Copyright Text",
+        section_display_name="Global Footer",
+        section_type="footer",
+        component_name="GlobalFooter",
+        source_value="Ember. All rights reserved.",
+        current_value="Ember. All rights reserved.",
+        max_chars=38,
+        max_words=6,
+        limit_note="Keep this copyright line concise. Do not repeat a year if the surrounding component already renders one.",
+    )
+
+    with pytest.raises(SitePageCopyAgentError, match="duplicated a copyright mark"):
+        _validate_site_page_copy_assignment(
+            slot=slot,
+            value="Ember © All rights reserved.",
+        )
+
+
+def test_parse_site_page_copy_agent_response_rejects_body_copy_in_structural_title_slot():
+    slots = extract_site_page_copy_slots(_build_feature_stack_title_overflow_puck())
+
+    with pytest.raises(SitePageCopyAgentError, match="character limit"):
+        parse_site_page_copy_agent_response(
+            raw_output=json.dumps(
+                {
+                    "assistantMessage": "Updated slots.",
+                    "assignments": [
+                        {
+                            "path": slots[0].path,
+                            "value": (
+                                "NSF testing confirms dosing and purity. No marketing fluff just proof that "
+                                "what's on the label is actually in the bottle. Built for knowledge workers "
+                                "who demand evidence, not hype."
+                            ),
+                        }
+                    ],
+                }
+            ),
+            base_puck_data=_build_feature_stack_title_overflow_puck(),
             slots=slots,
         )
 
