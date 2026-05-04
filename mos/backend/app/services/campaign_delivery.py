@@ -15,7 +15,7 @@ from app.services.paid_ads_qa import _CONTACT_RE, _MAILTO_RE, _PHONE_RE, _PRIVAC
 _HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 _HTTP_HEADERS = {"User-Agent": "MOS-CampaignDeliveryValidation/1.0"}
 _PUBLIC_HOST_BLOCKLIST_SUFFIXES = (".local", ".internal")
-_VALIDATION_BODY_TEXT_LIMIT = 250_000
+_VALIDATION_BODY_TEXT_LIMIT = 2_000_000
 
 
 class CampaignDeliveryConfigError(ValueError):
@@ -208,15 +208,15 @@ def validate_campaign_delivery_config(config: CampaignDeliveryConfig) -> list[di
         raise CampaignDeliveryConfigError("Only external_urls campaigns can run destination validation.")
 
     targets = [
-        ("preSalesUrl", config.pre_sales_url, True),
-        ("salesUrl", config.sales_url, True),
-        ("checkoutUrl", config.checkout_url, False),
-        ("thankYouUrl", config.thank_you_url, False),
+        ("preSalesUrl", config.pre_sales_url, True, False),
+        ("salesUrl", config.sales_url, True, True),
+        ("checkoutUrl", config.checkout_url, False, False),
+        ("thankYouUrl", config.thank_you_url, False, False),
     ]
     results: list[dict[str, Any]] = []
     errors: list[str] = []
 
-    for field_name, candidate_url, require_page_markers in targets:
+    for field_name, candidate_url, check_incomplete_markers, require_policy_markers in targets:
         if not candidate_url:
             continue
         checks = ["public_http_https", "fetchable"]
@@ -231,10 +231,12 @@ def validate_campaign_delivery_config(config: CampaignDeliveryConfig) -> list[di
         else:
             if status_code >= 400:
                 issues.append(f"{field_name} returned HTTP {status_code}.")
-            if require_page_markers:
-                checks.extend(["privacy_marker", "contact_marker", "not_under_construction"])
+            if check_incomplete_markers:
+                checks.append("not_under_construction")
                 if _UNDER_CONSTRUCTION_RE.search(body_text):
                     issues.append(f"{field_name} appears under construction or incomplete.")
+            if require_policy_markers:
+                checks.extend(["privacy_marker", "contact_marker"])
                 if not _PRIVACY_RE.search(body_text):
                     issues.append(f"{field_name} does not visibly reference privacy handling.")
                 if not (_CONTACT_RE.search(body_text) or _MAILTO_RE.search(body_text) or _PHONE_RE.search(body_text)):

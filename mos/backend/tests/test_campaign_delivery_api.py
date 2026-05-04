@@ -195,9 +195,47 @@ def test_campaign_delivery_validate_marks_invalid_when_required_markers_missing(
     assert get_response.json()["validationStatus"] == "invalid"
 
 
+def test_campaign_delivery_validate_does_not_require_policy_markers_on_presales(api_client, db_session, monkeypatch) -> None:
+    _, _, campaign_id = _create_campaign_with_product(api_client, suffix="delivery-presales-minimal")
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+    seed_ready_launch_context_for_campaign(
+        db_session,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id),
+        campaign_id=str(campaign.id),
+        launch_key=f"sv2-launch:test:{campaign.id}:delivery-presales-minimal",
+    )
+    put_response = api_client.put(
+        f"/campaigns/{campaign_id}/delivery",
+        json={
+            "deliveryMode": "external_urls",
+            "preSalesUrl": "https://example.com/presell",
+            "salesUrl": "https://example.com/offer",
+        },
+    )
+    assert put_response.status_code == 200, put_response.text
+
+    def _fake_fetch(url: str) -> tuple[int, str, str]:
+        if url.endswith("/presell"):
+            return 200, url, "<html>presell page</html>"
+        return 200, url, "<html>sales page privacy contact support</html>"
+
+    monkeypatch.setattr("app.services.campaign_delivery._fetch_url_validation_result", _fake_fetch)
+
+    response = api_client.post(f"/campaigns/{campaign_id}/delivery/validate")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["validationStatus"] == "valid"
+    pre_sales_result = next(result for result in payload["results"] if result["field"] == "preSalesUrl")
+    assert pre_sales_result["passed"] is True
+    assert "privacy_marker" not in pre_sales_result["checks"]
+    assert "contact_marker" not in pre_sales_result["checks"]
+
+
 def test_campaign_delivery_fetch_inspects_extended_body_window(monkeypatch) -> None:
     prefix = "<html>contact support "
-    privacy_offset = 98_181
+    privacy_offset = 1_650_000
     body = prefix + ("x" * (privacy_offset - len(prefix))) + "privacy footer</html>"
 
     class _FakeResponse:
@@ -229,7 +267,7 @@ def test_campaign_delivery_fetch_inspects_extended_body_window(monkeypatch) -> N
     assert final_url == "https://example.com/presell"
     assert "privacy" in body_text
     assert len(body_text) == len(body)
-    assert len(body_text) > 50_000
+    assert len(body_text) > 250_000
 
 
 def test_campaign_launch_context_readiness_reports_missing_launch_lineage(api_client) -> None:
