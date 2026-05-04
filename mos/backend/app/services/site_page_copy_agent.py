@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+import math
 import re
 from typing import Any
 
@@ -23,7 +24,11 @@ class SitePageCopySlot:
     section_display_name: str | None
     section_type: str | None
     component_name: str | None
+    source_value: str
     current_value: str
+    max_chars: int | None
+    max_words: int | None
+    limit_note: str | None
 
 
 @dataclass(frozen=True)
@@ -172,16 +177,7 @@ def build_site_page_copy_prompt(
     slots: list[SitePageCopySlot],
 ) -> str:
     slot_payload = [
-        {
-            "index": index + 1,
-            "path": slot.path,
-            "kind": slot.kind,
-            "label": slot.label,
-            "sectionDisplayName": slot.section_display_name,
-            "sectionType": slot.section_type,
-            "componentName": slot.component_name,
-            "currentValue": slot.current_value,
-        }
+        _slot_payload(slot=slot, index=index + 1)
         for index, slot in enumerate(slots)
     ]
     page_summary = {
@@ -202,10 +198,13 @@ def build_site_page_copy_prompt(
         "You are rewriting copy for a fixed imported-template page in mOS.",
         "The template structure is locked. Do not add, remove, reorder, or rename sections or components.",
         "Rewrite only the provided editable slots: copy, button labels, and image URLs.",
-        "Slot labels, section names, component names, current values, and JSON pointer paths may still contain source-template brand terms such as OMNI or creatine. Treat those source-template names as inert identifiers only, not as contradictions or approved claims.",
+        "Slot labels, section names, component names, source values, current values, and JSON pointer paths may still contain source-template brand terms such as OMNI or creatine. Treat those source-template names as inert identifiers only, not as contradictions or approved claims.",
         "Rewrite the slot values for the active bundle product even when the inherited source-template metadata still carries the original product naming.",
         "Use the active skills bundle as the source of truth for angle, offer, claim envelope, and voice.",
         "For image_src slots, return the final image URL only.",
+        "Each editable slot includes hard copy limits. Keep every returned value within that slot's maxChars and maxWords.",
+        "Buttons, badges, tabs, variant labels, table headers, and other short UI slots must stay compact enough to preserve the existing layout.",
+        "Do not expand copy to fill the limit. Match or tighten the original source slot density.",
         "Do not invent pricing, testimonials, scientific claims, compliance claims, or guarantees.",
         "If a source template contains stale sale badges, discount stickers, or promotional remnants that are not approved in the active bundle, replace them with short neutral positioning or trust language grounded in the bundle instead of refusing the slot.",
         "For stale sale-sticker slots, do not preserve fake percentages or fake discounts. Keep the structure fixed, but rewrite the sticker copy into non-quantified brand-safe language.",
@@ -276,8 +275,11 @@ def parse_site_page_copy_agent_response(
             raise SitePageCopyAgentError(f"Copy agent returned duplicate slot path: {normalized_path}.")
         if not isinstance(value, str) or not value.strip():
             raise SitePageCopyAgentError(f"Copy agent returned an empty value for {normalized_path}.")
+        slot = allowed_paths[normalized_path]
+        normalized_value = value.strip()
+        _validate_site_page_copy_assignment(slot=slot, value=normalized_value)
         seen_paths.add(normalized_path)
-        assignments.append({"path": normalized_path, "value": value.strip()})
+        assignments.append({"path": normalized_path, "value": normalized_value})
 
     missing_paths = sorted(set(allowed_paths) - seen_paths)
     if missing_paths:
@@ -328,6 +330,7 @@ def summarize_site_page_copy_assignments(
                 "sectionDisplayName": slot.section_display_name,
                 "sectionType": slot.section_type,
                 "componentName": slot.component_name,
+                "source": slot.source_value,
                 "before": slot.current_value,
                 "after": assignment["value"],
             }
@@ -419,6 +422,21 @@ def _extract_override_slots(
                         break
             if not current_value:
                 continue
+            source_value = _resolve_source_slot_value(
+                item=item,
+                kind=slot_kind,
+                field_name=field_name,
+                fallback_fields=fallback_fields,
+                current_value=current_value.strip(),
+            )
+            max_chars, max_words, limit_note = _infer_slot_copy_limits(
+                kind=slot_kind,
+                label=_normalize_label(item.get("label")),
+                source_value=source_value,
+                section_display_name=section_display_name,
+                section_type=section_type,
+                component_name=component_name,
+            )
             slots.append(
                 SitePageCopySlot(
                     path=(
@@ -434,10 +452,402 @@ def _extract_override_slots(
                     section_display_name=section_display_name,
                     section_type=section_type,
                     component_name=component_name,
+                    source_value=source_value,
                     current_value=current_value.strip(),
+                    max_chars=max_chars,
+                    max_words=max_words,
+                    limit_note=limit_note,
                 )
             )
     return slots
+
+
+def _slot_payload(*, slot: SitePageCopySlot, index: int | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "path": slot.path,
+        "kind": slot.kind,
+        "label": slot.label,
+        "sectionDisplayName": slot.section_display_name,
+        "sectionType": slot.section_type,
+        "componentName": slot.component_name,
+        "sourceValue": slot.source_value,
+        "currentValue": slot.current_value,
+    }
+    if index is not None:
+        payload["index"] = index
+    if slot.max_chars is not None:
+        payload["maxChars"] = slot.max_chars
+    if slot.max_words is not None:
+        payload["maxWords"] = slot.max_words
+    if slot.limit_note:
+        payload["limitNote"] = slot.limit_note
+    return payload
+
+
+def _validate_site_page_copy_assignment(*, slot: SitePageCopySlot, value: str) -> None:
+    if slot.kind == "image_src":
+        return
+
+    normalized_value = _normalize_copy_value(value)
+    char_count = len(normalized_value)
+    word_count = _word_count(normalized_value)
+    label_metadata = (slot.label or "").lower()
+    if _looks_copyright_slot(label_metadata):
+        source_has_year = bool(re.search(r"\b20\d{2}\b", slot.source_value or ""))
+        value_has_year = bool(re.search(r"\b20\d{2}\b", normalized_value))
+        source_has_copyright_mark = "©" in (slot.source_value or "")
+        value_has_copyright_mark = "©" in normalized_value
+        if value_has_year and not source_has_year:
+            raise SitePageCopyAgentError(
+                "Copy agent duplicated a year inside the copyright slot for "
+                f"{slot.path} ({slot.label}). Keep the slot text to the brand/legal line only."
+            )
+        if value_has_copyright_mark and not source_has_copyright_mark:
+            raise SitePageCopyAgentError(
+                "Copy agent duplicated a copyright mark inside the copyright slot for "
+                f"{slot.path} ({slot.label}). Keep the slot text to the brand/legal line only."
+            )
+    if slot.max_chars is not None:
+        allowed_chars = _char_limit_with_tolerance(slot.max_chars)
+        if char_count > allowed_chars:
+            raise SitePageCopyAgentError(
+                "Copy agent exceeded the slot character limit for "
+                f"{slot.path} ({slot.label}): {char_count} characters > {allowed_chars} allowed "
+                f"(base limit {slot.max_chars})."
+            )
+    if slot.max_words is not None:
+        allowed_words = _word_limit_with_tolerance(slot.max_words)
+        if word_count > allowed_words:
+            raise SitePageCopyAgentError(
+                "Copy agent exceeded the slot word limit for "
+                f"{slot.path} ({slot.label}): {word_count} words > {allowed_words} allowed "
+                f"(base limit {slot.max_words})."
+            )
+
+
+def _infer_slot_copy_limits(
+    *,
+    kind: str,
+    label: str | None,
+    source_value: str,
+    section_display_name: str | None,
+    section_type: str | None,
+    component_name: str | None,
+) -> tuple[int | None, int | None, str | None]:
+    if kind == "image_src":
+        return None, None, None
+
+    normalized_value = _normalize_copy_value(source_value)
+    baseline_chars = len(normalized_value)
+    baseline_words = max(1, _word_count(normalized_value))
+    label_metadata = " ".join(
+        part.lower()
+        for part in (
+            label,
+            kind,
+        )
+        if isinstance(part, str) and part.strip()
+    )
+    section_type_metadata = section_type.lower().strip() if isinstance(section_type, str) else ""
+    comparison_metadata = " ".join(
+        part for part in (label_metadata, section_type_metadata) if part
+    )
+
+    if _looks_numeric_slot(metadata=label_metadata, normalized_value=normalized_value):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(baseline_chars + 8, minimum=8, maximum=28),
+            max_words=_clamp(baseline_words + 2, minimum=1, maximum=6),
+            limit_note="Keep this numeric/stat slot compact.",
+        )
+
+    if _looks_structural_short_title_slot(label_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(int(round(baseline_chars * 1.1)) + 8, minimum=18, maximum=56),
+            max_words=_clamp(baseline_words + 2, minimum=2, maximum=8),
+            limit_note="Keep this short title label compact so the original card layout stays intact.",
+            preserve_current_floor=False,
+        )
+
+    if _looks_split_headline_fragment_slot(label_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(int(round(baseline_chars * 1.5)) + 6, minimum=14, maximum=24),
+            max_words=_clamp(baseline_words + 2, minimum=2, maximum=4),
+            limit_note="Keep this split headline fragment terse so the underline and line-break treatment stays intact.",
+            preserve_current_floor=False,
+        )
+
+    if _looks_tight_ui_label_slot(label_metadata=label_metadata, section_type_metadata=section_type_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(int(round(baseline_chars * 1.05)) + 6, minimum=14, maximum=30),
+            max_words=_clamp(baseline_words + 1, minimum=2, maximum=5),
+            limit_note="Keep this compact strip/checklist label extremely short so the original layout does not clip.",
+            preserve_current_floor=False,
+        )
+
+    if _looks_copyright_slot(label_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(baseline_chars + 4, minimum=24, maximum=44),
+            max_words=_clamp(baseline_words + 1, minimum=4, maximum=8),
+            limit_note="Keep this copyright line concise. Do not repeat a year if the surrounding component already renders one.",
+            preserve_current_floor=False,
+        )
+
+    if kind == "button" or _metadata_has_any(
+        label_metadata,
+        (
+            "cta",
+            "button",
+            "badge",
+            "pill",
+            "chip",
+            "nav",
+            "menu",
+            "tab",
+            "link",
+            "eyebrow",
+            "kicker",
+            "ribbon",
+            "sticker",
+            "banner",
+            "variant",
+            "flavor",
+            "flavour",
+            "bundle",
+            "plan",
+            "offer",
+            "label",
+            "option",
+        ),
+    ):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(baseline_chars + 10, minimum=18, maximum=42),
+            max_words=_clamp(baseline_words + 2, minimum=2, maximum=7),
+            limit_note="Keep this short UI label concise so it fits without wrapping awkwardly.",
+        )
+
+    if _looks_comparison_slot(comparison_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(baseline_chars + 16, minimum=24, maximum=88),
+            max_words=_clamp(baseline_words + 4, minimum=3, maximum=14),
+            limit_note="Keep comparison-table copy tight so the grid stays readable.",
+        )
+
+    if _looks_title_slot(label_metadata):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(int(round(baseline_chars * 1.2)) + 12, minimum=36, maximum=140),
+            max_words=_clamp(baseline_words + 4, minimum=6, maximum=18),
+            limit_note="Keep this headline tight enough to preserve the intended line breaks.",
+        )
+
+    if _metadata_has_any(
+        label_metadata,
+        (
+            "body",
+            "paragraph",
+            "description",
+            "supporting",
+            "subheadline",
+            "subhead",
+            "answer",
+            "blurb",
+            "testimonial",
+            "disclaimer",
+            "caption",
+            "copy",
+            "detail",
+        ),
+    ) or baseline_chars >= 100:
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(int(round(baseline_chars * 1.25)) + 20, minimum=90, maximum=360),
+            max_words=_clamp(baseline_words + 12, minimum=16, maximum=60),
+            limit_note="Preserve paragraph density. Keep this copy no longer than the existing layout can hold.",
+        )
+
+    if _metadata_has_any(
+        label_metadata,
+        (
+            "guarantee",
+            "supporting line",
+            "microcopy",
+            "helper text",
+            "subtext",
+            "fine print",
+            "trust line",
+        ),
+    ):
+        return _finalize_slot_copy_limits(
+            baseline_chars=baseline_chars,
+            baseline_words=baseline_words,
+            max_chars=_clamp(baseline_chars + 24, minimum=36, maximum=120),
+            max_words=_clamp(baseline_words + 6, minimum=5, maximum=14),
+            limit_note="Keep this support line compact, but allow enough room for a complete trust cue.",
+        )
+
+    return _finalize_slot_copy_limits(
+        baseline_chars=baseline_chars,
+        baseline_words=baseline_words,
+        max_chars=_clamp(int(round(baseline_chars * 1.25)) + 12, minimum=24, maximum=120),
+        max_words=_clamp(baseline_words + 6, minimum=4, maximum=24),
+        limit_note="Match the original slot density and avoid overflow.",
+    )
+
+
+def _normalize_copy_value(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _word_count(value: str) -> int:
+    return len(re.findall(r"\S+", value))
+
+
+def _clamp(value: int, *, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, value))
+
+
+def _char_limit_with_tolerance(limit: int) -> int:
+    if limit <= 24:
+        return limit
+    if limit <= 40:
+        return limit + 1
+    if limit <= 60:
+        return limit + 2
+    if limit <= 120:
+        return limit + 4
+    return limit + min(6, max(2, math.ceil(limit * 0.08)))
+
+
+def _word_limit_with_tolerance(limit: int) -> int:
+    if limit <= 6:
+        return limit
+    if limit <= 12:
+        return limit + 1
+    return limit + 2
+
+
+def _metadata_has_any(metadata: str, needles: tuple[str, ...]) -> bool:
+    return any(needle in metadata for needle in needles)
+
+
+def _looks_numeric_slot(*, metadata: str, normalized_value: str) -> bool:
+    if _metadata_has_any(metadata, ("stat value", "number", "count", "percent", "percentage", "rating")):
+        return True
+    return bool(re.fullmatch(r"[$€£]?\d[\d\s,./+-]*%?[A-Za-z]{0,6}", normalized_value))
+
+
+def _looks_comparison_slot(metadata: str) -> bool:
+    if _metadata_has_any(
+        metadata,
+        (
+            "comparison_table",
+            "comparison section",
+            "what you get",
+            "us vs",
+            "versus",
+        ),
+    ):
+        return True
+    if _metadata_has_any(metadata, ("column", "row")):
+        return True
+    return "benefit" in metadata and "comparison" in metadata
+
+
+def _looks_title_slot(metadata: str) -> bool:
+    return _metadata_has_any(
+        metadata,
+        (
+            "headline",
+            "heading",
+            "title",
+            "question",
+            "hero",
+        ),
+    )
+
+
+def _looks_structural_short_title_slot(metadata: str) -> bool:
+    return bool(
+        re.search(r"\b(feature|card|column|tier|plan|offer|benefit|stat)\s+\d+\s+title\b", metadata)
+    )
+
+
+def _looks_split_headline_fragment_slot(metadata: str) -> bool:
+    return bool(
+        re.search(r"\b(headline|heading|title|question)\s+part\s+\d+(\s+of\s+\d+)?\b", metadata)
+    )
+
+
+def _looks_tight_ui_label_slot(*, label_metadata: str, section_type_metadata: str) -> bool:
+    if section_type_metadata == "proof_bar" and "feature" in label_metadata:
+        return True
+    return _metadata_has_any(
+        label_metadata,
+        (
+            "checklist item",
+            "legend item",
+            "trust line",
+            "supporting line",
+        ),
+    )
+
+
+def _looks_copyright_slot(metadata: str) -> bool:
+    return "copyright" in metadata
+
+
+def _finalize_slot_copy_limits(
+    *,
+    baseline_chars: int,
+    baseline_words: int,
+    max_chars: int,
+    max_words: int,
+    limit_note: str,
+    preserve_current_floor: bool = True,
+) -> tuple[int, int, str]:
+    if not preserve_current_floor:
+        return (max_chars, max_words, limit_note)
+    return (
+        max(baseline_chars, max_chars),
+        max(baseline_words, max_words),
+        limit_note,
+    )
+
+
+def _resolve_source_slot_value(
+    *,
+    item: dict[str, Any],
+    kind: str,
+    field_name: str,
+    fallback_fields: tuple[str, ...],
+    current_value: str,
+) -> str:
+    if kind == "image_src":
+        candidate_fields = (*fallback_fields, "originalText", field_name)
+    else:
+        candidate_fields = ("originalText", *fallback_fields, field_name)
+
+    for candidate_field in candidate_fields:
+        candidate = item.get(candidate_field)
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return current_value
 
 
 def _slot_label(
