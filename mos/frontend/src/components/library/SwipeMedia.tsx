@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import { cn } from "@/lib/utils";
 import type { MediaAsset } from "@/types/library";
 
+type SwipeMediaFit = "cover" | "contain";
+
 function aspectToClass(aspect: "1/1" | "4/5" | "9/16" | "16/9") {
   switch (aspect) {
     case "1/1":
@@ -25,7 +27,17 @@ function mediaThumb(asset?: MediaAsset) {
   return asset.thumbUrl || asset.url;
 }
 
-function MediaContent({ asset }: { asset?: MediaAsset }) {
+function mediaFitClass(fit: SwipeMediaFit) {
+  return fit === "contain" ? "h-full w-full object-contain" : "h-full w-full object-cover";
+}
+
+function MediaContent({
+  asset,
+  fit = "cover",
+}: {
+  asset?: MediaAsset;
+  fit?: SwipeMediaFit;
+}) {
   const [errored, setErrored] = useState(false);
 
   const thumb = mediaThumb(asset);
@@ -79,7 +91,7 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
       <img
         src={thumb}
         alt={asset.type === "image" ? asset.alt ?? "Image preview" : "Video preview"}
-        className="h-full w-full object-cover"
+        className={mediaFitClass(fit)}
         loading="lazy"
         draggable={false}
         onError={() => setErrored(true)}
@@ -96,10 +108,12 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
 function VideoHoverPreview({
   asset,
   aspectClass,
+  fit = "cover",
   onClick,
 }: {
   asset: Extract<MediaAsset, { type: "video" }>;
   aspectClass: string;
+  fit?: SwipeMediaFit;
   onClick?: () => void;
 }) {
   const [errored, setErrored] = useState(false);
@@ -175,7 +189,7 @@ function VideoHoverPreview({
           ref={videoRef}
           src={sourceUrl}
           poster={posterUrl}
-          className="h-full w-full object-cover"
+          className={mediaFitClass(fit)}
           playsInline
           preload="metadata"
           onClick={handleVideoClick}
@@ -191,7 +205,7 @@ function VideoHoverPreview({
         <img
           src={posterUrl}
           alt="Video preview"
-          className="h-full w-full object-cover"
+          className={mediaFitClass(fit)}
           loading="lazy"
           draggable={false}
           onError={() => setErrored(true)}
@@ -235,10 +249,12 @@ function VideoHoverPreview({
 export function SwipeCarousel({
   media,
   aspectClass,
+  fit = "cover",
   onClick,
 }: {
   media: MediaAsset[];
   aspectClass: string;
+  fit?: SwipeMediaFit;
   onClick?: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -262,7 +278,7 @@ export function SwipeCarousel({
       onClick={onClick}
       role="presentation"
     >
-      <MediaContent asset={current} />
+      <MediaContent asset={current} fit={fit} />
 
       <button
         type="button"
@@ -293,10 +309,12 @@ export function SwipeCarousel({
 export function SwipeMedia({
   media,
   aspect = "4/5",
+  fit = "cover",
   onOpen,
 }: {
   media: MediaAsset[];
   aspect?: "1/1" | "4/5" | "9/16" | "16/9";
+  fit?: SwipeMediaFit;
   onOpen?: () => void;
 }) {
   const aspectClass = aspectToClass(aspect);
@@ -312,7 +330,7 @@ export function SwipeMedia({
   }
 
   if (primaryVideoAsset) {
-    return <VideoHoverPreview asset={primaryVideoAsset} aspectClass={aspectClass} onClick={onOpen} />;
+    return <VideoHoverPreview asset={primaryVideoAsset} aspectClass={aspectClass} fit={fit} onClick={onOpen} />;
   }
 
   if (assets.length === 1) {
@@ -322,10 +340,10 @@ export function SwipeMedia({
         onClick={onOpen}
         role="presentation"
       >
-        <MediaContent asset={assets[0]} />
+        <MediaContent asset={assets[0]} fit={fit} />
       </div>
     );
   }
 
-  return <SwipeCarousel media={assets} aspectClass={aspectClass} onClick={onOpen} />;
+  return <SwipeCarousel media={assets} aspectClass={aspectClass} fit={fit} onClick={onOpen} />;
 }

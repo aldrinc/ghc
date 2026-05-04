@@ -34,7 +34,11 @@ from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.campaign_delivery_configs import CampaignDeliveryConfigsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.repositories.products import ProductsRepository
-from app.db.repositories.swipes import CompanySwipesRepository, SwipeCollectionsRepository
+from app.db.repositories.swipes import (
+    CompanySwipesRepository,
+    SwipeCollectionsRepository,
+    infer_swipe_asset_ad_unit_format,
+)
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.creative_generation import (
     AdCopyPackArtifact,
@@ -669,6 +673,16 @@ def _resolve_collection_swipe_sources(
             missing_ids.append(swipe_asset_id)
             continue
         media_items = company_repo.list_media(org_id=org_id, swipe_asset_id=swipe_asset_id)
+        resolved_ad_unit_format = infer_swipe_asset_ad_unit_format(
+            ad_unit_format=getattr(swipe_asset, "ad_unit_format", None),
+            media_items=media_items,
+        )
+        if resolved_ad_unit_format != "image":
+            raise ValueError(
+                "Selected swipe collection contains non-static assets that are not supported "
+                "for image creative generation yet. "
+                f"swipe_asset_id={swipe_asset_id} ad_unit_format={resolved_ad_unit_format}"
+            )
         if not media_items:
             raise ValueError(f"Selected swipe asset has no media: {swipe_asset_id}")
         source_media_url = None
@@ -1897,10 +1911,11 @@ def resolve_default_swipe_collection_activity(params: Dict[str, Any]) -> Dict[st
         ready_swipe_asset_ids = swipe_collections_repo.ready_asset_ids(
             org_id=org_id,
             collection_id=swipe_collection_id,
+            ad_unit_formats=["image"],
         )
         if not ready_swipe_asset_ids:
             raise ValueError(
-                "Default swipe collection has no ready swipe assets for creative generation."
+                "Default swipe collection has no ready static image swipe assets for creative generation."
             )
 
         return {

@@ -1,3 +1,6 @@
+export type SwipeAssetType = "image" | "video" | "carousel" | "unknown";
+export type SwipeAssetTypeFilter = SwipeAssetType | "all";
+
 export interface CompanySwipeAsset {
   id: string;
   org_id: string;
@@ -120,6 +123,7 @@ export interface SwipeReviewFilter {
   reviewStatus?: "pending" | "approved" | "rejected" | "stale" | "all";
   search?: string;
   collectionId?: string;
+  clientId?: string;
   changedSince?: "last_sync" | "last_7_days" | "all";
   notInLaunchCollection?: boolean;
 }
@@ -127,4 +131,21 @@ export interface SwipeReviewFilter {
 export interface SwipeReviewBulkRequest {
   swipeAssetIds: string[];
   collectionId?: string;
+}
+
+export interface GetHookdInboxSummary {
+  latestRunId?: string | null;
+  latestRunStartedAt?: string | null;
+  rawImportedCount: number;
+  eligibleStaticImageCount: number;
+  duplicateCollapsedCount: number;
+  excludedNonStaticCount: number;
+  reviewLimit: number;
+  returnedCount: number;
+  defaultAssetType: SwipeAssetType;
+}
+
+export interface GetHookdInboxResponse {
+  summary: GetHookdInboxSummary;
+  swipes: CompanySwipeAsset[];
 }

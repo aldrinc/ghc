@@ -1,6 +1,7 @@
 import type { CompanySwipeAsset } from "@/types/swipes";
 import type { AssetReviewItem, ReviewStatus } from "@/types/assetReview";
 import {
+  resolveSwipeAssetType,
   mapSwipePlatforms,
   mapSwipeImages,
   mapSwipeVideos,
@@ -116,6 +117,7 @@ export function normalizeSwipeToAssetReviewItem(swipe: CompanySwipeAsset): Asset
     isInLaunchCollection: false,
     destinationUrl,
     destinationHostname: extractHostname(destinationUrl),
+    assetType: resolveSwipeAssetType(swipe),
     status: swipe.active === true ? "active" : swipe.active === false ? "inactive" : undefined,
     raw: swipe,
   };

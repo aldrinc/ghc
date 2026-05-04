@@ -18,6 +18,7 @@ const ITEMS: AssetReviewItem[] = [
     reviewStatus: "pending_review",
     source: "gethookd",
     sourceLastSyncedAt: "2026-03-25T12:00:00Z",
+    assetType: "image",
     collectionIds: ["launch"],
     isInLaunchCollection: true,
     destinationHostname: "northwind.test",
@@ -37,6 +38,7 @@ const ITEMS: AssetReviewItem[] = [
     reviewStatus: "approved",
     source: "catalog",
     sourceLastSyncedAt: "2026-03-18T12:00:00Z",
+    assetType: "video",
     collectionIds: [],
     isInLaunchCollection: false,
     destinationHostname: "bluebird.test",
@@ -86,6 +88,17 @@ describe("AssetReviewGrid", () => {
     expect(screen.getByText(/no assets match the current filters/i)).toBeInTheDocument();
   });
 
+  it("filters assets by asset type", () => {
+    render(<Harness />);
+
+    fireEvent.change(screen.getByDisplayValue("All asset types"), {
+      target: { value: "video" },
+    });
+
+    expect(screen.queryByLabelText("Select Northwind")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Select Bluebird")).toBeInTheDocument();
+  });
+
   it("selects and deselects only filtered assets", async () => {
     const user = userEvent.setup();
 
@@ -125,5 +138,15 @@ describe("AssetReviewGrid", () => {
 
     expect(onCardClick).toHaveBeenCalledTimes(1);
     expect(onCardClick).toHaveBeenCalledWith(expect.objectContaining({ id: "asset-1" }));
+  });
+
+  it("renders review previews without cropping the media", () => {
+    render(<Harness />);
+
+    const previews = screen.getAllByAltText("Image preview");
+    expect(previews.length).toBeGreaterThan(0);
+    for (const preview of previews) {
+      expect(preview).toHaveClass("object-contain");
+    }
   });
 });

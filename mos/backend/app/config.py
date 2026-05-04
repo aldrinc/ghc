@@ -236,8 +236,8 @@ class Settings(BaseSettings):
     GETHOOKD_API_BASE_URL: str = "https://app.gethookd.ai/api/v1"
     GETHOOKD_API_KEY: str | None = None
     GETHOOKD_TIMEOUT_SECONDS: float = 30.0
-    GETHOOKD_EXPLORE_PAGE_SIZE: int = 10
-    GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 1
+    GETHOOKD_EXPLORE_PAGE_SIZE: int = 20
+    GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN: int = 0
     GETHOOKD_SYNC_SCHEDULE_ID: str = "gethookd-nightly-sync"
     GETHOOKD_SYNC_SCHEDULE_CRON: str = "0 3 * * *"
     META_MANAGEMENT_SCHEDULE_CRON: str = "0 */6 * * *"

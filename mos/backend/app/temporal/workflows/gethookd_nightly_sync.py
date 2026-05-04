@@ -45,7 +45,7 @@ class GetHookdNightlySyncOutput:
     assets_updated: int
     assets_marked_stale: int
     assets_failed: int
-    credits_used: int
+    credits_used: float
     error_summary: Optional[str] = None
 
 

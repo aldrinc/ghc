@@ -34,6 +34,7 @@ from app.services.gethookd_client import (
     GetHookdClientError,
     GetHookdExploreFilters,
     GetHookdAdResult,
+    GetHookdExplorePage,
 )
 from app.services.remote_media import RemoteMediaOutput
 from app.temporal.activities import gethookd_sync_activities as gethookd_sync_activities_module
@@ -104,26 +105,27 @@ class TestGetHookdClient:
                 GetHookdClient()
 
     def test_explore_filters_defaults(self):
-        """Explore filters should have sensible defaults."""
+        """Explore filters should not invent API defaults."""
         filters = GetHookdExploreFilters()
 
-        assert filters.platforms == "facebook,instagram"
-        assert filters.performance_scores == "winning,optimized"
-        assert filters.status == "active"
-        assert filters.sort_column == "days_active"
-        assert filters.sort_direction == "desc"
+        assert filters.query == ""
+        assert filters.platform is None
+        assert filters.performance_scores is None
+        assert filters.status is None
+        assert filters.sort_column is None
+        assert filters.sort_direction is None
 
     def test_explore_filters_custom(self):
         """Explore filters should accept custom values."""
         filters = GetHookdExploreFilters(
             query="test",
-            platforms="tiktok",
+            platform="tiktok",
             niche="fitness",
             ad_format="video",
         )
 
         assert filters.query == "test"
-        assert filters.platforms == "tiktok"
+        assert filters.platform == "tiktok"
         assert filters.niche == "fitness"
         assert filters.ad_format == "video"
 
@@ -186,10 +188,10 @@ class TestGetHookdClient:
             "https://app.gethookd.ai/api/v1",
         ):
             client = GetHookdClient(api_token="token")
-            results = client.explore(
+            page = client.explore(
                 filters=GetHookdExploreFilters(
                     query="skincare",
-                    platforms="facebook",
+                    platform="facebook",
                     ad_format="video",
                 )
             )
@@ -197,22 +199,17 @@ class TestGetHookdClient:
         assert captured["url"] == "https://app.gethookd.ai/api/v1/explore"
         assert captured["params"] == {
             "page": 1,
-            "per_page": 10,
+            "per_page": 20,
             "query": "skincare",
             "platform": "facebook",
             "ad-format": "video",
-            "performance_scores": "winning,optimized",
-            "status": "active",
-            "sort_column": "days_active",
-            "sort_direction": "desc",
-            "ads_per_brand_limit": 3,
         }
-        assert len(results) == 1
-        assert results[0].brand_id == "2016485295279615"
-        assert results[0].media[0]["url"] == "https://example.com/video.mp4"
+        assert len(page.items) == 1
+        assert page.items[0].brand_id == "2016485295279615"
+        assert page.items[0].media[0]["url"] == "https://example.com/video.mp4"
 
-    def test_explore_caps_results_to_requested_per_page(self):
-        """Client should enforce a hard local cap when the upstream over-returns."""
+    def test_explore_does_not_truncate_upstream_rows(self):
+        """Client should preserve the full upstream page payload."""
         captured: dict[str, object] = {}
         dummy_client = self._http_client_factory(
             {
@@ -231,9 +228,62 @@ class TestGetHookdClient:
             "https://app.gethookd.ai/api/v1",
         ):
             client = GetHookdClient(api_token="token")
-            results = client.explore(filters=GetHookdExploreFilters(), per_page=1)
+            page = client.explore(filters=GetHookdExploreFilters(), per_page=1)
 
-        assert len(results) == 1
+        assert page.raw_items_count == 2
+        assert len(page.items) == 2
+
+    def test_explore_keeps_all_rows_and_normalizes_asset_type_after_parsing(self):
+        """Image-filtered API pages should retain upstream rows and annotate normalized asset types."""
+        captured: dict[str, object] = {}
+        dummy_client = self._http_client_factory(
+            {
+                "errors": False,
+                "data": [
+                    {
+                        "id": "image-1",
+                        "platform": "facebook",
+                        "media": [
+                            {"type": "image", "url": "https://example.com/image-1.jpg"},
+                        ],
+                    },
+                    {
+                        "id": "carousel-1",
+                        "platform": "facebook",
+                        "media": [
+                            {"type": "image", "url": "https://example.com/carousel-1.jpg"},
+                            {"type": "image", "url": "https://example.com/carousel-2.jpg"},
+                        ],
+                    },
+                    {
+                        "id": "video-1",
+                        "platform": "facebook",
+                        "media": [
+                            {"type": "video", "url": "https://example.com/video-1.mp4"},
+                        ],
+                    },
+                ],
+            },
+            captured,
+        )
+
+        with patch.object(gethookd_client_module.httpx, "Client", dummy_client), patch.object(
+            gethookd_client_module.settings,
+            "GETHOOKD_API_BASE_URL",
+            "https://app.gethookd.ai/api/v1",
+        ):
+            client = GetHookdClient(api_token="token")
+            page = client.explore(
+                filters=GetHookdExploreFilters(
+                    ad_format="image",
+                    platform="facebook",
+                ),
+                per_page=30,
+            )
+
+        assert captured["params"]["ad-format"] == "image"
+        assert [result.id for result in page.items] == ["image-1", "carousel-1", "video-1"]
+        assert [result.ad_unit_format for result in page.items] == ["image", "carousel", "video"]
 
     def test_explore_supports_active_ads_count_filter(self):
         """Explore requests should pass through the minimum active brand ads filter."""
@@ -259,6 +309,21 @@ class TestGetHookdClient:
         assert captured["params"]["performance_scores"] == "growing,optimized,winning"
         assert captured["params"]["ads_per_brand_limit"] == 4
         assert captured["params"]["active_ads_count"] == 2000
+
+    def test_from_filter_dict_reads_new_and_legacy_keys(self):
+        filters = GetHookdExploreFilters.from_filter_dict(
+            {
+                "platforms": "facebook,instagram",
+                "ad_format": "image",
+                "start-date": "2026-04-01",
+                "end_date": "2026-04-15",
+            }
+        )
+
+        assert filters.platform == "facebook,instagram"
+        assert filters.ad_format == "image"
+        assert filters.start_date == "2026-04-01"
+        assert filters.end_date == "2026-04-15"
 
 
 class TestGetHookdActivityInput:
@@ -499,6 +564,145 @@ def test_gethookd_sync_workspace_surfaces_page_failures(
     assert "Insufficient credits" in result.error_summary
 
 
+def test_gethookd_sync_workspace_fetches_all_pages_when_page_cap_is_zero(
+    db_session,
+    seed_data,
+    monkeypatch,
+):
+    client = seed_data["client"]
+    db_session.add(
+        ClientGetHookdCredentials(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            credentials_encrypted="encrypted",
+        )
+    )
+    db_session.add(
+        ClientGetHookdSyncFeed(
+            org_id=TEST_ORG_ID,
+            client_id=client.id,
+            name="Full import feed",
+            enabled=True,
+            filters_json={"query": "supplements"},
+            max_pages_per_run=0,
+            per_page=10,
+        )
+    )
+    db_session.commit()
+
+    def fake_get_session():
+        yield db_session
+
+    calls: list[int] = []
+
+    class FakeGetHookdClient:
+        def explore(self, *, filters, page, per_page):
+            calls.append(page)
+            return GetHookdExplorePage(
+                items=[
+                    GetHookdAdResult(
+                        id=f"ad-{page}",
+                        external_id=f"ext-{page}",
+                        platform="facebook",
+                        display_format="image",
+                        ad_unit_format="image",
+                        title=f"Ad {page}",
+                        body="Body",
+                        cta_type="SHOP_NOW",
+                        cta_text="Shop Now",
+                        landing_page="https://example.com",
+                        start_date=None,
+                        end_date=None,
+                        days_active=1,
+                        active_in_library=True,
+                        used_count=1,
+                        performance_score=1,
+                        performance_score_title="Testing",
+                        share_url=f"https://app.gethookd.ai/share/ad/{page}",
+                        ad_library_link=None,
+                        brand_id=f"brand-{page}",
+                        brand_name=f"Brand {page}",
+                        brand_logo_url=None,
+                        media=[{"type": "image", "url": f"https://cdn.example/{page}.jpg"}],
+                        raw_json={"id": page},
+                    )
+                ],
+                raw_items_count=1,
+                current_page=page,
+                last_page=2,
+                total=2,
+                next_url="https://app.gethookd.ai/api/v1/explore?page=2" if page == 1 else None,
+                previous_url=None if page == 1 else "https://app.gethookd.ai/api/v1/explore?page=1",
+                used_credits=0.5,
+                remaining_credits=99.5,
+                sorting={"column": "created_at", "direction": "desc"},
+                filters={"query": "supplements"},
+                raw_payload={"data": [{"id": page}]},
+            )
+
+    class FakeRemoteMediaService:
+        def __init__(self, session):
+            self.session = session
+
+        def upsert_and_mirror(self, *, channel, remote_media):
+            mirrored = self.session.scalar(
+                select(MediaAsset).where(MediaAsset.source_url == remote_media.source_url)
+            )
+            if mirrored is None:
+                mirrored = MediaAsset(
+                    channel=AdChannelEnum.META_ADS_LIBRARY,
+                    asset_type=remote_media.asset_type,
+                    source_url=remote_media.source_url,
+                    mirror_status=MediaMirrorStatusEnum.succeeded,
+                    metadata_json=remote_media.metadata or {},
+                )
+                self.session.add(mirrored)
+                self.session.flush()
+            return RemoteMediaOutput(
+                media_asset_id=str(mirrored.id),
+                storage_key=None,
+                preview_storage_key=None,
+                sha256=None,
+                mirror_status="mirrored",
+            )
+
+    monkeypatch.setattr(gethookd_sync_activities_module, "get_session", fake_get_session)
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "create_gethookd_client",
+        lambda api_token: FakeGetHookdClient(),
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "decrypt_secret_json",
+        lambda _: {"apiToken": "token"},
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module.settings,
+        "SWIPE_TAXONOMY_MODEL",
+        "gemini-test",
+    )
+    monkeypatch.setattr(
+        gethookd_sync_activities_module,
+        "RemoteMediaService",
+        FakeRemoteMediaService,
+    )
+
+    result = asyncio.run(
+        gethookd_sync_workspace_activity(
+            GetHookdSyncActivityInput(
+                org_id=str(TEST_ORG_ID),
+                client_id=str(client.id),
+            )
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.assets_new == 2
+    assert result.credits_used == 1.0
+    assert calls == [1, 2]
+
+
 class TestGetHookdCreativeChangeDetection:
     """Tests for creative change detection logic."""
 
@@ -553,55 +757,69 @@ def test_new_gethookd_assets_persist_ad_unit_format(
             credentials_encrypted="encrypted",
         )
     )
-    db_session.add(
-        ClientGetHookdSyncFeed(
-            org_id=TEST_ORG_ID,
-            client_id=client.id,
-            name="Carousel feed",
-            enabled=True,
-            filters_json={"query": "supplements", "ad_format": "carousel"},
-            max_pages_per_run=1,
-            per_page=25,
-        )
+    feed = ClientGetHookdSyncFeed(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        name="Carousel feed",
+        enabled=True,
+        filters_json={"query": "supplements", "ad_format": "carousel"},
+        max_pages_per_run=1,
+        per_page=25,
     )
+    db_session.add(feed)
     db_session.commit()
+    client_id = str(client.id)
+    feed_id = str(feed.id)
 
     def fake_get_session():
         yield db_session
 
     class FakeGetHookdClient:
         def explore(self, *, filters, page, per_page):
-            return [
-                GetHookdAdResult(
-                    id="carousel-123",
-                    external_id="9999999",
-                    platform="facebook",
-                    display_format="DCO",
-                    ad_unit_format="carousel",
-                    title="Carousel creative",
-                    body="Same body",
-                    cta_type="LEARN_MORE",
-                    cta_text="Learn More",
-                    landing_page="https://example.com",
-                    start_date=None,
-                    end_date=None,
-                    days_active=21,
-                    active_in_library=True,
-                    used_count=4,
-                    performance_score=120,
-                    performance_score_title="Winning",
-                    share_url="https://app.gethookd.ai/share/ad/carousel-123",
-                    ad_library_link=None,
-                    brand_id="brand-1",
-                    brand_name="Acme",
-                    brand_logo_url=None,
-                    media=[
-                        {"type": "image", "url": "https://cdn.example/carousel-1.jpg"},
-                        {"type": "image", "url": "https://cdn.example/carousel-2.jpg"},
-                    ],
-                    raw_json={"id": "carousel-123", "creativeVersion": "v1"},
-                )
-            ]
+            return GetHookdExplorePage(
+                items=[
+                    GetHookdAdResult(
+                        id="carousel-123",
+                        external_id="9999999",
+                        platform="facebook",
+                        display_format="DCO",
+                        ad_unit_format="carousel",
+                        title="Carousel creative",
+                        body="Same body",
+                        cta_type="LEARN_MORE",
+                        cta_text="Learn More",
+                        landing_page="https://example.com",
+                        start_date=None,
+                        end_date=None,
+                        days_active=21,
+                        active_in_library=True,
+                        used_count=4,
+                        performance_score=120,
+                        performance_score_title="Winning",
+                        share_url="https://app.gethookd.ai/share/ad/carousel-123",
+                        ad_library_link=None,
+                        brand_id="brand-1",
+                        brand_name="Acme",
+                        brand_logo_url=None,
+                        media=[
+                            {"type": "image", "url": "https://cdn.example/carousel-1.jpg"},
+                            {"type": "image", "url": "https://cdn.example/carousel-2.jpg"},
+                        ],
+                        raw_json={"id": "carousel-123", "creativeVersion": "v1"},
+                    )
+                ],
+                raw_items_count=1,
+                current_page=1,
+                last_page=1,
+                total=1,
+                next_url=None,
+                previous_url=None,
+                used_credits=0.0,
+                remaining_credits=None,
+                sorting={},
+                filters={},
+                raw_payload={"data": [{"id": "carousel-123"}]},
+            )
 
     class FakeRemoteMediaService:
         def __init__(self, session):
@@ -655,7 +873,7 @@ def test_new_gethookd_assets_persist_ad_unit_format(
         gethookd_sync_workspace_activity(
             GetHookdSyncActivityInput(
                 org_id=str(TEST_ORG_ID),
-                client_id=str(client.id),
+                client_id=client_id,
             )
         )
     )
@@ -671,6 +889,13 @@ def test_new_gethookd_assets_persist_ad_unit_format(
     )
     assert synced_asset is not None
     assert synced_asset.ad_unit_format == "carousel"
+    assert synced_asset.source_metadata_json is not None
+    assert synced_asset.source_metadata_json["feed_id"] == feed_id
+    assert synced_asset.source_metadata_json["feed_name"] == "Carousel feed"
+    assert synced_asset.source_metadata_json["run_id"]
+    assert synced_asset.source_metadata_json["client_ids"] == [client_id]
+    assert synced_asset.source_metadata_json["feed_ids"] == [feed_id]
+    assert synced_asset.source_metadata_json["feed_names"] == ["Carousel feed"]
 
 
 def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership(
@@ -687,17 +912,17 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
             credentials_encrypted="encrypted",
         )
     )
-    db_session.add(
-        ClientGetHookdSyncFeed(
-            org_id=TEST_ORG_ID,
-            client_id=client.id,
-            name="Winning feed",
-            enabled=True,
-            filters_json={"query": "supplements"},
-            max_pages_per_run=1,
-            per_page=25,
-        )
+    feed = ClientGetHookdSyncFeed(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        name="Winning feed",
+        enabled=True,
+        filters_json={"query": "supplements"},
+        max_pages_per_run=1,
+        per_page=25,
     )
+    db_session.add(feed)
+    client_id = str(client.id)
     existing_asset = CompanySwipeAsset(
         org_id=TEST_ORG_ID,
         source_kind="catalog",
@@ -712,9 +937,18 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
         review_status="approved",
         analysis_status="ready",
         source_payload_hash="old-payload",
+        source_metadata_json={
+            "client_ids": ["legacy-client"],
+            "feed_ids": ["legacy-feed"],
+            "feed_names": ["Legacy Feed"],
+            "feed_id": "legacy-feed",
+            "feed_name": "Legacy Feed",
+            "run_id": "legacy-run",
+        },
     )
     db_session.add(existing_asset)
     db_session.commit()
+    feed_id = str(feed.id)
     db_session.refresh(existing_asset)
     existing_asset_id = existing_asset.id
     db_session.add(
@@ -732,34 +966,47 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
 
     class FakeGetHookdClient:
         def explore(self, *, filters, page, per_page):
-            return [
-                GetHookdAdResult(
-                    id="123",
-                    external_id="9999999",
-                    platform="facebook",
-                    display_format="image",
-                    ad_unit_format="image",
-                    title="Same title",
-                    body="Same body",
-                    cta_type="LEARN_MORE",
-                    cta_text="Learn More",
-                    landing_page="https://example.com",
-                    start_date=None,
-                    end_date=None,
-                    days_active=21,
-                    active_in_library=True,
-                    used_count=4,
-                    performance_score=120,
-                    performance_score_title="Winning",
-                    share_url="https://app.gethookd.ai/share/ad/123",
-                    ad_library_link=None,
-                    brand_id="brand-1",
-                    brand_name="Acme",
-                    brand_logo_url=None,
-                    media=[{"type": "image", "url": "https://cdn.example/new.jpg"}],
-                    raw_json={"id": 123, "creativeVersion": "v2"},
-                )
-            ]
+            return GetHookdExplorePage(
+                items=[
+                    GetHookdAdResult(
+                        id="123",
+                        external_id="9999999",
+                        platform="facebook",
+                        display_format="image",
+                        ad_unit_format="image",
+                        title="Same title",
+                        body="Same body",
+                        cta_type="LEARN_MORE",
+                        cta_text="Learn More",
+                        landing_page="https://example.com",
+                        start_date=None,
+                        end_date=None,
+                        days_active=21,
+                        active_in_library=True,
+                        used_count=4,
+                        performance_score=120,
+                        performance_score_title="Winning",
+                        share_url="https://app.gethookd.ai/share/ad/123",
+                        ad_library_link=None,
+                        brand_id="brand-1",
+                        brand_name="Acme",
+                        brand_logo_url=None,
+                        media=[{"type": "image", "url": "https://cdn.example/new.jpg"}],
+                        raw_json={"id": 123, "creativeVersion": "v2"},
+                    )
+                ],
+                raw_items_count=1,
+                current_page=1,
+                last_page=1,
+                total=1,
+                next_url=None,
+                previous_url=None,
+                used_credits=0.0,
+                remaining_credits=None,
+                sorting={},
+                filters={},
+                raw_payload={"data": [{"id": 123}]},
+            )
 
     class FakeRemoteMediaService:
         def __init__(self, session):
@@ -813,7 +1060,7 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
         gethookd_sync_workspace_activity(
             GetHookdSyncActivityInput(
                 org_id=str(TEST_ORG_ID),
-                client_id=str(client.id),
+                client_id=client_id,
             )
         )
     )
@@ -826,6 +1073,13 @@ def test_existing_asset_media_changes_mark_stale_and_restore_gethookd_membership
     assert refreshed_asset is not None
     assert refreshed_asset.ad_unit_format == "image"
     assert refreshed_asset.review_status == "stale_after_sync"
+    assert refreshed_asset.source_metadata_json is not None
+    assert refreshed_asset.source_metadata_json["client_ids"] == ["legacy-client", client_id]
+    assert refreshed_asset.source_metadata_json["feed_ids"] == ["legacy-feed", feed_id]
+    assert refreshed_asset.source_metadata_json["feed_names"] == ["Legacy Feed", "Winning feed"]
+    assert refreshed_asset.source_metadata_json["feed_id"] == feed_id
+    assert refreshed_asset.source_metadata_json["feed_name"] == "Winning feed"
+    assert refreshed_asset.source_metadata_json["run_id"]
 
     media_rows = db_session.scalars(
         select(CompanySwipeMedia).where(CompanySwipeMedia.swipe_asset_id == existing_asset_id)
