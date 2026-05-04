@@ -169,6 +169,84 @@ def test_run_page_copy_batches_resumes_last_hermes_session(monkeypatch):
     assert raw_output
 
 
+def test_execute_page_copy_batch_uses_json_only_retry_for_single_slot_repairs(monkeypatch):
+    service = AgentThreadsService(session=MagicMock(), org_id="org-1", user_id="user-1")
+    monkeypatch.setattr(service, "_build_site_page_listing", lambda site_id: [])
+
+    base_puck = _build_imported_page_puck()
+    slots = extract_site_page_copy_slots(base_puck)
+    scoped_slots = slots[:2]
+    captured_queries: list[str] = []
+    responses = iter(
+        [
+            HermesRunResult(
+                response_text="I tightened the section copy.",
+                hermes_session_id="session-1",
+                raw_output="I tightened the section copy.",
+                usage={},
+            ),
+            HermesRunResult(
+                response_text="Updated slot value only.",
+                hermes_session_id="session-1",
+                raw_output="Updated slot value only.",
+                usage={},
+            ),
+            HermesRunResult(
+                response_text="Still fixing the slot.",
+                hermes_session_id="session-1",
+                raw_output="Still fixing the slot.",
+                usage={},
+            ),
+            HermesRunResult(
+                response_text=(
+                    '{"assistantMessage":"Updated slot.","assignments":'
+                    f'[{{"path":"{scoped_slots[0].path}","value":"Sharper Hero"}}]'
+                    "}"
+                ),
+                hermes_session_id="session-1",
+                raw_output="ok",
+                usage={},
+            ),
+            HermesRunResult(
+                response_text=(
+                    '{"assistantMessage":"Updated slot.","assignments":'
+                    f'[{{"path":"{scoped_slots[1].path}","value":"Clean proof line"}}]'
+                    "}"
+                ),
+                hermes_session_id="session-1",
+                raw_output="ok",
+                usage={},
+            ),
+        ]
+    )
+
+    def fake_run_turn(*, runtime_home, query, hermes_session_id):
+        captured_queries.append(query)
+        return next(responses)
+
+    monkeypatch.setattr(service.hermes, "run_turn", fake_run_turn)
+
+    _, result, repair_count, _ = service._execute_page_copy_batch(
+        runtime_home=Path("/tmp/runtime-home"),
+        session_id=None,
+        base_puck_data=base_puck,
+        scoped_slots=scoped_slots,
+        query="Rewrite the current batch.",
+        batch_note="Batch scope: section 1 of 2.",
+        site=cast(Any, SimpleNamespace(name="Ember")),
+        page=cast(Any, SimpleNamespace(name="Home", slug="home")),
+        page_context=[],
+        user_content="Keep this page concise.",
+    )
+
+    assert repair_count == 3
+    assert len(result.assignments) == 2
+    assert result.assignments[0]["value"] == "Sharper Hero"
+    assert result.assignments[1]["value"] == "Clean proof line"
+    assert len(captured_queries) == 5
+    assert any(f'"path": "{scoped_slots[0].path}"' in query for query in captured_queries)
+
+
 def test_get_or_create_page_thread_reuses_existing_thread():
     service = AgentThreadsService(session=MagicMock(), org_id="org-1", user_id="user-1")
     existing_thread = SimpleNamespace(id="thread-1")

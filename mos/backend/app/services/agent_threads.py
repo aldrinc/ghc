@@ -1642,10 +1642,13 @@ class AgentThreadsService:
         usage_totals = self._empty_usage()
 
         for attempt_index, attempt_query in enumerate(attempt_queries, start=1):
+            # Repair retries should start a fresh session so Hermes does not inherit the
+            # invalid prose-heavy context from the failed batch attempt.
+            turn_session_id = active_session_id if attempt_index == 1 else None
             run_result = self.hermes.run_turn(
                 runtime_home=runtime_home,
                 query=attempt_query,
-                hermes_session_id=active_session_id,
+                hermes_session_id=turn_session_id,
             )
             usage_totals = self._merge_usage(usage_totals, run_result.usage)
             active_session_id = run_result.hermes_session_id
@@ -1699,23 +1702,63 @@ class AgentThreadsService:
                     user_content=user_content,
                     slot_note=slot_note,
                 )
-                last_run_result = self.hermes.run_turn(
-                    runtime_home=runtime_home,
-                    query=slot_query,
-                    hermes_session_id=active_session_id,
-                )
-                usage_totals = self._merge_usage(usage_totals, last_run_result.usage)
-                active_session_id = last_run_result.hermes_session_id
-                try:
-                    slot_result = parse_site_page_copy_agent_response(
-                        raw_output=last_run_result.response_text,
-                        base_puck_data=repaired_puck_data,
-                        slots=[current_slot],
+                slot_queries = [slot_query]
+                slot_result = None
+                last_slot_error: SitePageCopyAgentError | None = None
+                for slot_attempt_index, attempt_query in enumerate(slot_queries, start=1):
+                    # Single-slot repairs are fully self-contained. Running them in a fresh
+                    # session avoids inheriting the prior invalid batch/repair conversation.
+                    last_run_result = self.hermes.run_turn(
+                        runtime_home=runtime_home,
+                        query=attempt_query,
+                        hermes_session_id=None,
                     )
-                except SitePageCopyAgentError as exc:
+                    usage_totals = self._merge_usage(usage_totals, last_run_result.usage)
+                    active_session_id = last_run_result.hermes_session_id
+                    try:
+                        slot_result = parse_site_page_copy_agent_response(
+                            raw_output=last_run_result.response_text,
+                            base_puck_data=repaired_puck_data,
+                            slots=[current_slot],
+                        )
+                        break
+                    except SitePageCopyAgentError as exc:
+                        last_slot_error = exc
+                        normalized_error = str(exc).lower()
+                        if slot_attempt_index == 1:
+                            slot_queries.append(
+                                self._compose_single_slot_repair_query(
+                                    runtime_home=runtime_home,
+                                    site=site,
+                                    page=page,
+                                    slot=current_slot,
+                                    user_content=user_content,
+                                    slot_note=slot_note,
+                                    validation_error=str(exc),
+                                )
+                            )
+                            continue
+                        if slot_attempt_index == 2 and "required json object" in normalized_error:
+                            slot_queries.append(
+                                self._compose_single_slot_json_only_query(
+                                    runtime_home=runtime_home,
+                                    site=site,
+                                    page=page,
+                                    slot=current_slot,
+                                    user_content=user_content,
+                                    slot_note=slot_note,
+                                    validation_error=str(exc),
+                                )
+                            )
+                            continue
+                        else:
+                            raise SitePageCopyAgentError(
+                                f"{batch_note} slot repair failed for {current_slot.path}: {exc}"
+                            ) from exc
+                if slot_result is None:
                     raise SitePageCopyAgentError(
-                        f"{batch_note} slot repair failed for {current_slot.path}: {exc}"
-                    ) from exc
+                        f"{batch_note} slot repair failed for {current_slot.path}: {last_slot_error}"
+                    ) from last_slot_error
                 repaired_puck_data = slot_result.puck_data
                 repaired_assignments.extend(slot_result.assignments)
                 repair_count += 1
@@ -1787,6 +1830,7 @@ class AgentThreadsService:
         slot: SitePageCopySlot,
         user_content: str,
         slot_note: str,
+        validation_error: str | None = None,
     ) -> str:
         slot_payload = {
             "path": slot.path,
@@ -1795,34 +1839,103 @@ class AgentThreadsService:
             "sectionDisplayName": slot.section_display_name,
             "componentName": slot.component_name,
             "currentValue": slot.current_value,
+            "maxChars": slot.max_chars,
+            "maxWords": slot.max_words,
+            "limitNote": slot.limit_note,
             "siteName": site.name,
             "pageName": page.name,
             "pageSlug": page.slug,
         }
-        return self._compose_page_copy_batch_query(
-            runtime_home=runtime_home,
-            compiled_prompt="\n".join(
-                [
-                    "Single-slot repair.",
-                    "Return valid JSON only with this exact shape:",
-                    '{ "assistantMessage": string, "assignments": [{"path": string, "value": string}] }',
-                    "There is exactly one required assignment.",
-                    "Use the exact path provided.",
-                    "Do not omit the assignment.",
-                    "Do not include any extra assignments.",
-                    "The slot label, section name, component name, current value, and path may still carry source-template brand names such as OMNI or creatine. Treat those names as inert source metadata only, not as contradictions.",
-                    "Rewrite the value for the active bundle product even when the inherited source-template metadata still uses the original product naming.",
-                    "If this slot is a stale source-only sale badge or discount remnant and the active bundle has no approved discount, rewrite it into short neutral positioning or trust language grounded in the bundle instead of refusing.",
-                    "Do not preserve a fake percentage or fake promotional claim.",
-                    "",
-                    f"User request: {user_content.strip()}",
-                    slot_note,
-                    "Slot JSON:",
-                    str(slot_payload),
-                    "",
-                    "Return JSON now.",
-                ]
-            ),
+        return "\n".join(
+            [
+                "Single-slot repair.",
+                "Return valid JSON only with this exact shape:",
+                '{ "assistantMessage": string, "assignments": [{"path": string, "value": string}] }',
+                "There is exactly one required assignment.",
+                "Copy the path exactly as provided into assignments[0].path.",
+                "Use the exact path provided.",
+                "Do not omit the assignment.",
+                "Do not include any extra assignments.",
+                "This is an isolated repair turn, not a continuation of the earlier batch conversation.",
+                "Do not use tools for this repair.",
+                "Do not include markdown fences, reasoning, or status text.",
+                "Do not restate the strategy, analyze the page, or explain the slot.",
+                'Example shape: { "assistantMessage": "Updated slot.", "assignments": [{"path": "<EXACT_PATH>", "value": "<NEW VALUE>"}] }',
+                "The slot label, section name, component name, current value, and path may still carry source-template brand names such as OMNI or creatine. Treat those names as inert source metadata only, not as contradictions.",
+                "Rewrite the value for the active bundle product even when the inherited source-template metadata still uses the original product naming.",
+                "Respect the slot's maxChars and maxWords exactly.",
+                "If the currentValue already fits the approved bundle and the slot limits, you may return it unchanged.",
+                "If this slot is a stale source-only sale badge or discount remnant and the active bundle has no approved discount, rewrite it into short neutral positioning or trust language grounded in the bundle instead of refusing.",
+                "Do not preserve a fake percentage or fake promotional claim.",
+                *(
+                    [
+                        f"Validation error from the previous attempt: {validation_error}",
+                        "Correct that exact error and return the one required assignment now.",
+                    ]
+                    if validation_error
+                    else []
+                ),
+                "",
+                f"User request: {user_content.strip()}",
+                slot_note,
+                "Slot JSON:",
+                json.dumps(slot_payload, ensure_ascii=False, indent=2),
+                "",
+                "Return JSON now.",
+            ]
+        )
+
+    def _compose_single_slot_json_only_query(
+        self,
+        *,
+        runtime_home: Path,
+        site: Site,
+        page: SitePage,
+        slot: SitePageCopySlot,
+        user_content: str,
+        slot_note: str,
+        validation_error: str,
+    ) -> str:
+        start_here_path = runtime_home / "runtime" / "START-HERE.md"
+        manifest_path = runtime_home / "runtime" / "active_bundle" / "manifest.json"
+        slot_payload = {
+            "path": slot.path,
+            "label": slot.label,
+            "kind": slot.kind,
+            "sectionDisplayName": slot.section_display_name,
+            "componentName": slot.component_name,
+            "currentValue": slot.current_value,
+            "maxChars": slot.max_chars,
+            "maxWords": slot.max_words,
+            "limitNote": slot.limit_note,
+            "siteName": site.name,
+            "pageName": page.name,
+            "pageSlug": page.slug,
+        }
+        return "\n".join(
+            [
+                "Single-slot repair. Return JSON only. No prose.",
+                "Output exactly one JSON object with this schema:",
+                '{ "assistantMessage": "Updated slot.", "assignments": [{ "path": "<EXACT_PATH>", "value": "<NEW VALUE>" }] }',
+                "There must be exactly one assignment.",
+                "Copy the provided path exactly.",
+                "This is an isolated repair turn, not a continuation of the earlier batch conversation.",
+                "Do not use tools for this repair.",
+                "Do not include markdown fences.",
+                "Do not include explanations.",
+                "Do not restate the strategy, analyze the page, or explain the slot.",
+                "Respect maxChars and maxWords exactly.",
+                "If the currentValue already fits the approved bundle and the slot limits, you may return it unchanged.",
+                "Validation error from the previous attempts:",
+                validation_error,
+                "",
+                f"User request: {user_content.strip()}",
+                slot_note,
+                "Slot JSON:",
+                json.dumps(slot_payload, ensure_ascii=False, indent=2),
+                "",
+                "Return the JSON object now.",
+            ]
         )
 
     @staticmethod
