@@ -131,6 +131,63 @@ class SwipeCollectionDetailModel(SwipeCollectionModel):
     swipes: list[CompanySwipeAssetModel] = Field(default_factory=list)
 
 
+class GetHookdInboxSummaryModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    latest_run_id: str | None = Field(
+        default=None,
+        validation_alias="latestRunId",
+        serialization_alias="latestRunId",
+    )
+    latest_run_started_at: datetime | None = Field(
+        default=None,
+        validation_alias="latestRunStartedAt",
+        serialization_alias="latestRunStartedAt",
+    )
+    raw_imported_count: int = Field(
+        default=0,
+        validation_alias="rawImportedCount",
+        serialization_alias="rawImportedCount",
+    )
+    eligible_static_image_count: int = Field(
+        default=0,
+        validation_alias="eligibleStaticImageCount",
+        serialization_alias="eligibleStaticImageCount",
+    )
+    duplicate_collapsed_count: int = Field(
+        default=0,
+        validation_alias="duplicateCollapsedCount",
+        serialization_alias="duplicateCollapsedCount",
+    )
+    excluded_non_static_count: int = Field(
+        default=0,
+        validation_alias="excludedNonStaticCount",
+        serialization_alias="excludedNonStaticCount",
+    )
+    review_limit: int = Field(
+        default=10,
+        validation_alias="reviewLimit",
+        serialization_alias="reviewLimit",
+    )
+    returned_count: int = Field(
+        default=0,
+        validation_alias="returnedCount",
+        serialization_alias="returnedCount",
+    )
+    default_asset_type: str = Field(
+        default="image",
+        validation_alias="defaultAssetType",
+        serialization_alias="defaultAssetType",
+    )
+
+
+class GetHookdInboxResponseModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    summary: GetHookdInboxSummaryModel
+    swipes: list[CompanySwipeAssetModel] = Field(default_factory=list)
+
+
 class SwipeCollectionCreateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 

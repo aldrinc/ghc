@@ -11,6 +11,7 @@ const DEFAULT_FILTER_STATE: AssetReviewFilterState = {
   inLaunchCollection: null,
   changedSince: "all",
   platform: "all",
+  assetType: "all",
 };
 
 function matchesSearch(item: AssetReviewItem, query: string): boolean {
@@ -62,6 +63,10 @@ function applyFilters(
     result = result.filter((item) => item.platform.includes(filters.platform));
   }
 
+  if (filters.assetType !== "all") {
+    result = result.filter((item) => (item.assetType ?? "unknown") === filters.assetType);
+  }
+
   return result;
 }
 
@@ -108,6 +113,7 @@ interface AssetReviewGridProps {
   className?: string;
   showFilters?: boolean;
   emptyMessage?: string;
+  initialFilters?: Partial<AssetReviewFilterState>;
 }
 
 /**
@@ -123,8 +129,12 @@ export function AssetReviewGrid({
   className,
   showFilters = true,
   emptyMessage = "No assets match the current filters.",
+  initialFilters,
 }: AssetReviewGridProps) {
-  const [filters, setFilters] = useState<AssetReviewFilterState>(DEFAULT_FILTER_STATE);
+  const [filters, setFilters] = useState<AssetReviewFilterState>({
+    ...DEFAULT_FILTER_STATE,
+    ...initialFilters,
+  });
   const [dragSelectMode, setDragSelectMode] = useState(false);
 
   const filteredItems = useMemo(

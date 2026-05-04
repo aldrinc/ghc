@@ -19,13 +19,26 @@ import { Callout } from "@/components/ui/callout";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { normalizeSwipeToLibraryItem } from "@/lib/library";
+import {
+  formatSwipeAssetTypeLabel,
+  matchesSwipeAssetTypeFilter,
+  normalizeSwipeToLibraryItem,
+  resolveSwipeAssetType,
+} from "@/lib/library";
 import { cn } from "@/lib/utils";
-import type { CompanySwipeAsset, SwipeCollection } from "@/types/swipes";
+import type { CompanySwipeAsset, SwipeAssetTypeFilter, SwipeCollection } from "@/types/swipes";
 
 const CREATE_KIND_OPTIONS = [
   { label: "Curated", value: "curated" },
   { label: "Uploaded", value: "uploaded" },
+] as const;
+
+const SWIPE_ASSET_TYPE_FILTER_OPTIONS = [
+  { label: "All asset types", value: "all" },
+  { label: "Static images", value: "image" },
+  { label: "Videos", value: "video" },
+  { label: "Carousels", value: "carousel" },
+  { label: "Unknown", value: "unknown" },
 ] as const;
 
 type SwipeCollectionSelectorProps = {
@@ -102,6 +115,7 @@ function SwipeAssetRow({
   disabled?: boolean;
 }) {
   const previewUrl = resolveSwipePreviewUrl(swipe);
+  const assetType = resolveSwipeAssetType(swipe);
 
   return (
     <label
@@ -139,6 +153,7 @@ function SwipeAssetRow({
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {swipe.analysis_status ? <Badge tone={swipe.analysis_status === "ready" ? "success" : "neutral"}>{swipe.analysis_status}</Badge> : null}
+          <Badge tone="neutral">{formatSwipeAssetTypeLabel(assetType)}</Badge>
           {swipe.channel ? <Badge tone="neutral">{swipe.channel}</Badge> : null}
           {swipe.funnel_stage ? <Badge tone="neutral">{swipe.funnel_stage}</Badge> : null}
           <Badge tone="neutral">{swipe.id.slice(0, 8)}</Badge>
@@ -188,6 +203,8 @@ export function SwipeCollectionSelector({
   const [selectedAvailableSwipeIds, setSelectedAvailableSwipeIds] = useState<string[]>([]);
   const [availableSearch, setAvailableSearch] = useState("");
   const [collectionSearch, setCollectionSearch] = useState("");
+  const [availableAssetTypeFilter, setAvailableAssetTypeFilter] = useState<SwipeAssetTypeFilter>("all");
+  const [collectionAssetTypeFilter, setCollectionAssetTypeFilter] = useState<SwipeAssetTypeFilter>("all");
   const [addPending, setAddPending] = useState(false);
   const [removingSwipeIds, setRemovingSwipeIds] = useState<string[]>([]);
 
@@ -232,6 +249,8 @@ export function SwipeCollectionSelector({
     if (!manageOpen) {
       setAvailableSearch("");
       setCollectionSearch("");
+      setAvailableAssetTypeFilter("all");
+      setCollectionAssetTypeFilter("all");
       setSelectedAvailableSwipeIds([]);
       return;
     }
@@ -274,15 +293,18 @@ export function SwipeCollectionSelector({
   );
   const filteredCollectionSwipes = useMemo(() => {
     const searchTerm = collectionSearch.trim().toLowerCase();
-    return currentCollectionSwipes.filter((swipe) => matchesSwipeSearch(swipe, searchTerm));
-  }, [collectionSearch, currentCollectionSwipes]);
+    return currentCollectionSwipes
+      .filter((swipe) => matchesSwipeSearch(swipe, searchTerm))
+      .filter((swipe) => matchesSwipeAssetTypeFilter(swipe, collectionAssetTypeFilter));
+  }, [collectionAssetTypeFilter, collectionSearch, currentCollectionSwipes]);
   const filteredAvailableSwipes = useMemo(() => {
     const searchTerm = availableSearch.trim().toLowerCase();
     return companySwipes
       .filter((swipe) => !currentCollectionSwipeIds.has(swipe.id))
       .filter((swipe) => matchesSwipeSearch(swipe, searchTerm))
+      .filter((swipe) => matchesSwipeAssetTypeFilter(swipe, availableAssetTypeFilter))
       .slice(0, 60);
-  }, [availableSearch, companySwipes, currentCollectionSwipeIds]);
+  }, [availableAssetTypeFilter, availableSearch, companySwipes, currentCollectionSwipeIds]);
 
   const invalidateCollectionData = async (collectionId?: string | null) => {
     await queryClient.invalidateQueries({ queryKey: SWIPE_COLLECTIONS_QUERY_KEY });
@@ -582,6 +604,13 @@ export function SwipeCollectionSelector({
                   onChange={(event) => setCollectionSearch(event.target.value)}
                   placeholder="Filter current swipes"
                 />
+                <div className="mt-2">
+                  <Select
+                    value={collectionAssetTypeFilter}
+                    onValueChange={(value) => setCollectionAssetTypeFilter(value as SwipeAssetTypeFilter)}
+                    options={SWIPE_ASSET_TYPE_FILTER_OPTIONS.map((option) => ({ ...option }))}
+                  />
+                </div>
                 <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
                   {filteredCollectionSwipes.length ? (
                     filteredCollectionSwipes.map((swipe) => (
@@ -637,6 +666,13 @@ export function SwipeCollectionSelector({
                       onChange={(event) => setAvailableSearch(event.target.value)}
                       placeholder="Filter saved swipes"
                     />
+                    <div className="mt-2">
+                      <Select
+                        value={availableAssetTypeFilter}
+                        onValueChange={(value) => setAvailableAssetTypeFilter(value as SwipeAssetTypeFilter)}
+                        options={SWIPE_ASSET_TYPE_FILTER_OPTIONS.map((option) => ({ ...option }))}
+                      />
+                    </div>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <div className="text-xs text-content-muted">
                         Showing up to {filteredAvailableSwipes.length} matching swipes not already in this collection.

@@ -9,9 +9,9 @@ from app.config import settings
 
 
 DEFAULT_GETHOOKD_MAX_PAGES_PER_RUN = max(
-    int(getattr(settings, "GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN", 1) or 1), 1
+    int(getattr(settings, "GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN", 0) or 0), 0
 )
-DEFAULT_GETHOOKD_PER_PAGE = max(int(getattr(settings, "GETHOOKD_EXPLORE_PAGE_SIZE", 10) or 10), 1)
+DEFAULT_GETHOOKD_PER_PAGE = max(int(getattr(settings, "GETHOOKD_EXPLORE_PAGE_SIZE", 20) or 20), 1)
 
 class GetHookdCredentialsRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -74,6 +74,20 @@ class GetHookdSyncFeedBase(BaseModel):
             raise ValueError("name is required.")
         return cleaned
 
+    @field_validator("max_pages_per_run")
+    @classmethod
+    def _validate_max_pages_per_run(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("maxPagesPerRun must be 0 or greater.")
+        return value
+
+    @field_validator("per_page")
+    @classmethod
+    def _validate_per_page(cls, value: int) -> int:
+        if value < 1 or value > 100:
+            raise ValueError("perPage must be between 1 and 100.")
+        return value
+
 
 class GetHookdSyncFeedCreateRequest(GetHookdSyncFeedBase):
     pass
@@ -99,6 +113,24 @@ class GetHookdSyncFeedUpdateRequest(BaseModel):
         validation_alias="perPage",
         serialization_alias="perPage",
     )
+
+    @field_validator("max_pages_per_run")
+    @classmethod
+    def _validate_optional_max_pages_per_run(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if value < 0:
+            raise ValueError("maxPagesPerRun must be 0 or greater.")
+        return value
+
+    @field_validator("per_page")
+    @classmethod
+    def _validate_optional_per_page(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if value < 1 or value > 100:
+            raise ValueError("perPage must be between 1 and 100.")
+        return value
 
 
 class GetHookdSyncFeedResponse(GetHookdSyncFeedBase):

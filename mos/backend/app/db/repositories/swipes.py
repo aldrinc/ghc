@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -37,6 +37,73 @@ REVIEW_STATUS_PENDING = GETHOOKD_REVIEW_STATUS_PENDING
 REVIEW_STATUS_APPROVED = GETHOOKD_REVIEW_STATUS_APPROVED
 REVIEW_STATUS_REJECTED = GETHOOKD_REVIEW_STATUS_REJECTED
 REVIEW_STATUS_STALE = GETHOOKD_REVIEW_STATUS_STALE
+
+_KNOWN_SWIPE_AD_UNIT_FORMATS = {"image", "video", "carousel"}
+
+
+def _normalize_swipe_ad_unit_format(value: object) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if normalized in _KNOWN_SWIPE_AD_UNIT_FORMATS:
+        return normalized
+    return None
+
+
+def _normalize_swipe_media_type(value: object) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"image", "video"}:
+        return normalized
+    return None
+
+
+def _resolve_company_swipe_media_type(media: CompanySwipeMedia) -> str | None:
+    for candidate in (
+        getattr(media, "type", None),
+        getattr(media, "_resolved_asset_type", None),
+    ):
+        normalized = _normalize_swipe_media_type(candidate)
+        if normalized:
+            return normalized
+
+    mime_type = str(getattr(media, "mime_type", None) or "").strip().lower()
+    if mime_type.startswith("image/"):
+        return "image"
+    if mime_type.startswith("video/"):
+        return "video"
+
+    video_length = getattr(media, "video_length", None)
+    if isinstance(video_length, int) and video_length > 0:
+        return "video"
+    return None
+
+
+def infer_swipe_asset_ad_unit_format(
+    *,
+    ad_unit_format: object,
+    media_items: Sequence[CompanySwipeMedia] | None = None,
+) -> str | None:
+    normalized_format = _normalize_swipe_ad_unit_format(ad_unit_format)
+    if normalized_format:
+        return normalized_format
+
+    if not media_items:
+        return None
+
+    video_count = 0
+    image_count = 0
+    for media in media_items:
+        media_type = _resolve_company_swipe_media_type(media)
+        if media_type == "video":
+            video_count += 1
+        elif media_type == "image":
+            image_count += 1
+
+    if video_count:
+        return "video"
+    if image_count > 1:
+        return "carousel"
+    if image_count == 1:
+        return "image"
+    return None
 
 
 class CompanySwipesRepository:
@@ -284,6 +351,7 @@ class CompanySwipesRepository:
         limit: int = 50,
         offset: int = 0,
         collection_id: str | None = None,
+        client_id: str | None = None,
         review_status: str | None = None,
         origin_system: str | None = None,
         search: str | None = None,
@@ -300,6 +368,11 @@ class CompanySwipesRepository:
             ).where(
                 SwipeCollectionItem.org_id == org_id,
                 SwipeCollectionItem.collection_id == collection_id,
+            )
+
+        if client_id:
+            stmt = stmt.where(
+                CompanySwipeAsset.source_metadata_json.contains({"client_ids": [client_id]})
             )
 
         if review_status is not None:
@@ -703,9 +776,18 @@ class SwipeCollectionsRepository:
             for collection_id, count in self.session.execute(stmt).all()
         }
 
-    def ready_asset_ids(self, *, org_id: str, collection_id: str) -> list[str]:
+    def ready_asset_ids(
+        self,
+        *,
+        org_id: str,
+        collection_id: str,
+        ad_unit_formats: Sequence[str] | None = None,
+    ) -> list[str]:
         stmt = (
-            select(CompanySwipeAsset.id)
+            select(
+                CompanySwipeAsset.id,
+                CompanySwipeAsset.ad_unit_format,
+            )
             .join(
                 SwipeCollectionItem,
                 SwipeCollectionItem.swipe_asset_id == CompanySwipeAsset.id,
@@ -718,7 +800,37 @@ class SwipeCollectionsRepository:
             )
             .order_by(CompanySwipeAsset.created_at.desc())
         )
-        return [str(asset_id) for asset_id in self.session.scalars(stmt).all()]
+        rows = list(self.session.execute(stmt).all())
+        if not ad_unit_formats:
+            return [str(asset_id) for asset_id, _ad_unit_format in rows]
+
+        normalized_formats = {
+            normalized
+            for value in ad_unit_formats
+            if (normalized := _normalize_swipe_ad_unit_format(value))
+        }
+        if not normalized_formats:
+            return [str(asset_id) for asset_id, _ad_unit_format in rows]
+
+        unresolved_asset_ids = [
+            str(asset_id)
+            for asset_id, ad_unit_format in rows
+            if _normalize_swipe_ad_unit_format(ad_unit_format) is None
+        ]
+        media_by_asset_id = CompanySwipesRepository(self.session).list_media_for_assets(
+            org_id=org_id,
+            swipe_asset_ids=unresolved_asset_ids,
+        )
+
+        matched_asset_ids: list[str] = []
+        for asset_id, ad_unit_format in rows:
+            resolved_format = infer_swipe_asset_ad_unit_format(
+                ad_unit_format=ad_unit_format,
+                media_items=media_by_asset_id.get(str(asset_id), []),
+            )
+            if resolved_format in normalized_formats:
+                matched_asset_ids.append(str(asset_id))
+        return matched_asset_ids
 
 
 class ClientSwipesRepository:

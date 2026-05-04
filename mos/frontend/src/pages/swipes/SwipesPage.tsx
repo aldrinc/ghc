@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { useCompanySwipes, useSwipeCollections, useSwipeReviewApi } from "@/api/swipes";
+import { useGetHookdInbox, useSwipeCollections, useSwipeReviewApi } from "@/api/swipes";
 import { AssetReviewGrid } from "@/components/review/AssetReviewGrid";
 import { SwipeDetailPanel } from "@/components/review/SwipeDetailPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Select } from "@/components/ui/select";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { normalizeSwipeToAssetReviewItem } from "@/lib/assetReviewNormalizers";
 import type { AssetReviewItem } from "@/types/assetReview";
 
@@ -18,13 +19,31 @@ function getErrorMessage(err: unknown) {
 }
 
 export function SwipesPage() {
+  const { workspace } = useWorkspace();
+  const reviewLimit = 10;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [targetCollectionId, setTargetCollectionId] = useState("");
   const [detailItem, setDetailItem] = useState<AssetReviewItem | null>(null);
 
-  const { data: swipes = [], isLoading, error } = useCompanySwipes({ source: "gethookd" });
+  const { data: inbox, isLoading, error } = useGetHookdInbox(
+    workspace?.id,
+    reviewLimit,
+    Boolean(workspace),
+  );
   const { data: collections = [] } = useSwipeCollections();
   const { approveSwipes, rejectSwipes, markPendingSwipes } = useSwipeReviewApi();
+  const swipes = inbox?.swipes ?? [];
+  const summary = inbox?.summary ?? {
+    latestRunId: null,
+    latestRunStartedAt: null,
+    rawImportedCount: 0,
+    eligibleStaticImageCount: 0,
+    duplicateCollapsedCount: 0,
+    excludedNonStaticCount: 0,
+    reviewLimit,
+    returnedCount: 0,
+    defaultAssetType: "image" as const,
+  };
 
   const launchableCollections = useMemo(
     () => collections.filter((c) => c.kind === "uploaded" || c.kind === "curated"),
@@ -46,13 +65,17 @@ export function SwipesPage() {
 
   const stats = useMemo(
     () => ({
-      total: swipes.length,
+      total: summary.rawImportedCount,
+      reviewable: summary.eligibleStaticImageCount,
+      duplicates: summary.duplicateCollapsedCount,
+      excluded: summary.excludedNonStaticCount,
+      returned: summary.returnedCount,
       pending: swipes.filter((s) => s.review_status === "pending_review").length,
       approved: swipes.filter((s) => s.review_status === "approved").length,
       rejected: swipes.filter((s) => s.review_status === "rejected").length,
       stale: swipes.filter((s) => s.review_status === "stale_after_sync").length,
     }),
-    [swipes],
+    [summary, swipes],
   );
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
@@ -86,6 +109,24 @@ export function SwipesPage() {
     [markPendingSwipes],
   );
 
+  if (!workspace) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
+            <p className="text-sm text-content-muted">
+              Select a workspace to review GetHookd swipes for that workspace.
+            </p>
+          </div>
+        </div>
+        <Callout variant="default" size="sm" title="Workspace required">
+          Choose a workspace from the sidebar before opening GetHookd Collections.
+        </Callout>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -93,17 +134,35 @@ export function SwipesPage() {
         <div>
           <h2 className="text-xl font-semibold text-content">GetHookd review inbox</h2>
           <p className="text-sm text-content-muted">
-            Review nightly-synced reference ads, then promote approved items into launchable collections.
+            Review nightly-synced reference ads for {workspace.name}, then promote approved items into
+            launchable collections.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge tone="neutral">{stats.total} total</Badge>
+          <Badge tone="neutral">{stats.total} raw imported</Badge>
+          <Badge tone="success">{stats.reviewable} exact statics</Badge>
+          <Badge tone="neutral">{stats.duplicates} duplicates collapsed</Badge>
+          <Badge tone="neutral">{stats.excluded} excluded non-static</Badge>
+          <Badge tone="neutral">{stats.returned} in review set</Badge>
           <Badge tone="warning">{stats.pending} pending</Badge>
           <Badge tone="success">{stats.approved} approved</Badge>
           <Badge tone="danger">{stats.rejected} rejected</Badge>
           <Badge tone="warning">{stats.stale} stale</Badge>
         </div>
       </div>
+
+      {summary.latestRunId ? (
+        <Callout variant="default" size="sm" title="Latest GetHookd run">
+          Showing the top {summary.returnedCount} exact static images from the latest workspace sync.
+          Imported {summary.rawImportedCount} raw ads, kept {summary.eligibleStaticImageCount} exact
+          statics, collapsed {summary.duplicateCollapsedCount} duplicates, excluded{" "}
+          {summary.excludedNonStaticCount} non-static ads.
+        </Callout>
+      ) : (
+        <Callout variant="default" size="sm" title="No GetHookd sync yet">
+          Run a GetHookd sync for this workspace before opening the review inbox.
+        </Callout>
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 ? (
@@ -187,7 +246,8 @@ export function SwipesPage() {
           onSelectionChange={setSelectedIds}
           onCardClick={handleCardClick}
           availablePlatforms={availablePlatforms}
-          emptyMessage="No GetHookd swipes match the current filters."
+          initialFilters={{ assetType: "image" }}
+          emptyMessage="No exact static images are available in the latest GetHookd run."
         />
       )}
 
