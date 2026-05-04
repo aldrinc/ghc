@@ -18,6 +18,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.models import Campaign, SwipeCollectionItem, WorkflowRun
+from app.db.repositories.gethookd import GetHookdSyncRunsRepository
 from app.db.repositories.swipes import (
     GETHOOKD_INBOX_COLLECTION_KIND,
     GETHOOKD_ORIGIN_SYSTEM,
@@ -26,6 +27,7 @@ from app.db.repositories.swipes import (
     CompanySwipesRepository,
     ClientSwipesRepository,
     SwipeCollectionsRepository,
+    infer_swipe_asset_ad_unit_format,
 )
 from app.schemas.gethookd import SwipeReviewBulkRequest
 from app.db.repositories.workflows import WorkflowsRepository
@@ -33,6 +35,7 @@ from app.schemas.swipe_assets import (
     ClientSwipeAssetModel,
     CompanySwipeAssetModel,
     CompanySwipeMediaModel,
+    GetHookdInboxResponseModel,
     SwipeAssetUpdateRequest,
     SwipeCollectionCloneRequest,
     SwipeCollectionCreateRequest,
@@ -71,6 +74,71 @@ class _StoredSwipeUpload:
     size_bytes: int
     width: int
     height: int
+
+
+def _normalize_swipe_duplicate_text(value: object) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _swipe_duplicate_media_key(media_items: list | None) -> str:
+    if not media_items:
+        return ""
+    first_media = media_items[0]
+    media_asset_id = str(getattr(first_media, "media_asset_id", "") or "").strip()
+    if media_asset_id:
+        return f"media_asset:{media_asset_id}"
+    for candidate in (
+        getattr(first_media, "url", None),
+        getattr(first_media, "download_url", None),
+        getattr(first_media, "thumbnail_url", None),
+        getattr(first_media, "path", None),
+    ):
+        normalized = str(candidate or "").strip()
+        if normalized:
+            return normalized
+    return ""
+
+
+def _swipe_duplicate_fingerprint(asset, media_items: list | None) -> str:
+    digest = hashlib.sha256()
+    parts = [
+        _swipe_duplicate_media_key(media_items),
+        _normalize_swipe_duplicate_text(getattr(asset, "title", None)),
+        _normalize_swipe_duplicate_text(getattr(asset, "body", None)),
+        _normalize_swipe_duplicate_text(getattr(asset, "cta_text", None)),
+        _normalize_swipe_duplicate_text(getattr(asset, "landing_page", None)),
+    ]
+    digest.update("\n".join(parts).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _swipe_duplicate_rank(asset) -> tuple[int, int, int, str]:
+    return (
+        int(getattr(asset, "used_count", 0) or 0),
+        int(getattr(asset, "performance_score", 0) or 0),
+        int(getattr(asset, "days_active", 0) or 0),
+        str(getattr(asset, "id", "") or ""),
+    )
+
+
+def _dedupe_review_swipes(assets: list, media_map: dict[str, list]) -> tuple[list, int]:
+    first_seen_order: list[str] = []
+    by_fingerprint: dict[str, object] = {}
+    duplicate_count = 0
+
+    for asset in assets:
+        asset_id = str(getattr(asset, "id", "") or "")
+        fingerprint = _swipe_duplicate_fingerprint(asset, media_map.get(asset_id, []))
+        existing = by_fingerprint.get(fingerprint)
+        if existing is None:
+            by_fingerprint[fingerprint] = asset
+            first_seen_order.append(fingerprint)
+            continue
+        duplicate_count += 1
+        if _swipe_duplicate_rank(asset) > _swipe_duplicate_rank(existing):
+            by_fingerprint[fingerprint] = asset
+
+    return [by_fingerprint[fingerprint] for fingerprint in first_seen_order], duplicate_count
 
 
 def _resolve_swipe_upload_content_type_or_400(file: UploadFile) -> str:
@@ -478,6 +546,7 @@ async def _start_swipe_image_ad_run(
 @router.get("/company")
 def list_company_swipes(
     collection_id: str | None = None,
+    client_id: str | None = None,
     source: str | None = None,
     review_status: str | None = None,
     search: str | None = None,
@@ -505,6 +574,7 @@ def list_company_swipes(
         limit=500,
         offset=0,
         collection_id=collection_id,
+        client_id=client_id,
         review_status=normalized_review_status,
         origin_system=origin_system,
         search=search,
@@ -515,6 +585,107 @@ def list_company_swipes(
         org_id=auth.org_id, swipe_asset_ids=[str(asset.id) for asset in assets]
     )
     return jsonable_encoder([_serialize_asset(asset, media_map) for asset in assets])
+
+
+@router.get("/gethookd-inbox")
+def get_gethookd_review_inbox(
+    client_id: str,
+    review_limit: int = 10,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    if review_limit < 1 or review_limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="review_limit must be between 1 and 100.",
+        )
+
+    runs_repo = GetHookdSyncRunsRepository(session)
+    latest_run = runs_repo.latest_for_client(
+        org_id=auth.org_id,
+        client_id=client_id,
+        statuses=["completed"],
+    )
+
+    if latest_run is None:
+        payload = GetHookdInboxResponseModel.model_validate(
+            {
+                "summary": {
+                    "latestRunId": None,
+                    "latestRunStartedAt": None,
+                    "rawImportedCount": 0,
+                    "eligibleStaticImageCount": 0,
+                    "duplicateCollapsedCount": 0,
+                    "excludedNonStaticCount": 0,
+                    "reviewLimit": review_limit,
+                    "returnedCount": 0,
+                    "defaultAssetType": "image",
+                },
+                "swipes": [],
+            }
+        )
+        return jsonable_encoder(payload)
+
+    repo = CompanySwipesRepository(session)
+    assets = repo.list_assets_with_review_filters(
+        org_id=auth.org_id,
+        limit=500,
+        offset=0,
+        client_id=client_id,
+        origin_system=GETHOOKD_ORIGIN_SYSTEM,
+    )
+    latest_run_id = str(latest_run.id)
+    latest_run_assets = [
+        asset
+        for asset in assets
+        if isinstance(getattr(asset, "source_metadata_json", None), dict)
+        and str((asset.source_metadata_json or {}).get("run_id") or "").strip() == latest_run_id
+    ]
+
+    # Preserve upstream ranking as closely as we can by keeping first-import order within the run.
+    latest_run_assets.sort(
+        key=lambda asset: getattr(asset, "created_at", None) or getattr(asset, "updated_at", None)
+    )
+
+    media_map = repo.list_media_for_assets(
+        org_id=auth.org_id,
+        swipe_asset_ids=[str(asset.id) for asset in latest_run_assets],
+    )
+
+    eligible_assets = [
+        asset
+        for asset in latest_run_assets
+        if infer_swipe_asset_ad_unit_format(
+            ad_unit_format=asset.ad_unit_format,
+            media_items=media_map.get(str(asset.id), []),
+        )
+        == "image"
+    ]
+    deduped_eligible_assets, duplicate_collapsed_count = _dedupe_review_swipes(
+        eligible_assets,
+        media_map,
+    )
+    review_assets = deduped_eligible_assets[:review_limit]
+
+    payload = GetHookdInboxResponseModel.model_validate(
+        {
+            "summary": {
+                "latestRunId": latest_run_id,
+                "latestRunStartedAt": latest_run.started_at,
+                "rawImportedCount": len(latest_run_assets),
+                "eligibleStaticImageCount": len(eligible_assets),
+                "duplicateCollapsedCount": duplicate_collapsed_count,
+                "excludedNonStaticCount": max(len(latest_run_assets) - len(eligible_assets), 0),
+                "reviewLimit": review_limit,
+                "returnedCount": len(review_assets),
+                "defaultAssetType": "image",
+            },
+            "swipes": [
+                _serialize_asset(asset, media_map).model_dump(mode="json") for asset in review_assets
+            ],
+        }
+    )
+    return jsonable_encoder(payload)
 
 
 @router.get("/client/{client_id}")

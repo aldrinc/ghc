@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 import httpx
 
@@ -76,20 +76,160 @@ class GetHookdAdResult:
 
 @dataclass
 class GetHookdExploreFilters:
-    """Filters for GetHookd Explore API."""
+    """Pass-through filters for GetHookd Explore API."""
 
     query: str = ""
-    platforms: str = "facebook,instagram"
-    niche: Optional[str] = None
+    sort_column: Optional[str] = None
+    sort_direction: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    status: Optional[str] = None
     ad_format: Optional[str] = None
-    location: Optional[str] = None
+    run_time: Optional[int] = None
     language: Optional[str] = None
-    performance_scores: str = "winning,optimized"
-    status: str = "active"
-    sort_column: str = "days_active"
-    sort_direction: str = "desc"
-    ads_per_brand_limit: int = 3
+    platform: Optional[str] = None
+    niche: Optional[str] = None
+    performance_scores: Optional[str] = None
+    used_count: Optional[int] = None
+    video_lengths: Optional[str] = None
+    eu_transparency: Optional[int] = None
+    eu_total_reach: Optional[int] = None
+    gender_audience: Optional[str] = None
+    age_audience: Optional[str] = None
+    location: Optional[str] = None
+    ad_spend_range: Optional[str] = None
+    excluded_brands: Optional[str] = None
+    creative_categories: Optional[str] = None
+    cta_types: Optional[str] = None
     active_ads_count: Optional[int] = None
+    ads_per_brand_limit: Optional[int] = None
+
+    @classmethod
+    def from_filter_dict(cls, filters: Mapping[str, Any] | None) -> "GetHookdExploreFilters":
+        source = dict(filters or {})
+
+        def read_text(primary: str, *aliases: str) -> Optional[str]:
+            for key in (primary, *aliases):
+                if key in source:
+                    raw = source.get(key)
+                    if raw is None:
+                        return None
+                    cleaned = str(raw).strip()
+                    return cleaned or None
+            return None
+
+        def read_int(primary: str, *aliases: str) -> Optional[int]:
+            raw_text = read_text(primary, *aliases)
+            if raw_text is None:
+                return None
+            try:
+                return int(raw_text)
+            except ValueError as exc:
+                raise GetHookdClientError(
+                    f"Invalid GetHookd filter '{primary}': expected integer, got {raw_text!r}"
+                ) from exc
+
+        return cls(
+            query=read_text("query") or "",
+            sort_column=read_text("sort_column"),
+            sort_direction=read_text("sort_direction"),
+            start_date=read_text("start_date", "start-date"),
+            end_date=read_text("end_date", "end-date"),
+            status=read_text("status"),
+            ad_format=read_text("ad_format", "ad-format"),
+            run_time=read_int("run_time", "run-time"),
+            language=read_text("language"),
+            platform=read_text("platform", "platforms"),
+            niche=read_text("niche"),
+            performance_scores=read_text("performance_scores"),
+            used_count=read_int("used_count"),
+            video_lengths=read_text("video_lengths"),
+            eu_transparency=read_int("eu_transparency"),
+            eu_total_reach=read_int("eu_total_reach"),
+            gender_audience=read_text("gender_audience"),
+            age_audience=read_text("age_audience"),
+            location=read_text("location"),
+            ad_spend_range=read_text("ad_spend_range"),
+            excluded_brands=read_text("excluded_brands"),
+            creative_categories=read_text("creative_categories"),
+            cta_types=read_text("cta_types"),
+            active_ads_count=read_int("active_ads_count"),
+            ads_per_brand_limit=read_int("ads_per_brand_limit"),
+        )
+
+    def to_query_params(self, *, page: int, per_page: int) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "page": page,
+            "per_page": per_page,
+        }
+
+        text_fields = {
+            "query": self.query,
+            "sort_column": self.sort_column,
+            "sort_direction": self.sort_direction,
+            "start-date": self.start_date,
+            "end-date": self.end_date,
+            "status": self.status,
+            "ad-format": self.ad_format,
+            "language": self.language,
+            "platform": self.platform,
+            "niche": self.niche,
+            "performance_scores": self.performance_scores,
+            "video_lengths": self.video_lengths,
+            "gender_audience": self.gender_audience,
+            "age_audience": self.age_audience,
+            "location": self.location,
+            "ad_spend_range": self.ad_spend_range,
+            "excluded_brands": self.excluded_brands,
+            "creative_categories": self.creative_categories,
+            "cta_types": self.cta_types,
+        }
+        for key, value in text_fields.items():
+            if value is None:
+                continue
+            cleaned = str(value).strip()
+            if cleaned:
+                params[key] = cleaned
+
+        int_fields = {
+            "run-time": self.run_time,
+            "used_count": self.used_count,
+            "eu_transparency": self.eu_transparency,
+            "eu_total_reach": self.eu_total_reach,
+            "active_ads_count": self.active_ads_count,
+            "ads_per_brand_limit": self.ads_per_brand_limit,
+        }
+        for key, value in int_fields.items():
+            if value is not None:
+                params[key] = int(value)
+
+        return params
+
+
+@dataclass
+class GetHookdExplorePage:
+    """A single GetHookd Explore page response."""
+
+    items: list[GetHookdAdResult]
+    raw_items_count: int
+    current_page: Optional[int]
+    last_page: Optional[int]
+    total: Optional[int]
+    next_url: Optional[str]
+    previous_url: Optional[str]
+    used_credits: float
+    remaining_credits: Optional[float]
+    sorting: dict[str, Any]
+    filters: dict[str, Any]
+    raw_payload: dict[str, Any]
+
+    @property
+    def has_next_page(self) -> bool:
+        return bool(self.next_url) or (
+            self.current_page is not None
+            and self.last_page is not None
+            and self.current_page < self.last_page
+        )
 
 
 class GetHookdClient:
@@ -150,39 +290,11 @@ class GetHookdClient:
         filters: GetHookdExploreFilters,
         page: int = 1,
         per_page: int = settings.GETHOOKD_EXPLORE_PAGE_SIZE,
-    ) -> list[GetHookdAdResult]:
+    ) -> GetHookdExplorePage:
         """
         Fetch ads from GetHookd Explore API.
         """
-        params: dict[str, Any] = {
-            "page": page,
-            "per_page": per_page,
-        }
-
-        if filters.query:
-            params["query"] = filters.query
-        if filters.platforms:
-            params["platform"] = filters.platforms
-        if filters.niche:
-            params["niche"] = filters.niche
-        if filters.ad_format:
-            params["ad-format"] = filters.ad_format
-        if filters.location:
-            params["location"] = filters.location
-        if filters.language:
-            params["language"] = filters.language
-        if filters.performance_scores:
-            params["performance_scores"] = filters.performance_scores
-        if filters.status:
-            params["status"] = filters.status
-        if filters.sort_column:
-            params["sort_column"] = filters.sort_column
-        if filters.sort_direction:
-            params["sort_direction"] = filters.sort_direction
-        if filters.ads_per_brand_limit:
-            params["ads_per_brand_limit"] = filters.ads_per_brand_limit
-        if filters.active_ads_count:
-            params["active_ads_count"] = filters.active_ads_count
+        params = filters.to_query_params(page=page, per_page=per_page)
 
         try:
             with httpx.Client(timeout=self.timeout_seconds) as client:
@@ -210,13 +322,56 @@ class GetHookdClient:
                     )
                 results = payload.get("data") if isinstance(payload, dict) else None
                 if results is None:
-                    return []
+                    return GetHookdExplorePage(
+                        items=[],
+                        raw_items_count=0,
+                        current_page=None,
+                        last_page=None,
+                        total=None,
+                        next_url=None,
+                        previous_url=None,
+                        used_credits=0.0,
+                        remaining_credits=None,
+                        sorting={},
+                        filters={},
+                        raw_payload=payload if isinstance(payload, dict) else {},
+                    )
                 if not isinstance(results, list):
                     raise GetHookdClientError(
                         "GetHookd explore response returned an invalid data payload"
                     )
                 parsed = self._parse_results(results)
-                return parsed[: max(int(per_page or 0), 0)]
+                meta = payload.get("meta") if isinstance(payload, dict) else None
+                links = payload.get("links") if isinstance(payload, dict) else None
+                sorting = payload.get("sorting") if isinstance(payload, dict) else None
+                response_filters = payload.get("filters") if isinstance(payload, dict) else None
+                return GetHookdExplorePage(
+                    items=parsed,
+                    raw_items_count=len(results),
+                    current_page=_coerce_optional_int(meta.get("current_page"))
+                    if isinstance(meta, dict)
+                    else None,
+                    last_page=_coerce_optional_int(meta.get("last_page"))
+                    if isinstance(meta, dict)
+                    else None,
+                    total=_coerce_optional_int(meta.get("total")) if isinstance(meta, dict) else None,
+                    next_url=str(links.get("next")).strip()
+                    if isinstance(links, dict) and links.get("next")
+                    else None,
+                    previous_url=str(links.get("prev")).strip()
+                    if isinstance(links, dict) and links.get("prev")
+                    else None,
+                    used_credits=_coerce_optional_float(
+                        payload.get("used_credits") if isinstance(payload, dict) else None
+                    )
+                    or 0.0,
+                    remaining_credits=_coerce_optional_float(
+                        payload.get("remaining_credits") if isinstance(payload, dict) else None
+                    ),
+                    sorting=sorting if isinstance(sorting, dict) else {},
+                    filters=response_filters if isinstance(response_filters, dict) else {},
+                    raw_payload=payload if isinstance(payload, dict) else {},
+                )
         except httpx.HTTPError as exc:
             raise GetHookdClientError(f"Failed to fetch ads: {exc}") from exc
 
@@ -281,3 +436,21 @@ def create_gethookd_client(
         base_url=base_url,
         timeout_seconds=timeout_seconds,
     )
+
+
+def _coerce_optional_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_optional_float(value: Any) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

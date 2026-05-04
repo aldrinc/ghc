@@ -122,17 +122,31 @@ export interface PostizCreatePostInput {
 
 export interface GetHookdSyncFeedFilters {
   query?: string;
-  platforms?: string;
-  niche?: string;
+  sort_column?: "created_at" | "start_date" | "days_active" | "used_count";
+  sort_direction?: "asc" | "desc";
+  start_date?: string;
+  end_date?: string;
+  status?: "active" | "inactive";
   ad_format?: string;
-  location?: string;
+  run_time?: number;
   language?: string;
+  platform?: string;
+  niche?: string;
+  location?: string;
   performance_scores?: string;
-  status?: string;
-  sort_column?: string;
-  sort_direction?: string;
+  used_count?: number;
+  video_lengths?: string;
+  eu_transparency?: number;
+  eu_total_reach?: number;
+  gender_audience?: string;
+  age_audience?: string;
+  ad_spend_range?: string;
+  excluded_brands?: string;
+  creative_categories?: string;
+  cta_types?: string;
   ads_per_brand_limit?: number;
   active_ads_count?: number;
+  platforms?: string;
 }
 
 export interface GetHookdSyncFeed {

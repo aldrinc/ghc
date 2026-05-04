@@ -4,6 +4,7 @@
  */
 
 import type { MediaAsset } from "./library";
+import type { SwipeAssetType, SwipeAssetTypeFilter } from "./swipes";
 
 export type ReviewStatus = "pending_review" | "approved" | "rejected" | "stale_after_sync";
 
@@ -55,6 +56,7 @@ export interface AssetReviewItem {
   // Landing/destination
   destinationUrl?: string;
   destinationHostname?: string;
+  assetType?: SwipeAssetType;
   
   // Status
   status?: "active" | "inactive" | "unknown";
@@ -73,6 +75,7 @@ export interface AssetReviewFilterState {
   inLaunchCollection: boolean | null; // null = all, true = in launch, false = not in launch
   changedSince: "last_sync" | "last_7_days" | "all";
   platform: string | "all";
+  assetType: SwipeAssetTypeFilter;
 }
 
 /**

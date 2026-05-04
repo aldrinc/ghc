@@ -30,6 +30,14 @@ const CHANGE_OPTIONS = [
   { label: "Changed in last 7 days", value: "last_7_days" },
 ] as const;
 
+const ASSET_TYPE_OPTIONS = [
+  { label: "All asset types", value: "all" },
+  { label: "Static images", value: "image" },
+  { label: "Videos", value: "video" },
+  { label: "Carousels", value: "carousel" },
+  { label: "Unknown", value: "unknown" },
+] as const;
+
 const DEFAULT_FILTER_STATE: AssetReviewFilterState = {
   search: "",
   reviewStatus: "all",
@@ -37,6 +45,7 @@ const DEFAULT_FILTER_STATE: AssetReviewFilterState = {
   inLaunchCollection: null,
   changedSince: "all",
   platform: "all",
+  assetType: "all",
 };
 
 function summarizeCounts(totalCount: number, filteredCount: number) {
@@ -138,6 +147,20 @@ export function AssetReviewToolbar({
             }
           >
             {CHANGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="h-9 rounded-md border border-border bg-surface px-2.5 text-xs text-content"
+            value={filters.assetType}
+            onChange={(event) =>
+              update({ assetType: event.target.value as AssetReviewFilterState["assetType"] })
+            }
+          >
+            {ASSET_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

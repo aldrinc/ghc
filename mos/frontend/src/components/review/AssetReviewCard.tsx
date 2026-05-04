@@ -51,8 +51,8 @@ function sourceTone(source: AssetReviewItem["source"]): "accent" | "neutral" {
 }
 
 /**
- * All review cards use a consistent 4/5 aspect so rows align evenly.
- * The underlying media is object-cover'd, so nothing gets distorted.
+ * Review cards keep a consistent 4/5 frame so rows stay aligned, but the media
+ * itself is contained so the full creative remains visible inside that frame.
  */
 const CARD_ASPECT = "4/5" as const;
 
@@ -111,7 +111,7 @@ export function AssetReviewCard({
           <Badge tone={sourceTone(item.source)}>{sourceLabel(item.source)}</Badge>
         </div>
 
-        <SwipeMedia media={item.media} aspect={CARD_ASPECT} onOpen={() => onClick(item)} />
+        <SwipeMedia media={item.media} aspect={CARD_ASPECT} fit="contain" onOpen={() => onClick(item)} />
       </div>
 
       <div

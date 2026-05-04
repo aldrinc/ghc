@@ -68,7 +68,7 @@ class GetHookdSyncActivityOutput:
     assets_updated: int
     assets_marked_stale: int
     assets_failed: int
-    credits_used: int
+    credits_used: float
     error_summary: Optional[str] = None
 
 
@@ -117,6 +117,54 @@ def _media_signature_from_rows(media_rows: list[CompanySwipeMedia]) -> list[tupl
         for media in media_rows
         if str(media.url or media.download_url or "").strip()
     ]
+
+
+def _dedupe_non_empty_strings(*groups: object) -> list[str]:
+    values: list[str] = []
+    for group in groups:
+        if isinstance(group, str):
+            normalized = group.strip()
+            if normalized and normalized not in values:
+                values.append(normalized)
+            continue
+        if isinstance(group, list):
+            for item in group:
+                normalized = str(item or "").strip()
+                if normalized and normalized not in values:
+                    values.append(normalized)
+    return values
+
+
+def _build_source_metadata(
+    *,
+    existing_metadata: dict[str, Any] | None,
+    client_id: str,
+    feed_id: str,
+    feed_name: str,
+    run_id: str,
+) -> dict[str, Any]:
+    metadata = dict(existing_metadata or {})
+    previous_feed_id = metadata.get("feed_id")
+    previous_feed_name = metadata.get("feed_name")
+    metadata["feed_id"] = feed_id
+    metadata["feed_name"] = feed_name
+    metadata["run_id"] = run_id
+    metadata["client_ids"] = _dedupe_non_empty_strings(
+        metadata.get("client_ids"),
+        metadata.get("client_id"),
+        client_id,
+    )
+    metadata["feed_ids"] = _dedupe_non_empty_strings(
+        metadata.get("feed_ids"),
+        previous_feed_id,
+        feed_id,
+    )
+    metadata["feed_names"] = _dedupe_non_empty_strings(
+        metadata.get("feed_names"),
+        previous_feed_name,
+        feed_name,
+    )
+    return metadata
 
 
 def _sync_swipe_media(
@@ -269,7 +317,7 @@ async def gethookd_sync_workspace_activity(
         assets_updated = 0
         assets_marked_stale = 0
         assets_failed = 0
-        credits_used = 0
+        credits_used = 0.0
         feed_errors: list[str] = []
 
         # Ensure GetHookd inbox collection exists
@@ -286,25 +334,8 @@ async def gethookd_sync_workspace_activity(
             feeds_attempted += 1
 
             try:
-                # Parse filters from feed
-                filters = GetHookdExploreFilters(
-                    query=feed.filters_json.get("query", ""),
-                    platforms=feed.filters_json.get("platforms", "facebook,instagram"),
-                    niche=feed.filters_json.get("niche"),
-                    ad_format=feed.filters_json.get("ad_format"),
-                    location=feed.filters_json.get("location"),
-                    language=feed.filters_json.get("language"),
-                    performance_scores=feed.filters_json.get(
-                        "performance_scores", "winning,optimized"
-                    ),
-                    status=feed.filters_json.get("status", "active"),
-                    sort_column=feed.filters_json.get("sort_column", "days_active"),
-                    sort_direction=feed.filters_json.get("sort_direction", "desc"),
-                    ads_per_brand_limit=feed.filters_json.get("ads_per_brand_limit", 3),
-                    active_ads_count=feed.filters_json.get("active_ads_count"),
-                )
-
-                max_pages = feed.max_pages_per_run or settings.GETHOOKD_DEFAULT_MAX_PAGES_PER_RUN
+                filters = GetHookdExploreFilters.from_filter_dict(feed.filters_json or {})
+                max_pages = int(feed.max_pages_per_run or 0)
                 per_page = feed.per_page or settings.GETHOOKD_EXPLORE_PAGE_SIZE
 
                 feed_assets_new = 0
@@ -313,17 +344,19 @@ async def gethookd_sync_workspace_activity(
                 feed_assets_failed = 0
                 feed_error_message: str | None = None
 
-                # Fetch pages
-                for page in range(1, max_pages + 1):
+                page = 1
+                pages_fetched = 0
+                while True:
                     try:
-                        results = client.explore(
+                        page_response = client.explore(
                             filters=filters,
                             page=page,
                             per_page=per_page,
                         )
-                        credits_used += len(results)
+                        pages_fetched += 1
+                        credits_used += float(page_response.used_credits or 0.0)
 
-                        for ad_result in results:
+                        for ad_result in page_response.items:
                             asset_savepoint = session.begin_nested()
                             try:
                                 # Compute payload hash for change detection
@@ -353,6 +386,17 @@ async def gethookd_sync_workspace_activity(
                                 remote_media_inputs = _build_remote_media_inputs(
                                     swipe_asset_id=str(existing.id) if existing is not None else "",
                                     media_items=ad_result.media or [],
+                                )
+                                source_metadata = _build_source_metadata(
+                                    existing_metadata=(
+                                        getattr(existing, "source_metadata_json", None)
+                                        if existing is not None
+                                        else None
+                                    ),
+                                    client_id=input.client_id,
+                                    feed_id=str(feed.id),
+                                    feed_name=feed.name,
+                                    run_id=str(run.id),
                                 )
 
                                 if existing is None:
@@ -387,11 +431,7 @@ async def gethookd_sync_workspace_activity(
                                         source_last_seen_at=now,
                                         source_last_synced_at=now,
                                         source_payload_hash=payload_hash,
-                                        source_metadata_json={
-                                            "feed_id": str(feed.id),
-                                            "feed_name": feed.name,
-                                            "run_id": str(run.id),
-                                        },
+                                        source_metadata_json=source_metadata,
                                         analysis_status="queued",
                                         analysis_model=settings.SWIPE_TAXONOMY_MODEL,
                                     )
@@ -472,11 +512,7 @@ async def gethookd_sync_workspace_activity(
                                         source_last_seen_at=now,
                                         source_last_synced_at=now,
                                         source_payload_hash=payload_hash,
-                                        source_metadata_json={
-                                            "feed_id": str(feed.id),
-                                            "feed_name": feed.name,
-                                            "run_id": str(run.id),
-                                        },
+                                        source_metadata_json=source_metadata,
                                         source_content_changed_at=now
                                         if creative_changed
                                         else existing.source_content_changed_at,
@@ -529,6 +565,12 @@ async def gethookd_sync_workspace_activity(
                             f"Feed '{feed.name}' failed on page {page}: {exc}"
                         )
                         break  # Stop fetching this feed on error
+
+                    if max_pages > 0 and pages_fetched >= max_pages:
+                        break
+                    if not page_response.has_next_page:
+                        break
+                    page += 1
 
                 session.commit()
                 assets_new += feed_assets_new

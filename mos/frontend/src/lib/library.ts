@@ -1,4 +1,4 @@
-import type { CompanySwipeAsset } from "@/types/swipes";
+import type { CompanySwipeAsset, SwipeAssetType, SwipeAssetTypeFilter } from "@/types/swipes";
 import type { LibraryItem, MediaAsset } from "@/types/library";
 import { resolveOptionalApiBaseUrl } from "@/lib/apiBaseUrl";
 
@@ -346,6 +346,57 @@ export function mapSwipeStoredMedia(mediaList: CompanySwipeAsset["media"], fallb
       } satisfies MediaAsset;
     })
     .filter(Boolean) as MediaAsset[];
+}
+
+export function resolveSwipeAssetType(swipe: CompanySwipeAsset): SwipeAssetType {
+  const adUnitFormat = strippableLower(swipe.ad_unit_format);
+  if (adUnitFormat === "image" || adUnitFormat === "video" || adUnitFormat === "carousel") {
+    return adUnitFormat;
+  }
+
+  const snapshot =
+    (swipe as any)?.snapshot ||
+    (swipe as any)?.ad_library_object?.snapshot ||
+    swipe.ad_library_object ||
+    {};
+  const snapshotImages = mapSwipeImages(snapshot);
+  const snapshotVideos = mapSwipeVideos(snapshot, snapshotImages[0]?.thumbUrl);
+  const storedMedia = mapSwipeStoredMedia(swipe.media);
+
+  const videoCount =
+    snapshotVideos.length + storedMedia.filter((mediaAsset) => mediaAsset.type === "video").length;
+  const imageCount =
+    snapshotImages.length + storedMedia.filter((mediaAsset) => mediaAsset.type === "image").length;
+
+  if (videoCount > 0) return "video";
+  if (imageCount > 1) return "carousel";
+  if (imageCount === 1) return "image";
+  return "unknown";
+}
+
+export function matchesSwipeAssetTypeFilter(
+  swipe: CompanySwipeAsset,
+  filter: SwipeAssetTypeFilter,
+): boolean {
+  if (filter === "all") return true;
+  return resolveSwipeAssetType(swipe) === filter;
+}
+
+export function formatSwipeAssetTypeLabel(assetType?: SwipeAssetType | null): string {
+  switch (assetType) {
+    case "image":
+      return "Static image";
+    case "video":
+      return "Video";
+    case "carousel":
+      return "Carousel";
+    default:
+      return "Unknown";
+  }
+}
+
+function strippableLower(value?: string | null): string {
+  return String(value || "").trim().toLowerCase();
 }
 
 export function normalizeSwipeToLibraryItem(swipe: CompanySwipeAsset): LibraryItem {

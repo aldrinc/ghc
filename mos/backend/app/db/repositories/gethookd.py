@@ -175,6 +175,26 @@ class GetHookdSyncRunsRepository:
         )
         return self.session.scalars(stmt).first()
 
+    def latest_for_client(
+        self,
+        *,
+        org_id: str,
+        client_id: str,
+        statuses: Optional[list[str]] = None,
+    ) -> Optional[GetHookdSyncRun]:
+        stmt = (
+            select(GetHookdSyncRun)
+            .where(
+                GetHookdSyncRun.org_id == org_id,
+                GetHookdSyncRun.client_id == client_id,
+            )
+            .order_by(GetHookdSyncRun.started_at.desc(), GetHookdSyncRun.id.desc())
+            .limit(1)
+        )
+        if statuses:
+            stmt = stmt.where(GetHookdSyncRun.status.in_(statuses))
+        return self.session.scalars(stmt).first()
+
     def update(
         self,
         *,
@@ -201,7 +221,7 @@ class GetHookdSyncRunsRepository:
         assets_updated: int,
         assets_marked_stale: int,
         assets_failed: int,
-        credits_used: int,
+        credits_used: float,
         error_summary: Optional[str] = None,
     ) -> Optional[GetHookdSyncRun]:
         return self.update(

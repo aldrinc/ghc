@@ -3,6 +3,7 @@ import { useApiClient } from "./client";
 import type {
   ClientSwipeAsset,
   CompanySwipeAsset,
+  GetHookdInboxResponse,
   SwipeCollection,
   SwipeCollectionCloneRequest,
   SwipeCollectionCreateRequest,
@@ -17,10 +18,11 @@ export const SWIPE_COLLECTIONS_QUERY_KEY = ["swipe-collections"] as const;
 export const swipeCollectionDetailQueryKey = (collectionId?: string | null) =>
   ["swipe-collection", collectionId] as const;
 
-function buildSwipeCompanyQuery(filters?: SwipeReviewFilter) {
+export function buildSwipeCompanyQuery(filters?: SwipeReviewFilter) {
   const params = new URLSearchParams();
   if (!filters) return "";
   if (filters.collectionId) params.set("collection_id", filters.collectionId);
+  if (filters.clientId) params.set("client_id", filters.clientId);
   if (filters.source === "gethookd") params.set("source", "gethookd");
   if (filters.reviewStatus && filters.reviewStatus !== "all") {
     params.set("review_status", filters.reviewStatus);
@@ -49,6 +51,15 @@ export function useCompanySwipes(filters?: SwipeReviewFilter, enabled = true) {
     queryKey: ["swipes", "company", filters],
     queryFn: () => get(`/swipes/company${buildSwipeCompanyQuery(filters)}`),
     enabled,
+  });
+}
+
+export function useGetHookdInbox(clientId?: string, reviewLimit = 10, enabled = true) {
+  const { get } = useApiClient();
+  return useQuery<GetHookdInboxResponse>({
+    queryKey: ["swipes", "gethookd-inbox", clientId, reviewLimit],
+    queryFn: () => get(`/swipes/gethookd-inbox?client_id=${encodeURIComponent(String(clientId))}&review_limit=${reviewLimit}`),
+    enabled: enabled && Boolean(clientId),
   });
 }
 

@@ -9,6 +9,7 @@ from app.db.models import (
     Campaign,
     Client,
     CompanySwipeAsset,
+    GetHookdSyncRun,
     SwipeCollection,
 )
 from app.db.repositories.swipes import (
@@ -23,20 +24,42 @@ def _seed_gethookd_swipe(
     db_session,
     *,
     title: str,
+    body: str | None = None,
+    landing_page: str | None = None,
+    ad_unit_format: str | None = "image",
+    used_count: int | None = None,
     review_status: str | None = None,
+    source_metadata_json: dict | None = None,
 ) -> CompanySwipeAsset:
     """Seed a GetHookd swipe asset."""
     swipe = CompanySwipeAsset(
         org_id=TEST_ORG_ID,
         title=title,
+        body=body,
+        landing_page=landing_page,
         source_kind="catalog",
         origin_system=GETHOOKD_ORIGIN_SYSTEM,
+        ad_unit_format=ad_unit_format,
+        used_count=used_count,
         review_status=review_status,
+        source_metadata_json=source_metadata_json,
     )
     db_session.add(swipe)
     db_session.commit()
     db_session.refresh(swipe)
     return swipe
+
+
+def _seed_gethookd_run(db_session, *, client_id: str, status: str = "completed") -> GetHookdSyncRun:
+    run = GetHookdSyncRun(
+        org_id=TEST_ORG_ID,
+        client_id=client_id,
+        status=status,
+    )
+    db_session.add(run)
+    db_session.commit()
+    db_session.refresh(run)
+    return run
 
 
 def _seed_catalog_swipe(db_session, *, title: str) -> CompanySwipeAsset:
@@ -78,6 +101,84 @@ def test_gethookd_inbox_list(api_client, db_session) -> None:
     inbox = response.json()
     assert len(inbox) == 1
     assert inbox[0]["title"] == "GetHookd Swipe 2"
+
+
+def test_company_swipes_can_filter_gethookd_assets_by_client(api_client, db_session, seed_data) -> None:
+    client = seed_data["client"]
+    other_client = Client(org_id=TEST_ORG_ID, name="Other Client", industry="Supplements")
+    db_session.add(other_client)
+    db_session.commit()
+    db_session.refresh(other_client)
+
+    matching = _seed_gethookd_swipe(
+        db_session,
+        title="Ember-only Swipe",
+        source_metadata_json={"client_ids": [str(client.id)]},
+    )
+    _seed_gethookd_swipe(
+        db_session,
+        title="Other Workspace Swipe",
+        source_metadata_json={"client_ids": [str(other_client.id)]},
+    )
+    _seed_gethookd_swipe(
+        db_session,
+        title="Unscoped Legacy Swipe",
+        source_metadata_json=None,
+    )
+
+    response = api_client.get(f"/swipes/company?source=gethookd&client_id={client.id}")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert [item["id"] for item in payload] == [str(matching.id)]
+
+
+def test_gethookd_review_inbox_dedupes_exact_static_duplicates(
+    api_client, db_session, seed_data
+) -> None:
+    client = seed_data["client"]
+    run = _seed_gethookd_run(db_session, client_id=str(client.id))
+    metadata = {
+        "client_ids": [str(client.id)],
+        "run_id": str(run.id),
+    }
+
+    kept = _seed_gethookd_swipe(
+        db_session,
+        title="Women's Hair Growth Collection, Vitamins & Supplements | Viviscal",
+        body="Same copy",
+        landing_page="https://www.viviscal.co.uk/collections/for-women",
+        used_count=9,
+        source_metadata_json=metadata,
+    )
+    _seed_gethookd_swipe(
+        db_session,
+        title="Women's Hair Growth Collection, Vitamins & Supplements | Viviscal",
+        body="Same copy",
+        landing_page="https://www.viviscal.co.uk/collections/for-women",
+        used_count=1,
+        source_metadata_json=metadata,
+    )
+    _seed_gethookd_swipe(
+        db_session,
+        title="Another static",
+        body="Different copy",
+        landing_page="https://example.com/other",
+        used_count=3,
+        source_metadata_json=metadata,
+    )
+
+    response = api_client.get(f"/swipes/gethookd-inbox?client_id={client.id}&review_limit=10")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert payload["summary"]["rawImportedCount"] == 3
+    assert payload["summary"]["eligibleStaticImageCount"] == 3
+    assert payload["summary"]["duplicateCollapsedCount"] == 1
+    assert payload["summary"]["returnedCount"] == 2
+    assert len(payload["swipes"]) == 2
+    assert payload["swipes"][0]["id"] == str(kept.id)
+    assert payload["swipes"][0]["used_count"] == 9
 
 
 def test_swipe_review_approve(api_client, db_session) -> None:
