@@ -69,6 +69,36 @@ def test_openai_image_render_client_requires_api_key(monkeypatch) -> None:
         image_render.OpenAIImageRenderClient()
 
 
+def test_openai_image_render_client_uses_openai_timeout_setting(monkeypatch) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs) -> None:
+            captured_kwargs.update(kwargs)
+            self.images = SimpleNamespace()
+
+    monkeypatch.setattr(image_render.settings, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(image_render.settings, "OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS", 240.0)
+    monkeypatch.setattr(image_render.settings, "CREATIVE_SERVICE_TIMEOUT_SECONDS", 30.0)
+    monkeypatch.setattr(image_render, "get_openai_client_class", lambda: _FakeOpenAI)
+
+    client = image_render.OpenAIImageRenderClient()
+
+    assert client.timeout_seconds == 240.0
+    assert captured_kwargs["timeout"] == 240.0
+
+
+def test_openai_image_render_client_rejects_non_positive_timeout(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(image_render.settings, "OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS", 0)
+
+    with pytest.raises(
+        image_render.CreativeServiceConfigError,
+        match="OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS must be greater than zero",
+    ):
+        image_render.OpenAIImageRenderClient()
+
+
 def test_embedded_freestyle_rejects_reference_image_urls() -> None:
     client = embedded_freestyle.EmbeddedFreestyleImageRenderClient()
 

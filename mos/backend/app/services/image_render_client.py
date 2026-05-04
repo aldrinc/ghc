@@ -329,9 +329,20 @@ class OpenAIImageRenderClient:
         self.output_compression = _normalize_openai_output_compression(
             os.getenv("OPENAI_IMAGE_RENDER_OUTPUT_COMPRESSION")
         )
-        self.timeout_seconds = float(
-            timeout_seconds or settings.CREATIVE_SERVICE_TIMEOUT_SECONDS or 30.0
+        configured_timeout = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else (
+                settings.OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS
+                if settings.OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS is not None
+                else settings.CREATIVE_SERVICE_TIMEOUT_SECONDS
+            )
         )
+        self.timeout_seconds = float(configured_timeout if configured_timeout is not None else 30.0)
+        if self.timeout_seconds <= 0:
+            raise CreativeServiceConfigError(
+                "OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS must be greater than zero."
+            )
         self._jobs: dict[str, CreativeServiceImageAdsJob] = {}
 
         if client is not None:

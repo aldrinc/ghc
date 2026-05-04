@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str | None = None
+    OPENAI_IMAGE_RENDER_TIMEOUT_SECONDS: float | None = 180.0
     BASETEN_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
     BASETEN_BASE_URL: str = "https://inference.baseten.co/v1"
