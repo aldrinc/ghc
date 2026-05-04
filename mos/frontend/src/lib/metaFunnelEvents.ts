@@ -18,6 +18,19 @@ function isFromPresale(event: RuntimeTrackingEvent): boolean {
   return event.props?.fromPresale === true;
 }
 
+function checkoutParams(event: RuntimeTrackingEvent) {
+  const params: Record<string, unknown> = {
+    content_type: "product",
+    num_items: 1,
+  };
+  const variantId =
+    typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
+  if (variantId) {
+    params.content_ids = [variantId];
+  }
+  return params;
+}
+
 export function mapRuntimeEventToMetaPixelEvents(
   event: RuntimeTrackingEvent,
 ): MetaPixelRuntimeEvent[] {
@@ -80,6 +93,9 @@ export function mapRuntimeEventToMetaPixelEvents(
       method: "trackCustom",
       params: event.props || {},
     }];
+  }
+  if (event.eventType === "checkout_started") {
+    return [{ eventName: "InitiateCheckout", params: checkoutParams(event) }];
   }
   return [];
 }

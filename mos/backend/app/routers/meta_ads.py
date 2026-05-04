@@ -111,6 +111,7 @@ from app.services.meta_management_service import (
     resolve_publish_run_management_meta_campaign_id,
     resolve_management_benchmark_mode,
 )
+from app.services.meta_management_reports import render_meta_management_report
 from app.services.meta_management_schedule import reconcile_campaign_meta_management_schedule
 from app.services.meta_publish_defaults import (
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
@@ -3574,7 +3575,9 @@ def plan_meta_management(
                 event_mappings=event_mappings,
             )
             if cached_snapshot is not None:
+                report_markdown = render_meta_management_report(cached_snapshot.plan)
                 response_payload = jsonable_encoder(cached_snapshot.plan)
+                response_payload["reportMarkdown"] = report_markdown
                 response_payload["artifacts"] = {
                     "metricsSnapshotArtifactId": cached_snapshot.artifact_id,
                 }
@@ -3596,7 +3599,9 @@ def plan_meta_management(
     except MetaManagementExecutionError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
+    report_markdown = render_meta_management_report(result.plan)
     response_payload = jsonable_encoder(result.plan)
+    response_payload["reportMarkdown"] = report_markdown
     if result.campaign is not None:
         response_payload["artifacts"] = persist_meta_management_artifacts(
             session=session,
@@ -3605,6 +3610,7 @@ def plan_meta_management(
             campaign=result.campaign,
             plan=result.plan,
             snapshot_request=snapshot_request,
+            report_markdown=report_markdown,
         )
     return response_payload
 

@@ -32,6 +32,7 @@ from app.services.meta_media_buying import (
     MetaMediaBuyingPlanError,
     build_management_plan,
 )
+from app.services.meta_management_reports import render_meta_management_report
 
 
 class MetaManagementExecutionError(RuntimeError):
@@ -447,8 +448,12 @@ def persist_meta_management_artifacts(
     campaign: Campaign,
     plan: MetaManagementPlan,
     snapshot_request: dict[str, Any] | None = None,
+    report_markdown: str | None = None,
 ) -> dict[str, str]:
     artifacts_repo = ArtifactsRepository(session)
+    resolved_report_markdown = (
+        report_markdown if report_markdown is not None else render_meta_management_report(plan)
+    )
     metrics_artifact = artifacts_repo.insert(
         org_id=org_id,
         client_id=str(campaign.client_id),
@@ -514,9 +519,27 @@ def persist_meta_management_artifacts(
         },
         created_by_user=user_id,
     )
+    report_artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id) if campaign.product_id else None,
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.meta_management_report_markdown,
+        data={
+            "snapshotRequest": snapshot_request,
+            "generatedAt": plan.generatedAt,
+            "reportMarkdown": resolved_report_markdown,
+            "sourceArtifactTypes": [
+                ArtifactTypeEnum.meta_management_metrics_snapshot.value,
+                ArtifactTypeEnum.meta_management_recommended_actions.value,
+            ],
+        },
+        created_by_user=user_id,
+    )
     artifact_ids = {
         "metricsSnapshotArtifactId": str(metrics_artifact.id),
         "recommendedActionsArtifactId": str(recommendations_artifact.id),
+        "reportMarkdownArtifactId": str(report_artifact.id),
     }
     if plan.mode == "apply":
         approval_artifact = artifacts_repo.insert(

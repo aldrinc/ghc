@@ -101,4 +101,22 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       },
     ]);
   });
+
+  it("maps checkout starts to Meta InitiateCheckout", () => {
+    expect(
+      mapRuntimeEventToMetaPixelEvents({
+        eventType: "checkout_started",
+        props: { variantId: "variant_123" },
+      }),
+    ).toEqual([
+      {
+        eventName: "InitiateCheckout",
+        params: {
+          content_ids: ["variant_123"],
+          content_type: "product",
+          num_items: 1,
+        },
+      },
+    ]);
+  });
 });

@@ -2845,6 +2845,8 @@ def test_meta_management_plan_only_uses_cached_snapshot_until_refresh(
     assert first_response.status_code == 200, first_response.text
     first_payload = first_response.json()
     first_artifact_id = first_payload["artifacts"]["metricsSnapshotArtifactId"]
+    assert first_payload["reportMarkdown"].startswith("# Meta Management Report")
+    assert first_payload["artifacts"]["reportMarkdownArtifactId"]
 
     def _should_not_execute(**_kwargs):
         raise AssertionError("Expected cached management snapshot to satisfy plan_only request.")
@@ -2865,6 +2867,7 @@ def test_meta_management_plan_only_uses_cached_snapshot_until_refresh(
     cached_payload = cached_response.json()
     assert cached_payload["generatedAt"] == first_generated_at
     assert cached_payload["artifacts"]["metricsSnapshotArtifactId"] == first_artifact_id
+    assert cached_payload["reportMarkdown"].startswith("# Meta Management Report")
 
     refreshed_generated_at = datetime.now(timezone.utc).isoformat()
     monkeypatch.setattr(
@@ -3308,11 +3311,19 @@ def test_meta_management_plan_evaluates_benchmarks_and_persists_snapshot(api_cli
     assert round(custom_metric_summary["meta_purchase_ratio_pct"]["value"], 2) == 33.33
     assert round(custom_metric_summary["meta_video_hold_rate_pct"]["value"], 2) == 0.8
     assert payload["artifacts"]["metricsSnapshotArtifactId"]
+    assert payload["artifacts"]["reportMarkdownArtifactId"]
+    assert payload["reportMarkdown"].startswith("# Meta Management Report")
 
     metrics_artifact = db_session.scalars(
         select(Artifact).where(Artifact.id == payload["artifacts"]["metricsSnapshotArtifactId"])
     ).first()
+    report_artifact = db_session.scalars(
+        select(Artifact).where(Artifact.id == payload["artifacts"]["reportMarkdownArtifactId"])
+    ).first()
     assert metrics_artifact is not None
+    assert report_artifact is not None
+    assert report_artifact.type == ArtifactTypeEnum.meta_management_report_markdown
+    assert report_artifact.data["reportMarkdown"].startswith("# Meta Management Report")
     assert metrics_artifact.data["managementScope"] == "meta_plus_funnel"
     assert metrics_artifact.data["benchmarkStatus"]["available"] is True
     assert metrics_artifact.data["objectState"]["deliveryState"] == "delivering"
