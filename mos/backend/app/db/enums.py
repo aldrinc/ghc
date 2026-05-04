@@ -138,6 +138,7 @@ class ArtifactTypeEnum(str, Enum):
     meta_launch_plan = "meta_launch_plan"
     meta_management_metrics_snapshot = "meta_management_metrics_snapshot"
     meta_management_recommended_actions = "meta_management_recommended_actions"
+    meta_management_report_markdown = "meta_management_report_markdown"
     meta_management_approval_decision = "meta_management_approval_decision"
     meta_management_applied_action = "meta_management_applied_action"
 

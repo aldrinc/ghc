@@ -549,9 +549,11 @@ export type MetaManagementPlan = {
   customMetricDefinitions: MetaManagementCustomMetricDefinition[];
   customMetricSummary: MetaManagementCustomMetricEvaluation[];
   customMetricRows: MetaManagementCustomMetricRow[];
+  reportMarkdown?: string | null;
   artifacts?: {
     metricsSnapshotArtifactId?: string;
     recommendedActionsArtifactId?: string;
+    reportMarkdownArtifactId?: string;
     approvalDecisionArtifactId?: string;
   };
 };
