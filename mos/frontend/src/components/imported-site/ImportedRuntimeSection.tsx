@@ -118,6 +118,12 @@ function normalizeComparableLabel(value: unknown): string {
     .toLowerCase();
 }
 
+function extractDurationComparableKey(value: unknown): string {
+  const normalized = normalizeComparableLabel(value);
+  const match = normalized.match(/(\d+)\s*day/);
+  return match ? `${match[1]}-day` : "";
+}
+
 function isExternalNavigationHref(href: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//");
 }
@@ -204,6 +210,71 @@ function buildImportedPurchaseRuntimeData(
       ),
     ],
     variants: runtimeVariants,
+  };
+}
+
+function mergeImportedPurchaseRuntimeData(
+  primary: ImportedPurchaseRuntimeData | null,
+  secondary: ImportedPurchaseRuntimeData | null,
+): ImportedPurchaseRuntimeData | null {
+  if (!primary && !secondary) return null;
+  if (!primary) return secondary;
+  if (!secondary) return primary;
+
+  const primaryByTitle = new Map<string, ImportedPurchaseRuntimeData["variants"][number]>();
+  for (const variant of primary.variants) {
+    const normalizedTitle = normalizeComparableLabel(variant.title);
+    const durationKey = extractDurationComparableKey(variant.title);
+    if (normalizedTitle && !primaryByTitle.has(normalizedTitle)) {
+      primaryByTitle.set(normalizedTitle, variant);
+    }
+    if (durationKey && !primaryByTitle.has(durationKey)) {
+      primaryByTitle.set(durationKey, variant);
+    }
+  }
+  const secondaryKeys = new Set<string>();
+  const mergedVariants: ImportedPurchaseRuntimeData["variants"] = secondary.variants.map((secondaryVariant) => {
+    const secondaryTitleKey = normalizeComparableLabel(secondaryVariant.title);
+    const secondaryDurationKey = extractDurationComparableKey(secondaryVariant.title);
+    if (secondaryTitleKey) {
+      secondaryKeys.add(secondaryTitleKey);
+    }
+    if (secondaryDurationKey) {
+      secondaryKeys.add(secondaryDurationKey);
+    }
+    const primaryVariant =
+      primaryByTitle.get(secondaryTitleKey) ||
+      primaryByTitle.get(secondaryDurationKey);
+    return {
+      title: secondaryVariant.title || primaryVariant?.title || "",
+      priceLabel: primaryVariant?.priceLabel || secondaryVariant.priceLabel || "",
+      compareAtLabel: secondaryVariant.compareAtLabel || primaryVariant?.compareAtLabel || undefined,
+      commerceVariantId: primaryVariant?.commerceVariantId || secondaryVariant.commerceVariantId || undefined,
+    };
+  });
+  for (const primaryVariant of primary.variants) {
+    const primaryTitleKey = normalizeComparableLabel(primaryVariant.title);
+    const primaryDurationKey = extractDurationComparableKey(primaryVariant.title);
+    if (
+      (primaryTitleKey && secondaryKeys.has(primaryTitleKey)) ||
+      (primaryDurationKey && secondaryKeys.has(primaryDurationKey))
+    ) {
+      continue;
+    }
+    mergedVariants.push(primaryVariant);
+  }
+
+  return {
+    ctaBaseLabel: primary.ctaBaseLabel || secondary.ctaBaseLabel || undefined,
+    imageUrls: [
+      ...new Set(
+        [
+          ...(Array.isArray(primary.imageUrls) ? primary.imageUrls : []),
+          ...(Array.isArray(secondary.imageUrls) ? secondary.imageUrls : []),
+        ].filter(Boolean),
+      ),
+    ],
+    variants: mergedVariants.filter((variant) => variant.title && variant.priceLabel),
   };
 }
 
@@ -415,9 +486,15 @@ export function ImportedRuntimeSection({
       commerceActionPendingRef.current = true;
       try {
         const normalizedSelectedOfferTitle = normalizeComparableLabel(selectedOfferTitle);
+        const selectedDurationKey = extractDurationComparableKey(selectedOfferTitle);
         const selectedVariant =
           purchaseRuntimeData.variants.find((variant) => {
-            return normalizeComparableLabel(variant.title) === normalizedSelectedOfferTitle;
+            const normalizedVariantTitle = normalizeComparableLabel(variant.title);
+            const variantDurationKey = extractDurationComparableKey(variant.title);
+            return (
+              normalizedVariantTitle === normalizedSelectedOfferTitle ||
+              (variantDurationKey && selectedDurationKey && variantDurationKey === selectedDurationKey)
+            );
           }) || null;
 
         if (!selectedVariant) {
@@ -429,13 +506,13 @@ export function ImportedRuntimeSection({
           throw new Error(`The imported offer "${selectedOfferTitle}" is missing its Medusa variant binding.`);
         }
 
-        if (payload.replaceCart && Array.isArray(b2cRuntime.cart?.items) && b2cRuntime.cart.items.length > 0) {
-          for (const item of b2cRuntime.cart.items) {
-            await b2cRuntime.removeCartItem(item.id);
-          }
+        if (payload.replaceCart) {
+          await b2cRuntime.replaceCartWithVariant(selectedVariant.commerceVariantId, 1);
+        } else {
+          await b2cRuntime.addToCart(selectedVariant.commerceVariantId, 1);
         }
-
-        await b2cRuntime.addToCart(selectedVariant.commerceVariantId, 1);
+        await b2cRuntime.refreshCart();
+        commerceActionPendingRef.current = false;
         b2cRuntime.navigateToCheckout();
       } catch (reason) {
         toast.error(reason instanceof Error ? reason.message : "Failed to start Medusa checkout from the imported section.");
@@ -510,7 +587,22 @@ export function ImportedRuntimeSection({
         if (cancelled) {
           return;
         }
-        const nextPurchaseRuntimeData = buildImportedPurchaseRuntimeDataFromSiteProduct(product, medusaActionLabel);
+        const localPurchaseRuntimeData = buildImportedPurchaseRuntimeDataFromSiteProduct(product, medusaActionLabel);
+        let medusaPurchaseRuntimeData: ImportedPurchaseRuntimeData | null = null;
+        const productHandle = String(product.handle || "").trim();
+        if (loadProductByHandle && productHandle && productHandle !== "preview-product") {
+          const medusaProduct = await loadProductByHandle(productHandle);
+          if (cancelled) {
+            return;
+          }
+          medusaPurchaseRuntimeData = medusaProduct
+            ? buildImportedPurchaseRuntimeData(medusaProduct, medusaActionLabel)
+            : null;
+        }
+        const nextPurchaseRuntimeData = mergeImportedPurchaseRuntimeData(
+          medusaPurchaseRuntimeData,
+          localPurchaseRuntimeData,
+        );
         setPurchaseRuntimeData((current) => {
           if (JSON.stringify(current) === JSON.stringify(nextPurchaseRuntimeData)) {
             return current;

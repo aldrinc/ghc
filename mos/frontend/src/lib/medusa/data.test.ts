@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const {
   cartCreate,
   cartRetrieve,
+  fetchMock,
   productList,
   regionList,
   getCartId,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   cartCreate: vi.fn(),
   cartRetrieve: vi.fn(),
+  fetchMock: vi.fn(),
   productList: vi.fn(),
   regionList: vi.fn(),
   getCartId: vi.fn(() => null),
@@ -38,6 +40,8 @@ vi.mock("./config", () => ({
   getMedusaRuntimeConfig,
 }));
 
+vi.stubGlobal("fetch", fetchMock);
+
 vi.mock("./session", () => ({
   getCartId,
   setCartId,
@@ -46,7 +50,15 @@ vi.mock("./session", () => ({
   getCountryCode,
 }));
 
-import { createCart, getOrCreateCart, getProductByHandle, MedusaApiError } from "./data";
+import {
+  addCartLineItem,
+  createCart,
+  deleteCartLineItem,
+  getOrCreateCart,
+  getProductByHandle,
+  MedusaApiError,
+  updateCartLineItem,
+} from "./data";
 
 describe("medusa cart creation", () => {
   afterEach(() => {
@@ -60,6 +72,7 @@ describe("medusa cart creation", () => {
     getCountryCode.mockReturnValue("us");
     getMedusaRuntimeConfig.mockReset();
     getMedusaRuntimeConfig.mockReturnValue(null);
+    fetchMock.mockReset();
     setCartId.mockReset();
   });
 
@@ -194,6 +207,80 @@ describe("medusa cart creation", () => {
       expect.objectContaining({
         limit: 50,
         offset: 0,
+      }),
+    );
+  });
+
+  it("adds cart items through the current Medusa /line-items endpoint", async () => {
+    getMedusaRuntimeConfig.mockReturnValue({
+      backendUrl: "http://localhost:9000",
+      publishableKey: "pk_test_123",
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ cart: { id: "cart_123", items: [{ id: "item_1", quantity: 1 }] } }),
+      text: async () => "",
+    });
+
+    const cart = await addCartLineItem("cart_123", "variant_1", 1);
+
+    expect(cart.id).toBe("cart_123");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:9000/store/carts/cart_123/line-items",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ variant_id: "variant_1", quantity: 1 }),
+      }),
+    );
+  });
+
+  it("updates cart items through the current Medusa /line-items endpoint", async () => {
+    getMedusaRuntimeConfig.mockReturnValue({
+      backendUrl: "http://localhost:9000",
+      publishableKey: "pk_test_123",
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ cart: { id: "cart_123", items: [{ id: "item_1", quantity: 3 }] } }),
+      text: async () => "",
+    });
+
+    const cart = await updateCartLineItem("cart_123", "item_1", 3);
+
+    expect(cart.items?.[0]?.quantity).toBe(3);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:9000/store/carts/cart_123/line-items/item_1",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ quantity: 3 }),
+      }),
+    );
+  });
+
+  it("deletes cart items through the current Medusa /line-items endpoint", async () => {
+    getMedusaRuntimeConfig.mockReturnValue({
+      backendUrl: "http://localhost:9000",
+      publishableKey: "pk_test_123",
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ cart: { id: "cart_123", items: [] } }),
+      text: async () => "",
+    });
+
+    const cart = await deleteCartLineItem("cart_123", "item_1");
+
+    expect(cart.items).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:9000/store/carts/cart_123/line-items/item_1",
+      expect.objectContaining({
+        method: "DELETE",
       }),
     );
   });

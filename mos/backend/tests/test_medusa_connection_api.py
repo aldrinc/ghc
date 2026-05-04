@@ -614,6 +614,7 @@ class TestMedusaServiceRequests:
         assert route.called
         payload = json.loads(route.calls[0].request.content.decode("utf-8"))
         assert payload["title"] == "Test Variant"
+        assert payload["manage_inventory"] is False
         assert "variant" not in payload
 
 

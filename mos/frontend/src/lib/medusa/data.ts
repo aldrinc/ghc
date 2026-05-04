@@ -444,12 +444,14 @@ export async function addCartLineItem(
   quantity: number
 ): Promise<MedusaCart> {
   try {
-    const client = getMedusaClient();
-    const response = await client.store.cart.createLineItem(cartId, {
-      variant_id: variantId,
-      quantity,
+    const response = await medusaStoreFetch<{ cart: MedusaCart }>(`/store/carts/${cartId}/line-items`, {
+      method: "POST",
+      body: {
+        variant_id: variantId,
+        quantity,
+      },
     });
-    return response.cart as MedusaCart;
+    return response.cart;
   } catch (error) {
     return handleApiError(error);
   }
@@ -464,11 +466,13 @@ export async function updateCartLineItem(
   quantity: number
 ): Promise<MedusaCart> {
   try {
-    const client = getMedusaClient();
-    const response = await client.store.cart.updateLineItem(cartId, lineId, {
-      quantity,
+    const response = await medusaStoreFetch<{ cart: MedusaCart }>(`/store/carts/${cartId}/line-items/${lineId}`, {
+      method: "POST",
+      body: {
+        quantity,
+      },
     });
-    return response.cart as MedusaCart;
+    return response.cart;
   } catch (error) {
     return handleApiError(error);
   }
@@ -482,9 +486,10 @@ export async function deleteCartLineItem(
   lineId: string
 ): Promise<MedusaCart> {
   try {
-    const client = getMedusaClient();
-    const response = await client.store.cart.deleteLineItem(cartId, lineId);
-    return response.cart as MedusaCart;
+    const response = await medusaStoreFetch<{ cart: MedusaCart }>(`/store/carts/${cartId}/line-items/${lineId}`, {
+      method: "DELETE",
+    });
+    return response.cart;
   } catch (error) {
     return handleApiError(error);
   }
