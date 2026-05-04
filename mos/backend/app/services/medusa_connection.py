@@ -943,6 +943,7 @@ def medusa_create_variant(
     payload: dict[str, Any] = {
         "title": title,
         "prices": processed_prices,
+        "manage_inventory": inventory_quantity is not None,
     }
 
     if sku:
@@ -950,7 +951,6 @@ def medusa_create_variant(
     if barcode:
         payload["barcode"] = barcode
     if inventory_quantity is not None:
-        payload["manage_inventory"] = True
         payload["allow_backorder"] = (inventory_policy or "deny") == "continue"
     elif inventory_policy is not None:
         payload["allow_backorder"] = inventory_policy == "continue"
@@ -975,6 +975,20 @@ def medusa_create_variant(
         )
 
     variant = result.get("variant") or result
+    if (not isinstance(variant, dict) or not str(variant.get("id") or "").strip()) and isinstance(
+        result.get("product"), dict
+    ):
+        product = result["product"]
+        variants = product.get("variants")
+        if isinstance(variants, list):
+            normalized_title = title.strip().lower()
+            matched_variants = [
+                item
+                for item in variants
+                if isinstance(item, dict) and str(item.get("title") or "").strip().lower() == normalized_title
+            ]
+            if matched_variants:
+                variant = matched_variants[-1]
     if not isinstance(variant, dict):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

@@ -42,6 +42,13 @@ from app.schemas.sites import (
     SiteMedusaConfigResponse,
     MedusaRuntimeConfig,
 )
+from app.schemas.commerce import (
+    SiteCommerceCartCreateRequest,
+    SiteCommerceCartResponse,
+    SiteCommerceCartUpdateRequest,
+    SiteCommerceLineItemAddRequest,
+    SiteCommerceLineItemUpdateRequest,
+)
 from app.schemas.site_templates import SiteTemplateSummary
 from app.schemas.funnels import FunnelPageAIGenerateRequest, FunnelPageAIGenerateResponse
 from app.services.site_blueprints import (
@@ -67,9 +74,15 @@ from app.services.medusa_connection import (
 from app.services.medusa_store_runtime import (
     filter_payment_providers_by_allowlist,
     get_medusa_store_config,
+    medusa_add_cart_line_item,
     medusa_create_payment_collection,
+    medusa_create_cart,
+    medusa_delete_cart_line_item,
+    medusa_get_cart,
     medusa_initialize_payment_session,
     medusa_list_payment_providers,
+    medusa_update_cart,
+    medusa_update_cart_line_item,
     resolve_default_payment_provider_id,
     validate_provider_id_against_allowlist,
 )
@@ -98,6 +111,65 @@ def _site_uses_b2c_medusa_runtime(site: Site) -> bool:
     if site.site_family == "medusa-b2b-starter":
         return False
     return site.commerce_provider == "medusa"
+
+
+def _get_authenticated_site_or_404(
+    *,
+    site_id: str,
+    auth: AuthContext,
+    session: Session,
+) -> Site:
+    site_uuid = _parse_uuid_or_400(site_id, "site_id")
+    site = session.scalars(
+        select(Site).where(
+            Site.id == site_uuid,
+            Site.org_id == UUID(auth.org_id),
+        )
+    ).first()
+
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Site not found.",
+        )
+
+    return site
+
+
+def _get_authenticated_site_medusa_store_config(
+    *,
+    site: Site,
+    session: Session,
+):
+    if site.commerce_provider != "medusa":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This site does not use Medusa commerce.",
+        )
+
+    medusa_config = get_client_medusa_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not medusa_config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa configuration not found for this workspace.",
+        )
+
+    config = get_medusa_store_config(
+        session=session,
+        org_id=str(site.org_id),
+        client_id=str(site.client_id),
+    )
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Medusa Store API is not configured for this workspace. A publishable key is required.",
+        )
+
+    return config
 
 
 def _parse_uuid_or_400(value: str, field_name: str) -> UUID:
@@ -596,6 +668,8 @@ def get_site(
     session: Session = Depends(get_session),
 ) -> SiteDetail:
     """Get detailed information about a specific site."""
+    parsed_site_id = _parse_uuid_or_400(site_id, "siteId")
+
     # Validate workspace ownership when the caller scopes the request to a workspace.
     if clientId is not None:
         client = session.scalars(
@@ -617,7 +691,7 @@ def get_site(
     # First check if site exists in this org (regardless of client)
     site = sites_repo.get_site_by_id(
         org_id=str(UUID(auth.org_id)),
-        site_id=site_id,
+        site_id=str(parsed_site_id),
     )
 
     if not site:
@@ -1452,6 +1526,131 @@ def get_site_medusa_config(
             available=True,
         ),
     )
+
+
+@router.get("/{site_id}/medusa/cart", response_model=SiteCommerceCartResponse)
+def get_site_medusa_cart(
+    site_id: str,
+    cart_id: str = Query(...),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Get a Medusa cart for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+    cart = medusa_get_cart(config=config, cart_id=cart_id)
+    return {"cart": cart}
+
+
+@router.post("/{site_id}/medusa/cart", response_model=SiteCommerceCartResponse)
+def create_site_medusa_cart(
+    site_id: str,
+    payload: SiteCommerceCartCreateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Create a Medusa cart for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+    cart = medusa_create_cart(
+        config=config,
+        region_id=payload.region_id,
+        country_code=payload.country_code,
+        email=payload.email,
+        shipping_address=payload.shipping_address,
+        items=payload.items,
+    )
+    return {"cart": cart}
+
+
+@router.post("/{site_id}/medusa/cart/{cart_id}", response_model=SiteCommerceCartResponse)
+def update_site_medusa_cart(
+    site_id: str,
+    cart_id: str,
+    payload: SiteCommerceCartUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Update a Medusa cart for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+    cart = medusa_update_cart(
+        config=config,
+        cart_id=cart_id,
+        email=payload.email,
+        shipping_address=payload.shipping_address,
+        billing_address=payload.billing_address,
+    )
+    return {"cart": cart}
+
+
+@router.post("/{site_id}/medusa/cart/{cart_id}/items", response_model=SiteCommerceCartResponse)
+def add_site_medusa_cart_item(
+    site_id: str,
+    cart_id: str,
+    payload: SiteCommerceLineItemAddRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Add a Medusa cart line item for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+    cart = medusa_add_cart_line_item(
+        config=config,
+        cart_id=cart_id,
+        variant_id=payload.variant_id,
+        quantity=payload.quantity,
+    )
+    return {"cart": cart}
+
+
+@router.post("/{site_id}/medusa/cart/{cart_id}/items/{line_id}", response_model=SiteCommerceCartResponse)
+def update_site_medusa_cart_item(
+    site_id: str,
+    cart_id: str,
+    line_id: str,
+    payload: SiteCommerceLineItemUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Update a Medusa cart line item for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+
+    if payload.quantity == 0:
+        medusa_delete_cart_line_item(
+            config=config,
+            cart_id=cart_id,
+            line_id=line_id,
+        )
+        cart = medusa_get_cart(config=config, cart_id=cart_id)
+    else:
+        cart = medusa_update_cart_line_item(
+            config=config,
+            cart_id=cart_id,
+            line_id=line_id,
+            quantity=payload.quantity,
+        )
+    return {"cart": cart}
+
+
+@router.delete("/{site_id}/medusa/cart/{cart_id}/items/{line_id}")
+def delete_site_medusa_cart_item(
+    site_id: str,
+    cart_id: str,
+    line_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Delete a Medusa cart line item for an authenticated site preview."""
+    site = _get_authenticated_site_or_404(site_id=site_id, auth=auth, session=session)
+    config = _get_authenticated_site_medusa_store_config(site=site, session=session)
+    medusa_delete_cart_line_item(
+        config=config,
+        cart_id=cart_id,
+        line_id=line_id,
+    )
+    return {"deleted": True}
 
 
 @router.get("/{site_id}/medusa/payment-providers")

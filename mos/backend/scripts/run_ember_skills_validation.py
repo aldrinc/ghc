@@ -4,9 +4,11 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
+import httpx
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -27,9 +29,21 @@ sys.path.insert(0, str(BACKEND_ROOT))
 from app.auth.dependencies import AuthContext, get_current_user  # noqa: E402
 from app.db.base import SessionLocal  # noqa: E402
 from app.db.deps import get_session  # noqa: E402
-from app.db.models import Client, Product, SiteTemplate  # noqa: E402
+from app.db.models import Client, ClientComplianceProfile, Product, SiteTemplate  # noqa: E402
+from app.db.repositories.products import ProductOffersRepository, ProductVariantsRepository  # noqa: E402
 from app.main import app  # noqa: E402
+from app.services.compliance import list_policy_page_keys, render_policy_template_markdown  # noqa: E402
 from app.services.ember_skills_flow import EmberSkillsFlowService  # noqa: E402
+from app.services.medusa_catalog import (  # noqa: E402
+    create_medusa_variant,
+    get_medusa_product,
+    update_medusa_variant,
+)
+from app.services.medusa_connection import (  # noqa: E402
+    medusa_admin_login,
+    test_medusa_connection,
+    upsert_client_medusa_config,
+)
 from app.services.product_strategy_bundles import ProductStrategyBundlesService  # noqa: E402
 from app.services.skills_runtime_registry import (  # noqa: E402
     DEFAULT_SKILL_BUNDLE_KEY,
@@ -55,6 +69,15 @@ PREVIEW_SCRIPT = REPO_ROOT / "mos" / "frontend" / "scripts" / "validate-site-pre
 LOCAL_DATABASE_URL = "postgresql+psycopg2://app:app@localhost:5433/app"
 LOCAL_BACKEND_URL = "http://127.0.0.1:8008"
 LOCAL_FRONTEND_URL = "http://127.0.0.1:5275"
+LOCAL_MEDUSA_BASE_URL = "http://localhost:9000"
+LOCAL_MEDUSA_ADMIN_EMAIL = os.environ.get("MEDUSA_ADMIN_EMAIL", "admin@test.com")
+LOCAL_MEDUSA_ADMIN_PASSWORD = os.environ.get("MEDUSA_ADMIN_PASSWORD", "supersecret")
+_PRICING_LINE_RE = re.compile(
+    r"^\*\*(?P<label>.+?):\*\*\s*\$(?P<price>\d+)(?:\s*\(save\s*\$(?P<save>\d+)\))?",
+    re.IGNORECASE,
+)
+_DURATION_RE = re.compile(r"(?P<days>\d+)\s*day", re.IGNORECASE)
+_DAY_TITLE_SUFFIX_RE = re.compile(r"^\s*\d+\s*day\s+(?P<suffix>.+?)\s*$", re.IGNORECASE)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -100,6 +123,11 @@ def _parse_args() -> argparse.Namespace:
 
     status = subparsers.add_parser("status", help="Print the active foundational and working bundles.")
 
+    subparsers.add_parser(
+        "sync-commerce",
+        help="Sync EMBER offer-document pricing into local product variants and Medusa variants.",
+    )
+
     page_copy = subparsers.add_parser("page-copy", help="Instantiate the template and run Hermes page-copy.")
     page_copy.add_argument("--base-url", default="http://localhost:5275")
     page_copy.add_argument("--country", default="us")
@@ -141,6 +169,474 @@ def _load_template(session) -> SiteTemplate:
     if template is None:
         raise RuntimeError(f"Could not find site template '{TEMPLATE_NAME}' in the local database.")
     return template
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _extract_duration_days(value: str) -> int | None:
+    match = _DURATION_RE.search(str(value or ""))
+    if not match:
+        return None
+    return int(match.group("days"))
+
+
+def _slugify(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower())
+    return normalized.strip("-")
+
+
+def _selected_variant_suffix(selected_variant_name: str) -> str | None:
+    match = _DAY_TITLE_SUFFIX_RE.match(str(selected_variant_name or ""))
+    if not match:
+        return None
+    suffix = match.group("suffix").strip()
+    return suffix or None
+
+
+def _extract_offer_document(bundle: dict[str, Any]) -> dict[str, Any]:
+    for item in bundle.get("items", []):
+        if str(item.get("role") or "").strip() != "offer_document":
+            continue
+        artifact_data = item.get("artifactData")
+        if not isinstance(artifact_data, dict):
+            raise RuntimeError("Offer document artifact payload is missing artifactData.")
+        if str(artifact_data.get("documentFormat") or "").strip().lower() != "json":
+            raise RuntimeError("Offer document artifact is not stored as JSON.")
+        payload = artifact_data.get("json")
+        if not isinstance(payload, dict):
+            raise RuntimeError("Offer document JSON payload is missing.")
+        return payload
+    raise RuntimeError("Active skills handoff bundle is missing the offer_document artifact.")
+
+
+def _parse_offer_variants(offer_document: dict[str, Any]) -> list[dict[str, Any]]:
+    offer_markdown = str(offer_document.get("offerDetailsMarkdown") or "").strip()
+    if not offer_markdown:
+        raise RuntimeError("Offer document is missing offerDetailsMarkdown.")
+
+    selected_variant_name = str(offer_document.get("selectedVariantName") or "").strip()
+    selected_variant_id = str(offer_document.get("selectedVariantId") or "").strip()
+    title_suffix = _selected_variant_suffix(selected_variant_name)
+    selected_variant_days = _extract_duration_days(selected_variant_name)
+
+    variants: list[dict[str, Any]] = []
+    for raw_line in offer_markdown.splitlines():
+        line = raw_line.strip()
+        match = _PRICING_LINE_RE.match(line)
+        if not match:
+            continue
+
+        source_label = match.group("label").strip()
+        price_cents = int(match.group("price")) * 100
+        savings_cents = int(match.group("save")) * 100 if match.group("save") else None
+        compare_at_cents = price_cents + savings_cents if savings_cents else None
+        duration_days = _extract_duration_days(source_label)
+        if duration_days and title_suffix:
+            title = f"{duration_days} Day {title_suffix}"
+        else:
+            title = source_label
+        if duration_days and selected_variant_days == duration_days and selected_variant_id:
+            variant_id = selected_variant_id
+        elif duration_days:
+            variant_id = f"ember-{duration_days}-day-supply"
+        else:
+            variant_id = _slugify(title)
+        variants.append(
+            {
+                "id": variant_id,
+                "title": title,
+                "sourceLabel": source_label,
+                "priceCents": price_cents,
+                "compareAtCents": compare_at_cents,
+                "currency": "USD",
+                "durationDays": duration_days,
+            }
+        )
+
+    if not variants:
+        raise RuntimeError("Offer document pricing section did not yield any variants.")
+
+    deduped_by_id: dict[str, dict[str, Any]] = {}
+    for variant in variants:
+        deduped_by_id[str(variant["id"])] = variant
+    return sorted(
+        deduped_by_id.values(),
+        key=lambda variant: (
+            int(variant["durationDays"]) if isinstance(variant.get("durationDays"), int) else 9999,
+            int(variant["priceCents"]),
+            str(variant["title"]),
+        ),
+    )
+
+
+def _resolve_ember_offer_id(*, session, product_id: str) -> str | None:
+    offers = ProductOffersRepository(session).list_by_product(product_id=product_id)
+    if len(offers) == 1:
+        return str(offers[0].id)
+    return None
+
+
+def _find_matching_existing_variant(
+    *,
+    desired_variant: dict[str, Any],
+    existing_rows: list[Any],
+    retained_row_ids: set[str],
+) -> Any | None:
+    desired_offer_id = str(desired_variant["id"]).strip().lower()
+    desired_title = _normalize_text(str(desired_variant["title"]))
+    desired_days = desired_variant.get("durationDays")
+
+    def row_matches(row: Any) -> bool:
+        option_values = row.option_values if isinstance(row.option_values, dict) else {}
+        option_offer_id = str(option_values.get("offerId") or "").strip().lower()
+        if option_offer_id and option_offer_id == desired_offer_id:
+            return True
+        row_title = _normalize_text(str(row.title or ""))
+        if row_title and row_title == desired_title:
+            return True
+        row_days = _extract_duration_days(str(row.title or ""))
+        if isinstance(desired_days, int) and row_days == desired_days:
+            return True
+        return False
+
+    for row in existing_rows:
+        row_id = str(row.id)
+        if row_id in retained_row_ids:
+            continue
+        if row_matches(row):
+            return row
+
+    for row in existing_rows:
+        row_id = str(row.id)
+        if row_id in retained_row_ids:
+            continue
+        if str(row.provider or "").strip().lower() == "medusa" and str(row.external_price_id or "").strip():
+            return row
+    return None
+
+
+def _ensure_local_medusa_admin_token(*, session, client: Client) -> dict[str, Any]:
+    status = test_medusa_connection(
+        session=session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+    )
+    session.commit()
+    if status.state == "connected":
+        return {"refreshed": False, "state": status.state, "message": status.message}
+
+    base_url = str(status.base_url or LOCAL_MEDUSA_BASE_URL).rstrip("/")
+    if base_url not in {LOCAL_MEDUSA_BASE_URL, "http://127.0.0.1:9000"}:
+        raise RuntimeError(
+            "Medusa admin authentication failed and the workspace is not pointed at the local Medusa dev instance. "
+            f"base_url={base_url!r} message={status.message!r}"
+        )
+
+    token = medusa_admin_login(
+        base_url=base_url,
+        email=LOCAL_MEDUSA_ADMIN_EMAIL,
+        password=LOCAL_MEDUSA_ADMIN_PASSWORD,
+    )
+    upsert_client_medusa_config(
+        session=session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        base_url=base_url,
+        admin_api_key=token.token,
+    )
+    session.commit()
+    refreshed_status = test_medusa_connection(
+        session=session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+    )
+    session.commit()
+    if refreshed_status.state != "connected":
+        raise RuntimeError(
+            "Refreshing the local Medusa admin token did not restore workspace connectivity. "
+            f"message={refreshed_status.message!r}"
+        )
+    return {
+        "refreshed": True,
+        "state": refreshed_status.state,
+        "message": refreshed_status.message,
+        "baseUrl": base_url,
+    }
+
+
+def _ensure_medusa_product_option_values(*, product: Product, variant_titles: list[str]) -> None:
+    medusa_product_id = str(product.medusa_product_id or "").strip()
+    if not medusa_product_id:
+        raise RuntimeError("Cannot sync Medusa option values because medusa_product_id is missing.")
+    normalized_titles = [str(title).strip() for title in variant_titles if str(title).strip()]
+    if not normalized_titles:
+        raise RuntimeError("Cannot sync Medusa option values without at least one variant title.")
+
+    token = medusa_admin_login(
+        base_url=LOCAL_MEDUSA_BASE_URL,
+        email=LOCAL_MEDUSA_ADMIN_EMAIL,
+        password=LOCAL_MEDUSA_ADMIN_PASSWORD,
+    ).token
+    response = httpx.post(
+        f"{LOCAL_MEDUSA_BASE_URL}/admin/products/{medusa_product_id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "options": [
+                {
+                    "title": "Variant",
+                    "values": normalized_titles,
+                }
+            ]
+        },
+        timeout=30,
+    )
+    if response.status_code >= 400 and "already exists" not in response.text.lower():
+        raise RuntimeError(
+            "Updating Medusa product option values failed. "
+            f"status={response.status_code} body={response.text}"
+        )
+
+
+def _sync_ember_offer_variants(*, session, client: Client, product: Product) -> dict[str, Any]:
+    medusa_auth = _ensure_local_medusa_admin_token(session=session, client=client)
+    bundle_service = _bundle_service(session=session, client=client, product=product)
+    handoff_bundle = bundle_service.get_active_bundle(bundle_type="skills_handoff")
+    offer_document = _extract_offer_document(handoff_bundle)
+    desired_variants = _parse_offer_variants(offer_document)
+    _ensure_medusa_product_option_values(
+        product=product,
+        variant_titles=[str(variant["title"]) for variant in desired_variants],
+    )
+    variants_repo = ProductVariantsRepository(session)
+    existing_rows = variants_repo.list_by_product(product_id=str(product.id))
+    retained_row_ids: set[str] = set()
+    offer_id = _resolve_ember_offer_id(session=session, product_id=str(product.id))
+    selected_variant_id = str(offer_document.get("selectedVariantId") or "").strip().lower()
+
+    remote_processing_order = sorted(
+        desired_variants,
+        key=lambda variant: (
+            str(variant.get("id") or "").strip().lower() != selected_variant_id,
+            int(variant.get("durationDays") or 9999),
+        ),
+    )
+
+    synced_variants: list[dict[str, Any]] = []
+    if not str(product.medusa_product_id or "").strip():
+        raise RuntimeError(
+            "EMBER product is missing medusa_product_id, so Medusa variant sync cannot proceed."
+        )
+    remote_product = get_medusa_product(
+        session=session,
+        org_id=str(client.org_id),
+        client_id=str(client.id),
+        medusa_product_id=str(product.medusa_product_id),
+    )
+    remote_variants_by_title = {
+        _normalize_text(str(variant.get("title") or "")): variant
+        for variant in (remote_product.get("variants") if isinstance(remote_product.get("variants"), list) else [])
+        if isinstance(variant, dict) and str(variant.get("title") or "").strip()
+    }
+
+    for desired_variant in remote_processing_order:
+        matched_row = _find_matching_existing_variant(
+            desired_variant=desired_variant,
+            existing_rows=existing_rows,
+            retained_row_ids=retained_row_ids,
+        )
+        row_id = str(matched_row.id) if matched_row is not None else None
+        remote_variant_id = str(matched_row.external_price_id or "").strip() if matched_row is not None else ""
+        if not remote_variant_id:
+            remote_variant = remote_variants_by_title.get(_normalize_text(str(desired_variant["title"])))
+            if isinstance(remote_variant, dict):
+                remote_variant_id = str(remote_variant.get("id") or "").strip()
+        variant_title = str(desired_variant["title"])
+        price_cents = int(desired_variant["priceCents"])
+        compare_at_cents = (
+            int(desired_variant["compareAtCents"])
+            if isinstance(desired_variant.get("compareAtCents"), int)
+            else None
+        )
+        option_values = {"offerId": str(desired_variant["id"]).strip()}
+
+        if remote_variant_id:
+            update_medusa_variant(
+                session=session,
+                org_id=str(client.org_id),
+                client_id=str(client.id),
+                product_id=str(product.medusa_product_id),
+                variant_id=remote_variant_id,
+                fields={
+                    "title": variant_title,
+                    "priceCents": price_cents,
+                    "currency": str(desired_variant["currency"]),
+                },
+            )
+        else:
+            created_remote = create_medusa_variant(
+                session=session,
+                org_id=str(client.org_id),
+                client_id=str(client.id),
+                product=product,
+                title=variant_title,
+                price_cents=price_cents,
+                currency=str(desired_variant["currency"]),
+                option_values={"Variant": variant_title},
+            )
+            remote_variant_id = str(created_remote["id"])
+            remote_variants_by_title[_normalize_text(variant_title)] = created_remote
+
+        if matched_row is not None and row_id is not None:
+            updated_row = variants_repo.update(
+                variant_id=row_id,
+                offer_id=offer_id,
+                title=variant_title,
+                price=price_cents,
+                currency=str(desired_variant["currency"]).upper(),
+                provider="medusa",
+                external_price_id=remote_variant_id,
+                compare_at_price=compare_at_cents,
+                option_values=option_values,
+            )
+            if updated_row is None:
+                raise RuntimeError(f"Failed to update local EMBER variant row {row_id}.")
+            retained_row_ids.add(str(updated_row.id))
+        else:
+            created_row = variants_repo.create(
+                product_id=str(product.id),
+                offer_id=offer_id,
+                title=variant_title,
+                price=price_cents,
+                currency=str(desired_variant["currency"]).upper(),
+                provider="medusa",
+                external_price_id=remote_variant_id,
+                compare_at_price=compare_at_cents,
+                option_values=option_values,
+            )
+            retained_row_ids.add(str(created_row.id))
+            existing_rows.append(created_row)
+
+        synced_variants.append(
+            {
+                "id": str(desired_variant["id"]),
+                "title": variant_title,
+                "priceCents": price_cents,
+                "compareAtCents": compare_at_cents,
+                "medusaVariantId": remote_variant_id,
+            }
+        )
+
+    for row in existing_rows:
+        row_id = str(row.id)
+        if row_id in retained_row_ids:
+            continue
+        variants_repo.delete(variant_id=row_id)
+
+    return {
+        "productId": str(product.id),
+        "medusaProductId": str(product.medusa_product_id),
+        "offerId": offer_id,
+        "medusaAuth": medusa_auth,
+        "offerDocumentSelectedVariantId": offer_document.get("selectedVariantId"),
+        "variants": sorted(synced_variants, key=lambda variant: (int(_extract_duration_days(str(variant["title"])) or 9999), int(variant["priceCents"]))),
+    }
+
+
+def _policy_placeholder_values(
+    *,
+    profile: ClientComplianceProfile,
+    workspace_name: str,
+    website_url: str,
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    scalar_fields = {
+        "legal_business_name": profile.legal_business_name,
+        "operating_entity_name": profile.operating_entity_name,
+        "company_address_text": profile.company_address_text,
+        "business_license_identifier": profile.business_license_identifier,
+        "support_email": profile.support_email,
+        "support_phone": profile.support_phone,
+        "support_hours_text": profile.support_hours_text,
+        "response_time_commitment": profile.response_time_commitment,
+    }
+    for key, value in scalar_fields.items():
+        if isinstance(value, str) and value.strip():
+            values[key] = value.strip()
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    for key, raw_value in metadata.items():
+        if not isinstance(key, str):
+            continue
+        placeholder_key = key.strip()
+        if not placeholder_key or raw_value is None:
+            continue
+        if isinstance(raw_value, str):
+            cleaned = raw_value.strip()
+            if cleaned:
+                values[placeholder_key] = cleaned
+            continue
+        if isinstance(raw_value, (int, float, bool)):
+            values[placeholder_key] = str(raw_value)
+    values["brand_name"] = workspace_name
+    values["website_url"] = website_url
+    return values
+
+
+def _validate_policy_page_renderability(
+    *,
+    session,
+    client: Client,
+    website_url: str,
+) -> dict[str, Any]:
+    workspace_name = str(client.name or "").strip()
+    profile = session.scalars(
+        select(ClientComplianceProfile).where(
+            ClientComplianceProfile.org_id == client.org_id,
+            ClientComplianceProfile.client_id == client.id,
+        )
+    ).first()
+    if not profile:
+        return {
+            "ok": False,
+            "error": "Compliance profile not found for this workspace.",
+            "missingFields": [],
+            "pages": [],
+        }
+
+    placeholder_values = _policy_placeholder_values(
+        profile=profile,
+        workspace_name=workspace_name,
+        website_url=website_url,
+    )
+    page_results: list[dict[str, Any]] = []
+    missing_fields: set[str] = set()
+    for page_key in list_policy_page_keys():
+        try:
+            render_policy_template_markdown(
+                page_key=page_key,
+                placeholder_values=placeholder_values,
+            )
+            page_results.append({"pageKey": page_key, "status": "ok"})
+        except ValueError as exc:
+            message = str(exc)
+            missing_match = re.search(r"Missing placeholder values for page '[^']+': (?P<fields>.+)$", message)
+            if missing_match:
+                for field in missing_match.group("fields").split(","):
+                    cleaned = field.strip()
+                    if cleaned:
+                        missing_fields.add(cleaned)
+            page_results.append({"pageKey": page_key, "status": "failed", "error": message})
+
+    return {
+        "ok": not any(page["status"] == "failed" for page in page_results),
+        "profileId": str(profile.id),
+        "missingFields": sorted(missing_fields),
+        "pages": page_results,
+    }
 
 
 def _bundle_service(*, session, client: Client, product: Product) -> ProductStrategyBundlesService:
@@ -449,6 +945,16 @@ def _run_activate_handoff(args: argparse.Namespace) -> None:
         session.close()
 
 
+def _run_sync_commerce() -> None:
+    session = SessionLocal()
+    try:
+        client, product = _load_workspace(session)
+        result = _sync_ember_offer_variants(session=session, client=client, product=product)
+        _print(result)
+    finally:
+        session.close()
+
+
 def _instantiate_site(
     *,
     api_client: TestClient,
@@ -493,6 +999,7 @@ def _run_page_copy(args: argparse.Namespace) -> None:
     try:
         client, product = _load_workspace(session)
         template = _load_template(session)
+        commerce_sync = _sync_ember_offer_variants(session=session, client=client, product=product)
         bundles = _bundle_service(session=session, client=client, product=product)
         handoff = bundles.get_active_bundle(bundle_type="skills_handoff")
 
@@ -554,6 +1061,7 @@ def _run_page_copy(args: argparse.Namespace) -> None:
                             "Rewrite this one-product store home page for Ember: Brain Clarity Protocol. "
                             "Use the active approved strategy bundle as the source of truth. "
                             "Preserve the imported page structure and rewrite copy slots only. "
+                            "Respect every provided slot-level copy limit exactly. "
                             "Keep the hero CTA concise and review-friendly. "
                             "Do not invent prices, testimonials, scientific claims, or guarantees."
                         )
@@ -569,7 +1077,8 @@ def _run_page_copy(args: argparse.Namespace) -> None:
                     json={
                         "content": (
                             "Revise the same page. Tighten the above-the-fold clarity, improve flow into the purchase section, "
-                            "and keep the CTA and benefit language grounded in the approved strategy bundle."
+                            "keep the CTA and benefit language grounded in the approved strategy bundle, "
+                            "and stay within the provided slot-level copy limits."
                         )
                     },
                 )
@@ -625,13 +1134,19 @@ def _run_page_copy(args: argparse.Namespace) -> None:
                 text=True,
                 check=False,
             )
-            if preview_validation.returncode != 0:
-                raise RuntimeError(
-                    "Preview validation failed:\n"
-                    + (preview_validation.stdout or "")
-                    + "\n"
-                    + (preview_validation.stderr or "")
-                )
+            preview_validation_payload = (
+                json.loads(preview_validation.stdout)
+                if (preview_validation.stdout or "").strip()
+                else {
+                    "stdout": preview_validation.stdout,
+                    "stderr": preview_validation.stderr,
+                }
+            )
+            compliance_preflight = _validate_policy_page_renderability(
+                session=session,
+                client=client,
+                website_url=f"{stack_info['baseUrl']}/workspaces/sites/{instantiation['siteId']}/preview/{args.country}",
+            )
 
             report_path = run_dir / "page-copy-validation.json"
             report_payload = {
@@ -643,12 +1158,21 @@ def _run_page_copy(args: argparse.Namespace) -> None:
                 "entryPageId": instantiation["entryPageId"],
                 "threadId": thread_id,
                 "strategyBundleId": handoff["id"],
+                "commerceSync": commerce_sync,
+                "compliancePreflight": compliance_preflight,
                 "previewBaseUrl": stack_info["baseUrl"],
                 "previewStack": stack_info,
-                "previewValidation": json.loads(preview_validation.stdout),
+                "previewValidation": preview_validation_payload,
             }
             report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
             _print(report_payload)
+            if preview_validation.returncode != 0:
+                raise RuntimeError(
+                    "Preview validation failed:\n"
+                    + (preview_validation.stdout or "")
+                    + "\n"
+                    + (preview_validation.stderr or "")
+                )
     finally:
         app.dependency_overrides.clear()
         session.close()
@@ -679,6 +1203,9 @@ def main() -> None:
         return
     if args.command == "status":
         _run_status()
+        return
+    if args.command == "sync-commerce":
+        _run_sync_commerce()
         return
     if args.command == "page-copy":
         _run_page_copy(args)

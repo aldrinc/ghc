@@ -195,6 +195,9 @@ async function collectRuntimeErrors(page) {
     /No Medusa product could be loaded/i,
     /No Medusa variant title matches/i,
     /Imported section target .* was not found/i,
+    /Unable to load .* Missing placeholder values/i,
+    /Missing placeholder values for page/i,
+    /Unable to load .* Funnel not found/i,
   ];
   const matches = [];
   for (const frame of allFrames(page)) {
@@ -217,6 +220,121 @@ async function assertNoRuntimeErrors(page) {
   if (matches.length === 0) return;
   const rendered = matches.map((entry) => `${entry.message} [${entry.frameUrl}]`).join("; ");
   throw new Error(`Preview runtime reported blocking errors: ${rendered}`);
+}
+
+async function runCheck(report, name, fn) {
+  try {
+    const details = (await fn()) || {};
+    report.checks.push({
+      name,
+      status: "passed",
+      ...details,
+    });
+    return true;
+  } catch (error) {
+    report.checks.push({
+      name,
+      status: "failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    report.failed = true;
+    return false;
+  }
+}
+
+async function validateFooterRoute({
+  page,
+  previewUrl,
+  siteId,
+  countryCode,
+  linkRegex,
+  expectedPath,
+  screenshotPath,
+}) {
+  await openPreview(page, previewUrl);
+  const link = await findAction(page, linkRegex);
+  if (!link) {
+    throw new Error(`Could not find footer/header link matching ${String(linkRegex)}.`);
+  }
+  await link.click();
+  await waitForPath(page, `/workspaces/sites/${siteId}/preview/${countryCode}${expectedPath}`);
+  await assertNoRuntimeErrors(page);
+  if (screenshotPath) {
+    await saveScreenshot(page, screenshotPath);
+  }
+  return { url: compactUrl(page.url()) };
+}
+
+async function validatePurchaseRuntime({ page, previewUrl, targetSelector, screenshotPath }) {
+  await openPreview(page, previewUrl);
+  await assertNoRuntimeErrors(page);
+  const purchaseFrame = await findPurchaseSectionFrame(page, targetSelector);
+  if (!purchaseFrame) {
+    throw new Error("Could not locate the product-purchase section iframe.");
+  }
+
+  const cardTitles = (await purchaseFrame.locator("h3").evaluateAll((nodes) =>
+    nodes
+      .map((node) => (node.textContent || "").trim())
+      .filter(Boolean),
+  )).filter((title) => /\bday\b/i.test(title));
+  const uniqueTitles = Array.from(new Set(cardTitles));
+  if (uniqueTitles.length < 3) {
+    throw new Error(`Expected at least 3 purchasable variants, found ${uniqueTitles.length}: ${uniqueTitles.join(", ")}`);
+  }
+
+  const imageState = await purchaseFrame.evaluate(() => {
+    const allImages = Array.from(document.querySelectorAll("img"));
+    const mainImage =
+      allImages
+        .slice()
+        .sort((left, right) => {
+          const leftArea = (left.clientWidth || 0) * (left.clientHeight || 0);
+          const rightArea = (right.clientWidth || 0) * (right.clientHeight || 0);
+          return rightArea - leftArea;
+        })[0] || null;
+    const thumbnailButtons = Array.from(document.querySelectorAll("button")).filter((button) => {
+      return button.querySelector("img");
+    });
+    thumbnailButtons.forEach((button, index) => {
+      button.setAttribute("data-mos-validate-thumb", String(index));
+    });
+    return {
+      mainSrc: mainImage ? mainImage.getAttribute("src") || "" : "",
+      thumbnailCount: thumbnailButtons.length,
+    };
+  });
+
+  if (!imageState.mainSrc) {
+    throw new Error("Could not resolve the main product image in the purchase section.");
+  }
+  if (imageState.thumbnailCount < 2) {
+    throw new Error(`Expected at least 2 product thumbnails, found ${imageState.thumbnailCount}.`);
+  }
+
+  await purchaseFrame.locator("[data-mos-validate-thumb='1']").click();
+  await purchaseFrame.waitForFunction(
+    (previousSrc) => {
+      const allImages = Array.from(document.querySelectorAll("img"));
+      const mainImage =
+        allImages
+          .slice()
+          .sort((left, right) => {
+            const leftArea = (left.clientWidth || 0) * (left.clientHeight || 0);
+            const rightArea = (right.clientWidth || 0) * (right.clientHeight || 0);
+            return rightArea - leftArea;
+          })[0] || null;
+      const nextSrc = mainImage ? mainImage.getAttribute("src") || "" : "";
+      return Boolean(nextSrc) && nextSrc !== previousSrc;
+    },
+    imageState.mainSrc,
+    { timeout: 10000 },
+  );
+
+  if (screenshotPath) {
+    await saveScreenshot(page, screenshotPath);
+  }
+  return { variantTitles: uniqueTitles };
 }
 
 async function main() {
@@ -283,110 +401,133 @@ async function main() {
     });
 
     const targetSelector = "#product-purchase-section, [data-imported-section-id='product-purchase-section']";
-    const heroCta =
-      (await findAction(page, /restore clarity/i)) ||
-      (await findAction(page, /recover your clarity/i)) ||
-      (await findAction(page, /start the protocol/i)) ||
-      (await findAction(page, /start the brain clarity protocol/i)) ||
-      (await findAction(page, /shop now/i));
-    if (!heroCta) {
-      throw new Error(
-        'Could not find an Ember purchase CTA ("RESTORE CLARITY", "RECOVER YOUR CLARITY", "START THE PROTOCOL", "START THE BRAIN CLARITY PROTOCOL", or "SHOP NOW").',
+    await runCheck(report, "hero CTA scrolls to purchase section", async () => {
+      await openPreview(page, previewUrl);
+      const heroCta =
+        (await findAction(page, /restore clarity/i)) ||
+        (await findAction(page, /recover your clarity/i)) ||
+        (await findAction(page, /start the protocol/i)) ||
+        (await findAction(page, /start the brain clarity protocol/i)) ||
+        (await findAction(page, /shop now/i));
+      if (!heroCta) {
+        throw new Error(
+          'Could not find an Ember purchase CTA ("RESTORE CLARITY", "RECOVER YOUR CLARITY", "START THE PROTOCOL", "START THE BRAIN CLARITY PROTOCOL", or "SHOP NOW").',
+        );
+      }
+      await heroCta.click();
+      await page.waitForFunction(
+        (selector) => {
+          const target = document.querySelector(selector);
+          if (!(target instanceof HTMLElement)) return false;
+          return Math.abs(target.getBoundingClientRect().top) < 400;
+        },
+        targetSelector,
+        { timeout: 20000 },
       );
-    }
-    await heroCta.click();
-    await page.waitForFunction(
-      (selector) => {
-        const target = document.querySelector(selector);
-        if (!(target instanceof HTMLElement)) return false;
-        return Math.abs(target.getBoundingClientRect().top) < 400;
-      },
-      targetSelector,
-      { timeout: 20000 },
-    );
-    await saveScreenshot(page, path.join(runDir, "02-after-hero-cta.png"));
-    report.screenshots.afterHeroCta = path.join(runDir, "02-after-hero-cta.png");
-    report.checks.push({
-      name: "hero CTA scrolls to purchase section",
-      status: "passed",
-      url: compactUrl(page.url()),
+      const screenshotPath = path.join(runDir, "02-after-hero-cta.png");
+      await saveScreenshot(page, screenshotPath);
+      report.screenshots.afterHeroCta = screenshotPath;
+      return { url: compactUrl(page.url()) };
     });
 
-    await openPreview(page, previewUrl);
-    const contactLink = (await findAction(page, /contact us/i)) || (await findAction(page, /contact support/i));
-    if (!contactLink) {
-      throw new Error('Could not find the footer contact link ("CONTACT US" / "Contact Support").');
-    }
-    await contactLink.click();
-    await waitForPath(page, `/workspaces/sites/${siteId}/preview/${countryCode}/policies/contact-support`);
-    await saveScreenshot(page, path.join(runDir, "03-contact-support.png"));
-    report.screenshots.contactSupport = path.join(runDir, "03-contact-support.png");
-    report.checks.push({
-      name: "footer contact support route",
-      status: "passed",
-      url: compactUrl(page.url()),
+    await runCheck(report, "purchase runtime exposes synced variants and gallery updates", async () => {
+      const screenshotPath = path.join(runDir, "03-purchase-runtime.png");
+      const details = await validatePurchaseRuntime({
+        page,
+        previewUrl,
+        targetSelector,
+        screenshotPath,
+      });
+      report.screenshots.purchaseRuntime = screenshotPath;
+      return details;
     });
 
-    await openPreview(page, previewUrl);
-    const loginLink =
-      (await findAction(page, /^account$/i, { frameText: /contact support/i })) ||
-      (await findAction(page, /account login/i, { frameText: /contact support/i })) ||
-      (await findAction(page, /account login/i)) ||
-      (await findAction(page, /^account$/i)) ||
-      (await findAction(page, /^log in$/i));
-    if (!loginLink) {
-      throw new Error('Could not find the footer account link ("ACCOUNT LOGIN", "Account", or "Log In").');
-    }
-    await loginLink.click();
-    await waitForPath(page, `/workspaces/sites/${siteId}/preview/${countryCode}/account`);
-    await saveScreenshot(page, path.join(runDir, "04-account.png"));
-    report.screenshots.account = path.join(runDir, "04-account.png");
-    report.checks.push({
-      name: "footer account route",
-      status: "passed",
-      url: compactUrl(page.url()),
-    });
-
-    await openPreview(page, previewUrl);
-    await assertNoRuntimeErrors(page);
-    const purchaseFrame = await findPurchaseSectionFrame(page, targetSelector);
-    if (!purchaseFrame) {
-      throw new Error("Could not locate the product-purchase section iframe.");
-    }
-    const purchaseButton =
-      (await findActionInFrame(purchaseFrame, /add to cart/i)) ||
-      (await findActionInFrame(purchaseFrame, /start clarity protocol/i)) ||
-      (await findActionInFrame(purchaseFrame, /start the brain clarity protocol/i)) ||
-      (await findActionInFrame(purchaseFrame, /restore clarity now/i));
-    if (!purchaseButton) {
-      throw new Error(
-        'Could not find the purchase button in the product-purchase section ("ADD TO CART", "Start Clarity Protocol", "Start the Brain Clarity Protocol", or "Restore Clarity Now").',
-      );
-    }
-    await purchaseButton.click();
-    try {
+    await runCheck(report, "purchase button reaches checkout", async () => {
+      await openPreview(page, previewUrl);
+      await assertNoRuntimeErrors(page);
+      const purchaseFrame = await findPurchaseSectionFrame(page, targetSelector);
+      if (!purchaseFrame) {
+        throw new Error("Could not locate the product-purchase section iframe.");
+      }
+      const purchaseButton =
+        (await findActionInFrame(purchaseFrame, /add to cart/i)) ||
+        (await findActionInFrame(purchaseFrame, /order now/i)) ||
+        (await findActionInFrame(purchaseFrame, /buy now/i)) ||
+        (await findActionInFrame(purchaseFrame, /start clarity protocol/i)) ||
+        (await findActionInFrame(purchaseFrame, /start the brain clarity protocol/i)) ||
+        (await findActionInFrame(purchaseFrame, /restore clarity now/i)) ||
+        (await findActionInFrame(purchaseFrame, /get brain clarity protocol/i)) ||
+        (await findActionInFrame(purchaseFrame, /get your handbook/i)) ||
+        (await findActionInFrame(purchaseFrame, /get your copy/i));
+      if (!purchaseButton) {
+        throw new Error(
+          'Could not find the purchase button in the product-purchase section ("ADD TO CART", "Order Now", "Buy Now", "Start Clarity Protocol", "Start the Brain Clarity Protocol", "Restore Clarity Now", "Get Brain Clarity Protocol", "Get Your Handbook", or "Get Your Copy").',
+        );
+      }
+      await purchaseButton.click();
       await waitForPath(page, `/workspaces/sites/${siteId}/preview/${countryCode}/checkout`, 30000);
-      await saveScreenshot(page, path.join(runDir, "05-checkout.png"));
-      report.screenshots.checkout = path.join(runDir, "05-checkout.png");
-      report.checks.push({
-        name: "purchase button reaches checkout",
-        status: "passed",
-        url: compactUrl(page.url()),
+      const screenshotPath = path.join(runDir, "04-checkout.png");
+      await saveScreenshot(page, screenshotPath);
+      report.screenshots.checkout = screenshotPath;
+      return { url: compactUrl(page.url()) };
+    });
+
+    await runCheck(report, "footer contact support route", async () => {
+      const screenshotPath = path.join(runDir, "05-contact-support.png");
+      const details = await validateFooterRoute({
+        page,
+        previewUrl,
+        siteId,
+        countryCode,
+        linkRegex: /contact us|contact support/i,
+        expectedPath: "/policies/contact-support",
+        screenshotPath,
       });
-    } catch (error) {
-      const toasts = await collectToastText(page);
-      const runtimeErrors = await collectRuntimeErrors(page);
-      await saveScreenshot(page, path.join(runDir, "05-purchase-failure.png"));
-      report.screenshots.purchaseFailure = path.join(runDir, "05-purchase-failure.png");
-      report.checks.push({
-        name: "purchase button reaches checkout",
-        status: "failed",
-        url: compactUrl(page.url()),
-        toasts,
-        runtimeErrors,
-        error: error instanceof Error ? error.message : String(error),
+      report.screenshots.contactSupport = screenshotPath;
+      return details;
+    });
+
+    await runCheck(report, "footer account route", async () => {
+      await openPreview(page, previewUrl);
+      const loginLink =
+        (await findAction(page, /^account$/i, { frameText: /contact support/i })) ||
+        (await findAction(page, /account login/i, { frameText: /contact support/i })) ||
+        (await findAction(page, /account login/i)) ||
+        (await findAction(page, /^account$/i)) ||
+        (await findAction(page, /^log in$/i));
+      if (!loginLink) {
+        throw new Error('Could not find the footer account link ("ACCOUNT LOGIN", "Account", or "Log In").');
+      }
+      await loginLink.click();
+      await waitForPath(page, `/workspaces/sites/${siteId}/preview/${countryCode}/account`);
+      await assertNoRuntimeErrors(page);
+      const screenshotPath = path.join(runDir, "06-account.png");
+      await saveScreenshot(page, screenshotPath);
+      report.screenshots.account = screenshotPath;
+      return { url: compactUrl(page.url()) };
+    });
+
+    const policyRoutes = [
+      { name: "privacy policy route", linkRegex: /privacy policy/i, path: "/policies/privacy-policy", screenshot: "07-privacy-policy.png" },
+      { name: "terms of service route", linkRegex: /terms of service/i, path: "/policies/terms-of-service", screenshot: "08-terms-of-service.png" },
+      { name: "shipping policy route", linkRegex: /shipping policy/i, path: "/policies/shipping-policy", screenshot: "09-shipping-policy.png" },
+      { name: "refund policy route", linkRegex: /refund policy/i, path: "/policies/refund-policy", screenshot: "10-refund-policy.png" },
+    ];
+    for (const policyRoute of policyRoutes) {
+      await runCheck(report, `footer ${policyRoute.name}`, async () => {
+        const screenshotPath = path.join(runDir, policyRoute.screenshot);
+        const details = await validateFooterRoute({
+          page,
+          previewUrl,
+          siteId,
+          countryCode,
+          linkRegex: policyRoute.linkRegex,
+          expectedPath: policyRoute.path,
+          screenshotPath,
+        });
+        report.screenshots[policyRoute.screenshot] = screenshotPath;
+        return details;
       });
-      report.failed = true;
     }
   } finally {
     const reportPath = path.join(runDir, "report.json");

@@ -433,6 +433,25 @@ ${compiledRuntime}
       .split(NEWLINE)
       .map((entry) => entry.trim())
       .filter(Boolean);
+  const preserveTextNodeBoundaryWhitespace = (node, value) => {
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+      return String(value ?? "");
+    }
+    const nextValue = String(value ?? "").trim();
+    if (!nextValue) {
+      return "";
+    }
+    const originalValue = String(node.textContent || "");
+    const hasLeadingWhitespace = /^\\s/.test(originalValue) && node.previousSibling != null;
+    const hasTrailingWhitespace = /\\s$/.test(originalValue) && node.nextSibling != null;
+    const previousText = normalizeText(readNodeText(node.previousSibling));
+    const nextSiblingText = normalizeText(readNodeText(node.nextSibling));
+    const shouldAddLeadingWhitespace =
+      hasLeadingWhitespace || shouldInsertTextBoundaryWhitespaceFromText(previousText, nextValue);
+    const shouldAddTrailingWhitespace =
+      hasTrailingWhitespace || shouldInsertTextBoundaryWhitespaceFromText(nextValue, nextSiblingText);
+    return (shouldAddLeadingWhitespace ? " " : "") + nextValue + (shouldAddTrailingWhitespace ? " " : "");
+  };
   const readRawText = (node) => String(node && node.textContent ? node.textContent : "");
   const readNodeText = (node) => {
     if (node == null) return "";
@@ -451,6 +470,82 @@ ${compiledRuntime}
       if (text) parts.push(text);
     });
     return parts.join(" ");
+  };
+  const isVisibleInlineBoundaryNode = (node) => {
+    if (node == null) return false;
+    if (node.nodeType === Node.TEXT_NODE) {
+      return normalizeText(node.textContent).length > 0;
+    }
+    if (!(node instanceof Element)) {
+      return normalizeText(readNodeText(node)).length > 0;
+    }
+    if (node.hidden) return false;
+    const tagName = node.tagName.toLowerCase();
+    if (tagName === "script" || tagName === "style" || tagName === "br") {
+      return false;
+    }
+    return normalizeText(readNodeText(node)).length > 0;
+  };
+  const shouldInsertTextBoundaryWhitespaceFromText = (leftText, rightText) => {
+    if (!leftText || !rightText) return false;
+    if (/^[,.;:!?)}\\]]/.test(rightText)) return false;
+    const leftLastCharacter = leftText.slice(-1);
+    const rightFirstCharacter = rightText.slice(0, 1);
+    if (!/[\\p{L}\\p{N}%©).,;:!?]/u.test(leftLastCharacter)) return false;
+    if (!/[\\p{L}\\p{N}(©]/u.test(rightFirstCharacter)) return false;
+    return true;
+  };
+  const shouldInsertTextBoundaryWhitespace = (leftNode, rightNode) =>
+    shouldInsertTextBoundaryWhitespaceFromText(
+      normalizeText(readNodeText(leftNode)),
+      normalizeText(readNodeText(rightNode)),
+    );
+  const normalizeInlineBoundarySpacing = (scope) => {
+    if (!(scope instanceof Element)) return;
+    const containers = [scope, ...Array.from(scope.querySelectorAll("*"))];
+    containers.forEach((containerNode) => {
+      const childNodes = Array.from(containerNode.childNodes);
+      const visibleNodes = childNodes.filter((node) => isVisibleInlineBoundaryNode(node));
+      const textNodeState = new Map();
+      const getTextNodeState = (node) => {
+        let state = textNodeState.get(node);
+        if (!state) {
+          state = {
+            coreText: String(node.textContent || "").trim(),
+            prefixSpace: false,
+            suffixSpace: false,
+          };
+          textNodeState.set(node, state);
+        }
+        return state;
+      };
+
+      for (let index = 0; index < visibleNodes.length - 1; index += 1) {
+        const leftNode = visibleNodes[index];
+        const rightNode = visibleNodes[index + 1];
+        if (!shouldInsertTextBoundaryWhitespace(leftNode, rightNode)) {
+          continue;
+        }
+        if (rightNode.nodeType === Node.TEXT_NODE) {
+          getTextNodeState(rightNode).prefixSpace = true;
+          continue;
+        }
+        if (leftNode.nodeType === Node.TEXT_NODE) {
+          getTextNodeState(leftNode).suffixSpace = true;
+        }
+      }
+
+      childNodes.forEach((node) => {
+        if (node.nodeType !== Node.TEXT_NODE) return;
+        const state = getTextNodeState(node);
+        if (!state.coreText) {
+          node.textContent = "";
+          return;
+        }
+        node.textContent =
+          (state.prefixSpace ? " " : "") + state.coreText + (state.suffixSpace ? " " : "");
+      });
+    });
   };
   const readNormalizedNodeText = (node) => normalizeText(readNodeText(node));
   const readRawButtonText = (element) => normalizeText(readRawText(element));
@@ -689,7 +784,22 @@ ${compiledRuntime}
       return;
     }
 
+    const normalizeFooterCopyright = (footerRoot) => {
+      if (!(footerRoot instanceof Element)) return;
+      const paragraphs = Array.from(footerRoot.querySelectorAll("p"));
+      paragraphs.forEach((paragraph) => {
+        if (!(paragraph instanceof HTMLElement)) return;
+        const text = normalizeText(paragraph.textContent);
+        const duplicateCopyrightMatch = text.match(/^(©\\s*20\\d{2})\\s*(.+?)\\s+©\\s+(.+)$/u);
+        if (!duplicateCopyrightMatch) return;
+        const brand = duplicateCopyrightMatch[2].replace(/[.\\s]+$/u, "");
+        const remainder = duplicateCopyrightMatch[3].trim();
+        paragraph.textContent = duplicateCopyrightMatch[1] + " " + brand + ". " + remainder;
+      });
+    };
+
     const footer = scope instanceof HTMLElement ? scope : null;
+    normalizeFooterCopyright(footer);
     const navContainer =
       footer?.querySelector('a[href="policies/contact-support"]')?.parentElement instanceof HTMLElement
         ? footer.querySelector('a[href="policies/contact-support"]')?.parentElement
@@ -723,6 +833,15 @@ ${compiledRuntime}
       link.style.letterSpacing = "0.06em";
     });
   };
+  const listPurchaseCardCandidates = (scope) => {
+    if (!(scope instanceof Element)) return [];
+    return Array.from(scope.querySelectorAll("*")).filter((candidate) => {
+      if (!(candidate instanceof HTMLElement)) return false;
+      const className = candidate.className || "";
+      if (typeof className !== "string" || !className.includes("cursor-pointer")) return false;
+      return candidate.querySelector("h3") instanceof HTMLElement;
+    });
+  };
   const findSelectedPurchaseCard = (scope) => {
     if (!(scope instanceof Element)) return null;
     const selectedTitle = normalizeText(scope.getAttribute("data-mos-imported-selected-title") || "");
@@ -746,11 +865,7 @@ ${compiledRuntime}
   };
   const listPurchaseCards = (scope) => {
     if (!(scope instanceof Element)) return [];
-    return Array.from(scope.querySelectorAll("*")).filter((candidate) => {
-      if (!(candidate instanceof HTMLElement)) return false;
-      const className = candidate.className || "";
-      if (typeof className !== "string" || !className.includes("cursor-pointer")) return false;
-      if (!(candidate.querySelector("h3") instanceof HTMLElement)) return false;
+    return listPurchaseCardCandidates(scope).filter((candidate) => {
       const title = resolvePurchaseCardTitle(candidate);
       return Boolean(title) && Boolean(findPurchaseVariantByTitle(title));
     });
@@ -769,13 +884,23 @@ ${compiledRuntime}
     }
     const normalizedDisplayTitle = normalizeText(displayTitle);
     const normalizedOriginalTitle = resolveOriginalTextForDisplay(displayTitle);
+    const resolveDurationKey = (value) => {
+      const normalizedValue = normalizeText(value);
+      const match = normalizedValue.match(/(\d+)\s*day/);
+      return match ? String(match[1]) + "-day" : "";
+    };
+    const displayDurationKey = resolveDurationKey(displayTitle);
+    const originalDurationKey = resolveDurationKey(normalizedOriginalTitle);
     return (
       purchaseRuntimeData.variants.find(
         (variant) => {
           const normalizedVariantTitle = normalizeText(variant.title);
+          const variantDurationKey = resolveDurationKey(variant.title);
           return (
             normalizedVariantTitle === normalizedDisplayTitle ||
-            normalizedVariantTitle === normalizedOriginalTitle
+            normalizedVariantTitle === normalizedOriginalTitle ||
+            (variantDurationKey &&
+              (variantDurationKey === displayDurationKey || variantDurationKey === originalDurationKey))
           );
         },
       ) || null
@@ -791,6 +916,15 @@ ${compiledRuntime}
     }
     const runtimeMatchedTitle = headingTexts.find((title) => Boolean(findPurchaseVariantByTitle(title)));
     return runtimeMatchedTitle || headingTexts[headingTexts.length - 1] || "";
+  };
+  const setPurchaseCardTitle = (card, title) => {
+    if (!(card instanceof HTMLElement)) return;
+    const headings = Array.from(card.querySelectorAll("h3")).filter((heading) => heading instanceof HTMLElement);
+    if (!headings.length) return;
+    const targetHeading = headings[headings.length - 1];
+    if (targetHeading instanceof HTMLElement) {
+      targetHeading.textContent = title;
+    }
   };
   const renderPurchasePriceColumn = (container, variant) => {
     if (!(container instanceof HTMLElement) || !variant) return;
@@ -811,6 +945,123 @@ ${compiledRuntime}
       priceElement.textContent = variant.priceLabel;
     }
   };
+  const ensurePurchaseVariantCards = (scope) => {
+    if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
+      return;
+    }
+    const candidateCards = listPurchaseCardCandidates(scope);
+    if (!candidateCards.length) {
+      return;
+    }
+    const cardParent = candidateCards[0] && candidateCards.every((card) => card.parentElement === candidateCards[0].parentElement)
+      ? candidateCards[0].parentElement
+      : null;
+    if (!(cardParent instanceof HTMLElement)) {
+      return;
+    }
+    const selectedTitleFromState = normalizeText(scope.getAttribute("data-mos-imported-selected-title") || "");
+    const visuallySelectedCard =
+      candidateCards.find((card) => {
+        return card.classList.contains("border-primary") || card.classList.contains("bg-bg-card");
+      }) || null;
+    const preferredSelectedTitle =
+      selectedTitleFromState || resolvePurchaseCardTitle(visuallySelectedCard);
+
+    const resolveDurationKey = (value) => {
+      const normalizedValue = normalizeText(value);
+      const match = normalizedValue.match(/(\d+)\s*day/);
+      return match ? String(match[1]) + "-day" : "";
+    };
+    const referenceNode = candidateCards[candidateCards.length - 1]?.nextSibling || null;
+    const unusedCards = candidateCards.slice();
+    const orderedCards = purchaseRuntimeData.variants
+      .map((variant, index) => {
+        const variantTitleKey = normalizeText(variant.title);
+        const variantDurationKey = resolveDurationKey(variant.title);
+        const exactMatchIndex = unusedCards.findIndex((card) => {
+          const cardTitle = resolvePurchaseCardTitle(card);
+          const cardTitleKey = normalizeText(cardTitle);
+          const cardDurationKey = resolveDurationKey(cardTitle);
+          return (
+            (variantTitleKey && cardTitleKey === variantTitleKey) ||
+            (variantDurationKey && cardDurationKey && cardDurationKey === variantDurationKey)
+          );
+        });
+
+        let card = exactMatchIndex >= 0 ? unusedCards.splice(exactMatchIndex, 1)[0] : null;
+        if (!(card instanceof HTMLElement) && unusedCards[index] instanceof HTMLElement) {
+          card = unusedCards.splice(index, 1)[0];
+        }
+
+        if (!(card instanceof HTMLElement)) {
+          const templateCard = candidateCards[0]?.cloneNode(true);
+          if (!(templateCard instanceof HTMLElement)) {
+            return null;
+          }
+          templateCard.dataset.mosImportedGeneratedPurchaseCard = "true";
+          delete templateCard.dataset.mosImportedPurchaseCardBound;
+          card = templateCard;
+        } else {
+          card.removeAttribute("aria-hidden");
+          card.style.display = "";
+        }
+
+        delete card.dataset.mosImportedPurchaseCardBound;
+        setPurchaseCardTitle(card, variant.title);
+        const priceColumn = card.lastElementChild;
+        if (priceColumn instanceof HTMLElement) {
+          renderPurchasePriceColumn(priceColumn, variant);
+        }
+        return card;
+      })
+      .filter((card) => card instanceof HTMLElement);
+
+    unusedCards.forEach((card) => {
+      if (!(card instanceof HTMLElement)) return;
+      card.style.display = "none";
+      card.setAttribute("aria-hidden", "true");
+    });
+
+    orderedCards.forEach((card) => {
+      if (!(card instanceof HTMLElement)) return;
+      cardParent.insertBefore(card, referenceNode);
+    });
+
+    const preferredSelectedVariant = findPurchaseVariantByTitle(preferredSelectedTitle);
+    if (preferredSelectedVariant && preferredSelectedVariant.title) {
+      scope.setAttribute("data-mos-imported-selected-title", preferredSelectedVariant.title);
+    }
+  };
+  const resolvePurchaseGalleryTargets = (scope) => {
+    if (!(scope instanceof Element)) {
+      return { mainImage: null, thumbnailButtons: [], thumbnailImages: [] };
+    }
+    const allImages = Array.from(scope.querySelectorAll("img")).filter(
+      (candidate) => candidate instanceof HTMLImageElement,
+    );
+    if (!allImages.length) {
+      return { mainImage: null, thumbnailButtons: [], thumbnailImages: [] };
+    }
+
+    const thumbnailButtons = Array.from(scope.querySelectorAll("button")).filter((candidate) => {
+      if (!(candidate instanceof HTMLButtonElement)) return false;
+      return candidate.querySelector("img") instanceof HTMLImageElement;
+    });
+    const thumbnailImages = thumbnailButtons
+      .map((button) => button.querySelector("img"))
+      .filter((candidate) => candidate instanceof HTMLImageElement);
+
+    const mainImage =
+      allImages
+        .slice()
+        .sort((left, right) => {
+          const leftArea = (left.clientWidth || 0) * (left.clientHeight || 0);
+          const rightArea = (right.clientWidth || 0) * (right.clientHeight || 0);
+          return rightArea - leftArea;
+        })[0] || null;
+
+    return { mainImage, thumbnailButtons, thumbnailImages };
+  };
   const syncPurchaseImages = (scope) => {
     if (
       !(scope instanceof Element) ||
@@ -820,18 +1071,34 @@ ${compiledRuntime}
     ) {
       return;
     }
-    const images = Array.from(scope.querySelectorAll("img"));
-    if (!images.length) {
+    const { mainImage, thumbnailButtons, thumbnailImages } = resolvePurchaseGalleryTargets(scope);
+    if (!(mainImage instanceof HTMLImageElement)) {
       return;
     }
-    const fallbackImageUrl = purchaseRuntimeData.imageUrls[0];
-    images.forEach((image, index) => {
-      const nextImageUrl = purchaseRuntimeData.imageUrls[index] || fallbackImageUrl;
-      if (!nextImageUrl) {
-        return;
-      }
+    const runtimeImageUrls = purchaseRuntimeData.imageUrls.filter(Boolean);
+    const fallbackImageUrl = runtimeImageUrls[0];
+    if (!fallbackImageUrl) {
+      return;
+    }
+
+    if (!thumbnailImages.length) {
+      mainImage.setAttribute("src", fallbackImageUrl);
+      return;
+    }
+
+    thumbnailImages.forEach((image, index) => {
+      const nextImageUrl = runtimeImageUrls[index] || fallbackImageUrl;
+      if (!nextImageUrl) return;
       image.setAttribute("src", nextImageUrl);
     });
+
+    const selectedThumbnailIndex = thumbnailButtons.findIndex((button) => {
+      if (!(button instanceof HTMLElement)) return false;
+      return button.classList.contains("border-primary") || button.getAttribute("aria-pressed") === "true";
+    });
+    const nextMainImageUrl =
+      runtimeImageUrls[selectedThumbnailIndex >= 0 ? selectedThumbnailIndex : 0] || fallbackImageUrl;
+    mainImage.setAttribute("src", nextMainImageUrl);
   };
   const hideLegacyPurchaseVariantSelector = (scope) => {
     if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
@@ -891,6 +1158,7 @@ ${compiledRuntime}
     if (!(scope instanceof Element) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
       return;
     }
+    ensurePurchaseVariantCards(scope);
 
     const titleElements = Array.from(scope.querySelectorAll("h3"));
     for (const titleElement of titleElements) {
@@ -928,6 +1196,7 @@ ${compiledRuntime}
     if (!(scope instanceof HTMLElement) || componentName !== "ProductPurchaseSection" || !purchaseRuntimeData) {
       return;
     }
+    ensurePurchaseVariantCards(scope);
     const schedulePurchaseRuntimeSync = () => {
       const run = () => syncPurchaseRuntime(scope);
       if (typeof queueMicrotask === "function") {
@@ -1088,7 +1357,7 @@ ${compiledRuntime}
       if (matchedNodeIndexes.length) {
         for (const index of matchedNodeIndexes) {
           const node = textNodes[index];
-          node.textContent = nextText;
+          node.textContent = preserveTextNodeBoundaryWhitespace(node, nextText);
           if (node.parentElement) {
             syncEmptyElementVisibility(node.parentElement);
           }
@@ -1143,7 +1412,7 @@ ${compiledRuntime}
         if (segments.length > 1 && slots.length === segments.length) {
           slots.forEach((slot, slotIndex) => {
             const segment = segments[slotIndex] || "";
-            slot.textContent = segment;
+            slot.textContent = preserveTextNodeBoundaryWhitespace(slot, segment);
             if (slot instanceof HTMLElement) {
               syncEmptyElementVisibility(slot);
             }
@@ -1153,6 +1422,8 @@ ${compiledRuntime}
         }
       }
     }
+    normalizeInlineBoundarySpacing(scope);
+    enhanceFooterLayout(scope);
   };
 
   const applyButtonOverrides = (scope) => {

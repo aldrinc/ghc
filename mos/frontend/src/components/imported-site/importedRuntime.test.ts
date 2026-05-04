@@ -907,6 +907,140 @@ describe("buildImportedRuntimeSrcDoc", () => {
     expect(bodyTextAfterClick).toContain("Get Your Handbook $119");
   });
 
+  it("materializes missing purchase cards from synced runtime variants", async () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              element.setAttribute(key === "className" ? "class" : key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return {
+            render(node) {
+              container.replaceChildren(renderNode(node));
+            },
+          };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ImportedSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "product-purchase-section" },
+          React.createElement(
+            "div",
+            null,
+            React.createElement(
+              "div",
+              {
+                className:
+                  "relative cursor-pointer border-2 rounded-[16px] p-5 transition-all flex justify-between items-center border-primary bg-bg-card",
+              },
+              React.createElement("div", null, React.createElement("h3", null, "60 Day Brain Clarity Protocol")),
+              React.createElement("div", { className: "text-right" }, React.createElement("div", null, "$69")),
+            ),
+            React.createElement("button", null, "Order Now $69"),
+          ),
+        );
+    `;
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-purchase-runtime-materialize",
+      sectionLabel: "Purchase",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "ProductPurchaseSection",
+      sectionTargetId: "product-purchase-section",
+      initialButtonOverrides: [
+        {
+          originalText: "Order Now",
+          text: "Order Now",
+          href: "",
+          action: "medusa_buy_now",
+          selectionStrategy: "omni_selected_tier",
+          replaceCart: true,
+        },
+      ],
+      purchaseRuntimeData: {
+        ctaBaseLabel: "Order Now",
+        variants: [
+          { title: "30 Day Brain Clarity Protocol", priceLabel: "$39" },
+          { title: "60 Day Brain Clarity Protocol", priceLabel: "$69", compareAtLabel: "$78" },
+          { title: "90 Day Brain Clarity Protocol", priceLabel: "$99", compareAtLabel: "$117" },
+        ],
+      },
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage: () => {} };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const purchaseCards = Array.from(dom.window.document.querySelectorAll("div")).filter((candidate) => {
+      const className = candidate.getAttribute("class") || "";
+      return className.includes("cursor-pointer") && candidate.querySelector("h3");
+    });
+    expect(purchaseCards).toHaveLength(3);
+    expect(purchaseCards.map((card) => card.querySelector("h3")?.textContent?.trim())).toEqual([
+      "30 Day Brain Clarity Protocol",
+      "60 Day Brain Clarity Protocol",
+      "90 Day Brain Clarity Protocol",
+    ]);
+
+    const initialBodyText = dom.window.document.body.textContent || "";
+    expect(initialBodyText).toContain("Order Now $69");
+
+    purchaseCards[2]?.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    const bodyTextAfterClick = dom.window.document.body.textContent || "";
+    expect(bodyTextAfterClick).toContain("Order Now $99");
+  });
+
   it("emits the selected purchase tier title when imported cards contain nested headings", async () => {
     const reactStubSource = `
       var React = window.React = {
@@ -1809,6 +1943,328 @@ describe("buildImportedRuntimeSrcDoc", () => {
     expect(trailingSpan?.hidden).toBe(true);
     expect(trailingSpan?.style.display).toBe("none");
     expect(lineBreak == null || lineBreak.hidden || lineBreak.style.display === "none").toBe(true);
+  });
+
+  it("preserves spacing when split heading overrides target text nodes around an underlined span", () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              element.setAttribute(key === "className" ? "class" : key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return { render(node) { container.replaceChildren(renderNode(node)); } };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ImportedSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "comparison-section" },
+          React.createElement(
+            "h2",
+            null,
+            "Why Choose ",
+            React.createElement("span", { className: "underline" }, "OMNI?"),
+          ),
+        );
+    `;
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-spacing",
+      sectionLabel: "Comparison",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "ImportedSection",
+      sectionTargetId: "comparison-section",
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage: () => {} };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    dom.window.dispatchEvent(
+      new dom.window.MessageEvent("message", {
+        data: {
+          source: "mos-imported-runtime-host",
+          frameId: "frame-spacing",
+          type: "update-overrides",
+          revision: "2",
+          textOverrides: [
+            { originalText: "Why Choose", text: "Why Choose" },
+            { originalText: "OMNI?", text: "Ember Brain Clarity?" },
+          ],
+          buttonOverrides: [],
+          imageOverrides: [],
+        },
+      }),
+    );
+
+    const heading = dom.window.document.querySelector("h2");
+    const underline = heading?.querySelector("span");
+    expect(heading?.textContent).toBe("Why Choose Ember Brain Clarity?");
+    expect(heading?.firstChild?.textContent).toBe("Why Choose ");
+    expect(underline?.textContent).toBe("Ember Brain Clarity?");
+  });
+
+  it("synthesizes spacing for split text when the source markup omitted inline whitespace", () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              element.setAttribute(key === "className" ? "class" : key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return { render(node) { container.replaceChildren(renderNode(node)); } };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ImportedSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "faq-section" },
+          React.createElement(
+            "h2",
+            null,
+            "Any Last",
+            React.createElement("span", { className: "underline" }, "Questions?"),
+          ),
+          React.createElement("p", null, "© 2026", "Ember. All rights reserved."),
+        );
+    `;
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-inline-spacing",
+      sectionLabel: "FAQ",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "ImportedSection",
+      sectionTargetId: "faq-section",
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage: () => {} };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    dom.window.dispatchEvent(
+      new dom.window.MessageEvent("message", {
+        data: {
+          source: "mos-imported-runtime-host",
+          frameId: "frame-inline-spacing",
+          type: "update-overrides",
+          revision: "2",
+          textOverrides: [
+            { originalText: "Any Last", text: "Common Concerns" },
+            { originalText: "Questions?", text: "Ready to Reclaim Your Words?" },
+            { originalText: "Ember. All rights reserved.", text: "Ember. All rights reserved." },
+          ],
+          buttonOverrides: [],
+          imageOverrides: [],
+        },
+      }),
+    );
+
+    const heading = dom.window.document.querySelector("h2");
+    const copyright = dom.window.document.querySelector("p");
+    expect(heading?.textContent).toBe("Common Concerns Ready to Reclaim Your Words?");
+    expect(heading?.innerHTML).toContain("Common Concerns ");
+    expect(copyright?.textContent).toBe("© 2026 Ember. All rights reserved.");
+  });
+
+  it("preserves sentence-boundary spacing before underlined headline fragments and normalizes duplicated copyright marks", async () => {
+    const reactStubSource = `
+      var React = window.React = {
+        Fragment: Symbol.for("react.fragment"),
+        createElement(type, props, ...children) {
+          return { type, props: props || {}, children };
+        },
+      };
+    `;
+    const reactDomStubSource = `
+      var ReactDOM = window.ReactDOM = {
+        createRoot(container) {
+          const renderNode = (node) => {
+            if (node == null || node === false) return document.createTextNode("");
+            if (typeof node === "string" || typeof node === "number") return document.createTextNode(String(node));
+            if (Array.isArray(node)) {
+              const fragment = document.createDocumentFragment();
+              node.forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            if (typeof node.type === "function") {
+              return renderNode(node.type({ ...(node.props || {}), children: node.children || [] }));
+            }
+            if (node.type === React.Fragment) {
+              const fragment = document.createDocumentFragment();
+              (node.children || []).forEach((child) => fragment.appendChild(renderNode(child)));
+              return fragment;
+            }
+            const element = document.createElement(node.type);
+            Object.entries(node.props || {}).forEach(([key, value]) => {
+              if (value == null || key === "children") return;
+              element.setAttribute(key === "className" ? "class" : key, String(value));
+            });
+            (node.children || []).flat().forEach((child) => element.appendChild(renderNode(child)));
+            return element;
+          };
+          return { render(node) { container.replaceChildren(renderNode(node)); } };
+        },
+      };
+    `;
+    const compiledSource = `
+      const ImportedSection = () =>
+        React.createElement(
+          "section",
+          { "data-section-id": "evidence-section" },
+          React.createElement(
+            "h2",
+            null,
+            "Brain energy without hormones.",
+            React.createElement("span", { className: "underline" }, "Clarity in 3 weeks."),
+          ),
+          React.createElement("p", null, "© 2026", "Ember © All rights reserved."),
+        );
+    `;
+    const srcDoc = buildImportedRuntimeSrcDoc({
+      frameId: "frame-punctuation-spacing",
+      sectionLabel: "Evidence",
+      compiledSource,
+      reactUmdSource: reactStubSource,
+      reactDomUmdSource: reactDomStubSource,
+      componentName: "GlobalFooter",
+      sectionTargetId: "evidence-section",
+    });
+
+    const scripts = [...srcDoc.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+      runScripts: "outside-only",
+      url: "http://localhost/imported-runtime",
+    });
+    const context = dom.getInternalVMContext();
+    context.parent = { postMessage: () => {} };
+    context.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+    context.cancelAnimationFrame = () => {};
+    context.queueMicrotask = (callback: VoidFunction) => callback();
+    context.ResizeObserver = undefined;
+
+    for (const script of scripts) {
+      new vm.Script(script).runInContext(context);
+    }
+
+    dom.window.dispatchEvent(
+      new dom.window.MessageEvent("message", {
+        data: {
+          source: "mos-imported-runtime-host",
+          frameId: "frame-punctuation-spacing",
+          type: "update-overrides",
+          revision: "2",
+          textOverrides: [
+            { originalText: "Brain energy without hormones.", text: "Brain energy without hormones." },
+            { originalText: "Clarity in 3 weeks.", text: "Clarity in 3 weeks." },
+            { originalText: "Ember © All rights reserved.", text: "Ember © All rights reserved." },
+          ],
+          buttonOverrides: [],
+          imageOverrides: [],
+        },
+      }),
+    );
+
+    const heading = dom.window.document.querySelector("h2");
+    const copyright = dom.window.document.querySelector("p");
+    expect(heading?.textContent).toBe("Brain energy without hormones. Clarity in 3 weeks.");
+    expect(heading?.innerHTML).toContain("hormones. ");
+    expect(copyright?.textContent).toBe("© 2026 Ember. All rights reserved.");
   });
 
   it("replaces repeated exact text matches across an isolated section", () => {
