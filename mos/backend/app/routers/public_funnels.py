@@ -1854,7 +1854,11 @@ def public_funnel_commerce(
         funnel_slug=funnel_slug,
     )
 
-    variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
+    variants_query = (
+        select(ProductVariant)
+        .where(ProductVariant.product_id == product.id)
+        .order_by(ProductVariant.price.asc(), ProductVariant.title.asc())
+    )
     if funnel.selected_offer_id:
         variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
     variants = session.scalars(variants_query).all()
@@ -1933,8 +1937,10 @@ def _resolve_public_checkout_context(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="selection is required when variantId is not provided.",
             )
-        candidates_query = select(ProductVariant).where(
-            ProductVariant.product_id == funnel.product_id
+        candidates_query = (
+            select(ProductVariant)
+            .where(ProductVariant.product_id == funnel.product_id)
+            .order_by(ProductVariant.price.asc(), ProductVariant.title.asc())
         )
         if funnel.selected_offer_id:
             candidates_query = candidates_query.where(

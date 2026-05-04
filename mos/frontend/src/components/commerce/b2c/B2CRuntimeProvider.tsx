@@ -222,6 +222,7 @@ export type B2CRuntimeContextValue = {
   createCart: (regionId?: string) => Promise<MedusaCart>;
   refreshCart: () => Promise<void>;
   addToCart: (variantId: string, quantity: number) => Promise<void>;
+  replaceCartWithVariant: (variantId: string, quantity: number) => Promise<MedusaCart>;
   updateCartItem: (lineId: string, quantity: number) => Promise<void>;
   removeCartItem: (lineId: string) => Promise<void>;
   applyPromotionCode: (code: string) => Promise<void>;
@@ -332,7 +333,7 @@ export function B2CRuntimeProvider({
 }: B2CRuntimeProviderProps): ReactNode {
   const funnelRuntime = useFunnelRuntime();
   const navigate = useNavigate();
-  const { get: apiGet, post: apiPost } = useApiClient();
+  const { request: apiRequest, get: apiGet, post: apiPost } = useApiClient();
 
   // Configuration state
   const runtimeConfig = getMedusaRuntimeConfig();
@@ -404,6 +405,198 @@ export function B2CRuntimeProvider({
     });
   }, [designSystemTokens, importedShell, importedShellBrandName]);
 
+  const siteCartProxyBasePath = useMemo(() => {
+    if (siteId) {
+      return `/sites/${encodeURIComponent(siteId)}/medusa`;
+    }
+    const productSlug = funnelRuntime?.productSlug?.trim();
+    const funnelSlug = funnelRuntime?.funnelSlug?.trim();
+    if (!productSlug || !funnelSlug) {
+      return null;
+    }
+    return `/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/site`;
+  }, [funnelRuntime?.funnelSlug, funnelRuntime?.productSlug, siteId]);
+
+  const buildSiteCartProxyPath = useCallback(
+    (path: string, params?: Record<string, string | null | undefined>) => {
+      if (!siteCartProxyBasePath) {
+        return null;
+      }
+      const searchParams = new URLSearchParams();
+      Object.entries(params || {}).forEach(([key, value]) => {
+        if (typeof value === "string" && value.length > 0) {
+          searchParams.set(key, value);
+        }
+      });
+      const query = searchParams.toString();
+      return `${siteCartProxyBasePath}${path}${query ? `?${query}` : ""}`;
+    },
+    [siteCartProxyBasePath],
+  );
+
+  const resolveSiteCartRegionId = useCallback(
+    async (explicitRegionId?: string): Promise<string> => {
+      const trimmedRegionId = explicitRegionId?.trim();
+      if (trimmedRegionId) {
+        return trimmedRegionId;
+      }
+
+      const configuredRegionId = runtimeConfig?.defaultRegionId?.trim();
+      if (configuredRegionId) {
+        return configuredRegionId;
+      }
+
+      const normalizedCountryCode = countryCode.trim().toLowerCase();
+      const availableRegions = regions.length > 0 ? regions : await listRegions();
+      const matchingRegion = availableRegions.find((region) =>
+        region.countries?.some((country) => country.iso_2.toLowerCase() === normalizedCountryCode)
+      );
+
+      if (!matchingRegion) {
+        throw new MedusaApiError(`No Medusa region is configured for country code '${normalizedCountryCode}'.`);
+      }
+
+      return matchingRegion.id;
+    },
+    [countryCode, regions, runtimeConfig],
+  );
+
+  const getSiteCart = useCallback(
+    async (cartId: string): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath("/cart", { cart_id: cartId });
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      const response = await apiGet<{ cart: MedusaCart }>(path);
+      if (!response.cart?.id) {
+        throw new Error("Site cart proxy returned an invalid cart payload.");
+      }
+      return response.cart;
+    },
+    [apiGet, buildSiteCartProxyPath],
+  );
+
+  const createSiteCart = useCallback(
+    async (options?: {
+      regionId?: string;
+      email?: string;
+      shippingAddress?: Record<string, unknown>;
+      items?: Array<{ variant_id: string; quantity: number }>;
+    }): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath("/cart");
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      const regionId = await resolveSiteCartRegionId(options?.regionId);
+      const response = await apiPost<{ cart: MedusaCart }>(path, {
+        region_id: regionId,
+        email: options?.email,
+        shipping_address: options?.shippingAddress,
+        items: options?.items,
+      });
+      if (!response.cart?.id) {
+        throw new Error("Site cart proxy returned an invalid cart payload.");
+      }
+      setCartId(response.cart.id);
+      return response.cart;
+    },
+    [apiPost, buildSiteCartProxyPath, resolveSiteCartRegionId],
+  );
+
+  const getOrCreateSiteCart = useCallback(async (): Promise<MedusaCart> => {
+    const cartId = getCartId();
+    if (cartId) {
+      try {
+        const existingCart = await getSiteCart(cartId);
+        if (existingCart?.completed_at) {
+          setCartId(null);
+        } else {
+          return existingCart;
+        }
+      } catch {
+        setCartId(null);
+      }
+    }
+    return createSiteCart();
+  }, [createSiteCart, getSiteCart]);
+
+  const updateSiteCart = useCallback(
+    async (
+      cartId: string,
+      updates: {
+        email?: string;
+        shippingAddress?: Record<string, unknown>;
+        billingAddress?: Record<string, unknown>;
+      },
+    ): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath(`/cart/${encodeURIComponent(cartId)}`);
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      const response = await apiPost<{ cart: MedusaCart }>(path, {
+        email: updates.email,
+        shipping_address: updates.shippingAddress,
+        billing_address: updates.billingAddress,
+      });
+      if (!response.cart?.id) {
+        throw new Error("Site cart proxy returned an invalid cart payload.");
+      }
+      return response.cart;
+    },
+    [apiPost, buildSiteCartProxyPath],
+  );
+
+  const addSiteCartLineItem = useCallback(
+    async (cartId: string, variantId: string, quantity: number): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath(`/cart/${encodeURIComponent(cartId)}/items`);
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      const response = await apiPost<{ cart: MedusaCart }>(path, {
+        variant_id: variantId,
+        quantity,
+      });
+      if (!response.cart?.id) {
+        throw new Error("Site cart proxy returned an invalid cart payload.");
+      }
+      return response.cart;
+    },
+    [apiPost, buildSiteCartProxyPath],
+  );
+
+  const updateSiteCartLineItem = useCallback(
+    async (cartId: string, lineId: string, quantity: number): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath(
+        `/cart/${encodeURIComponent(cartId)}/items/${encodeURIComponent(lineId)}`,
+      );
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      const response = await apiPost<{ cart: MedusaCart }>(path, {
+        quantity,
+      });
+      if (!response.cart?.id) {
+        throw new Error("Site cart proxy returned an invalid cart payload.");
+      }
+      return response.cart;
+    },
+    [apiPost, buildSiteCartProxyPath],
+  );
+
+  const deleteSiteCartLineItem = useCallback(
+    async (cartId: string, lineId: string): Promise<MedusaCart> => {
+      const path = buildSiteCartProxyPath(
+        `/cart/${encodeURIComponent(cartId)}/items/${encodeURIComponent(lineId)}`,
+      );
+      if (!path) {
+        throw new Error("Site cart proxy is unavailable for this storefront runtime.");
+      }
+      await apiRequest<{ deleted: boolean }>(path, { method: "DELETE" });
+      return getSiteCart(cartId);
+    },
+    [apiRequest, buildSiteCartProxyPath, getSiteCart],
+  );
+
   // =============================================================================
   // Initialization
   // =============================================================================
@@ -449,7 +642,7 @@ export function B2CRuntimeProvider({
     const loadCart = async () => {
       setCartLoading(true);
       try {
-        const cartData = await getOrCreateCart();
+        const cartData = siteCartProxyBasePath ? await getOrCreateSiteCart() : await getOrCreateCart();
         setCart(cartData);
       } catch (err) {
         setCartError(err instanceof Error ? err.message : "Failed to load cart");
@@ -459,7 +652,7 @@ export function B2CRuntimeProvider({
     };
 
     loadCart();
-  }, [isConfigured]);
+  }, [getOrCreateSiteCart, isConfigured, siteCartProxyBasePath]);
 
   // Load customer if auth token exists
   useEffect(() => {
@@ -593,9 +786,11 @@ export function B2CRuntimeProvider({
     setCartLoading(true);
     setCartError(null);
     try {
-      const newCart = regionId
-        ? await createMedusaCart({ regionId, countryCode })
-        : await getOrCreateCart();
+      const newCart = siteCartProxyBasePath
+        ? await createSiteCart({ regionId })
+        : regionId
+          ? await createMedusaCart({ regionId, countryCode })
+          : await getOrCreateCart();
       setCart(newCart);
       return newCart;
     } catch (err) {
@@ -605,7 +800,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, [countryCode]);
+  }, [countryCode, createSiteCart, siteCartProxyBasePath]);
 
   const refreshCart = useCallback(async () => {
     const cartId = getCartId();
@@ -615,7 +810,7 @@ export function B2CRuntimeProvider({
     }
     setCartLoading(true);
     try {
-      const cartData = await getCart(cartId);
+      const cartData = siteCartProxyBasePath ? await getSiteCart(cartId) : await getCart(cartId);
       if (cartData?.completed_at) {
         setCartId(null);
         setCart(null);
@@ -627,7 +822,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [getSiteCart, siteCartProxyBasePath]);
 
   const addToCart = useCallback(async (variantId: string, quantity: number) => {
     setCartLoading(true);
@@ -635,10 +830,12 @@ export function B2CRuntimeProvider({
     try {
       let cartId = getCartId();
       if (!cartId) {
-        const newCart = await getOrCreateCart();
+        const newCart = siteCartProxyBasePath ? await getOrCreateSiteCart() : await getOrCreateCart();
         cartId = newCart.id;
       }
-      const updatedCart = await addCartLineItem(cartId, variantId, quantity);
+      const updatedCart = siteCartProxyBasePath
+        ? await addSiteCartLineItem(cartId, variantId, quantity)
+        : await addCartLineItem(cartId, variantId, quantity);
       setCart(updatedCart);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to add to cart";
@@ -647,14 +844,49 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [addSiteCartLineItem, getOrCreateSiteCart, siteCartProxyBasePath]);
+
+  const replaceCartWithVariant = useCallback(async (variantId: string, quantity: number): Promise<MedusaCart> => {
+    setCartLoading(true);
+    setCartError(null);
+    try {
+      const baseCart = siteCartProxyBasePath ? await getOrCreateSiteCart() : await getOrCreateCart();
+      const cartId = baseCart.id;
+      if (!cartId) {
+        throw new Error("Failed to resolve an active cart for replacement.");
+      }
+
+      let workingCart = baseCart;
+      const existingItems = Array.isArray(baseCart.items) ? [...baseCart.items] : [];
+      for (const item of existingItems) {
+        if (!item?.id) continue;
+        workingCart = siteCartProxyBasePath
+          ? await deleteSiteCartLineItem(cartId, item.id)
+          : await deleteCartLineItem(cartId, item.id);
+      }
+
+      const updatedCart = siteCartProxyBasePath
+        ? await addSiteCartLineItem(workingCart.id || cartId, variantId, quantity)
+        : await addCartLineItem(workingCart.id || cartId, variantId, quantity);
+      setCart(updatedCart);
+      return updatedCart;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to replace cart contents";
+      setCartError(message);
+      throw err;
+    } finally {
+      setCartLoading(false);
+    }
+  }, [addSiteCartLineItem, deleteSiteCartLineItem, getOrCreateSiteCart, siteCartProxyBasePath]);
 
   const updateCartItem = useCallback(async (lineId: string, quantity: number) => {
     const cartId = getCartId();
     if (!cartId) return;
     setCartLoading(true);
     try {
-      const updatedCart = await updateCartLineItem(cartId, lineId, quantity);
+      const updatedCart = siteCartProxyBasePath
+        ? await updateSiteCartLineItem(cartId, lineId, quantity)
+        : await updateCartLineItem(cartId, lineId, quantity);
       setCart(updatedCart);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to update cart item");
@@ -662,14 +894,16 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [siteCartProxyBasePath, updateSiteCartLineItem]);
 
   const removeCartItem = useCallback(async (lineId: string) => {
     const cartId = getCartId();
     if (!cartId) return;
     setCartLoading(true);
     try {
-      const updatedCart = await deleteCartLineItem(cartId, lineId);
+      const updatedCart = siteCartProxyBasePath
+        ? await deleteSiteCartLineItem(cartId, lineId)
+        : await deleteCartLineItem(cartId, lineId);
       setCart(updatedCart);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to remove cart item");
@@ -677,7 +911,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [deleteSiteCartLineItem, siteCartProxyBasePath]);
 
   const applyPromotionCode = useCallback(async (code: string) => {
     const cartId = getCartId();
@@ -720,7 +954,9 @@ export function B2CRuntimeProvider({
     if (!cartId) return;
     setCartLoading(true);
     try {
-      const updatedCart = await updateCart(cartId, { email });
+      const updatedCart = siteCartProxyBasePath
+        ? await updateSiteCart(cartId, { email })
+        : await updateCart(cartId, { email });
       setCart(updatedCart);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to update email");
@@ -728,14 +964,16 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [siteCartProxyBasePath, updateSiteCart]);
 
   const updateCartShippingAddress = useCallback(async (address: Record<string, unknown>) => {
     const cartId = getCartId();
     if (!cartId) return;
     setCartLoading(true);
     try {
-      const updatedCart = await updateCart(cartId, { shippingAddress: address });
+      const updatedCart = siteCartProxyBasePath
+        ? await updateSiteCart(cartId, { shippingAddress: address })
+        : await updateCart(cartId, { shippingAddress: address });
       setCart(updatedCart);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to update address");
@@ -743,14 +981,16 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [siteCartProxyBasePath, updateSiteCart]);
 
   const updateCartBillingAddress = useCallback(async (address: Record<string, unknown>) => {
     const cartId = getCartId();
     if (!cartId) return;
     setCartLoading(true);
     try {
-      const updatedCart = await updateCart(cartId, { billingAddress: address });
+      const updatedCart = siteCartProxyBasePath
+        ? await updateSiteCart(cartId, { billingAddress: address })
+        : await updateCart(cartId, { billingAddress: address });
       setCart(updatedCart);
     } catch (err) {
       setCartError(err instanceof Error ? err.message : "Failed to update billing address");
@@ -758,7 +998,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, []);
+  }, [siteCartProxyBasePath, updateSiteCart]);
 
   /**
    * Consolidated checkout action helper.
@@ -790,19 +1030,25 @@ export function B2CRuntimeProvider({
       switch (step) {
         case "update_email": {
           if (data.step !== "update_email") throw new Error("Invalid step data");
-          const updatedCart = await updateCart(cartId, { email: data.email });
+          const updatedCart = siteCartProxyBasePath
+            ? await updateSiteCart(cartId, { email: data.email })
+            : await updateCart(cartId, { email: data.email });
           setCart(updatedCart);
           return updatedCart;
         }
         case "update_shipping_address": {
           if (data.step !== "update_shipping_address") throw new Error("Invalid step data");
-          const updatedCart = await updateCart(cartId, { shippingAddress: data.address });
+          const updatedCart = siteCartProxyBasePath
+            ? await updateSiteCart(cartId, { shippingAddress: data.address })
+            : await updateCart(cartId, { shippingAddress: data.address });
           setCart(updatedCart);
           return updatedCart;
         }
         case "update_billing_address": {
           if (data.step !== "update_billing_address") throw new Error("Invalid step data");
-          const updatedCart = await updateCart(cartId, { billingAddress: data.address });
+          const updatedCart = siteCartProxyBasePath
+            ? await updateSiteCart(cartId, { billingAddress: data.address })
+            : await updateCart(cartId, { billingAddress: data.address });
           setCart(updatedCart);
           return updatedCart;
         }
@@ -833,7 +1079,7 @@ export function B2CRuntimeProvider({
     } finally {
       setCartLoading(false);
     }
-  }, [addShippingMethod, apiPost, siteId, updateCart]);
+  }, [addShippingMethod, apiPost, siteCartProxyBasePath, siteId, updateSiteCart]);
 
   // =============================================================================
   // Actions: Shipping
@@ -1247,6 +1493,7 @@ export function B2CRuntimeProvider({
     createCart,
     refreshCart,
     addToCart,
+    replaceCartWithVariant,
     updateCartItem,
     removeCartItem,
     applyPromotionCode,

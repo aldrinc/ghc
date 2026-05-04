@@ -477,8 +477,35 @@ class TestMedusaCartOperations:
 
         assert len(result["items"]) == 1
         call_args = mock_request.call_args
+        assert call_args.kwargs["method"] == "POST"
+        assert "/store/carts/cart_1/line-items" in call_args.kwargs["path"]
         assert call_args.kwargs["json_body"]["variant_id"] == "var_1"
         assert call_args.kwargs["json_body"]["quantity"] == 2
+
+    @patch("app.services.medusa_store_runtime._make_medusa_store_request")
+    def test_update_line_item(self, mock_request):
+        """Test updating line item quantity."""
+        mock_request.return_value = {
+            "cart": {"id": "cart_1", "items": [{"id": "item_1", "quantity": 3}]}
+        }
+
+        config = MedusaStoreConfig(
+            base_url="https://store.example.com",
+            publishable_key="pk_test_123",
+        )
+
+        result = medusa_update_cart_line_item(
+            config=config,
+            cart_id="cart_1",
+            line_id="item_1",
+            quantity=3,
+        )
+
+        assert result["items"][0]["quantity"] == 3
+        call_args = mock_request.call_args
+        assert call_args.kwargs["method"] == "POST"
+        assert "/store/carts/cart_1/line-items/item_1" in call_args.kwargs["path"]
+        assert call_args.kwargs["json_body"]["quantity"] == 3
 
     @patch("app.services.medusa_store_runtime._make_medusa_store_request")
     def test_delete_line_item(self, mock_request):

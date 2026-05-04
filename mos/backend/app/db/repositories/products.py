@@ -190,7 +190,11 @@ class ProductVariantsRepository:
         self.session = session
 
     def list_by_product(self, *, product_id: str) -> list[ProductVariant]:
-        stmt = select(ProductVariant).where(ProductVariant.product_id == product_id)
+        stmt = (
+            select(ProductVariant)
+            .where(ProductVariant.product_id == product_id)
+            .order_by(ProductVariant.price.asc(), ProductVariant.title.asc())
+        )
         return list(self.session.scalars(stmt).all())
 
     def get(self, *, variant_id: str) -> Optional[ProductVariant]:
