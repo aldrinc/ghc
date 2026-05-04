@@ -3,6 +3,7 @@ import { useMetaApi } from "@/api/meta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type {
   MetaManagementBenchmarkEvaluation,
@@ -601,6 +602,20 @@ export function MetaManagementPanel() {
                   </div>
                 ) : null}
               </div>
+
+              {plan.reportMarkdown ? (
+                <div className="rounded-xl border border-border bg-surface p-4">
+                  <div className="text-base font-semibold text-content">Strategy report</div>
+                  <div className="mt-1 text-xs text-content-muted">
+                    {plan.artifacts?.reportMarkdownArtifactId
+                      ? `Artifact ${shortId(plan.artifacts.reportMarkdownArtifactId, 8)}`
+                      : "Generated from the current management run"}
+                  </div>
+                  <div className="mt-4 rounded-md border border-border/70 bg-background p-4">
+                    <MarkdownViewer content={plan.reportMarkdown} className="max-w-none px-0" />
+                  </div>
+                </div>
+              ) : null}
 
               {plan.actions.length ? (
                 <Callout variant="warning" size="sm" title="Rule-triggered actions">
