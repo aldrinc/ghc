@@ -14772,7 +14772,7 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
                 source_files=_ordered_scraped_data_file_names(scraped_data_manifest),
             ),
             use_reasoning=True,
-            reasoning_effort="low",
+            reasoning_effort="xhigh",
             use_web_search=False,
             openai_tools=_openai_python_tool_resources(
                 settings.STRATEGY_V2_VOC_MODEL,
@@ -16383,7 +16383,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         source_files=_ordered_scraped_data_file_names(scraped_data_manifest),
                     ),
                     use_reasoning=True,
-                    reasoning_effort="low",
+                    reasoning_effort="xhigh",
                     use_web_search=False,
                     openai_tools=_openai_python_tool_resources(
                         settings.STRATEGY_V2_VOC_MODEL,

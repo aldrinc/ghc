@@ -1,6 +1,21 @@
 import importlib
 
 import app.config as config_module
+from app.temporal.workflows import precanon_market_research as precanon_workflow
+
+
+def test_strategy_v2_reasoning_defaults_use_gpt55():
+    assert config_module.Settings.model_fields["STRATEGY_V2_VOC_MODEL"].default == "gpt-5.5"
+    assert config_module.Settings.model_fields["STRATEGY_V2_OFFER_MODEL"].default == "gpt-5.5"
+
+
+def test_precanon_reasoning_default_uses_gpt55_xhigh():
+    assert precanon_workflow.DEFAULT_REASONING_MODEL == "gpt-5.5"
+    assert precanon_workflow.DEFAULT_REASONING_EFFORT == "xhigh"
+    params = precanon_workflow._llm_params_for_step("01")
+    assert params.model == "gpt-5.5"
+    assert params.use_reasoning is True
+    assert params.reasoning_effort == "xhigh"
 
 
 def test_strategy_v2_copy_defaults_remain_claude():
