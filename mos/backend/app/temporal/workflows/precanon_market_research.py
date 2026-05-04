@@ -49,7 +49,8 @@ with workflow.unsafe.imports_passed_through():
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL", "claude-opus-4-6")
-DEFAULT_REASONING_MODEL = os.getenv("PRECANON_REASONING_MODEL", "gpt-5.2-2025-12-11")
+DEFAULT_REASONING_MODEL = os.getenv("PRECANON_REASONING_MODEL", "gpt-5.5")
+DEFAULT_REASONING_EFFORT = os.getenv("PRECANON_REASONING_EFFORT", "xhigh")
 DEFAULT_PARENT_FOLDER_ID = os.getenv("RESEARCH_DRIVE_PARENT_FOLDER_ID") or os.getenv("PARENT_FOLDER_ID")
 STEP04_START_TO_CLOSE_MINUTES = int(os.getenv("PRECANON_STEP04_START_TO_CLOSE_MINUTES", "360"))
 STEP04_SCHEDULE_TO_CLOSE_MINUTES = int(os.getenv("PRECANON_STEP04_SCHEDULE_TO_CLOSE_MINUTES", "420"))
@@ -57,16 +58,19 @@ STEP_LLM_CONFIG: Dict[str, Dict[str, Any]] = {
     "01": {
         "model": os.getenv("PRECANON_STEP01_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
         "use_web_search": True,
     },
     "015": {
         "model": os.getenv("PRECANON_STEP015_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
         "use_web_search": True,
     },
     "03": {
         "model": os.getenv("PRECANON_STEP03_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
     },
     "04": {
         "model": os.getenv("PRECANON_STEP04_MODEL", "o3-deep-research-2025-06-26"),
@@ -76,18 +80,22 @@ STEP_LLM_CONFIG: Dict[str, Dict[str, Any]] = {
     "06": {
         "model": os.getenv("PRECANON_STEP06_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
     },
     "07": {
         "model": os.getenv("PRECANON_STEP07_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
     },
     "08": {
         "model": os.getenv("PRECANON_STEP08_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
     },
     "09": {
         "model": os.getenv("PRECANON_STEP09_MODEL", DEFAULT_REASONING_MODEL),
         "use_reasoning": True,
+        "reasoning_effort": DEFAULT_REASONING_EFFORT,
     },
 }
 
@@ -147,6 +155,7 @@ def _llm_params_for_step(step_key: str) -> LLMGenerationParams:
     return LLMGenerationParams(
         model=model,
         use_reasoning=bool(config.get("use_reasoning", False)),
+        reasoning_effort=config.get("reasoning_effort"),
         use_web_search=bool(config.get("use_web_search", False)),
         max_tokens=config.get("max_tokens"),
     )
