@@ -63,8 +63,8 @@ class Settings(BaseSettings):
     TEMPORAL_ADDRESS: str = "localhost:7234"
     CAMPAIGN_FUNNEL_VARIANT_ACTIVITY_CONCURRENCY: int = 3
     STRATEGY_V2_DEFAULT_ENABLED: bool = False
-    STRATEGY_V2_VOC_MODEL: str = "gpt-5.2-2025-12-11"
-    STRATEGY_V2_OFFER_MODEL: str = "gpt-5.2-2025-12-11"
+    STRATEGY_V2_VOC_MODEL: str = "gpt-5.5"
+    STRATEGY_V2_OFFER_MODEL: str = "gpt-5.5"
     STRATEGY_V2_COPY_MODEL: str = "claude-opus-4-6"
     STRATEGY_V2_COPY_QA_MODEL: str = "claude-opus-4-6"
     STRATEGY_V2_APIFY_ENABLED: bool = False
