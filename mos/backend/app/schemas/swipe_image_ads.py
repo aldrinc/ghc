@@ -91,6 +91,7 @@ class SwipeImageAdGenerateRequest(BaseModel):
         if model_value and (
             "image-preview" in model_value
             or "image-generation" in model_value
+            or model_value.startswith("gpt-image-")
             or model_value.endswith("-image")
         ):
             raise ValueError(
@@ -127,6 +128,7 @@ class SwipeTemplateTestimonialsGenerateRequest(BaseModel):
         if model_value and (
             "image-preview" in model_value
             or "image-generation" in model_value
+            or model_value.startswith("gpt-image-")
             or model_value.endswith("-image")
         ):
             raise ValueError(

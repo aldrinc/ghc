@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+from types import SimpleNamespace
+
 import pytest
 
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
@@ -30,6 +33,13 @@ def test_get_image_render_provider_uses_higgsfield_for_nano_banana_models(monkey
     assert image_render.get_image_render_provider(model_id="nano-banana-pro") == "higgsfield"
 
 
+def test_get_image_render_provider_uses_openai_for_gpt_image_models(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
+
+    assert image_render.get_image_render_provider(model_id="gpt-image-2") == "openai"
+    assert image_render.get_image_render_provider(model_id="openai/gpt-image-2") == "openai"
+
+
 def test_get_image_render_provider_uses_settings_swipe_render_model_default(monkeypatch) -> None:
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "higgsfield")
     monkeypatch.setattr(image_render.settings, "SWIPE_IMAGE_RENDER_MODEL", "gemini-3.1-flash-image-preview")
@@ -51,6 +61,14 @@ def test_build_image_render_client_returns_embedded_freestyle_for_creative_servi
     assert client.org_id == "org-123"
 
 
+def test_openai_image_render_client_requires_api_key(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "OPENAI_API_KEY", None)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(image_render.CreativeServiceConfigError, match="OPENAI_API_KEY is required"):
+        image_render.OpenAIImageRenderClient()
+
+
 def test_embedded_freestyle_rejects_reference_image_urls() -> None:
     client = embedded_freestyle.EmbeddedFreestyleImageRenderClient()
 
@@ -62,6 +80,199 @@ def test_embedded_freestyle_rejects_reference_image_urls() -> None:
                 reference_image_urls=["https://example.com/reference.png"],
             ),
             idempotency_key="idem-1",
+        )
+
+
+def test_openai_create_image_ads_generates_and_stores_b64_output(monkeypatch) -> None:
+    uploaded_objects: list[tuple[str, str, bytes, str | None]] = []
+    captured_generate: dict[str, object] = {}
+
+    class _FakeStorage:
+        bucket = "media-bucket"
+
+        def build_key(self, *, sha256: str, ext: str, kind: str = "orig") -> str:
+            assert kind == "orig"
+            return f"orig/{sha256}.{ext.lstrip('.')}"
+
+        def object_exists(self, *, bucket: str, key: str) -> bool:
+            assert bucket == self.bucket
+            return any(existing_key == key for _, existing_key, _, _ in uploaded_objects)
+
+        def upload_bytes(
+            self,
+            *,
+            bucket: str,
+            key: str,
+            data: bytes,
+            content_type: str | None,
+            cache_control: str | None = None,
+            extra_metadata: dict[str, str] | None = None,
+        ) -> None:
+            del cache_control, extra_metadata
+            uploaded_objects.append((bucket, key, data, content_type))
+
+        def presign_get(self, *, bucket: str, key: str, expires_in: int | None = None) -> str:
+            del expires_in
+            return f"https://cdn.example/{bucket}/{key}"
+
+    class _FakeImages:
+        def generate(self, **kwargs):
+            captured_generate.update(kwargs)
+            return SimpleNamespace(
+                data=[
+                    SimpleNamespace(
+                        b64_json=base64.b64encode(b"openai-generated-image").decode("ascii")
+                    )
+                ]
+            )
+
+        def edit(self, **kwargs):  # pragma: no cover
+            raise AssertionError(f"edit should not be called: {kwargs}")
+
+    class _FakeOpenAIClient:
+        images = _FakeImages()
+
+    monkeypatch.setattr(image_render, "MediaStorage", _FakeStorage)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_OUTPUT_FORMAT", raising=False)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_QUALITY", raising=False)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_OUTPUT_COMPRESSION", raising=False)
+    client = image_render.OpenAIImageRenderClient(client=_FakeOpenAIClient())
+
+    job = client.create_image_ads(
+        payload=CreativeServiceImageAdsCreateIn(
+            prompt="Create a square image ad",
+            count=1,
+            aspect_ratio="4:5",
+            model_id="gpt-image-2",
+        ),
+        idempotency_key="idem-openai-generate",
+    )
+
+    assert job.status == "succeeded"
+    assert job.id.startswith("openai:")
+    assert job.model_id == "gpt-image-2"
+    assert job.outputs[0].primary_url is not None
+    assert captured_generate["model"] == "gpt-image-2"
+    assert captured_generate["prompt"] == "Create a square image ad"
+    assert captured_generate["n"] == 1
+    assert captured_generate["size"] == "1024x1280"
+    assert "response_format" not in captured_generate
+    assert captured_generate["output_format"] == "png"
+    assert captured_generate["extra_headers"] == {"Idempotency-Key": "idem-openai-generate"}
+    assert uploaded_objects == [
+        (
+            "media-bucket",
+            f"orig/{image_render.hashlib.sha256(b'openai-generated-image').hexdigest()}.png",
+            b"openai-generated-image",
+            "image/png",
+        )
+    ]
+
+
+def test_openai_create_image_ads_edits_with_local_reference_assets(monkeypatch) -> None:
+    uploaded_objects: list[tuple[str, str, bytes, str | None]] = []
+    captured_edit: dict[str, object] = {}
+
+    class _FakeStorage:
+        bucket = "media-bucket"
+
+        def build_key(self, *, sha256: str, ext: str, kind: str = "orig") -> str:
+            assert kind == "orig"
+            return f"orig/{sha256}.{ext.lstrip('.')}"
+
+        def object_exists(self, *, bucket: str, key: str) -> bool:
+            assert bucket == self.bucket
+            return False
+
+        def upload_bytes(
+            self,
+            *,
+            bucket: str,
+            key: str,
+            data: bytes,
+            content_type: str | None,
+            cache_control: str | None = None,
+            extra_metadata: dict[str, str] | None = None,
+        ) -> None:
+            del cache_control, extra_metadata
+            uploaded_objects.append((bucket, key, data, content_type))
+
+        def presign_get(self, *, bucket: str, key: str, expires_in: int | None = None) -> str:
+            del expires_in
+            return f"https://cdn.example/{bucket}/{key}"
+
+    class _FakeImages:
+        def generate(self, **kwargs):  # pragma: no cover
+            raise AssertionError(f"generate should not be called: {kwargs}")
+
+        def edit(self, **kwargs):
+            captured_edit.update(kwargs)
+            return SimpleNamespace(
+                data=[
+                    SimpleNamespace(
+                        b64_json=base64.b64encode(b"openai-edited-image").decode("ascii")
+                    )
+                ]
+            )
+
+    class _FakeOpenAIClient:
+        images = _FakeImages()
+
+    monkeypatch.setattr(image_render, "MediaStorage", _FakeStorage)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_OUTPUT_FORMAT", raising=False)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_QUALITY", raising=False)
+    monkeypatch.delenv("OPENAI_IMAGE_RENDER_OUTPUT_COMPRESSION", raising=False)
+    client = image_render.OpenAIImageRenderClient(client=_FakeOpenAIClient(), org_id="org-123")
+    monkeypatch.setattr(
+        client,
+        "_load_reference_images",
+        lambda *, storage, reference_asset_ids: (
+            [
+                image_render.CreativeServiceAssetRef(
+                    asset_id="asset-1",
+                    position=0,
+                    primary_url="https://cdn.example/reference.png",
+                )
+            ],
+            [("reference-1.png", b"reference-bytes", "image/png")],
+        ),
+    )
+
+    job = client.create_image_ads(
+        payload=CreativeServiceImageAdsCreateIn(
+            prompt="Create an image ad with the product",
+            reference_asset_ids=["asset-1"],
+            count=1,
+            aspect_ratio="1:1",
+            model_id="gpt-image-2",
+        ),
+        idempotency_key="idem-openai-edit",
+    )
+
+    assert job.status == "succeeded"
+    assert [ref.asset_id for ref in job.references] == ["asset-1"]
+    assert captured_edit["model"] == "gpt-image-2"
+    assert captured_edit["image"] == [("reference-1.png", b"reference-bytes", "image/png")]
+    assert captured_edit["size"] == "1024x1024"
+    assert "input_fidelity" not in captured_edit
+    assert uploaded_objects[0][2] == b"openai-edited-image"
+
+
+def test_openai_create_image_ads_rejects_reference_image_urls() -> None:
+    client = image_render.OpenAIImageRenderClient(client=SimpleNamespace(images=SimpleNamespace()))
+
+    with pytest.raises(
+        image_render.CreativeServiceRequestError,
+        match="does not accept reference_image_urls",
+    ):
+        client.create_image_ads(
+            payload=CreativeServiceImageAdsCreateIn(
+                prompt="Create an image ad",
+                count=1,
+                reference_image_urls=["https://example.com/reference.png"],
+                model_id="gpt-image-2",
+            ),
+            idempotency_key="idem-openai-urls",
         )
 
 

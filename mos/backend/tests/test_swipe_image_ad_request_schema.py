@@ -32,6 +32,16 @@ def test_swipe_request_rejects_image_model_for_stage_one() -> None:
     assert "Use renderModelId for final image rendering models" in str(exc.value)
 
 
+def test_swipe_request_rejects_gpt_image_model_for_stage_one() -> None:
+    payload = _base_payload()
+    payload["model"] = "gpt-image-2"
+
+    with pytest.raises(ValidationError) as exc:
+        SwipeImageAdGenerateRequest.model_validate(payload)
+
+    assert "Use renderModelId for final image rendering models" in str(exc.value)
+
+
 def test_swipe_request_accepts_render_model_id_override() -> None:
     payload = _base_payload()
     payload["model"] = "gemini-2.5-flash"
@@ -40,6 +50,16 @@ def test_swipe_request_accepts_render_model_id_override() -> None:
     parsed = SwipeImageAdGenerateRequest.model_validate(payload)
     assert parsed.model == "gemini-2.5-flash"
     assert parsed.render_model_id == "gemini-3-pro-image-preview"
+
+
+def test_swipe_request_accepts_gpt_image_render_model_id_override() -> None:
+    payload = _base_payload()
+    payload["model"] = "gemini-2.5-flash"
+    payload["renderModelId"] = "gpt-image-2"
+
+    parsed = SwipeImageAdGenerateRequest.model_validate(payload)
+    assert parsed.model == "gemini-2.5-flash"
+    assert parsed.render_model_id == "gpt-image-2"
 
 
 def test_swipe_request_accepts_swipe_requires_product_image_flag() -> None:
@@ -55,6 +75,19 @@ def test_swipe_template_request_rejects_image_model_for_stage_one() -> None:
         "campaignId": "00000000-0000-0000-0000-000000000033",
         "assetBriefId": "asset-brief-1",
         "model": "gemini-3-pro-image-preview",
+    }
+
+    with pytest.raises(ValidationError) as exc:
+        SwipeTemplateTestimonialsGenerateRequest.model_validate(payload)
+
+    assert "Use renderModelId for final image rendering models" in str(exc.value)
+
+
+def test_swipe_template_request_rejects_gpt_image_model_for_stage_one() -> None:
+    payload = {
+        "campaignId": "00000000-0000-0000-0000-000000000033",
+        "assetBriefId": "asset-brief-1",
+        "model": "gpt-image-2",
     }
 
     with pytest.raises(ValidationError) as exc:

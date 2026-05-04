@@ -933,6 +933,202 @@ def test_call_gemini_generate_content_with_retries_treats_daily_quota_as_non_ret
     assert exc_info.value.non_retryable is True
 
 
+def test_render_retry_classifier_handles_openai_transients():
+    assert swipe_activity._is_retryable_render_failure(
+        "OpenAI image rendering rate limit status=429"
+    )
+    assert swipe_activity._is_retryable_render_failure(
+        "OpenAI image rendering API error status=503"
+    )
+    assert swipe_activity._is_retryable_render_failure("OpenAI image rendering timed out")
+    assert swipe_activity._is_retryable_render_failure("OpenAI image rendering network error")
+    assert not swipe_activity._is_retryable_render_failure(
+        "OpenAI image rendering API error status=400"
+    )
+
+
+def test_generate_swipe_image_ad_activity_routes_openai_references_as_local_assets(monkeypatch):
+    captured: dict[str, object] = {}
+
+    @contextmanager
+    def _fake_session_scope():
+        yield object()
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            captured["model"] = model
+            captured["contents"] = contents
+            captured["config"] = config
+            return SimpleNamespace(
+                text="```text\nDense generation-ready prompt.\n```",
+                usage_metadata=SimpleNamespace(prompt_token_count=111, candidates_token_count=222),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    class _FakeOpenAIRenderClient:
+        def create_image_ads(self, payload, idempotency_key):
+            captured["render_payload_reference_asset_ids"] = list(payload.reference_asset_ids or [])
+            captured["render_payload_reference_image_urls"] = list(
+                payload.reference_image_urls or []
+            )
+            captured["render_payload_model_id"] = payload.model_id
+            captured["render_idempotency_key"] = idempotency_key
+            return SimpleNamespace(id="job-openai-123")
+
+        def get_image_ads_job(self, job_id):
+            assert job_id == "job-openai-123"
+            return SimpleNamespace(
+                id=job_id,
+                status="succeeded",
+                error_detail=None,
+                model_id="gpt-image-2",
+                references=[
+                    SimpleNamespace(
+                        asset_id="local-product-asset-1",
+                        primary_url="https://example.com/product-1.png",
+                    )
+                ],
+                outputs=[
+                    SimpleNamespace(
+                        output_index=0,
+                        asset_id="openai-asset-1",
+                        prompt_used="Dense generation-ready prompt.",
+                        primary_url="https://example.com/generated.png",
+                    )
+                ],
+            )
+
+    monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda **_kwargs: "openai")
+    monkeypatch.setattr(
+        swipe_activity,
+        "build_image_render_client",
+        lambda **_kwargs: _FakeOpenAIRenderClient(),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "load_swipe_to_image_ad_prompt",
+        lambda: (
+            "\n".join(
+                [
+                    "You make ONE static image ad from ONE competitor swipe image.",
+                    "Brand name: [BRAND_NAME]",
+                    "Product: [PRODUCT]",
+                    "Audience: [AUDIENCE] (optional)",
+                    "Brand colors/fonts: [UNKNOWN if not given]",
+                    "Must-avoid claims: [UNKNOWN if not given]",
+                    "Assets: [PACKSHOT? LOGO?] (optional)",
+                    "[User uploads image]",
+                ]
+            ),
+            "prompt-sha",
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_extract_brief",
+        lambda **_kwargs: (
+            {
+                "creativeConcept": "Concept",
+                "requirements": [
+                    {
+                        "channel": "meta",
+                        "format": "image",
+                        "angle": "Clinical proof",
+                        "funnelStage": "bottom-of-funnel",
+                    }
+                ],
+                "constraints": [],
+                "toneGuidelines": [],
+                "visualGuidelines": [],
+            },
+            "brief-artifact-id",
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_validate_brief_scope",
+        lambda **_kwargs: _fake_brief_scope(),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_swipe_minimal_context",
+        lambda **_kwargs: {
+            "brand_name": "Brand Name",
+            "product_name": "Product Name",
+            "context_block": "Minimal context block",
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_select_product_reference_assets",
+        lambda **_kwargs: [
+            SimpleNamespace(
+                local_asset_id="local-product-asset-1",
+                primary_url="https://example.com/product-1.png",
+                title="Product 1",
+                remote_asset_id=None,
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_swipe_image",
+        lambda **_kwargs: (b"swipe-image-bytes", "image/png", "https://example.com/swipe.png"),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_download_bytes",
+        lambda url, *, max_bytes, timeout_seconds: (
+            (b"product-bytes", "image/png")
+            if url == "https://example.com/product-1.png"
+            else (b"rendered-image-bytes", "image/png")
+        ),
+    )
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+
+    def _fake_create_generated_asset_from_url(**kwargs):
+        captured["extra_ai_metadata"] = kwargs.get("extra_ai_metadata") or {}
+        return "asset-1"
+
+    monkeypatch.setattr(
+        swipe_activity,
+        "_create_generated_asset_from_url",
+        _fake_create_generated_asset_from_url,
+    )
+
+    result = swipe_activity.generate_swipe_image_ad_activity(
+        {
+            "org_id": "00000000-0000-0000-0000-000000000001",
+            "client_id": "00000000-0000-0000-0000-000000000011",
+            "product_id": "00000000-0000-0000-0000-000000000022",
+            "campaign_id": "00000000-0000-0000-0000-000000000033",
+            "asset_brief_id": "asset-brief-1",
+            "requirement_index": 0,
+            "company_swipe_id": "swipe-1",
+            "model": "models/gemini-2.5-flash",
+            "render_model_id": "gpt-image-2",
+            "swipe_context_mode": "minimal",
+            "count": 1,
+            "aspect_ratio": "1:1",
+        }
+    )
+
+    assert result["asset_ids"] == ["asset-1"]
+    assert result["swipe_render_provider"] == "openai"
+    assert captured["render_payload_reference_asset_ids"] == ["local-product-asset-1"]
+    assert captured["render_payload_reference_image_urls"] == []
+    assert captured["render_payload_model_id"] == "gpt-image-2"
+    extra_ai_metadata = captured["extra_ai_metadata"]
+    assert extra_ai_metadata["swipeRenderProvider"] == "openai"
+    assert extra_ai_metadata["swipeRenderModelIdUsed"] == "gpt-image-2"
+    assert extra_ai_metadata["swipeProductReferenceRenderAssetIds"] == ["local-product-asset-1"]
+    assert extra_ai_metadata["swipeCopyGenerationSkipped"] is True
+
+
 def test_call_swipe_copy_gemini_json_message_repairs_literal_newlines_in_json_strings(monkeypatch):
     raw_response = """```json
 {

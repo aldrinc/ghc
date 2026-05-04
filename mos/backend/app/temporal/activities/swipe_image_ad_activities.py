@@ -638,6 +638,7 @@ def _is_image_render_model_name(model: str) -> bool:
     return (
         "image-preview" in normalized
         or "image-generation" in normalized
+        or normalized.startswith("gpt-image-")
         or normalized.endswith("-image")
     )
 
@@ -3513,9 +3514,17 @@ def _is_retryable_render_failure(error_text: str | None) -> bool:
         "inline image",
         "internal error",
         "status\": \"internal\"",
+        "status=429",
+        "status=500",
+        "status=502",
+        "status=503",
+        "status=504",
+        "rate limit",
         "failed (500)",
         "timed out",
         "network error",
+        "connection error",
+        "temporarily unavailable",
     )
     return any(marker in normalized for marker in retryable_markers)
 
@@ -3764,7 +3773,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     raise
 
         product_reference_render_ids: list[str] = []
-        if render_provider == "creative_service":
+        if render_provider in {"creative_service", "openai"}:
             product_reference_render_ids = [
                 reference.local_asset_id
                 for reference in product_reference_assets
