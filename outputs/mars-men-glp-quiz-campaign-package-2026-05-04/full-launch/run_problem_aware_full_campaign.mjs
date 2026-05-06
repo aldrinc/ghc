@@ -46,6 +46,12 @@ const NANOBANANA_RENDER_MODEL_ID = "gemini-3.1-flash-image-preview";
 const NANOBANANA_RENDER_MODEL_ID_USED = `models/${NANOBANANA_RENDER_MODEL_ID}`;
 const CURATED_COLLECTION_ID = "b89e89f4-2565-4b5d-afd1-195532613bfb";
 const CURATED_COLLECTION_NAME = "Tenor initial swipe collection";
+const TENOR_PRIMARY_RED_HEX = "#ee1f2d";
+const BRAND_COLOR_POLICY = [
+  "Brand color policy:",
+  `Use Tenor primary red ${TENOR_PRIMARY_RED_HEX} for brand accents and CTA accents in the generated ad image.`,
+  "Do not reproduce the orange accent color from the source reference.",
+].join("\n");
 const CURATED_NO_PRODUCT_REVEAL_POLICY = [
   "Curated source product-reveal policy:",
   "Do not show the Tenor product, Daily Drive Essentials packaging, bottles, capsules, labels, Supplement Facts panels, checkout/product-page imagery, or any product reference image in the generated image.",
@@ -605,7 +611,7 @@ function manualCreativeContextPayload(campaignId) {
       audienceProductMarkdown:
         "Audience and product context are supplied by the Tenor campaign CSV rows and destination-level congruence blocks.",
       brandVoiceMarkdown:
-        "Use Tenor naming and the supplied destination-matched copy. Generation payloads omit swipeHook. Offer language is normalized to the approved $44 / 52% off / 30-day supply framing.",
+        `Use Tenor naming and the supplied destination-matched copy. Generation payloads omit swipeHook. Offer language is normalized to the approved $44 / 52% off / 30-day supply framing. Use Tenor primary red ${TENOR_PRIMARY_RED_HEX} for brand accents and do not carry over orange accents from source references.`,
       complianceMarkdown:
         "Use the MOS validation flow and the destination-level Problem-Aware congruence blocks. Curated swipes do not receive Tenor product reference images.",
       mentalModelsMarkdown:
@@ -888,6 +894,8 @@ function bundleForGroup(manifest, group, groupedEntries = null) {
 
 function buildBasePayload({ state, entry, congruenceBlock }) {
   const isCurated = entry.sourceType === "standard_curated";
+  const swipeAngleParts = [congruenceBlock, BRAND_COLOR_POLICY];
+  if (isCurated) swipeAngleParts.push(CURATED_NO_PRODUCT_REVEAL_POLICY);
   const payload = {
       clientId: CLIENT_ID,
       productId: PRODUCT_ID,
@@ -898,7 +906,7 @@ function buildBasePayload({ state, entry, congruenceBlock }) {
       swipeContextMode: "minimal",
       swipeBrandName: "Tenor",
       swipeProductName: isCurated ? "Daily Drive Essentials (not pictured)" : "Daily Drive Essentials",
-      swipeAngle: isCurated ? `${congruenceBlock}\n\n${CURATED_NO_PRODUCT_REVEAL_POLICY}` : congruenceBlock,
+      swipeAngle: swipeAngleParts.join("\n\n"),
       model: STAGE_ONE_MODEL,
       renderModelId: RENDER_MODEL_ID,
       aspectRatio: entry.aspectRatio,
@@ -1013,7 +1021,7 @@ async function buildManifest() {
   const orderedEntries = sortedEntries(entries);
   const manifest = {
     createdAt: new Date().toISOString(),
-    note: "Full problem-aware generation. Logical ads are grouped by concept, each with 1:1, 4:5, and 9:16 siblings. Curated rows reuse destination-matched non-curated Tenor copy. Generation payloads omit swipeHook. Curated rows include the user-approved no-product-reveal policy.",
+    note: `Full problem-aware generation. Logical ads are grouped by concept, each with 1:1, 4:5, and 9:16 siblings. Curated rows reuse destination-matched non-curated Tenor copy. Generation payloads omit swipeHook. All generated ads must use Tenor primary red ${TENOR_PRIMARY_RED_HEX} instead of inheriting orange source accents. Curated rows include the user-approved no-product-reveal policy.`,
     campaignId: state.campaignId,
     campaignName: CAMPAIGN_NAME,
     metaCampaignName: META_CAMPAIGN_NAME,
