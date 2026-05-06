@@ -173,16 +173,13 @@ function parseCsv(text) {
 }
 
 function imageSize(filePath) {
-  const output = execFileSync(
-    "python3",
-    [
-      "-c",
-      "from PIL import Image; import sys; im=Image.open(sys.argv[1]); print(f'{im.size[0]}x{im.size[1]}')",
-      filePath,
-    ],
-    { encoding: "utf8" },
-  ).trim();
-  const [width, height] = output.split("x").map((value) => Number(value));
+  const output = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", filePath], {
+    encoding: "utf8",
+  });
+  const widthMatch = output.match(/pixelWidth:\s*(\d+)/);
+  const heightMatch = output.match(/pixelHeight:\s*(\d+)/);
+  const width = Number(widthMatch?.[1]);
+  const height = Number(heightMatch?.[1]);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new Error(`Could not read image dimensions for ${filePath}: ${output}`);
   }
