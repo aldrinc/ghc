@@ -54,6 +54,7 @@ from app.services.meta_review import (
 )
 from app.services.meta_account_configs import MetaWorkspaceConfigError, resolve_workspace_config
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_BILLING_EVENT,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_OPTIMIZATION_GOAL,
@@ -1660,6 +1661,10 @@ def setup_campaign_meta_review(
                 placements=deepcopy(template_placements)
                 if isinstance(template_placements, dict)
                 else None,
+                daily_min_spend_target=(
+                    getattr(bucket_template_spec, "daily_min_spend_target", None)
+                    or DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+                ),
                 bid_amount=None,
                 dsa_beneficiary=getattr(bucket_template_spec, "dsa_beneficiary", None),
                 dsa_payor=getattr(bucket_template_spec, "dsa_payor", None),
