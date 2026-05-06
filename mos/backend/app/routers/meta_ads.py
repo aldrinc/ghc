@@ -115,6 +115,7 @@ from app.services.meta_management_service import (
 from app.services.meta_management_reports import render_meta_management_report
 from app.services.meta_management_schedule import reconcile_campaign_meta_management_schedule
 from app.services.meta_publish_defaults import (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS,
     DEFAULT_META_PUBLISH_BUCKET_COUNT,
     DEFAULT_META_PUBLISH_CAMPAIGN_DAILY_BUDGET_MINOR_UNITS,
     default_meta_publish_attribution_spec,
@@ -173,6 +174,9 @@ _META_CTA_LABEL_ALIASES = {
     "SIGN UP": "SIGN_UP",
 }
 _META_MIN_DAILY_BUDGET_MINOR_UNITS = 100
+_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS = (
+    DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+)
 _META_MULTI_ASPECT_METADATA_KEY = "multiAspectSpec"
 _META_MULTI_ASPECT_ALLOWED_RATIOS = ("1:1", "4:5", "9:16")
 _META_MULTI_ASPECT_DEFAULT_RATIO = "1:1"
@@ -836,6 +840,35 @@ def _validate_meta_adset_budget_fields(
     if int(daily_budget) <= _META_MIN_DAILY_BUDGET_MINOR_UNITS:
         return [_meta_daily_budget_too_low_message(scope_label)]
     return []
+
+
+def _validate_meta_adset_daily_min_spend_target_fields(
+    *,
+    daily_min_spend_target: Any,
+    scope_label: str,
+    required: bool = False,
+) -> list[str]:
+    if daily_min_spend_target is None:
+        if required:
+            return [
+                (
+                    f"{scope_label} dailyMinSpendTarget is required and must be at least "
+                    f"{_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS} minor units. "
+                    "For USD accounts, that means at least $10.00/day."
+                )
+            ]
+        return []
+    if int(daily_min_spend_target) < _META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS:
+        return [
+            (
+                f"{scope_label} dailyMinSpendTarget must be at least "
+                f"{_META_MIN_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS} minor units. "
+                "For USD accounts, that means at least $10.00/day."
+            )
+        ]
+    return []
+
+
 _META_PLACEMENT_TARGETING_KEYS = frozenset(
     {
         "device_platforms",
@@ -1783,6 +1816,7 @@ def _build_launch_plan_payload(
                     "billingEvent": adset_spec.billing_event,
                     "dailyBudget": adset_spec.daily_budget,
                     "lifetimeBudget": adset_spec.lifetime_budget,
+                    "dailyMinSpendTarget": adset_spec.daily_min_spend_target,
                     "dsaBeneficiary": adset_spec.dsa_beneficiary,
                     "dsaPayor": adset_spec.dsa_payor,
                     "targeting": adset_spec.targeting,
@@ -2040,6 +2074,7 @@ def _create_publish_run_item_record(
         "assetPublicId": str(asset.public_id),
         "creativeSpecName": creative_spec.name,
         "adsetSpecName": adset_spec.name,
+        "adsetDailyMinSpendTarget": adset_spec.daily_min_spend_target,
         "bucketIndex": resolved.get("bucket_index"),
         "groupKey": resolved.get("group_key"),
         "variantAssetIds": [
@@ -2375,6 +2410,13 @@ def _validate_publish_plan(
                     _validate_meta_adset_budget_fields(
                         daily_budget=adset_spec.daily_budget,
                         scope_label="Linked Meta ad set spec",
+                    )
+                )
+                item_blockers.extend(
+                    _validate_meta_adset_daily_min_spend_target_fields(
+                        daily_min_spend_target=adset_spec.daily_min_spend_target,
+                        scope_label="Linked Meta ad set spec",
+                        required=True,
                     )
                 )
                 if adset_spec.start_time and adset_spec.end_time and adset_spec.end_time <= adset_spec.start_time:
@@ -3078,6 +3120,12 @@ def _create_meta_adset_internal(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=payload.dailyMinSpendTarget,
+        scope_label="Meta ad set",
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     request_payload: dict[str, Any] = {
         "name": payload.name,
@@ -3096,6 +3144,8 @@ def _create_meta_adset_internal(
         request_payload["daily_budget"] = payload.dailyBudget
     if payload.lifetimeBudget is not None:
         request_payload["lifetime_budget"] = payload.lifetimeBudget
+    if payload.dailyMinSpendTarget is not None:
+        request_payload["daily_min_spend_target"] = payload.dailyMinSpendTarget
     if payload.startTime:
         request_payload["start_time"] = payload.startTime
     if payload.endTime:
@@ -3228,6 +3278,13 @@ def _update_meta_adset_internal(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = update_fields.get("dailyMinSpendTarget")
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set",
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     request_payload: dict[str, Any] = {}
     if "name" in update_fields:
@@ -3238,6 +3295,8 @@ def _update_meta_adset_internal(
         request_payload["daily_budget"] = update_fields["dailyBudget"]
     if "lifetimeBudget" in update_fields:
         request_payload["lifetime_budget"] = update_fields["lifetimeBudget"]
+    if "dailyMinSpendTarget" in update_fields:
+        request_payload["daily_min_spend_target"] = update_fields["dailyMinSpendTarget"]
     if update_fields.get("clearBidAmount"):
         request_payload["bid_strategy"] = (
             _clean_optional_text(update_fields.get("bidStrategy")) or "LOWEST_COST_WITHOUT_CAP"
@@ -4208,6 +4267,18 @@ def create_meta_adset_spec(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = (
+        payload.dailyMinSpendTarget
+        if payload.dailyMinSpendTarget is not None
+        else DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
+    )
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set spec",
+        required=True,
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     repo = MetaAdsRepository(session)
     record = repo.create_adset_spec(
@@ -4222,6 +4293,7 @@ def create_meta_adset_spec(
         placements=payload.placements,
         daily_budget=payload.dailyBudget,
         lifetime_budget=payload.lifetimeBudget,
+        daily_min_spend_target=daily_min_spend_target,
         bid_amount=None,
         dsa_beneficiary=_clean_optional_text(payload.dsaBeneficiary),
         dsa_payor=_clean_optional_text(payload.dsaPayor),
@@ -4284,6 +4356,17 @@ def update_meta_adset_spec(
     )
     if budget_errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=budget_errors[0])
+    daily_min_spend_target = update_fields.get(
+        "dailyMinSpendTarget",
+        record.daily_min_spend_target,
+    )
+    min_spend_errors = _validate_meta_adset_daily_min_spend_target_fields(
+        daily_min_spend_target=daily_min_spend_target,
+        scope_label="Meta ad set spec",
+        required=True,
+    )
+    if min_spend_errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=min_spend_errors[0])
 
     start_time = update_fields.get("startTime", record.start_time)
     end_time = update_fields.get("endTime", record.end_time)
@@ -4310,6 +4393,7 @@ def update_meta_adset_spec(
         placements=update_fields["placements"] if "placements" in update_fields else record.placements,
         daily_budget=daily_budget,
         lifetime_budget=lifetime_budget,
+        daily_min_spend_target=daily_min_spend_target,
         bid_amount=update_fields["bidAmount"] if "bidAmount" in update_fields else record.bid_amount,
         dsa_beneficiary=(
             _clean_optional_text(update_fields["dsaBeneficiary"])
@@ -4970,6 +5054,7 @@ def create_meta_publish_run(
                             status="PAUSED",
                             dailyBudget=adset_spec.daily_budget if publish_budget_scope == "adset" else None,
                             lifetimeBudget=adset_spec.lifetime_budget if publish_budget_scope == "adset" else None,
+                            dailyMinSpendTarget=adset_spec.daily_min_spend_target,
                             billingEvent=_clean_optional_text(adset_spec.billing_event) or "",
                             optimizationGoal=_clean_optional_text(adset_spec.optimization_goal) or "",
                             targeting=adset_spec.targeting or {},

@@ -305,6 +305,9 @@ export function MetaPublishConfigPanel() {
                     <Field label="Lifetime budget">
                       <Input value={form.lifetimeBudget} onChange={(e) => updatePublishAdSetField(spec.id, "lifetimeBudget", e.target.value)} placeholder="Leave blank for campaign CBO" />
                     </Field>
+                    <Field label="Daily min spend target">
+                      <Input value={form.dailyMinSpendTarget} onChange={(e) => updatePublishAdSetField(spec.id, "dailyMinSpendTarget", e.target.value)} placeholder="1000" />
+                    </Field>
                     <Field label="DSA beneficiary">
                       <Input
                         value={form.dsaBeneficiary}

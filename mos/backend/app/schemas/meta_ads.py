@@ -69,6 +69,7 @@ class MetaAdSetCreateRequest(BaseModel):
     status: str
     dailyBudget: Optional[int] = None
     lifetimeBudget: Optional[int] = None
+    dailyMinSpendTarget: Optional[int] = None
     billingEvent: str
     optimizationGoal: str
     targeting: dict[str, Any]
@@ -89,6 +90,7 @@ class MetaAdSetUpdateRequest(BaseModel):
     status: Optional[str] = None
     dailyBudget: Optional[int] = None
     lifetimeBudget: Optional[int] = None
+    dailyMinSpendTarget: Optional[int] = None
     bidAmount: Optional[int] = None
     clearBidAmount: Optional[bool] = None
     bidStrategy: Optional[str] = None
@@ -144,6 +146,7 @@ class MetaAdSetSpecCreateRequest(BaseModel):
     placements: Optional[dict[str, Any]] = None
     dailyBudget: Optional[int] = None
     lifetimeBudget: Optional[int] = None
+    dailyMinSpendTarget: Optional[int] = None
     bidAmount: Optional[int] = None
     dsaBeneficiary: Optional[str] = None
     dsaPayor: Optional[str] = None
@@ -266,6 +269,7 @@ class MetaAdSetSpecUpdateRequest(BaseModel):
     placements: dict[str, Any] | None = None
     dailyBudget: int | None = None
     lifetimeBudget: int | None = None
+    dailyMinSpendTarget: int | None = None
     bidAmount: int | None = None
     dsaBeneficiary: str | None = None
     dsaPayor: str | None = None
