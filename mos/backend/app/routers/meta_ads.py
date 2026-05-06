@@ -65,6 +65,7 @@ from app.schemas.meta_ads import (
     MetaPublishRunRequest,
     MetaPublishRunResponse,
     CampaignMetaPublishSelectionsRequest,
+    MetaCreativeAssetVariantRequest,
     MetaCreativeCreateRequest,
     MetaCreativePreviewRequest,
     MetaCreativeSpecCreateRequest,
@@ -172,6 +173,11 @@ _META_CTA_LABEL_ALIASES = {
     "SIGN UP": "SIGN_UP",
 }
 _META_MIN_DAILY_BUDGET_MINOR_UNITS = 100
+_META_MULTI_ASPECT_METADATA_KEY = "multiAspectSpec"
+_META_MULTI_ASPECT_ALLOWED_RATIOS = ("1:1", "4:5", "9:16")
+_META_MULTI_ASPECT_DEFAULT_RATIO = "1:1"
+_META_MULTI_ASPECT_FEED_RATIO = "4:5"
+_META_MULTI_ASPECT_STORY_RATIO = "9:16"
 
 class _MetaEventMappingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -543,6 +549,274 @@ def _normalize_meta_call_to_action_type(value: Any) -> str | None:
     if _META_CTA_ENUM_RE.fullmatch(cleaned):
         return cleaned
     raise ValueError(_invalid_meta_cta_message(cleaned))
+
+
+def _normalize_meta_aspect_ratio(value: Any) -> str | None:
+    cleaned = _clean_optional_text(value)
+    if not cleaned:
+        return None
+    if cleaned in _META_MULTI_ASPECT_ALLOWED_RATIOS:
+        return cleaned
+    return None
+
+
+def _infer_meta_asset_aspect_ratio(asset: Asset) -> str | None:
+    width = int(asset.width or 0)
+    height = int(asset.height or 0)
+    if width <= 0 or height <= 0:
+        return None
+
+    candidates = {
+        "1:1": 1 / 1,
+        "4:5": 4 / 5,
+        "9:16": 9 / 16,
+    }
+    actual = width / height
+    for ratio, expected in candidates.items():
+        if abs(actual - expected) <= 0.01:
+            return ratio
+    return None
+
+
+def _meta_creative_has_multi_aspect_spec(creative_spec: MetaCreativeSpec) -> bool:
+    metadata = creative_spec.metadata_json if isinstance(creative_spec.metadata_json, dict) else {}
+    return isinstance(metadata.get(_META_MULTI_ASPECT_METADATA_KEY), dict)
+
+
+def _resolve_multi_aspect_variants(
+    *,
+    creative_spec: MetaCreativeSpec,
+    primary_asset: Asset,
+    assets_by_id: dict[str, Asset],
+) -> tuple[list[dict[str, Any]], list[str], str | None]:
+    metadata = creative_spec.metadata_json if isinstance(creative_spec.metadata_json, dict) else {}
+    raw_spec = metadata.get(_META_MULTI_ASPECT_METADATA_KEY)
+    if not isinstance(raw_spec, dict):
+        aspect_ratio = _infer_meta_asset_aspect_ratio(primary_asset)
+        errors = [] if aspect_ratio else ["Final-package asset aspect ratio could not be resolved."]
+        return (
+            [
+                {
+                    "asset": primary_asset,
+                    "asset_id": str(primary_asset.id),
+                    "aspect_ratio": aspect_ratio,
+                }
+            ],
+            errors,
+            None,
+        )
+
+    primary_asset_id = _clean_optional_text(raw_spec.get("primaryAssetId")) or str(primary_asset.id)
+    group_key = _clean_optional_text(raw_spec.get("groupKey")) or f"multi-aspect:{primary_asset_id}"
+    errors: list[str] = []
+    if primary_asset_id != str(primary_asset.id):
+        errors.append(
+            "Multi-aspect creative metadata primaryAssetId must match the creative spec asset."
+        )
+
+    raw_variants = raw_spec.get("variants")
+    if not isinstance(raw_variants, list) or not raw_variants:
+        return [], errors + ["Multi-aspect creative metadata is missing variants."], group_key
+
+    variants: list[dict[str, Any]] = []
+    seen_asset_ids: set[str] = set()
+    for raw_variant in raw_variants:
+        if not isinstance(raw_variant, dict):
+            errors.append("Multi-aspect creative variants must be JSON objects.")
+            continue
+        asset_id = _clean_optional_text(raw_variant.get("assetId"))
+        if not asset_id:
+            errors.append("Multi-aspect creative variants must include assetId.")
+            continue
+        if asset_id in seen_asset_ids:
+            errors.append(f"Multi-aspect creative variants contain duplicate assetId '{asset_id}'.")
+            continue
+        seen_asset_ids.add(asset_id)
+
+        asset = assets_by_id.get(asset_id)
+        if asset is None:
+            errors.append(f"Multi-aspect creative variant asset {asset_id} was not found.")
+            continue
+
+        explicit_ratio = _normalize_meta_aspect_ratio(raw_variant.get("aspectRatio"))
+        if raw_variant.get("aspectRatio") is not None and explicit_ratio is None:
+            allowed = ", ".join(_META_MULTI_ASPECT_ALLOWED_RATIOS)
+            errors.append(
+                f"Multi-aspect creative variant {asset_id} uses an unsupported aspectRatio. "
+                f"Allowed values: {allowed}."
+            )
+            continue
+
+        inferred_ratio = _infer_meta_asset_aspect_ratio(asset)
+        aspect_ratio = explicit_ratio or inferred_ratio
+        if aspect_ratio is None:
+            errors.append(
+                f"Multi-aspect creative variant asset {asset_id} aspect ratio could not be resolved."
+            )
+            continue
+        if explicit_ratio and inferred_ratio and explicit_ratio != inferred_ratio:
+            errors.append(
+                f"Multi-aspect creative variant {asset_id} metadata aspectRatio "
+                f"'{explicit_ratio}' does not match the asset dimensions."
+            )
+            continue
+
+        variants.append(
+            {
+                "asset": asset,
+                "asset_id": asset_id,
+                "aspect_ratio": aspect_ratio,
+            }
+        )
+
+    if str(primary_asset.id) not in seen_asset_ids:
+        errors.append("Multi-aspect creative variants must include the primary asset.")
+    if len(variants) < 2:
+        errors.append("Multi-aspect creatives require at least two valid aspect-ratio variants.")
+
+    return variants, errors, group_key
+
+
+def _variant_upload_label(group_key: str, aspect_ratio: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", group_key).strip("_") or "variant"
+    safe_ratio = aspect_ratio.replace(":", "x")
+    return f"{normalized}_{safe_ratio}".upper()
+
+
+def _asset_feed_variant_for_ratio(
+    *,
+    variants: list[dict[str, Any]],
+    preferred_ratios: tuple[str, ...],
+) -> dict[str, Any] | None:
+    by_ratio = {variant["aspect_ratio"]: variant for variant in variants}
+    for ratio in preferred_ratios:
+        variant = by_ratio.get(ratio)
+        if variant is not None:
+            return variant
+    return variants[0] if variants else None
+
+
+def _multi_aspect_creative_payload(
+    *,
+    page_id: str,
+    instagram_actor_id: str | None,
+    link_url: str,
+    name: str,
+    message: str | None,
+    headline: str | None,
+    description: str | None,
+    call_to_action_type: str | None,
+    group_key: str,
+    variants: list[dict[str, Any]],
+    validate_only: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    story_variant = _asset_feed_variant_for_ratio(
+        variants=variants,
+        preferred_ratios=(_META_MULTI_ASPECT_STORY_RATIO,),
+    )
+    feed_variant = _asset_feed_variant_for_ratio(
+        variants=variants,
+        preferred_ratios=(_META_MULTI_ASPECT_FEED_RATIO, _META_MULTI_ASPECT_DEFAULT_RATIO),
+    )
+    default_variant = _asset_feed_variant_for_ratio(
+        variants=variants,
+        preferred_ratios=(_META_MULTI_ASPECT_DEFAULT_RATIO, _META_MULTI_ASPECT_FEED_RATIO),
+    )
+    if story_variant is None or feed_variant is None or default_variant is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Multi-aspect creative payload is missing required aspect-ratio variants.",
+        )
+
+    labeled_variants = []
+    for variant in variants:
+        image_hash = _clean_optional_text(variant.get("image_hash"))
+        if not image_hash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Variant asset {variant['asset_id']} is missing an uploaded Meta image hash.",
+            )
+        label = _variant_upload_label(group_key, variant["aspect_ratio"])
+        labeled_variants.append({**variant, "label": label})
+
+    variant_by_asset_id = {variant["asset_id"]: variant for variant in labeled_variants}
+    story_variant = variant_by_asset_id[story_variant["asset_id"]]
+    feed_variant = variant_by_asset_id[feed_variant["asset_id"]]
+    default_variant = variant_by_asset_id[default_variant["asset_id"]]
+
+    object_story_spec: dict[str, Any] = {"page_id": page_id}
+    if instagram_actor_id:
+        object_story_spec["instagram_actor_id"] = instagram_actor_id
+
+    asset_feed_spec: dict[str, Any] = {
+        "ad_formats": ["SINGLE_IMAGE"],
+        "optimization_type": "PLACEMENT",
+        "images": [
+            {
+                "hash": variant["image_hash"],
+                "adlabels": [{"name": variant["label"]}],
+            }
+            for variant in labeled_variants
+        ],
+        "link_urls": [{"website_url": link_url}],
+        "asset_customization_rules": [
+            {
+                "customization_spec": {
+                    "publisher_platforms": ["facebook", "instagram", "messenger"],
+                    "facebook_positions": [
+                        "story",
+                        "facebook_reels",
+                        "facebook_reels_overlay",
+                    ],
+                    "instagram_positions": ["story", "reels"],
+                    "messenger_positions": ["story"],
+                },
+                "image_label": {"name": story_variant["label"]},
+            },
+            {
+                "customization_spec": {
+                    "publisher_platforms": ["facebook", "instagram"],
+                    "facebook_positions": [
+                        "feed",
+                        "marketplace",
+                        "search",
+                        "video_feeds",
+                        "profile_feed",
+                    ],
+                    "instagram_positions": [
+                        "stream",
+                        "explore",
+                        "explore_home",
+                        "profile_feed",
+                        "ig_search",
+                    ],
+                },
+                "image_label": {"name": feed_variant["label"]},
+            },
+            {
+                "is_default": True,
+                "image_label": {"name": default_variant["label"]},
+            },
+        ],
+    }
+    if message:
+        asset_feed_spec["bodies"] = [{"text": message}]
+    if headline:
+        asset_feed_spec["titles"] = [{"text": headline}]
+    if description:
+        asset_feed_spec["descriptions"] = [{"text": description}]
+    if call_to_action_type:
+        asset_feed_spec["call_to_action_types"] = [call_to_action_type]
+
+    request_payload: dict[str, Any] = {
+        "name": name,
+        "object_story_spec": object_story_spec,
+        "link_url": link_url,
+        "asset_feed_spec": asset_feed_spec,
+    }
+    if validate_only:
+        request_payload["execution_options"] = ["validate_only"]
+    return request_payload, object_story_spec
 
 
 def _meta_daily_budget_too_low_message(scope_label: str) -> str:
@@ -1482,6 +1756,15 @@ def _build_launch_plan_payload(
             {
                 "assetId": str(asset.id),
                 "assetPublicId": str(asset.public_id),
+                "groupKey": resolved.get("group_key"),
+                "variantAssetIds": [
+                    variant["asset_id"] for variant in resolved.get("asset_variants", [])
+                ],
+                "variantAspectRatios": [
+                    variant["aspect_ratio"]
+                    for variant in resolved.get("asset_variants", [])
+                    if variant.get("aspect_ratio")
+                ],
                 "creativeSpecId": str(creative_spec.id),
                 "creativeSpecName": creative_spec.name,
                 "adsetSpecId": str(adset_spec.id),
@@ -1758,6 +2041,15 @@ def _create_publish_run_item_record(
         "creativeSpecName": creative_spec.name,
         "adsetSpecName": adset_spec.name,
         "bucketIndex": resolved.get("bucket_index"),
+        "groupKey": resolved.get("group_key"),
+        "variantAssetIds": [
+            variant["asset_id"] for variant in resolved.get("asset_variants", [])
+        ],
+        "variantAspectRatios": [
+            variant["aspect_ratio"]
+            for variant in resolved.get("asset_variants", [])
+            if variant.get("aspect_ratio")
+        ],
     }
     if source_item is not None:
         source_metadata = _publish_run_item_metadata(source_item)
@@ -1902,6 +2194,7 @@ def _validate_publish_plan(
     )
 
     asset_ids = [str(asset.id) for asset in selected_assets]
+    selected_asset_id_set = set(asset_ids)
     asset_rows = session.scalars(
         select(Asset).where(
             Asset.org_id == auth.org_id,
@@ -1918,6 +2211,41 @@ def _validate_publish_plan(
         )
     ).all()
     creative_specs_by_asset_id = {str(spec.asset_id): spec for spec in creative_specs}
+    grouped_variant_owner_by_asset_id: dict[str, str] = {}
+    group_data_by_primary_asset_id: dict[str, dict[str, Any]] = {}
+    for creative_spec in creative_specs:
+        primary_asset_id = str(creative_spec.asset_id)
+        primary_asset = assets_by_id.get(primary_asset_id)
+        if primary_asset is None or not _meta_creative_has_multi_aspect_spec(creative_spec):
+            continue
+        variants, group_errors, group_key = _resolve_multi_aspect_variants(
+            creative_spec=creative_spec,
+            primary_asset=primary_asset,
+            assets_by_id=assets_by_id,
+        )
+        group_data = {
+            "group_key": group_key,
+            "variants": variants,
+            "errors": group_errors,
+        }
+        group_data_by_primary_asset_id[primary_asset_id] = group_data
+        for variant in variants:
+            owner_asset_id = grouped_variant_owner_by_asset_id.get(variant["asset_id"])
+            if owner_asset_id and owner_asset_id != primary_asset_id:
+                group_errors.append(
+                    "Multi-aspect variant asset "
+                    f"{variant['asset_id']} is already assigned to primary asset {owner_asset_id}."
+                )
+                continue
+            grouped_variant_owner_by_asset_id[variant["asset_id"]] = primary_asset_id
+
+    logical_publish_assets: list[Asset] = []
+    for asset in selected_assets:
+        asset_id = str(asset.id)
+        owner_asset_id = grouped_variant_owner_by_asset_id.get(asset_id)
+        if owner_asset_id and owner_asset_id != asset_id:
+            continue
+        logical_publish_assets.append(asset)
 
     adset_specs = session.scalars(
         select(MetaAdSetSpec).where(
@@ -1943,7 +2271,7 @@ def _validate_publish_plan(
             )
         )
     asset_bucket_assignments = _assign_assets_to_bucket_specs(
-        assets=selected_assets,
+        assets=logical_publish_assets,
         bucket_specs=(
             selected_campaign_bucket_specs
             if len(selected_campaign_bucket_specs) == requested_bucket_count
@@ -1956,7 +2284,7 @@ def _validate_publish_plan(
     resolved_items: list[dict[str, Any]] = []
     publish_domains: set[str] = set()
 
-    for asset in selected_assets:
+    for asset in logical_publish_assets:
         asset_id = str(asset.id)
         item_blockers: list[str] = []
         asset = assets_by_id.get(asset_id)
@@ -1964,6 +2292,8 @@ def _validate_publish_plan(
         adset_spec: MetaAdSetSpec | None = None
         bucket_index: int | None = None
         resolved_destination_url: str | None = None
+        asset_variants: list[dict[str, Any]] = []
+        group_key: str | None = None
 
         if asset is None:
             item_blockers.append("Final-package asset was not found on this campaign.")
@@ -1971,6 +2301,39 @@ def _validate_publish_plan(
             item_blockers.append("Final-package asset is missing a prepared Meta creative spec.")
 
         if asset is not None and creative_spec is not None:
+            group_data = group_data_by_primary_asset_id.get(asset_id)
+            if group_data is not None:
+                asset_variants = list(group_data["variants"])
+                item_blockers.extend(group_data["errors"])
+                group_key = group_data["group_key"]
+            else:
+                asset_variants, variant_errors, group_key = _resolve_multi_aspect_variants(
+                    creative_spec=creative_spec,
+                    primary_asset=asset,
+                    assets_by_id=assets_by_id,
+                )
+                item_blockers.extend(variant_errors)
+
+            missing_variant_asset_ids = sorted(
+                variant["asset_id"]
+                for variant in asset_variants
+                if variant["asset_id"] not in selected_asset_id_set
+            )
+            if missing_variant_asset_ids:
+                item_blockers.append(
+                    "Final-package multi-aspect ad is missing selected sibling variant assets: "
+                    f"{', '.join(missing_variant_asset_ids)}."
+                )
+            variant_ratios = [
+                variant["aspect_ratio"]
+                for variant in asset_variants
+                if variant.get("aspect_ratio")
+            ]
+            if len(variant_ratios) != len(set(variant_ratios)):
+                item_blockers.append(
+                    "Final-package multi-aspect ad contains duplicate aspect-ratio variants."
+                )
+
             try:
                 _normalize_meta_call_to_action_type(creative_spec.call_to_action_type)
             except ValueError as exc:
@@ -2063,6 +2426,7 @@ def _validate_publish_plan(
             resolved_items.append(
                 {
                     "asset": asset,
+                    "asset_variants": asset_variants,
                     "creative_spec": creative_spec,
                     "adset_spec": adset_spec,
                     "bucket_index": read_default_meta_publish_bucket_index(
@@ -2070,6 +2434,7 @@ def _validate_publish_plan(
                     ),
                     "resolved_destination_url": resolved_destination_url,
                     "effective_page_id": _clean_optional_text(creative_spec.page_id) or profile_page_id,
+                    "group_key": group_key,
                 }
             )
 
@@ -2101,7 +2466,7 @@ def _validate_publish_plan(
         campaignId=str(campaign.id),
         generationKey=payload.generationKey,
         ok=not blockers and all(item.status == "ok" for item in validation_items),
-        includedCount=len(selected_assets),
+        includedCount=len(logical_publish_assets),
         adsetCount=(
             len(selected_campaign_bucket_specs)
             if selected_campaign_bucket_specs
@@ -2251,6 +2616,58 @@ def _upload_meta_asset_internal(
         _raise_meta_error(exc)
 
 
+def _upload_meta_asset_variants_for_publish_item(
+    *,
+    asset_variants: list[dict[str, Any]],
+    ad_account_id: str,
+    resolved_meta_config: ResolvedMetaWorkspaceConfig,
+    auth: AuthContext,
+    session: Session,
+) -> list[dict[str, Any]]:
+    uploads: list[dict[str, Any]] = []
+    for variant in asset_variants:
+        uploaded_asset = _upload_meta_asset_internal(
+            asset_id=variant["asset_id"],
+            payload=MetaAssetUploadRequest(
+                requestId=_meta_asset_upload_request_id(asset_id=variant["asset_id"]),
+                adAccountId=ad_account_id,
+                metaConfigId=str(resolved_meta_config.workspace_config.id),
+            ),
+            auth=auth,
+            session=session,
+            resolved_meta_config=resolved_meta_config,
+        )
+        uploads.append(
+            {
+                "assetId": variant["asset_id"],
+                "aspectRatio": variant.get("aspect_ratio"),
+                "upload": uploaded_asset,
+            }
+        )
+    return uploads
+
+
+def _primary_variant_upload_id(
+    *, primary_asset_id: str, uploaded_variants: list[dict[str, Any]]
+) -> str | None:
+    for uploaded_variant in uploaded_variants:
+        if uploaded_variant.get("assetId") == primary_asset_id:
+            return _clean_optional_text((uploaded_variant.get("upload") or {}).get("id"))
+    return None
+
+
+def _meta_creative_variant_requests(
+    asset_variants: list[dict[str, Any]],
+) -> list[MetaCreativeAssetVariantRequest]:
+    return [
+        MetaCreativeAssetVariantRequest(
+            assetId=variant["asset_id"],
+            aspectRatio=variant.get("aspect_ratio"),
+        )
+        for variant in asset_variants
+    ]
+
+
 def _create_meta_creative_internal(
     *,
     payload: MetaCreativeCreateRequest,
@@ -2303,7 +2720,76 @@ def _create_meta_creative_internal(
         tracking_url_parameters=resolved.workspace_config.tracking_url_parameters,
     )
 
-    if upload.meta_image_hash:
+    if payload.assetVariants:
+        variant_assets = []
+        seen_variant_asset_ids: set[str] = set()
+        for requested_variant in payload.assetVariants:
+            variant_asset_id = requested_variant.assetId
+            if variant_asset_id in seen_variant_asset_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate creative asset variant assetId '{variant_asset_id}'.",
+                )
+            seen_variant_asset_ids.add(variant_asset_id)
+
+            variant_asset = assets_repo.get(org_id=auth.org_id, asset_id=variant_asset_id)
+            if variant_asset is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Asset variant {variant_asset_id} not found.",
+                )
+            variant_upload = repo.get_asset_upload(
+                org_id=auth.org_id,
+                ad_account_id=ad_account_id,
+                asset_id=variant_asset_id,
+            )
+            if not variant_upload:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Asset variant {variant_asset_id} must be uploaded to Meta before creating a creative.",
+                )
+            if not variant_upload.meta_image_hash or variant_upload.meta_video_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Multi-aspect creatives currently support image assets only.",
+                )
+            aspect_ratio = _normalize_meta_aspect_ratio(
+                requested_variant.aspectRatio
+            ) or _infer_meta_asset_aspect_ratio(variant_asset)
+            if not aspect_ratio:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Asset variant {variant_asset_id} aspect ratio could not be resolved.",
+                )
+            variant_assets.append(
+                {
+                    "asset_id": variant_asset_id,
+                    "aspect_ratio": aspect_ratio,
+                    "image_hash": variant_upload.meta_image_hash,
+                    "upload_id": str(variant_upload.id),
+                }
+            )
+
+        if len(variant_assets) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="assetVariants requires at least two uploaded image variants.",
+            )
+
+        request_payload, object_story_spec = _multi_aspect_creative_payload(
+            page_id=page_id,
+            instagram_actor_id=instagram_actor_id,
+            link_url=tracked_link_url,
+            name=payload.name,
+            message=_clean_optional_text(payload.message),
+            headline=_clean_optional_text(payload.headline),
+            description=_clean_optional_text(payload.description),
+            call_to_action_type=normalized_cta_type,
+            group_key=f"asset-{payload.assetId}",
+            variants=variant_assets,
+            validate_only=bool(payload.validateOnly),
+        )
+    elif upload.meta_image_hash:
         link_data: dict[str, Any] = {
             "link": tracked_link_url,
             "image_hash": upload.meta_image_hash,
@@ -2352,12 +2838,13 @@ def _create_meta_creative_internal(
     if instagram_actor_id:
         object_story_spec["instagram_actor_id"] = instagram_actor_id
 
-    request_payload: dict[str, Any] = {
-        "name": payload.name,
-        "object_story_spec": object_story_spec,
-    }
-    if payload.validateOnly:
-        request_payload["execution_options"] = ["validate_only"]
+    if not payload.assetVariants:
+        request_payload = {
+            "name": payload.name,
+            "object_story_spec": object_story_spec,
+        }
+        if payload.validateOnly:
+            request_payload["execution_options"] = ["validate_only"]
 
     client = _get_meta_client(resolved=resolved)
     response: dict[str, Any] | None = None
@@ -2414,7 +2901,11 @@ def _create_meta_creative_internal(
         name=payload.name,
         status=response.get("status"),
         object_story_spec=object_story_spec,
-        metadata_json=response,
+        metadata_json={
+            **(response if isinstance(response, dict) else {"response": response}),
+            "requestPayload": request_payload,
+            "assetVariants": [variant.model_dump(mode="json") for variant in payload.assetVariants],
+        },
     )
     return jsonable_encoder(record)
 
@@ -4560,10 +5051,10 @@ def create_meta_publish_run(
             current_stage = "asset_upload"
             try:
                 item_metadata = _publish_run_item_metadata(run_item)
-                uploaded_asset = (
-                    item_metadata.get("upload")
-                    if isinstance(item_metadata.get("upload"), dict)
-                    else None
+                uploaded_variants = (
+                    item_metadata.get("uploads")
+                    if isinstance(item_metadata.get("uploads"), list)
+                    else []
                 )
                 created_creative = (
                     item_metadata.get("creative")
@@ -4581,18 +5072,17 @@ def create_meta_publish_run(
                         status="running",
                         meta_adset_id=meta_adset_id,
                     )
-                    uploaded_asset = _upload_meta_asset_internal(
-                        asset_id=str(asset.id),
-                        payload=MetaAssetUploadRequest(
-                            requestId=_meta_asset_upload_request_id(asset_id=str(asset.id)),
-                            adAccountId=ad_account_id,
-                            metaConfigId=str(resolved_meta_config.workspace_config.id),
-                        ),
+                    uploaded_variants = _upload_meta_asset_variants_for_publish_item(
+                        asset_variants=resolved.get("asset_variants", []),
+                        ad_account_id=ad_account_id,
+                        resolved_meta_config=resolved_meta_config,
                         auth=auth,
                         session=session,
-                        resolved_meta_config=resolved_meta_config,
                     )
-                    meta_asset_upload_id = _clean_optional_text(uploaded_asset.get("id"))
+                    meta_asset_upload_id = _primary_variant_upload_id(
+                        primary_asset_id=str(asset.id),
+                        uploaded_variants=uploaded_variants,
+                    )
 
                 meta_creative_id = _clean_optional_text(run_item.meta_creative_id)
                 if not meta_creative_id:
@@ -4605,7 +5095,7 @@ def create_meta_publish_run(
                         status="running",
                         meta_asset_upload_id=meta_asset_upload_id,
                         meta_adset_id=meta_adset_id,
-                        metadata_updates={"upload": uploaded_asset} if uploaded_asset else None,
+                        metadata_updates={"uploads": uploaded_variants},
                     )
                     created_creative = _create_meta_creative_internal(
                         payload=MetaCreativeCreateRequest(
@@ -4622,6 +5112,11 @@ def create_meta_publish_run(
                             description=_clean_optional_text(creative_spec.description),
                             callToActionType=_clean_optional_text(creative_spec.call_to_action_type),
                             validateOnly=False,
+                            assetVariants=(
+                                _meta_creative_variant_requests(resolved.get("asset_variants", []))
+                                if len(resolved.get("asset_variants", [])) > 1
+                                else []
+                            ),
                         ),
                         auth=auth,
                         session=session,
@@ -4645,7 +5140,7 @@ def create_meta_publish_run(
                     meta_creative_id=meta_creative_id,
                     meta_adset_id=meta_adset_id,
                     metadata_updates={
-                        "upload": uploaded_asset,
+                        "uploads": uploaded_variants,
                         "creative": created_creative,
                     },
                 )
@@ -4684,7 +5179,7 @@ def create_meta_publish_run(
                     meta_adset_id=meta_adset_id,
                     meta_ad_id=meta_ad_id,
                     metadata_updates={
-                        "upload": uploaded_asset,
+                        "uploads": uploaded_variants,
                         "creative": created_creative,
                         "ad": created_ad,
                     },

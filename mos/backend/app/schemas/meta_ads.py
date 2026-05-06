@@ -32,6 +32,12 @@ class MetaCreativeCreateRequest(BaseModel):
     description: Optional[str] = None
     callToActionType: Optional[str] = None
     validateOnly: Optional[bool] = None
+    assetVariants: list["MetaCreativeAssetVariantRequest"] = Field(default_factory=list)
+
+
+class MetaCreativeAssetVariantRequest(BaseModel):
+    assetId: str
+    aspectRatio: Optional[str] = None
 
 
 class MetaCampaignCreateRequest(BaseModel):
