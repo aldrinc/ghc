@@ -150,6 +150,14 @@ def _build_user_data(
     if user_agent:
         user_data["client_user_agent"] = user_agent
 
+    fbp = clean_optional_text(payload.noteAttributes.get("fbp"))
+    if fbp:
+        user_data["fbp"] = fbp
+
+    fbc = clean_optional_text(payload.noteAttributes.get("fbc"))
+    if fbc:
+        user_data["fbc"] = fbc
+
     return user_data
 
 
@@ -208,6 +216,7 @@ def send_shopify_purchase_event(
         external_order_ref=external_order_ref,
     )
     event_id = external_order_ref
+    event_source_url = clean_optional_text(payload.noteAttributes.get("event_source_url"))
     event_payload = {
         "data": [
             {
@@ -215,6 +224,7 @@ def send_shopify_purchase_event(
                 "event_time": _event_time(payload.createdAt),
                 "action_source": "website",
                 "event_id": event_id,
+                **({"event_source_url": event_source_url} if event_source_url else {}),
                 "user_data": user_data,
                 "custom_data": _build_custom_data(
                     payload=payload,

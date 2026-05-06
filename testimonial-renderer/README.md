@@ -123,6 +123,7 @@ npx playwright install chromium
 ### PDP output preset
 
 - `output.preset: "feed"` (default and only supported value): 1080x1350 (4:5)
+- `output.showBottomBanner: false` hides the bottom rating / CTA / logo strip while keeping the same feed canvas size
 
 ### PDP background generation (Nano Banana)
 

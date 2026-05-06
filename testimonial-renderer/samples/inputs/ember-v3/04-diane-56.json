@@ -1,0 +1,43 @@
+{
+  "template": "pdp_ugc_standard",
+  "output": { "preset": "feed", "showBottomBanner": false },
+  "brand": {
+    "name": "Ember: Brain Clarity Protocol",
+    "logoText": "Ember",
+    "logoUrl": "/Users/auggieclement/Documents/GitHub/ghc/testimonial-renderer/samples/assets/ember/ember-logo.png",
+    "stripBgColor": "#FFFFFF",
+    "stripTextColor": "#2D2926",
+    "assets": {
+      "palette": { "primary": "#C41423", "accent": "#2D2926" },
+      "notes": "Authentic smartphone UGC. Women age 42-58 in perimenopause. Use the exact Ember Brain Clarity Protocol pouch from the reference image: matte white stand-up pouch, orange Ember logo, large orange Brain Clarity Protocol text, and a clear gummy window.",
+      "referenceImages": ["/Users/auggieclement/Documents/GitHub/ghc/testimonial-renderer/samples/assets/ember/current/ember-brain-clarity-protocol-packshot.png"]
+    }
+  },
+  "rating": {
+    "valueText": "4.8/5",
+    "detailText": "14,000+ Women on the Protocol"
+  },
+  "cta": { "text": "START MY BRAIN CLARITY PROTOCOL" },
+  "background": {
+    "referenceImages": ["/Users/auggieclement/Documents/GitHub/ghc/testimonial-renderer/samples/assets/ember/current/ember-brain-clarity-protocol-packshot.png"],
+    "referenceFirst": true,
+    "imageModel": "gemini-3-pro-image-preview",
+    "promptVars": {
+      "product": "the exact Ember Brain Clarity Protocol supplement pouch shown in the reference image: a matte white resealable stand-up pouch with an orange Ember logo, large orange Brain Clarity Protocol text, small orange supplement text near the bottom, and orange gummies visible through the clear lower window",
+      "subject": "Diane, a 56-year-old litigator with chin-length grey-blonde hair, reading glasses pushed up on her head, wearing a navy blazer over a soft tee, steady confident expression",
+      "scene": "her home study with a wall of law books and a warm lamp behind her, a worn leather reading chair just visible, mixed warm lamp and daylight, quietly professional",
+      "extra": "She holds the Ember pouch in one hand at chest level with the front label facing the camera. Match the package shape, logo, colors, and front label layout from the reference image closely. Keep the pouch fully readable and do not redesign the package. Keep the reading glasses on her head realistic. Handheld phone-photo quality, not corporate portrait.",
+      "avoid": [
+        "any jar, bottle, canister, tub, or box packaging",
+        "the older red Ember Creatine Gummies pouch design",
+        "extra flames, badges, fruit, or marketing callouts printed on the package",
+        "changing the Ember logo, the Brain Clarity Protocol title, or the clear gummy window placement"
+      ]
+    }
+  },
+  "comment": {
+    "handle": "diane.c.56",
+    "text": "Doctor blamed stress and offered antidepressants. Six weeks on this and I trust my brain again. Back in court not apologizing.",
+    "avatarUrl": ""
+  }
+}

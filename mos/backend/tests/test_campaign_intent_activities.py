@@ -221,12 +221,11 @@ def test_configure_generated_funnels_meta_tracking_activity_persists_profile(db_
                     "pixelId": "pixel-123",
                     "funnelIds": funnel_ids,
                     "browserEvents": [
-                        "Entered Funnel",
+                        "EnteredFunnel",
                         "PageView",
-                        "ViewContent",
+                        "EnteredSales",
                         "PreSalesToSalesClick",
-                        "AddToCart",
-                        "Purchase",
+                        "SalesToCheckoutClick",
                     ],
                     "internalEvents": [
                         "Entered Funnel",

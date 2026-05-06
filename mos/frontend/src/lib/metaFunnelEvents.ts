@@ -4,11 +4,77 @@ export type MetaPixelRuntimeEvent = {
   eventName: string;
   params?: Record<string, unknown>;
   method?: "track" | "trackCustom";
+  eventId?: string;
 };
 
 export const CTA_LINK_CLICK_EVENT_NAME = "CTA Link Click";
 
-function pageViewParams(event: RuntimeTrackingEvent) {
+type RuntimeTrackingEventLike = {
+  eventType: RuntimeTrackingEvent["eventType"];
+  props?: Record<string, unknown>;
+};
+
+function cleanText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function randomEventIdSegment(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function buildMetaEventId({
+  eventName,
+  eventType,
+  publicationId,
+  pageId,
+  sessionId,
+  index,
+}: {
+  eventName: string;
+  eventType: string;
+  publicationId?: string | null;
+  pageId?: string | null;
+  sessionId?: string | null;
+  index: number;
+}): string {
+  return [
+    cleanText(eventName) || "meta",
+    cleanText(eventType) || "event",
+    cleanText(publicationId) || "publication",
+    cleanText(pageId) || "page",
+    cleanText(sessionId) || "session",
+    String(index),
+    randomEventIdSegment(),
+  ].join(":");
+}
+
+export function attachMetaEventIds(
+  events: MetaPixelRuntimeEvent[],
+  context: {
+    eventType: string;
+    publicationId?: string | null;
+    pageId?: string | null;
+    sessionId?: string | null;
+  },
+): MetaPixelRuntimeEvent[] {
+  return events.map((event, index) => ({
+    ...event,
+    eventId:
+      cleanText(event.eventId) ||
+      buildMetaEventId({
+        ...context,
+        eventName: event.eventName,
+        index,
+      }),
+  }));
+}
+
+function pageViewParams(event: RuntimeTrackingEventLike) {
   const pageStage =
     typeof event.props?.pageStage === "string" ? event.props.pageStage.trim() : "";
   return pageStage ? { page_stage: pageStage } : undefined;
@@ -32,8 +98,11 @@ function checkoutParams(event: RuntimeTrackingEvent) {
 }
 
 export function mapRuntimeEventToMetaPixelEvents(
-  event: RuntimeTrackingEvent,
+  event: RuntimeTrackingEventLike,
 ): MetaPixelRuntimeEvent[] {
+  if (event.eventType === "presell_page_view") {
+    return [{ eventName: "EnteredPresales", method: "trackCustom", params: pageViewParams(event) }];
+  }
   if (event.eventType === "Entered Funnel") {
     return [{ eventName: "Entered Funnel", method: "trackCustom", params: pageViewParams(event) }];
   }
@@ -76,16 +145,28 @@ export function mapRuntimeEventToMetaPixelEvents(
   if (event.eventType === "sales_to_checkout_click") {
     const variantId =
       typeof event.props?.variantId === "string" ? event.props.variantId.trim() : "";
-    if (variantId) {
-      return [{
-        eventName: "AddToCart",
+    return [
+      ...(variantId
+        ? [
+            {
+              eventName: "AddToCart",
+              params: {
+                content_ids: [variantId],
+                content_type: "product",
+                num_items: 1,
+              },
+            },
+          ]
+        : []),
+      {
+        eventName: "SalesToCheckoutClick",
+        method: "trackCustom",
         params: {
-          content_ids: [variantId],
-          content_type: "product",
-          num_items: 1,
+          from_stage: "sales",
+          to_stage: "checkout",
         },
-      }];
-    }
+      },
+    ];
   }
   if (event.eventType === "custom_page_click") {
     return [{

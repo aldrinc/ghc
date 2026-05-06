@@ -109,6 +109,45 @@ export interface PostizPublicationListResponse {
   total: number;
 }
 
+export type ClientPosthogPersonProfiles = "identified_only" | "always";
+export type ClientPosthogSourceMode = "structured" | "snippet";
+
+export interface ClientPosthogResolvedTracking {
+  provider: "posthog";
+  mode: "public_funnel_runtime";
+  posthogProjectApiKey: string;
+  posthogApiHost: string;
+  posthogUiHost?: string | null;
+  posthogDefaults: string;
+  posthogPersonProfiles: ClientPosthogPersonProfiles;
+}
+
+export interface ClientPosthogSettings {
+  hasSettings: boolean;
+  enabled: boolean;
+  projectApiKey?: string | null;
+  apiHost?: string | null;
+  uiHost?: string | null;
+  defaults?: string | null;
+  personProfiles: ClientPosthogPersonProfiles;
+  sourceMode: ClientPosthogSourceMode;
+  sourceSnippet?: string | null;
+  resolvedTracking?: ClientPosthogResolvedTracking | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ClientPosthogSettingsInput {
+  enabled: boolean;
+  projectApiKey?: string | null;
+  apiHost?: string | null;
+  uiHost?: string | null;
+  defaults?: string | null;
+  personProfiles?: ClientPosthogPersonProfiles | null;
+  sourceMode?: ClientPosthogSourceMode;
+  sourceSnippet?: string | null;
+}
+
 export interface PostizCreatePostInput {
   content: string;
   postType: "now" | "schedule" | "draft";

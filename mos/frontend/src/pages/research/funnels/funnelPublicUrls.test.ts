@@ -66,6 +66,30 @@ describe("funnelPublicUrls", () => {
     ).toBe("/070d6cf7/18ac0fe1/presales");
   });
 
+  it("preserves custom pre-sales slugs in the public URL", () => {
+    expect(
+      buildCanonicalPublicPageSlug({
+        id: "page-3",
+        name: "Focus Story A",
+        slug: "focus-story-a",
+        template_id: "pre-sales-listicle",
+      }),
+    ).toBe("focus-story-a");
+
+    expect(
+      buildStandalonePublicPagePath({
+        productSlug: "070d6cf7",
+        funnelSlug: "18ac0fe1",
+        page: {
+          id: "page-3",
+          name: "Focus Story A",
+          slug: "focus-story-a",
+          template_id: "pre-sales-listicle",
+        },
+      }),
+    ).toBe("/070d6cf7/18ac0fe1/focus-story-a");
+  });
+
   it("prefers the configured deploy domain for public links", () => {
     const baseUrl = resolvePrimaryDeployedPublicBaseUrl({
       configuredDeployDomains: ["shop.shopemberco.com"],

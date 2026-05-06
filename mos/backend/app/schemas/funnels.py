@@ -122,6 +122,7 @@ class PublicFunnelRedirectResponse(BaseModel):
 
 
 class PublicEventIn(BaseModel):
+    eventId: Optional[str] = Field(default=None, max_length=256)
     eventType: str
     occurredAt: Optional[datetime] = None
     publicationId: str

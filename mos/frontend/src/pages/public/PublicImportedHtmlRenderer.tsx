@@ -1,6 +1,6 @@
 import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
 import type { PublicCommerceVariant } from "@/types/commerce";
-import type { ImportedHtmlInstrumentationManifest, PublicFunnelPage } from "@/types/funnels";
+import type { ImportedHtmlInstrumentationManifest, PublicFunnelPage, PublicFunnelStage } from "@/types/funnels";
 
 type PublicImportedHtmlRendererProps = {
   page: PublicFunnelPage;
@@ -12,7 +12,7 @@ type PublicImportedHtmlRendererProps = {
   instrumentationManifest: ImportedHtmlInstrumentationManifest;
   variants: PublicCommerceVariant[];
   pagePathById: Record<string, string>;
-  pageStageById: Record<string, string>;
+  pageStageById: Record<string, PublicFunnelStage>;
 };
 
 export default function PublicImportedHtmlRenderer(props: PublicImportedHtmlRendererProps) {

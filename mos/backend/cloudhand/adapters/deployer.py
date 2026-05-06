@@ -35,7 +35,6 @@ from ..models import (
     RuntimeType,
 )
 
-
 _NGINX_PROXY_CONNECT_TIMEOUT = "60s"
 _NGINX_PROXY_SEND_TIMEOUT = "3600s"
 _NGINX_PROXY_READ_TIMEOUT = "3600s"
@@ -45,7 +44,12 @@ _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _FUNNEL_ARTIFACT_RELEASES_DIRNAME = "site-releases"
 _FUNNEL_ARTIFACT_LIVE_DIRNAME = "site"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
-_ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpHero", "SalesPdpTemplate"}
+_ENTRY_PRELOAD_COMPONENT_TYPES = {
+    "PreSalesHero",
+    "PreSalesTemplate",
+    "SalesPdpHero",
+    "SalesPdpTemplate",
+}
 _ENV_ASSIGNMENT_PATTERN = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 _PUBLIC_ASSET_URL_PATTERN = re.compile(r"/(?:api/)?public/assets/([0-9a-fA-F-]{36})(?:[/?#]|$)")
 _ABSOLUTE_PUBLIC_ASSET_URL_PATTERN = re.compile(
@@ -96,7 +100,9 @@ _MOS_PUBLIC_ASSET_HOSTS = {
 _STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX = "/_standalone-assets"
 _STANDALONE_FONT_ASSET_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/fonts"
 _STANDALONE_COMPRESSED_IMAGE_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/compressed"
-_STANDALONE_RESPONSIVE_VARIANT_ROUTE_PREFIX = f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/responsive"
+_STANDALONE_RESPONSIVE_VARIANT_ROUTE_PREFIX = (
+    f"{_STANDALONE_MIRRORED_ASSET_ROUTE_PREFIX}/responsive"
+)
 _STANDALONE_LOCAL_IMAGE_ASSET_ROOTS = (
     Path(__file__).resolve().parents[2] / "app" / "templates" / "funnels",
 )
@@ -134,9 +140,21 @@ _BINARY_ASSET_CONTENT_TYPE_EXTENSION_MAP = {
 }
 _FONT_ASSET_URL_SUFFIXES = (".eot", ".otf", ".ttf", ".woff", ".woff2")
 _FONTAWESOME_FAMILY_SPECS = {
-    "fa-solid": {"font_family": "Font Awesome 6 Free", "font_weight": "900", "font_style": "normal"},
-    "fa-regular": {"font_family": "Font Awesome 6 Free", "font_weight": "400", "font_style": "normal"},
-    "fa-brands": {"font_family": "Font Awesome 6 Brands", "font_weight": "400", "font_style": "normal"},
+    "fa-solid": {
+        "font_family": "Font Awesome 6 Free",
+        "font_weight": "900",
+        "font_style": "normal",
+    },
+    "fa-regular": {
+        "font_family": "Font Awesome 6 Free",
+        "font_weight": "400",
+        "font_style": "normal",
+    },
+    "fa-brands": {
+        "font_family": "Font Awesome 6 Brands",
+        "font_weight": "400",
+        "font_style": "normal",
+    },
 }
 _RESPONSIVE_VARIANT_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 _STANDALONE_IMAGE_LAYOUT_VIEWPORTS = (
@@ -352,10 +370,14 @@ def _is_probably_decorative_imported_html_image(raw_tag: str) -> bool:
 def _resolve_imported_html_priority_image_index(html_document: str) -> int | None:
     fallback_index: int | None = None
     preferred_index: int | None = None
-    for image_index, match in enumerate(re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)):
+    for image_index, match in enumerate(
+        re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)
+    ):
         raw_tag = match.group(0)
         existing_loading = str(_read_html_tag_attribute(raw_tag, "loading") or "").strip().lower()
-        existing_fetchpriority = str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        existing_fetchpriority = (
+            str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        )
         if existing_loading == "eager" or existing_fetchpriority == "high":
             return image_index
         if fallback_index is None:
@@ -500,7 +522,9 @@ def _set_html_tag_attribute(raw_tag: str, attribute_name: str, attribute_value: 
 
 
 def _find_nth_img_tag(html_document: str, target_index: int) -> str | None:
-    for image_index, match in enumerate(re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)):
+    for image_index, match in enumerate(
+        re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)
+    ):
         if image_index == target_index:
             return match.group(0)
     return None
@@ -529,7 +553,9 @@ def _optimize_standalone_imported_html_document(html_document: str) -> str:
 
         raw_tag = match.group(0)
         existing_loading = str(_read_html_tag_attribute(raw_tag, "loading") or "").strip().lower()
-        existing_fetchpriority = str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        existing_fetchpriority = (
+            str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        )
         should_remain_eager = (
             existing_loading == "eager"
             or existing_fetchpriority == "high"
@@ -638,7 +664,9 @@ def _calculate_image_psnr_db(*, reference_image: Any, candidate_image: Any) -> f
 
     if reference_image.size != candidate_image.size:
         raise ValueError("reference and candidate images must share dimensions to calculate PSNR")
-    candidate_mode = "RGBA" if "A" in reference_image.getbands() or "A" in candidate_image.getbands() else "RGB"
+    candidate_mode = (
+        "RGBA" if "A" in reference_image.getbands() or "A" in candidate_image.getbands() else "RGB"
+    )
     reference = reference_image.convert(candidate_mode)
     candidate = candidate_image.convert(candidate_mode)
     diff = ImageChops.difference(reference, candidate)
@@ -646,7 +674,9 @@ def _calculate_image_psnr_db(*, reference_image: Any, candidate_image: Any) -> f
     rms_components = [float(value or 0.0) for value in getattr(stat, "rms", [])]
     if not rms_components:
         return float("inf")
-    mean_square_error = sum(component * component for component in rms_components) / float(len(rms_components))
+    mean_square_error = sum(component * component for component in rms_components) / float(
+        len(rms_components)
+    )
     if mean_square_error <= 0:
         return float("inf")
     return 20.0 * math.log10(255.0 / math.sqrt(mean_square_error))
@@ -668,14 +698,18 @@ def _resolve_imported_html_preload_image_spec(html_document: str) -> dict[str, s
     preferred_sizes: str | None = None
     for match in re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE):
         raw_tag = match.group(0)
-        raw_src = _read_html_tag_attribute(raw_tag, "src") or _read_html_tag_attribute(raw_tag, "data-src")
+        raw_src = _read_html_tag_attribute(raw_tag, "src") or _read_html_tag_attribute(
+            raw_tag, "data-src"
+        )
         normalized_src = str(raw_src or "").strip()
         if not normalized_src or normalized_src.lower().startswith("data:image/"):
             continue
         normalized_srcset = str(_read_html_tag_attribute(raw_tag, "srcset") or "").strip()
         normalized_sizes = str(_read_html_tag_attribute(raw_tag, "sizes") or "").strip()
         existing_loading = str(_read_html_tag_attribute(raw_tag, "loading") or "").strip().lower()
-        existing_fetchpriority = str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        existing_fetchpriority = (
+            str(_read_html_tag_attribute(raw_tag, "fetchpriority") or "").strip().lower()
+        )
         if existing_loading == "eager" or existing_fetchpriority == "high":
             result = {"href": normalized_src}
             if normalized_srcset:
@@ -709,7 +743,11 @@ def _normalize_standalone_public_asset_urls(
     *,
     allowed_hosts: set[str] | None = None,
 ) -> str:
-    normalized_hosts = {str(host or "").strip().lower() for host in (allowed_hosts or set()) if str(host or "").strip()}
+    normalized_hosts = {
+        str(host or "").strip().lower()
+        for host in (allowed_hosts or set())
+        if str(host or "").strip()
+    }
 
     def _replace(match: re.Match[str]) -> str:
         if normalized_hosts:
@@ -734,7 +772,9 @@ def _is_mirrorable_absolute_image_url(
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
         return False
     normalized_host = parsed.netloc.strip().lower()
-    if normalized_host in {str(host or "").strip().lower() for host in (skip_hosts or set()) if str(host or "").strip()}:
+    if normalized_host in {
+        str(host or "").strip().lower() for host in (skip_hosts or set()) if str(host or "").strip()
+    }:
         return False
     normalized_path = parsed.path.strip().lower()
     if _PUBLIC_ASSET_URL_PATTERN.search(parsed.path):
@@ -804,7 +844,9 @@ def _detect_raster_image_content_type(
             normalized_format = str(image.format or "").strip().upper()
     except Exception:  # noqa: BLE001
         return normalized_hint or "application/octet-stream"
-    return _RASTER_IMAGE_FORMAT_CONTENT_TYPE_MAP.get(normalized_format, normalized_hint or "application/octet-stream")
+    return _RASTER_IMAGE_FORMAT_CONTENT_TYPE_MAP.get(
+        normalized_format, normalized_hint or "application/octet-stream"
+    )
 
 
 def _decode_stylesheet_payload(*, payload: bytes, source_url: str, context_label: str) -> str:
@@ -823,7 +865,9 @@ def _build_font_preload_tag(*, href: str, content_type: str) -> str:
     normalized_content_type = str(content_type or "").split(";", 1)[0].strip().lower()
     if not normalized_href:
         raise ValueError("Font preload href must be non-empty.")
-    type_attr = f' type="{escape(normalized_content_type, quote=True)}"' if normalized_content_type else ""
+    type_attr = (
+        f' type="{escape(normalized_content_type, quote=True)}"' if normalized_content_type else ""
+    )
     return (
         f'<link rel="preload" as="font" href="{escape(normalized_href, quote=True)}"'
         f'{type_attr} crossorigin="anonymous" data-mos-font-preload="true">'
@@ -856,7 +900,9 @@ def _extract_fontawesome_icon_usage_from_html(html_document: str) -> dict[str, s
         class_tokens = [token.strip() for token in str(raw_value or "").split() if token.strip()]
         if not class_tokens:
             continue
-        family_class = next((token for token in class_tokens if token in _FONTAWESOME_FAMILY_SPECS), None)
+        family_class = next(
+            (token for token in class_tokens if token in _FONTAWESOME_FAMILY_SPECS), None
+        )
         icon_classes = [
             token
             for token in class_tokens
@@ -886,12 +932,16 @@ def _parse_fontawesome_icon_codepoints(stylesheet_text: str) -> dict[str, int]:
 
 def _parse_css_font_face_blocks(stylesheet_text: str) -> list[dict[str, Any]]:
     font_faces: list[dict[str, Any]] = []
-    for match in re.finditer(r"@font-face\s*{(?P<body>[^}]*)}", stylesheet_text, flags=re.IGNORECASE | re.DOTALL):
+    for match in re.finditer(
+        r"@font-face\s*{(?P<body>[^}]*)}", stylesheet_text, flags=re.IGNORECASE | re.DOTALL
+    ):
         body = str(match.group("body") or "")
         family_name = _extract_css_property(block_body=body, property_name="font-family")
         font_weight = _extract_css_property(block_body=body, property_name="font-weight")
         font_style = _extract_css_property(block_body=body, property_name="font-style") or "normal"
-        font_display = _extract_css_property(block_body=body, property_name="font-display") or "swap"
+        font_display = (
+            _extract_css_property(block_body=body, property_name="font-display") or "swap"
+        )
         unicode_range = _extract_css_property(block_body=body, property_name="unicode-range")
         urls: list[str] = []
         for url_match in _CSS_URL_REFERENCE_PATTERN.finditer(body):
@@ -968,7 +1018,9 @@ def _parse_css_unicode_ranges(unicode_range: str | None) -> list[tuple[int, int]
     return parsed_ranges
 
 
-def _filter_codepoints_for_unicode_range(*, codepoints: set[int], unicode_range: str | None) -> set[int]:
+def _filter_codepoints_for_unicode_range(
+    *, codepoints: set[int], unicode_range: str | None
+) -> set[int]:
     parsed_ranges = _parse_css_unicode_ranges(unicode_range)
     if not parsed_ranges:
         return set(codepoints)
@@ -1002,7 +1054,9 @@ def _origin_hint_markup_for_html_document(html_document: str) -> str:
             continue
         if has_localized_fontshare and host in _FONTSHARE_STYLESHEET_HOSTS:
             continue
-        if has_localized_google_fonts and host in (_GOOGLE_FONTS_STYLESHEET_HOSTS | {"fonts.gstatic.com"}):
+        if has_localized_google_fonts and host in (
+            _GOOGLE_FONTS_STYLESHEET_HOSTS | {"fonts.gstatic.com"}
+        ):
             continue
         if has_localized_fontawesome and host in _FONTAWESOME_STYLESHEET_HOSTS:
             continue
@@ -1067,7 +1121,9 @@ def _inject_head_html_block(*, html_document: str, block: str) -> str:
 
 
 def _extract_html_document_head_inner(html_document: str) -> str | None:
-    match = re.search(r"<head\b[^>]*>(?P<inner>[\s\S]*?)</head>", html_document, flags=re.IGNORECASE)
+    match = re.search(
+        r"<head\b[^>]*>(?P<inner>[\s\S]*?)</head>", html_document, flags=re.IGNORECASE
+    )
     if match is None:
         return None
     return str(match.group("inner") or "")
@@ -1140,7 +1196,7 @@ def _sanitize_supporting_page_head_html(*, supporting_html_document: str, page_t
         sanitized,
         flags=re.IGNORECASE,
     )
-    return f'<title>{escape(page_title)}</title>{sanitized}'
+    return f"<title>{escape(page_title)}</title>{sanitized}"
 
 
 def _rewrite_standalone_compliance_navigation_links(
@@ -1228,7 +1284,9 @@ def _resolve_responsive_image_sizes_attr(*, viewport_widths: dict[str, int]) -> 
     return None
 
 
-def _resolve_responsive_variant_widths(*, original_width: int, viewport_widths: dict[str, int]) -> tuple[int, ...]:
+def _resolve_responsive_variant_widths(
+    *, original_width: int, viewport_widths: dict[str, int]
+) -> tuple[int, ...]:
     if original_width <= 0:
         return ()
     widths: set[int] = set()
@@ -1282,7 +1340,9 @@ def _preferred_fontawesome_subset_source_url(source_url: str) -> str:
     path = parsed.path or ""
     if host in _FONTAWESOME_STYLESHEET_HOSTS and path.lower().endswith(".woff2"):
         rewritten_path = re.sub(r"\.woff2$", ".ttf", path, flags=re.IGNORECASE)
-        return urlunsplit((parsed.scheme, parsed.netloc, rewritten_path, parsed.query, parsed.fragment))
+        return urlunsplit(
+            (parsed.scheme, parsed.netloc, rewritten_path, parsed.query, parsed.fragment)
+        )
     return source_url
 
 
@@ -1302,8 +1362,8 @@ class ServerDeployer:
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.local_root = Path(local_root).expanduser().resolve() if local_root else None
-        self._known_remote_dirs: set[str] = {"/"}
         self._sftp_client: Any | None = None
+        self._remote_directory_cache: set[str] = {"/"}
 
     def connect(self):
         self._reset_sftp_client()
@@ -1323,6 +1383,14 @@ class ServerDeployer:
             except Exception:
                 pass
         self._sftp_client = None
+
+    def _remote_dir_cache(self) -> set[str]:
+        cache = getattr(self, "_remote_directory_cache", None)
+        if not isinstance(cache, set):
+            cache = {"/"}
+            self._remote_directory_cache = cache
+        cache.add("/")
+        return cache
 
     def _ensure_transport(self) -> None:
         transport = self.client.get_transport()
@@ -1381,21 +1449,18 @@ class ServerDeployer:
         if not parent_dir or parent_dir == "/":
             return
 
-        known_remote_dirs = getattr(self, "_known_remote_dirs", None)
-        if known_remote_dirs is None:
-            known_remote_dirs = {"/"}
-            self._known_remote_dirs = known_remote_dirs
-        if parent_dir in known_remote_dirs:
+        remote_dir_cache = self._remote_dir_cache()
+        if parent_dir in remote_dir_cache:
             return
 
         pending_dirs: list[str] = []
         current_dir = parent_dir
         while current_dir and current_dir != "/":
-            if current_dir in known_remote_dirs:
+            if current_dir in remote_dir_cache:
                 break
             try:
                 sftp.stat(current_dir)
-                known_remote_dirs.add(current_dir)
+                remote_dir_cache.add(current_dir)
                 break
             except OSError:
                 pending_dirs.append(current_dir)
@@ -1410,7 +1475,7 @@ class ServerDeployer:
                     raise ValueError(
                         f"Failed to create remote directory '{missing_dir}' for '{remote_path}': {exc}"
                     ) from exc
-            known_remote_dirs.add(missing_dir)
+            remote_dir_cache.add(missing_dir)
 
     def _upload_local_directory(self, *, local_dir: Path, remote_dir: str) -> None:
         if not local_dir.is_dir():
@@ -1506,8 +1571,12 @@ class ServerDeployer:
         tailwind_entry: Path | None = None
         postcss_entry: Path | None = None
         for frontend_root in self._resolve_standalone_tailwind_frontend_roots():
-            candidate_tailwind_entry = frontend_root / "node_modules" / "tailwindcss" / "lib" / "index.js"
-            candidate_postcss_entry = frontend_root / "node_modules" / "postcss" / "lib" / "postcss.js"
+            candidate_tailwind_entry = (
+                frontend_root / "node_modules" / "tailwindcss" / "lib" / "index.js"
+            )
+            candidate_postcss_entry = (
+                frontend_root / "node_modules" / "postcss" / "lib" / "postcss.js"
+            )
             if candidate_tailwind_entry.is_file() and candidate_postcss_entry.is_file():
                 toolchain_frontend_root = frontend_root
                 tailwind_entry = candidate_tailwind_entry
@@ -1588,7 +1657,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         if tailwind_match is None:
             return html_document
 
-        compiled_css = self._compile_standalone_imported_html_tailwind_css(html_document=html_document)
+        compiled_css = self._compile_standalone_imported_html_tailwind_css(
+            html_document=html_document
+        )
         if not compiled_css:
             return html_document
 
@@ -1605,7 +1676,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         safe_css = compiled_css.replace("</style", "<\\/style")
         compiled_style_block = f'<style data-mos-compiled-tailwind="true">{safe_css}</style>'
-        html_without_tailwind_runtime = f"{html_document[:replacement_start]}{html_document[replacement_end:]}"
+        html_without_tailwind_runtime = (
+            f"{html_document[:replacement_start]}{html_document[replacement_end:]}"
+        )
 
         head_close_index = html_without_tailwind_runtime.lower().rfind("</head>")
         if head_close_index == -1:
@@ -1629,7 +1702,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         request = Request(
             fetch_url,
             headers={
-                "User-Agent": str(user_agent or "").strip() or "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)",
+                "User-Agent": str(user_agent or "").strip()
+                or "Mozilla/5.0 (compatible; CloudhandStandaloneMirror/1.0)",
                 "Accept": accept,
             },
         )
@@ -1645,14 +1719,20 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 f"{context_label} failed to fetch asset '{url}': upstream returned HTTP {exc.code}."
             ) from exc
         except URLError as exc:
-            raise ValueError(f"{context_label} failed to fetch asset '{url}': {exc.reason}.") from exc
+            raise ValueError(
+                f"{context_label} failed to fetch asset '{url}': {exc.reason}."
+            ) from exc
         except TimeoutError as exc:
-            raise ValueError(f"{context_label} failed to fetch asset '{url}': request timed out.") from exc
+            raise ValueError(
+                f"{context_label} failed to fetch asset '{url}': request timed out."
+            ) from exc
         except OSError as exc:
             raise ValueError(f"{context_label} failed to fetch asset '{url}': {exc}.") from exc
 
         if not payload:
-            raise ValueError(f"{context_label} failed to fetch asset '{url}': response body was empty.")
+            raise ValueError(
+                f"{context_label} failed to fetch asset '{url}': response body was empty."
+            )
         return payload, content_type
 
     def _subset_font_awesome_font_payload(
@@ -1666,7 +1746,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         output_flavor: str | None = "woff2",
     ) -> tuple[bytes, str]:
         if not used_codepoints:
-            raise ValueError(f"{context_label} could not determine any Font Awesome codepoints for '{source_url}'.")
+            raise ValueError(
+                f"{context_label} could not determine any Font Awesome codepoints for '{source_url}'."
+            )
         try:
             from fontTools.subset import Options, Subsetter
             from fontTools.ttLib import TTFont
@@ -1693,7 +1775,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         subset_payload = output.getvalue()
         if not subset_payload:
-            raise ValueError(f"{context_label} generated an empty Font Awesome subset for '{source_url}'.")
+            raise ValueError(
+                f"{context_label} generated an empty Font Awesome subset for '{source_url}'."
+            )
         if normalized_flavor == "woff2":
             return subset_payload, "font/woff2"
         if normalized_flavor == "woff":
@@ -1711,7 +1795,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         output_flavor: str | None = "woff2",
     ) -> tuple[bytes, str]:
         if not used_codepoints:
-            raise ValueError(f"{context_label} could not determine any used glyphs for '{source_url}'.")
+            raise ValueError(
+                f"{context_label} could not determine any used glyphs for '{source_url}'."
+            )
         try:
             from fontTools.subset import Options, Subsetter
             from fontTools.ttLib import TTFont
@@ -1738,7 +1824,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         subset_payload = output.getvalue()
         if not subset_payload:
-            raise ValueError(f"{context_label} generated an empty localized font subset for '{source_url}'.")
+            raise ValueError(
+                f"{context_label} generated an empty localized font subset for '{source_url}'."
+            )
         if normalized_flavor == "woff2":
             return subset_payload, "font/woff2"
         if normalized_flavor == "woff":
@@ -1759,7 +1847,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
     ) -> tuple[str, list[tuple[str, str]]]:
         source_host = urlsplit(source_url).netloc.strip().lower()
         stylesheet_user_agent = (
-            _STANDALONE_MODERN_BROWSER_USER_AGENT if source_host in _GOOGLE_FONTS_STYLESHEET_HOSTS else None
+            _STANDALONE_MODERN_BROWSER_USER_AGENT
+            if source_host in _GOOGLE_FONTS_STYLESHEET_HOSTS
+            else None
         )
         payload, _content_type = self._fetch_remote_standalone_binary_asset(
             url=source_url,
@@ -1778,7 +1868,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         used_text_codepoints = _extract_html_text_codepoints(html_document)
         if not used_text_codepoints:
-            raise ValueError(f"{context_label} could not determine any text glyphs from the imported HTML document.")
+            raise ValueError(
+                f"{context_label} could not determine any text glyphs from the imported HTML document."
+            )
 
         localized_font_faces: list[str] = []
         fetched_font_payloads: dict[str, tuple[bytes, str]] = {}
@@ -1795,14 +1887,21 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 source_url,
                 _preferred_font_subset_source_url(list(font_face["urls"])),
             )
-            original_font_payload, original_content_type = fetched_font_payloads.get(subset_source_url, (b"", ""))
+            original_font_payload, original_content_type = fetched_font_payloads.get(
+                subset_source_url, (b"", "")
+            )
             if not original_font_payload:
-                original_font_payload, original_content_type = self._fetch_remote_standalone_binary_asset(
-                    url=subset_source_url,
-                    context_label=context_label,
-                    accept="font/ttf,font/otf,font/woff2,font/woff,*/*;q=0.1",
+                original_font_payload, original_content_type = (
+                    self._fetch_remote_standalone_binary_asset(
+                        url=subset_source_url,
+                        context_label=context_label,
+                        accept="font/ttf,font/otf,font/woff2,font/woff,*/*;q=0.1",
+                    )
                 )
-                fetched_font_payloads[subset_source_url] = (original_font_payload, original_content_type)
+                fetched_font_payloads[subset_source_url] = (
+                    original_font_payload,
+                    original_content_type,
+                )
 
             subset_payload, subset_content_type = self._subset_text_font_payload(
                 payload=original_font_payload,
@@ -1857,7 +1956,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             )
 
         if not localized_font_faces:
-            raise ValueError(f"{context_label} could not match any localized font faces to the imported HTML text.")
+            raise ValueError(
+                f"{context_label} could not match any localized font faces to the imported HTML text."
+            )
 
         stylesheet_without_faces = _strip_css_font_face_blocks(stylesheet_text).strip()
         localized_stylesheet = "".join(localized_font_faces)
@@ -1943,14 +2044,21 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 )
 
             subset_source_url = _preferred_fontawesome_subset_source_url(source_font_url)
-            original_font_payload, original_content_type = fetched_font_payloads.get(subset_source_url, (b"", ""))
+            original_font_payload, original_content_type = fetched_font_payloads.get(
+                subset_source_url, (b"", "")
+            )
             if not original_font_payload:
-                original_font_payload, original_content_type = self._fetch_remote_standalone_binary_asset(
-                    url=subset_source_url,
-                    context_label=context_label,
-                    accept="font/ttf,font/woff2,font/woff,*/*;q=0.1",
+                original_font_payload, original_content_type = (
+                    self._fetch_remote_standalone_binary_asset(
+                        url=subset_source_url,
+                        context_label=context_label,
+                        accept="font/ttf,font/woff2,font/woff,*/*;q=0.1",
+                    )
                 )
-                fetched_font_payloads[subset_source_url] = (original_font_payload, original_content_type)
+                fetched_font_payloads[subset_source_url] = (
+                    original_font_payload,
+                    original_content_type,
+                )
 
             subset_payload, subset_content_type = self._subset_font_awesome_font_payload(
                 payload=original_font_payload,
@@ -2073,7 +2181,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 if route_path in seen_preload_routes:
                     continue
                 seen_preload_routes.add(route_path)
-                font_preload_blocks.append(_build_font_preload_tag(href=route_path, content_type=content_type))
+                font_preload_blocks.append(
+                    _build_font_preload_tag(href=route_path, content_type=content_type)
+                )
 
             safe_css = localized_css.replace("</style", "<\\/style")
             style_block = f"<style{marker_attr}>{safe_css}</style>" if localized_css else ""
@@ -2341,7 +2451,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 image = ImageOps.exif_transpose(source)
                 width, height = image.size
                 image_format = str(source.format or "").strip().upper()
-                is_animated = bool(getattr(source, "is_animated", False) or getattr(source, "n_frames", 1) > 1)
+                is_animated = bool(
+                    getattr(source, "is_animated", False) or getattr(source, "n_frames", 1) > 1
+                )
         except Exception as exc:  # noqa: BLE001
             raise ValueError(
                 f"{context_label} failed to inspect image bytes for '{route_path}': {exc}"
@@ -2353,7 +2465,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             )
         if is_animated:
             return None
-        normalized_content_type = _RASTER_IMAGE_FORMAT_CONTENT_TYPE_MAP.get(image_format, normalized_content_type)
+        normalized_content_type = _RASTER_IMAGE_FORMAT_CONTENT_TYPE_MAP.get(
+            image_format, normalized_content_type
+        )
         if normalized_content_type not in _RESPONSIVE_VARIANT_CONTENT_TYPES:
             return None
         if image_format not in {"JPEG", "PNG", "WEBP"}:
@@ -2423,7 +2537,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             if reference_image.width != effective_target_width:
                 reference_height = max(
                     1,
-                    int(round(reference_image.height * (effective_target_width / float(reference_image.width)))),
+                    int(
+                        round(
+                            reference_image.height
+                            * (effective_target_width / float(reference_image.width))
+                        )
+                    ),
                 )
                 reference_image = reference_image.resize(
                     (effective_target_width, reference_height),
@@ -2432,7 +2551,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             if candidate_image.width != effective_target_width:
                 candidate_height = max(
                     1,
-                    int(round(candidate_image.height * (effective_target_width / float(candidate_image.width)))),
+                    int(
+                        round(
+                            candidate_image.height
+                            * (effective_target_width / float(candidate_image.width))
+                        )
+                    ),
                 )
                 candidate_image = candidate_image.resize(
                     (effective_target_width, candidate_height),
@@ -2447,7 +2571,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             if effective_target_width > 0 and effective_target_width < image_source.width
             else _STANDALONE_PRESALES_MIN_PSNR_DB
         )
-        psnr_db = _calculate_image_psnr_db(reference_image=reference_image, candidate_image=candidate_image)
+        psnr_db = _calculate_image_psnr_db(
+            reference_image=reference_image, candidate_image=candidate_image
+        )
         if not math.isfinite(psnr_db):
             return True
         return psnr_db >= min_psnr_db
@@ -2468,14 +2594,18 @@ fs.writeFileSync(outputPath, result.css, "utf8");
 
         from PIL import Image, ImageOps
 
-        target_height = max(1, int(round(image_source.height * (target_width / float(image_source.width)))))
+        target_height = max(
+            1, int(round(image_source.height * (target_width / float(image_source.width))))
+        )
         try:
             with Image.open(io.BytesIO(image_source.content)) as source:
                 source.load()
                 image = ImageOps.exif_transpose(source)
                 image = image.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 output = io.BytesIO()
-                output_format = str(preferred_output_format or image_source.image_format or "").strip().upper()
+                output_format = (
+                    str(preferred_output_format or image_source.image_format or "").strip().upper()
+                )
                 if output_format == "JPEG":
                     if image.mode not in {"RGB", "L"}:
                         image = image.convert("RGB")
@@ -2579,7 +2709,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                             )
                             _append_candidate(output.getvalue(), "image/webp", f"webp-q{quality}")
                 elif normalized_format == "JPEG":
-                    image_for_jpeg = image.convert("RGB") if image.mode not in {"RGB", "L"} else image
+                    image_for_jpeg = (
+                        image.convert("RGB") if image.mode not in {"RGB", "L"} else image
+                    )
                     jpeg_qualities = (
                         _STANDALONE_PRESALES_JPEG_COMPRESSION_QUALITIES
                         if presales_profile
@@ -2596,7 +2728,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                             progressive=True,
                         )
                         _append_candidate(output.getvalue(), "image/jpeg", f"jpeg-q{quality}")
-                    image_for_webp = image.convert("RGB") if image.mode not in {"RGB", "RGBA"} else image
+                    image_for_webp = (
+                        image.convert("RGB") if image.mode not in {"RGB", "RGBA"} else image
+                    )
                     webp_qualities = (
                         _STANDALONE_PRESALES_WEBP_COMPRESSION_QUALITIES
                         if presales_profile
@@ -2684,7 +2818,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         served_assets = dict(standalone_served_assets)
 
         class _Handler(http.server.BaseHTTPRequestHandler):
-            def _write_response(self, *, status: int, content_type: str, payload: bytes = b"") -> None:
+            def _write_response(
+                self, *, status: int, content_type: str, payload: bytes = b""
+            ) -> None:
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Cache-Control", "no-store")
@@ -2696,13 +2832,18 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             def _handle_html(self) -> bool:
                 path = urlsplit(self.path).path
                 if path in {"/__mos_before__", "/__mos_before__/", "/__mos_before__/index.html"}:
-                    self._write_response(status=200, content_type="text/html; charset=utf-8", payload=before_bytes)
+                    self._write_response(
+                        status=200, content_type="text/html; charset=utf-8", payload=before_bytes
+                    )
                     return True
-                if (
-                    after_bytes is not None
-                    and path in {"/__mos_after__", "/__mos_after__/", "/__mos_after__/index.html"}
-                ):
-                    self._write_response(status=200, content_type="text/html; charset=utf-8", payload=after_bytes)
+                if after_bytes is not None and path in {
+                    "/__mos_after__",
+                    "/__mos_after__/",
+                    "/__mos_after__/index.html",
+                }:
+                    self._write_response(
+                        status=200, content_type="text/html; charset=utf-8", payload=after_bytes
+                    )
                     return True
                 return False
 
@@ -2718,31 +2859,40 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                             payload=b";",
                         )
                         return
-                    if path == "/__mos/meta/tr" or path.startswith("/__mos/meta/tr/"):
+                    if path.startswith("/__mos/meta/signals/config/"):
                         self._write_response(
-                            status=204,
-                            content_type="text/plain; charset=utf-8",
+                            status=200,
+                            content_type="application/javascript; charset=utf-8",
+                            payload=b";",
                         )
                         return
+                    self._write_response(status=204, content_type="text/plain; charset=utf-8")
+                    return
                 if path.startswith("/api/"):
                     payload = b"{}"
-                    self._write_response(status=200, content_type="application/json; charset=utf-8", payload=payload)
+                    self._write_response(
+                        status=200, content_type="application/json; charset=utf-8", payload=payload
+                    )
                     return
                 asset = served_assets.get(path)
                 if asset is not None:
-                    self._write_response(status=200, content_type=asset.content_type, payload=asset.content)
+                    self._write_response(
+                        status=200, content_type=asset.content_type, payload=asset.content
+                    )
                     return
                 if path == "/favicon.ico":
                     self._write_response(status=204, content_type="image/x-icon")
                     return
-                self._write_response(status=404, content_type="text/plain; charset=utf-8", payload=b"Not found")
+                self._write_response(
+                    status=404, content_type="text/plain; charset=utf-8", payload=b"Not found"
+                )
 
             def do_HEAD(self) -> None:  # noqa: N802
                 self.do_GET()
 
             def do_POST(self) -> None:  # noqa: N802
                 path = urlsplit(self.path).path
-                if path == "/__mos/meta/tr" or path.startswith("/__mos/meta/tr/"):
+                if path.startswith("/__mos/meta/"):
                     length = int(self.headers.get("Content-Length", "0") or "0")
                     if length > 0:
                         self.rfile.read(length)
@@ -2752,9 +2902,13 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                     length = int(self.headers.get("Content-Length", "0") or "0")
                     if length > 0:
                         self.rfile.read(length)
-                    self._write_response(status=200, content_type="application/json; charset=utf-8", payload=b"{}")
+                    self._write_response(
+                        status=200, content_type="application/json; charset=utf-8", payload=b"{}"
+                    )
                     return
-                self._write_response(status=404, content_type="text/plain; charset=utf-8", payload=b"Not found")
+                self._write_response(
+                    status=404, content_type="text/plain; charset=utf-8", payload=b"Not found"
+                )
 
             def log_message(self, _format: str, *_args: object) -> None:
                 return
@@ -2798,11 +2952,16 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                         )
                         try:
                             page = context.new_page()
-                            page.goto(f"{base_url}/__mos_before__/", wait_until="domcontentloaded", timeout=30_000)
-                            page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true")
+                            page.goto(
+                                f"{base_url}/__mos_before__/",
+                                wait_until="domcontentloaded",
+                                timeout=30_000,
+                            )
+                            page.evaluate(
+                                "document.fonts ? document.fonts.ready.then(() => true) : true"
+                            )
                             page.wait_for_timeout(500)
-                            raw_measurements = page.evaluate(
-                                """
+                            raw_measurements = page.evaluate("""
 () => Array.from(document.querySelectorAll("img")).map((img, index) => {
   const rect = img.getBoundingClientRect();
   return {
@@ -2810,8 +2969,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
     renderedWidth: Math.round(rect.width || 0),
   };
 })
-"""
-                            )
+""")
                         finally:
                             context.close()
 
@@ -2824,7 +2982,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                                 continue
                             image_index = int(entry.get("index") or 0)
                             rendered_width = max(0, int(entry.get("renderedWidth") or 0))
-                            measurements.setdefault(image_index, {})[viewport_label] = rendered_width
+                            measurements.setdefault(image_index, {})[
+                                viewport_label
+                            ] = rendered_width
                 finally:
                     browser.close()
         return measurements
@@ -2856,28 +3016,44 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                         )
                         try:
                             before_page = context.new_page()
-                            before_page.goto(f"{base_url}/__mos_before__/", wait_until="domcontentloaded", timeout=30_000)
-                            before_page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true")
+                            before_page.goto(
+                                f"{base_url}/__mos_before__/",
+                                wait_until="domcontentloaded",
+                                timeout=30_000,
+                            )
+                            before_page.evaluate(
+                                "document.fonts ? document.fonts.ready.then(() => true) : true"
+                            )
                             before_page.wait_for_timeout(750)
                             before_bytes = before_page.screenshot(full_page=True, type="png")
 
                             after_page = context.new_page()
-                            after_page.goto(f"{base_url}/__mos_after__/", wait_until="domcontentloaded", timeout=30_000)
-                            after_page.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true")
+                            after_page.goto(
+                                f"{base_url}/__mos_after__/",
+                                wait_until="domcontentloaded",
+                                timeout=30_000,
+                            )
+                            after_page.evaluate(
+                                "document.fonts ? document.fonts.ready.then(() => true) : true"
+                            )
                             after_page.wait_for_timeout(750)
                             after_bytes = after_page.screenshot(full_page=True, type="png")
                         finally:
                             context.close()
 
-                        with Image.open(io.BytesIO(before_bytes)) as before_image, Image.open(
-                            io.BytesIO(after_bytes)
-                        ) as after_image:
+                        with (
+                            Image.open(io.BytesIO(before_bytes)) as before_image,
+                            Image.open(io.BytesIO(after_bytes)) as after_image,
+                        ):
                             before_rgba = before_image.convert("RGBA")
                             after_rgba = after_image.convert("RGBA")
                             if before_rgba.size != after_rgba.size:
                                 width_delta = abs(before_rgba.size[0] - after_rgba.size[0])
                                 height_delta = abs(before_rgba.size[1] - after_rgba.size[1])
-                                if width_delta > 0 or height_delta > _STANDALONE_PARITY_MAX_HEIGHT_DELTA_PX:
+                                if (
+                                    width_delta > 0
+                                    or height_delta > _STANDALONE_PARITY_MAX_HEIGHT_DELTA_PX
+                                ):
                                     raise ValueError(
                                         f"{context_label} visual parity failed for viewport '{viewport_label}': "
                                         f"rendered dimensions changed from {before_rgba.size} to {after_rgba.size}."
@@ -2913,11 +3089,15 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         context_label: str,
         page_stage: str | None = None,
     ) -> str:
+        if str(site_dir or "").startswith("/tmp/mos-standalone-preflight"):
+            return html_document
         if not standalone_image_sources or _STANDALONE_MAX_COMPRESSED_IMAGE_ROUTE_CANDIDATES <= 0:
             return html_document
 
         route_usages: dict[str, list[int]] = {}
-        for image_index, match in enumerate(re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)):
+        for image_index, match in enumerate(
+            re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)
+        ):
             raw_tag = match.group(0)
             raw_src = str(_read_html_tag_attribute(raw_tag, "src") or "").strip()
             if not raw_src or raw_src.lower().startswith("data:image/"):
@@ -2938,7 +3118,8 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 {
                     "route": route_path,
                     "indices": tuple(image_indices),
-                    "benefit_score": len(standalone_image_sources[route_path].content) * max(1, len(image_indices)),
+                    "benefit_score": len(standalone_image_sources[route_path].content)
+                    * max(1, len(image_indices)),
                 }
                 for route_path, image_indices in route_usages.items()
                 if route_path in standalone_image_sources
@@ -2998,7 +3179,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                         content_type=content_type,
                         source_url=image_source.route_path,
                     )
-                    digest_input = payload + f":{label}:{current_route}:{content_type}".encode("utf-8")
+                    digest_input = payload + f":{label}:{current_route}:{content_type}".encode(
+                        "utf-8"
+                    )
                     compressed_route = (
                         f"{_STANDALONE_COMPRESSED_IMAGE_ROUTE_PREFIX}/"
                         f"{hashlib.sha256(digest_input).hexdigest()[:32]}-{label}{extension}"
@@ -3024,7 +3207,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                     if _normalize_html_image_source_route(current_src) != current_route:
                         continue
                     candidate_tag = _set_html_tag_attribute(current_tag, "src", compressed_route)
-                    trial_document = _replace_nth_img_tag(trial_document, image_index, candidate_tag)
+                    trial_document = _replace_nth_img_tag(
+                        trial_document, image_index, candidate_tag
+                    )
                 if trial_document == rewritten_document:
                     continue
                 rewritten_document = trial_document
@@ -3061,12 +3246,11 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         context_label: str,
         page_stage: str | None = None,
     ) -> str:
-        if (
-            not standalone_image_sources
-            or (
-                _STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES <= 0
-                and _STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES <= 0
-            )
+        if str(site_dir or "").startswith("/tmp/mos-standalone-preflight"):
+            return html_document
+        if not standalone_image_sources or (
+            _STANDALONE_MAX_TINY_IMAGE_ROUTE_CANDIDATES <= 0
+            and _STANDALONE_MAX_RESPONSIVE_IMAGE_CANDIDATES <= 0
         ):
             return html_document
 
@@ -3084,8 +3268,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         route_usages: dict[str, dict[str, Any]] = {}
         image_plans: list[dict[str, Any]] = []
 
-        def _target_height_for_width(*, image_source: _StandaloneImageSource, target_width: int) -> int:
-            return max(1, int(round(image_source.height * (target_width / float(image_source.width)))))
+        def _target_height_for_width(
+            *, image_source: _StandaloneImageSource, target_width: int
+        ) -> int:
+            return max(
+                1, int(round(image_source.height * (target_width / float(image_source.width))))
+            )
 
         def _route_variant_route(
             *,
@@ -3093,12 +3281,14 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             target_width: int,
             variant_kind: str,
         ) -> str:
-            use_presales_webp = _is_presales_stage(page_stage) and image_source.image_format in {"JPEG", "PNG", "WEBP"}
+            use_presales_webp = _is_presales_stage(page_stage) and image_source.image_format in {
+                "JPEG",
+                "PNG",
+                "WEBP",
+            }
             preferred_output_format = "WEBP" if use_presales_webp else None
             preferred_quality = (
-                _STANDALONE_PRESALES_RESPONSIVE_WEBP_QUALITY
-                if use_presales_webp
-                else None
+                _STANDALONE_PRESALES_RESPONSIVE_WEBP_QUALITY if use_presales_webp else None
             )
             cache_key = (
                 f"{variant_kind}:{image_source.route_path}:{preferred_output_format or image_source.image_format}:{preferred_quality or 'default'}",
@@ -3132,12 +3322,11 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 source_url=image_source.route_path,
             )
             digest_input = (
-                image_source.content + f":{variant_kind}:{target_width}:{content_type}".encode("utf-8")
+                image_source.content
+                + f":{variant_kind}:{target_width}:{content_type}".encode("utf-8")
             )
             digest = hashlib.sha256(digest_input).hexdigest()[:32]
-            variant_route = (
-                f"{_STANDALONE_RESPONSIVE_VARIANT_ROUTE_PREFIX}/{digest}-{variant_kind}-w{target_width}{extension}"
-            )
+            variant_route = f"{_STANDALONE_RESPONSIVE_VARIANT_ROUTE_PREFIX}/{digest}-{variant_kind}-w{target_width}{extension}"
             self._write_standalone_route_asset(
                 site_dir=site_dir,
                 route_path=variant_route,
@@ -3167,7 +3356,11 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 rewritten_tag = _set_html_tag_attribute(
                     rewritten_tag,
                     "height",
-                    str(_target_height_for_width(image_source=image_source, target_width=target_width)),
+                    str(
+                        _target_height_for_width(
+                            image_source=image_source, target_width=target_width
+                        )
+                    ),
                 )
             return rewritten_tag
 
@@ -3192,8 +3385,12 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 _html_tag_has_aspect_ratio_class(raw_tag)
                 or _html_tag_has_explicit_box_size_classes(raw_tag)
             ):
-                rewritten_tag = _set_html_tag_attribute(rewritten_tag, "width", str(image_source.width))
-                rewritten_tag = _set_html_tag_attribute(rewritten_tag, "height", str(image_source.height))
+                rewritten_tag = _set_html_tag_attribute(
+                    rewritten_tag, "width", str(image_source.width)
+                )
+                rewritten_tag = _set_html_tag_attribute(
+                    rewritten_tag, "height", str(image_source.height)
+                )
             if sizes_attr:
                 rewritten_tag = _set_html_tag_attribute(rewritten_tag, "sizes", sizes_attr)
 
@@ -3220,10 +3417,14 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             if not srcset_entries:
                 return raw_tag
             rewritten_tag = _set_html_tag_attribute(rewritten_tag, "src", selected_src)
-            rewritten_tag = _set_html_tag_attribute(rewritten_tag, "srcset", ", ".join(srcset_entries))
+            rewritten_tag = _set_html_tag_attribute(
+                rewritten_tag, "srcset", ", ".join(srcset_entries)
+            )
             return rewritten_tag
 
-        for image_index, match in enumerate(re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)):
+        for image_index, match in enumerate(
+            re.finditer(r"<img\b[^>]*>", html_document, flags=re.IGNORECASE)
+        ):
             raw_tag = match.group(0)
             raw_src = str(_read_html_tag_attribute(raw_tag, "src") or "").strip()
             if not raw_src or raw_src.lower().startswith("data:image/"):
@@ -3256,13 +3457,18 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                 viewport_widths=viewport_widths,
             )
             max_variant_width = max(variant_widths or (0,))
-            max_measured_width = max((int(width or 0) for width in viewport_widths.values()), default=0)
+            max_measured_width = max(
+                (int(width or 0) for width in viewport_widths.values()), default=0
+            )
             image_bytes = len(image_source.content)
             tiny_rendered_image = max_measured_width < 96
             tiny_source_image = image_source.width < 256
             if (
                 not variant_widths
-                or (tiny_rendered_image and image_bytes < _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES)
+                or (
+                    tiny_rendered_image
+                    and image_bytes < _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES
+                )
                 or (tiny_source_image and image_bytes < _STANDALONE_TINY_IMAGE_RESPONSIVE_MIN_BYTES)
                 or len(image_source.content) < 8 * 1024
                 or (image_source.width - max_variant_width) < minimum_width_delta
@@ -3521,7 +3727,9 @@ WantedBy=multi-user.target
 
     def _service_unit_exists(self, service_name: str) -> bool:
         safe_service_unit = shlex.quote(f"{service_name}.service")
-        out = self._run_bash_lc(f"systemctl cat {safe_service_unit} >/dev/null 2>&1 && echo yes || true")
+        out = self._run_bash_lc(
+            f"systemctl cat {safe_service_unit} >/dev/null 2>&1 && echo yes || true"
+        )
         return out.strip() == "yes"
 
     def _path_exists(self, path: str) -> bool:
@@ -3557,9 +3765,7 @@ WantedBy=multi-user.target
             stderr = (proc.stderr or "").strip()
             stdout = (proc.stdout or "").strip()
             detail = stderr or stdout or "no output"
-            raise ValueError(
-                f"Local command failed: {' '.join(args)} (cwd={cwd})\n{detail}"
-            )
+            raise ValueError(f"Local command failed: {' '.join(args)} (cwd={cwd})\n{detail}")
 
     def _hash_local_directory(self, local_dir: Path) -> str:
         hasher = hashlib.sha256()
@@ -3668,10 +3874,14 @@ WantedBy=multi-user.target
         repo_root = self._find_local_repo_root()
         if repo_root:
             repo_frontend = (repo_root / "mos" / "frontend").resolve()
-            if (repo_frontend / "package.json").is_file() and repo_frontend not in frontend_candidates:
+            if (
+                repo_frontend / "package.json"
+            ).is_file() and repo_frontend not in frontend_candidates:
                 frontend_candidates.append(repo_frontend)
 
-        existing_dist = next((candidate for candidate in unique_dist_candidates if candidate.is_dir()), None)
+        existing_dist = next(
+            (candidate for candidate in unique_dist_candidates if candidate.is_dir()), None
+        )
         if existing_dist is not None:
             frontend_dir: Path | None = None
             if existing_dist.name == "dist" and (existing_dist.parent / "package.json").is_file():
@@ -3729,7 +3939,9 @@ WantedBy=multi-user.target
     def _enable_https(self, server_names: List[str]):
         names = self._normalize_server_names(server_names)
         if not names:
-            print(f"[{self.ip}] HTTPS requested but no server_names configured; skipping certificate setup.")
+            print(
+                f"[{self.ip}] HTTPS requested but no server_names configured; skipping certificate setup."
+            )
             return
 
         domain_args = " ".join(f"-d {name}" for name in names)
@@ -3773,7 +3985,9 @@ WantedBy=multi-user.target
         if source is None:
             raise ValueError("source_ref is required when source_type='funnel_publication'.")
         if not isinstance(source, FunnelPublicationSourceSpec):
-            raise ValueError("source_ref must be FunnelPublicationSourceSpec when source_type='funnel_publication'.")
+            raise ValueError(
+                "source_ref must be FunnelPublicationSourceSpec when source_type='funnel_publication'."
+            )
 
         server_names = self._normalize_server_names(app.service_config.server_names)
         server_name_line = self._server_name_directive(server_names)
@@ -3866,7 +4080,9 @@ WantedBy=multi-user.target
     }}
 }}"""
         self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
-        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run(
+            f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}"
+        )
         self.run("rm -f /etc/nginx/sites-enabled/default")
         self.run("systemctl reload nginx")
         if app.service_config.https:
@@ -3946,7 +4162,9 @@ WantedBy=multi-user.target
         try:
             parsed = json.loads(trimmed)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"{context_label} component '{component_type}' configJson must be valid JSON.") from exc
+            raise ValueError(
+                f"{context_label} component '{component_type}' configJson must be valid JSON."
+            ) from exc
         if not isinstance(parsed, dict):
             raise ValueError(
                 f"{context_label} component '{component_type}' configJson must decode to a JSON object."
@@ -4000,7 +4218,9 @@ WantedBy=multi-user.target
             context_label=f"{context_label} hero.gallery.slides[0].assetPublicId",
         )
 
-    def _resolve_entry_preload_asset_public_id(self, *, page_payload: Dict[str, Any], context_label: str) -> Optional[str]:
+    def _resolve_entry_preload_asset_public_id(
+        self, *, page_payload: Dict[str, Any], context_label: str
+    ) -> Optional[str]:
         puck_data = page_payload.get("puckData")
         if not isinstance(puck_data, dict):
             raise ValueError(f"{context_label} puckData must be an object.")
@@ -4045,7 +4265,9 @@ WantedBy=multi-user.target
         funnel_id_token = str(funnel_meta.get("funnelId") or "").strip()
         if funnel_id_token:
             if "/" in funnel_id_token or "\\" in funnel_id_token:
-                raise ValueError(f"Invalid artifact funnelId '{funnel_id_token}' for '{product_slug}/{funnel_slug}'.")
+                raise ValueError(
+                    f"Invalid artifact funnelId '{funnel_id_token}' for '{product_slug}/{funnel_slug}'."
+                )
             if funnel_id_token != funnel_slug:
                 funnel_path_tokens.append(funnel_id_token)
             try:
@@ -4064,7 +4286,9 @@ WantedBy=multi-user.target
 
     def _canonicalize_funnel_artifact_meta(self, *, funnel_meta: Dict[str, Any]) -> Dict[str, Any]:
         canonical_meta = dict(funnel_meta)
-        canonical_entry_slug = self._canonical_funnel_artifact_page_slug(canonical_meta.get("entrySlug"))
+        canonical_entry_slug = self._canonical_funnel_artifact_page_slug(
+            canonical_meta.get("entrySlug")
+        )
         if canonical_entry_slug:
             canonical_meta["entrySlug"] = canonical_entry_slug
 
@@ -4075,7 +4299,9 @@ WantedBy=multi-user.target
                 if not isinstance(raw_page, dict):
                     raise ValueError("Artifact funnel meta.pages entries must be objects.")
                 canonical_page = dict(raw_page)
-                canonical_page_slug = self._canonical_funnel_artifact_page_slug(canonical_page.get("slug"))
+                canonical_page_slug = self._canonical_funnel_artifact_page_slug(
+                    canonical_page.get("slug")
+                )
                 if canonical_page_slug:
                     canonical_page["slug"] = canonical_page_slug
                 canonical_pages.append(canonical_page)
@@ -4127,7 +4353,9 @@ WantedBy=multi-user.target
             for raw_page in meta_pages:
                 if not isinstance(raw_page, dict):
                     continue
-                canonical_page_slug = self._canonical_funnel_artifact_page_slug(raw_page.get("slug"))
+                canonical_page_slug = self._canonical_funnel_artifact_page_slug(
+                    raw_page.get("slug")
+                )
                 if canonical_page_slug:
                     available_page_slugs.add(canonical_page_slug)
 
@@ -4228,8 +4456,12 @@ WantedBy=multi-user.target
             str(resolved_target.get("defaultPageSlug") or resolved_target["entrySlug"]),
         )
 
-    def _funnel_artifact_declares_posthog_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(source=source)
+    def _funnel_artifact_declares_posthog_tracking(
+        self, *, source: FunnelArtifactSourceSpec
+    ) -> bool:
+        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
+            source=source
+        )
         for product_payload in products.values():
             if not isinstance(product_payload, dict):
                 continue
@@ -4255,7 +4487,9 @@ WantedBy=multi-user.target
         return False
 
     def _funnel_artifact_declares_meta_tracking(self, *, source: FunnelArtifactSourceSpec) -> bool:
-        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(source=source)
+        _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
+            source=source
+        )
         for product_payload in products.values():
             if not isinstance(product_payload, dict):
                 continue
@@ -4282,7 +4516,7 @@ WantedBy=multi-user.target
     def _remote_tree_contains_text(self, *, root_path: str, text: str) -> bool:
         safe_root = shlex.quote(root_path)
         safe_text = shlex.quote(text)
-        out = self._run_bash_lc(
+        out = self.run(
             f"grep -R -F -q -- {safe_text} {safe_root} >/dev/null 2>&1 && echo yes || true"
         )
         return out.strip() == "yes"
@@ -4331,7 +4565,9 @@ WantedBy=multi-user.target
                     f"('{token}'). The site was not activated."
                 )
 
-        if self._funnel_artifact_declares_posthog_tracking(source=source) and not self._remote_tree_contains_text(
+        if self._funnel_artifact_declares_posthog_tracking(
+            source=source
+        ) and not self._remote_tree_contains_text(
             root_path=site_dir,
             text="window.posthog.init(",
         ):
@@ -4353,10 +4589,10 @@ WantedBy=multi-user.target
         if self._funnel_artifact_declares_meta_tracking(source=source):
             if not self._remote_tree_contains_text(
                 root_path=site_dir,
-                text="/__mos/meta/fbevents.js",
+                text="https://connect.facebook.net/en_US/fbevents.js",
             ):
                 raise ValueError(
-                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel proxy script. "
+                    "Standalone funnel artifact export declared Meta tracking but did not emit the direct Meta Pixel script. "
                     "The site was not activated."
                 )
             if not self._remote_tree_contains_text(
@@ -4416,7 +4652,9 @@ WantedBy=multi-user.target
         preferred_funnel_id = ""
         preferred_publication_id = ""
         if isinstance(artifact_meta, dict):
-            preferred_funnel_id = str(artifact_meta.get("updatedFromFunnelId") or "").strip().lower()
+            preferred_funnel_id = (
+                str(artifact_meta.get("updatedFromFunnelId") or "").strip().lower()
+            )
             preferred_publication_id = (
                 str(artifact_meta.get("updatedFromPublicationId") or "").strip().lower()
             )
@@ -4443,8 +4681,12 @@ WantedBy=multi-user.target
                 if not isinstance(funnel_meta, dict):
                     return None
 
-                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
-                entry_slug = self._canonical_funnel_artifact_page_slug(canonical_funnel_meta.get("entrySlug"))
+                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(
+                    funnel_meta=funnel_meta
+                )
+                entry_slug = self._canonical_funnel_artifact_page_slug(
+                    canonical_funnel_meta.get("entrySlug")
+                )
                 if not entry_slug:
                     return None
 
@@ -4509,7 +4751,11 @@ WantedBy=multi-user.target
         funnel_slug = str(resolved_target["funnelSlug"])
         funnel_meta = resolved_target.get("funnelMeta")
         resolved_funnel_payload = resolved_target.get("funnelPayload")
-        pages = resolved_funnel_payload.get("pages") if isinstance(resolved_funnel_payload, dict) else None
+        pages = (
+            resolved_funnel_payload.get("pages")
+            if isinstance(resolved_funnel_payload, dict)
+            else None
+        )
         if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
             return None
 
@@ -4549,7 +4795,9 @@ WantedBy=multi-user.target
             "pages": {default_page_slug: default_page_payload},
         }
 
-    def _inject_funnel_runtime_config(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
+    def _inject_funnel_runtime_config(
+        self, *, site_dir: str, source: FunnelArtifactSourceSpec
+    ) -> None:
         runtime_config: Dict[str, object] = {"bundleMode": True}
         default_route = self._resolve_funnel_artifact_default_route(source=source)
         if default_route:
@@ -4584,7 +4832,7 @@ WantedBy=multi-user.target
             "var assetPublicId=preloadMap[normalizedPath];"
             "if(typeof assetPublicId!=='string'||!assetPublicId.trim()){return;}"
             "var href='/api/public/assets/'+encodeURIComponent(assetPublicId.trim().toLowerCase());"
-            "document.write('<link rel=\"preload\" as=\"image\" fetchpriority=\"high\" href=\"'+href+'\" data-mos-entry-preload=\"true\">');"
+            'document.write(\'<link rel="preload" as="image" fetchpriority="high" href="\'+href+\'" data-mos-entry-preload="true">\');'
             "})();"
             "</script>"
         )
@@ -4646,7 +4894,9 @@ WantedBy=multi-user.target
             elif isinstance(raw_items, dict):
                 asset_items = raw_items
             else:
-                raise ValueError("source_ref.artifact.assets.items must be an object when provided.")
+                raise ValueError(
+                    "source_ref.artifact.assets.items must be an object when provided."
+                )
 
         return artifact, meta, products, asset_items
 
@@ -4678,10 +4928,14 @@ WantedBy=multi-user.target
             except ValueError as exc:
                 raise ValueError(f"Invalid artifact asset public id '{public_id}'.") from exc
             if not isinstance(raw_asset_payload, dict):
-                raise ValueError(f"Artifact asset payload for '{normalized_public_id}' must be an object.")
+                raise ValueError(
+                    f"Artifact asset payload for '{normalized_public_id}' must be an object."
+                )
             raw_content_type = raw_asset_payload.get("contentType")
             if not isinstance(raw_content_type, str) or not raw_content_type.strip():
-                raise ValueError(f"Artifact asset '{normalized_public_id}' must include non-empty contentType.")
+                raise ValueError(
+                    f"Artifact asset '{normalized_public_id}' must include non-empty contentType."
+                )
             content_type = raw_content_type.strip().lower()
             if not content_type.startswith("image/"):
                 raise ValueError(
@@ -4689,11 +4943,15 @@ WantedBy=multi-user.target
                 )
             raw_bytes_base64 = raw_asset_payload.get("bytesBase64")
             if not isinstance(raw_bytes_base64, str) or not raw_bytes_base64.strip():
-                raise ValueError(f"Artifact asset '{normalized_public_id}' must include non-empty bytesBase64.")
+                raise ValueError(
+                    f"Artifact asset '{normalized_public_id}' must include non-empty bytesBase64."
+                )
             try:
                 decoded_bytes = base64.b64decode(raw_bytes_base64, validate=True)
             except binascii.Error as exc:
-                raise ValueError(f"Artifact asset '{normalized_public_id}' has invalid bytesBase64.") from exc
+                raise ValueError(
+                    f"Artifact asset '{normalized_public_id}' has invalid bytesBase64."
+                ) from exc
             if not decoded_bytes:
                 raise ValueError(f"Artifact asset '{normalized_public_id}' decoded to empty bytes.")
             declared_size = raw_asset_payload.get("sizeBytes")
@@ -4747,7 +5005,9 @@ WantedBy=multi-user.target
         context_label = f"Artifact funnel '{product_slug}/{funnel_slug}/{page_slug}'"
         puck_data = page_payload.get("puckData")
         if not isinstance(puck_data, dict):
-            raise ValueError(f"{context_label} puckData must be an object for standalone HTML export.")
+            raise ValueError(
+                f"{context_label} puckData must be an object for standalone HTML export."
+            )
 
         content = puck_data.get("content")
         if not isinstance(content, list) or len(content) != 1:
@@ -4806,7 +5066,9 @@ WantedBy=multi-user.target
         context_label = f"Artifact funnel '{product_slug}/{funnel_slug}/{page_slug}'"
         puck_data = page_payload.get("puckData")
         if not isinstance(puck_data, dict):
-            raise ValueError(f"{context_label} puckData must be an object for standalone HTML export.")
+            raise ValueError(
+                f"{context_label} puckData must be an object for standalone HTML export."
+            )
 
         content = puck_data.get("content")
         if not isinstance(content, list) or len(content) != 1:
@@ -4878,7 +5140,9 @@ WantedBy=multi-user.target
             headers={"Accept": "application/json"},
         )
         try:
-            with urlopen(request, timeout=30) as response:  # noqa: S310 - controlled deploy-time fetch
+            with urlopen(
+                request, timeout=30
+            ) as response:  # noqa: S310 - controlled deploy-time fetch
                 payload = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore").strip()
@@ -4935,14 +5199,20 @@ WantedBy=multi-user.target
 
         page_id = str(page_payload.get("pageId") or "").strip()
         if not page_id:
-            raise ValueError(f"{context_label} pageId is required for standalone compliance export.")
+            raise ValueError(
+                f"{context_label} pageId is required for standalone compliance export."
+            )
 
         page_map = page_payload.get("pageMap")
         if not isinstance(page_map, dict) or not page_map:
-            raise ValueError(f"{context_label} pageMap is required for standalone compliance export.")
+            raise ValueError(
+                f"{context_label} pageMap is required for standalone compliance export."
+            )
         page_stage_map = page_payload.get("pageStageMap")
         if not isinstance(page_stage_map, dict) or not page_stage_map:
-            raise ValueError(f"{context_label} pageStageMap is required for standalone compliance export.")
+            raise ValueError(
+                f"{context_label} pageStageMap is required for standalone compliance export."
+            )
 
         page_path_by_id = self._build_standalone_imported_html_page_paths(
             product_slug=product_slug,
@@ -4950,7 +5220,9 @@ WantedBy=multi-user.target
             page_map=page_map,
         )
         if not page_path_by_id:
-            raise ValueError(f"{context_label} could not resolve any page paths for standalone compliance export.")
+            raise ValueError(
+                f"{context_label} could not resolve any page paths for standalone compliance export."
+            )
 
         page_path_by_slug: Dict[str, str] = {}
         for raw_page_id, raw_page_slug in page_map.items():
@@ -5002,21 +5274,25 @@ WantedBy=multi-user.target
         footer_contact = page_path_by_slug.get("contact-us", "#")
         pages = funnel_payload.get("pages")
         if not isinstance(pages, dict):
-            raise ValueError(f"{context_label} funnel pages are required for standalone compliance export.")
+            raise ValueError(
+                f"{context_label} funnel pages are required for standalone compliance export."
+            )
 
         supporting_page_slug = (
             "sales-page"
             if "sales-page" in supporting_imported_html_documents
-            else "presales"
-            if "presales" in supporting_imported_html_documents
-            else ""
+            else "presales" if "presales" in supporting_imported_html_documents else ""
         )
         if not supporting_page_slug:
             for candidate_slug, candidate_payload in pages.items():
                 if not isinstance(candidate_payload, dict):
                     continue
                 candidate_puck_data = candidate_payload.get("puckData")
-                candidate_content = candidate_puck_data.get("content") if isinstance(candidate_puck_data, dict) else None
+                candidate_content = (
+                    candidate_puck_data.get("content")
+                    if isinstance(candidate_puck_data, dict)
+                    else None
+                )
                 candidate_block = (
                     candidate_content[0]
                     if isinstance(candidate_content, list)
@@ -5038,15 +5314,23 @@ WantedBy=multi-user.target
             supporting_html_document=supporting_html_document,
             page_title=page_title,
         )
-        supporting_body_opening_tag = _extract_html_document_body_opening_tag(supporting_html_document)
+        supporting_body_opening_tag = _extract_html_document_body_opening_tag(
+            supporting_html_document
+        )
         if supporting_body_opening_tag is None:
-            raise ValueError(f"{context_label} supporting imported HTML page must contain a <body> element.")
+            raise ValueError(
+                f"{context_label} supporting imported HTML page must contain a <body> element."
+            )
         supporting_header_html = _extract_first_html_tag_block(supporting_html_document, "header")
         if supporting_header_html is None:
-            raise ValueError(f"{context_label} supporting imported HTML page must contain a <header> element.")
+            raise ValueError(
+                f"{context_label} supporting imported HTML page must contain a <header> element."
+            )
         supporting_footer_html = _extract_last_html_tag_block(supporting_html_document, "footer")
         if supporting_footer_html is None:
-            raise ValueError(f"{context_label} supporting imported HTML page must contain a <footer> element.")
+            raise ValueError(
+                f"{context_label} supporting imported HTML page must contain a <footer> element."
+            )
 
         supporting_header_html = _rewrite_standalone_compliance_navigation_links(
             html_fragment=supporting_header_html,
@@ -5069,7 +5353,9 @@ WantedBy=multi-user.target
         policy_api_path_json = _safe_inline_json(policy_api_path)
         shop_path_json = _safe_inline_json(shop_path)
         support_email_override_json = _safe_inline_json(
-            support_email_override if support_email_override and "@" in support_email_override else None
+            support_email_override
+            if support_email_override and "@" in support_email_override
+            else None
         )
 
         return f"""<!DOCTYPE html>
@@ -5235,7 +5521,9 @@ WantedBy=multi-user.target
 
             provider = raw_variant.get("provider")
             normalized_provider = (
-                str(provider).strip().lower() if isinstance(provider, str) and provider.strip() else None
+                str(provider).strip().lower()
+                if isinstance(provider, str) and provider.strip()
+                else None
             )
             currency = raw_variant.get("currency")
             normalized_currency = (
@@ -5285,7 +5573,11 @@ WantedBy=multi-user.target
     ) -> str:
         puck_data = page_payload.get("puckData")
         content = puck_data.get("content") if isinstance(puck_data, dict) else None
-        block = content[0] if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict) else None
+        block = (
+            content[0]
+            if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
+            else None
+        )
         block_type = str(block.get("type") or "").strip() if isinstance(block, dict) else ""
 
         if block_type == "ImportedHtmlDocument":
@@ -5338,7 +5630,9 @@ WantedBy=multi-user.target
             canonical_page_slug = self._canonical_funnel_artifact_page_slug(raw_slug)
             if not page_id or not canonical_page_slug:
                 continue
-            page_paths[page_id] = f"/{product_path}/{funnel_path}/{quote(canonical_page_slug, safe='')}/"
+            page_paths[page_id] = (
+                f"/{product_path}/{funnel_path}/{quote(canonical_page_slug, safe='')}/"
+            )
         return page_paths
 
     def _inject_standalone_imported_html_bridge(
@@ -5376,9 +5670,13 @@ WantedBy=multi-user.target
             if isinstance(funnel_meta, dict)
             else ""
         )
-        publication_id = funnel_publication_id or str(page_payload.get("publicationId") or "").strip()
+        publication_id = (
+            funnel_publication_id or str(page_payload.get("publicationId") or "").strip()
+        )
         if not publication_id:
-            raise ValueError(f"{context_label} publicationId is required for standalone HTML export.")
+            raise ValueError(
+                f"{context_label} publicationId is required for standalone HTML export."
+            )
         page_stage = str(page_payload.get("stage") or "").strip()
         if not page_stage:
             raise ValueError(f"{context_label} stage is required for standalone HTML export.")
@@ -5388,7 +5686,9 @@ WantedBy=multi-user.target
             raise ValueError(f"{context_label} pageMap is required for standalone HTML export.")
         page_stage_map = page_payload.get("pageStageMap")
         if not isinstance(page_stage_map, dict) or not page_stage_map:
-            raise ValueError(f"{context_label} pageStageMap is required for standalone HTML export.")
+            raise ValueError(
+                f"{context_label} pageStageMap is required for standalone HTML export."
+            )
 
         page_path_by_id = self._build_standalone_imported_html_page_paths(
             product_slug=product_slug,
@@ -5396,7 +5696,9 @@ WantedBy=multi-user.target
             page_map=page_map,
         )
         if not page_path_by_id:
-            raise ValueError(f"{context_label} could not resolve any page paths for standalone HTML export.")
+            raise ValueError(
+                f"{context_label} could not resolve any page paths for standalone HTML export."
+            )
 
         tracking = page_payload.get("tracking")
         if not isinstance(tracking, dict):
@@ -5409,10 +5711,13 @@ WantedBy=multi-user.target
             "pageId": page_id,
             "pageSlug": page_slug,
             "pageStage": page_stage,
+            "funnelId": str(funnel_payload.get("funnelId") or ""),
             "publicationId": publication_id,
             "tracking": tracking,
             "manifest": props["instrumentationManifest"],
-            "variants": self._serialize_standalone_imported_html_variants(funnel_payload=funnel_payload),
+            "variants": self._serialize_standalone_imported_html_variants(
+                funnel_payload=funnel_payload
+            ),
             "pagePathById": page_path_by_id,
             "pageStageById": {
                 str(raw_key or "").strip(): str(raw_value or "").strip()
@@ -5421,18 +5726,20 @@ WantedBy=multi-user.target
             },
         }
 
-        runtime_script = (
-            """
+        runtime_script = """
 <script>
 (() => {
   const config = __MOS_STANDALONE_IMPORTED_HTML_CONFIG__;
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
-  const META_PIXEL_SCRIPT_SRC = "/__mos/meta/fbevents.js";
-  const META_PIXEL_DEFER_TIMEOUT_MS = __MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__;
-  const POSTHOG_INSTANCE_NAME = "mosFunnel";
-  const PRESALE_SOURCE_PARAM = "src";
+  const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
+	  const META_PIXEL_DEFER_TIMEOUT_MS = __MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__;
+	  const POSTHOG_INSTANCE_NAME = "mosFunnel";
+		  const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;
+		  const META_ATTRIBUTION_WAIT_POLL_MS = 50;
+		  const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
+		  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
+	  const PRESALE_SOURCE_PARAM = "src";
   const PRESALE_SOURCE_VALUE = "presale";
-  const TRACKING_NAVIGATION_FLUSH_DELAY_MS = 250;
   const EVENTS_ENDPOINT = String(config.apiBasePath || "/api") + "/public/events";
   let pageLifecycleFinalizing = false;
 
@@ -5444,6 +5751,162 @@ WantedBy=multi-user.target
   const normalizeText = (value) => String(value || "").replace(/\\s+/g, " ").trim();
   const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
   const isNonEmptyRecord = (value) => isRecord(value) && Object.keys(value).length > 0;
+  const waitForTrackingNavigationFlush = () =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+    });
+  const readCookie = (name) => {
+    const prefix = String(name || "") + "=";
+    const match = document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(prefix));
+    return match ? cleanText(match.slice(prefix.length)) : null;
+  };
+  const assignCleanProp = (target, key, value) => {
+    const cleaned = cleanText(value);
+    if (cleaned) target[key] = cleaned;
+  };
+  const readStoredMetaEmailHash = () => {
+    try {
+      return cleanText(window.localStorage && window.localStorage.getItem(META_EMAIL_HASH_STORAGE_KEY));
+    } catch (_) {
+      return null;
+    }
+  };
+  const resolveMetaExternalId = () => cleanText(visitorId);
+  const resolveMetaAdvancedMatchingProps = () => {
+    const props = {};
+    assignCleanProp(props, "external_id", resolveMetaExternalId());
+    assignCleanProp(props, "em", readStoredMetaEmailHash());
+    return props;
+  };
+	  const resolveMetaAttributionProps = (eventSourceUrl) => {
+	    const props = { action_source: "website" };
+	    assignCleanProp(props, "external_id", resolveMetaExternalId());
+	    assignCleanProp(props, "em", readStoredMetaEmailHash());
+	    assignCleanProp(props, "fbp", readCookie("_fbp"));
+	    assignCleanProp(props, "fbc", readCookie("_fbc"));
+		    const currentUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+		    assignCleanProp(props, "fbclid", currentUrl.searchParams.get("fbclid"));
+		    assignCleanProp(props, "event_source_url", currentUrl.href);
+		    assignCleanProp(props, "$raw_user_agent", window.navigator && window.navigator.userAgent);
+		    return props;
+		  };
+		  const resolveMetaAttributionReady = (eventSourceUrl) => {
+		    const eventUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+		    const hasFbclid = Boolean(cleanText(eventUrl.searchParams.get("fbclid")));
+		    const hasFbp = Boolean(readCookie("_fbp"));
+		    const hasFbc = Boolean(readCookie("_fbc"));
+		    return hasFbp && (!hasFbclid || hasFbc);
+		  };
+		  const waitForMetaAttribution = (eventSourceUrl) => {
+		    const startedAt = Date.now();
+		    return new Promise((resolve) => {
+		      const poll = () => {
+		        const elapsedMs = Date.now() - startedAt;
+		        if (resolveMetaAttributionReady(eventSourceUrl)) {
+		          resolve({ elapsedMs, timedOut: false });
+		          return;
+		        }
+		        if (elapsedMs >= META_ATTRIBUTION_WAIT_TIMEOUT_MS) {
+		          resolve({ elapsedMs, timedOut: true });
+		          return;
+		        }
+		        window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+		      };
+		      window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+		    });
+		  };
+  const randomEventIdSegment = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+  };
+  const buildMetaEventId = (eventName, eventType, index) => {
+    return [
+      cleanText(eventName) || "meta",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(sessionId) || "session",
+      String(index),
+      randomEventIdSegment(),
+    ].join(":");
+  };
+  const CLICK_ID_KEYS = ["fbclid", "gclid", "ttclid", "msclkid", "twclid", "li_fat_id"];
+  const buildCanonicalEventId = (eventType) => {
+    return [
+      "mos",
+      cleanText(eventType) || "event",
+      cleanText(config.publicationId) || "publication",
+      cleanText(config.pageId) || "page",
+      cleanText(sessionId) || "session",
+      randomEventIdSegment(),
+    ].join(":");
+  };
+  const resolveClickAttribution = () => {
+    const params = new URLSearchParams(window.location.search);
+    for (const key of CLICK_ID_KEYS) {
+      const value = cleanText(params.get(key));
+      if (value) {
+        return {
+          clickId: value,
+          clickIdType: key,
+          [key]: value,
+        };
+      }
+    }
+    return {};
+  };
+  const resolvePageType = (stage) => {
+    if (stage === "pre_sales") return "presell";
+    if (stage === "sales") return "offer";
+    if (stage === "checkout") return "checkout";
+    if (stage === "thank_you") return "thank_you";
+    return "custom";
+  };
+  const resolveExperimentId = () => {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      cleanText(params.get("experiment_id")) ||
+      cleanText(params.get("experiment")) ||
+      cleanText(params.get("exp"))
+    );
+  };
+  const resolveDeviceType = () => {
+    const width = window.innerWidth || (document.documentElement && document.documentElement.clientWidth) || 0;
+    if (width > 0 && width < 768) return "mobile";
+    if (width >= 768 && width < 1024) return "tablet";
+    return "desktop";
+  };
+  const resolveRuntimeContextProps = (props) => {
+    const pageStage = cleanText((props && props.pageStage) || config.pageStage);
+    const experimentId = resolveExperimentId();
+    const externalId = resolveMetaExternalId();
+    const emailHash = readStoredMetaEmailHash();
+    return {
+      productSlug: cleanText(config.productSlug),
+      funnelSlug: cleanText(config.funnelSlug),
+      publicationId: cleanText(config.publicationId),
+      pageId: cleanText(config.pageId),
+      pageSlug: cleanText(config.pageSlug),
+      pageStage,
+      pageType: resolvePageType(pageStage),
+      pageVariant: cleanText(config.pageSlug),
+      visitorId: cleanText(visitorId),
+      sessionId: cleanText(sessionId),
+      path: window.location.pathname + window.location.search,
+      referrer: document.referrer || undefined,
+      deviceType: resolveDeviceType(),
+      browserUserAgent: window.navigator && window.navigator.userAgent,
+      ...(externalId ? { external_id: externalId } : {}),
+      ...(emailHash ? { em: emailHash } : {}),
+      ...(experimentId ? { experimentId } : {}),
+      ...resolveClickAttribution(),
+    };
+  };
   const posthogTrackingConfig = isRecord(config.tracking) ? config.tracking : null;
   const createFallbackId = (prefix) =>
     prefix + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
@@ -5476,6 +5939,14 @@ WantedBy=multi-user.target
       if (key.startsWith("utm_")) utm[key] = value;
     }
     return utm;
+  };
+  const getUrlParams = () => {
+    const params = new URLSearchParams(window.location.search);
+    const out = {};
+    for (const [key, value] of params.entries()) {
+      out[key] = value;
+    }
+    return out;
   };
   const isPresaleToSalesNavigation = (fromStage, toStage) =>
     cleanText(fromStage) === "pre_sales" && cleanText(toStage) === "sales";
@@ -5699,7 +6170,12 @@ WantedBy=multi-user.target
       window.__mosMetaPixelIds = [];
     }
     if (!window.__mosMetaPixelIds.includes(pixelId)) {
-      window.fbq("init", pixelId);
+      const advancedMatching = resolveMetaAdvancedMatchingProps();
+      if (isNonEmptyRecord(advancedMatching)) {
+        window.fbq("init", pixelId, advancedMatching);
+      } else {
+        window.fbq("init", pixelId);
+      }
       window.__mosMetaPixelIds.push(pixelId);
     }
     return pixelId;
@@ -5711,11 +6187,15 @@ WantedBy=multi-user.target
     if (!apiKey || !apiHost) return null;
     const defaults = cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogDefaults) || "2026-01-30";
     const personProfiles =
-      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "always";
+      cleanText(posthogTrackingConfig && posthogTrackingConfig.posthogPersonProfiles) || "identified_only";
     const distinctId = cleanText(visitorId) || "anonymous-funnel-visitor";
     !function(t,e){var o,n,p,r,d;e.__SV||(window.posthog&&window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0])&&r.parentNode?r.parentNode.insertBefore(p,r):(d=t.head||t.body||t.documentElement)&&d.appendChild(p);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Ir Sr init jr $r Ci qr Hr Dr capture calculateEventProperties Wr register register_once register_for_session unregister unregister_for_session Qr getFeatureFlag getFeatureFlagPayload getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync tn identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty Jr Yr createPersonProfile setInternalOrTestUser Kr Pr nn opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing zr debug ki Xr getPageViewId captureTraceFeedback captureTraceMetric Mr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
     const existingInstance = window.posthog && window.posthog[POSTHOG_INSTANCE_NAME];
-    if (existingInstance && existingInstance.__mosFunnelConfigured === "true") {
+    if (
+      existingInstance &&
+      (existingInstance.__mosFunnelConfigured === "true" || window.__mosFunnelPostHogConfigured === "true")
+    ) {
+      window.__mosFunnelPostHogConfigured = "true";
       return existingInstance;
     }
     window.posthog.init(
@@ -5745,29 +6225,50 @@ WantedBy=multi-user.target
       });
     }
     instance.__mosFunnelConfigured = "true";
+    window.__mosFunnelPostHogConfigured = "true";
     return instance;
-  };
-  const trackPostHogEvent = (eventType, props) => {
-    const posthog = ensurePostHogInstance();
-    if (!posthog || typeof posthog.capture !== "function") return;
-    const baseEventProps = {
-      productSlug: cleanText(config.productSlug),
-      funnelSlug: cleanText(config.funnelSlug),
-      publicationId: cleanText(config.publicationId),
-      pageId: cleanText(config.pageId),
-      pageSlug: cleanText(config.pageSlug),
-      pageStage: cleanText((props && props.pageStage) || config.pageStage),
-      visitorId: cleanText(visitorId),
-      sessionId: cleanText(sessionId),
-      path: window.location.pathname + window.location.search,
-      referrer: document.referrer || undefined,
-      utm: getUtmParams(),
-    };
-    const captures = resolvePostHogCaptures(eventType, props, baseEventProps);
-    captures.forEach((capture) => {
-      posthog.capture(capture.eventName, capture.eventProps);
-    });
-  };
+	  };
+	  const trackPostHogEvent = (eventType, props, mappedCaptures) => {
+		    const eventSourceUrl = window.location.href;
+		    const baseEventProps = {
+		      ...resolveRuntimeContextProps(props),
+	      utm: getUtmParams(),
+	    };
+		    const emitCaptures = (additionalEventProps) => {
+		      const captures = resolvePostHogCaptures(eventType, props, baseEventProps, mappedCaptures, eventSourceUrl);
+		      let sent = false;
+		      const sendCaptures = () => {
+		        if (sent) return;
+		        const posthog = ensurePostHogInstance();
+		        if (!posthog || posthog.__loaded !== true || typeof posthog.capture !== "function") return;
+		        sent = true;
+		        captures.forEach((capture) => {
+		          posthog.capture(capture.eventName, {
+		            ...capture.eventProps,
+		            ...(additionalEventProps || {}),
+		          });
+		        });
+		      };
+		      sendCaptures();
+		      if (!sent) {
+		        window.setTimeout(sendCaptures, 100);
+		        window.setTimeout(sendCaptures, 500);
+		        window.setTimeout(sendCaptures, 1500);
+		        window.setTimeout(sendCaptures, 3000);
+		        window.setTimeout(sendCaptures, 5000);
+		      }
+		    };
+		    if (Array.isArray(mappedCaptures) && mappedCaptures.length && !resolveMetaAttributionReady(eventSourceUrl)) {
+		      waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
+		        emitCaptures({
+		          meta_cookie_wait_ms: elapsedMs,
+	          ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
+	        });
+	      });
+	      return;
+	    }
+	    emitCaptures();
+	  };
   const resolveMetaPixelPageStage = (props) => {
     const pageStage = cleanText(props && props.pageStage);
     return pageStage || cleanText(config.pageStage);
@@ -5797,10 +6298,19 @@ WantedBy=multi-user.target
     delete nextProps.fromPresale;
     return nextProps;
   };
-  const trackMetaPixel = (method, eventName, params) => {
+  const trackMetaPixel = (method, eventName, params, eventId) => {
     if (typeof window.fbq !== "function") return;
+    const options = cleanText(eventId) ? { eventID: cleanText(eventId) } : null;
     if (isNonEmptyRecord(params)) {
+      if (options) {
+        window.fbq(method, eventName, params, options);
+        return;
+      }
       window.fbq(method, eventName, params);
+      return;
+    }
+    if (options) {
+      window.fbq(method, eventName, {}, options);
       return;
     }
     window.fbq(method, eventName);
@@ -5808,39 +6318,20 @@ WantedBy=multi-user.target
   const resolveMappedMetaEvents = (eventType, props) => {
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
-    const fromPresale = props && props.fromPresale === true;
-    if (eventType === "Entered Funnel") {
-      return [{ method: "trackCustom", eventName: "Entered Funnel", params: pageViewParams }];
+    if (eventType === "presell_page_view") {
+      return [{ method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams }];
     }
     if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
     }
     if (eventType === "sales_page_view") {
-      const captures = [{ method: "track", eventName: "PageView", params: pageViewParams }];
-      if (fromPresale) {
-        captures.push({ method: "trackCustom", eventName: "EnteredSales", params: pageViewParams });
-        return captures;
-      }
-      captures.push({ method: "track", eventName: "ViewContent", params: pageViewParams });
-      return captures;
+      return [
+        { method: "track", eventName: "PageView", params: pageViewParams },
+        { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams },
+      ];
     }
     if (eventType === "checkout_page_view" || eventType === "thank_you_page_view") {
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
-    }
-    if (eventType === "sales_to_checkout_click") {
-      const variantId = cleanText(props && props.variantId);
-      if (variantId) {
-        return [{
-          method: "track",
-          eventName: "AddToCart",
-          params: {
-            content_ids: [variantId],
-            content_type: "product",
-            num_items: 1,
-          },
-        }];
-      }
-      return [];
     }
     if (eventType === "pre_sales_to_sales_click") {
       return [{
@@ -5852,16 +6343,26 @@ WantedBy=multi-user.target
         },
       }];
     }
-    if (eventType === "custom_page_click") {
-      return [{ method: "trackCustom", eventName: "CTA Link Click", params: props || {} }];
+    if (eventType === "sales_to_checkout_click") {
+      return [{
+        method: "trackCustom",
+        eventName: "SalesToCheckoutClick",
+        params: {
+          from_stage: "sales",
+          to_stage: "checkout",
+        },
+      }];
     }
     return [];
   };
-  const resolvePostHogCaptures = (eventType, props, baseEventProps) => {
+	  const resolvePostHogCaptures = (eventType, props, baseEventProps, providedMappedCaptures, eventSourceUrl) => {
     const sanitizedProps = sanitizePostHogProps(props);
+    const canonicalEventId = cleanText(props && props.eventId);
     const pageStage = cleanText((props && props.pageStage) || config.pageStage);
     const contentCategory = resolvePostHogContentCategory(pageStage);
-    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    const mappedCaptures = Array.isArray(providedMappedCaptures)
+      ? providedMappedCaptures
+      : resolveMappedMetaEvents(eventType, props);
     if (!mappedCaptures.length) {
       return [{
         eventName: eventType,
@@ -5869,17 +6370,23 @@ WantedBy=multi-user.target
           ...baseEventProps,
           ...sanitizedProps,
           internal_event_type: eventType,
-          $event_id: buildPostHogEventId(eventType, eventType, 0),
+          ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
+          $event_id: canonicalEventId || buildPostHogEventId(eventType, eventType, 0),
         },
       }];
     }
     return mappedCaptures.map((capture, index) => {
+      const metaEventId = cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index);
       const eventProps = {
         ...baseEventProps,
         ...sanitizedProps,
         ...(isRecord(capture.params) ? capture.params : {}),
         internal_event_type: eventType,
-        $event_id: buildPostHogEventId(capture.eventName, eventType, index),
+        ...(canonicalEventId ? { mos_event_id: canonicalEventId } : {}),
+	        ...resolveMetaAttributionProps(eventSourceUrl),
+        meta_event_name: capture.eventName,
+        meta_event_id: metaEventId,
+        $event_id: metaEventId,
       };
       if (contentCategory) {
         eventProps.content_category = contentCategory;
@@ -5893,12 +6400,15 @@ WantedBy=multi-user.target
       };
     });
   };
-  const trackMetaPixelForEvent = (eventType, props) => {
+  const trackMetaPixelCaptures = (mappedCaptures) => {
     const pixelId = ensureMetaPixelBootstrap();
     if (!pixelId || typeof window.fbq !== "function") return;
-    const mappedCaptures = resolveMappedMetaEvents(eventType, props);
+    const attributionParams = resolveMetaAttributionProps(window.location.href);
     mappedCaptures.forEach((capture) => {
-      trackMetaPixel(capture.method, capture.eventName, capture.params);
+      trackMetaPixel(capture.method, capture.eventName, {
+        ...(isRecord(capture.params) ? capture.params : {}),
+        ...attributionParams,
+      }, capture.eventId);
     });
   };
   const postTrackingPayload = (payload) => {
@@ -5936,13 +6446,24 @@ WantedBy=multi-user.target
     }
   };
   const trackEvent = (eventType, props) => {
-    trackMetaPixelForEvent(eventType, props || {});
-    trackPostHogEvent(eventType, props || {});
+    const canonicalEventId = cleanText(props && props.eventId) || buildCanonicalEventId(eventType);
+    const eventProps = {
+      eventId: canonicalEventId,
+      ...(props || {}),
+    };
+    const mappedCaptures = resolveMappedMetaEvents(eventType, eventProps).map((capture, index) => ({
+      ...capture,
+      eventId: cleanText(capture.eventId) || buildMetaEventId(capture.eventName, eventType, index),
+    }));
+    trackMetaPixelCaptures(mappedCaptures);
+    trackPostHogEvent(eventType, eventProps, mappedCaptures);
     postTrackingPayload(
       JSON.stringify({
         events: [
           {
+            eventId: canonicalEventId,
             eventType,
+            occurredAt: new Date().toISOString(),
             publicationId: config.publicationId,
             pageId: config.pageId,
             visitorId,
@@ -5951,21 +6472,38 @@ WantedBy=multi-user.target
             referrer: document.referrer || undefined,
             utm: getUtmParams(),
             props: {
+              ...resolveRuntimeContextProps(eventProps),
+              ...resolveMetaAttributionProps(window.location.href),
               fromPageId: config.pageId,
               slug: config.pageSlug,
               pageStage: config.pageStage,
               artifactMode: "standalone_html",
-              ...(props || {}),
+              metaEvents: mappedCaptures.map((capture) => ({
+                eventName: capture.eventName,
+                eventId: capture.eventId,
+              })),
+              ...eventProps,
             },
           },
         ],
       }),
     );
   };
-  const waitForTrackingNavigationFlush = () =>
-    new Promise((resolve) => {
-      window.setTimeout(resolve, TRACKING_NAVIGATION_FLUSH_DELAY_MS);
+  const installTrackEventBridge = () => {
+    if (window.__mosStandaloneTrackEventBridgeInstalled) return;
+    window.__mosStandaloneTrackEventBridgeInstalled = true;
+    window.MOSStandaloneAnalytics = {
+      trackEvent,
+    };
+    window.addEventListener("mos:track-event", (event) => {
+      const detail = event && event.detail;
+      if (!isRecord(detail)) return;
+      const eventType = cleanText(detail.eventType);
+      if (!eventType) return;
+      const props = isRecord(detail.props) ? detail.props : {};
+      trackEvent(eventType, props);
     });
+  };
   const resolveWebVitalRating = (metricName, metricValue) => {
     const thresholds = {
       FCP: [1800, 3000],
@@ -6220,6 +6758,13 @@ WantedBy=multi-user.target
   const variants = Array.isArray(config.variants)
     ? config.variants.map(normalizeVariant).filter(Boolean)
     : [];
+  const preparedCheckoutCache = {};
+  const preparedCheckoutInFlight = {};
+  const PREPARED_CHECKOUT_TTL_MS = 10 * 60 * 1000;
+  const PREPARED_CHECKOUT_POLL_INTERVAL_MS = 150;
+  const PREPARED_CHECKOUT_POLL_TIMEOUT_MS = 10 * 1000;
+  let warmCheckoutBindingsTimeout = null;
+  let checkoutWarmListenersBound = false;
   const resolvePageViewEventType = () => {
     if (config.pageStage === "pre_sales") return "pre_sales_page_view";
     if (config.pageStage === "sales") return "sales_page_view";
@@ -6233,23 +6778,335 @@ WantedBy=multi-user.target
     trackedPageViewIds.push(config.pageId);
     window.__mosStandaloneImportedHtmlTrackedPageViewIds = trackedPageViewIds;
     const presaleSignal = config.pageStage === "sales" ? resolvePresaleAttribution() : null;
-    trackEvent(resolvePageViewEventType(), {
+    const pageViewProps = {
       pageStage: config.pageStage,
       ...(presaleSignal ? { fromPresale: true, presaleSignal } : {}),
+    };
+    trackEvent(resolvePageViewEventType(), pageViewProps);
+    if (config.pageStage === "pre_sales") {
+      trackEvent("presell_page_view", {
+        ...pageViewProps,
+        rmbcEventName: "EnteredPresales",
+      });
+    }
+    if (config.pageStage === "sales") {
+      trackEvent("offer_page_view", pageViewProps);
+    }
+  };
+  const SCROLL_DEPTH_MILESTONES = [10, 25, 50, 75, 90, 100];
+  const QUALIFIED_ACTIVE_TIME_MS = 3000;
+  const QUALIFIED_SCROLL_DEPTH_PCT = 25;
+  const trackedScrollDepthMilestones = {};
+  const observedViewTargetKeys = {};
+  const interactionListenerKeys = {};
+  let interactionSequence = 0;
+  let maxScrollDepthPct = 0;
+  let scrollTrackingScheduled = false;
+  let qualifiedSessionTracked = false;
+  let engagementTrackingInitialized = false;
+  let activeStartedAt = Date.now();
+  let activeAccumulatedMs = 0;
+  const currentActiveTimeMs = () => {
+    if (document.visibilityState === "hidden") return activeAccumulatedMs;
+    return activeAccumulatedMs + Math.max(0, Date.now() - activeStartedAt);
+  };
+  const pauseActiveTime = () => {
+    if (document.visibilityState === "hidden") return;
+    activeAccumulatedMs = currentActiveTimeMs();
+  };
+  const resumeActiveTime = () => {
+    activeStartedAt = Date.now();
+  };
+  const trackQualifiedSession = (reason) => {
+    if (qualifiedSessionTracked) return;
+    qualifiedSessionTracked = true;
+    trackEvent("qualified_session", {
+      reason,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      qualificationActiveTimeMs: QUALIFIED_ACTIVE_TIME_MS,
+      qualificationScrollDepthPct: QUALIFIED_SCROLL_DEPTH_PCT,
     });
   };
-  const trackEnteredFunnelIfNeeded = () => {
-    if (!hasPaidEntryAttribution()) return;
-    const key = "funnel_entered:" + String(config.funnelSlug || "") + ":" + sessionId;
-    try {
-      if (window.sessionStorage.getItem(key)) return;
-      window.sessionStorage.setItem(key, "1");
-    } catch (_) {
-      // ignore storage write failures
+  const evaluateQualifiedSession = (reason) => {
+    if (currentActiveTimeMs() >= QUALIFIED_ACTIVE_TIME_MS || maxScrollDepthPct >= QUALIFIED_SCROLL_DEPTH_PCT) {
+      trackQualifiedSession(reason);
     }
-    trackEvent("Entered Funnel", {
-      pageStage: config.pageStage,
+  };
+  const calculateScrollDepthPct = () => {
+    const doc = document.documentElement;
+    const body = document.body;
+    const scrollTop = window.scrollY || doc.scrollTop || (body && body.scrollTop) || 0;
+    const viewportHeight = window.innerHeight || doc.clientHeight || 0;
+    const scrollHeight = Math.max(
+      doc.scrollHeight || 0,
+      body ? body.scrollHeight || 0 : 0,
+      doc.offsetHeight || 0,
+      body ? body.offsetHeight || 0 : 0,
+      viewportHeight,
+    );
+    if (!scrollHeight || viewportHeight >= scrollHeight) return 100;
+    return Math.max(0, Math.min(100, Math.round(((scrollTop + viewportHeight) / scrollHeight) * 100)));
+  };
+  const handleScrollDepthTracking = () => {
+    scrollTrackingScheduled = false;
+    maxScrollDepthPct = Math.max(maxScrollDepthPct, calculateScrollDepthPct());
+    for (const milestone of SCROLL_DEPTH_MILESTONES) {
+      if (maxScrollDepthPct >= milestone && trackedScrollDepthMilestones[milestone] !== true) {
+        trackedScrollDepthMilestones[milestone] = true;
+        trackEvent("scroll_depth", {
+          scrollDepthPct: milestone,
+          maxScrollDepthPct,
+          activeTimeMs: Math.round(currentActiveTimeMs()),
+        });
+      }
+    }
+    evaluateQualifiedSession("scroll_depth");
+  };
+  const scheduleScrollDepthTracking = () => {
+    if (scrollTrackingScheduled) return;
+    scrollTrackingScheduled = true;
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(handleScrollDepthTracking);
+      return;
+    }
+    window.setTimeout(handleScrollDepthTracking, 0);
+  };
+  const initializeEngagementTracking = () => {
+    if (engagementTrackingInitialized) return;
+    engagementTrackingInitialized = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        pauseActiveTime();
+        return;
+      }
+      resumeActiveTime();
     });
+    window.addEventListener("pagehide", pauseActiveTime);
+    window.addEventListener("scroll", scheduleScrollDepthTracking, { passive: true });
+    window.addEventListener("resize", scheduleScrollDepthTracking);
+    window.setInterval(() => evaluateQualifiedSession("active_time"), 1000);
+    scheduleScrollDepthTracking();
+  };
+  const observationTargetsFromManifest = () => {
+    const targets = [];
+    const addTarget = (eventType, kind, target) => {
+      if (!target || typeof target !== "object") return;
+      const id = cleanText(target.id);
+      const selector = cleanText(target.selector);
+      if (!id || !selector) return;
+      targets.push({
+        eventType,
+        kind,
+        id,
+        selector,
+        label: cleanText(target.label),
+      });
+    };
+    const manifest = config.manifest || {};
+    if (Array.isArray(manifest.sections)) {
+      manifest.sections.forEach((target) => addTarget("section_view", "section", target));
+    }
+    if (Array.isArray(manifest.proofs)) {
+      manifest.proofs.forEach((target) => addTarget("proof_view", "proof", target));
+    }
+    if (Array.isArray(manifest.ctas)) {
+      manifest.ctas.forEach((target) => addTarget("cta_view", "cta", target));
+    }
+    if (Array.isArray(manifest.offerStacks)) {
+      manifest.offerStacks.forEach((target) => addTarget("offer_stack_view", "offer_stack", target));
+    }
+    if (Array.isArray(manifest.valueStacks)) {
+      manifest.valueStacks.forEach((target) => addTarget("value_stack_view", "value_stack", target));
+    }
+    if (Array.isArray(manifest.priceReveals)) {
+      manifest.priceReveals.forEach((target) => addTarget("price_reveal_view", "price_reveal", target));
+    }
+    if (Array.isArray(manifest.guarantees)) {
+      manifest.guarantees.forEach((target) => addTarget("guarantee_view", "guarantee", target));
+    }
+    if (Array.isArray(manifest.trustElements)) {
+      manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
+    }
+    if (Array.isArray(manifest.bindings)) {
+      manifest.bindings.forEach((binding) => {
+        if (!binding || typeof binding !== "object") return;
+        const id = cleanText(binding.id);
+        const selector = cleanText(binding.selector);
+        if (!id || !selector) return;
+        targets.push({
+          eventType: "cta_view",
+          kind: "cta",
+          id,
+          selector,
+          bindingType: cleanText(binding.type),
+          trackEventType: cleanText(binding.trackEventType),
+        });
+      });
+    }
+    return targets;
+  };
+  const trackObservedViewTarget = (target, element, index) => {
+    const key = [target.eventType, target.id, String(index)].join(":");
+    if (observedViewTargetKeys[key] === true) return;
+    observedViewTargetKeys[key] = true;
+    trackEvent(target.eventType, {
+      targetKind: target.kind,
+      targetId: target.id,
+      selector: target.selector,
+      label: target.label || undefined,
+      bindingType: target.bindingType || undefined,
+      trackEventType: target.trackEventType || undefined,
+      text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      ...(target.kind === "cta" ? { ctaId: target.id } : {}),
+      ...(target.kind === "section" ? { sectionId: target.id } : {}),
+      ...(target.kind === "proof" ? { proofId: target.id } : {}),
+      ...(target.kind === "offer_stack" ? { offerStackId: target.id, offer_id: target.id } : {}),
+      ...(target.kind === "value_stack" ? { valueStackId: target.id } : {}),
+      ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
+      ...(target.kind === "guarantee" ? { guaranteeId: target.id, guarantee_id: target.id } : {}),
+      ...(target.kind === "trust_element" ? { trustElementId: target.id } : {}),
+    });
+  };
+  const initializeViewTracking = () => {
+    if (typeof window.IntersectionObserver !== "function") return;
+    const targets = observationTargetsFromManifest();
+    if (!targets.length) return;
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.5) return;
+          const targetConfig = entry.target.__mosViewTrackingTarget;
+          const targetIndex = entry.target.__mosViewTrackingIndex || 0;
+          if (targetConfig) {
+            trackObservedViewTarget(targetConfig, entry.target, targetIndex);
+          }
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: [0.5] },
+    );
+    targets.forEach((target) => {
+      const matches = Array.from(document.querySelectorAll(target.selector));
+      matches.forEach((element, index) => {
+        if (!(element instanceof HTMLElement)) return;
+        const key = [target.eventType, target.id, String(index)].join(":");
+        if (observedViewTargetKeys[key] === true) return;
+        element.__mosViewTrackingTarget = target;
+        element.__mosViewTrackingIndex = index;
+        observer.observe(element);
+      });
+    });
+  };
+  const interactionTargetsFromManifest = () => {
+    const targets = [];
+    const addTarget = (eventType, kind, target) => {
+      if (!target || typeof target !== "object") return;
+      const id = cleanText(target.id);
+      const selector = cleanText(target.selector);
+      if (!id || !selector) return;
+      targets.push({
+        eventType,
+        kind,
+        id,
+        selector,
+        label: cleanText(target.label),
+        event: target.event === "input" || target.event === "change" ? target.event : "click",
+        source: target.source === "text" || target.source === "checked" ? target.source : "value",
+        interactionType: cleanText(target.interactionType) || kind,
+      });
+    };
+    const manifest = config.manifest || {};
+    if (Array.isArray(manifest.selectorInteractions)) {
+      manifest.selectorInteractions.forEach((target) => addTarget("selector_interaction", "selector", target));
+    }
+    if (Array.isArray(manifest.productDetailInteractions)) {
+      manifest.productDetailInteractions.forEach((target) =>
+        addTarget("product_detail_interaction", "product_detail", target),
+      );
+    }
+    return targets;
+  };
+  const readInteractionValue = (element, source) => {
+    if (source === "checked") {
+      return element instanceof HTMLInputElement ? (element.checked ? "checked" : "unchecked") : undefined;
+    }
+    if (source === "text") {
+      return normalizeText(element.textContent || "") || undefined;
+    }
+    if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+      return normalizeText(element.value || "") || undefined;
+    }
+    return normalizeText(element.textContent || "") || undefined;
+  };
+  const selectedValueLooksSubscribed = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "subscribe" || normalized === "subscription" || normalized.includes("subscribe");
+  };
+  const trackInteractionTarget = (target, element) => {
+    interactionSequence += 1;
+    const selectedValue = readInteractionValue(element, target.source);
+    const props = {
+      targetKind: target.kind,
+      targetId: target.id,
+      selector: target.selector,
+      label: target.label || undefined,
+      interactionType: target.interactionType,
+      selectedValue,
+      text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
+      activeTimeMs: Math.round(currentActiveTimeMs()),
+      maxScrollDepthPct,
+      interactionSequence,
+      ...(target.kind === "selector" ? { selectorId: target.id } : {}),
+      ...(target.kind === "product_detail" ? { productDetailId: target.id } : {}),
+    };
+    trackEvent(target.eventType, props);
+    if (target.eventType === "selector_interaction" && selectedValueLooksSubscribed(selectedValue)) {
+      trackEvent("subscription_selected", {
+        ...props,
+        subscription_flag: true,
+      });
+    }
+    evaluateQualifiedSession("element_interaction");
+  };
+  const initializeInteractionTracking = () => {
+    const targets = interactionTargetsFromManifest();
+    if (!targets.length) return;
+    targets.forEach((target) => {
+      const matches = Array.from(document.querySelectorAll(target.selector));
+      matches.forEach((element, index) => {
+        if (!(element instanceof HTMLElement)) return;
+        const key = [target.eventType, target.id, String(index), target.event].join(":");
+        if (interactionListenerKeys[key] === true) return;
+        interactionListenerKeys[key] = true;
+        element.addEventListener(target.event, () => trackInteractionTarget(target, element), {
+          passive: true,
+        });
+      });
+    });
+  };
+  const initializeEngagementTrackingSafely = () => {
+    try {
+      initializeEngagementTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize engagement tracking.", error);
+    }
+  };
+  const initializeViewTrackingSafely = () => {
+    try {
+      initializeViewTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize view tracking.", error);
+    }
+  };
+  const initializeInteractionTrackingSafely = () => {
+    try {
+      initializeInteractionTracking();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize interaction tracking.", error);
+    }
   };
   const handleCheckoutReturn = () => {
     const checkoutStatus = checkoutStatusFromLocation();
@@ -6273,6 +7130,11 @@ WantedBy=multi-user.target
   const parseResponseError = async (response) => {
     try {
       const payload = await response.clone().json();
+      const firstError = Array.isArray(payload && payload.errors) ? payload.errors[0] : null;
+      const errorDetail = cleanText(firstError && firstError.detail);
+      if (errorDetail) return errorDetail;
+      const errorTitle = cleanText(firstError && firstError.title);
+      if (errorTitle) return errorTitle;
       const detail = cleanText(payload && payload.detail);
       if (detail) return detail;
       const message = cleanText(payload && payload.message);
@@ -6367,26 +7229,150 @@ WantedBy=multi-user.target
     }
     throw new Error("Unsupported checkout resolver type.");
   };
-  const requestCheckout = async ({ variantId, selection }) => {
+  const buildPreparedCheckoutCacheKey = (variantId, selection) => {
+    const normalizedSelection = normalizeSelection(selection) || {};
+    const selectionEntries = Object.entries(normalizedSelection).sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+    return JSON.stringify({
+      variantId: cleanText(variantId) || "",
+      selection: selectionEntries,
+    });
+  };
+  const getPreparedCheckoutRecord = (cacheKey) => {
+    const record = cacheKey ? preparedCheckoutCache[cacheKey] : null;
+    if (!record) return null;
+    if (Date.now() - record.createdAt > PREPARED_CHECKOUT_TTL_MS) {
+      delete preparedCheckoutCache[cacheKey];
+      return null;
+    }
+    return record;
+  };
+  const delay = (durationMs) =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, durationMs);
+    });
+  const serializeCheckoutAttributeValue = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === "string") return cleanText(value);
+    return JSON.stringify(value);
+  };
+  const checkoutAttributionProps = ({ ctaId, transitionId } = {}) => {
+    const metaProps = resolveMetaAttributionProps(window.location.href);
+    const clickProps = resolveClickAttribution();
+    const experimentId = resolveExperimentId();
+    return {
+      ...(clickProps.clickId ? { clickId: clickProps.clickId, clickIdType: clickProps.clickIdType } : {}),
+      ...(metaProps.fbp ? { fbp: metaProps.fbp } : {}),
+      ...(metaProps.fbc ? { fbc: metaProps.fbc } : {}),
+      ...(metaProps.external_id ? { externalId: metaProps.external_id } : {}),
+      ...(metaProps.em ? { em: metaProps.em } : {}),
+      ...(metaProps.event_source_url ? { eventSourceUrl: metaProps.event_source_url } : {}),
+      pageVariant: cleanText(config.pageSlug),
+      ...(experimentId ? { experimentId } : {}),
+      ...(cleanText(ctaId) ? { ctaId: cleanText(ctaId) } : {}),
+      ...(cleanText(transitionId) ? { transitionId: cleanText(transitionId) } : {}),
+    };
+  };
+  const checkoutAttributeMap = ({ variantId, selection, ctaId, transitionId }) => {
+    const attribution = checkoutAttributionProps({ ctaId, transitionId });
+    return {
+      funnel_slug: cleanText(config.funnelSlug),
+      funnel_id: cleanText(config.funnelId),
+      publication_id: cleanText(config.publicationId),
+      page_id: cleanText(config.pageId),
+      visitor_id: cleanText(visitorId),
+      session_id: cleanText(sessionId),
+      variant_id: cleanText(variantId),
+      price_point_id: cleanText(variantId),
+      selection: selection || {},
+      utm: getUtmParams(),
+      url_params: getUrlParams(),
+      quantity: "1",
+      click_id: attribution.clickId,
+      click_id_type: attribution.clickIdType,
+      fbp: attribution.fbp,
+      fbc: attribution.fbc,
+      external_id: attribution.externalId,
+      em: attribution.em,
+      event_source_url: attribution.eventSourceUrl,
+      page_variant: attribution.pageVariant,
+      experiment_id: attribution.experimentId,
+      cta_id: attribution.ctaId,
+      transition_id: attribution.transitionId,
+    };
+  };
+  const appendCheckoutAttributesToCartUrl = (checkoutUrl, attributes) => {
+    const href = cleanText(checkoutUrl);
+    if (!href) return href;
+    let url;
+    try {
+      url = new URL(href, window.location.href);
+    } catch (_) {
+      return href;
+    }
+    if (!url.pathname.startsWith("/cart/")) return href;
+    Object.entries(attributes || {}).forEach(([key, value]) => {
+      const serialized = serializeCheckoutAttributeValue(value);
+      if (serialized) {
+        url.searchParams.set("attributes[" + key + "]", serialized);
+      }
+    });
+    return url.toString();
+  };
+  const appendCurrentUrlParams = (targetUrl) => {
+    const href = cleanText(targetUrl);
+    if (!href) return href;
+    const url = new URL(href, window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    for (const [key, value] of params.entries()) {
+      url.searchParams.set(key, value);
+    }
+    return url.toString();
+  };
+  const createCheckoutPayload = ({ variantId, selection, ctaId, transitionId }) => {
     const successUrl = new URL(window.location.href);
     const cancelUrl = new URL(window.location.href);
     successUrl.searchParams.set("checkout", "success");
     cancelUrl.searchParams.set("checkout", "cancel");
+    return {
+      funnelSlug: config.funnelSlug,
+      variantId: variantId || undefined,
+      selection: selection || {},
+      quantity: 1,
+      successUrl: successUrl.toString(),
+      cancelUrl: cancelUrl.toString(),
+      pageId: config.pageId,
+      visitorId,
+      sessionId,
+      utm: getUtmParams(),
+      urlParams: getUrlParams(),
+      ...checkoutAttributionProps({ ctaId, transitionId }),
+    };
+  };
+  const normalizePreparedCheckoutResponse = (data) => {
+    if (!isRecord(data)) {
+      throw new Error("Prepared checkout response is invalid.");
+    }
+    const preparedCheckoutId = cleanText(data.preparedCheckoutId);
+    const status = cleanText(data.status);
+    if (!preparedCheckoutId || !status) {
+      throw new Error("Prepared checkout response is incomplete.");
+    }
+    return {
+      preparedCheckoutId,
+      status,
+      checkoutUrl: cleanText(data.checkoutUrl),
+      sessionId: cleanText(data.sessionId),
+      error: cleanText(data.error),
+      pollAfterMs: typeof data.pollAfterMs === "number" ? data.pollAfterMs : PREPARED_CHECKOUT_POLL_INTERVAL_MS,
+    };
+  };
+  const requestCheckout = async ({ variantId, selection, ctaId, transitionId }) => {
     const response = await fetch(String(config.apiBasePath || "/api") + "/public/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        funnelSlug: config.funnelSlug,
-        variantId: variantId || undefined,
-        selection: selection || {},
-        quantity: 1,
-        successUrl: successUrl.toString(),
-        cancelUrl: cancelUrl.toString(),
-        pageId: config.pageId,
-        visitorId,
-        sessionId,
-        utm: getUtmParams(),
-      }),
+      body: JSON.stringify(createCheckoutPayload({ variantId, selection, ctaId, transitionId })),
     });
     if (!response.ok) {
       throw new Error(await parseResponseError(response));
@@ -6400,6 +7386,165 @@ WantedBy=multi-user.target
       checkoutUrl,
       sessionId: cleanText(data && data.sessionId) || null,
     };
+  };
+  const requestPreparedCheckout = async ({ variantId, selection, ctaId, transitionId }) => {
+    const response = await fetch(String(config.apiBasePath || "/api") + "/public/checkout/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createCheckoutPayload({ variantId, selection, ctaId, transitionId })),
+    });
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+    return normalizePreparedCheckoutResponse(await response.json());
+  };
+  const requestPreparedCheckoutStatus = async (preparedCheckoutId) => {
+    const response = await fetch(
+      String(config.apiBasePath || "/api") + "/public/checkout/prepare/" + encodeURIComponent(preparedCheckoutId),
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+    return normalizePreparedCheckoutResponse(await response.json());
+  };
+  const consumePreparedCheckout = async (preparedCheckoutId) => {
+    const response = await fetch(
+      String(config.apiBasePath || "/api") +
+        "/public/checkout/prepare/" +
+        encodeURIComponent(preparedCheckoutId) +
+        "/consume",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+    const data = await response.json();
+    const checkoutUrl = cleanText(data && data.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Checkout URL is missing.");
+    }
+    return {
+      checkoutUrl,
+      sessionId: cleanText(data && data.sessionId) || null,
+    };
+  };
+  const finalizePreparedCheckoutRecord = ({ cacheKey, preparedCheckout, variantId, selection }) => {
+    const checkoutUrl = cleanText(preparedCheckout && preparedCheckout.checkoutUrl);
+    if (!checkoutUrl) {
+      throw new Error("Prepared checkout is missing checkoutUrl.");
+    }
+    const record = {
+      preparedCheckoutId: cleanText(preparedCheckout.preparedCheckoutId) || "",
+      checkoutUrl,
+      sessionId: cleanText(preparedCheckout.sessionId) || null,
+      variantId: variantId || "",
+      selection: selection || {},
+      createdAt: Date.now(),
+    };
+    preparedCheckoutCache[cacheKey] = record;
+    return record;
+  };
+  const waitForPreparedCheckoutStatus = async (preparedCheckoutId, initialPollAfterMs) => {
+    const deadline = Date.now() + PREPARED_CHECKOUT_POLL_TIMEOUT_MS;
+    let pollAfterMs = initialPollAfterMs || PREPARED_CHECKOUT_POLL_INTERVAL_MS;
+    while (Date.now() < deadline) {
+      await delay(pollAfterMs);
+      const preparedCheckout = await requestPreparedCheckoutStatus(preparedCheckoutId);
+      if (preparedCheckout.status === "ready") {
+        return preparedCheckout;
+      }
+      if (preparedCheckout.status === "failed") {
+        throw new Error(preparedCheckout.error || "Prepared checkout failed.");
+      }
+      if (preparedCheckout.status === "expired") {
+        throw new Error("Prepared checkout expired before it was used.");
+      }
+      pollAfterMs = preparedCheckout.pollAfterMs || PREPARED_CHECKOUT_POLL_INTERVAL_MS;
+    }
+    throw new Error("Prepared checkout timed out.");
+  };
+  const prepareCheckoutInBackground = async ({ variantId, variant, selection, cacheKey, ctaId, transitionId }) => {
+    if (!cacheKey || !variant || variant.provider !== "shopify") {
+      return null;
+    }
+    const cachedRecord = getPreparedCheckoutRecord(cacheKey);
+    if (cachedRecord) {
+      return cachedRecord;
+    }
+    if (preparedCheckoutInFlight[cacheKey]) {
+      return preparedCheckoutInFlight[cacheKey];
+    }
+    const promise = (async () => {
+      try {
+        let preparedCheckout = await requestPreparedCheckout({ variantId, selection, ctaId, transitionId });
+        if (preparedCheckout.status === "pending") {
+          preparedCheckout = await waitForPreparedCheckoutStatus(
+            preparedCheckout.preparedCheckoutId,
+            preparedCheckout.pollAfterMs,
+          );
+        }
+        if (preparedCheckout.status !== "ready") {
+          throw new Error(preparedCheckout.error || "Prepared checkout is unavailable.");
+        }
+        return finalizePreparedCheckoutRecord({ cacheKey, preparedCheckout, variantId, selection });
+      } catch (error) {
+        console.error("[StandaloneImportedHtmlArtifact] Failed to prepare checkout in background.", error);
+        return null;
+      }
+    })().finally(() => {
+      delete preparedCheckoutInFlight[cacheKey];
+    });
+    preparedCheckoutInFlight[cacheKey] = promise;
+    return promise;
+  };
+  const waitForPreparedCheckout = async (cacheKey) => {
+    if (!cacheKey || !preparedCheckoutInFlight[cacheKey]) {
+      return null;
+    }
+    return preparedCheckoutInFlight[cacheKey];
+  };
+  const resolveCheckoutState = (binding) => {
+    const bindingId = String(binding.id || "unknown");
+    const resolvedSelection = augmentSelectionWithCheckoutContext(
+      readSelectionFromResolver(binding.checkout.variantResolver, bindingId),
+    );
+    const { variantId, variant, selection } = resolveCheckoutVariant(binding.checkout, resolvedSelection);
+    return {
+      variantId,
+      variant,
+      selection,
+      ctaId: bindingId,
+      cacheKey: buildPreparedCheckoutCacheKey(variantId, selection),
+    };
+  };
+  const ensurePreparedCheckoutForClick = async ({ variantId, variant, selection, cacheKey, ctaId, transitionId }) => {
+    const isWarmableShopifyCheckout = Boolean(cacheKey) && Boolean(variant) && variant.provider === "shopify";
+    if (!isWarmableShopifyCheckout) {
+      return requestCheckout({ variantId, selection, ctaId, transitionId });
+    }
+    let preparedCheckout = getPreparedCheckoutRecord(cacheKey);
+    if (preparedCheckout) {
+      return consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
+    }
+    preparedCheckout =
+      (await waitForPreparedCheckout(cacheKey)) ||
+      (await prepareCheckoutInBackground({ variantId, variant, selection, cacheKey, ctaId, transitionId }));
+    if (!preparedCheckout) {
+      throw new Error("Prepared checkout is unavailable.");
+    }
+    const consumedCheckout = await consumePreparedCheckout(preparedCheckout.preparedCheckoutId);
+    preparedCheckoutCache[cacheKey] = {
+      ...preparedCheckout,
+      ...consumedCheckout,
+    };
+    return consumedCheckout;
   };
   const setElementBusy = (element, busy) => {
     if (!(element instanceof HTMLElement)) return;
@@ -6459,6 +7604,453 @@ WantedBy=multi-user.target
       }
     }
   };
+  const EMAIL_CAPTURE_LOADING_LABEL = "Saving your email...";
+  const EMAIL_CAPTURE_SUCCESS_LABEL = "You're subscribed.";
+  const EMAIL_CAPTURE_ERROR_LABEL = "We couldn't save your email. Please try again.";
+  const KLAVIYO_CLIENT_SUBSCRIPTION_ENDPOINT = "https://a.klaviyo.com/client/subscriptions";
+  const isLikelyEmailAddress = (value) => {
+    const text = String(value || "");
+    if (!text) return false;
+    for (let index = 0; index < text.length; index += 1) {
+      const code = text.charCodeAt(index);
+      if (code <= 32 || code === 127) return false;
+    }
+    const parts = text.split("@");
+    if (parts.length !== 2) return false;
+    const local = parts[0];
+    const domain = parts[1];
+    return Boolean(local && domain && domain.includes(".") && !domain.startsWith(".") && !domain.endsWith("."));
+  };
+  const isPrivateKlaviyoApiKey = (value) => cleanText(value).toLowerCase().startsWith("pk_");
+  const ensureEmailCaptureStatusNote = (bindingId, element) => {
+    const existingId = cleanText(element.dataset.mosEmailCaptureStatusNoteId);
+    if (existingId) {
+      const existing = document.getElementById(existingId);
+      if (existing) return existing;
+    }
+    const noteId =
+      "mos-email-capture-status-" +
+      String(bindingId || "unknown") +
+      "-" +
+      String(Date.now()) +
+      "-" +
+      String(Math.floor(Math.random() * 100000));
+    const note = document.createElement("p");
+    note.id = noteId;
+    note.style.display = "none";
+    note.style.width = "100%";
+    note.style.margin = "0.65rem 0 0";
+    note.style.fontSize = "0.875rem";
+    note.style.lineHeight = "1.35";
+    note.style.fontWeight = "600";
+    note.style.letterSpacing = "normal";
+    note.style.textTransform = "none";
+    note.style.color = "inherit";
+    note.setAttribute("aria-live", "polite");
+    element.insertAdjacentElement("afterend", note);
+    element.dataset.mosEmailCaptureStatusNoteId = noteId;
+    return note;
+  };
+  const setEmailCaptureStatus = (bindingId, element, status, message) => {
+    const note = ensureEmailCaptureStatusNote(bindingId, element);
+    const cleanedMessage = cleanText(message);
+    if (!status || !cleanedMessage) {
+      note.textContent = "";
+      note.style.display = "none";
+      note.removeAttribute("role");
+      return;
+    }
+    note.textContent = cleanedMessage;
+    note.style.display = "block";
+    note.style.color = status === "error" ? "#b42318" : status === "success" ? "#047857" : "inherit";
+    note.setAttribute("role", status === "error" ? "alert" : "status");
+  };
+  const setEmailCaptureSubmitting = (element, busy) => {
+    if (!(element instanceof HTMLElement)) return;
+    const controls = Array.from(
+      element.querySelectorAll("button[type='submit'], button:not([type]), input[type='submit']"),
+    );
+    element.setAttribute("aria-busy", busy ? "true" : "false");
+    controls.forEach((control) => {
+      if (!(control instanceof HTMLElement)) return;
+      if (busy) {
+        if (!("mosEmailCaptureSavedDisabled" in control.dataset)) {
+          const disabled =
+            control instanceof HTMLButtonElement || control instanceof HTMLInputElement
+              ? control.disabled
+              : control.getAttribute("aria-disabled") === "true";
+          control.dataset.mosEmailCaptureSavedDisabled = disabled ? "true" : "false";
+        }
+        control.setAttribute("aria-disabled", "true");
+        control.setAttribute("aria-busy", "true");
+        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+          control.disabled = true;
+        }
+        return;
+      }
+      const wasDisabled = control.dataset.mosEmailCaptureSavedDisabled === "true";
+      control.removeAttribute("aria-busy");
+      if (wasDisabled) {
+        control.setAttribute("aria-disabled", "true");
+      } else {
+        control.removeAttribute("aria-disabled");
+      }
+      if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+        control.disabled = wasDisabled;
+      }
+      delete control.dataset.mosEmailCaptureSavedDisabled;
+    });
+    if (!busy) {
+      element.removeAttribute("aria-busy");
+    }
+  };
+  const queryEmailCaptureElement = (rootElement, selector, label) => {
+    const cleanedSelector = cleanText(selector);
+    if (!cleanedSelector) {
+      throw new Error(label + " selector is missing.");
+    }
+    try {
+      if (rootElement && typeof rootElement.querySelector === "function") {
+        const scopedMatch = rootElement.querySelector(cleanedSelector);
+        if (scopedMatch) return scopedMatch;
+      }
+      return document.querySelector(cleanedSelector);
+    } catch (_) {
+      throw new Error(label + " selector '" + cleanedSelector + "' is invalid.");
+    }
+  };
+  const readEmailCaptureElementValue = (element, source) => {
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    ) {
+      return cleanText(element.value);
+    }
+    if (source === "text") {
+      return cleanText(element.textContent || "");
+    }
+    return cleanText(element.getAttribute("value")) || cleanText(element.textContent || "");
+  };
+  const readEmailCaptureEmail = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    if (!emailCapture || emailCapture.provider !== "klaviyo") {
+      throw new Error("Email capture binding '" + String(binding && binding.id ? binding.id : "unknown") + "' is missing Klaviyo configuration.");
+    }
+    const emailElement = queryEmailCaptureElement(element, emailCapture.emailSelector, "Email capture email");
+    const email = readEmailCaptureElementValue(emailElement, "value");
+    if (!email || !isLikelyEmailAddress(email)) {
+      throw new Error("Please enter a valid email address.");
+    }
+    return email.toLowerCase();
+  };
+  const readEmailCaptureProfileProperties = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    const fields = Array.isArray(emailCapture && emailCapture.profileFields) ? emailCapture.profileFields : [];
+    const properties = {};
+    fields.forEach((field) => {
+      const name = cleanText(field && field.name);
+      const selector = cleanText(field && field.selector);
+      if (!name || !selector) return;
+      const fieldElement = queryEmailCaptureElement(element, selector, "Email capture profile field '" + name + "'");
+      const value = readEmailCaptureElementValue(fieldElement, field.source === "text" ? "text" : "value");
+      if (value) {
+        properties[name] = value;
+      }
+    });
+    return properties;
+  };
+  const buildKlaviyoSubscriptionPayload = (binding, element, email) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const emailCapture = binding && binding.emailCapture;
+    if (!emailCapture || emailCapture.provider !== "klaviyo") {
+      throw new Error("Email capture binding '" + bindingId + "' is missing Klaviyo configuration.");
+    }
+    const source = cleanText(emailCapture.source);
+    if (!source) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing a Klaviyo source.");
+    }
+    const profileProperties = {
+      source,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      page_id: cleanText(config.pageId),
+      publication_id: cleanText(config.publicationId),
+      visitor_id: cleanText(visitorId),
+      session_id: cleanText(sessionId),
+      binding_id: bindingId,
+      url: window.location.href,
+      utm: getUtmParams(),
+      url_params: getUrlParams(),
+      ...readEmailCaptureProfileProperties(binding, element),
+    };
+    const payload = {
+      data: {
+        type: "subscription",
+        attributes: {
+          custom_source: source,
+          profile: {
+            data: {
+              type: "profile",
+              attributes: {
+                email,
+                properties: profileProperties,
+                subscriptions: {
+                  email: {
+                    marketing: {
+                      consent: "SUBSCRIBED",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const listId = cleanText(emailCapture.klaviyo && emailCapture.klaviyo.listId);
+    if (listId) {
+      payload.data.relationships = {
+        list: {
+          data: {
+            type: "list",
+            id: listId,
+          },
+        },
+      };
+    }
+    return payload;
+  };
+  const requestKlaviyoEmailSubscription = async (binding, element, email) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const emailCapture = binding && binding.emailCapture;
+    const klaviyo = emailCapture && emailCapture.klaviyo;
+    const publicApiKey = cleanText(klaviyo && klaviyo.publicApiKey);
+    if (!publicApiKey) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing the Klaviyo public API key.");
+    }
+    if (isPrivateKlaviyoApiKey(publicApiKey)) {
+      throw new Error("Email capture binding '" + bindingId + "' must use the Klaviyo public Site ID, not a private API key.");
+    }
+    const revision = cleanText(klaviyo && klaviyo.revision);
+    if (!revision) {
+      throw new Error("Email capture binding '" + bindingId + "' is missing the Klaviyo API revision.");
+    }
+    const url = new URL(KLAVIYO_CLIENT_SUBSCRIPTION_ENDPOINT);
+    url.searchParams.set("company_id", publicApiKey);
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
+        revision,
+      },
+      body: JSON.stringify(buildKlaviyoSubscriptionPayload(binding, element, email)),
+    });
+    if (!response.ok) {
+      throw new Error(await parseResponseError(response));
+    }
+  };
+  const loadKlaviyoOnsiteScript = (publicApiKey) => {
+    const key = cleanText(publicApiKey);
+    if (!key) return;
+    if (isPrivateKlaviyoApiKey(key)) return;
+    if (!window.klaviyo) {
+      window.klaviyo = [];
+    }
+    const scriptId = "mos-klaviyo-onsite-" + key.replace(/[^A-Za-z0-9_-]/g, "-");
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.async = true;
+    script.type = "text/javascript";
+    script.src = "https://static.klaviyo.com/onsite/js/" + encodeURIComponent(key) + "/klaviyo.js";
+    (document.body || document.head || document.documentElement).appendChild(script);
+  };
+  const loadKlaviyoOnsiteScriptForBinding = (binding) => {
+    const key =
+      binding &&
+      binding.emailCapture &&
+      binding.emailCapture.klaviyo &&
+      binding.emailCapture.klaviyo.publicApiKey;
+    loadKlaviyoOnsiteScript(key);
+  };
+  const sendKlaviyoBrowserSignals = (binding, email) => {
+    const source = cleanText(binding && binding.emailCapture && binding.emailCapture.source);
+    const props = {
+      email,
+      source,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      binding_id: String(binding && binding.id ? binding.id : "unknown"),
+    };
+    try {
+      const klaviyo = window.klaviyo;
+      if (Array.isArray(klaviyo)) {
+        klaviyo.push(["identify", { email }]);
+        klaviyo.push(["track", "Email Capture Submitted", props]);
+        return;
+      }
+      if (klaviyo && typeof klaviyo.identify === "function") {
+        klaviyo.identify({ email });
+      }
+      if (klaviyo && typeof klaviyo.track === "function") {
+        klaviyo.track("Email Capture Submitted", props);
+      }
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Klaviyo browser signal failed.", error);
+    }
+  };
+  const sha256Hex = async (value) => {
+    if (!window.crypto || !window.crypto.subtle || typeof TextEncoder === "undefined") {
+      throw new Error("Browser SHA-256 hashing is unavailable.");
+    }
+    const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  };
+  const persistMetaEmailHash = async (email) => {
+    const normalizedEmail = cleanText(email) ? String(email).trim().toLowerCase() : null;
+    if (!normalizedEmail) return null;
+    let emailHash = null;
+    try {
+      emailHash = await sha256Hex(normalizedEmail);
+      window.localStorage.setItem(META_EMAIL_HASH_STORAGE_KEY, emailHash);
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Failed to persist Meta email hash.", error);
+    }
+    return emailHash;
+  };
+  const identifyPostHogEmailCapture = (binding, email, emailHash) => {
+    const normalizedEmail = cleanText(email) ? String(email).trim().toLowerCase() : null;
+    if (!normalizedEmail) return;
+    const posthog = ensurePostHogInstance();
+    if (!posthog || typeof posthog.identify !== "function") return;
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    const source = cleanText(binding && binding.emailCapture && binding.emailCapture.source);
+    const personProps = {
+      email: normalizedEmail,
+      capture_source: source,
+      product_slug: cleanText(config.productSlug),
+      funnel_slug: cleanText(config.funnelSlug),
+      page_slug: cleanText(config.pageSlug),
+      page_stage: cleanText(config.pageStage),
+      page_id: cleanText(config.pageId),
+      publication_id: cleanText(config.publicationId),
+      visitor_id: cleanText(visitorId),
+      session_id: cleanText(sessionId),
+      binding_id: bindingId,
+      external_id: resolveMetaExternalId(),
+    };
+    assignCleanProp(personProps, "em", emailHash);
+    assignCleanProp(personProps, "email_sha256", emailHash);
+    posthog.identify(normalizedEmail, personProps);
+  };
+  const completeEmailCaptureSuccess = (binding, element) => {
+    const emailCapture = binding && binding.emailCapture;
+    if (
+      element instanceof HTMLFormElement &&
+      emailCapture &&
+      emailCapture.successBehavior === "redispatch_submit"
+    ) {
+      element.dataset.mosEmailCaptureSucceeded = "true";
+      element.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      if (element.dataset.mosEmailCaptureSucceeded === "true") {
+        delete element.dataset.mosEmailCaptureSucceeded;
+      }
+      return;
+    }
+    setEmailCaptureStatus(
+      String(binding && binding.id ? binding.id : "unknown"),
+      element,
+      "success",
+      cleanText(emailCapture && emailCapture.successMessage) || EMAIL_CAPTURE_SUCCESS_LABEL,
+    );
+  };
+  const handleEmailCaptureSubmit = async (binding, element, event) => {
+    const bindingId = String(binding && binding.id ? binding.id : "unknown");
+    if (event && event.__mosEmailCaptureBypass === true) {
+      return;
+    }
+    if (element.dataset.mosEmailCaptureSucceeded === "true") {
+      if (event) {
+        event.__mosEmailCaptureBypass = true;
+      }
+      delete element.dataset.mosEmailCaptureSucceeded;
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+    if (element instanceof HTMLFormElement && typeof element.reportValidity === "function" && !element.reportValidity()) {
+      return;
+    }
+    const emailCapture = binding && binding.emailCapture;
+    const source = cleanText(emailCapture && emailCapture.source) || bindingId;
+    try {
+      const email = readEmailCaptureEmail(binding, element);
+      setEmailCaptureSubmitting(element, true);
+      setEmailCaptureStatus(bindingId, element, "loading", EMAIL_CAPTURE_LOADING_LABEL);
+      trackEvent(binding.trackEventType || "email_capture_submit", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+      });
+      await requestKlaviyoEmailSubscription(binding, element, email);
+      const emailHash = await persistMetaEmailHash(email);
+      identifyPostHogEmailCapture(binding, email, emailHash);
+      sendKlaviyoBrowserSignals(binding, email);
+      trackEvent("email_capture_success", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+      });
+      completeEmailCaptureSuccess(binding, element);
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Email capture binding '" + bindingId + "' failed.", error);
+      trackEvent("email_capture_failed", {
+        bindingId,
+        source,
+        provider: "klaviyo",
+        errorMessage: cleanText(error && error.message) || "Email capture failed.",
+      });
+      setEmailCaptureStatus(
+        bindingId,
+        element,
+        "error",
+        cleanText(emailCapture && emailCapture.errorMessage) || EMAIL_CAPTURE_ERROR_LABEL,
+      );
+    } finally {
+      setEmailCaptureSubmitting(element, false);
+    }
+  };
+  const emailCaptureFormBindings = [];
+  let emailCaptureDocumentSubmitListenerBound = false;
+  const registerEmailCaptureSubmitBinding = (binding, element) => {
+    emailCaptureFormBindings.push({ binding, element });
+    if (!emailCaptureDocumentSubmitListenerBound) {
+      emailCaptureDocumentSubmitListenerBound = true;
+      document.addEventListener("submit", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLFormElement)) return;
+        const match = emailCaptureFormBindings.find((entry) => entry && entry.element === target);
+        if (!match) return;
+        void handleEmailCaptureSubmit(match.binding, match.element, event);
+      }, true);
+    }
+    element.addEventListener("submit", (event) => {
+      void handleEmailCaptureSubmit(binding, element, event);
+    }, true);
+  };
   const bindManifest = () => {
     const manifest = config.manifest;
     if (!manifest || !Array.isArray(manifest.bindings)) return;
@@ -6481,6 +8073,12 @@ WantedBy=multi-user.target
         if (!(element instanceof HTMLElement)) continue;
         if (element.dataset.mosStandaloneBridgeBound === "true") continue;
         element.dataset.mosStandaloneBridgeBound = "true";
+        if (binding.type === "checkout" && binding.checkout && binding.checkout.mode !== "external_checkout_url") {
+          element.addEventListener("pointerenter", () => scheduleWarmCheckoutBindings(75), { passive: true });
+          element.addEventListener("touchstart", () => scheduleWarmCheckoutBindings(0), { passive: true });
+          element.addEventListener("mousedown", () => scheduleWarmCheckoutBindings(0), { passive: true });
+          element.addEventListener("focus", () => scheduleWarmCheckoutBindings(0));
+        }
         if (binding.type === "internal_navigation" && element instanceof HTMLAnchorElement) {
           const targetPath = cleanText(config.pagePathById && config.pagePathById[String(binding.targetPageId || "")]);
           const targetStage = cleanText(config.pageStageById && config.pageStageById[String(binding.targetPageId || "")]);
@@ -6490,6 +8088,19 @@ WantedBy=multi-user.target
               toStage: targetStage || "custom",
             });
           }
+        }
+        if (binding.type === "email_capture") {
+          if (!(element instanceof HTMLFormElement)) {
+            console.error(
+              "[StandaloneImportedHtmlArtifact] Email capture binding '" +
+                String(binding.id || "unknown") +
+                "' must target a form element.",
+            );
+            continue;
+          }
+          loadKlaviyoOnsiteScriptForBinding(binding);
+          registerEmailCaptureSubmitBinding(binding, element);
+          continue;
         }
         element.addEventListener("click", async (event) => {
           const modifiedClick =
@@ -6550,16 +8161,19 @@ WantedBy=multi-user.target
               throw new Error("Unsupported binding type.");
             }
             setElementBusy(element, true);
-            const resolvedSelection = augmentSelectionWithCheckoutContext(
-              readSelectionFromResolver(binding.checkout.variantResolver, String(binding.id || "unknown")),
-            );
-            const { variantId, variant, selection } = resolveCheckoutVariant(binding.checkout, resolvedSelection);
+            const { variantId, variant, selection, cacheKey } = resolveCheckoutState(binding);
+            const bindingId = String(binding.id || "unknown");
+            const transitionId = buildCanonicalEventId("checkout_transition");
             trackEvent(binding.trackEventType || "sales_to_checkout_click", {
               fromStage: config.pageStage,
               toStage: "checkout",
-              bindingId: binding.id,
+              bindingId,
+              ctaId: bindingId,
+              transitionId,
               buttonText: buttonText || undefined,
               ...(variantId ? { variantId } : {}),
+              ...(variant && typeof variant.price === "number" ? { value: Math.round(variant.price) / 100 } : {}),
+              ...(variant && variant.currency ? { currency: variant.currency } : {}),
             });
             if (binding.checkout.mode === "external_checkout_url") {
               const checkoutUrl = resolveExternalCheckoutUrlForVariant(
@@ -6581,12 +8195,26 @@ WantedBy=multi-user.target
                   provider: variant.provider,
                 });
               }
-              window.location.href = checkoutUrl;
+              window.location.href = appendCurrentUrlParams(
+                appendCheckoutAttributesToCartUrl(
+                  checkoutUrl,
+                  checkoutAttributeMap({
+                    variantId,
+                    selection,
+                    ctaId: bindingId,
+                    transitionId,
+                  }),
+                ),
+              );
               return;
             }
-            const checkout = await requestCheckout({
+            const checkout = await ensurePreparedCheckoutForClick({
               variantId,
+              variant,
               selection,
+              cacheKey,
+              ctaId: bindingId,
+              transitionId,
             });
             if (variant && variant.provider === "stripe") {
               const pendingKey = pendingMetaPurchaseStorageKey(sessionId, config.funnelSlug);
@@ -6600,7 +8228,7 @@ WantedBy=multi-user.target
                 provider: variant.provider,
               });
             }
-            window.location.href = checkout.checkoutUrl;
+            window.location.href = appendCurrentUrlParams(checkout.checkoutUrl);
           } catch (error) {
             console.error(
               "[StandaloneImportedHtmlArtifact] Binding '" + String(binding.id || "unknown") + "' failed.",
@@ -6612,16 +8240,73 @@ WantedBy=multi-user.target
       }
     }
   };
+  const warmCheckoutBindings = async () => {
+    const manifest = config.manifest;
+    if (!manifest || !Array.isArray(manifest.bindings)) return;
+    await Promise.all(
+      manifest.bindings.map(async (binding) => {
+        if (!binding || typeof binding !== "object") return;
+        if (binding.type !== "checkout" || !binding.checkout) return;
+        if (binding.checkout.mode === "external_checkout_url") return;
+        try {
+          const checkoutState = resolveCheckoutState(binding);
+          if (!checkoutState.variant || checkoutState.variant.provider !== "shopify") {
+            return;
+          }
+          await prepareCheckoutInBackground(checkoutState);
+        } catch (error) {
+          console.error(
+            "[StandaloneImportedHtmlArtifact] Failed to warm checkout binding '" +
+              String(binding.id || "unknown") +
+              "'.",
+            error,
+          );
+        }
+      }),
+    );
+  };
+  const warmCheckoutBindingsSafely = () => {
+    try {
+      void warmCheckoutBindings();
+    } catch (error) {
+      console.error("[StandaloneImportedHtmlArtifact] Failed to warm checkout bindings.", error);
+    }
+  };
+  const scheduleWarmCheckoutBindings = (delayMs = 75) => {
+    if (warmCheckoutBindingsTimeout !== null) {
+      window.clearTimeout(warmCheckoutBindingsTimeout);
+    }
+    warmCheckoutBindingsTimeout = window.setTimeout(() => {
+      warmCheckoutBindingsTimeout = null;
+      warmCheckoutBindingsSafely();
+    }, delayMs);
+  };
+  const scheduleInitialWarmCheckoutBindings = () => {
+    scheduleWarmCheckoutBindings(0);
+    window.setTimeout(() => scheduleWarmCheckoutBindings(0), 250);
+    window.setTimeout(() => scheduleWarmCheckoutBindings(0), 1000);
+  };
+  const bindCheckoutWarmListeners = () => {
+    if (checkoutWarmListenersBound) return;
+    checkoutWarmListenersBound = true;
+    document.addEventListener("input", () => scheduleWarmCheckoutBindings(), true);
+    document.addEventListener("change", () => scheduleWarmCheckoutBindings(), true);
+  };
   const initialize = () => {
+    installTrackEventBridge();
     try {
       resetBusyBoundElements();
       initializeWebVitalsTracking();
       bindManifest();
+      bindCheckoutWarmListeners();
+      scheduleInitialWarmCheckoutBindings();
       handleCheckoutReturn();
       if (!(config.pageStage === "sales" && checkoutStatusFromLocation())) {
         trackInitialPageView();
       }
-      trackEnteredFunnelIfNeeded();
+      initializeEngagementTrackingSafely();
+      initializeViewTrackingSafely();
+      initializeInteractionTrackingSafely();
     } catch (error) {
       console.error("[StandaloneImportedHtmlArtifact] Failed to initialize.", error);
     }
@@ -6635,9 +8320,11 @@ WantedBy=multi-user.target
     resetBusyBoundElements();
   });
 })();
-            </script>"""
-            .replace("__MOS_STANDALONE_IMPORTED_HTML_CONFIG__", _safe_inline_json(script_config))
-            .replace("__MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__", str(_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS))
+            </script>""".replace(
+            "__MOS_STANDALONE_IMPORTED_HTML_CONFIG__", _safe_inline_json(script_config)
+        ).replace(
+            "__MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__",
+            str(_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS),
         )
 
         block = (
@@ -6672,22 +8359,22 @@ WantedBy=multi-user.target
         if "</body>" in html_document.lower():
             return _minify_standalone_imported_html_document(
                 re.sub(
-                r"</body>",
-                lambda match: f"{block}{match.group(0)}",
-                html_document,
-                count=1,
-                flags=re.IGNORECASE,
-            )
+                    r"</body>",
+                    lambda match: f"{block}{match.group(0)}",
+                    html_document,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
             )
         if "</html>" in html_document.lower():
             return _minify_standalone_imported_html_document(
                 re.sub(
-                r"</html>",
-                lambda match: f"{block}{match.group(0)}",
-                html_document,
-                count=1,
-                flags=re.IGNORECASE,
-            )
+                    r"</html>",
+                    lambda match: f"{block}{match.group(0)}",
+                    html_document,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
             )
         return _minify_standalone_imported_html_document(f"{html_document}{block}")
 
@@ -6729,7 +8416,9 @@ WantedBy=multi-user.target
                 normalized_server_hosts.add(host)
         upstream_api_root = str(upstream_api_base_root or "").strip()
         if upstream_api_root:
-            parsed = urlsplit(upstream_api_root if "://" in upstream_api_root else f"https://{upstream_api_root}")
+            parsed = urlsplit(
+                upstream_api_root if "://" in upstream_api_root else f"https://{upstream_api_root}"
+            )
             host = parsed.netloc.strip().lower()
             if host:
                 normalized_server_hosts.add(host)
@@ -6749,7 +8438,9 @@ WantedBy=multi-user.target
             context_label=context_label,
         )
         if page_stage in {"sales", "pre_sales"}:
-            html_document = self._replace_standalone_imported_html_tailwind_runtime(html_document=html_document)
+            html_document = self._replace_standalone_imported_html_tailwind_runtime(
+                html_document=html_document
+            )
             html_document = self._localize_standalone_imported_html_stylesheets(
                 site_dir=site_dir,
                 html_document=html_document,
@@ -6761,7 +8452,9 @@ WantedBy=multi-user.target
             )
             origin_hints = _origin_hint_markup_for_html_document(html_document)
             if origin_hints:
-                html_document = _inject_head_html_block(html_document=html_document, block=origin_hints)
+                html_document = _inject_head_html_block(
+                    html_document=html_document, block=origin_hints
+                )
         image_rewrite_baseline_html = html_document
         html_document = self._rewrite_standalone_imported_html_compressed_images(
             site_dir=site_dir,
@@ -6823,7 +8516,9 @@ WantedBy=multi-user.target
                 f"{preload_imagesizes}"
                 'data-mos-standalone-entry-preload="true">'
             )
-            html_document = _inject_head_html_block(html_document=html_document, block=preload_block)
+            html_document = _inject_head_html_block(
+                html_document=html_document, block=preload_block
+            )
         return html_document
 
     def _write_funnel_artifact_standalone_html_routes(
@@ -6839,7 +8534,9 @@ WantedBy=multi-user.target
         _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
             source=source
         )
-        preferred_export_target = self._resolve_preferred_funnel_artifact_export_target(source=source)
+        preferred_export_target = self._resolve_preferred_funnel_artifact_export_target(
+            source=source
+        )
         preferred_product_slug = ""
         preferred_funnel_payload: Optional[Dict[str, Any]] = None
         if preferred_export_target is not None:
@@ -6858,7 +8555,9 @@ WantedBy=multi-user.target
             if "/" in product_slug or "\\" in product_slug:
                 raise ValueError(f"Invalid artifact product slug '{product_slug}'.")
             if not isinstance(product_payload, dict):
-                raise ValueError(f"Artifact product payload for '{product_slug}' must be an object.")
+                raise ValueError(
+                    f"Artifact product payload for '{product_slug}' must be an object."
+                )
 
             product_meta = product_payload.get("meta")
             funnels = product_payload.get("funnels")
@@ -6872,7 +8571,10 @@ WantedBy=multi-user.target
                 funnel_slug = str(raw_funnel_slug or "").strip()
                 if not funnel_slug:
                     continue
-                if preferred_funnel_payload is not None and funnel_payload is not preferred_funnel_payload:
+                if (
+                    preferred_funnel_payload is not None
+                    and funnel_payload is not preferred_funnel_payload
+                ):
                     continue
                 if "/" in funnel_slug or "\\" in funnel_slug:
                     raise ValueError(
@@ -6894,8 +8596,12 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a pages object."
                     )
 
-                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
-                entry_slug = self._canonical_funnel_artifact_page_slug(canonical_funnel_meta.get("entrySlug"))
+                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(
+                    funnel_meta=funnel_meta
+                )
+                entry_slug = self._canonical_funnel_artifact_page_slug(
+                    canonical_funnel_meta.get("entrySlug")
+                )
                 if not entry_slug:
                     raise ValueError(
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical entry slug for standalone HTML export."
@@ -6924,16 +8630,20 @@ WantedBy=multi-user.target
                             f"Artifact funnel '{product_slug}/{funnel_slug}' duplicates page slug '{canonical_page_slug}'."
                         )
 
-                    canonical_page_payloads[canonical_page_slug] = self._canonicalize_funnel_artifact_page_payload(
-                        page_slug=page_slug,
-                        page_payload=raw_page_payload,
+                    canonical_page_payloads[canonical_page_slug] = (
+                        self._canonicalize_funnel_artifact_page_payload(
+                            page_slug=page_slug,
+                            page_payload=raw_page_payload,
+                        )
                     )
                     canonical_page_payload = canonical_page_payloads[canonical_page_slug]
                     puck_data = canonical_page_payload.get("puckData")
                     content = puck_data.get("content") if isinstance(puck_data, dict) else None
                     block = (
                         content[0]
-                        if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
+                        if isinstance(content, list)
+                        and len(content) == 1
+                        and isinstance(content[0], dict)
                         else None
                     )
                     if str(block.get("type") or "").strip() == "ImportedHtmlDocument":
@@ -6987,7 +8697,9 @@ WantedBy=multi-user.target
                             mirrored_target_paths=mirrored_target_paths,
                             standalone_served_assets=standalone_served_assets,
                             standalone_image_sources=standalone_image_sources,
-                            prepared_imported_html_document=prepared_imported_html_documents.get(page_slug),
+                            prepared_imported_html_document=prepared_imported_html_documents.get(
+                                page_slug
+                            ),
                             prepared_imported_html_documents=prepared_imported_html_documents,
                         )
                     entry_html_document = rendered_pages.get(entry_slug)
@@ -6999,7 +8711,9 @@ WantedBy=multi-user.target
                     entry_route_dir = f"{site_dir}/{product_slug}/{funnel_path_token}"
                     entry_route_path = f"{entry_route_dir}/index.html"
                     if entry_route_path in written_route_paths:
-                        raise ValueError(f"Standalone artifact route '{entry_route_path}' was generated more than once.")
+                        raise ValueError(
+                            f"Standalone artifact route '{entry_route_path}' was generated more than once."
+                        )
                     self.upload_file(entry_html_document, entry_route_path)
                     written_route_paths.add(entry_route_path)
 
@@ -7013,7 +8727,9 @@ WantedBy=multi-user.target
                         self.upload_file(html_document, page_route_path)
                         written_route_paths.add(page_route_path)
 
-    def _write_funnel_artifact_payload(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
+    def _write_funnel_artifact_payload(
+        self, *, site_dir: str, source: FunnelArtifactSourceSpec
+    ) -> None:
         _artifact, _meta, products, _asset_items = self._resolve_funnel_artifact_payload_sections(
             source=source
         )
@@ -7029,7 +8745,9 @@ WantedBy=multi-user.target
             if "/" in product_slug or "\\" in product_slug:
                 raise ValueError(f"Invalid artifact product slug '{product_slug}'.")
             if not isinstance(product_payload, dict):
-                raise ValueError(f"Artifact product payload for '{product_slug}' must be an object.")
+                raise ValueError(
+                    f"Artifact product payload for '{product_slug}' must be an object."
+                )
 
             product_meta = product_payload.get("meta")
             funnels = product_payload.get("funnels")
@@ -7039,7 +8757,9 @@ WantedBy=multi-user.target
                 raise ValueError(f"Artifact product '{product_slug}' is missing a funnels object.")
 
             product_dir = f"{base_root}/{product_slug}"
-            self.upload_file(json.dumps(product_meta, ensure_ascii=False), f"{product_dir}/meta.json")
+            self.upload_file(
+                json.dumps(product_meta, ensure_ascii=False), f"{product_dir}/meta.json"
+            )
             seen_funnel_path_tokens: set[str] = set()
 
             for raw_funnel_slug, funnel_payload in funnels.items():
@@ -7067,7 +8787,9 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a pages object."
                     )
 
-                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(funnel_meta=funnel_meta)
+                canonical_funnel_meta = self._canonicalize_funnel_artifact_meta(
+                    funnel_meta=funnel_meta
+                )
 
                 funnel_path_tokens = self._resolve_funnel_path_tokens(
                     product_slug=product_slug,
@@ -7084,10 +8806,15 @@ WantedBy=multi-user.target
 
                     funnel_dir = f"{product_dir}/{funnel_path_token}"
                     pages_dir = f"{funnel_dir}/pages"
-                    self.upload_file(json.dumps(canonical_funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
+                    self.upload_file(
+                        json.dumps(canonical_funnel_meta, ensure_ascii=False),
+                        f"{funnel_dir}/meta.json",
+                    )
 
                     if isinstance(commerce, dict):
-                        self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{funnel_dir}/commerce.json")
+                        self.upload_file(
+                            json.dumps(commerce, ensure_ascii=False), f"{funnel_dir}/commerce.json"
+                        )
 
                     written_page_slugs: set[str] = set()
                     for raw_page_slug, page_payload in pages.items():
@@ -7124,7 +8851,9 @@ WantedBy=multi-user.target
         if source is None:
             raise ValueError("source_ref is required when source_type='funnel_artifact'.")
         if not isinstance(source, FunnelArtifactSourceSpec):
-            raise ValueError("source_ref must be FunnelArtifactSourceSpec when source_type='funnel_artifact'.")
+            raise ValueError(
+                "source_ref must be FunnelArtifactSourceSpec when source_type='funnel_artifact'."
+            )
 
         render_mode = source.artifact_render_mode
 
@@ -7151,7 +8880,9 @@ WantedBy=multi-user.target
         if render_mode == FunnelArtifactRenderMode.RUNTIME_BUNDLE:
             runtime_dist_path = (source.runtime_dist_path or "").strip()
             if not runtime_dist_path:
-                raise ValueError("source_ref.runtime_dist_path must be non-empty for source_type='funnel_artifact'.")
+                raise ValueError(
+                    "source_ref.runtime_dist_path must be non-empty for source_type='funnel_artifact'."
+                )
 
             if self._path_exists(runtime_dist_path):
                 dist_q = shlex.quote(runtime_dist_path)
@@ -7169,12 +8900,16 @@ WantedBy=multi-user.target
                 if not self._path_exists(cached_runtime_dir):
                     self.run(f"mkdir -p {shlex.quote(_RUNTIME_CACHE_DIR)}")
                     self.run(f"mkdir -p {shlex.quote(cached_runtime_dir)}")
-                    self._upload_local_directory(local_dir=local_dist, remote_dir=cached_runtime_dir)
+                    self._upload_local_directory(
+                        local_dir=local_dist, remote_dir=cached_runtime_dir
+                    )
                 cached_runtime_q = shlex.quote(cached_runtime_dir)
                 self.run(f"cp -R {cached_runtime_q}/. {site_dir_q}/")
             self._inject_funnel_runtime_config(site_dir=site_dir, source=source)
             self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
-            self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
+            self._replace_api_base_tokens(
+                site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root
+            )
             self._validate_funnel_artifact_site_output(
                 site_dir=site_dir,
                 source=source,
@@ -7249,7 +8984,9 @@ WantedBy=multi-user.target
         if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML:
             default_route = self._resolve_funnel_artifact_default_route(source=source)
             if default_route:
-                default_route_path = "/" + "/".join(quote(segment, safe="") for segment in default_route)
+                default_route_path = "/" + "/".join(
+                    quote(segment, safe="") for segment in default_route
+                )
                 redirect_target = f"{default_route_path}$is_args$args"
                 if canonical_redirect_host:
                     redirect_target = (
@@ -7257,9 +8994,7 @@ WantedBy=multi-user.target
                         f"{default_route_path}$is_args$args"
                     )
                 default_route_location = (
-                    "    location = / {\n"
-                    f"        return 302 {redirect_target};\n"
-                    "    }\n\n"
+                    "    location = / {\n" f"        return 302 {redirect_target};\n" "    }\n\n"
                 )
 
         conf = f"""server {{
@@ -7292,36 +9027,6 @@ WantedBy=multi-user.target
         add_header Cache-Control "public, max-age=31536000, immutable";
     }}
 
-    location = /__mos/meta/fbevents.js {{
-        proxy_pass https://connect.facebook.net/en_US/fbevents.js;
-        proxy_http_version 1.1;
-        proxy_set_header Host connect.facebook.net;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Accept-Encoding "";
-        proxy_ssl_server_name on;
-        sub_filter_once off;
-        sub_filter_types application/javascript application/x-javascript text/javascript;
-        sub_filter 'https://www.facebook.com/tr/' '/__mos/meta/tr/';
-        sub_filter 'https://www.facebook.com/tr' '/__mos/meta/tr';
-    }}
-
-    location = /__mos/meta/tr {{
-        proxy_pass https://www.facebook.com/tr;
-        proxy_http_version 1.1;
-        proxy_set_header Host www.facebook.com;
-        proxy_ssl_server_name on;
-    }}
-
-    location ^~ /__mos/meta/tr/ {{
-        proxy_pass https://www.facebook.com/tr/;
-        proxy_http_version 1.1;
-        proxy_set_header Host www.facebook.com;
-        proxy_ssl_server_name on;
-    }}
-
     location ^~ /api/ {{
         proxy_pass {upstream_api_proxy_base}/;
         proxy_http_version 1.1;
@@ -7344,7 +9049,9 @@ WantedBy=multi-user.target
                 1,
             )
         self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
-        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run(
+            f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}"
+        )
         self.run("rm -f /etc/nginx/sites-enabled/default")
         self.run("nginx -t")
         self.run("systemctl reload nginx")
@@ -7385,7 +9092,9 @@ WantedBy=multi-user.target
     }}
 }}"""
         self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
-        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run(
+            f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}"
+        )
         self.run("rm -f /etc/nginx/sites-enabled/default")
         self.run("systemctl reload nginx")
         if app.service_config.https:
@@ -7394,9 +9103,13 @@ WantedBy=multi-user.target
     def _configure_git_static_site(self, app: ApplicationSpec, app_dir: str):
         raw_static_root = (app.service_config.static_root or "").strip()
         if not raw_static_root:
-            raise ValueError("service_config.static_root is required for git static site deployments.")
+            raise ValueError(
+                "service_config.static_root is required for git static site deployments."
+            )
 
-        static_root_path = raw_static_root if raw_static_root.startswith("/") else f"{app_dir}/{raw_static_root}"
+        static_root_path = (
+            raw_static_root if raw_static_root.startswith("/") else f"{app_dir}/{raw_static_root}"
+        )
         if not self._path_exists(static_root_path):
             raise ValueError(
                 f"Static site root '{static_root_path}' does not exist after build for workload '{app.name}'."
@@ -7438,7 +9151,9 @@ WantedBy=multi-user.target
     }}
 }}"""
         self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
-        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run(
+            f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}"
+        )
         self.run("rm -f /etc/nginx/sites-enabled/default")
         self.run("nginx -t")
         self.run("systemctl reload nginx")
@@ -7466,16 +9181,14 @@ WantedBy=multi-user.target
                 prefix = f"/{prefix}"
             if not prefix.endswith("/"):
                 prefix = f"{prefix}/"
-            locations.append(
-                f"""    location {prefix} {{
+            locations.append(f"""    location {prefix} {{
         proxy_pass http://127.0.0.1:{port}/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-    }}"""
-            )
+    }}""")
 
         server_names: List[str] = []
         https_enabled = False
@@ -7543,7 +9256,10 @@ WantedBy=multi-user.target
                 f"DEBIAN_FRONTEND=noninteractive apt-get update && "
                 f"DEBIAN_FRONTEND=noninteractive apt-get install -y {' '.join(app.build_config.system_packages)}"
             )
-        if app.source_type in {ApplicationSourceType.FUNNEL_PUBLICATION, ApplicationSourceType.FUNNEL_ARTIFACT}:
+        if app.source_type in {
+            ApplicationSourceType.FUNNEL_PUBLICATION,
+            ApplicationSourceType.FUNNEL_ARTIFACT,
+        }:
             # Funnel publication/artifact workloads should update in place so the
             # current site keeps serving until the replacement proxy or artifact
             # has been fully written and validated.
@@ -7570,10 +9286,7 @@ WantedBy=multi-user.target
             raise ValueError(f"Workload '{app.name}' requires repo_url for source_type='git'.")
 
         gh_token = (
-            os.getenv("GITHUB_TOKEN")
-            or os.getenv("GH_TOKEN")
-            or os.getenv("GITHUB_PAT")
-            or ""
+            os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GITHUB_PAT") or ""
         )
         try:
             self.run(f"test -d {app_dir}")

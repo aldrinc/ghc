@@ -145,6 +145,12 @@
         throw new Error(`Unsupported output.preset: ${preset}. Only "feed" is supported.`);
       };
 
+      const setBottomBannerVisibility = (output) => {
+        const card = document.getElementById('card');
+        const showBottomBanner = output && output.showBottomBanner !== false;
+        card.classList.toggle('no-bottom-banner', !showBottomBanner);
+      };
+
       const fitContextLine = (el) => {
         if (!el) {
           return;
@@ -416,6 +422,7 @@
         }
 
         setOutputPreset(data.output);
+        setBottomBannerVisibility(data.output);
 
         const card = document.getElementById('card');
         card.style.setProperty('--strip-bg', data.brand.stripBgColor);

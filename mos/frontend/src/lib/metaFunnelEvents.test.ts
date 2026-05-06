@@ -69,7 +69,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ]);
   });
 
-  it("maps sales checkout clicks with a variant to AddToCart", () => {
+  it("maps sales checkout clicks with a variant to AddToCart and a checkout click", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "sales_to_checkout_click",
@@ -82,6 +82,14 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
           content_ids: ["variant_123"],
           content_type: "product",
           num_items: 1,
+        },
+      },
+      {
+        eventName: "SalesToCheckoutClick",
+        method: "trackCustom",
+        params: {
+          from_stage: "sales",
+          to_stage: "checkout",
         },
       },
     ]);

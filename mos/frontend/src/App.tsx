@@ -13,6 +13,7 @@ import { WorkspacesPage } from "@/pages/workspaces/WorkspacesPage";
 import { WorkspaceOnboardingPage } from "@/pages/workspaces/WorkspaceOnboardingPage";
 import { WorkspaceOverviewPage } from "@/pages/workspaces/WorkspaceOverviewPage";
 import { BrandDesignSystemPage } from "@/pages/workspaces/BrandDesignSystemPage";
+import { AnalyticsPage } from "@/pages/workspaces/AnalyticsPage";
 import { ProductsPage } from "@/pages/workspaces/ProductsPage";
 import { PostizPage } from "@/pages/workspaces/PostizPage";
 import { ProductDetailPage } from "@/pages/workspaces/ProductDetailPage";
@@ -117,6 +118,7 @@ function App() {
             <Route index element={<Navigate to="/workspaces/overview" replace />} />
             <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
             <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
+            <Route path="workspaces/execution/analytics" element={<AnalyticsPage />} />
             <Route path="workspaces/execution/postiz" element={<PostizPage />} />
             {/* Sites - canonical workspace destination */}
             <Route path="workspaces/sites" element={<SitesPage />} />

@@ -127,10 +127,17 @@ function resolveStageFromPage(page: RuntimePageLike): PublicFunnelStage {
   return "custom";
 }
 
+function isLegacyPreSalesPublicSlug(slug: string | null): boolean {
+  const normalized = cleanOptionalText(slug)?.toLowerCase();
+  return normalized === "pre-sales" || normalized === "presales";
+}
+
 function resolveCanonicalSlug(page: RuntimePageLike): string | null {
   const slug = readRawSlug(page);
   if (!slug) return null;
-  return resolveStageFromPage(page) === "pre_sales" ? "presales" : slug;
+  return resolveStageFromPage(page) === "pre_sales" && isLegacyPreSalesPublicSlug(slug)
+    ? "presales"
+    : slug;
 }
 
 function isSitePageType(value: string | null): value is SitePageType {

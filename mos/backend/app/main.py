@@ -53,6 +53,7 @@ from app.routers import (
     site_product_bindings,
     site_imports,
     postiz,
+    analytics,
 )
 
 logger = logging.getLogger(__name__)
@@ -195,6 +196,7 @@ def create_app() -> FastAPI:
     app.include_router(site_product_bindings.products_router)
     app.include_router(site_imports.router)
     app.include_router(postiz.router)
+    app.include_router(analytics.router)
 
     return app
 

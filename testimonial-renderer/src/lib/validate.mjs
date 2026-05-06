@@ -20,6 +20,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const PDP_OUTPUT_PRESETS = new Set(['feed']);
 const PDP_DEFAULT_OUTPUT_PRESET = 'feed';
 const PDP_DEFAULT_COMMENT_TAIL_SCALE = 1.2;
+const PDP_DEFAULT_SHOW_BOTTOM_BANNER = true;
 const PDP_MIN_COMMENT_TAIL_SCALE = 0.5;
 const PDP_MAX_COMMENT_TAIL_SCALE = 2;
 const PDP_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -31,6 +32,9 @@ const MAX_PDP_RATING_VALUE = 16;
 const MAX_PDP_RATING_DETAIL = 60;
 const MAX_PDP_BRAND_NAME = 80;
 const MAX_PDP_BRAND_NOTES = 260;
+const MAX_PDP_PROMPT_PRODUCT = 600;
+const MAX_PDP_PROMPT_SCENE = 300;
+const MAX_PDP_PROMPT_SUBJECT = 300;
 const NANO_REFERENCE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const NANO_REFERENCE_DATA_MIME_TYPES = new Set([
   'image/png',
@@ -155,12 +159,13 @@ const validatePdpOutput = (output) => {
     return {
       preset: PDP_DEFAULT_OUTPUT_PRESET,
       commentTailScale: PDP_DEFAULT_COMMENT_TAIL_SCALE,
+      showBottomBanner: PDP_DEFAULT_SHOW_BOTTOM_BANNER,
     };
   }
   if (!isPlainObject(output)) {
     throw new Error('output must be an object when provided.');
   }
-  const allowedKeys = new Set(['preset', 'commentTailScale']);
+  const allowedKeys = new Set(['preset', 'commentTailScale', 'showBottomBanner']);
   for (const key of Object.keys(output)) {
     if (!allowedKeys.has(key)) {
       throw new Error(`output contains unsupported key: ${key}`);
@@ -191,7 +196,12 @@ const validatePdpOutput = (output) => {
     commentTailScale = output.commentTailScale;
   }
 
-  return { preset, commentTailScale };
+  let showBottomBanner = PDP_DEFAULT_SHOW_BOTTOM_BANNER;
+  if (output.showBottomBanner != null) {
+    showBottomBanner = assertBoolean(output.showBottomBanner, 'output.showBottomBanner');
+  }
+
+  return { preset, commentTailScale, showBottomBanner };
 };
 
 const validatePdpBrand = (brand, baseDir) => {
@@ -346,9 +356,9 @@ const validatePdpPromptVars = (vars) => {
     }
   }
 
-  const product = assertString(vars.product, 'background.promptVars.product', 220);
-  const scene = assertOptionalString(vars.scene, 'background.promptVars.scene', 220);
-  const subject = assertOptionalString(vars.subject, 'background.promptVars.subject', 220);
+  const product = assertString(vars.product, 'background.promptVars.product', MAX_PDP_PROMPT_PRODUCT);
+  const scene = assertOptionalString(vars.scene, 'background.promptVars.scene', MAX_PDP_PROMPT_SCENE);
+  const subject = assertOptionalString(vars.subject, 'background.promptVars.subject', MAX_PDP_PROMPT_SUBJECT);
   const extra = assertOptionalString(vars.extra, 'background.promptVars.extra', 600);
 
   let avoid;

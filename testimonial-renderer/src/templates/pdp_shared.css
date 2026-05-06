@@ -42,6 +42,10 @@ body {
   --pdp-strip-copy-left-pad: 14px;
 }
 
+#card.no-bottom-banner {
+  --strip-h: 0px;
+}
+
 .pdp-bg {
   position: absolute;
   inset: 0;
@@ -352,6 +356,10 @@ body {
   gap: 16px;
   padding: 12px 22px 11px;
   z-index: 4;
+}
+
+#card.no-bottom-banner .pdp-strip {
+  display: none;
 }
 
 #card.is-feed .pdp-strip {

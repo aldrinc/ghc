@@ -276,12 +276,11 @@ def test_meta_platform_profile_v2_accepts_mos_runtime_tracking_for_account_008()
             "mode": "public_funnel_runtime",
             "pixelId": "pixel-123",
             "browserEvents": [
-                "Entered Funnel",
+                "EnteredFunnel",
                 "PageView",
-                "ViewContent",
+                "EnteredSales",
                 "PreSalesToSalesClick",
-                "AddToCart",
-                "Purchase",
+                "SalesToCheckoutClick",
             ],
             "internalEvents": [
                 "Entered Funnel",
@@ -460,12 +459,11 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
     assert mos_meta_tracking["mode"] == "public_funnel_runtime"
     assert mos_meta_tracking["pixelId"] == "pixel-123"
     assert mos_meta_tracking["browserEvents"] == [
-        "Entered Funnel",
+        "EnteredFunnel",
         "PageView",
-        "ViewContent",
+        "EnteredSales",
         "PreSalesToSalesClick",
-        "AddToCart",
-        "Purchase",
+        "SalesToCheckoutClick",
     ]
     assert mos_meta_tracking["funnelIds"] == [str(funnel.id)]
 

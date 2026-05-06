@@ -3476,10 +3476,13 @@ class ShopifyApiClient:
         return f"{_MOS_BONUS_DISCOUNT_KEY_PREFIX}:{offer_id}"
 
     @staticmethod
-    def _bonus_discount_title(*, offer_description: str) -> str:
-        title = "Natural Remedies Handbook + Bonus Gifts"
-        if len(title) <= _MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH:
-            return title
+    def _bonus_discount_title(*, offer_description: str, offer_id: str | None = None) -> str:
+        title_base = str(offer_description or "").strip() or "MOS Offer"
+        title_suffix = " + Bonus Gifts"
+        if offer_id:
+            title_suffix = f"{title_suffix} ({offer_id.strip()[:8]})"
+        max_base_length = max(1, _MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH - len(title_suffix))
+        title = title_base[:max_base_length].rstrip() + title_suffix
         return title[:_MOS_BONUS_DISCOUNT_MAX_TITLE_LENGTH].rstrip()
 
     def _extract_bonus_discount_specs(
@@ -3578,6 +3581,7 @@ class ShopifyApiClient:
                         "offerId": offer_id,
                         "title": self._bonus_discount_title(
                             offer_description=str(offer_description or ""),
+                            offer_id=offer_id,
                         ),
                         "buyProductVariantGids": sorted(set(shopify_variant_gids)),
                         "bonusProductVariantGids": sorted(set(bonus_product_variant_gids)),
@@ -3624,6 +3628,7 @@ class ShopifyApiClient:
                 record: dict[str, str] = {
                     "title": self._bonus_discount_title(
                         offer_description=str(offer_description or raw_bonus_title.strip()),
+                        offer_id=offer_id,
                     )
                 }
                 if isinstance(automatic_discount, dict):

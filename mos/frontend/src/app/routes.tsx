@@ -14,6 +14,7 @@ export const appRoutes: AppRoute[] = [
   { path: "/workspaces/sites/:siteId", label: "Site Detail" },
   { path: "/workspaces/overview", label: "Workspace Overview" },
   { path: "/workspaces/brand", label: "Brand Settings" },
+  { path: "/workspaces/execution/analytics", label: "Analytics" },
   { path: "/workspaces/execution/postiz", label: "Postiz" },
   { path: "/workspaces/sites", label: "Sites" },
   { path: "/workspaces/products", label: "Products" },

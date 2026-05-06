@@ -1,4 +1,4 @@
-import { mapRuntimeEventToMetaPixelEvents } from "./metaFunnelEvents";
+import { buildMetaEventId, mapRuntimeEventToMetaPixelEvents, type MetaPixelRuntimeEvent } from "./metaFunnelEvents";
 import type { RuntimeTrackingEvent } from "./funnelTracking";
 
 declare global {
@@ -41,6 +41,9 @@ type PostHogRoot = {
 };
 
 const POSTHOG_INSTANCE_NAME = "mosFunnel";
+const META_ATTRIBUTION_WAIT_TIMEOUT_MS = 1500;
+const META_ATTRIBUTION_WAIT_POLL_MS = 50;
+const META_EMAIL_HASH_STORAGE_KEY = "mos_meta_em";
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -50,6 +53,87 @@ function cleanText(value: unknown): string | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${name}=`;
+  const match = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+  if (!match) return null;
+  return cleanText(match.slice(prefix.length));
+}
+
+function assignCleanProp(target: Record<string, unknown>, key: string, value: unknown) {
+  const cleaned = cleanText(value);
+  if (cleaned) {
+    target[key] = cleaned;
+  }
+}
+
+function readStoredMetaEmailHash(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return cleanText(window.localStorage?.getItem(META_EMAIL_HASH_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function resolveMetaAttributionProps(eventSourceUrl?: string | null): Record<string, unknown> {
+  const props: Record<string, unknown> = {
+    action_source: "website",
+  };
+  assignCleanProp(props, "em", readStoredMetaEmailHash());
+  assignCleanProp(props, "fbp", readCookie("_fbp"));
+  assignCleanProp(props, "fbc", readCookie("_fbc"));
+
+  if (typeof window !== "undefined") {
+    const url = new URL(cleanText(eventSourceUrl) || window.location.href);
+    assignCleanProp(props, "fbclid", url.searchParams.get("fbclid"));
+    assignCleanProp(props, "event_source_url", url.href);
+    assignCleanProp(props, "$raw_user_agent", window.navigator?.userAgent);
+  }
+
+  return props;
+}
+
+function resolveMetaAttributionReady(eventSourceUrl?: string | null): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  const eventUrl = new URL(cleanText(eventSourceUrl) || window.location.href);
+  const hasFbclid = Boolean(cleanText(eventUrl.searchParams.get("fbclid")));
+  const hasFbp = Boolean(readCookie("_fbp"));
+  const hasFbc = Boolean(readCookie("_fbc"));
+  return hasFbp && (!hasFbclid || hasFbc);
+}
+
+function waitForMetaAttribution(eventSourceUrl?: string | null): Promise<{
+  elapsedMs: number;
+  timedOut: boolean;
+}> {
+  if (typeof window === "undefined") {
+    return Promise.resolve({ elapsedMs: 0, timedOut: false });
+  }
+  const startedAt = Date.now();
+  return new Promise((resolve) => {
+    const poll = () => {
+      const elapsedMs = Date.now() - startedAt;
+      if (resolveMetaAttributionReady(eventSourceUrl)) {
+        resolve({ elapsedMs, timedOut: false });
+        return;
+      }
+      if (elapsedMs >= META_ATTRIBUTION_WAIT_TIMEOUT_MS) {
+        resolve({ elapsedMs, timedOut: true });
+        return;
+      }
+      window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+    };
+    window.setTimeout(poll, META_ATTRIBUTION_WAIT_POLL_MS);
+  });
 }
 
 function buildPostHogEventId({
@@ -89,7 +173,7 @@ function resolvePostHogContentCategory(pageStage: string | null): string | null 
 
 function isRuntimeTrackingEventType(value: string): value is RuntimeTrackingEvent["eventType"] {
   return (
-    value === "Entered Funnel"
+    value === "presell_page_view"
     || value === "pre_sales_page_view"
     || value === "sales_page_view"
     || value === "checkout_page_view"
@@ -98,6 +182,31 @@ function isRuntimeTrackingEventType(value: string): value is RuntimeTrackingEven
     || value === "pre_sales_to_sales_click"
     || value === "sales_to_checkout_click"
     || value === "custom_page_click"
+    || value === "qualified_session"
+    || value === "scroll_depth"
+    || value === "section_view"
+    || value === "proof_view"
+    || value === "cta_view"
+    || value === "offer_stack_view"
+    || value === "value_stack_view"
+    || value === "price_reveal_view"
+    || value === "selector_interaction"
+    || value === "subscription_selected"
+    || value === "guarantee_view"
+    || value === "trust_element_view"
+    || value === "product_detail_interaction"
+    || value === "quiz_lead_viewed"
+    || value === "quiz_question_viewed"
+    || value === "quiz_option_presented"
+    || value === "quiz_option_selected"
+    || value === "quiz_option_deselected"
+    || value === "quiz_question_submitted"
+    || value === "quiz_completed"
+    || value === "quiz_result_viewed"
+    || value === "quiz_mechanism_viewed"
+    || value === "quiz_proof_viewed"
+    || value === "quiz_recommendation_viewed"
+    || value === "quiz_cta_viewed"
   );
 }
 
@@ -110,6 +219,36 @@ function sanitizePostHogProps(props?: Record<string, unknown>) {
   return nextProps;
 }
 
+function resolveMetaEventId(
+  mappedEvent: MetaPixelRuntimeEvent,
+  metaEvents: MetaPixelRuntimeEvent[] | undefined,
+  index: number,
+  context: {
+    eventType: string;
+    publicationId: string | null;
+    pageId: string | null;
+    sessionId: string | null;
+  },
+) {
+  const providedEvent = metaEvents?.[index];
+  const providedEventId = cleanText(providedEvent?.eventId);
+  if (providedEvent?.eventName === mappedEvent.eventName && providedEventId) {
+    return providedEventId;
+  }
+  const mappedEventId = cleanText(mappedEvent.eventId);
+  if (mappedEventId) {
+    return mappedEventId;
+  }
+  return buildMetaEventId({
+    eventName: mappedEvent.eventName,
+    eventType: context.eventType,
+    publicationId: context.publicationId,
+    pageId: context.pageId,
+    sessionId: context.sessionId,
+    index,
+  });
+}
+
 function resolvePostHogCaptures({
   eventType,
   publicationId,
@@ -118,6 +257,8 @@ function resolvePostHogCaptures({
   sessionId,
   props,
   baseProps,
+  metaEvents,
+  eventSourceUrl,
 }: {
   eventType: string;
   publicationId: string | null;
@@ -126,6 +267,8 @@ function resolvePostHogCaptures({
   sessionId: string | null;
   props?: Record<string, unknown>;
   baseProps: Record<string, unknown>;
+  metaEvents?: MetaPixelRuntimeEvent[];
+  eventSourceUrl?: string | null;
 }) {
   const sanitizedProps = sanitizePostHogProps(props);
   if (!isRuntimeTrackingEventType(eventType)) {
@@ -176,19 +319,21 @@ function resolvePostHogCaptures({
   }
 
   return metaMappedEvents.map((mappedEvent, index) => {
+    const metaEventId = resolveMetaEventId(mappedEvent, metaEvents, index, {
+      eventType,
+      publicationId,
+      pageId,
+      sessionId,
+    });
     const eventProps: Record<string, unknown> = {
       ...baseProps,
       ...sanitizedProps,
       ...(mappedEvent.params || {}),
       internal_event_type: eventType,
-      $event_id: buildPostHogEventId({
-        eventName: mappedEvent.eventName,
-        eventType,
-        publicationId,
-        pageId,
-        sessionId,
-        index,
-      }),
+      ...resolveMetaAttributionProps(eventSourceUrl),
+      meta_event_name: mappedEvent.eventName,
+      meta_event_id: metaEventId,
+      $event_id: metaEventId,
     };
     if (contentCategory) {
       eventProps.content_category = contentCategory;
@@ -309,7 +454,7 @@ export function ensurePostHogInstance({
       api_host: apiHost,
       ...(uiHost ? { ui_host: uiHost } : {}),
       defaults: cleanText(tracking?.posthogDefaults) || "2026-01-30",
-      person_profiles: cleanText(tracking?.posthogPersonProfiles) || "always",
+      person_profiles: cleanText(tracking?.posthogPersonProfiles) || "identified_only",
       autocapture: false,
       capture_pageview: true,
       capture_pageleave: true,
@@ -350,6 +495,7 @@ export function capturePostHogEvent({
   eventType,
   props,
   utm,
+  metaEvents,
 }: {
   tracking: PostHogTrackingConfig | null | undefined;
   distinctId: string | null | undefined;
@@ -363,6 +509,7 @@ export function capturePostHogEvent({
   eventType: string;
   props?: Record<string, unknown>;
   utm?: Record<string, string>;
+  metaEvents?: MetaPixelRuntimeEvent[];
 }) {
   const instance = ensurePostHogInstance({
     tracking,
@@ -374,8 +521,12 @@ export function capturePostHogEvent({
   if (!instance || typeof instance.capture !== "function") {
     return;
   }
+  const capture = instance.capture;
 
   const resolvedPageStage = cleanText(pageStage);
+  const eventSourceUrl = typeof window === "undefined" ? null : window.location.href;
+  const externalId = cleanText(distinctId);
+  const emailHash = readStoredMetaEmailHash();
   const baseProps = {
     productSlug: cleanText(productSlug),
     funnelSlug: cleanText(funnelSlug),
@@ -384,21 +535,48 @@ export function capturePostHogEvent({
     pageSlug: cleanText(pageSlug),
     pageStage: resolvedPageStage,
     visitorId: cleanText(distinctId),
+    ...(externalId ? { external_id: externalId } : {}),
+    ...(emailHash ? { em: emailHash } : {}),
     sessionId: cleanText(sessionId),
     path: typeof window === "undefined" ? undefined : window.location.pathname + window.location.search,
     referrer: typeof document === "undefined" ? undefined : document.referrer || undefined,
     utm: utm || {},
   };
-  const resolvedCaptures = resolvePostHogCaptures({
-    eventType,
-    publicationId: cleanText(publicationId),
-    pageId: cleanText(pageId),
-    pageStage: resolvedPageStage,
-    sessionId: cleanText(sessionId),
-    props,
-    baseProps,
-  });
-  for (const resolvedCapture of resolvedCaptures) {
-    instance.capture(resolvedCapture.eventName, resolvedCapture.eventProps);
+  const emitCaptures = (additionalEventProps?: Record<string, unknown>) => {
+    const resolvedCaptures = resolvePostHogCaptures({
+      eventType,
+      publicationId: cleanText(publicationId),
+      pageId: cleanText(pageId),
+      pageStage: resolvedPageStage,
+      sessionId: cleanText(sessionId),
+      props,
+      baseProps,
+      metaEvents,
+      eventSourceUrl,
+    });
+    for (const resolvedCapture of resolvedCaptures) {
+      capture(resolvedCapture.eventName, {
+        ...resolvedCapture.eventProps,
+        ...(additionalEventProps || {}),
+      });
+    }
+  };
+
+  const hasMetaMappedCaptures =
+    (metaEvents?.length || 0) > 0 ||
+    mapRuntimeEventToMetaPixelEvents({
+      eventType: eventType as RuntimeTrackingEvent["eventType"],
+      props,
+    }).length > 0;
+  if (hasMetaMappedCaptures && !resolveMetaAttributionReady(eventSourceUrl)) {
+    void waitForMetaAttribution(eventSourceUrl).then(({ elapsedMs, timedOut }) => {
+      emitCaptures({
+        meta_cookie_wait_ms: elapsedMs,
+        ...(timedOut ? { meta_cookie_wait_timed_out: true } : {}),
+      });
+    });
+    return;
   }
+
+  emitCaptures();
 }

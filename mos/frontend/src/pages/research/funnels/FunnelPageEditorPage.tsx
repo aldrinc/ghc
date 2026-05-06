@@ -55,10 +55,12 @@ export function FunnelPageEditorPage() {
   const [metaName, setMetaName] = useState("");
   const [metaSlug, setMetaSlug] = useState("");
   const [metaDesignSystemId, setMetaDesignSystemId] = useState<string | null>(null);
+  const [metaNextPageId, setMetaNextPageId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftSlug, setDraftSlug] = useState("");
   const [draftDesignSystemId, setDraftDesignSystemId] = useState("");
+  const [draftNextPageId, setDraftNextPageId] = useState("");
   const [siteCommerce, setSiteCommerce] = useState<SiteCommerceData | null>(null);
   const [siteCommerceLoading, setSiteCommerceLoading] = useState(false);
   const [siteCommerceError, setSiteCommerceError] = useState<string | null>(null);
@@ -86,11 +88,21 @@ export function FunnelPageEditorPage() {
     setMetaName(pageDetail.page.name);
     setMetaSlug(pageDetail.page.slug);
     setMetaDesignSystemId(pageDetail.page.design_system_id || null);
+    setMetaNextPageId(pageDetail.page.next_page_id || null);
   }, [pageDetail, pageId]);
 
   const pageOptions = useMemo(() => {
-    return funnel?.pages?.map((p) => ({ label: p.name, value: p.id })) || [];
+    return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
   }, [funnel?.pages]);
+  const nextPageOptions = useMemo(
+    () => [
+      { label: "No next page", value: "" },
+      ...(funnel?.pages || [])
+        .filter((p) => p.id !== pageId)
+        .map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })),
+    ],
+    [funnel?.pages, pageId]
+  );
 
   const pageOptionsKey = useMemo(
     () => pageOptions.map((o) => `${o.value}:${o.label}`).join("|"),
@@ -175,7 +187,8 @@ export function FunnelPageEditorPage() {
     setDraftName(metaName);
     setDraftSlug(metaSlug);
     setDraftDesignSystemId(metaDesignSystemId || "");
-  }, [settingsOpen, metaName, metaSlug, metaDesignSystemId]);
+    setDraftNextPageId(metaNextPageId || "");
+  }, [settingsOpen, metaDesignSystemId, metaName, metaNextPageId, metaSlug]);
 
   const { data: designSystems = [] } = useDesignSystems(funnel?.client_id || workspace?.id);
   const designSystemOptions = useMemo(() => {
@@ -292,7 +305,9 @@ export function FunnelPageEditorPage() {
           <div className="space-y-4">
             <div className="space-y-1">
               <DialogTitle>Page settings</DialogTitle>
-              <p className="text-sm text-content-muted">Update the page name and slug for this funnel page.</p>
+              <p className="text-sm text-content-muted">
+                Update the page name, slug, default next page, and design system override.
+              </p>
             </div>
             <div className="grid gap-3">
               <div className="space-y-1">
@@ -314,6 +329,17 @@ export function FunnelPageEditorPage() {
                   Leave as workspace default to inherit the brand tokens.
                 </div>
               </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Next page</label>
+                <Select
+                  value={draftNextPageId}
+                  onValueChange={setDraftNextPageId}
+                  options={nextPageOptions}
+                />
+                <div className="text-xs text-content-muted">
+                  `nextPage` CTAs on this page will route here.
+                </div>
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button variant="secondary" size="sm" onClick={() => setSettingsOpen(false)}>
@@ -331,6 +357,7 @@ export function FunnelPageEditorPage() {
                         name: draftName,
                         slug: draftSlug,
                         designSystemId: draftDesignSystemId || null,
+                        nextPageId: draftNextPageId || null,
                       },
                     },
                     {
@@ -338,6 +365,7 @@ export function FunnelPageEditorPage() {
                         setMetaName(draftName);
                         setMetaSlug(draftSlug);
                         setMetaDesignSystemId(draftDesignSystemId || null);
+                        setMetaNextPageId(draftNextPageId || null);
                         setSettingsOpen(false);
                       },
                     }

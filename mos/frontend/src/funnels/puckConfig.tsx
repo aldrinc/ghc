@@ -43,6 +43,18 @@ import {
   type RuntimeTrackingEvent,
 } from "@/lib/funnelTracking";
 import {
+  appendCheckoutAttributesToCartUrl,
+  appendCheckoutTrackingUrlParams,
+  buildCheckoutTimingProps,
+  buildCheckoutAttributionProps,
+  buildCheckoutTransitionId,
+} from "@/lib/checkoutAttribution";
+import {
+  buildPresaleAttributedInternalPath,
+  isPresaleToSalesNavigation,
+  markPresaleAttribution,
+} from "@/lib/presaleAttribution";
+import {
   SalesPdpComparison,
   SalesPdpFaq,
   SalesPdpFooter,
@@ -332,20 +344,31 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
     const targetSlug = runtime.pageMap[targetPageId];
     const targetStage = runtime.pageStageMap[targetPageId] || resolvePublicFunnelStage(targetSlug);
     const to = targetSlug ? resolveRuntimePagePath(runtime, targetSlug) : "#";
+    const presaleToSales = isPresaleToSalesNavigation(runtime.pageStage, targetStage);
+    const resolvedTo =
+      presaleToSales && typeof window !== "undefined"
+        ? buildPresaleAttributedInternalPath(to, window.location.search)
+        : to;
     return (
       <div className={wrapperClass}>
         <Link
-          to={to}
+          to={resolvedTo}
           className={className}
-          onClick={() =>
+          onClick={() => {
+            if (presaleToSales && typeof window !== "undefined") {
+              markPresaleAttribution(window.sessionStorage, {
+                productSlug: runtime.productSlug,
+                funnelSlug: runtime.funnelSlug,
+              });
+            }
             runtime.trackEvent?.(
               navigationClickEventForStages({
                 fromStage: runtime.pageStage || "custom",
                 toStage: targetStage,
                 props: { targetPageId },
               }),
-            )
-          }
+            );
+          }}
         >
           {text}
         </Link>
@@ -372,20 +395,31 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
     }
     const targetStage = runtime.pageStageMap[runtime.nextPageId] || resolvePublicFunnelStage(targetSlug);
     const to = resolveRuntimePagePath(runtime, targetSlug);
+    const presaleToSales = isPresaleToSalesNavigation(runtime.pageStage, targetStage);
+    const resolvedTo =
+      presaleToSales && typeof window !== "undefined"
+        ? buildPresaleAttributedInternalPath(to, window.location.search)
+        : to;
     return (
       <div className={wrapperClass}>
         <Link
-          to={to}
+          to={resolvedTo}
           className={className}
-          onClick={() =>
+          onClick={() => {
+            if (presaleToSales && typeof window !== "undefined") {
+              markPresaleAttribution(window.sessionStorage, {
+                productSlug: runtime.productSlug,
+                funnelSlug: runtime.funnelSlug,
+              });
+            }
             runtime.trackEvent?.(
               navigationClickEventForStages({
                 fromStage: runtime.pageStage || "custom",
                 toStage: targetStage,
                 props: { targetPageId: runtime.nextPageId },
               }),
-            )
-          }
+            );
+          }}
         >
           {text}
         </Link>
@@ -473,6 +507,11 @@ function getUtmParams(): Record<string, string> {
   return utm;
 }
 
+function resolveRuntimePageVariant(runtime: FunnelRuntimeContextValue): string | null {
+  const pageSlug = runtime.pageId ? runtime.pageMap[runtime.pageId] : null;
+  return pageSlug || runtime.entrySlug || null;
+}
+
 function normalizeImportedHtmlSelection(
   selection: Record<string, unknown> | null | undefined,
 ): Record<string, string> | null {
@@ -507,6 +546,12 @@ function importedHtmlTrackingEventFromType(
   }
   if (eventType === "sales_to_checkout_click") {
     return { eventType: "sales_to_checkout_click", props };
+  }
+  if (eventType === "selector_interaction") {
+    return { eventType: "selector_interaction", props };
+  }
+  if (eventType === "product_detail_interaction") {
+    return { eventType: "product_detail_interaction", props };
   }
   return { eventType: "custom_page_click", props };
 }
@@ -556,6 +601,14 @@ function ImportedHtmlDocumentBlock({
         buttonText: message.buttonText || undefined,
       }),
     );
+    if (isPresaleToSalesNavigation(runtime.pageStage, targetStage) && typeof window !== "undefined") {
+      markPresaleAttribution(window.sessionStorage, {
+        productSlug: runtime.productSlug,
+        funnelSlug: runtime.funnelSlug,
+      });
+      navigate(buildPresaleAttributedInternalPath(resolveRuntimePagePath(runtime, targetSlug), window.location.search));
+      return;
+    }
     navigate(resolveRuntimePagePath(runtime, targetSlug));
   };
 
@@ -580,12 +633,37 @@ function ImportedHtmlDocumentBlock({
       message.selection ||
       normalizeImportedHtmlSelection(selectedVariant?.option_values ?? null) ||
       {};
+    const transitionId = buildCheckoutTransitionId();
+    const ctaId = message.bindingId || "imported_html_checkout";
+    const checkoutAttribution = buildCheckoutAttributionProps({
+      pageVariant: resolveRuntimePageVariant(runtime),
+      ctaId,
+      transitionId,
+    });
 
     const checkoutProps = {
       bindingId: message.bindingId,
+      ctaId,
+      transitionId,
       buttonText: message.buttonText || undefined,
       ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
+      ...(typeof selectedVariant?.price === "number" ? { value: Math.round(selectedVariant.price) / 100 } : {}),
+      ...(selectedVariant?.currency ? { currency: selectedVariant.currency } : {}),
     };
+    runtime.trackEvent?.(
+      {
+        eventType: "checkout_click",
+        props: {
+          ...checkoutProps,
+          ...buildCheckoutTimingProps({
+            transitionId,
+            ctaId,
+            selectedOffer: String(resolvedSelection?.offerId || resolvedSelection?.Offer || ""),
+            variantIds: resolvedVariantId ? [resolvedVariantId] : null,
+          }),
+        },
+      },
+    );
     runtime.trackEvent?.(
       message.trackEventType === "sales_to_checkout_click"
         ? checkoutClickEventForStage({
@@ -607,7 +685,42 @@ function ImportedHtmlDocumentBlock({
         );
         return;
       }
-      window.location.href = checkoutUrl;
+      const finalCheckoutUrl = appendCheckoutTrackingUrlParams(
+        appendCheckoutAttributesToCartUrl(checkoutUrl, {
+          funnel_slug: runtime.funnelSlug,
+          page_id: runtime.pageId || undefined,
+          visitor_id: runtime.visitorId || undefined,
+          session_id: runtime.sessionId || undefined,
+          variant_id: resolvedVariantId || undefined,
+          price_point_id: resolvedVariantId || undefined,
+          selection: resolvedSelection,
+          utm: getUtmParams(),
+          quantity: "1",
+          click_id: checkoutAttribution.clickId,
+          click_id_type: checkoutAttribution.clickIdType,
+          fbp: checkoutAttribution.fbp,
+          fbc: checkoutAttribution.fbc,
+          event_source_url: checkoutAttribution.eventSourceUrl,
+          page_variant: checkoutAttribution.pageVariant,
+          experiment_id: checkoutAttribution.experimentId,
+          cta_id: checkoutAttribution.ctaId,
+          transition_id: checkoutAttribution.transitionId,
+        }),
+      );
+      runtime.trackEvent?.({
+        eventType: "checkout_redirect_started",
+        props: {
+          ...checkoutProps,
+          ...buildCheckoutTimingProps({
+            transitionId,
+            ctaId,
+            checkoutUrl: finalCheckoutUrl,
+            selectedOffer: String(resolvedSelection?.offerId || resolvedSelection?.Offer || ""),
+            variantIds: resolvedVariantId ? [resolvedVariantId] : null,
+          }),
+        },
+      });
+      window.location.href = finalCheckoutUrl;
       return;
     }
 
@@ -631,6 +744,7 @@ function ImportedHtmlDocumentBlock({
           visitorId: runtime.visitorId || undefined,
           sessionId: runtime.sessionId || undefined,
           utm: getUtmParams(),
+          ...checkoutAttribution,
         }),
       });
       if (!response.ok) {
@@ -655,7 +769,21 @@ function ImportedHtmlDocumentBlock({
           provider: normalizedProvider,
         });
       }
-      window.location.href = data.checkoutUrl;
+      const finalCheckoutUrl = appendCheckoutTrackingUrlParams(data.checkoutUrl);
+      runtime.trackEvent?.({
+        eventType: "checkout_redirect_started",
+        props: {
+          ...checkoutProps,
+          ...buildCheckoutTimingProps({
+            transitionId,
+            ctaId,
+            checkoutUrl: finalCheckoutUrl,
+            selectedOffer: String(resolvedSelection?.offerId || resolvedSelection?.Offer || ""),
+            variantIds: resolvedVariantId ? [resolvedVariantId] : null,
+          }),
+        },
+      });
+      window.location.href = finalCheckoutUrl;
     } catch (error) {
       console.error(
         `[ImportedHtmlDocument] Checkout failed for binding ${message.bindingId}.`,

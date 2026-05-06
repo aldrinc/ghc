@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
-from app.db.enums import FunnelDomainStatusEnum
+from app.db.enums import FunnelDomainStatusEnum, FunnelEventTypeEnum
 from app.db.models import (
     AgentRun,
     AgentToolCall,
@@ -325,6 +325,96 @@ def test_public_events_accept_valid_inactive_funnel_publication(api_client: Test
     assert event is not None
     assert str(event.funnel_id) == funnel_id
     assert str(event.page_id) == page_id
+
+
+def test_public_events_accept_quiz_event_types(api_client: TestClient, db_session):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Quiz Event Types"
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+    publication_id = publish.json()["publicationId"]
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    page_id = meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventId": "quiz-question-viewed-1",
+                    "eventType": "quiz_question_viewed",
+                    "publicationId": publication_id,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": f"/{product_slug}/{route_slug}/quiz-v6/",
+                    "props": {
+                        "quizId": "tenor-daily-drive-quiz-v6",
+                        "questionId": "age",
+                    },
+                },
+                {
+                    "eventId": "quiz-completed-1",
+                    "eventType": "quiz_completed",
+                    "publicationId": publication_id,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                    "path": f"/{product_slug}/{route_slug}/quiz-v6/",
+                    "props": {
+                        "quizId": "tenor-daily-drive-quiz-v6",
+                        "answerPathHash": "example_hash",
+                    },
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": 2}
+    events = db_session.scalars(
+        select(FunnelEvent).where(FunnelEvent.publication_id == publication_id).order_by(FunnelEvent.event_id)
+    ).all()
+    assert [event.event_type for event in events] == [
+        FunnelEventTypeEnum.quiz_completed,
+        FunnelEventTypeEnum.quiz_question_viewed,
+    ]
+
+
+def test_public_events_reject_unsupported_event_type(api_client: TestClient):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client, funnel_name="Unsupported Event Type"
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+    publication_id = publish.json()["publicationId"]
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    page_id = meta.json()["pages"][0]["pageId"]
+
+    response = api_client.post(
+        "/public/events",
+        json={
+            "events": [
+                {
+                    "eventType": "quiz_fake_event",
+                    "publicationId": publication_id,
+                    "pageId": page_id,
+                    "visitorId": "visitor_123",
+                    "sessionId": "session_123",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported eventType: quiz_fake_event"
 
 
 def test_public_runtime_serves_b2c_site_preview_pages_and_policy_pages(

@@ -2383,7 +2383,7 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     )
 
     assert result["productGid"] == "gid://shopify/Product/999"
-    assert observed_discount_payload["title"] == "Natural Remedies Handbook + Bonus Gifts"
+    assert observed_discount_payload["title"] == "Use the Starter Pack description in checkout. + Bonus Gifts (offer-1)"
     assert observed_discount_payload["customerBuys"]["items"]["products"]["productVariantsToAdd"] == [
         "gid://shopify/ProductVariant/100"
     ]
@@ -2395,12 +2395,12 @@ def test_sync_product_creates_bonus_discounts_and_persists_discount_metadata():
     assert observed_discount_payload["customerGets"]["value"]["discountOnQuantity"]["quantity"] == "2"
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][0]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Natural Remedies Handbook + Bonus Gifts",
+        "title": "Use the Starter Pack description in checkout. + Bonus Gifts (offer-1)",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_metafield_payload["offers"][0]["basket"]["bonusProducts"][1]["automaticDiscount"] == {
         "key": "offer-bonus:offer-1",
-        "title": "Natural Remedies Handbook + Bonus Gifts",
+        "title": "Use the Starter Pack description in checkout. + Bonus Gifts (offer-1)",
         "discountId": "gid://shopify/DiscountAutomaticNode/777",
     }
     assert observed_publication_check == {
