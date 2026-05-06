@@ -127,6 +127,8 @@ def _create_asset(
     batch_id: str,
     suffix: str,
     asset_brief_id: str,
+    width: int = 16,
+    height: int = 16,
 ) -> Asset:
     content = _jpeg_bytes()
     asset = Asset(
@@ -143,8 +145,8 @@ def _create_asset(
         storage_key=f"creative/{suffix}.jpg",
         content_type="image/jpeg",
         size_bytes=len(content),
-        width=16,
-        height=16,
+        width=width,
+        height=height,
         file_source="ai",
         file_status="ready",
         ai_metadata={"creativeGenerationBatchId": batch_id, "assetBriefId": asset_brief_id},
@@ -215,7 +217,18 @@ def _create_meta_publish_inputs(
     experiment_key: str,
     with_targeting: bool = True,
     bucket_count: int = DEFAULT_META_PUBLISH_BUCKET_COUNT,
+    multi_aspect_variants: list[tuple[Asset, str]] | None = None,
 ) -> tuple[MetaCreativeSpec, MetaAdSetSpec]:
+    metadata = {"experimentSpecId": experiment_key}
+    if multi_aspect_variants:
+        metadata["multiAspectSpec"] = {
+            "groupKey": f"group-{asset.id}",
+            "primaryAssetId": str(asset.id),
+            "variants": [
+                {"assetId": str(variant_asset.id), "aspectRatio": aspect_ratio}
+                for variant_asset, aspect_ratio in multi_aspect_variants
+            ],
+        }
     creative_spec = MetaCreativeSpec(
         org_id=TEST_ORG_ID,
         asset_id=asset.id,
@@ -229,7 +242,7 @@ def _create_meta_publish_inputs(
         page_id="page_123",
         instagram_actor_id=None,
         status="draft",
-        metadata_json={"experimentSpecId": experiment_key},
+        metadata_json=metadata,
     )
     existing_adset_specs = db_session.scalars(
         select(MetaAdSetSpec).where(
@@ -1128,6 +1141,201 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
     assert detail_response.status_code == 200
     detail_payload = detail_response.json()
     assert detail_payload["items"][0]["metaAdId"] == "meta_ad_123"
+
+
+def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
+    api_client, db_session, monkeypatch
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(
+        api_client,
+        suffix="publish-run-multi-aspect",
+        db_session=db_session,
+    )
+    funnel_id = str(uuid4())
+    brief_id = "brief-publish-run-multi-aspect"
+    _create_funnel_scoped_brief(
+        db_session,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        brief_id=brief_id,
+        funnel_id=funnel_id,
+    )
+    square_asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-run-multi-aspect-square",
+        asset_brief_id=brief_id,
+        width=16,
+        height=16,
+    )
+    feed_asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-run-multi-aspect-feed",
+        asset_brief_id=brief_id,
+        width=16,
+        height=20,
+    )
+    story_asset = _create_asset(
+        db_session,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        batch_id="latest-run",
+        suffix="publish-run-multi-aspect-story",
+        asset_brief_id=brief_id,
+        width=18,
+        height=32,
+    )
+    creative_spec, _adset_spec = _create_meta_publish_inputs(
+        db_session,
+        asset=square_asset,
+        campaign_id=campaign_id,
+        experiment_key="exp-publish-multi-aspect",
+        with_targeting=True,
+        multi_aspect_variants=[
+            (square_asset, "1:1"),
+            (feed_asset, "4:5"),
+            (story_asset, "9:16"),
+        ],
+    )
+    creative_spec.call_to_action_type = "Learn More"
+    db_session.add(creative_spec)
+    db_session.commit()
+    _upsert_meta_profile(api_client, client_id=client_id)
+
+    content = _jpeg_bytes()
+    upload_hash_by_filename = {
+        f"{square_asset.id}.jpg": "hash_square",
+        f"{feed_asset.id}.jpg": "hash_4x5",
+        f"{story_asset.id}.jpg": "hash_9x16",
+    }
+    upload_calls: list[str] = []
+    adset_counter = {"count": 0}
+    creative_counter = {"count": 0}
+    ad_counter = {"count": 0}
+
+    class _FakeStorage:
+        def download_bytes(self, *, key: str, bucket: str | None = None) -> tuple[bytes, str]:
+            _ = bucket
+            assert key.startswith("creative/publish-run-multi-aspect-")
+            return content, "image/jpeg"
+
+    class _FakeMetaClient:
+        def upload_image(self, **kwargs):
+            upload_calls.append(kwargs["filename"])
+            return {"images": {kwargs["filename"]: {"hash": upload_hash_by_filename[kwargs["filename"]]}}}
+
+        def create_campaign(self, **kwargs):
+            assert kwargs["payload"]["status"] == "PAUSED"
+            return {"id": "meta_campaign_multi_aspect", "status": "PAUSED"}
+
+        def create_adset(self, **kwargs):
+            adset_counter["count"] += 1
+            return {"id": f"meta_adset_multi_aspect_{adset_counter['count']}", "status": "PAUSED"}
+
+        def create_adcreative(self, **kwargs):
+            creative_counter["count"] += 1
+            payload = kwargs["payload"]
+            assert payload["object_story_spec"]["page_id"] == "page_123"
+            parsed_link = urlsplit(payload["link_url"])
+            assert f"{parsed_link.scheme}://{parsed_link.netloc}{parsed_link.path}" == "https://shop.thehonestherbalist.com/presales"
+            assert parse_qs(parsed_link.query) == {
+                "utm_source": ["meta"],
+                "utm_medium": ["paid"],
+            }
+            asset_feed_spec = payload["asset_feed_spec"]
+            assert asset_feed_spec["optimization_type"] == "PLACEMENT"
+            assert asset_feed_spec["call_to_action_types"] == ["LEARN_MORE"]
+            assert len(asset_feed_spec["link_urls"]) == 1
+            asset_feed_url = asset_feed_spec["link_urls"][0]["website_url"]
+            assert parse_qs(urlsplit(asset_feed_url).query) == {
+                "utm_source": ["meta"],
+                "utm_medium": ["paid"],
+            }
+            images = asset_feed_spec["images"]
+            assert len(images) == 3
+            label_to_hash = {
+                image["adlabels"][0]["name"]: image["hash"]
+                for image in images
+            }
+            rules = asset_feed_spec["asset_customization_rules"]
+            assert len(rules) == 3
+            story_rule = next(
+                rule
+                for rule in rules
+                if rule.get("customization_spec", {}).get("instagram_positions") == ["story", "reels"]
+            )
+            feed_rule = next(
+                rule
+                for rule in rules
+                if rule.get("customization_spec", {}).get("facebook_positions")
+                == ["feed", "marketplace", "search", "video_feeds", "profile_feed"]
+            )
+            default_rule = next(rule for rule in rules if rule.get("is_default") is True)
+            assert label_to_hash[story_rule["image_label"]["name"]] == "hash_9x16"
+            assert label_to_hash[feed_rule["image_label"]["name"]] == "hash_4x5"
+            assert label_to_hash[default_rule["image_label"]["name"]] == "hash_square"
+            return {"id": "meta_creative_multi_aspect"}
+
+        def create_ad(self, **kwargs):
+            ad_counter["count"] += 1
+            assert kwargs["payload"]["status"] == "PAUSED"
+            return {"id": f"meta_ad_multi_aspect_{ad_counter['count']}", "status": "PAUSED"}
+
+    monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
+    monkeypatch.setattr(meta_ads_router, "_get_meta_client", lambda **kwargs: _FakeMetaClient())
+
+    validation_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-plan/validate",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Multi Aspect",
+            "campaignObjective": "OUTCOME_SALES",
+            "buyingType": "AUCTION",
+        },
+    )
+    assert validation_response.status_code == 200
+    validation_payload = validation_response.json()
+    assert validation_payload["ok"] is True
+    assert validation_payload["includedCount"] == 1
+    assert len(validation_payload["items"]) == 1
+
+    publish_response = api_client.post(
+        f"/meta/campaigns/{campaign_id}/publish-runs",
+        json={
+            "generationKey": "batch:latest-run",
+            "funnelId": funnel_id,
+            "publishBaseUrl": "https://shop.thehonestherbalist.com",
+            "campaignName": "Honest Herbalist Multi Aspect",
+            "campaignObjective": "OUTCOME_SALES",
+            "buyingType": "AUCTION",
+        },
+    )
+
+    assert publish_response.status_code == 200, publish_response.text
+    publish_payload = publish_response.json()
+    assert publish_payload["status"] == "published"
+    assert len(publish_payload["items"]) == 1
+    assert publish_payload["items"][0]["status"] == "published"
+    assert publish_payload["items"][0]["metaCreativeId"] == "meta_creative_multi_aspect"
+    assert publish_payload["items"][0]["metadata"]["variantAssetIds"] == [
+        str(square_asset.id),
+        str(feed_asset.id),
+        str(story_asset.id),
+    ]
+    assert upload_calls == [f"{square_asset.id}.jpg", f"{feed_asset.id}.jpg", f"{story_asset.id}.jpg"]
+    assert adset_counter["count"] == DEFAULT_META_PUBLISH_BUCKET_COUNT
+    assert creative_counter["count"] == 1
+    assert ad_counter["count"] == 1
 
 
 def test_publish_meta_run_uses_requested_campaign_daily_budget(api_client, db_session, monkeypatch) -> None:
