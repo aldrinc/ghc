@@ -1071,7 +1071,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
 
         def create_adset(self, **kwargs):
             adset_counter["count"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             assert kwargs["payload"]["dsa_beneficiary"] == "Test Page"
             assert kwargs["payload"]["dsa_payor"] == "Test Page"
             assert kwargs["payload"]["daily_min_spend_target"] == (
@@ -1103,7 +1103,7 @@ def test_publish_meta_run_creates_paused_entities_and_history(api_client, db_ses
             return {"id": "meta_creative_123"}
 
         def create_ad(self, **kwargs):
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": "meta_ad_123", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
@@ -1291,7 +1291,7 @@ def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
 
         def create_ad(self, **kwargs):
             ad_counter["count"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": f"meta_ad_multi_aspect_{ad_counter['count']}", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)
@@ -2160,7 +2160,7 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
 
         def create_adset(self, **kwargs):
             counters["create_adset"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             assert kwargs["payload"]["daily_min_spend_target"] == (
                 DEFAULT_META_PUBLISH_ADSET_DAILY_MIN_SPEND_TARGET_MINOR_UNITS
             )
@@ -2172,7 +2172,7 @@ def test_publish_meta_run_reuses_existing_asset_upload_when_launch_plan_changes(
 
         def create_ad(self, **kwargs):
             counters["create_ad"] += 1
-            assert kwargs["payload"]["status"] == "PAUSED"
+            assert kwargs["payload"]["status"] == "ACTIVE"
             return {"id": f"meta_ad_{counters['create_ad']}", "status": "PAUSED"}
 
     monkeypatch.setattr(meta_ads_router, "MediaStorage", _FakeStorage)

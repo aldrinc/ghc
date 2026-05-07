@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -41,6 +42,6 @@ class MetaManagementMonitorWorkflow:
                 campaign_id=input.campaign_id,
                 date_preset=input.date_preset,
             ),
-            start_to_close_timeout=900,
+            start_to_close_timeout=timedelta(minutes=15),
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
