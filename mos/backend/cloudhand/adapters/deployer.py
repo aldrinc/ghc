@@ -43,7 +43,8 @@ _NGINX_APP_CLIENT_MAX_BODY_SIZE = "250m"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _FUNNEL_ARTIFACT_RELEASES_DIRNAME = "site-releases"
 _FUNNEL_ARTIFACT_LIVE_DIRNAME = "site"
-_STANDALONE_IMPORTED_HTML_BRIDGE_VERSION = "inline-standalone-bridge-v1"
+_HTML_DEPLOY_BRIDGE_VERSION = "inline-html-deploy-bridge-v1"
+_STANDALONE_IMPORTED_HTML_BRIDGE_VERSION = _HTML_DEPLOY_BRIDGE_VERSION
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 _ENTRY_PRELOAD_COMPONENT_TYPES = {
     "PreSalesHero",
@@ -232,17 +233,17 @@ def _resolve_standalone_upstream_api_origin(*, upstream_api_base_root: str) -> t
     normalized = str(upstream_api_base_root or "").strip().rstrip("/")
     if not normalized.startswith(("http://", "https://")):
         raise ValueError(
-            "Standalone funnel artifacts require source_ref.upstream_api_base_root to be an absolute http(s) URL."
+            "HTML deploy artifacts require source_ref.upstream_api_base_root to be an absolute http(s) URL."
         )
 
     parsed = urlsplit(normalized)
     if not parsed.scheme or not parsed.netloc:
         raise ValueError(
-            "Standalone funnel artifacts require source_ref.upstream_api_base_root to include a scheme and host."
+            "HTML deploy artifacts require source_ref.upstream_api_base_root to include a scheme and host."
         )
     if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
         raise ValueError(
-            "Standalone funnel artifacts require source_ref.upstream_api_base_root to be an origin URL without a path, "
+            "HTML deploy artifacts require source_ref.upstream_api_base_root to be an origin URL without a path, "
             f"query, or fragment; got '{normalized}'."
         )
 
@@ -622,7 +623,7 @@ def _minify_standalone_imported_html_document(html_document: str) -> str:
     if not normalized:
         return normalized
     normalized = re.sub(
-        r"<!--(?!\s*\[if|\s*<!\[endif|\s*MOS_STANDALONE_IMPORTED_HTML_BRIDGE_)[\s\S]*?-->",
+        r"<!--(?!\s*\[if|\s*<!\[endif|\s*MOS_HTML_DEPLOY_BRIDGE_)[\s\S]*?-->",
         "",
         normalized,
         flags=re.IGNORECASE,
@@ -1564,7 +1565,7 @@ class ServerDeployer:
 
         return candidates
 
-    def _compile_standalone_imported_html_tailwind_css(self, *, html_document: str) -> str | None:
+    def _compile_html_deploy_tailwind_css(self, *, html_document: str) -> str | None:
         if not _TAILWIND_CDN_SCRIPT_PATTERN.search(html_document):
             return None
 
@@ -1653,12 +1654,15 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
             return None
 
-    def _replace_standalone_imported_html_tailwind_runtime(self, *, html_document: str) -> str:
+    def _compile_standalone_imported_html_tailwind_css(self, *, html_document: str) -> str | None:
+        return self._compile_html_deploy_tailwind_css(html_document=html_document)
+
+    def _replace_html_deploy_tailwind_runtime(self, *, html_document: str) -> str:
         tailwind_match = _TAILWIND_CDN_SCRIPT_PATTERN.search(html_document)
         if tailwind_match is None:
             return html_document
 
-        compiled_css = self._compile_standalone_imported_html_tailwind_css(
+        compiled_css = self._compile_html_deploy_tailwind_css(
             html_document=html_document
         )
         if not compiled_css:
@@ -1690,6 +1694,9 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             f"{compiled_style_block}"
             f"{html_without_tailwind_runtime[head_close_index:]}"
         )
+
+    def _replace_standalone_imported_html_tailwind_runtime(self, *, html_document: str) -> str:
+        return self._replace_html_deploy_tailwind_runtime(html_document=html_document)
 
     def _fetch_remote_standalone_binary_asset(
         self,
@@ -2927,7 +2934,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
             server.server_close()
             thread.join(timeout=5)
 
-    def _measure_standalone_imported_html_image_layouts(
+    def _measure_html_deploy_image_layouts(
         self,
         *,
         html_document: str,
@@ -2990,7 +2997,20 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                     browser.close()
         return measurements
 
-    def _validate_standalone_imported_html_visual_parity(
+    def _measure_standalone_imported_html_image_layouts(
+        self,
+        *,
+        html_document: str,
+        standalone_served_assets: dict[str, _StandaloneServedAsset],
+        context_label: str,
+    ) -> dict[int, dict[str, int]]:
+        return self._measure_html_deploy_image_layouts(
+            html_document=html_document,
+            standalone_served_assets=standalone_served_assets,
+            context_label=context_label,
+        )
+
+    def _validate_html_deploy_visual_parity(
         self,
         *,
         before_html: str,
@@ -3078,6 +3098,21 @@ fs.writeFileSync(outputPath, result.css, "utf8");
                                 )
                 finally:
                     browser.close()
+
+    def _validate_standalone_imported_html_visual_parity(
+        self,
+        *,
+        before_html: str,
+        after_html: str,
+        standalone_served_assets: dict[str, _StandaloneServedAsset],
+        context_label: str,
+    ) -> None:
+        self._validate_html_deploy_visual_parity(
+            before_html=before_html,
+            after_html=after_html,
+            standalone_served_assets=standalone_served_assets,
+            context_label=context_label,
+        )
 
     def _rewrite_standalone_imported_html_compressed_images(
         self,
@@ -3255,7 +3290,7 @@ fs.writeFileSync(outputPath, result.css, "utf8");
         ):
             return html_document
 
-        image_layouts = self._measure_standalone_imported_html_image_layouts(
+        image_layouts = self._measure_html_deploy_image_layouts(
             html_document=html_document,
             standalone_served_assets=standalone_served_assets,
             context_label=context_label,
@@ -4567,27 +4602,27 @@ WantedBy=multi-user.target
             default_index_path = f"{site_dir}/{'/'.join(default_route)}/index.html"
             if not self._path_exists(default_index_path):
                 raise ValueError(
-                    "Standalone funnel artifact export did not produce the default route entry page "
+                    "HTML deploy artifact export did not produce the default route entry page "
                     f"at '{default_index_path}'."
                 )
 
         if not self._remote_tree_contains_text(
             root_path=site_dir,
-            text="MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START",
+            text="MOS_HTML_DEPLOY_BRIDGE_START",
         ):
             raise ValueError(
-                "Standalone funnel artifact export is missing the imported HTML bridge marker. "
+                "HTML deploy artifact export is missing the imported HTML bridge marker. "
                 "The site was not activated."
             )
 
         unresolved_tokens = (
-            "__MOS_STANDALONE_IMPORTED_HTML_CONFIG__",
+            "__MOS_HTML_DEPLOY_CONFIG__",
             "__MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__",
         )
         for token in unresolved_tokens:
             if self._remote_tree_contains_text(root_path=site_dir, text=token):
                 raise ValueError(
-                    "Standalone funnel artifact export still contains unresolved runtime placeholders "
+                    "HTML deploy artifact export still contains unresolved runtime placeholders "
                     f"('{token}'). The site was not activated."
                 )
 
@@ -4598,18 +4633,18 @@ WantedBy=multi-user.target
             text="window.posthog.init(",
         ):
             raise ValueError(
-                "Standalone funnel artifact export declared PostHog tracking but did not emit the PostHog bootstrap. "
+                "HTML deploy artifact export declared PostHog tracking but did not emit the PostHog bootstrap. "
                 "The site was not activated."
             )
         if self._funnel_artifact_declares_posthog_tracking(source=source):
             if self._remote_tree_contains_text(root_path=site_dir, text="capture_pageview: false"):
                 raise ValueError(
-                    "Standalone funnel artifact export declared PostHog tracking but disabled capture_pageview. "
+                    "HTML deploy artifact export declared PostHog tracking but disabled capture_pageview. "
                     "The site was not activated."
                 )
             if self._remote_tree_contains_text(root_path=site_dir, text="capture_pageleave: false"):
                 raise ValueError(
-                    "Standalone funnel artifact export declared PostHog tracking but disabled capture_pageleave. "
+                    "HTML deploy artifact export declared PostHog tracking but disabled capture_pageleave. "
                     "The site was not activated."
                 )
         if self._funnel_artifact_declares_meta_tracking(source=source):
@@ -4618,7 +4653,7 @@ WantedBy=multi-user.target
                 text="https://connect.facebook.net/en_US/fbevents.js",
             ):
                 raise ValueError(
-                    "Standalone funnel artifact export declared Meta tracking but did not emit the direct Meta Pixel script. "
+                    "HTML deploy artifact export declared Meta tracking but did not emit the direct Meta Pixel script. "
                     "The site was not activated."
                 )
             if not self._remote_tree_contains_text(
@@ -4626,7 +4661,7 @@ WantedBy=multi-user.target
                 text='window.fbq("init", pixelId);',
             ):
                 raise ValueError(
-                    "Standalone funnel artifact export declared Meta tracking but did not emit the Meta Pixel bootstrap. "
+                    "HTML deploy artifact export declared Meta tracking but did not emit the Meta Pixel bootstrap. "
                     "The site was not activated."
                 )
 
@@ -5034,29 +5069,29 @@ WantedBy=multi-user.target
         puck_data = page_payload.get("puckData")
         if not isinstance(puck_data, dict):
             raise ValueError(
-                f"{context_label} puckData must be an object for standalone HTML export."
+                f"{context_label} puckData must be an object for HTML deploy export."
             )
 
         content = puck_data.get("content")
         if not isinstance(content, list) or len(content) != 1:
             raise ValueError(
-                f"{context_label} must contain exactly one standalone-supported content block for standalone HTML export."
+                f"{context_label} must contain exactly one HTML deploy-supported content block for HTML deploy export."
             )
 
         block = content[0]
         if not isinstance(block, dict) or not isinstance(block.get("type"), str):
             raise ValueError(
-                f"{context_label} must contain a standalone-supported content block for standalone HTML export."
+                f"{context_label} must contain a HTML deploy-supported content block for HTML deploy export."
             )
         if block.get("type") != "ImportedHtmlDocument":
             raise ValueError(
-                f"{context_label} must contain an ImportedHtmlDocument block for standalone HTML export."
+                f"{context_label} must contain an ImportedHtmlDocument block for HTML deploy export."
             )
 
         props = block.get("props")
         if not isinstance(props, dict):
             raise ValueError(
-                f"{context_label} ImportedHtmlDocument.props must be an object for standalone HTML export."
+                f"{context_label} ImportedHtmlDocument.props must be an object for HTML deploy export."
             )
 
         html_document = props.get("htmlDocument")
@@ -5074,7 +5109,7 @@ WantedBy=multi-user.target
         except Exception as exc:  # noqa: BLE001
             raise ValueError(
                 f"{context_label} ImportedHtmlDocument.props.instrumentationManifest is required "
-                f"and must be valid for standalone HTML export. {exc}"
+                f"and must be valid for HTML deploy export. {exc}"
             ) from exc
 
         return {
@@ -5095,13 +5130,13 @@ WantedBy=multi-user.target
         puck_data = page_payload.get("puckData")
         if not isinstance(puck_data, dict):
             raise ValueError(
-                f"{context_label} puckData must be an object for standalone HTML export."
+                f"{context_label} puckData must be an object for HTML deploy export."
             )
 
         content = puck_data.get("content")
         if not isinstance(content, list) or len(content) != 1:
             raise ValueError(
-                f"{context_label} must contain exactly one standalone-supported content block for standalone HTML export."
+                f"{context_label} must contain exactly one HTML deploy-supported content block for HTML deploy export."
             )
 
         block = content[0]
@@ -5691,7 +5726,7 @@ WantedBy=multi-user.target
 
         page_id = str(page_payload.get("pageId") or "").strip()
         if not page_id:
-            raise ValueError(f"{context_label} pageId is required for standalone HTML export.")
+            raise ValueError(f"{context_label} pageId is required for HTML deploy export.")
         funnel_meta = funnel_payload.get("meta")
         funnel_publication_id = (
             str(funnel_meta.get("publicationId") or "").strip()
@@ -5703,19 +5738,19 @@ WantedBy=multi-user.target
         )
         if not publication_id:
             raise ValueError(
-                f"{context_label} publicationId is required for standalone HTML export."
+                f"{context_label} publicationId is required for HTML deploy export."
             )
         page_stage = str(page_payload.get("stage") or "").strip()
         if not page_stage:
-            raise ValueError(f"{context_label} stage is required for standalone HTML export.")
+            raise ValueError(f"{context_label} stage is required for HTML deploy export.")
 
         page_map = page_payload.get("pageMap")
         if not isinstance(page_map, dict) or not page_map:
-            raise ValueError(f"{context_label} pageMap is required for standalone HTML export.")
+            raise ValueError(f"{context_label} pageMap is required for HTML deploy export.")
         page_stage_map = page_payload.get("pageStageMap")
         if not isinstance(page_stage_map, dict) or not page_stage_map:
             raise ValueError(
-                f"{context_label} pageStageMap is required for standalone HTML export."
+                f"{context_label} pageStageMap is required for HTML deploy export."
             )
 
         page_path_by_id = self._build_standalone_imported_html_page_paths(
@@ -5725,7 +5760,7 @@ WantedBy=multi-user.target
         )
         if not page_path_by_id:
             raise ValueError(
-                f"{context_label} could not resolve any page paths for standalone HTML export."
+                f"{context_label} could not resolve any page paths for HTML deploy export."
             )
 
         tracking = page_payload.get("tracking")
@@ -5743,6 +5778,8 @@ WantedBy=multi-user.target
             "publicationId": publication_id,
             "tracking": tracking,
             "manifest": props["instrumentationManifest"],
+            "htmlArtifactKind": props["instrumentationManifest"].get("htmlArtifactKind"),
+            "htmlDeploySchemaVersion": props["instrumentationManifest"].get("schemaVersion"),
             "variants": self._serialize_standalone_imported_html_variants(
                 funnel_payload=funnel_payload
             ),
@@ -5757,7 +5794,7 @@ WantedBy=multi-user.target
         runtime_script = """
 <script>
 (() => {
-  const config = __MOS_STANDALONE_IMPORTED_HTML_CONFIG__;
+  const config = __MOS_HTML_DEPLOY_CONFIG__;
   const META_PIXEL_SCRIPT_ID = "mos-meta-pixel-script";
   const META_PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
 	  const META_PIXEL_DEFER_TIMEOUT_MS = __MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__;
@@ -5794,6 +5831,89 @@ WantedBy=multi-user.target
   const assignCleanProp = (target, key, value) => {
     const cleaned = cleanText(value);
     if (cleaned) target[key] = cleaned;
+  };
+  const assignNumberProp = (target, key, value) => {
+    if (value === null || value === undefined || value === "") return;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) target[key] = numberValue;
+  };
+  const assignBooleanProp = (target, key, value) => {
+    if (typeof value === "boolean") target[key] = value;
+  };
+  const buildDeclaredTargetProps = (target) => {
+    const props = {};
+    if (!target || typeof target !== "object") return props;
+    assignCleanProp(props, "quizId", target.quizId);
+    assignCleanProp(props, "quiz_id", target.quizId);
+    assignCleanProp(props, "quizVersion", target.quizVersion);
+    assignCleanProp(props, "quiz_version", target.quizVersion);
+    assignCleanProp(props, "quizVariant", target.quizVariant);
+    assignCleanProp(props, "quiz_variant", target.quizVariant);
+    assignCleanProp(props, "questionId", target.questionId);
+    assignCleanProp(props, "question_id", target.questionId);
+    assignNumberProp(props, "questionIndex", target.questionIndex);
+    assignNumberProp(props, "question_index", target.questionIndex);
+    assignCleanProp(props, "questionRole", target.questionRole);
+    assignCleanProp(props, "question_role", target.questionRole);
+    assignCleanProp(props, "optionId", target.optionId);
+    assignCleanProp(props, "option_id", target.optionId);
+    assignCleanProp(props, "optionRole", target.optionRole);
+    assignCleanProp(props, "option_role", target.optionRole);
+    assignCleanProp(props, "resultId", target.resultId);
+    assignCleanProp(props, "result_id", target.resultId);
+    assignCleanProp(props, "segmentId", target.segmentId);
+    assignCleanProp(props, "segment_id", target.segmentId);
+    assignCleanProp(props, "recommendationId", target.recommendationId);
+    assignCleanProp(props, "recommendation_id", target.recommendationId);
+    assignCleanProp(props, "answerPathId", target.answerPathId);
+    assignCleanProp(props, "answer_path_id", target.answerPathId);
+    assignCleanProp(props, "angle", target.angle);
+    assignCleanProp(props, "awarenessLevel", target.awarenessLevel);
+    assignCleanProp(props, "awareness_level", target.awarenessLevel);
+    assignCleanProp(props, "sophisticationLevel", target.sophisticationLevel);
+    assignCleanProp(props, "sophistication_level", target.sophisticationLevel);
+    assignCleanProp(props, "angleFamily", target.angleFamily);
+    assignCleanProp(props, "angle_family", target.angleFamily);
+    assignCleanProp(props, "hookId", target.hookId);
+    assignCleanProp(props, "hook_id", target.hookId);
+    assignCleanProp(props, "promiseId", target.promiseId);
+    assignCleanProp(props, "promise_id", target.promiseId);
+    assignCleanProp(props, "mechanismName", target.mechanismName);
+    assignCleanProp(props, "mechanism_name", target.mechanismName);
+    assignCleanProp(props, "offerId", target.offerId);
+    assignCleanProp(props, "offer_id", target.offerId);
+    assignCleanProp(props, "sku", target.sku);
+    assignCleanProp(props, "bundleId", target.bundleId);
+    assignCleanProp(props, "bundle_id", target.bundleId);
+    assignCleanProp(props, "pricePoint", target.pricePoint);
+    assignCleanProp(props, "price_point", target.pricePoint);
+    assignCleanProp(props, "guaranteeId", target.guaranteeId);
+    assignCleanProp(props, "guarantee_id", target.guaranteeId);
+    assignCleanProp(props, "guaranteeType", target.guaranteeType);
+    assignCleanProp(props, "guarantee_type", target.guaranteeType);
+    assignCleanProp(props, "guaranteeDuration", target.guaranteeDuration);
+    assignCleanProp(props, "guarantee_duration", target.guaranteeDuration);
+    assignNumberProp(props, "valueTotal", target.valueTotal);
+    assignNumberProp(props, "value_total", target.valueTotal);
+    assignNumberProp(props, "actualPrice", target.actualPrice);
+    assignNumberProp(props, "actual_price", target.actualPrice);
+    assignNumberProp(props, "valueRatio", target.valueRatio);
+    assignNumberProp(props, "value_ratio", target.valueRatio);
+    assignCleanProp(props, "clickType", target.clickType);
+    assignCleanProp(props, "click_type", target.clickType);
+    assignCleanProp(props, "targetOfferId", target.targetOfferId);
+    assignCleanProp(props, "target_offer_id", target.targetOfferId);
+    assignCleanProp(props, "destinationUrl", target.destinationUrl);
+    assignCleanProp(props, "destination_url", target.destinationUrl);
+    assignCleanProp(props, "elementId", target.elementId);
+    assignCleanProp(props, "element_id", target.elementId);
+    assignCleanProp(props, "interactionType", target.interactionType);
+    assignCleanProp(props, "interaction_type", target.interactionType);
+    assignCleanProp(props, "selectedValue", target.selectedValue);
+    assignCleanProp(props, "selected_value", target.selectedValue);
+    assignBooleanProp(props, "subscriptionFlag", target.subscriptionFlag);
+    assignBooleanProp(props, "subscription_flag", target.subscriptionFlag);
+    return props;
   };
   const readStoredMetaEmailHash = () => {
     try {
@@ -5935,6 +6055,10 @@ WantedBy=multi-user.target
       page_stage: pageStage,
       pageType,
       page_type: pageType,
+      htmlArtifactKind: cleanText(config.htmlArtifactKind),
+      html_artifact_kind: cleanText(config.htmlArtifactKind),
+      htmlDeploySchemaVersion: cleanText(config.htmlDeploySchemaVersion),
+      html_deploy_schema_version: cleanText(config.htmlDeploySchemaVersion),
       pageVariant,
       page_variant: pageVariant,
       visitorId: resolvedVisitorId,
@@ -6378,7 +6502,10 @@ WantedBy=multi-user.target
     const pageStage = resolveMetaPixelPageStage(props);
     const pageViewParams = pageStage ? { page_stage: pageStage } : undefined;
     if (eventType === "presell_page_view") {
-      return [{ method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams }];
+      return [
+        { method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams },
+        { method: "trackCustom", eventName: "Entered Presales Page", params: pageViewParams },
+      ];
     }
     if (eventType === "pre_sales_page_view" || eventType === "custom_page_view") {
       return [{ method: "track", eventName: "PageView", params: pageViewParams }];
@@ -6387,6 +6514,7 @@ WantedBy=multi-user.target
       const fromPresale = props && props.fromPresale === true;
       return [
         { method: "track", eventName: "PageView", params: pageViewParams },
+        { method: "trackCustom", eventName: "Entered Sales Page", params: pageViewParams },
         fromPresale
           ? { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams }
           : { method: "track", eventName: "ViewContent", params: pageViewParams },
@@ -6427,6 +6555,14 @@ WantedBy=multi-user.target
             to_stage: "checkout",
           },
         },
+        {
+          method: "trackCustom",
+          eventName: "SalesToCheckoutClicked",
+          params: {
+            from_stage: "sales",
+            to_stage: "checkout",
+          },
+        },
       ];
     }
     if (eventType === "checkout_started") {
@@ -6441,12 +6577,29 @@ WantedBy=multi-user.target
   const resolveCanonicalPostHogEventNames = (eventType) => {
     const normalized = cleanText(eventType);
     if (!normalized) return [];
+    const rmbcAliasesByEventType = {
+      quiz_lead_viewed: ["QuizLeadViewed"],
+      quiz_question_viewed: ["QuizQuestionViewed"],
+      quiz_option_presented: ["QuizOptionPresented"],
+      quiz_option_selected: ["QuizOptionSelected"],
+      quiz_option_deselected: ["QuizOptionDeselected"],
+      quiz_question_submitted: ["QuizQuestionSubmitted"],
+      quiz_completed: ["QuizCompleted"],
+      quiz_result_viewed: ["QuizResultViewed"],
+      quiz_mechanism_viewed: ["QuizMechanismViewed"],
+      quiz_proof_viewed: ["QuizProofViewed"],
+      quiz_recommendation_viewed: ["QuizRecommendationViewed"],
+      quiz_cta_viewed: ["QuizCtaViewed"],
+    };
     const names = [normalized];
     if (normalized === "pre_sales_page_view") {
       names.push("presell_page_view");
     }
     if (normalized === "pre_sales_to_sales_click") {
       names.push("cta_click");
+    }
+    if (Array.isArray(rmbcAliasesByEventType[normalized])) {
+      rmbcAliasesByEventType[normalized].forEach((alias) => names.push(alias));
     }
     return names;
   };
@@ -6530,7 +6683,7 @@ WantedBy=multi-user.target
         }
       } catch (error) {
         if (!pageLifecycleFinalizing) {
-          console.error("[StandaloneImportedHtmlArtifact] Tracking failed.", error);
+          console.error("[HtmlDeployArtifact] Tracking failed.", error);
         }
       }
     }
@@ -6542,12 +6695,12 @@ WantedBy=multi-user.target
         keepalive: true,
       }).catch((error) => {
         if (!pageLifecycleFinalizing) {
-          console.error("[StandaloneImportedHtmlArtifact] Tracking failed.", error);
+          console.error("[HtmlDeployArtifact] Tracking failed.", error);
         }
       });
     } catch (error) {
       if (!pageLifecycleFinalizing) {
-        console.error("[StandaloneImportedHtmlArtifact] Tracking failed.", error);
+        console.error("[HtmlDeployArtifact] Tracking failed.", error);
       }
     }
   };
@@ -6583,7 +6736,9 @@ WantedBy=multi-user.target
               fromPageId: config.pageId,
               slug: config.pageSlug,
               pageStage: config.pageStage,
-              artifactMode: "standalone_html",
+              artifactMode: "html_deploy",
+              htmlArtifactKind: cleanText(config.htmlArtifactKind),
+              htmlDeploySchemaVersion: cleanText(config.htmlDeploySchemaVersion),
               metaEvents: mappedCaptures.map((capture) => ({
                 eventName: capture.eventName,
                 eventId: capture.eventId,
@@ -6670,7 +6825,7 @@ WantedBy=multi-user.target
         try {
           listener && listener();
         } catch (error) {
-          console.error("[StandaloneImportedHtmlArtifact] Failed to finalize web vital.", error);
+          console.error("[HtmlDeployArtifact] Failed to finalize web vital.", error);
         }
       }
     };
@@ -6695,7 +6850,7 @@ WantedBy=multi-user.target
         trackWebVital("TTFB", navEntry.responseStart);
       }
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to record TTFB.", error);
+      console.error("[HtmlDeployArtifact] Failed to record TTFB.", error);
     }
 
     if (typeof PerformanceObserver !== "function") return;
@@ -6713,7 +6868,7 @@ WantedBy=multi-user.target
         });
         fcpObserver.observe({ type: "paint", buffered: true });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlArtifact] Failed to observe FCP.", error);
+        console.error("[HtmlDeployArtifact] Failed to observe FCP.", error);
       }
     }
 
@@ -6735,7 +6890,7 @@ WantedBy=multi-user.target
           }
         });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlArtifact] Failed to observe LCP.", error);
+        console.error("[HtmlDeployArtifact] Failed to observe LCP.", error);
       }
     }
 
@@ -6756,7 +6911,7 @@ WantedBy=multi-user.target
           trackWebVital("CLS", clsValue);
         });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlArtifact] Failed to observe CLS.", error);
+        console.error("[HtmlDeployArtifact] Failed to observe CLS.", error);
       }
     }
 
@@ -6780,7 +6935,7 @@ WantedBy=multi-user.target
           }
         });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlArtifact] Failed to observe INP.", error);
+        console.error("[HtmlDeployArtifact] Failed to observe INP.", error);
       }
     }
   };
@@ -7010,18 +7165,26 @@ WantedBy=multi-user.target
         proofType: cleanText(target.proofType),
         sectionId: cleanText(target.sectionId),
         ctaPosition: Number.isFinite(Number(target.ctaPosition)) ? Number(target.ctaPosition) : undefined,
+        declaredProps: buildDeclaredTargetProps(target),
       });
     };
     const manifest = config.manifest || {};
+    const htmlArtifactKind = cleanText(config.htmlArtifactKind);
     const hasExplicitCtaTargets = Array.isArray(manifest.ctas) && manifest.ctas.length > 0;
     if (Array.isArray(manifest.sections)) {
       manifest.sections.forEach((target) => addTarget("section_view", "section", target));
     }
     if (Array.isArray(manifest.proofs)) {
       manifest.proofs.forEach((target) => addTarget("proof_view", "proof", target));
+      if (htmlArtifactKind === "quiz") {
+        manifest.proofs.forEach((target) => addTarget("quiz_proof_viewed", "quiz_proof", target));
+      }
     }
     if (Array.isArray(manifest.ctas)) {
       manifest.ctas.forEach((target) => addTarget("cta_view", "cta", target));
+      if (htmlArtifactKind === "quiz") {
+        manifest.ctas.forEach((target) => addTarget("quiz_cta_viewed", "quiz_cta", target));
+      }
     }
     if (Array.isArray(manifest.offerStacks)) {
       manifest.offerStacks.forEach((target) => addTarget("offer_stack_view", "offer_stack", target));
@@ -7037,6 +7200,24 @@ WantedBy=multi-user.target
     }
     if (Array.isArray(manifest.trustElements)) {
       manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
+    }
+    if (Array.isArray(manifest.quizLeads)) {
+      manifest.quizLeads.forEach((target) => addTarget("quiz_lead_viewed", "quiz_lead", target));
+    }
+    if (Array.isArray(manifest.quizQuestions)) {
+      manifest.quizQuestions.forEach((target) => addTarget("quiz_question_viewed", "quiz_question", target));
+    }
+    if (Array.isArray(manifest.quizOptions)) {
+      manifest.quizOptions.forEach((target) => addTarget("quiz_option_presented", "quiz_option", target));
+    }
+    if (Array.isArray(manifest.quizResults)) {
+      manifest.quizResults.forEach((target) => addTarget("quiz_result_viewed", "quiz_result", target));
+    }
+    if (Array.isArray(manifest.quizMechanisms)) {
+      manifest.quizMechanisms.forEach((target) => addTarget("quiz_mechanism_viewed", "quiz_mechanism", target));
+    }
+    if (Array.isArray(manifest.quizRecommendations)) {
+      manifest.quizRecommendations.forEach((target) => addTarget("quiz_recommendation_viewed", "quiz_recommendation", target));
     }
     if (!hasExplicitCtaTargets && Array.isArray(manifest.bindings)) {
       manifest.bindings.forEach((binding) => {
@@ -7101,6 +7282,24 @@ WantedBy=multi-user.target
       ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
       ...(target.kind === "guarantee" ? { guaranteeId: target.id, guarantee_id: target.id } : {}),
       ...(target.kind === "trust_element" ? { trustElementId: target.id } : {}),
+      ...(target.kind === "quiz_lead" ? { quizLeadId: target.id, quiz_lead_id: target.id } : {}),
+      ...(target.kind === "quiz_question" ? { questionId: target.id, question_id: target.id } : {}),
+      ...(target.kind === "quiz_option" ? { optionId: target.id, option_id: target.id } : {}),
+      ...(target.kind === "quiz_result" ? { resultId: target.id, result_id: target.id } : {}),
+      ...(target.kind === "quiz_mechanism" ? { mechanismId: target.id, mechanism_id: target.id } : {}),
+      ...(target.kind === "quiz_proof" ? { proofId: target.id, proof_id: target.id } : {}),
+      ...(target.kind === "quiz_recommendation"
+        ? { recommendationId: target.id, recommendation_id: target.id }
+        : {}),
+      ...(target.kind === "quiz_cta"
+        ? {
+            ctaId: target.id,
+            cta_id: target.id,
+            ctaPosition: target.ctaPosition || index + 1,
+            cta_position: target.ctaPosition || index + 1,
+          }
+        : {}),
+      ...(target.declaredProps || {}),
     });
   };
   const initializeViewTracking = () => {
@@ -7149,14 +7348,15 @@ WantedBy=multi-user.target
         event: target.event === "input" || target.event === "change" ? target.event : "click",
         source: target.source === "text" || target.source === "checked" ? target.source : "value",
         interactionType: cleanText(target.interactionType) || kind,
+        declaredProps: buildDeclaredTargetProps(target),
       });
     };
     const manifest = config.manifest || {};
-    if (Array.isArray(manifest.selectorInteractions)) {
-      manifest.selectorInteractions.forEach((target) => addTarget("selector_interaction", "selector", target));
+    if (Array.isArray(manifest.selectors)) {
+      manifest.selectors.forEach((target) => addTarget("selector_interaction", "selector", target));
     }
-    if (Array.isArray(manifest.productDetailInteractions)) {
-      manifest.productDetailInteractions.forEach((target) =>
+    if (Array.isArray(manifest.productDetails)) {
+      manifest.productDetails.forEach((target) =>
         addTarget("product_detail_interaction", "product_detail", target),
       );
     }
@@ -7187,7 +7387,9 @@ WantedBy=multi-user.target
       selector: target.selector,
       label: target.label || undefined,
       interactionType: target.interactionType,
+      ...(target.declaredProps || {}),
       selectedValue,
+      selected_value: selectedValue,
       text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
       activeTimeMs: Math.round(currentActiveTimeMs()),
       maxScrollDepthPct,
@@ -7224,21 +7426,21 @@ WantedBy=multi-user.target
     try {
       initializeEngagementTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize engagement tracking.", error);
+      console.error("[HtmlDeployArtifact] Failed to initialize engagement tracking.", error);
     }
   };
   const initializeViewTrackingSafely = () => {
     try {
       initializeViewTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize view tracking.", error);
+      console.error("[HtmlDeployArtifact] Failed to initialize view tracking.", error);
     }
   };
   const initializeInteractionTrackingSafely = () => {
     try {
       initializeInteractionTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize interaction tracking.", error);
+      console.error("[HtmlDeployArtifact] Failed to initialize interaction tracking.", error);
     }
   };
   const handleCheckoutReturn = () => {
@@ -7628,7 +7830,7 @@ WantedBy=multi-user.target
         }
         return finalizePreparedCheckoutRecord({ cacheKey, preparedCheckout, variantId, selection });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlArtifact] Failed to prepare checkout in background.", error);
+        console.error("[HtmlDeployArtifact] Failed to prepare checkout in background.", error);
         return null;
       }
     })().finally(() => {
@@ -8037,7 +8239,7 @@ WantedBy=multi-user.target
         klaviyo.track("Email Capture Submitted", props);
       }
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Klaviyo browser signal failed.", error);
+      console.error("[HtmlDeployArtifact] Klaviyo browser signal failed.", error);
     }
   };
   const sha256Hex = async (value) => {
@@ -8057,7 +8259,7 @@ WantedBy=multi-user.target
       emailHash = await sha256Hex(normalizedEmail);
       window.localStorage.setItem(META_EMAIL_HASH_STORAGE_KEY, emailHash);
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to persist Meta email hash.", error);
+      console.error("[HtmlDeployArtifact] Failed to persist Meta email hash.", error);
     }
     return emailHash;
   };
@@ -8149,7 +8351,7 @@ WantedBy=multi-user.target
       });
       completeEmailCaptureSuccess(binding, element);
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Email capture binding '" + bindingId + "' failed.", error);
+      console.error("[HtmlDeployArtifact] Email capture binding '" + bindingId + "' failed.", error);
       trackEvent("email_capture_failed", {
         bindingId,
         source,
@@ -8194,7 +8396,7 @@ WantedBy=multi-user.target
       const matches = Array.from(document.querySelectorAll(selector));
       if (matches.length < 1) {
         console.error(
-          "[StandaloneImportedHtmlArtifact] Binding '" +
+          "[HtmlDeployArtifact] Binding '" +
             String(binding.id || "unknown") +
             "' selector '" +
             selector +
@@ -8225,7 +8427,7 @@ WantedBy=multi-user.target
         if (binding.type === "email_capture") {
           if (!(element instanceof HTMLFormElement)) {
             console.error(
-              "[StandaloneImportedHtmlArtifact] Email capture binding '" +
+              "[HtmlDeployArtifact] Email capture binding '" +
                 String(binding.id || "unknown") +
                 "' must target a form element.",
             );
@@ -8390,7 +8592,7 @@ WantedBy=multi-user.target
             window.location.href = appendCurrentUrlParams(checkout.checkoutUrl);
           } catch (error) {
             console.error(
-              "[StandaloneImportedHtmlArtifact] Binding '" + String(binding.id || "unknown") + "' failed.",
+              "[HtmlDeployArtifact] Binding '" + String(binding.id || "unknown") + "' failed.",
               error,
             );
             setElementBusy(element, false);
@@ -8415,7 +8617,7 @@ WantedBy=multi-user.target
           await prepareCheckoutInBackground(checkoutState);
         } catch (error) {
           console.error(
-            "[StandaloneImportedHtmlArtifact] Failed to warm checkout binding '" +
+            "[HtmlDeployArtifact] Failed to warm checkout binding '" +
               String(binding.id || "unknown") +
               "'.",
             error,
@@ -8428,7 +8630,7 @@ WantedBy=multi-user.target
     try {
       void warmCheckoutBindings();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to warm checkout bindings.", error);
+      console.error("[HtmlDeployArtifact] Failed to warm checkout bindings.", error);
     }
   };
   const scheduleWarmCheckoutBindings = (delayMs = 75) => {
@@ -8467,7 +8669,7 @@ WantedBy=multi-user.target
       initializeViewTrackingSafely();
       initializeInteractionTrackingSafely();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlArtifact] Failed to initialize.", error);
+      console.error("[HtmlDeployArtifact] Failed to initialize.", error);
     }
   };
   if (document.readyState === "loading") {
@@ -8480,19 +8682,19 @@ WantedBy=multi-user.target
   });
 })();
             </script>""".replace(
-            "__MOS_STANDALONE_IMPORTED_HTML_CONFIG__", _safe_inline_json(script_config)
+            "__MOS_HTML_DEPLOY_CONFIG__", _safe_inline_json(script_config)
         ).replace(
             "__MOS_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS__",
             str(_STANDALONE_META_PIXEL_DEFER_TIMEOUT_MS),
         )
 
         block = (
-            "<!-- MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START -->"
+            "<!-- MOS_HTML_DEPLOY_BRIDGE_START -->"
             f"{runtime_script}"
-            "<!-- MOS_STANDALONE_IMPORTED_HTML_BRIDGE_END -->"
+            "<!-- MOS_HTML_DEPLOY_BRIDGE_END -->"
         )
         if prepared_html_document is None:
-            html_document = self._prepare_standalone_imported_html_document(
+            html_document = self._prepare_html_deploy_document(
                 site_dir=site_dir,
                 product_slug=product_slug,
                 funnel_slug=funnel_slug,
@@ -8507,8 +8709,8 @@ WantedBy=multi-user.target
             )
         else:
             html_document = prepared_html_document
-        start_marker = "<!-- MOS_STANDALONE_IMPORTED_HTML_BRIDGE_START -->"
-        end_marker = "<!-- MOS_STANDALONE_IMPORTED_HTML_BRIDGE_END -->"
+        start_marker = "<!-- MOS_HTML_DEPLOY_BRIDGE_START -->"
+        end_marker = "<!-- MOS_HTML_DEPLOY_BRIDGE_END -->"
         if start_marker in html_document and end_marker in html_document:
             start_idx = html_document.index(start_marker)
             end_idx = html_document.index(end_marker) + len(end_marker)
@@ -8537,7 +8739,7 @@ WantedBy=multi-user.target
             )
         return _minify_standalone_imported_html_document(f"{html_document}{block}")
 
-    def _prepare_standalone_imported_html_document(
+    def _prepare_html_deploy_document(
         self,
         *,
         site_dir: str,
@@ -8561,7 +8763,7 @@ WantedBy=multi-user.target
         )
         page_stage = str(page_payload.get("stage") or "").strip()
         if not page_stage:
-            raise ValueError(f"{context_label} stage is required for standalone HTML export.")
+            raise ValueError(f"{context_label} stage is required for HTML deploy export.")
 
         html_document = str(props["htmlDocument"])
         normalized_server_hosts: set[str] = set()
@@ -8597,7 +8799,7 @@ WantedBy=multi-user.target
             context_label=context_label,
         )
         if page_stage in {"sales", "pre_sales"}:
-            html_document = self._replace_standalone_imported_html_tailwind_runtime(
+            html_document = self._replace_html_deploy_tailwind_runtime(
                 html_document=html_document
             )
             html_document = self._localize_standalone_imported_html_stylesheets(
@@ -8635,7 +8837,7 @@ WantedBy=multi-user.target
         )
         if not _is_presales_stage(page_stage) and html_document != image_rewrite_baseline_html:
             try:
-                self._validate_standalone_imported_html_visual_parity(
+                self._validate_html_deploy_visual_parity(
                     before_html=image_rewrite_baseline_html,
                     after_html=html_document,
                     standalone_served_assets=standalone_served_assets,
@@ -8679,6 +8881,35 @@ WantedBy=multi-user.target
                 html_document=html_document, block=preload_block
             )
         return html_document
+
+    def _prepare_standalone_imported_html_document(
+        self,
+        *,
+        site_dir: str,
+        product_slug: str,
+        funnel_slug: str,
+        page_slug: str,
+        page_payload: Dict[str, Any],
+        server_names: list[str],
+        upstream_api_base_root: str | None = None,
+        mirrored_url_map: dict[str, str],
+        mirrored_target_paths: set[str],
+        standalone_served_assets: dict[str, _StandaloneServedAsset],
+        standalone_image_sources: dict[str, _StandaloneImageSource],
+    ) -> str:
+        return self._prepare_html_deploy_document(
+            site_dir=site_dir,
+            product_slug=product_slug,
+            funnel_slug=funnel_slug,
+            page_slug=page_slug,
+            page_payload=page_payload,
+            server_names=server_names,
+            upstream_api_base_root=upstream_api_base_root,
+            mirrored_url_map=mirrored_url_map,
+            mirrored_target_paths=mirrored_target_paths,
+            standalone_served_assets=standalone_served_assets,
+            standalone_image_sources=standalone_image_sources,
+        )
 
     def _write_funnel_artifact_standalone_html_routes(
         self,
@@ -8763,7 +8994,7 @@ WantedBy=multi-user.target
                 )
                 if not entry_slug:
                     raise ValueError(
-                        f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical entry slug for standalone HTML export."
+                        f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a canonical entry slug for HTML deploy export."
                     )
 
                 canonical_page_payloads: dict[str, Dict[str, Any]] = {}
@@ -8807,7 +9038,7 @@ WantedBy=multi-user.target
                     )
                     if str(block.get("type") or "").strip() == "ImportedHtmlDocument":
                         prepared_imported_html_documents[canonical_page_slug] = (
-                            self._prepare_standalone_imported_html_document(
+                            self._prepare_html_deploy_document(
                                 site_dir=site_dir,
                                 product_slug=product_slug,
                                 funnel_slug=funnel_slug,
@@ -9020,6 +9251,7 @@ WantedBy=multi-user.target
         release_metadata = source.release_metadata if isinstance(source.release_metadata, dict) else {}
 
         funnels_manifest: List[Dict[str, Any]] = []
+        html_artifact_kinds: set[str] = set()
         has_posthog = False
         has_meta_pixel = False
         for product_slug, product_payload in products.items():
@@ -9045,11 +9277,30 @@ WantedBy=multi-user.target
                         has_meta_pixel = has_meta_pixel or bool(
                             str(tracking.get("metaPixelId") or "").strip()
                         )
+                    instrumentation_manifest: Dict[str, Any] = {}
+                    puck_data = page_payload.get("puckData")
+                    content = puck_data.get("content") if isinstance(puck_data, dict) else None
+                    block = (
+                        content[0]
+                        if isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
+                        else None
+                    )
+                    props = block.get("props") if isinstance(block, dict) else None
+                    if isinstance(props, dict) and isinstance(props.get("instrumentationManifest"), dict):
+                        instrumentation_manifest = props["instrumentationManifest"]
+                    html_artifact_kind = str(instrumentation_manifest.get("htmlArtifactKind") or "").strip()
+                    if html_artifact_kind:
+                        html_artifact_kinds.add(html_artifact_kind)
                     pages_manifest.append(
                         {
                             "pageId": str(page_payload.get("pageId") or "").strip(),
                             "slug": str(page_slug),
                             "stage": str(page_payload.get("stage") or "").strip() or "custom",
+                            "htmlArtifactKind": html_artifact_kind or None,
+                            "htmlDeploySchemaVersion": (
+                                str(instrumentation_manifest.get("schemaVersion") or "").strip()
+                                or None
+                            ),
                         }
                     )
                 funnels_manifest.append(
@@ -9081,6 +9332,12 @@ WantedBy=multi-user.target
             "artifactId": source.artifact_id or str(artifact_meta.get("artifactId") or "").strip() or None,
             "artifactVersion": source.artifact_version,
             "renderMode": render_mode.value if hasattr(render_mode, "value") else str(render_mode),
+            "htmlDeploySchemaVersion": (
+                "html-deploy-v1"
+                if render_mode == FunnelArtifactRenderMode.STANDALONE_IMPORTED_HTML
+                else None
+            ),
+            "htmlArtifactKinds": sorted(html_artifact_kinds) if html_artifact_kinds else None,
             "workloadName": app.name,
             "clientId": source.client_id,
             "defaultRoute": {

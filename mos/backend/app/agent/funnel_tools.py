@@ -2027,6 +2027,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- The server will preserve the uploaded HTML exactly as provided.\n\n"
                 "instrumentationManifest requirements:\n"
                 f"- schemaVersion MUST be '{imported_runtime_context['schemaVersion']}'.\n"
+                f"- htmlArtifactKind MUST be '{imported_runtime_context['defaultHtmlArtifactKind']}' unless the operator explicitly requested one of {imported_runtime_context['supportedHtmlArtifactKinds']}.\n"
                 f"- pageStage MUST be '{current_page_stage}'.\n"
                 "- Use the exact manifest JSON schema below.\n"
                 f"- {imported_html_selector_hint()}\n"

@@ -34,7 +34,8 @@ function buildPage(overrides?: Partial<PublicFunnelPage>): PublicFunnelPage {
 
 function buildInstrumentationManifest() {
   return {
-    schemaVersion: "imported-html-instrumentation-v1" as const,
+    schemaVersion: "html-deploy-v1" as const,
+    htmlArtifactKind: "sales" as const,
     pageStage: "sales" as const,
     bindings: [
       {
@@ -162,7 +163,8 @@ describe("StandaloneImportedHtmlPage", () => {
       </html>
     `;
     const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
-      schemaVersion: "imported-html-instrumentation-v1",
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "sales",
       pageStage: "sales",
       bindings: [
         {
@@ -353,7 +355,8 @@ describe("StandaloneImportedHtmlPage", () => {
       </html>
     `;
     const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
-      schemaVersion: "imported-html-instrumentation-v1",
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "sales",
       pageStage: "sales",
       bindings: [
         {
@@ -443,7 +446,8 @@ describe("StandaloneImportedHtmlPage", () => {
       </html>
     `;
     const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
-      schemaVersion: "imported-html-instrumentation-v1",
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "sales",
       pageStage: "sales",
       bindings: [],
       offerStacks: [{ id: "offer-stack", selector: "#offer-stack", label: "Offer stack" }],
@@ -451,7 +455,7 @@ describe("StandaloneImportedHtmlPage", () => {
       priceReveals: [{ id: "price-reveal", selector: "#price-reveal", label: "Price reveal" }],
       guarantees: [{ id: "guarantee", selector: "#guarantee", label: "Guarantee" }],
       trustElements: [{ id: "trust", selector: "#trust", label: "Trust" }],
-      selectorInteractions: [
+      selectors: [
         {
           id: "purchase-mode",
           selector: "#purchase-mode",
@@ -459,9 +463,10 @@ describe("StandaloneImportedHtmlPage", () => {
           event: "change",
           source: "value",
           interactionType: "purchase_mode",
+          offerId: "brain-clarity-stack",
         },
       ],
-      productDetailInteractions: [
+      productDetails: [
         {
           id: "ingredients",
           selector: "#ingredients",
@@ -469,6 +474,7 @@ describe("StandaloneImportedHtmlPage", () => {
           event: "click",
           source: "text",
           interactionType: "supplement_facts_open",
+          elementId: "ingredients",
         },
       ],
     };
@@ -560,12 +566,175 @@ describe("StandaloneImportedHtmlPage", () => {
           selectorId: "purchase-mode",
           selectedValue: "subscribe",
           interactionType: "purchase_mode",
+          offer_id: "brain-clarity-stack",
         }),
       );
       expect(trackedEvents.find((event) => event.eventType === "product_detail_interaction")?.props).toEqual(
         expect.objectContaining({
           productDetailId: "ingredients",
+          element_id: "ingredients",
           selectedValue: "Supplement facts",
+        }),
+      );
+    });
+
+    dom.window.close();
+  });
+
+  it("tracks quiz manifest targets with RMBC diagnostic properties", async () => {
+    const htmlDocument = `
+      <html>
+        <body>
+          <section id="lead">Lead</section>
+          <section id="q1">Question one</section>
+          <button id="o1">Often</button>
+          <section id="result">Result</section>
+          <section id="mechanism">Mechanism</section>
+          <a id="to-sales">Continue</a>
+        </body>
+      </html>
+    `;
+    const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "quiz",
+      pageStage: "pre_sales",
+      quizId: "brain-quiz",
+      quizVersion: "v1",
+      quizVariant: "control",
+      bindings: [
+        {
+          id: "to-sales",
+          type: "internal_navigation",
+          selector: "#to-sales",
+          event: "click",
+          targetPageId: "page-sales",
+          trackEventType: "pre_sales_to_sales_click",
+        },
+      ],
+      ctas: [{ id: "to-sales", selector: "#to-sales", ctaPosition: 1 }],
+      quizLeads: [{ id: "lead", selector: "#lead", quizId: "brain-quiz" }],
+      quizQuestions: [
+        {
+          id: "q1",
+          selector: "#q1",
+          quizId: "brain-quiz",
+          questionId: "q1",
+          questionIndex: 1,
+          questionRole: "symptom",
+        },
+      ],
+      quizOptions: [
+        {
+          id: "o1",
+          selector: "#o1",
+          quizId: "brain-quiz",
+          questionId: "q1",
+          optionId: "o1",
+          optionRole: "high_intent",
+        },
+      ],
+      quizResults: [{ id: "result", selector: "#result", resultId: "fog-pattern" }],
+      quizMechanisms: [{ id: "mechanism", selector: "#mechanism", mechanismName: "daily-drive" }],
+    };
+    const { injectedDocument } = await captureInjectedDocument({
+      htmlDocument,
+      instrumentationManifest,
+      variants: [],
+      page: {
+        pageId: "page-quiz",
+        slug: "quiz",
+        stage: "pre_sales",
+        nextPageId: "page-sales",
+        pageMap: { "page-quiz": "quiz", "page-sales": "sales-page" },
+        pageStageMap: { "page-quiz": "pre_sales", "page-sales": "sales" },
+      },
+      pagePathById: {
+        "page-quiz": "/example-product/example-funnel/quiz",
+        "page-sales": "/example-product/example-funnel/sales-page",
+      },
+      pageStageById: {
+        "page-quiz": "pre_sales",
+        "page-sales": "sales",
+      },
+    });
+    const runtimeScript = extractRuntimeScript(injectedDocument);
+    const dom = new JSDOM(htmlDocument, {
+      pretendToBeVisual: true,
+      runScripts: "dangerously",
+      url: "https://example.test/quiz",
+    });
+    const eventBodies: Array<Record<string, unknown>> = [];
+    dom.window.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/public/events")) {
+        if (typeof init?.body === "string") {
+          eventBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected fetch request: ${url}`);
+    }) as typeof dom.window.fetch;
+    class ImmediateIntersectionObserver {
+      private readonly callback: IntersectionObserverCallback;
+
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+      }
+
+      observe(element: Element) {
+        this.callback(
+          [{ isIntersecting: true, intersectionRatio: 1, target: element } as IntersectionObserverEntry],
+          this as unknown as IntersectionObserver,
+        );
+      }
+
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    Object.defineProperty(dom.window, "IntersectionObserver", {
+      configurable: true,
+      writable: true,
+      value: ImmediateIntersectionObserver,
+    });
+    dom.window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    }) as typeof dom.window.requestAnimationFrame;
+
+    dom.window.eval(runtimeScript);
+
+    await waitFor(() => {
+      const trackedEvents = eventBodies.flatMap((body) =>
+        Array.isArray(body.events) ? (body.events as Array<Record<string, unknown>>) : [],
+      );
+      expect(trackedEvents.map((event) => event.eventType)).toEqual(
+        expect.arrayContaining([
+          "quiz_lead_viewed",
+          "quiz_question_viewed",
+          "quiz_option_presented",
+          "quiz_result_viewed",
+          "quiz_mechanism_viewed",
+          "quiz_cta_viewed",
+        ]),
+      );
+      expect(trackedEvents.find((event) => event.eventType === "quiz_question_viewed")?.props).toEqual(
+        expect.objectContaining({
+          quiz_id: "brain-quiz",
+          question_id: "q1",
+          question_index: 1,
+          question_role: "symptom",
+        }),
+      );
+      expect(trackedEvents.find((event) => event.eventType === "quiz_option_presented")?.props).toEqual(
+        expect.objectContaining({
+          option_id: "o1",
+          option_role: "high_intent",
         }),
       );
     });
@@ -1165,7 +1334,8 @@ describe("StandaloneImportedHtmlPage", () => {
       </html>
     `;
     const instrumentationManifest: ImportedHtmlInstrumentationManifest = {
-      schemaVersion: "imported-html-instrumentation-v1",
+      schemaVersion: "html-deploy-v1",
+      htmlArtifactKind: "listicle",
       pageStage: "pre_sales",
       sections: [{ id: "hero", selector: "#hero", label: "Hero" }],
       proofs: [{ id: "proof", selector: "#proof", proofType: "clinical", sectionId: "hero" }],

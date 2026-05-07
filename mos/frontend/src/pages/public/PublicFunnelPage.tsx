@@ -14,6 +14,7 @@ import {
   normalizeRouteToken,
   resolvePublicApiBaseUrl,
 } from "@/funnels/runtimeRouting";
+import { normalizeImportedHtmlManifest } from "@/funnels/importedHtmlRuntime";
 import {
   buildPurchaseEventParams,
   clearCheckoutQueryParam,
@@ -226,9 +227,9 @@ function resolveStandaloneImportedHtmlPayload(
   if (!props) return null;
   const htmlDocument = typeof props.htmlDocument === "string" ? props.htmlDocument.trim() : "";
   if (!htmlDocument) return null;
-  const manifest = isRecord(props.instrumentationManifest)
-    ? (props.instrumentationManifest as ImportedHtmlInstrumentationManifest)
-    : null;
+  const manifest = normalizeImportedHtmlManifest(
+    isRecord(props.instrumentationManifest) ? props.instrumentationManifest : null,
+  );
   return {
     htmlDocument,
     instrumentationManifest: manifest,

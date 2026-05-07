@@ -278,9 +278,12 @@ def test_meta_platform_profile_v2_accepts_mos_runtime_tracking_for_account_008()
             "browserEvents": [
                 "EnteredFunnel",
                 "PageView",
+                "Entered Presales Page",
+                "Entered Sales Page",
                 "EnteredSales",
                 "PreSalesToSalesClick",
                 "SalesToCheckoutClick",
+                "SalesToCheckoutClicked",
             ],
             "internalEvents": [
                 "Entered Funnel",
@@ -461,9 +464,12 @@ def test_repair_funnel_meta_tracking_updates_existing_funnel(
     assert mos_meta_tracking["browserEvents"] == [
         "EnteredFunnel",
         "PageView",
+        "Entered Presales Page",
+        "Entered Sales Page",
         "EnteredSales",
         "PreSalesToSalesClick",
         "SalesToCheckoutClick",
+        "SalesToCheckoutClicked",
     ]
     assert mos_meta_tracking["funnelIds"] == [str(funnel.id)]
 

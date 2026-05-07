@@ -1,4 +1,4 @@
-import { StandaloneImportedHtmlPage } from "@/funnels/StandaloneImportedHtmlPage";
+import { HtmlDeployPage } from "@/funnels/StandaloneImportedHtmlPage";
 import type { PublicCommerceVariant } from "@/types/commerce";
 import type { ImportedHtmlInstrumentationManifest, PublicFunnelPage, PublicFunnelStage } from "@/types/funnels";
 
@@ -16,5 +16,5 @@ type PublicImportedHtmlRendererProps = {
 };
 
 export default function PublicImportedHtmlRenderer(props: PublicImportedHtmlRendererProps) {
-  return <StandaloneImportedHtmlPage {...props} />;
+  return <HtmlDeployPage {...props} />;
 }

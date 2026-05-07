@@ -38,7 +38,8 @@ def test_validate_imported_html_document_manifest_accepts_sales_checkout_binding
     )
     variant.id = "variant-1"
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
         "pageStage": "sales",
         "bindings": [
             {
@@ -87,7 +88,8 @@ def test_validate_imported_html_document_manifest_accepts_checkout_started_bindi
     )
     variant.id = "variant-1"
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
         "pageStage": "sales",
         "bindings": [
             {
@@ -137,7 +139,8 @@ def test_validate_imported_html_document_manifest_accepts_checkout_binding_match
     )
     variant.id = "variant-1"
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
         "pageStage": "sales",
         "bindings": [
             {
@@ -178,7 +181,8 @@ def test_validate_imported_html_document_manifest_accepts_rmbc_view_targets():
     </html>
     """
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "listicle",
         "pageStage": "pre_sales",
         "sections": [
             {"id": "hero", "selector": "#hero", "label": "Hero"},
@@ -238,7 +242,8 @@ def test_validate_imported_html_document_manifest_allows_purchase_mode_checkout_
     variant.id = "variant-1"
     variant.option_values = {"Pack": "2x"}
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "sales",
         "pageStage": "sales",
         "bindings": [
             {
@@ -288,7 +293,8 @@ def test_validate_imported_html_document_manifest_rejects_unsupported_selector()
     </html>
     """
     manifest = {
-        "schemaVersion": "imported-html-instrumentation-v1",
+        "schemaVersion": "html-deploy-v1",
+        "htmlArtifactKind": "listicle",
         "pageStage": "pre_sales",
         "bindings": [
             {
@@ -537,7 +543,8 @@ def test_deploy_artifact_includes_tracking_and_stage_map_for_imported_html(db_se
                             "title": "Imported HTML",
                             "htmlDocument": "<!doctype html><html><body><button id='buy-now'>Buy</button></body></html>",
                             "instrumentationManifest": {
-                                "schemaVersion": "imported-html-instrumentation-v1",
+                                "schemaVersion": "html-deploy-v1",
+                                "htmlArtifactKind": "sales",
                                 "pageStage": "sales",
                                 "bindings": [
                                     {

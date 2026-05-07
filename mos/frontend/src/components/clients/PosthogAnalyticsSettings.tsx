@@ -148,7 +148,7 @@ export function PosthogAnalyticsSettings({ clientId }: { clientId: string }) {
           <div>
             <div className="text-base font-semibold text-content">Workspace analytics</div>
             <div className="text-sm text-content-muted">
-              Manage the workspace-owned PostHog config used for published funnels and standalone deployments.
+              Manage the workspace-owned PostHog config used for published funnels and HTML deploy artifacts.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export function PosthogAnalyticsSettings({ clientId }: { clientId: string }) {
             <span>
               <span className="block font-medium">Enable PostHog on published runtime</span>
               <span className="block text-xs text-content-muted">
-                Preview pages stay analytics-free. Published public funnels and standalone imported HTML deployments use the resolved config below.
+                Preview pages stay analytics-free. Published public funnels and HTML deploy flow artifacts use the resolved config below.
               </span>
             </span>
           </label>
@@ -234,7 +234,7 @@ export function PosthogAnalyticsSettings({ clientId }: { clientId: string }) {
         <div className="mt-4 rounded-lg border border-border bg-surface-2 p-4">
           <div className="text-sm font-medium text-content">Resolved runtime preview</div>
           <div className="mt-1 text-xs text-content-muted">
-            This is the exact PostHog payload the public runtime and standalone artifact builder consume.
+            This is the exact PostHog payload the public runtime and HTML deploy artifact builder consume.
           </div>
           <pre className="mt-3 overflow-x-auto rounded-lg border border-border bg-background/60 p-3 text-xs text-content">
             {prettyJson(runtimePreview)}

@@ -94,6 +94,8 @@ function buildStandaloneImportedHtmlRuntimeScript({
     sessionId,
     tracking: page.tracking ?? null,
     manifest: instrumentationManifest,
+    htmlArtifactKind: instrumentationManifest.htmlArtifactKind,
+    htmlDeploySchemaVersion: instrumentationManifest.schemaVersion,
     variants: serializeVariants(variants),
     pagePathById,
     pageStageById,
@@ -145,6 +147,92 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const assignCleanProp = (target, key, value) => {
     const cleaned = cleanText(value);
     if (cleaned) target[key] = cleaned;
+  };
+
+  const assignNumberProp = (target, key, value) => {
+    if (value === null || value === undefined || value === "") return;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) target[key] = numberValue;
+  };
+
+  const assignBooleanProp = (target, key, value) => {
+    if (typeof value === "boolean") target[key] = value;
+  };
+
+  const buildDeclaredTargetProps = (target) => {
+    const props = {};
+    if (!target || typeof target !== "object") return props;
+    assignCleanProp(props, "quizId", target.quizId);
+    assignCleanProp(props, "quiz_id", target.quizId);
+    assignCleanProp(props, "quizVersion", target.quizVersion);
+    assignCleanProp(props, "quiz_version", target.quizVersion);
+    assignCleanProp(props, "quizVariant", target.quizVariant);
+    assignCleanProp(props, "quiz_variant", target.quizVariant);
+    assignCleanProp(props, "questionId", target.questionId);
+    assignCleanProp(props, "question_id", target.questionId);
+    assignNumberProp(props, "questionIndex", target.questionIndex);
+    assignNumberProp(props, "question_index", target.questionIndex);
+    assignCleanProp(props, "questionRole", target.questionRole);
+    assignCleanProp(props, "question_role", target.questionRole);
+    assignCleanProp(props, "optionId", target.optionId);
+    assignCleanProp(props, "option_id", target.optionId);
+    assignCleanProp(props, "optionRole", target.optionRole);
+    assignCleanProp(props, "option_role", target.optionRole);
+    assignCleanProp(props, "resultId", target.resultId);
+    assignCleanProp(props, "result_id", target.resultId);
+    assignCleanProp(props, "segmentId", target.segmentId);
+    assignCleanProp(props, "segment_id", target.segmentId);
+    assignCleanProp(props, "recommendationId", target.recommendationId);
+    assignCleanProp(props, "recommendation_id", target.recommendationId);
+    assignCleanProp(props, "answerPathId", target.answerPathId);
+    assignCleanProp(props, "answer_path_id", target.answerPathId);
+    assignCleanProp(props, "angle", target.angle);
+    assignCleanProp(props, "awarenessLevel", target.awarenessLevel);
+    assignCleanProp(props, "awareness_level", target.awarenessLevel);
+    assignCleanProp(props, "sophisticationLevel", target.sophisticationLevel);
+    assignCleanProp(props, "sophistication_level", target.sophisticationLevel);
+    assignCleanProp(props, "angleFamily", target.angleFamily);
+    assignCleanProp(props, "angle_family", target.angleFamily);
+    assignCleanProp(props, "hookId", target.hookId);
+    assignCleanProp(props, "hook_id", target.hookId);
+    assignCleanProp(props, "promiseId", target.promiseId);
+    assignCleanProp(props, "promise_id", target.promiseId);
+    assignCleanProp(props, "mechanismName", target.mechanismName);
+    assignCleanProp(props, "mechanism_name", target.mechanismName);
+    assignCleanProp(props, "offerId", target.offerId);
+    assignCleanProp(props, "offer_id", target.offerId);
+    assignCleanProp(props, "sku", target.sku);
+    assignCleanProp(props, "bundleId", target.bundleId);
+    assignCleanProp(props, "bundle_id", target.bundleId);
+    assignCleanProp(props, "pricePoint", target.pricePoint);
+    assignCleanProp(props, "price_point", target.pricePoint);
+    assignCleanProp(props, "guaranteeId", target.guaranteeId);
+    assignCleanProp(props, "guarantee_id", target.guaranteeId);
+    assignCleanProp(props, "guaranteeType", target.guaranteeType);
+    assignCleanProp(props, "guarantee_type", target.guaranteeType);
+    assignCleanProp(props, "guaranteeDuration", target.guaranteeDuration);
+    assignCleanProp(props, "guarantee_duration", target.guaranteeDuration);
+    assignNumberProp(props, "valueTotal", target.valueTotal);
+    assignNumberProp(props, "value_total", target.valueTotal);
+    assignNumberProp(props, "actualPrice", target.actualPrice);
+    assignNumberProp(props, "actual_price", target.actualPrice);
+    assignNumberProp(props, "valueRatio", target.valueRatio);
+    assignNumberProp(props, "value_ratio", target.valueRatio);
+    assignCleanProp(props, "clickType", target.clickType);
+    assignCleanProp(props, "click_type", target.clickType);
+    assignCleanProp(props, "targetOfferId", target.targetOfferId);
+    assignCleanProp(props, "target_offer_id", target.targetOfferId);
+    assignCleanProp(props, "destinationUrl", target.destinationUrl);
+    assignCleanProp(props, "destination_url", target.destinationUrl);
+    assignCleanProp(props, "elementId", target.elementId);
+    assignCleanProp(props, "element_id", target.elementId);
+    assignCleanProp(props, "interactionType", target.interactionType);
+    assignCleanProp(props, "interaction_type", target.interactionType);
+    assignCleanProp(props, "selectedValue", target.selectedValue);
+    assignCleanProp(props, "selected_value", target.selectedValue);
+    assignBooleanProp(props, "subscriptionFlag", target.subscriptionFlag);
+    assignBooleanProp(props, "subscription_flag", target.subscriptionFlag);
+    return props;
   };
 
   const readStoredMetaEmailHash = () => {
@@ -308,6 +396,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
       page_stage: pageStage,
       pageType,
       page_type: pageType,
+      htmlArtifactKind: cleanText(config.htmlArtifactKind),
+      html_artifact_kind: cleanText(config.htmlArtifactKind),
+      htmlDeploySchemaVersion: cleanText(config.htmlDeploySchemaVersion),
+      html_deploy_schema_version: cleanText(config.htmlDeploySchemaVersion),
       pageVariant,
       page_variant: pageVariant,
       visitorId,
@@ -691,6 +783,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       const fromPresale = props && props.fromPresale === true;
       return [
         { method: "track", eventName: "PageView", params: pageViewParams },
+        { method: "trackCustom", eventName: "Entered Sales Page", params: pageViewParams },
         fromPresale
           ? { method: "trackCustom", eventName: "EnteredSales", params: pageViewParams }
           : { method: "track", eventName: "ViewContent", params: pageViewParams },
@@ -731,6 +824,14 @@ function buildStandaloneImportedHtmlRuntimeScript({
             to_stage: "checkout",
           },
         },
+        {
+          method: "trackCustom",
+          eventName: "SalesToCheckoutClicked",
+          params: {
+            from_stage: "sales",
+            to_stage: "checkout",
+          },
+        },
       ];
     }
     if (eventType === "checkout_started") {
@@ -741,7 +842,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
       }];
     }
     if (eventType === "presell_page_view") {
-      return [{ method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams }];
+      return [
+        { method: "trackCustom", eventName: "EnteredPresales", params: pageViewParams },
+        { method: "trackCustom", eventName: "Entered Presales Page", params: pageViewParams },
+      ];
     }
     return [];
   };
@@ -749,12 +853,29 @@ function buildStandaloneImportedHtmlRuntimeScript({
   const resolveCanonicalPostHogEventNames = (eventType) => {
     const normalized = cleanText(eventType);
     if (!normalized) return [];
+    const rmbcAliasesByEventType = {
+      quiz_lead_viewed: ["QuizLeadViewed"],
+      quiz_question_viewed: ["QuizQuestionViewed"],
+      quiz_option_presented: ["QuizOptionPresented"],
+      quiz_option_selected: ["QuizOptionSelected"],
+      quiz_option_deselected: ["QuizOptionDeselected"],
+      quiz_question_submitted: ["QuizQuestionSubmitted"],
+      quiz_completed: ["QuizCompleted"],
+      quiz_result_viewed: ["QuizResultViewed"],
+      quiz_mechanism_viewed: ["QuizMechanismViewed"],
+      quiz_proof_viewed: ["QuizProofViewed"],
+      quiz_recommendation_viewed: ["QuizRecommendationViewed"],
+      quiz_cta_viewed: ["QuizCtaViewed"],
+    };
     const names = [normalized];
     if (normalized === "pre_sales_page_view") {
       names.push("presell_page_view");
     }
     if (normalized === "pre_sales_to_sales_click") {
       names.push("cta_click");
+    }
+    if (Array.isArray(rmbcAliasesByEventType[normalized])) {
+      rmbcAliasesByEventType[normalized].forEach((alias) => names.push(alias));
     }
     return names;
   };
@@ -866,6 +987,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
                 fromPageId: config.pageId,
                 slug: config.pageSlug,
                 pageStage: config.pageStage,
+                artifactMode: "html_deploy",
+                htmlArtifactKind: cleanText(config.htmlArtifactKind),
+                htmlDeploySchemaVersion: cleanText(config.htmlDeploySchemaVersion),
                 metaEvents: mappedCaptures.map((capture) => ({
                   eventName: capture.eventName,
                   eventId: capture.eventId,
@@ -877,10 +1001,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
         }),
         keepalive: true,
       }).catch((error) => {
-        console.error("[StandaloneImportedHtmlPage] Tracking failed.", error);
+        console.error("[HtmlDeployPage] Tracking failed.", error);
       });
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Tracking failed.", error);
+      console.error("[HtmlDeployPage] Tracking failed.", error);
     }
   };
 
@@ -1050,7 +1174,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       try {
         trackInitialPageView();
       } catch (error) {
-        console.error("[StandaloneImportedHtmlPage] Failed to track initial page view.", error);
+        console.error("[HtmlDeployPage] Failed to track initial page view.", error);
       }
     };
     if (typeof window.requestAnimationFrame === "function") {
@@ -1185,19 +1309,27 @@ function buildStandaloneImportedHtmlRuntimeScript({
         proofType: cleanText(target.proofType),
         sectionId: cleanText(target.sectionId),
         ctaPosition: Number.isFinite(Number(target.ctaPosition)) ? Number(target.ctaPosition) : undefined,
+        declaredProps: buildDeclaredTargetProps(target),
       });
     };
 
     const manifest = config.manifest || {};
+    const htmlArtifactKind = cleanText(config.htmlArtifactKind);
     const hasExplicitCtaTargets = Array.isArray(manifest.ctas) && manifest.ctas.length > 0;
     if (Array.isArray(manifest.sections)) {
       manifest.sections.forEach((target) => addTarget("section_view", "section", target));
     }
     if (Array.isArray(manifest.proofs)) {
       manifest.proofs.forEach((target) => addTarget("proof_view", "proof", target));
+      if (htmlArtifactKind === "quiz") {
+        manifest.proofs.forEach((target) => addTarget("quiz_proof_viewed", "quiz_proof", target));
+      }
     }
     if (Array.isArray(manifest.ctas)) {
       manifest.ctas.forEach((target) => addTarget("cta_view", "cta", target));
+      if (htmlArtifactKind === "quiz") {
+        manifest.ctas.forEach((target) => addTarget("quiz_cta_viewed", "quiz_cta", target));
+      }
     }
     if (Array.isArray(manifest.offerStacks)) {
       manifest.offerStacks.forEach((target) => addTarget("offer_stack_view", "offer_stack", target));
@@ -1213,6 +1345,24 @@ function buildStandaloneImportedHtmlRuntimeScript({
     }
     if (Array.isArray(manifest.trustElements)) {
       manifest.trustElements.forEach((target) => addTarget("trust_element_view", "trust_element", target));
+    }
+    if (Array.isArray(manifest.quizLeads)) {
+      manifest.quizLeads.forEach((target) => addTarget("quiz_lead_viewed", "quiz_lead", target));
+    }
+    if (Array.isArray(manifest.quizQuestions)) {
+      manifest.quizQuestions.forEach((target) => addTarget("quiz_question_viewed", "quiz_question", target));
+    }
+    if (Array.isArray(manifest.quizOptions)) {
+      manifest.quizOptions.forEach((target) => addTarget("quiz_option_presented", "quiz_option", target));
+    }
+    if (Array.isArray(manifest.quizResults)) {
+      manifest.quizResults.forEach((target) => addTarget("quiz_result_viewed", "quiz_result", target));
+    }
+    if (Array.isArray(manifest.quizMechanisms)) {
+      manifest.quizMechanisms.forEach((target) => addTarget("quiz_mechanism_viewed", "quiz_mechanism", target));
+    }
+    if (Array.isArray(manifest.quizRecommendations)) {
+      manifest.quizRecommendations.forEach((target) => addTarget("quiz_recommendation_viewed", "quiz_recommendation", target));
     }
     if (!hasExplicitCtaTargets && Array.isArray(manifest.bindings)) {
       manifest.bindings.forEach((binding) => {
@@ -1278,6 +1428,24 @@ function buildStandaloneImportedHtmlRuntimeScript({
       ...(target.kind === "price_reveal" ? { priceRevealId: target.id } : {}),
       ...(target.kind === "guarantee" ? { guaranteeId: target.id, guarantee_id: target.id } : {}),
       ...(target.kind === "trust_element" ? { trustElementId: target.id } : {}),
+      ...(target.kind === "quiz_lead" ? { quizLeadId: target.id, quiz_lead_id: target.id } : {}),
+      ...(target.kind === "quiz_question" ? { questionId: target.id, question_id: target.id } : {}),
+      ...(target.kind === "quiz_option" ? { optionId: target.id, option_id: target.id } : {}),
+      ...(target.kind === "quiz_result" ? { resultId: target.id, result_id: target.id } : {}),
+      ...(target.kind === "quiz_mechanism" ? { mechanismId: target.id, mechanism_id: target.id } : {}),
+      ...(target.kind === "quiz_proof" ? { proofId: target.id, proof_id: target.id } : {}),
+      ...(target.kind === "quiz_recommendation"
+        ? { recommendationId: target.id, recommendation_id: target.id }
+        : {}),
+      ...(target.kind === "quiz_cta"
+        ? {
+            ctaId: target.id,
+            cta_id: target.id,
+            ctaPosition: target.ctaPosition || index + 1,
+            cta_position: target.ctaPosition || index + 1,
+          }
+        : {}),
+      ...(target.declaredProps || {}),
     });
   };
 
@@ -1328,14 +1496,15 @@ function buildStandaloneImportedHtmlRuntimeScript({
         event: target.event === "input" || target.event === "change" ? target.event : "click",
         source: target.source === "text" || target.source === "checked" ? target.source : "value",
         interactionType: cleanText(target.interactionType) || kind,
+        declaredProps: buildDeclaredTargetProps(target),
       });
     };
     const manifest = config.manifest || {};
-    if (Array.isArray(manifest.selectorInteractions)) {
-      manifest.selectorInteractions.forEach((target) => addTarget("selector_interaction", "selector", target));
+    if (Array.isArray(manifest.selectors)) {
+      manifest.selectors.forEach((target) => addTarget("selector_interaction", "selector", target));
     }
-    if (Array.isArray(manifest.productDetailInteractions)) {
-      manifest.productDetailInteractions.forEach((target) =>
+    if (Array.isArray(manifest.productDetails)) {
+      manifest.productDetails.forEach((target) =>
         addTarget("product_detail_interaction", "product_detail", target),
       );
     }
@@ -1369,7 +1538,9 @@ function buildStandaloneImportedHtmlRuntimeScript({
       selector: target.selector,
       label: target.label || undefined,
       interactionType: target.interactionType,
+      ...(target.declaredProps || {}),
       selectedValue,
+      selected_value: selectedValue,
       text: normalizeText(element.textContent || "").slice(0, 160) || undefined,
       activeTimeMs: Math.round(currentActiveTimeMs()),
       maxScrollDepthPct,
@@ -1408,7 +1579,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       initializeEngagementTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to initialize engagement tracking.", error);
+      console.error("[HtmlDeployPage] Failed to initialize engagement tracking.", error);
     }
   };
 
@@ -1416,7 +1587,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       initializeViewTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to initialize view tracking.", error);
+      console.error("[HtmlDeployPage] Failed to initialize view tracking.", error);
     }
   };
 
@@ -1424,7 +1595,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       initializeInteractionTracking();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to initialize interaction tracking.", error);
+      console.error("[HtmlDeployPage] Failed to initialize interaction tracking.", error);
     }
   };
 
@@ -1960,10 +2131,10 @@ function buildStandaloneImportedHtmlRuntimeScript({
           keepalive: true,
         },
       ).catch((error) => {
-        console.error("[StandaloneImportedHtmlPage] Failed to mark prepared checkout consumed.", error);
+        console.error("[HtmlDeployPage] Failed to mark prepared checkout consumed.", error);
       });
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to mark prepared checkout consumed.", error);
+      console.error("[HtmlDeployPage] Failed to mark prepared checkout consumed.", error);
     }
   };
 
@@ -2100,7 +2271,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
           resolvedSelection,
         });
       } catch (error) {
-        console.error("[StandaloneImportedHtmlPage] Failed to prepare checkout in background.", error);
+        console.error("[HtmlDeployPage] Failed to prepare checkout in background.", error);
         return null;
       }
     })()
@@ -2650,7 +2821,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
         klaviyo.track("Email Capture Submitted", props);
       }
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Klaviyo browser signal failed.", error);
+      console.error("[HtmlDeployPage] Klaviyo browser signal failed.", error);
     }
   };
 
@@ -2672,7 +2843,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       emailHash = await sha256Hex(normalizedEmail);
       window.localStorage.setItem(META_EMAIL_HASH_STORAGE_KEY, emailHash);
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to persist Meta email hash.", error);
+      console.error("[HtmlDeployPage] Failed to persist Meta email hash.", error);
     }
     return emailHash;
   };
@@ -2768,7 +2939,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       });
       completeEmailCaptureSuccess(binding, element);
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Email capture binding '" + bindingId + "' failed.", error);
+      console.error("[HtmlDeployPage] Email capture binding '" + bindingId + "' failed.", error);
       trackEvent("email_capture_failed", {
         bindingId,
         source,
@@ -2817,7 +2988,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
       const matches = Array.from(document.querySelectorAll(selector));
       if (matches.length < 1) {
         console.error(
-          "[StandaloneImportedHtmlPage] Binding '" +
+          "[HtmlDeployPage] Binding '" +
             String(binding.id || "unknown") +
             "' selector '" +
             selector +
@@ -2850,7 +3021,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
         if (binding.type === "email_capture") {
           if (!(element instanceof HTMLFormElement)) {
             console.error(
-              "[StandaloneImportedHtmlPage] Email capture binding '" +
+              "[HtmlDeployPage] Email capture binding '" +
                 String(binding.id || "unknown") +
                 "' must target a form element.",
             );
@@ -3044,7 +3215,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
             window.location.href = finalCheckoutUrl;
           } catch (error) {
             console.error(
-              "[StandaloneImportedHtmlPage] Binding '" + String(binding.id || "unknown") + "' failed.",
+              "[HtmlDeployPage] Binding '" + String(binding.id || "unknown") + "' failed.",
               error,
             );
             setCheckoutBindingState(String(binding.id || "unknown"), {
@@ -3062,7 +3233,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       bindManifest();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to bind manifest.", error);
+      console.error("[HtmlDeployPage] Failed to bind manifest.", error);
     }
   };
 
@@ -3070,7 +3241,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       applyMobileSpacingFixes();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to apply mobile spacing fixes.", error);
+      console.error("[HtmlDeployPage] Failed to apply mobile spacing fixes.", error);
     }
   };
 
@@ -3098,7 +3269,7 @@ function buildStandaloneImportedHtmlRuntimeScript({
     try {
       void warmCheckoutBindings();
     } catch (error) {
-      console.error("[StandaloneImportedHtmlPage] Failed to warm checkout bindings.", error);
+      console.error("[HtmlDeployPage] Failed to warm checkout bindings.", error);
     }
   };
 
@@ -3177,7 +3348,7 @@ export function StandaloneImportedHtmlPage(props: StandaloneImportedHtmlPageProp
   useEffect(() => {
     const normalizedHtml = optimizeImportedHtmlDocument(props.htmlDocument);
     if (!normalizedHtml) {
-      throw new Error("Standalone imported HTML page is empty.");
+      throw new Error("HTML deploy page is empty.");
     }
     if (window.__mosImportedHtmlStandalonePageId === props.page.pageId) {
       return;
@@ -3192,3 +3363,5 @@ export function StandaloneImportedHtmlPage(props: StandaloneImportedHtmlPageProp
 
   return null;
 }
+
+export const HtmlDeployPage = StandaloneImportedHtmlPage;

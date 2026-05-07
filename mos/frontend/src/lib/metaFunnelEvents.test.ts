@@ -27,7 +27,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
     ).toEqual([{ eventName: "PageView", params: { page_stage: "pre_sales" } }]);
   });
 
-  it("maps direct sales page views to Meta PageView and ViewContent", () => {
+  it("maps direct sales page views to Meta PageView and sales conversion events", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "sales_page_view",
@@ -35,11 +35,12 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       }),
     ).toEqual([
       { eventName: "PageView", params: { page_stage: "sales" } },
+      { eventName: "Entered Sales Page", method: "trackCustom", params: { page_stage: "sales" } },
       { eventName: "ViewContent", params: { page_stage: "sales" } },
     ]);
   });
 
-  it("maps attributed sales page views to Meta PageView and EnteredSales", () => {
+  it("maps attributed sales page views to Meta PageView and sales conversion events", () => {
     expect(
       mapRuntimeEventToMetaPixelEvents({
         eventType: "sales_page_view",
@@ -47,6 +48,7 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       }),
     ).toEqual([
       { eventName: "PageView", params: { page_stage: "sales" } },
+      { eventName: "Entered Sales Page", method: "trackCustom", params: { page_stage: "sales" } },
       { eventName: "EnteredSales", method: "trackCustom", params: { page_stage: "sales" } },
     ]);
   });
@@ -86,6 +88,14 @@ describe("mapRuntimeEventToMetaPixelEvents", () => {
       },
       {
         eventName: "SalesToCheckoutClick",
+        method: "trackCustom",
+        params: {
+          from_stage: "sales",
+          to_stage: "checkout",
+        },
+      },
+      {
+        eventName: "SalesToCheckoutClicked",
         method: "trackCustom",
         params: {
           from_stage: "sales",

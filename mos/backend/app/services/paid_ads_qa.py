@@ -341,9 +341,12 @@ def activate_mos_meta_funnel_tracking_profile(
         "browserEvents": [
             "EnteredFunnel",
             "PageView",
+            "Entered Presales Page",
+            "Entered Sales Page",
             "EnteredSales",
             "PreSalesToSalesClick",
             "SalesToCheckoutClick",
+            "SalesToCheckoutClicked",
         ],
         "internalEvents": [
             "Entered Funnel",

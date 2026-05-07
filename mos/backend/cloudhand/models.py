@@ -66,7 +66,8 @@ class ApplicationSourceType(str, Enum):
 
 class FunnelArtifactRenderMode(str, Enum):
     RUNTIME_BUNDLE = "runtime_bundle"
-    STANDALONE_IMPORTED_HTML = "standalone_imported_html"
+    HTML_DEPLOY = "html_deploy"
+    STANDALONE_IMPORTED_HTML = "html_deploy"
 
 
 class FunnelPublicationSourceSpec(BaseModel):

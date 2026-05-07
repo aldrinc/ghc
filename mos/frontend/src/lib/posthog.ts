@@ -171,6 +171,23 @@ function resolvePostHogContentCategory(pageStage: string | null): string | null 
   return null;
 }
 
+const RMBC_POSTHOG_EVENT_ALIASES: Partial<Record<RuntimeTrackingEvent["eventType"], string[]>> = {
+  pre_sales_page_view: ["presell_page_view"],
+  pre_sales_to_sales_click: ["cta_click"],
+  quiz_lead_viewed: ["QuizLeadViewed"],
+  quiz_question_viewed: ["QuizQuestionViewed"],
+  quiz_option_presented: ["QuizOptionPresented"],
+  quiz_option_selected: ["QuizOptionSelected"],
+  quiz_option_deselected: ["QuizOptionDeselected"],
+  quiz_question_submitted: ["QuizQuestionSubmitted"],
+  quiz_completed: ["QuizCompleted"],
+  quiz_result_viewed: ["QuizResultViewed"],
+  quiz_mechanism_viewed: ["QuizMechanismViewed"],
+  quiz_proof_viewed: ["QuizProofViewed"],
+  quiz_recommendation_viewed: ["QuizRecommendationViewed"],
+  quiz_cta_viewed: ["QuizCtaViewed"],
+};
+
 function isRuntimeTrackingEventType(value: string): value is RuntimeTrackingEvent["eventType"] {
   return (
     value === "presell_page_view"
@@ -294,32 +311,54 @@ function resolvePostHogCaptures({
   }
 
   const contentCategory = resolvePostHogContentCategory(pageStage);
+  const buildCapture = ({
+    eventName,
+    role,
+    index,
+  }: {
+    eventName: string;
+    role: "canonical" | "rmbc_alias";
+    index: number;
+  }) => {
+    const eventProps: Record<string, unknown> = {
+      ...baseProps,
+      ...sanitizedProps,
+      internal_event_type: eventType,
+      canonical_event_type: role === "canonical" ? eventType : eventName,
+      posthog_event_role: role,
+      $event_id: role === "canonical" && cleanText(props?.eventId) ? cleanText(props?.eventId) : buildPostHogEventId({
+        eventName,
+        eventType,
+        publicationId,
+        pageId,
+        sessionId,
+        index,
+      }),
+    };
+    if (contentCategory) {
+      eventProps.content_category = contentCategory;
+    }
+    if (eventType === "sales_page_view") {
+      eventProps.from_presale = props?.fromPresale === true;
+    }
+    return {
+      eventName,
+      eventProps,
+    };
+  };
+  const canonicalCapture = buildCapture({ eventName: eventType, role: "canonical", index: 0 });
+  const rmbcAliasCaptures = (RMBC_POSTHOG_EVENT_ALIASES[eventType] || []).map((eventName, index) =>
+    buildCapture({ eventName, role: "rmbc_alias", index: index + 1 }),
+  );
   const metaMappedEvents = mapRuntimeEventToMetaPixelEvents({
     eventType,
     props,
   });
   if (metaMappedEvents.length === 0) {
-    return [
-      {
-        eventName: eventType,
-        eventProps: {
-          ...baseProps,
-          ...sanitizedProps,
-          internal_event_type: eventType,
-          $event_id: buildPostHogEventId({
-            eventName: eventType,
-            eventType,
-            publicationId,
-            pageId,
-            sessionId,
-            index: 0,
-          }),
-        },
-      },
-    ];
+    return [canonicalCapture, ...rmbcAliasCaptures];
   }
 
-  return metaMappedEvents.map((mappedEvent, index) => {
+  return [canonicalCapture, ...rmbcAliasCaptures, ...metaMappedEvents.map((mappedEvent, index) => {
     const metaEventId = resolveMetaEventId(mappedEvent, metaEvents, index, {
       eventType,
       publicationId,
@@ -331,6 +370,8 @@ function resolvePostHogCaptures({
       ...sanitizedProps,
       ...(mappedEvent.params || {}),
       internal_event_type: eventType,
+      canonical_event_type: eventType,
+      posthog_event_role: "platform_alias",
       ...resolveMetaAttributionProps(eventSourceUrl),
       meta_event_name: mappedEvent.eventName,
       meta_event_id: metaEventId,
@@ -346,7 +387,7 @@ function resolvePostHogCaptures({
       eventName: mappedEvent.eventName,
       eventProps,
     };
-  });
+  })];
 }
 
 function ensurePostHogRoot() {

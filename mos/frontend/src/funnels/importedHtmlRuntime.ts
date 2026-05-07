@@ -6,6 +6,7 @@ import type {
 import type { PublicCommerceVariant } from "@/types/commerce";
 
 export const IMPORTED_HTML_RUNTIME_MESSAGE_SOURCE = "mos-imported-html-runtime";
+export const HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION = "html-deploy-v1";
 export const IMPORTED_HTML_HEIGHT_MESSAGE = "height";
 
 export type ImportedHtmlRuntimeHeightMessage = {
@@ -74,7 +75,15 @@ export function normalizeImportedHtmlManifest(
   value: ImportedHtmlInstrumentationManifest | Record<string, unknown> | null | undefined,
 ): ImportedHtmlInstrumentationManifest | null {
   if (!isRecord(value)) return null;
-  if (value.schemaVersion !== "imported-html-instrumentation-v1") return null;
+  if (value.schemaVersion !== HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION) return null;
+  if (
+    value.htmlArtifactKind !== "listicle"
+    && value.htmlArtifactKind !== "listicle_hybrid"
+    && value.htmlArtifactKind !== "quiz"
+    && value.htmlArtifactKind !== "sales"
+  ) {
+    return null;
+  }
   if (!Array.isArray(value.bindings)) return null;
   return value as ImportedHtmlInstrumentationManifest;
 }

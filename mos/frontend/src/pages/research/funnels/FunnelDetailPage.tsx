@@ -375,7 +375,7 @@ export function FunnelDetailPage() {
       workloadPayload.source_ref = {
         client_id: funnel?.client_id,
         upstream_api_base_root: normalizedApiBaseRoot,
-        artifact_render_mode: "standalone_imported_html",
+        artifact_render_mode: "html_deploy",
         artifact: {
           meta: {
             clientId: funnel?.client_id,
@@ -429,7 +429,7 @@ export function FunnelDetailPage() {
         https?: boolean;
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
-        renderMode?: "runtime_bundle" | "standalone_imported_html";
+        renderMode?: "runtime_bundle" | "html_deploy";
         defaultRoutePolicy?: "entry_page" | "prefer_sales" | "explicit_slug" | "none";
         defaultPageSlug?: string;
       };
@@ -439,7 +439,7 @@ export function FunnelDetailPage() {
         createIfMissing: true,
         applyPlan: true,
         bunnyPullZone: true,
-        renderMode: "standalone_imported_html",
+        renderMode: "html_deploy",
         defaultRoutePolicy: "entry_page",
       },
     };

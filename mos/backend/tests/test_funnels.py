@@ -1516,7 +1516,7 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://api.moshq.app",
-                "renderMode": "standalone_imported_html",
+                "renderMode": "html_deploy",
             }
         },
     )
@@ -1524,11 +1524,11 @@ def test_publish_with_deploy_passes_explicit_standalone_render_mode(api_client: 
 
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
-    assert workload_patch["source_ref"]["artifact_render_mode"] == "standalone_imported_html"
+    assert workload_patch["source_ref"]["artifact_render_mode"] == "html_deploy"
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://api.moshq.app"
     assert "runtime_dist_path" not in workload_patch["source_ref"]
     assert deploy_request["artifact_render_mode_explicit"] is True
-    assert deploy_request["artifact_render_mode_requested"] == "standalone_imported_html"
+    assert deploy_request["artifact_render_mode_requested"] == "html_deploy"
 
 
 def test_publish_with_deploy_rejects_pathful_api_base_for_explicit_standalone(api_client: TestClient):
@@ -1544,7 +1544,7 @@ def test_publish_with_deploy_rejects_pathful_api_base_for_explicit_standalone(ap
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://moshq.app/api",
-                "renderMode": "standalone_imported_html",
+                "renderMode": "html_deploy",
             }
         },
     )

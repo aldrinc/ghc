@@ -101,7 +101,10 @@ export function mapRuntimeEventToMetaPixelEvents(
   event: RuntimeTrackingEventLike,
 ): MetaPixelRuntimeEvent[] {
   if (event.eventType === "presell_page_view") {
-    return [{ eventName: "EnteredPresales", method: "trackCustom", params: pageViewParams(event) }];
+    return [
+      { eventName: "EnteredPresales", method: "trackCustom", params: pageViewParams(event) },
+      { eventName: "Entered Presales Page", method: "trackCustom", params: pageViewParams(event) },
+    ];
   }
   if (event.eventType === "Entered Funnel") {
     return [{ eventName: "Entered Funnel", method: "trackCustom", params: pageViewParams(event) }];
@@ -112,6 +115,7 @@ export function mapRuntimeEventToMetaPixelEvents(
   if (event.eventType === "sales_page_view") {
     return [
       { eventName: "PageView", params: pageViewParams(event) },
+      { eventName: "Entered Sales Page", method: "trackCustom", params: pageViewParams(event) },
       isFromPresale(event)
         ? {
             eventName: "EnteredSales",
@@ -160,6 +164,14 @@ export function mapRuntimeEventToMetaPixelEvents(
         : []),
       {
         eventName: "SalesToCheckoutClick",
+        method: "trackCustom",
+        params: {
+          from_stage: "sales",
+          to_stage: "checkout",
+        },
+      },
+      {
+        eventName: "SalesToCheckoutClicked",
         method: "trackCustom",
         params: {
           from_stage: "sales",

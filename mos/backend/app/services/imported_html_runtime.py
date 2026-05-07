@@ -6,7 +6,7 @@ import re
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.db.models import ProductVariant
 from app.services.campaign_destinations import normalize_destination_type
@@ -14,13 +14,20 @@ from app.services.funnel_template_categories import resolve_funnel_template_publ
 from app.services.paid_ads_qa import clean_optional_text
 
 
-IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = "imported-html-instrumentation-v1"
+HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION = "html-deploy-v1"
+LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = "imported-html-instrumentation-v1"
+IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION = HTML_DEPLOY_INSTRUMENTATION_SCHEMA_VERSION
 ImportedHtmlPageStage = Literal["pre_sales", "sales", "checkout", "thank_you", "custom"]
+HtmlDeployArtifactKind = Literal["listicle", "listicle_hybrid", "quiz", "sales"]
 ImportedHtmlBindingEvent = Literal["click"]
+ImportedHtmlTargetEvent = Literal["click", "change", "input"]
+ImportedHtmlTargetSource = Literal["value", "text", "checked"]
 ImportedHtmlTrackEventType = Literal[
     "pre_sales_to_sales_click",
     "sales_to_checkout_click",
     "checkout_started",
+    "selector_interaction",
+    "product_detail_interaction",
     "custom_page_click",
 ]
 
@@ -239,13 +246,55 @@ class ImportedHtmlViewTarget(BaseModel):
     proofType: str | None = Field(default=None, max_length=80)
     sectionId: str | None = Field(default=None, max_length=120)
     ctaPosition: int | None = Field(default=None, ge=1)
+    questionId: str | None = Field(default=None, max_length=120)
+    questionIndex: int | None = Field(default=None, ge=1)
+    questionRole: str | None = Field(default=None, max_length=120)
+    optionId: str | None = Field(default=None, max_length=120)
+    optionRole: str | None = Field(default=None, max_length=120)
+    resultId: str | None = Field(default=None, max_length=120)
+    segmentId: str | None = Field(default=None, max_length=120)
+    recommendationId: str | None = Field(default=None, max_length=120)
+    offerId: str | None = Field(default=None, max_length=120)
+    sku: str | None = Field(default=None, max_length=120)
+    mechanismName: str | None = Field(default=None, max_length=160)
+    guaranteeType: str | None = Field(default=None, max_length=120)
+    interactionType: str | None = Field(default=None, max_length=120)
+    selectedValue: str | None = Field(default=None, max_length=240)
+    event: ImportedHtmlTargetEvent | None = None
+    source: ImportedHtmlTargetSource | None = None
+    quizId: str | None = Field(default=None, max_length=120)
+    quizVersion: str | None = Field(default=None, max_length=120)
+    quizVariant: str | None = Field(default=None, max_length=120)
+    answerPathId: str | None = Field(default=None, max_length=120)
+    angle: str | None = Field(default=None, max_length=160)
+    awarenessLevel: str | None = Field(default=None, max_length=120)
+    sophisticationLevel: str | None = Field(default=None, max_length=120)
+    angleFamily: str | None = Field(default=None, max_length=160)
+    hookId: str | None = Field(default=None, max_length=120)
+    promiseId: str | None = Field(default=None, max_length=120)
+    bundleId: str | None = Field(default=None, max_length=120)
+    pricePoint: str | None = Field(default=None, max_length=120)
+    guaranteeId: str | None = Field(default=None, max_length=120)
+    guaranteeDuration: str | None = Field(default=None, max_length=120)
+    valueTotal: float | None = Field(default=None, ge=0)
+    actualPrice: float | None = Field(default=None, ge=0)
+    valueRatio: float | None = Field(default=None, ge=0)
+    clickType: str | None = Field(default=None, max_length=120)
+    targetOfferId: str | None = Field(default=None, max_length=120)
+    destinationUrl: str | None = Field(default=None, max_length=4096)
+    elementId: str | None = Field(default=None, max_length=120)
+    subscriptionFlag: bool | None = None
 
 
 class ImportedHtmlInstrumentationManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schemaVersion: Literal[IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION]
+    htmlArtifactKind: HtmlDeployArtifactKind
     pageStage: ImportedHtmlPageStage
+    quizId: str | None = Field(default=None, max_length=120)
+    quizVersion: str | None = Field(default=None, max_length=120)
+    quizVariant: str | None = Field(default=None, max_length=120)
     bindings: list[ImportedHtmlBinding] = Field(default_factory=list)
     sections: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     proofs: list[ImportedHtmlViewTarget] = Field(default_factory=list)
@@ -255,6 +304,44 @@ class ImportedHtmlInstrumentationManifest(BaseModel):
     priceReveals: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     guarantees: list[ImportedHtmlViewTarget] = Field(default_factory=list)
     trustElements: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizLeads: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizQuestions: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizOptions: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizResults: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizMechanisms: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    quizRecommendations: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    productDetails: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+    selectors: list[ImportedHtmlViewTarget] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_artifact_kind_stage(self) -> "ImportedHtmlInstrumentationManifest":
+        if self.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"} and self.pageStage != "pre_sales":
+            raise ValueError(
+                f"htmlArtifactKind '{self.htmlArtifactKind}' requires pageStage 'pre_sales'."
+            )
+        if self.htmlArtifactKind == "sales" and self.pageStage != "sales":
+            raise ValueError("htmlArtifactKind 'sales' requires pageStage 'sales'.")
+        if self.htmlArtifactKind == "quiz":
+            missing = [
+                field_name
+                for field_name, value in (
+                    ("quizId", self.quizId),
+                    ("quizVersion", self.quizVersion),
+                    ("quizVariant", self.quizVariant),
+                )
+                if not str(value or "").strip()
+            ]
+            if missing:
+                raise ValueError(
+                    "htmlArtifactKind 'quiz' requires stable quiz identity fields: "
+                    + ", ".join(missing)
+                    + "."
+                )
+            if not self.quizQuestions:
+                raise ValueError("htmlArtifactKind 'quiz' requires at least one quizQuestions target.")
+            if not self.quizOptions:
+                raise ValueError("htmlArtifactKind 'quiz' requires at least one quizOptions target.")
+        return self
 
 
 class ImportedHtmlRuntimeValidationError(ValueError):
@@ -302,11 +389,16 @@ def imported_html_instrumentation_schema() -> dict[str, Any]:
 def coerce_imported_html_instrumentation_manifest(raw: Any) -> dict[str, Any]:
     if raw is None:
         raise ImportedHtmlRuntimeValidationError("instrumentationManifest is required for imported HTML pages.")
+    if isinstance(raw, dict) and raw.get("schemaVersion") == LEGACY_IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION:
+        raise ImportedHtmlRuntimeValidationError(
+            "instrumentationManifest.schemaVersion must be 'html-deploy-v1'. "
+            "Rebuild this page with the HTML deploy manifest contract instead of the legacy imported HTML schema."
+        )
     try:
         manifest = ImportedHtmlInstrumentationManifest.model_validate(raw)
     except Exception as exc:  # noqa: BLE001
         raise ImportedHtmlRuntimeValidationError(f"instrumentationManifest is invalid. {exc}") from exc
-    return manifest.model_dump(mode="json")
+    return manifest.model_dump(mode="json", exclude_none=True)
 
 
 def validate_imported_html_document_manifest(
@@ -347,6 +439,14 @@ def validate_imported_html_document_manifest(
         ("price_reveal", manifest.priceReveals),
         ("guarantee", manifest.guarantees),
         ("trust_element", manifest.trustElements),
+        ("quiz_lead", manifest.quizLeads),
+        ("quiz_question", manifest.quizQuestions),
+        ("quiz_option", manifest.quizOptions),
+        ("quiz_result", manifest.quizResults),
+        ("quiz_mechanism", manifest.quizMechanisms),
+        ("quiz_recommendation", manifest.quizRecommendations),
+        ("product_detail", manifest.productDetails),
+        ("selector", manifest.selectors),
     )
     for target_group_name, targets in view_target_groups:
         for target in targets:
@@ -409,16 +509,20 @@ def validate_imported_html_document_manifest(
             )
 
     if require_stage_bindings:
+        if manifest.htmlArtifactKind in {"listicle", "listicle_hybrid", "quiz"} and not manifest.ctas:
+            raise ImportedHtmlRuntimeValidationError(
+                f"HTML deploy {manifest.htmlArtifactKind} pages must include at least one CTA target."
+            )
         if current_page_stage == "pre_sales" and navigation_count < 1:
             raise ImportedHtmlRuntimeValidationError(
-                "Imported pre-sales HTML pages must include at least one internal_navigation binding."
+                "HTML deploy pre-sales pages must include at least one internal_navigation binding."
             )
         if current_page_stage == "sales" and checkout_count < 1:
             raise ImportedHtmlRuntimeValidationError(
-                "Imported sales HTML pages must include at least one checkout binding."
+                "HTML deploy sales pages must include at least one checkout binding."
             )
 
-    return manifest.model_dump(mode="json")
+    return manifest.model_dump(mode="json", exclude_none=True)
 
 
 def build_imported_html_generation_context(
@@ -442,6 +546,8 @@ def build_imported_html_generation_context(
         )
     return {
         "schemaVersion": IMPORTED_HTML_INSTRUMENTATION_SCHEMA_VERSION,
+        "supportedHtmlArtifactKinds": ["listicle", "listicle_hybrid", "quiz", "sales"],
+        "defaultHtmlArtifactKind": "sales" if current_page_stage == "sales" else "listicle",
         "currentPageStage": current_page_stage,
         "currentPageId": current_page_id,
         "nextPageId": next_page_id,

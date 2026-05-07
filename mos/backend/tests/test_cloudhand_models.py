@@ -231,7 +231,7 @@ def test_funnel_artifact_source_allows_standalone_render_mode_without_runtime_di
     payload["source_ref"] = {
         "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         "upstream_api_base_root": "https://moshq.app/api/",
-        "artifact_render_mode": "standalone_imported_html",
+        "artifact_render_mode": "html_deploy",
         "artifact": {
             "meta": {
                 "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
@@ -282,5 +282,5 @@ def test_funnel_artifact_source_allows_standalone_render_mode_without_runtime_di
     app = ApplicationSpec.model_validate(payload)
     assert app.source_type == ApplicationSourceType.FUNNEL_ARTIFACT
     assert app.source_ref is not None
-    assert app.source_ref.artifact_render_mode.value == "standalone_imported_html"
+    assert app.source_ref.artifact_render_mode.value == "html_deploy"
     assert app.source_ref.runtime_dist_path == "mos/frontend/dist"

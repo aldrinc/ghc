@@ -60,7 +60,9 @@ _PUBLIC_ASSET_URL_PREFIXES = (
     "api/public/assets/",
 )
 _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE = "runtime_bundle"
-_FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML = "standalone_imported_html"
+_FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY = "html_deploy"
+_FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML = _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY
+_FUNNEL_ARTIFACT_RENDER_MODE_LEGACY_STANDALONE_IMPORTED_HTML = "standalone_imported_html"
 _PUBLIC_ASSET_URL_IN_TEXT_RE = re.compile(
     r"(?i)(?:https?://[^\s\"'<>]+)?/?(?:api/)?public/assets/[^\s\"'<>?#]+"
 )
@@ -275,7 +277,7 @@ def _require_standalone_upstream_api_origin(*, upstream_api_base_url: str) -> st
         raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
     if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
         raise DeployError(
-            "Standalone imported HTML deploys require deploy.upstreamApiBaseUrl to be an origin URL without a path, "
+            "HTML deploy flow requires deploy.upstreamApiBaseUrl to be an origin URL without a path, "
             f"for example 'https://api.example.com'; got '{normalized}'."
         )
     return f"{parsed.scheme}://{parsed.netloc}"
@@ -851,10 +853,11 @@ def build_funnel_publication_workload_patch(
     normalized_render_mode = str(artifact_render_mode or "").strip().lower()
     if normalized_render_mode not in {
         _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE,
-        _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML,
+        _FUNNEL_ARTIFACT_RENDER_MODE_HTML_DEPLOY,
     }:
         raise DeployError(
-            "Deploy renderMode must be 'runtime_bundle' or 'standalone_imported_html'."
+            "Deploy renderMode must be 'runtime_bundle' or 'html_deploy'. "
+            "Legacy 'standalone_imported_html' plans must be rebuilt through the HTML deploy flow."
         )
 
     if normalized_render_mode == _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML:
@@ -2113,6 +2116,12 @@ def _artifact_payload_supports_standalone_imported_html(*, artifact_payload: dic
     return True
 
 
+def _artifact_payload_supports_html_deploy(*, artifact_payload: dict[str, Any]) -> bool:
+    return _artifact_payload_supports_standalone_imported_html(
+        artifact_payload=artifact_payload
+    )
+
+
 def _resolve_publish_job_artifact_render_mode(
     *,
     artifact_payload: dict[str, Any],
@@ -2124,7 +2133,7 @@ def _resolve_publish_job_artifact_render_mode(
         return (
             normalized_requested_mode or _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
         )
-    if _artifact_payload_supports_standalone_imported_html(artifact_payload=artifact_payload):
+    if _artifact_payload_supports_html_deploy(artifact_payload=artifact_payload):
         return _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
     return _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
 
@@ -2440,6 +2449,11 @@ def _extract_funnel_tracking_page_entries(
             {
                 "slug": page_slug,
                 "stage": page_stage,
+                "html_artifact_kind": (
+                    str(manifest.get("htmlArtifactKind") or "").strip()
+                    if isinstance(manifest, dict)
+                    else ""
+                ),
                 "page_id": page_id,
                 "payload": page_payload,
                 "manifest": manifest,
@@ -2483,8 +2497,10 @@ def _build_expected_tracking_events(
             "Entered Funnel",
             "PageView",
             "EnteredPresales",
+            "Entered Presales Page",
             "PreSalesToSalesClick",
             "PageView",
+            "Entered Sales Page",
             "EnteredSales",
         ]
         posthog_events = [
@@ -2501,6 +2517,7 @@ def _build_expected_tracking_events(
         meta_events = [
             "Entered Funnel",
             "PageView",
+            "Entered Sales Page",
             "ViewContent",
         ]
         posthog_events = [
@@ -2515,6 +2532,8 @@ def _build_expected_tracking_events(
     if "sales_to_checkout_click" in checkout_event_type_set:
         internal_events.append("sales_to_checkout_click")
         meta_events.append("AddToCart")
+        meta_events.append("SalesToCheckoutClick")
+        meta_events.append("SalesToCheckoutClicked")
         posthog_events.append("sales_to_checkout_click")
     if "checkout_started" in checkout_event_type_set:
         internal_events.append("checkout_started")
@@ -3154,7 +3173,16 @@ async def _run_funnel_tracking_post_deploy_validation(
         expected_posthog_events.extend(path_plan["expected_posthog_events"])
 
     return {
+        "schemaVersion": "html-deploy-v1",
         "origin": validation_plan["origin"],
+        "renderMode": validation_plan["render_mode"],
+        "artifactKinds": sorted(
+            {
+                str(page.get("html_artifact_kind") or "").strip()
+                for page in validation_plan["pages_to_validate"]
+                if str(page.get("html_artifact_kind") or "").strip()
+            }
+        ),
         "salesUrl": validation_plan["sales_page"]["url"],
         "validatedPageUrls": [page["url"] for page in validation_plan["pages_to_validate"]],
         "validatedPaths": path_results,
@@ -3974,7 +4002,7 @@ def _materialize_funnel_artifacts_for_apply(
             if not raw_render_mode:
                 inferred_render_mode = (
                     _FUNNEL_ARTIFACT_RENDER_MODE_STANDALONE_IMPORTED_HTML
-                    if _artifact_payload_supports_standalone_imported_html(
+                    if _artifact_payload_supports_html_deploy(
                         artifact_payload=artifact_payload
                     )
                     else _FUNNEL_ARTIFACT_RENDER_MODE_RUNTIME_BUNDLE
@@ -5511,15 +5539,15 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     job["phase"] = "validating_tracking"
                     job["result"] = result_payload
                     _write_json_atomic(path, job)
-                    deploy_response["trackingValidation"] = (
-                        await _run_funnel_tracking_post_deploy_validation(
-                            artifact_payload=hydrated_artifact_payload,
-                            funnel_id=funnel_id,
-                            publication_id=publication_id,
-                            access_urls=access_urls,
-                            render_mode=hydrated_artifact_render_mode,
-                        )
+                    html_deploy_validation_report = await _run_funnel_tracking_post_deploy_validation(
+                        artifact_payload=hydrated_artifact_payload,
+                        funnel_id=funnel_id,
+                        publication_id=publication_id,
+                        access_urls=access_urls,
+                        render_mode=hydrated_artifact_render_mode,
                     )
+                    deploy_response["trackingValidation"] = html_deploy_validation_report
+                    deploy_response["htmlDeployValidationReport"] = html_deploy_validation_report
 
                 result_payload["deploy"] = deploy_response
         finally:
