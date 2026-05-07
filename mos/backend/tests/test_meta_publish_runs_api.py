@@ -1272,6 +1272,12 @@ def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
             }
             rules = asset_feed_spec["asset_customization_rules"]
             assert len(rules) == 3
+            square_rule = next(
+                rule
+                for rule in rules
+                if rule.get("customization_spec", {}).get("facebook_positions")
+                == ["feed", "marketplace", "search", "right_hand_column"]
+            )
             story_rule = next(
                 rule
                 for rule in rules
@@ -1281,12 +1287,13 @@ def test_publish_meta_run_groups_multi_aspect_variants_into_one_meta_ad(
                 rule
                 for rule in rules
                 if rule.get("customization_spec", {}).get("facebook_positions")
-                == ["feed", "marketplace", "search", "video_feeds", "profile_feed"]
+                == ["video_feeds", "profile_feed"]
             )
-            default_rule = next(rule for rule in rules if rule.get("is_default") is True)
+            assert square_rule["customization_spec"]["audience_network_positions"] == ["classic"]
+            assert feed_rule["customization_spec"]["audience_network_positions"] == ["instream_video"]
             assert label_to_hash[story_rule["image_label"]["name"]] == "hash_9x16"
             assert label_to_hash[feed_rule["image_label"]["name"]] == "hash_4x5"
-            assert label_to_hash[default_rule["image_label"]["name"]] == "hash_square"
+            assert label_to_hash[square_rule["image_label"]["name"]] == "hash_square"
             return {"id": "meta_creative_multi_aspect"}
 
         def create_ad(self, **kwargs):

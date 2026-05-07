@@ -182,6 +182,23 @@ _META_MULTI_ASPECT_ALLOWED_RATIOS = ("1:1", "4:5", "9:16")
 _META_MULTI_ASPECT_DEFAULT_RATIO = "1:1"
 _META_MULTI_ASPECT_FEED_RATIO = "4:5"
 _META_MULTI_ASPECT_STORY_RATIO = "9:16"
+_META_MULTI_ASPECT_SQUARE_RULE = {
+    "publisher_platforms": ["facebook", "audience_network"],
+    "facebook_positions": ["feed", "marketplace", "search", "right_hand_column"],
+    "audience_network_positions": ["classic"],
+}
+_META_MULTI_ASPECT_FEED_RULE = {
+    "publisher_platforms": ["facebook", "instagram", "audience_network"],
+    "facebook_positions": ["video_feeds", "profile_feed"],
+    "instagram_positions": ["stream", "explore", "explore_home", "profile_feed", "ig_search"],
+    "audience_network_positions": ["instream_video"],
+}
+_META_MULTI_ASPECT_STORY_RULE = {
+    "publisher_platforms": ["facebook", "instagram", "messenger"],
+    "facebook_positions": ["story", "facebook_reels", "facebook_reels_overlay"],
+    "instagram_positions": ["story", "reels"],
+    "messenger_positions": ["story"],
+}
 
 class _MetaEventMappingsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -765,41 +782,16 @@ def _multi_aspect_creative_payload(
         "link_urls": [{"website_url": link_url}],
         "asset_customization_rules": [
             {
-                "customization_spec": {
-                    "publisher_platforms": ["facebook", "instagram", "messenger"],
-                    "facebook_positions": [
-                        "story",
-                        "facebook_reels",
-                        "facebook_reels_overlay",
-                    ],
-                    "instagram_positions": ["story", "reels"],
-                    "messenger_positions": ["story"],
-                },
-                "image_label": {"name": story_variant["label"]},
+                "customization_spec": dict(_META_MULTI_ASPECT_SQUARE_RULE),
+                "image_label": {"name": default_variant["label"]},
             },
             {
-                "customization_spec": {
-                    "publisher_platforms": ["facebook", "instagram"],
-                    "facebook_positions": [
-                        "feed",
-                        "marketplace",
-                        "search",
-                        "video_feeds",
-                        "profile_feed",
-                    ],
-                    "instagram_positions": [
-                        "stream",
-                        "explore",
-                        "explore_home",
-                        "profile_feed",
-                        "ig_search",
-                    ],
-                },
+                "customization_spec": dict(_META_MULTI_ASPECT_FEED_RULE),
                 "image_label": {"name": feed_variant["label"]},
             },
             {
-                "is_default": True,
-                "image_label": {"name": default_variant["label"]},
+                "customization_spec": dict(_META_MULTI_ASPECT_STORY_RULE),
+                "image_label": {"name": story_variant["label"]},
             },
         ],
     }
